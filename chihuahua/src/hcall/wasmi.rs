@@ -27,8 +27,9 @@ use crate::{
     hcall::common::{
         sha_256_digest, Chihuahua, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
         HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
-        HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_READ_INPUT_NAME,
-        HCALL_WRITE_OUTPUT_NAME,
+        HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_PREVIOUS_RESULT_SIZE_NAME,
+        HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME, HCALL_READ_STREAM_NAME,
+        HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME, HCALL_WRITE_OUTPUT_NAME,
     },
 };
 
@@ -60,6 +61,16 @@ const HCALL_READ_INPUT_CODE: usize = 2;
 const HCALL_WRITE_OUTPUT_CODE: usize = 3;
 /// H-call code for the `__veracruz_hcall_getrandom` H-call.
 const HCALL_GETRANDOM_CODE: usize = 4;
+/// H-call code for the `__veracruz_hcall_read_previous_result` H-call.
+const HCALL_READ_PREVIOUS_RESULT_CODE: usize = 5;
+/// H-call code for the `__veracruz_hcall_previous_result_size` H-call.
+const HCALL_PREVIOUS_RESULT_SIZE_CODE: usize = 6;
+/// H-call code for the `__veracruz_hcall_stream_count` H-call.
+const HCALL_STREAM_COUNT_CODE: usize = 7;
+/// H-call code for the `__veracruz_hcall_stream_size` H-call.
+const HCALL_STREAM_SIZE_CODE: usize = 8;
+/// H-call code for the `__veracruz_hcall_read_stream` H-call.
+const HCALL_READ_STREAM_CODE: usize = 9;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Function well-formedness checks.
@@ -125,21 +136,78 @@ fn check_getrandom_signature(signature: &Signature) -> bool {
         && signature.return_type() == Some(ValueType::I32)
 }
 
+/// Checks the function signature `signature` has the correct type for the
+/// `__veracruz_hcall_previous_result_size()` function.  This is:
+///
+///     enum veracruz_status_t __veracruz_hcall_previous_result_size(uint8_t* buffer)
+#[inline]
+fn check_previous_result_size_signature(signature: &Signature) -> bool {
+    signature.params() == [ValueType::I32] && signature.return_type() == Some(ValueType::I32)
+}
+
+/// Checks the function signature `signature` has the correct type for the
+/// `__veracruz_hcall_stream_count()` function.  This is:
+///
+/// ```C
+///     uint32_t __veracruz_hcall_stream_count(void)
+/// ```
+///
+#[inline]
+fn check_stream_count_signature(signature: &Signature) -> bool {
+    signature.params() == [ValueType::I32] && signature.return_type() == Some(ValueType::I32)
+}
+
+/// Checks the function signature `signature` has the correct type for the
+/// `__veracruz_hcall_stream_size()` function.  This is:
+///
+/// ```C
+///     enum veracruz_status_t __veracruz_hcall_stream_size(uint32_t ix, uint32_t *sz)
+/// ```
+#[inline]
+fn check_stream_size_signature(signature: &Signature) -> bool {
+    signature.params() == [ValueType::I32, ValueType::I32]
+        && signature.return_type() == Some(ValueType::I32)
+}
+
+/// Checks the function signature `signature` has the correct type for the
+/// `__veracruz_hcall_read_stream()` function.  This is:
+///
+/// ```C
+///     enum veracruz_status_t __veracruz_hcall_read_stream(uint32_t ix, uint8_t* buffer, uint32_t sz)
+/// ```
+#[inline]
+fn check_read_stream_signature(signature: &Signature) -> bool {
+    signature.params() == [ValueType::I32, ValueType::I32, ValueType::I32]
+        && signature.return_type() == Some(ValueType::I32)
+}
+
+/// Checks the function signature `signature` has the correct type for the
+/// `__veracruz_hcall_read_previous_result()` function.  This is:
+///
+/// ```C
+///     enum veracruz_status_t __veracruz_hcall_read_previous_result(uint8_t* buffer, uint32_t sz)
+/// ```
+#[inline]
+fn check_read_previous_result_signature(signature: &Signature) -> bool {
+    signature.params() == [ValueType::I32, ValueType::I32]
+        && signature.return_type() == Some(ValueType::I32)
+}
+
 /// Checks the function signature, `signature`, has the correct type for the
 /// H-call coded by `index`.
 fn check_signature(index: usize, signature: &Signature) -> bool {
-    if index == HCALL_INPUT_COUNT_CODE {
-        check_input_count_signature(signature)
-    } else if index == HCALL_INPUT_SIZE_CODE {
-        check_input_size_signature(signature)
-    } else if index == HCALL_READ_INPUT_CODE {
-        check_read_input_signature(signature)
-    } else if index == HCALL_WRITE_OUTPUT_CODE {
-        check_write_output_signature(signature)
-    } else if index == HCALL_GETRANDOM_CODE {
-        check_getrandom_signature(signature)
-    } else {
-        false
+    match index {
+        HCALL_INPUT_COUNT_CODE => check_input_count_signature(signature),
+        HCALL_INPUT_SIZE_CODE => check_input_size_signature(signature),
+        HCALL_READ_INPUT_CODE => check_read_input_signature(signature),
+        HCALL_WRITE_OUTPUT_CODE => check_write_output_signature(signature),
+        HCALL_GETRANDOM_CODE => check_getrandom_signature(signature),
+        HCALL_READ_PREVIOUS_RESULT_CODE => check_read_previous_result_signature(signature),
+        HCALL_PREVIOUS_RESULT_SIZE_CODE => check_previous_result_size_signature(signature),
+        HCALL_STREAM_COUNT_CODE => check_stream_count_signature(signature),
+        HCALL_STREAM_SIZE_CODE => check_stream_size_signature(signature),
+        HCALL_READ_STREAM_CODE => check_read_stream_signature(signature),
+        _otherwise => false,
     }
 }
 
@@ -196,6 +264,11 @@ impl ModuleImportResolver for WasmiHostProvisioningState {
             HCALL_READ_INPUT_NAME => HCALL_READ_INPUT_CODE,
             HCALL_WRITE_OUTPUT_NAME => HCALL_WRITE_OUTPUT_CODE,
             HCALL_GETRANDOM_NAME => HCALL_GETRANDOM_CODE,
+            HCALL_READ_PREVIOUS_RESULT_NAME => HCALL_READ_PREVIOUS_RESULT_CODE,
+            HCALL_PREVIOUS_RESULT_SIZE_NAME => HCALL_PREVIOUS_RESULT_SIZE_CODE,
+            HCALL_STREAM_COUNT_NAME => HCALL_STREAM_COUNT_CODE,
+            HCALL_STREAM_SIZE_NAME => HCALL_STREAM_SIZE_CODE,
+            HCALL_READ_STREAM_NAME => HCALL_READ_STREAM_CODE,
             otherwise => {
                 return Err(Error::Instantiation(format!(
                     "Unknown function export '{}' with signature '{:?}'.",
@@ -274,6 +347,26 @@ impl Externals for WasmiHostProvisioningState {
                 Ok(return_code) => mk_error_code(return_code),
                 Err(host_trap) => mk_host_trap(host_trap),
             },
+            HCALL_STREAM_COUNT_CODE => match self.stream_count(args) {
+                Ok(return_code) => mk_error_code(return_code),
+                Err(host_trap) => mk_host_trap(host_trap),
+            },
+            HCALL_STREAM_SIZE_CODE => match self.stream_size(args) {
+                Ok(return_code) => mk_error_code(return_code),
+                Err(host_trap) => mk_host_trap(host_trap),
+            },
+            HCALL_READ_STREAM_CODE => match self.read_stream(args) {
+                Ok(return_code) => mk_error_code(return_code),
+                Err(host_trap) => mk_host_trap(host_trap),
+            },
+            HCALL_PREVIOUS_RESULT_SIZE_CODE => match self.previous_result_size(args) {
+                Ok(return_code) => mk_error_code(return_code),
+                Err(host_trap) => mk_host_trap(host_trap),
+            },
+            HCALL_READ_PREVIOUS_RESULT_CODE => match self.previous_result(args) {
+                Ok(return_code) => mk_error_code(return_code),
+                Err(host_trap) => mk_host_trap(host_trap),
+            },
             otherwise => mk_host_trap(FatalHostError::UnknownHostFunction { index: otherwise }),
         }
     }
@@ -314,7 +407,11 @@ impl WasmiHostProvisioningState {
                         self.set_program_digest(&sha_256_digest(buffer));
 
                         if self.get_expected_data_source_count() == 0 {
-                            self.set_ready_to_execute();
+                            if self.get_expected_stream_source_count() == 0 {
+                                self.set_ready_to_execute();
+                            } else {
+                                self.set_stream_sources_loading();
+                            }
                         } else {
                             self.set_data_sources_loading();
                         }
@@ -467,6 +564,161 @@ impl WasmiHostProvisioningState {
                     Ok(VeracruzError::Success)
                 }
             },
+        }
+    }
+
+    /// The WASMI implementation of `__veracruz_hcall_stream_count()`.
+    fn stream_count(&mut self, args: RuntimeArgs) -> HCallError {
+        if args.len() != 1 {
+            return Err(FatalHostError::BadArgumentsToHostFunction {
+                function_name: HCALL_STREAM_COUNT_NAME.to_string(),
+            });
+        }
+
+        let address: u32 = args.nth(0);
+        let result = self.get_current_stream_source_count() as u32;
+
+        match self.get_memory() {
+            None => Err(FatalHostError::NoMemoryRegistered),
+            Some(memory) => {
+                if let Err(_) = memory.set_value(address, result) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: std::mem::size_of::<u32>(),
+                    });
+                }
+
+                Ok(VeracruzError::Success)
+            }
+        }
+    }
+
+    /// The WASMI implementation of `__veracruz_hcall_stream_size()`.
+    fn stream_size(&mut self, args: RuntimeArgs) -> HCallError {
+        if args.len() != 2 {
+            return Err(FatalHostError::BadArgumentsToHostFunction {
+                function_name: HCALL_STREAM_SIZE_NAME.to_string(),
+            });
+        }
+
+        let index: u32 = args.nth(0);
+        let address: u32 = args.nth(1);
+
+        match self.get_memory() {
+            None => Err(FatalHostError::NoMemoryRegistered),
+            Some(memory) => match self.get_current_stream_source(index as usize) {
+                None => return Ok(VeracruzError::BadStream),
+                Some(frame) => {
+                    let result = frame.get_data().len() as u32;
+                    let result: Vec<u8> = result.to_le_bytes().to_vec();
+
+                    if let Err(_) = memory.set(address, &result) {
+                        return Err(FatalHostError::MemoryWriteFailed {
+                            memory_address: address as usize,
+                            bytes_to_be_written: result.len() as usize,
+                        });
+                    }
+
+                    Ok(VeracruzError::Success)
+                }
+            },
+        }
+    }
+
+    /// The WASMI implementation of `__veracruz_hcall_stream_input()`.
+    fn read_stream(&mut self, args: RuntimeArgs) -> HCallError {
+        if args.len() != 3 {
+            return Err(FatalHostError::BadArgumentsToHostFunction {
+                function_name: HCALL_READ_STREAM_NAME.to_string(),
+            });
+        }
+
+        let index: u32 = args.nth(0);
+        let address: u32 = args.nth(1);
+        let size: u32 = args.nth(2);
+
+        match self.get_memory() {
+            None => Err(FatalHostError::NoMemoryRegistered),
+            Some(memory) => match self.get_current_stream_source(index as usize) {
+                None => return Ok(VeracruzError::BadStream),
+                Some(frame) => {
+                    let data = frame.get_data();
+
+                    if data.len() > size as usize {
+                        return Ok(VeracruzError::StreamSourceSize);
+                    }
+
+                    if let Err(_) = memory.set(address, data) {
+                        return Err(FatalHostError::MemoryWriteFailed {
+                            memory_address: address as usize,
+                            bytes_to_be_written: data.len(),
+                        });
+                    }
+
+                    Ok(VeracruzError::Success)
+                }
+            },
+        }
+    }
+
+    /// The WASMI implementation of the `__veracruz_hcall_previous_result_size()`.
+    fn previous_result_size(&mut self, args: RuntimeArgs) -> HCallError {
+        if args.len() != 1 {
+            return Err(FatalHostError::BadArgumentsToHostFunction {
+                function_name: HCALL_PREVIOUS_RESULT_SIZE_NAME.to_string(),
+            });
+        }
+
+        let address: u32 = args.nth(0);
+
+        match self.get_memory() {
+            None => Err(FatalHostError::NoMemoryRegistered),
+            Some(memory) => {
+                let previous_result = self.get_previous_result();
+                let encoded_previous_result = pinecone::to_vec(&previous_result)?;
+                let encoded_previous_result_size = encoded_previous_result.len() as u32;
+                let result: Vec<u8> = encoded_previous_result_size.to_le_bytes().to_vec();
+
+                if let Err(_) = memory.set(address, &result) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: result.len() as usize,
+                    });
+                }
+                Ok(VeracruzError::Success)
+            }
+        }
+    }
+
+    /// The WASMI implementation of the `__veracruz_hcall_read_previous_result()`.
+    fn previous_result(&mut self, args: RuntimeArgs) -> HCallError {
+        if args.len() != 2 {
+            return Err(FatalHostError::BadArgumentsToHostFunction {
+                function_name: HCALL_READ_PREVIOUS_RESULT_NAME.to_string(),
+            });
+        }
+
+        let address: u32 = args.nth(0);
+        let size: u32 = args.nth(1);
+
+        match self.get_memory() {
+            None => Err(FatalHostError::NoMemoryRegistered),
+            Some(memory) => {
+                let previous_result = self.get_previous_result();
+                let encoded_previous_result = pinecone::to_vec(&previous_result)?;
+
+                if encoded_previous_result.len() > size as usize {
+                    return Ok(VeracruzError::PreviousResultSize);
+                }
+
+                if let Err(_) = memory.set(address, &encoded_previous_result) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: encoded_previous_result.len(),
+                    });
+                }
+                Ok(VeracruzError::Success)
+            }
         }
     }
 
@@ -635,6 +887,14 @@ impl Chihuahua for WasmiHostProvisioningState {
     }
 
     #[inline]
+    fn add_new_stream_source(
+        &mut self,
+        metadata: DataSourceMetadata,
+    ) -> Result<(), HostProvisioningError> {
+        self.add_new_stream_source(metadata)
+    }
+
+    #[inline]
     fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
         self.invoke_entry_point()
     }
@@ -680,6 +940,21 @@ impl Chihuahua for WasmiHostProvisioningState {
     }
 
     #[inline]
+    fn get_current_stream_source_count(&self) -> usize {
+        self.get_current_stream_source_count().clone()
+    }
+
+    #[inline]
+    fn get_expected_stream_sources(&self) -> Vec<u64> {
+        self.get_expected_stream_sources().clone()
+    }
+
+    #[inline]
+    fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
+        self.set_previous_result(result);
+    }
+
+    #[inline]
     fn get_result(&self) -> Option<Vec<u8>> {
         self.get_result().map(|r| r.clone())
     }
@@ -692,6 +967,11 @@ impl Chihuahua for WasmiHostProvisioningState {
     #[inline]
     fn set_expected_data_sources(&mut self, sources: &[u64]) {
         self.set_expected_data_sources(sources);
+    }
+
+    #[inline]
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) {
+        self.set_expected_stream_sources(sources);
     }
 
     #[inline]

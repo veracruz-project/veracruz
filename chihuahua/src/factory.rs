@@ -67,6 +67,7 @@ pub enum ExecutionStrategy {
 pub fn single_threaded_chihuahua(
     strategy: &ExecutionStrategy,
     expected_data_sources: &[u64],
+    expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
 ) -> Option<Box<dyn Chihuahua + 'static>> {
     #[cfg(feature = "std")]
@@ -75,11 +76,13 @@ pub fn single_threaded_chihuahua(
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
                 state.set_expected_data_sources(expected_data_sources);
+                state.set_expected_stream_sources(expected_stream_sources);
                 state.set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
             }
             ExecutionStrategy::JIT => {
+                //TODO change the initialize
                 wasmtime::initialize(expected_data_sources, expected_shutdown_sources);
 
                 Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
@@ -92,6 +95,7 @@ pub fn single_threaded_chihuahua(
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
                 state.set_expected_data_sources(expected_data_sources);
+                state.set_expected_stream_sources(expected_stream_sources);
                 state.set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
@@ -112,6 +116,7 @@ pub fn single_threaded_chihuahua(
 pub fn multi_threaded_chihuahua(
     strategy: &ExecutionStrategy,
     expected_data_sources: &[u64],
+    expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
 ) -> Option<Arc<Mutex<dyn Chihuahua + 'static>>> {
     #[cfg(feature = "std")]
@@ -120,11 +125,13 @@ pub fn multi_threaded_chihuahua(
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
                 state.set_expected_data_sources(expected_data_sources);
+                state.set_expected_stream_sources(expected_stream_sources);
                 state.set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(state)))
             }
             ExecutionStrategy::JIT => {
+                //TODO change the initialize
                 wasmtime::initialize(expected_data_sources, expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(
@@ -139,6 +146,7 @@ pub fn multi_threaded_chihuahua(
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
                 state.set_expected_data_sources(expected_data_sources);
+                state.set_expected_stream_sources(expected_stream_sources);
                 state.set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(state)))

@@ -194,6 +194,16 @@ pub fn serialize_request_enclave_state() -> ColimaResult {
     Ok(request.write_to_bytes()?)
 }
 
+pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> ColimaResult {
+    let mut data = colima::Data::new();
+    data.set_data(data_buffer.to_vec());
+    data.set_package_id(package_id);
+    let mut colima = colima::MexicoCityRequest::new();
+    colima.set_stream(data);
+
+    Ok(colima.write_to_bytes()?)
+}
+
 pub fn serialize_request_result() -> ColimaResult {
     let command = colima::RequestResult::new();
     let mut request = colima::MexicoCityRequest::new();
@@ -215,6 +225,14 @@ pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> Colima
     rpat.set_challenge(challenge.to_vec());
     let mut request = colima::MexicoCityRequest::new();
     request.set_request_proxy_psa_attestation_token(rpat);
+
+    Ok(request.write_to_bytes()?)
+}
+
+pub fn serialize_request_next_round() -> ColimaResult {
+    let command = colima::RequestNextRound::new();
+    let mut request = colima::MexicoCityRequest::new();
+    request.set_request_next_round(command);
 
     Ok(request.write_to_bytes()?)
 }

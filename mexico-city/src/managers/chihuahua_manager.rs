@@ -10,20 +10,21 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#[cfg(feature = "tz")]
-use std::sync::Mutex;
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
-use core::convert::{TryFrom, TryInto};
-use std::{collections::HashMap, result::Result, vec::Vec};
-use lazy_static::lazy_static;
+use super::{
+    buffer::MexicoCityBuffer, MexicoCityError, ProtocolState, ProvisioningResponse,
+    ProvisioningResult,
+};
 use chihuahua::hcall::common::{DataSourceMetadata, LifecycleState};
 use colima::colima::{
     MexicoCityRequest as REQUEST, MexicoCityRequest_oneof_message_oneof as MESSAGE,
 };
+use lazy_static::lazy_static;
+#[cfg(feature = "tz")]
+use std::sync::Mutex;
+#[cfg(feature = "sgx")]
+use std::sync::SgxMutex as Mutex;
+use std::{collections::HashMap, result::Result, vec::Vec};
 use veracruz_utils::VeracruzRole;
-
-use super::{MexicoCityError, ProtocolState, ProvisioningResponse, ProvisioningResult};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The buffer of incoming data.
@@ -31,6 +32,7 @@ use super::{MexicoCityError, ProtocolState, ProvisioningResponse, ProvisioningRe
 
 lazy_static! {
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
+    static ref PROG_AND_DATA_BUFFER: Mutex<MexicoCityBuffer> = Mutex::new(MexicoCityBuffer::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -200,6 +202,9 @@ fn dispatch_on_program(
     protocol_state: &ProtocolState,
     colima::Program { code, .. }: colima::Program,
 ) -> ProvisioningResult {
+    // Buffer the program, it will be used in batch process
+    PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice());
+
     if check_state(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::Initial],
@@ -209,7 +214,7 @@ fn dispatch_on_program(
             // program provisioner can just try again.
             assert!(check_state(
                 &protocol_state.get_lifecycle_state()?,
-                &[LifecycleState::Initial]
+                &[LifecycleState::Error, LifecycleState::Initial]
             ));
 
             Err(reason)
@@ -245,6 +250,9 @@ fn dispatch_on_data(
     }: colima::Data,
     client_id: u64,
 ) -> ProvisioningResult {
+    let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
+    PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame);
+
     if check_state(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::DataSourcesLoading],
@@ -270,6 +278,55 @@ fn dispatch_on_data(
                 &protocol_state.get_lifecycle_state()?,
                 &[
                     LifecycleState::DataSourcesLoading,
+                    LifecycleState::StreamSourcesLoading,
+                    LifecycleState::ReadyToExecute,
+                ]
+            ));
+
+            let response = colima::serialize_result(colima::ResponseStatus::SUCCESS as i32, None)?;
+            Ok(ProvisioningResponse::Success { response })
+        }
+    } else {
+        response_not_ready()
+    }
+}
+
+//TODO CHANGE to match the new structure
+/// We must be in the correct data sources loading state to be able to continue
+/// provisioning data into the machine.  Check this now to avoid nasty runtime
+/// failures...
+fn dispatch_on_stream(
+    protocol_state: &ProtocolState,
+    colima::Data {
+        data, package_id, ..
+    }: colima::Data,
+    client_id: u64,
+) -> ProvisioningResult {
+    if check_state(
+        &protocol_state.get_lifecycle_state()?,
+        &[LifecycleState::StreamSourcesLoading],
+    ) {
+        let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
+
+        if let Err(error) = protocol_state.add_new_stream_source(frame) {
+            // If something critical went wrong (e.g. all data was provisioned,
+            // but the platform couldn't sort the incoming data for some reason
+            // then we should be in an error state, otherwise we remain in the
+            // same state.
+
+            assert!(check_state(
+                &protocol_state.get_lifecycle_state()?,
+                &[LifecycleState::Error, LifecycleState::StreamSourcesLoading]
+            ));
+
+            Err(error)
+        } else {
+            // We either stay in the same state, or progress to ready to execute
+            // if all data is now available.
+            assert!(check_state(
+                &protocol_state.get_lifecycle_state()?,
+                &[
+                    LifecycleState::StreamSourcesLoading,
                     LifecycleState::ReadyToExecute
                 ]
             ));
@@ -280,6 +337,44 @@ fn dispatch_on_data(
     } else {
         response_not_ready()
     }
+}
+
+fn dispatch_on_next_round(
+    protocol_state: &mut ProtocolState,
+) -> (Option<ProtocolState>, ProvisioningResult) {
+    let lifecycle_state = match protocol_state.get_lifecycle_state() {
+        Ok(o) => o,
+        Err(e) => return (None, Err(e)),
+    };
+    if check_state(&lifecycle_state, &[LifecycleState::FinishedExecuting]) {
+        match reload(protocol_state) {
+            Ok(o) => (
+                Some(o),
+                Ok(ProvisioningResponse::Success {
+                    response: response_success(None),
+                }),
+            ),
+            Err(e) => (None, Err(e)),
+        }
+    } else {
+        (None, response_not_ready())
+    }
+}
+
+/// Allocate a new protocol state
+fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, MexicoCityError> {
+    let mut new_protocol_state = ProtocolState::new(
+        old_protocol_state.get_policy().clone(),
+        format!("{}", old_protocol_state.get_policy_hash()),
+    )?;
+    new_protocol_state.set_previous_result(&old_protocol_state.get_result()?)?;
+    let buffer = PROG_AND_DATA_BUFFER.lock()?;
+    new_protocol_state.load_program(buffer.get_program()?)?;
+    let all_data = buffer.all_data()?;
+    for data in all_data {
+        new_protocol_state.add_new_data_source(data)?;
+    }
+    Ok(new_protocol_state)
 }
 
 /// Branches on a decoded protobuf message, `request`, and invokes appropriate
@@ -334,6 +429,22 @@ fn dispatch_on_request(
                     *protocol_state_guard = None;
                 }
 
+                response
+            } else {
+                response_invalid_role()
+            }
+        }
+        MESSAGE::stream(stream) => {
+            if check_roles(roles, &vec![veracruz_utils::VeracruzRole::DataProvider]) {
+                dispatch_on_stream(protocol_state, stream, client_id)
+            } else {
+                response_invalid_role()
+            }
+        }
+        MESSAGE::request_next_round(_) => {
+            if check_roles(roles, &vec![veracruz_utils::VeracruzRole::ResultReader]) {
+                let (new_protocol_state, response) = dispatch_on_next_round(protocol_state);
+                *protocol_state_guard = new_protocol_state;
                 response
             } else {
                 response_invalid_role()

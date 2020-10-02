@@ -103,7 +103,11 @@ impl WasmtimeHostProvisioningState {
             self.set_program_digest(&sha_256_digest(buffer));
 
             if self.get_expected_data_source_count() == 0 {
-                self.set_ready_to_execute();
+                if self.get_expected_stream_source_count() == 0 {
+                    self.set_ready_to_execute();
+                } else {
+                    self.set_stream_sources_loading();
+                }
             } else {
                 self.set_data_sources_loading();
             }
@@ -528,6 +532,17 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
     }
 
     #[inline]
+    fn add_new_stream_source(
+        &mut self,
+        metadata: DataSourceMetadata,
+    ) -> Result<(), HostProvisioningError> {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .add_new_stream_source(metadata)
+    }
+
+    #[inline]
     fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
         invoke_entry_point()
             //TODO: Change the error of invoke_entry_point to FatalHostError.
@@ -603,6 +618,24 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
     }
 
     #[inline]
+    fn get_current_stream_source_count(&self) -> usize {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .get_current_stream_source_count()
+            .clone()
+    }
+
+    #[inline]
+    fn get_expected_stream_sources(&self) -> Vec<u64> {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .get_expected_stream_sources()
+            .clone()
+    }
+
+    #[inline]
     fn get_expected_shutdown_sources(&self) -> Vec<u64> {
         HOST_PROVISIONING_STATE
             .lock()
@@ -621,6 +654,14 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
     }
 
     #[inline]
+    fn set_previous_result(&mut self, sources: &Option<Vec<u8>>) {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .set_previous_result(sources);
+    }
+
+    #[inline]
     fn get_program_digest(&self) -> Option<Vec<u8>> {
         HOST_PROVISIONING_STATE
             .lock()
@@ -635,6 +676,14 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
             .set_expected_data_sources(sources);
+    }
+
+    #[inline]
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .set_expected_stream_sources(sources);
     }
 
     #[inline]

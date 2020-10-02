@@ -119,6 +119,9 @@ pub enum VeracruzRole {
     DataProvider,
     /// The principal is capable of retrieving the result of the computation.
     ResultReader,
+    /// The principal is responsible for providing an input stream package set to the
+    /// computation.
+    StreamProvider,
 }
 
 /// A notion of identitity for Veracruz principals.
@@ -322,6 +325,13 @@ pub struct VeracruzPolicy {
     debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
+    /// The declared ordering of stream package data inputs, provided by the various data
+    /// providers, as specified in the policy.  Note that data providers can
+    /// provision their inputs asynchronously, and in an arbitrary order.  Once
+    /// all are provisioned, however, we reorder these inputs into this fixed
+    /// declared order so that the Veracruz host ABI, which allows access to
+    /// inputs via an index, remains well-defined.
+    streaming_order: std::vec::Vec<u64>,
 }
 
 impl VeracruzPolicy {
@@ -335,6 +345,7 @@ impl VeracruzPolicy {
         ciphersuite: String,
         mexico_city_hash: String,
         data_provision_order: Vec<u64>,
+        streaming_order: Vec<u64>,
         tabasco_url: String,
         pi_hash: String,
         debug: bool,
@@ -351,6 +362,7 @@ impl VeracruzPolicy {
             pi_hash,
             debug,
             execution_strategy,
+            streaming_order,
         };
 
         policy.assert_valid()?;
@@ -404,6 +416,12 @@ impl VeracruzPolicy {
     #[inline]
     pub fn data_provision_order(&self) -> &Vec<u64> {
         &self.data_provision_order
+    }
+
+    /// Returns the fixed stream provisioning order, associated with this policy.
+    #[inline]
+    pub fn stream_provision_order(&self) -> &Vec<u64> {
+        &self.streaming_order
     }
 
     /// Returns the URL of the Tabasco attestation service, associated with this

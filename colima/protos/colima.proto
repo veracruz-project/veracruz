@@ -166,6 +166,9 @@ message ProxyPsaAttestationToken {
 message RequestShutdown {
 }
 
+message RequestNextRound {
+}
+
 message RequestState {
 }
 
@@ -207,6 +210,8 @@ message MexicoCityRequest {
     RequestShutdown request_shutdown = 8;
     PsaAttestationInit psa_attestation_init = 9;
     RequestPolicyHash request_policy_hash = 10;
+    Data stream = 11;
+    RequestNextRound request_next_round = 12;
   }
   uint32 context = 1;
 }
