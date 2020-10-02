@@ -13,9 +13,9 @@
 
 use alloc::vec::Vec;
 use byteorder::{ByteOrder, LittleEndian};
-
 use core::convert::TryFrom;
 use core::fmt;
+use pinecone;
 
 ///////////////////////////////////////////////////////////////////////////////
 // The raw H-call error return type.
@@ -354,6 +354,16 @@ extern "C" {
     /// Fills a buffer with random bytes taken from a platform-specific trusted
     /// entropy source.
     fn __veracruz_hcall_getrandom(buffer: *mut u8, size: u32) -> i32;
+    /// Reads previous result the given buffer
+    fn __veracruz_hcall_read_previous_result(buffer: *mut u8, size: u32) -> i32;
+    /// Reads the size of previous result encoded by pinecone
+    fn __veracruz_hcall_previous_result_size(count: *mut u8) -> i32;
+    /// Returns the number of stream sources that are available to this program
+    fn __veracruz_hcall_stream_count(count: *mut u8) -> i32;
+    /// Returns the size of stream source N, in bytes
+    fn __veracruz_hcall_stream_size(index: u32, size: *mut u8) -> i32;
+    /// Reads stream source N into the given buffer
+    fn __veracruz_hcall_read_stream(index: u32, buffer: *mut u8, size: u32) -> i32;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -502,4 +512,106 @@ pub fn getrandom(buffer: &mut [u8]) -> HCallReturnCode<()> {
     }
 
     lift(retcode, ()).unwrap()
+}
+
+/// Returns the size of previous result
+pub fn previous_result_size() -> HCallReturnCode<u32> {
+    let retcode;
+    let mut buffer = vec![0u8; 4];
+
+    unsafe {
+        retcode = __veracruz_hcall_previous_result_size(buffer.as_mut_ptr() as *mut u8);
+    };
+
+    lift(retcode, LittleEndian::read_u32(&buffer)).unwrap()
+}
+
+/// Reads the previous result, returned Option<Vec<u8>>.
+/// The program is assumed to understand how to parse the array of bytes, wrapped in Some(-)
+/// returned into something more meaningful, e.g. by fixing an assumed encoding
+/// between data source providers and the program owner.
+pub fn read_previous_result() -> HCallReturnCode<Option<Vec<u8>>> {
+    previous_result_size().and_then(|size| {
+        let mut buffer = vec![0u8; size as usize];
+        let retcode;
+
+        unsafe {
+            retcode = __veracruz_hcall_read_previous_result(buffer.as_mut_ptr() as *mut u8, size)
+        };
+
+        let result: Option<Vec<u8>> = pinecone::from_bytes(&buffer).unwrap();
+
+        lift(retcode, result).unwrap()
+    })
+}
+
+/// Returns the number of stream sources that are available to the program.
+///
+/// The H-call does not fail.
+pub fn stream_count() -> u32 {
+    let retcode;
+    let mut buffer = vec![0u8; 4];
+
+    unsafe {
+        retcode = __veracruz_hcall_stream_count(buffer.as_mut_ptr() as *mut u8);
+    };
+
+    assert_eq!(retcode, 0);
+
+    LittleEndian::read_u32(&buffer)
+}
+
+/// Returns the size, in bytes, of the stream source indexed by `index`.
+///
+/// The H-call fails for only the following reasons:
+///
+/// 1. Fails if the `index` value is larger than the number of input sources
+/// available to the program with `HCallReturnCode::ErrorDataSourceCount`.
+pub fn stream_size(index: u32) -> HCallReturnCode<u32> {
+    let retcode;
+    let mut buffer = vec![0u8; 4];
+
+    unsafe { retcode = __veracruz_hcall_stream_size(index, buffer.as_mut_ptr() as *mut u8) };
+
+    lift(retcode, LittleEndian::read_u32(&buffer)).unwrap()
+}
+
+/// Reads a stream source, returned as a vector of `u8` values, indexed by `index`.
+/// The program is assumed to understand how to parse the array of bytes
+/// returned into something more meaningful, e.g. by fixing an assumed encoding
+/// between data source providers and the program owner.
+///
+/// The H-call fails for only the following reasons:
+///
+/// 1. Fails if the `index` value is larger than the number of input sources
+/// available to the program with `HCallReturnCode::ErrorDataSourceCount`.
+pub fn read_stream(index: u32) -> HCallReturnCode<Vec<u8>> {
+    stream_size(index).and_then(|size| {
+        let mut buffer = vec![0u8; size as usize];
+        let retcode;
+
+        unsafe {
+            retcode = __veracruz_hcall_read_stream(index, buffer.as_mut_ptr() as *mut u8, size)
+        };
+
+        lift(retcode, buffer).unwrap()
+    })
+}
+
+/// Reads all streams, returned as a vector of vector of `u8` values.  The
+/// program is assumed to understand how to parse the bytes returned into
+/// something more meaningful, e.g. by fixing an assumed encoding between data
+/// source providers and the program owner.
+///
+/// The H-call does not fail.
+pub fn read_all_streams() -> Vec<Vec<u8>> {
+    let inputs = stream_count();
+    let mut buffer = Vec::new();
+
+    for i in 0..inputs {
+        let input = read_stream(i).expect("read_all_inputs: read_input failed.");
+        buffer.push(input);
+    }
+
+    buffer
 }
