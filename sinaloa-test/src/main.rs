@@ -51,8 +51,9 @@ mod tests {
     // to avoid adding chihuahua as a direct dependency of this crate.
     const ENCLAVE_STATE_INITIAL: u8 = 0;
     const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
-    const ENCLAVE_STATE_READY_TO_EXECUTE: u8 = 2;
-    const ENCLAVE_STATE_FINISHED_EXECUTING: u8 = 3;
+    const ENCLAVE_STATE_STREAM_SOURCE_SLOADING: u8 = 2;
+    const ENCLAVE_STATE_READY_TO_EXECUTE: u8 = 3;
+    const ENCLAVE_STATE_FINISHED_EXECUTING: u8 = 4;
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "../test-collateral/one_data_source_policy.json";
     const GET_RANDOM_POLICY: &'static str = "../test-collateral/get_random_policy.json";
@@ -70,6 +71,8 @@ mod tests {
         "../test-collateral/moving_average_convergence_divergence.json";
     const PRIVATE_SET_INTER_SUM_POLICY: &'static str =
         "../test-collateral/private_set_intersection_sum.json";
+    const NUMBER_STREAM_ACCUMULATION_POLICY: &'static str =
+        "../test-collateral/number-stream-accumulation.json";
     const CLIENT_CERT: &'static str = "../test-collateral/client_rsa_cert.pem";
     const CLIENT_KEY: &'static str = "../test-collateral/client_rsa_key.pem";
     const UNAUTHORIZED_CERT: &'static str = "../test-collateral/data_client_cert.pem";
@@ -123,7 +126,7 @@ mod tests {
         }
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
-            std::env::set_var("RUST_LOG", "debug,actix_server=debug,actix_web=debug");
+            std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Tabasco Server");
                 let server = tabasco::server::server(tabasco_url).unwrap();
@@ -285,6 +288,7 @@ mod tests {
             CLIENT_KEY,
             Some(RANDOM_SOURCE_WASM),
             &[],
+            &[],
             false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -293,8 +297,15 @@ mod tests {
     #[test]
     /// Attempt to fetch the result without program nor data
     fn test_phase2_random_source_no_program_no_data() {
-        let result =
-            test_template::<Vec<u8>>(GET_RANDOM_POLICY, CLIENT_CERT, CLIENT_KEY, None, &[], false);
+        let result = test_template::<Vec<u8>>(
+            GET_RANDOM_POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            None,
+            &[],
+            &[],
+            false,
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -306,6 +317,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
+            &[],
             &[],
             false,
         );
@@ -321,6 +333,7 @@ mod tests {
             UNAUTHORIZED_KEY,
             Some(RANDOM_SOURCE_WASM),
             &[],
+            &[],
             false,
         );
         assert!(result.is_err(), "An error should occur");
@@ -334,6 +347,7 @@ mod tests {
             UNAUTHORIZED_CERT,
             CLIENT_KEY,
             Some(RANDOM_SOURCE_WASM),
+            &[],
             &[],
             false,
         );
@@ -349,6 +363,7 @@ mod tests {
             UNAUTHORIZED_KEY,
             Some(RANDOM_SOURCE_WASM),
             &[],
+            &[],
             false,
         );
         assert!(result.is_err(), "An error should occur");
@@ -363,6 +378,7 @@ mod tests {
             CLIENT_KEY,
             Some(RANDOM_SOURCE_WASM),
             &[(0, LINEAR_REGRESSION_DATA)],
+            &[],
             false,
         );
         assert!(result.is_err(), "An error should occur");
@@ -390,6 +406,7 @@ mod tests {
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
             &[(0, LINEAR_REGRESSION_DATA)],
+            &[],
             false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -403,6 +420,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
+            &[],
             &[],
             false,
         );
@@ -433,6 +451,7 @@ mod tests {
                 (1, INTERSECTION_SET_SUM_CUSTOMER_DATA),
                 (0, INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
             ],
+            &[],
             false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -450,6 +469,7 @@ mod tests {
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
             &[(0, STRING_1_DATA), (1, STRING_2_DATA)],
+            &[],
             false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -470,6 +490,7 @@ mod tests {
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
             &[(0, LINEAR_REGRESSION_DATA)],
+            &[],
             true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -495,6 +516,24 @@ mod tests {
             CLIENT_KEY,
             Some(PERSON_SET_INTERSECTION_WASM),
             &[(0, PERSON_SET_1_DATA), (1, PERSON_SET_2_DATA)],
+            &[],
+            true,
+        );
+        assert!(result.is_ok(), "error:{:?}", result);
+    }
+
+    #[test]
+    fn test_phase4_number_stream_accumulation_three_data_with_attestation() {
+        let result = test_template::<f64>(
+            NUMBER_STREAM_ACCUMULATION_POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            Some("../test-collateral/number-stream-accumulation.wasm"),
+            &[(0, "../test-collateral/number-stream-init.dat")],
+            &[
+                (0, "../test-collateral/number-stream-1.dat"),
+                (1, "../test-collateral/number-stream-2.dat"),
+            ],
             true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -515,6 +554,7 @@ mod tests {
                 CLIENT_KEY,
                 Some(LOGISTICS_REGRESSION_WASM),
                 &[(0, data_path)],
+                &[],
                 // turn on attestation
                 true,
             );
@@ -539,6 +579,7 @@ mod tests {
                 CLIENT_KEY,
                 Some(MACD_WASM),
                 &[(0, data_path)],
+                &[],
                 // turn on attestation
                 true,
             );
@@ -567,6 +608,7 @@ mod tests {
                 CLIENT_KEY,
                 Some(MACD_DATA_PATH),
                 &[(0, data_path)],
+                &[],
                 // turn on attestation
                 true,
             );
@@ -591,6 +633,7 @@ mod tests {
                 CLIENT_KEY,
                 Some(INTERSECTION_SET_SUM_WASM),
                 &[(0, data_path)],
+                &[],
                 // turn on attestation
                 true,
             );
@@ -612,7 +655,7 @@ mod tests {
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
         data_id_pathes: &[(u64, &str)],
-        // print out information about execution and performance
+        stream_id_pathes: &[(u64, &str)],
         // if there is an attestation
         attestation_flag: bool,
     ) -> Result<(), SinaloaError> {
@@ -691,6 +734,10 @@ mod tests {
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
         let data_id_pathes: Vec<_> = data_id_pathes
+            .iter()
+            .map(|(number, path)| (number.clone(), path.to_string()))
+            .collect();
+        let stream_id_pathes: Vec<_> = stream_id_pathes
             .iter()
             .map(|(number, path)| (number.clone(), path.to_string()))
             .collect();
@@ -813,64 +860,230 @@ mod tests {
                     time_data.elapsed().as_micros()
                 );
             }
-            info!("### Step 7.  Result retrievers request program.");
-            let time_result_hash = Instant::now();
-            check_enclave_state(
-                client_session_id,
-                &mut client_session,
-                ticket,
-                &client_tls_tx,
-                &client_tls_rx,
-                ENCLAVE_STATE_READY_TO_EXECUTE,
-            )?;
-            let _response = request_program_hash(
-                policy.pi_hash().as_str(),
-                client_session_id,
-                &mut client_session,
-                ticket,
-                &client_tls_tx,
-                &client_tls_rx,
-            )?;
-            check_policy_hash(
-                &policy_hash,
-                client_session_id,
-                &mut client_session,
-                ticket,
-                &client_tls_tx,
-                &client_tls_rx,
-            )?;
-            info!(
-                "             Result retriever hash response time (μs): {}.",
-                time_result_hash.elapsed().as_micros()
-            );
-            let time_result = Instant::now();
-            info!("             Result retrievers request result.");
-            let response = client_tls_send(
-                &client_tls_tx,
-                &client_tls_rx,
-                client_session_id,
-                &mut client_session,
-                ticket,
-                &colima::serialize_request_result()?.as_slice(),
-            )
-            .and_then(|response| {
-                // decode the result
-                let response = colima::parse_mexico_city_response(&response)?;
-                let response = colima::parse_result(&response)?;
-                response.ok_or(SinaloaError::MissingFieldError(
-                    "Result retrievers response",
-                ))
-            })?;
-            info!(
-                "             Computation result time (μs): {}.",
-                time_result.elapsed().as_micros()
-            );
+            // If stream_id_pathes is NOT empty, we are in streaming mode
+            if !stream_id_pathes.is_empty() {
+                info!("### Step 7.  Stream providers request the program hash.");
 
-            info!("### Step 8.  Client decodes the result.");
-            let result: T = pinecone::from_bytes(&response.as_slice())?;
-            info!("             Client received result: {:?},", result);
+                let mut id_vec = Vec::new();
+                let mut stream_data_vec = Vec::new();
 
-            info!("### Step 9.  Client shuts down Veracruz.");
+                for (package_id, data_path) in stream_id_pathes.iter() {
+                    id_vec.push(*package_id);
+                    let data = {
+                        let mut data_file = std::fs::File::open(data_path)?;
+                        let mut data_buffer = std::vec::Vec::new();
+                        data_file.read_to_end(&mut data_buffer)?;
+                        data_buffer
+                    };
+                    let decoded_data: Vec<Vec<u8>> = pinecone::from_bytes(&data.as_slice())?;
+                    // convert vec of raw stream packages to queue of them
+                    stream_data_vec.push(decoded_data);
+                }
+
+                // Reverse the vec so we can use `pop` for the `first` element of the list.
+                // In each round of stream, the loop pops an element from the `stream_data_vec`
+                // in the order specified in the package id vec `id_vec`.
+                // e.g. if id_vec is [2,1,0], the loop pops stream_data_vec[2] then
+                // stream_data_vec[1] and then stream_data_vec[0].
+                stream_data_vec.iter_mut().for_each(|e| e.reverse());
+                let mut count = 0;
+                loop {
+                    let next_round_data: Vec<_> = {
+                        let next: Vec<_> = stream_data_vec.iter_mut().map(|d| d.pop()).collect();
+                        if next.iter().any(|e| e.is_none()) {
+                            break;
+                        }
+                        id_vec
+                            .clone()
+                            .into_iter()
+                            .zip(next.into_iter().flatten())
+                            .collect()
+                    };
+                    info!("------------ Streaming Round # {} ------------", count);
+                    count += 1;
+                    for (package_id, data) in next_round_data.iter() {
+                        let time_stream_hash = Instant::now();
+                        check_enclave_state(
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &client_tls_tx,
+                            &client_tls_rx,
+                            ENCLAVE_STATE_STREAM_SOURCE_SLOADING,
+                        )?;
+                        let _response = request_program_hash(
+                            policy.pi_hash().as_str(),
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &client_tls_tx,
+                            &client_tls_rx,
+                        )?;
+                        check_policy_hash(
+                            &policy_hash,
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &client_tls_tx,
+                            &client_tls_rx,
+                        )?;
+                        info!(
+                            "             Stream provider hash response time (μs): {}.",
+                            time_stream_hash.elapsed().as_micros()
+                        );
+                        info!(
+                            "             Stream provider provision secret data #{}.",
+                            package_id
+                        );
+                        let time_stream = Instant::now();
+                        let response = provision_stream(
+                            data.as_slice(),
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &client_tls_tx,
+                            &client_tls_rx,
+                            *package_id,
+                        )?;
+                        info!(
+                            "             Stream provider received acknowledgement after sending stream data: {:?},",
+                            colima::parse_mexico_city_response(&response)
+                        );
+                        info!(
+                            "             Provisioning stream time (μs): {}.",
+                            time_stream.elapsed().as_micros()
+                        );
+                    }
+                    info!("### Step 8.  Result retrievers request program.");
+                    let time_result_hash = Instant::now();
+                    check_enclave_state(
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        ENCLAVE_STATE_READY_TO_EXECUTE,
+                    )?;
+                    let _response = request_program_hash(
+                        policy.pi_hash().as_str(),
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                    )?;
+                    check_policy_hash(
+                        &policy_hash,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                    )?;
+                    info!(
+                        "             Result retriever hash response time (μs): {}.",
+                        time_result_hash.elapsed().as_micros()
+                    );
+                    let time_result = Instant::now();
+                    info!("             Result retrievers request result.");
+                    let response = client_tls_send(
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &colima::serialize_request_result()?.as_slice(),
+                    )
+                    .and_then(|response| {
+                        // decode the result
+                        let response = colima::parse_mexico_city_response(&response)?;
+                        let response = colima::parse_result(&response)?;
+                        response.ok_or(SinaloaError::MissingFieldError(
+                            "Result retrievers response",
+                        ))
+                    })?;
+                    info!(
+                        "             Computation result time (μs): {}.",
+                        time_result.elapsed().as_micros()
+                    );
+                    info!("### Step 9.  Client decodes the result.");
+                    let result: T = pinecone::from_bytes(&response.as_slice())?;
+                    info!("             Client received result: {:?},", result);
+                    // there are more streaming data, requesting next round
+                    if stream_data_vec.iter().map(|d| !d.is_empty()).all(|d| d) {
+                        info!("             Client request next round");
+                        let _response = client_tls_send(
+                            &client_tls_tx,
+                            &client_tls_rx,
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &colima::serialize_request_next_round()?.as_slice(),
+                        )?;
+                    }
+                }
+                info!("------------ Stream-Result-Next End  ------------");
+            } else {
+                info!("### Step 7.  NOT in streaming mode.");
+                info!("### Step 8.  Result retrievers request program.");
+                let time_result_hash = Instant::now();
+                check_enclave_state(
+                    client_session_id,
+                    &mut client_session,
+                    ticket,
+                    &client_tls_tx,
+                    &client_tls_rx,
+                    ENCLAVE_STATE_READY_TO_EXECUTE,
+                )?;
+                let _response = request_program_hash(
+                    policy.pi_hash().as_str(),
+                    client_session_id,
+                    &mut client_session,
+                    ticket,
+                    &client_tls_tx,
+                    &client_tls_rx,
+                )?;
+                check_policy_hash(
+                    &policy_hash,
+                    client_session_id,
+                    &mut client_session,
+                    ticket,
+                    &client_tls_tx,
+                    &client_tls_rx,
+                )?;
+                info!(
+                    "             Result retriever hash response time (μs): {}.",
+                    time_result_hash.elapsed().as_micros()
+                );
+                let time_result = Instant::now();
+                info!("             Result retrievers request result.");
+                let response = client_tls_send(
+                    &client_tls_tx,
+                    &client_tls_rx,
+                    client_session_id,
+                    &mut client_session,
+                    ticket,
+                    &colima::serialize_request_result()?.as_slice(),
+                )
+                .and_then(|response| {
+                    // decode the result
+                    let response = colima::parse_mexico_city_response(&response)?;
+                    let response = colima::parse_result(&response)?;
+                    response.ok_or(SinaloaError::MissingFieldError(
+                        "Result retrievers response",
+                    ))
+                })?;
+                info!(
+                    "             Computation result time (μs): {}.",
+                    time_result.elapsed().as_micros()
+                );
+
+                info!("### Step 9.  Client decodes the result.");
+                let result: T = pinecone::from_bytes(&response.as_slice())?;
+                info!("             Client received result: {:?},", result);
+            }
+
+            info!("### Step 10. Client shuts down Veracruz.");
             let time_shutdown = Instant::now();
             check_enclave_state(
                 client_session_id,
@@ -1151,6 +1364,28 @@ mod tests {
             client_session,
             ticket,
             &serialized_data[..],
+        )
+    }
+
+    fn provision_stream(
+        data: &[u8],
+        client_session_id: u32,
+        client_session: &mut rustls::ClientSession,
+        ticket: u32,
+        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
+        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
+        package_id: u64,
+    ) -> Result<Vec<u8>, SinaloaError> {
+        // The client also sends the associated data
+        let serialized_stream = colima::serialize_stream(data, package_id as u32)?;
+
+        client_tls_send(
+            client_tls_tx,
+            client_tls_rx,
+            client_session_id,
+            client_session,
+            ticket,
+            &serialized_stream[..],
         )
     }
 

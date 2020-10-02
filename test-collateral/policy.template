@@ -7,6 +7,7 @@
     "mexico_city_hash": "<HASH_VALUE>",
     "tabasco_url": "<TABASCO_URL>",
     "data_provision_order": <DATA_PROVISION_ORDER>,
+    "streaming_order": <STREAMING_ORDER>,
     "pi_hash": "<PI_HASH>",
     "debug": <DEBUG_FLAG>,
     "execution_strategy": <EXECUTION_STRATEGY>

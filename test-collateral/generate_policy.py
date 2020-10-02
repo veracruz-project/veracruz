@@ -48,6 +48,13 @@ def data_provision_order(args):
     else:
         return int_list_to_json(argument)
 
+def streaming_order(args):
+    argument = args.streaming_order
+    if argument is None:
+        return int_list_to_json([])
+    else:
+        return int_list_to_json(argument)
+
 parser = argparse.ArgumentParser('Generate a Veracruz Policy file from a template')
 parser.add_argument('--identity', '-i', help='Information for an identity', required=True, nargs=2, metavar=('cert', 'roles'), action='append')
 parser.add_argument('--sinaloa-url', help='URL where the Sinaloa instance will be started', required=True)
@@ -56,6 +63,7 @@ parser.add_argument('--output-policy-file', '-o', help='Location of the output p
 parser.add_argument('--template-file', '-t', help='Location of the input template file', required=True)
 parser.add_argument('--certificate-lifetime-in-hours', help='The expiry for the server certificate will be set to this number of hours in the future', required=True)
 parser.add_argument('--data-provision-order', '-p', type=int, nargs='+', help='The data provision order', required=False)
+parser.add_argument('--streaming-order', '-s', type=int, nargs='+', help='The data provision order', required=False)
 parser.add_argument('--pi-binary', help='Filename of the binary (wasm) of the PI', required=True)
 parser.add_argument('--debug-flag', help='Debug flag', required=False, type=bool, default=False)
 parser.add_argument('--execution-strategy', '-x', help='Execution strategy for the computation', required=True)
@@ -97,6 +105,7 @@ policy = policy.replace('<IDENTITIES>', identities_string)
 policy = policy.replace('<SINALOA_URL>', args.sinaloa_url)
 
 policy = policy.replace('<DATA_PROVISION_ORDER>', data_provision_order(args))
+policy = policy.replace('<STREAMING_ORDER>', streaming_order(args))
 
 # set the "enclave_cert_expiry" field
 expiry =  datetime.datetime.now() + datetime.timedelta(hours=int(args.certificate_lifetime_in_hours))
