@@ -39,6 +39,7 @@ use veracruz_utils::VeracruzPolicy;
 pub mod baja_manager;
 pub mod chihuahua_manager;
 pub mod error;
+pub mod buffer;
 pub use error::MexicoCityError;
 
 ////////////////////////////////////////////////////////////////////////////////
