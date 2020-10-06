@@ -4,6 +4,11 @@
         "__veracruz_hcall_input_size",
         "__veracruz_hcall_read_input",
         "__veracruz_hcall_write_output",
-        "__veracruz_hcall_getrandom"
+        "__veracruz_hcall_getrandom",
+        "__veracruz_hcall_previous_result_size",
+        "__veracruz_hcall_read_previous_result",
+        "__veracruz_hcall_stream_count",
+        "__veracruz_hcall_stream_size",
+        "__veracruz_hcall_read_stream"
     ]
 }
