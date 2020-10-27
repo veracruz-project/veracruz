@@ -1411,7 +1411,7 @@ There are several ways interesting ways that the Veracruz ABI can be extended:
    the global policy becomes an upper-bound on who can receive data from a
    computation, rather than a precise description.
 
-## What do all the components do?
+## What do all the components do?
 
 We maintain a document that describes all of the project components and their
 purpose, in `COMPONENTS.markdown`.  If you do add a new component, change the
