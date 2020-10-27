@@ -1,0 +1,24 @@
+[package]
+name = "psa-attestation"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+build = "build.rs"
+links="psa_attestation"
+description = "An implementation of Arm's PSA attestation protocol."
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+# build.rs depends on features
+tz = []
+sgx = []
+
+[dependencies]
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+
+[build-dependencies]
+bindgen = "0.53.1"
+cmake = "0.1"
+target_build_utils = "0.1"

@@ -1,0 +1,129 @@
+# Authors: Veracruz Team, Arm Research
+# CI for Veracruz project.
+# Please use a runner on a machine with SGX enable and add the following configuration:
+# privileged = true
+# devices = ["/dev/isgx", "/dev/mei0"]
+#
+image: "$DOCKER_IMAGE_PATH"
+
+variables:
+  CARGO_HOME: $VERACRUZ_PATH/.cargo
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_DEPTH: 1
+
+before_script:
+    ################################################# 
+    ## project specific setting 
+    #################################################
+    - cd /work/rust-optee-trustzone-sdk && source environment && unset CC
+    # return the veracruz dir
+    - cd $VERACRUZ_PATH
+    - LD_LIBRARY_PATH=/opt/intel/libsgx-enclave-common/aesm /opt/intel/libsgx-enclave-common/aesm/aesm_service; sleep inf &
+
+stages:
+    - sdk-build
+    - enclave-build
+    - test
+
+cache: &global_cache
+    key: GLOBAL_CACHE
+    paths:
+        - "$VERACRUZ_PATH/**/target/**"
+        - "$VERACRUZ_PATH/.cargo/**"
+        - "$VERACRUZ_PATH/test-collateral/**"
+    policy: pull-push
+
+build:sdk:
+    stage: sdk-build
+    script:
+        - make clean
+        - make sdk
+    cache:
+        <<: *global_cache
+        key: SDK
+        policy: push
+
+build:sgx:
+    stage: enclave-build
+    script: 
+        - make clean
+        - make sgx
+    needs:
+        - build:sdk
+    cache:
+        <<: *global_cache
+        key: SGX
+        policy: push
+    
+build:trustzone:
+    stage: enclave-build
+    script: 
+        - make clean
+        - make trustzone
+    needs:
+        - build:sdk
+    cache:
+        <<: *global_cache
+        key: TRUSTZONE
+        policy: push
+
+test:sgx:durango:
+    stage: test
+    script: make sgx-durango-test
+    needs:
+        - build:sgx
+    cache:
+        <<: *global_cache
+        key: SGX
+        policy: pull
+
+test:trustzone:durango:
+    stage: test
+    script: make trustzone-durango-test
+    needs:
+        - build:trustzone
+    cache:
+        <<: *global_cache
+        key: TRUSTZONE
+        policy: pull
+
+test:sgx:sinaloa:
+    stage: test
+    script: make sgx-sinaloa-test
+    needs:
+        - build:sgx
+    cache:
+        <<: *global_cache
+        key: SGX
+        policy: pull
+
+test:trustzone:sinaloa:
+    stage: test
+    script: make trustzone-sinaloa-test
+    needs:
+        - build:trustzone
+    cache:
+        <<: *global_cache
+        key: TRUSTZONE
+        policy: pull
+
+test:sgx:veracruz:
+    stage: test
+    script: make sgx-veracruz-test
+    needs:
+        - build:sgx
+    cache:
+        <<: *global_cache
+        key: SGX
+        policy: pull
+
+test:trustzone:veracruz:
+    stage: test
+    script: make trustzone-veracruz-test
+    needs:
+        - build:trustzone
+    cache:
+        <<: *global_cache
+        key: TRUSTZONE
+        policy: pull

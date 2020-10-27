@@ -1,0 +1,23 @@
+﻿---
+BasedOnStyle: WebKit
+AlignConsecutiveAssignments: 'false'
+AlignConsecutiveDeclarations: 'false'
+AlignOperands: 'false'
+AlignTrailingComments: 'true'
+AllowAllParametersOfDeclarationOnNextLine: 'false'
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+ColumnLimit: '100'
+ContinuationIndentWidth: '8'
+IndentWidth: '4'
+MaxEmptyLinesToKeep: '1'
+PenaltyReturnTypeOnItsOwnLine: '1000'
+PointerAlignment: Left
+SortIncludes: 'false'
+SpaceAfterCStyleCast: 'false'
+TabWidth: '4'
+UseTab: Never
+
+...

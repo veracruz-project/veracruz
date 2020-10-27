@@ -1,0 +1,12 @@
+[package]
+name = "veracruz-rt"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Minimal Veracruz runtime library.  Supports `no_std` development of Rust WASM programs for Veracruz."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wee_alloc = { version = "0.4.5" }
+

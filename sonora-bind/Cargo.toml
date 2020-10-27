@@ -1,0 +1,13 @@
+[package]
+name = "sonora-bind"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Automatically-generated C bindings for the Sonora enclave image."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.53.1"

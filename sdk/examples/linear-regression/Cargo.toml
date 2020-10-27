@@ -1,0 +1,19 @@
+[package]
+name = "linear-regression"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Another pure-Rust implementation of logistic regression."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libveracruz = {path = "../../libveracruz"}
+pinecone = "*"
+serde = { version = "1.0.3", default-features = false, features = ["derive"] }
+veracruz-rt = {path = "../../veracruz-rt" }
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+

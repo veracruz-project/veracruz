@@ -1,0 +1,19 @@
+[package]
+name = "random-source"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Samples random data from the trusted Veracruz runtime.  Used to test random number generation in Veracruz."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libveracruz = {path = "../../libveracruz"}
+pinecone = "*"
+veracruz-rt = {path = "../../veracruz-rt"}
+
+[profile.release]
+codegen-units = 1
+#lto = true
+opt-level = 3
+

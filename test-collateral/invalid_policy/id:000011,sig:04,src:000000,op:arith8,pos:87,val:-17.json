@@ -1,0 +1,24 @@
+{
+    "identities": [
+		{"cert": "-----BEGIN CERTIFICATE-----\nMIIDnzCCAoegAwIBAgIUTGK3\/4bEiRSD8mrE90vX29CpyowDQYJKoZIhvcNAQELBQAwdzELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4xEDAOBgNVBAoMB0FybSBMdGQxIzAhBgkqhkiG9w0BCQEWFGRlcmVrLm1pbGxlckBhcm0uY29tMRAwDgYDVQQDDAdhcm0uY29tMB4XDTE5MTAxMDIxNDQyMVoXDTI5MDcwOTIxNDQyMVowdzELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4xEDAOBgNVBAoMB0FybSBMdGQxIzAhBgkqhkiG9w0BCQEWFGRlcmVrLm1pbGxlckBhcm0uY29tMRAwDgYDVQQDDAdhcm0uY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtFDp4NHy03SxEgODdTmI5bWBvjCEKUg6rU445r1A7lIMGLtWVa5aSv4WoJ7cMkzFc7iqNZ4uTOgAjsaLyBF0qFyOsiu7fO2xgIhGFUQtKwG9FxfYIoF+h61bW80fb7VBXRE6/cG1+tXfFbiMAYzUW+mLr97xbN5FHySwFTmELbl0wV4vUX9v5P4N2Hmrg35IAKNkUoRuB8tqGK03bRtG7Ui6OK4BP61JujwbbDwhtFsk6v9LduyYvLxL3DUc/xl9Uyh54VyrlIilMuXMfsIzppEhx1QtiQWQuZ26KE/t+iumfpchhR5x3IuzoxuXoc7YxXGD7hhuKyEWMaC2s1gGSQIDAQABoyMwITAfBgNVHREEGDAWggdhcm0uY29tggt3d3cuYXJtLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAUxDwSJDi9u6c1vstbq8MTLrkGiGTJZt9+/I9fg+MKkOXlg2zCBePTpVbSMk7FxIFb2FMQXAZZtChjNVYXhjHysENYNdlOMjnygmRTt+6hWgmVO/BgYJc9govWP++/AP8cKgDJC1+vbvrNOABc7rICWSr3Xw0lWVOK7y1lnCAiMfrVsLGVjL+MJGXkxhLnGsBuvClFT0TaPFrV/Syf1nJaLkTG/Q8WfmHWVEyrL8YBYLjmow3MxZgVM5Y4cgC7O5/Wavqn28eybRt3dVXus5crvYv54DSwQtsNjBME1xke/GS0n9GJVNuCKBttgnz5iQu5C4lJdqVowzHUGS5Vab6uw==\n-----END CERTIFICATE-----",
+		"id": 0,
+		"roles": ["PiProvider"]},
+
+		{"cert": "-----BEGIN CERTIFICATE-----\nMIIDnzCCAoegAwIBAgIUER9porgppjIEcGbuBmA6oyDU0/cwDQYJKoZIhvcNAQELBQAwdzELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4xEDAOBgNVBAoMB0FybSBMdGQxIzAhBgkqhkiG9w0BCQEWFGRlcmVrLm1pbGxlckBhcm0uY29tMRAwDgYDVQQDDAdhcm0uY29tMB4XDTE5MTAxMDIxNDQzOVoXDTI5MDcwOTIxNDQzOVowdzELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4xEDAOBgNVBAoMB0FybSBMdGQxIzAhBgkqhkiG9w0BCQEWFGRlcmVrLm1pbGxlckBhcm0uY29tMRAwDgYDVQQDDAdhcm0uY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuy0vUp8RWRZ4HAZjIZekZWgBFHTxJNzsa0xOLqO6Aj4lKkO6wJsRGZf6ci2n0hlQdQrmVLkgq9kgezJy8ysZuDgW0XVcZ7otqCtaC4jrDLnobtBHGqHm6Sc9qteuhZunjnVGtdXmMZwifHWV1geuLA47i/hn65tapqFdRXAeOVortMaOKTSVFP+OgSlQvuc08wMagKQ456IB352n9+cDS4nWbSowe/+ZWx/nE9eV/vZkrTQPJ7YBaloWxeDnjiC5psQJjs+X48wNtyXzv1XGdv7MwbjBGko61gzR/LCYTzvUtTEtJBcTQGg4Cp4Y7Jbr+PY47QUqgvz0Salsl7IIdwIDAQABoyMwITAfBgNVHREEGDAWggdhcm0uY29tggt3d3cuYXJtLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAtIQnCcIHI2s6zfiuHmswKp6cVpjM/a+/bfq7ryWix/M/v/300ZVE2sa738kbe55wsEgDKmym5RB35CA7GJxBDvoRnIZFsBFZGIxbmpLCqIAlY658PRieZOK89nZOo7Ic08MDT4f8QL2QO4X+HVfrexneK2Xpf8DN+NfkXgxC+938K9ke9LLG0dvK81zktD0XqhbhiJeOsLf1rozgFXNjyI9voOgCoXQLdkxWWlz8Q/vOfIIIiEK+aj63qMUPG+POAKWjNVcnD+QRUPiJyE698Qnsw3ye0csPa6BF3JDClwMbBIbfpXtncXOVEoEx4QLcEFyB2CKbrjdsXr7iqgYB3g==\n-----END CERTIFICATE-----",
+		"id": 1,
+		"roles": ["DataProvider", "ResultReader"]}
+    ],
+    "pi_total_gas_count": 32,
+    "dataset_gas_count": 64,
+    "chihuahua_return_address_stack_size": 32768,
+    "chihuahua_operand_stack_size": 32768,
+    "chihuahua_max_code_size": 32768,
+    "chihuahua_max_ram_size": 524288,
+    "sinaloa_url": "127.0.0.1:3013",
+    "enclave_cert_expiry": { "year": 2021, "month": 2, "day": 11, "hour":17, "minute": 47},
+    "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+    "mexico_city_hash": "59599157d95f08b5ee5ee6008688b140054305114c9d4c4e3710913aaff1e61a",
+    "tabasco_url": "127.0.0.1:3016",
+    "data_provision_order": [1],
+    "pi_hash": "f00dcafedeadbeeff00dcafedeadbeeff00dcafedeadbeeff00dcafedeadbeef"
+}

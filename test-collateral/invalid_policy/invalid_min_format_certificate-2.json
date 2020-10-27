@@ -1,0 +1,20 @@
+{
+    "identities": [
+		{"cert": "-----BEGIN CERTIFICATE-----\nMIIDizCCAnOgAwIBAgIJAOEhZY9VvHCIMA0GCSqGSIb3DQEBCwUAMHwxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRAwDgYDVQQKDAdBcm0gTHRkMSMwIQYJKoZIhvcNAQkBFhRkZXJlay5taWxsZXJAYXJtLmNvbTEVMBMGA1UEAwwMRGVyZWsgTWlsbGVyMB4XDTE5MDUyMzEyMTI1MVoXDTIwMDUyMjEyMTI1MVowfDELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4xEDAOBgNVBAoMB0FybSBMdGQxIzAhBgkqhkiG9w0BCQEWFGRlcmVrLm1pbGxlckBhcm0uY29tMRUwEwYDVQQDDAxEZXJlayBNaWxsZXIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCystFg6VgxEAOYz+yXethsqqb+GX8rXEZFD+wEwN9re2X6NIrrwrF06peoVVfBgU2HyT7tbAIKyJz/eB1PO+0I0OOgHmnyBpfGapgGvGWVG5RZEgC4AdWl3JSe4sDPBntVPptRzNtSLT2qaeMHe7jM6D71N+/TCDGbKDgdJQ2tEhSBZZ70Mkog4mmEDVDJ5wYWlMhtwAW4FbKM/UK7PpM4Ch/vg7Qo6SkSAHu0x8m7EJwQa5FJtnlj6b6COyjL9RgiektwhG4/b5wbpsXBQaV8pj5r6rO7pWIq8X7VHpjAdU5EWXTTWqKlw+nKnl6Lb4BQIWAyIEWmIeeSwIUdpYYNAgMBAAGjEDAOMAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQELBQADggEBAHt3PYvzrIGiDBVlxvDAZxuRrB3XbB7D+QPsUdO9ME2YKJU3kseGZhQvgjM6sFMqmQ62JDfuv10rXHGuYzbDQ4vyWd6HRkLSr/J2p6xsCAdpt5S5ZyVrwVWqT1BTvsS/G5dLomBBEX584HsmMeYlymu7/tImWzo0CGimc5eP9rphr7rjvUqlcFZTCFO/YHpC+HTy+rIpTJ3Mv5VwjsT2T1238Cf/VJi71ou524Hz4SsavMRLBe34eRC/ackI3xp/hPWX7wsIWMhOWd5OUzKqxbMhJrjWR10/W3xEF9dw/S5XnogcbglUzXX+W31B577jlVoiN/2sjkvLxmJdRMUmou0=\n-----END CERTIFICATE-----",
+		"id": 0,
+		"roles": ["PiProvider", "DataProvider", "ResultReader"]}
+    ],
+    "pi_total_gas_count": 32,
+    "dataset_gas_count": 64,
+    "chihuahua_return_address_stack_size": 32768,
+    "chihuahua_operand_stack_size": 32768,
+    "chihuahua_max_code_size": 32768,
+    "chihuahua_max_ram_size": 524288,
+    "sinaloa_url": "127.0.0.1:3010",
+    "enclave_cert_expiry": { "year": 1992, "month": 3, "day": 7, "hour":22, "minute": -1},
+    "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+    "mexico_city_hash": "d205e9e877d37d6b2b88d74d0a539ad60e3b3d9387c14394ec2d42ca2b4f5cb9",
+    "tabasco_url": "127.0.0.1:3016",
+    "data_provision_order": [0],
+    "pi_hash": "f00dcafedeadbeeff00dcafedeadbeeff00dcafedeadbeeff00dcafedeadbeef"
+}

@@ -1,0 +1,52 @@
+[package]
+name = "sinaloa-test"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+build = "build.rs"
+description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime functioanlity, and session management code, without establishing a network connection."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
+tz = ["sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz", "psa-attestation/tz"]
+
+[dependencies]
+sinaloa = { path = "../sinaloa"}
+veracruz-utils = { path = "../veracruz-utils", features=["std"] }
+webpki = "0.21"                                               
+webpki-roots = "0.19"
+rustls = "0.16"
+ring = "0.16"
+colima = { path = "../colima" }
+protobuf = "2.6"
+curl = "0.4.22"
+untrusted = "0.6.2"
+base64 = "0.10.1"
+stringreader = "0.1.1"
+serde_json = "1.0"
+serde = { version = "1.0.97", features = ["derive"] }
+percent-encoding = "2.1.0"
+openssl = "0.10.24"
+rand = "0.7.0"
+tabasco = { path = "../tabasco" }
+psa-attestation = { path = "../psa-attestation"}
+hex = "0.4"
+pinecone = "0.2"
+futures = "0.3"
+actix-rt = "1.0.0"
+env_logger = "0.7"
+log = "0.4"
+lazy_static = "1.4"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+
+[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
+sgx_ucrypto = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
+sgx_types = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
+
+[patch.crates-io]
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }

@@ -1,0 +1,18 @@
+[package]
+name = "libveracruz"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Rust support library for Veracruz computation development.  Abstracts over the Veracruz host ABI."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = {version = "1.3.4", default-features = false }
+pinecone = "*"
+serde = { version = "1.0.3", default-features = false, features = ["derive"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+lto = true

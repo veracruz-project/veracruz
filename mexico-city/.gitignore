@@ -1,0 +1,9 @@
+*.so
+*.a
+*_t.c
+*_u.c
+*_t.h
+*_u.h
+target/
+*.rlib
+test_tmp/

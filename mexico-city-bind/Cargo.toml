@@ -1,0 +1,11 @@
+[package]
+name = "mexico-city-bind"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Automatically-generated C bindings for the Mexico-City enclave image."
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.53.1"

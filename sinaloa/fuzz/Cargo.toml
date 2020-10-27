@@ -1,0 +1,43 @@
+
+[package]
+name = "sinaloa-fuzz"
+version = "0.0.0"
+authors = ["Shale Xiong"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+
+# Has to use 0.1.1 due to any later versions import arbitrary packages 
+# that are incompatable with the rust version we are using.
+[dependencies]
+libfuzzer-sys = "=0.1.1"
+veracruz_utils = { path = "../../veracruz_utils_std" }
+serde_json = "1.0"
+colima = { path = "../../colima_std"}
+rustls = { path = "../../third-party/rustls" }
+protobuf = "=2.6.2"
+ring = "0.14.6"
+webpki = "0.19"                                               
+webpki-roots = "0.16"
+
+
+[features]
+sgx = ["sinaloa/sgx"]
+
+[dependencies.sinaloa]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "init_sinaloa"
+path = "fuzz_targets/init_sinaloa.rs"
+
+[[bin]]
+name = "provision_data"
+path = "fuzz_targets/provision_data.rs"

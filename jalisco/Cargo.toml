@@ -1,0 +1,33 @@
+[package]
+name = "jalisco"
+# NOTE: when update this version, please also update psa entry in populate_test_database.sh in sinaloa-test and veracruz-test 
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+build = "build.rs"
+description = "TLS endpoint code for clients interacting with a trusted Veracruz runtime"
+
+[[bin]]
+name = "jalisco"
+path = "src/main.rs"
+
+[features]
+default = ["tz"]
+tz = []
+
+[dependencies]
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+colima = { path = "../colima", features=["tz"] }
+protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz"}
+psa-attestation = { path = "../psa-attestation", features=["tz"]}
+optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
+optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
+veracruz-utils = { path = "../veracruz-utils", features = ["tz"] }
+lazy_static = {version = "1.4.0", features=["spin_no_std"] }
+ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz" }
+
+[build-dependencies]
+uuid = { version = "=0.7.4", features = ["v4"] }
+
+[profile.release]
+lto = true
