@@ -1438,8 +1438,11 @@ Veracruz codebase.
 
 See the `CONTRIBUTING.markdown` file for information on how to contribute to
 Veracruz, where to find help, how to get in touch with the rest of the
-Veracruz development team, how to contribute code, and details of our
-project-level code-of-conduct.
+Veracruz development team, and how to contribute code.
+
+The Veracruz project has adopted a project-level code of conduct, the full
+text of which is available in the CODE_OF_CONDUCT.markdown file in the
+Veracruz root directory, or through the Github web-interface.
 
 ## Disclosure of security vulnerabilities
 
