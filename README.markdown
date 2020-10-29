@@ -1436,26 +1436,32 @@ Veracruz codebase.
 
 ## Contributing to Veracruz
 
-See the `CONTRIBUTING.markdown` file for information on how to contribute to
-Veracruz, where to find help, how to get in touch with the rest of the
-Veracruz development team, how to contribute code, and details of our
-project-level code-of-conduct.
+See the [CONTRIBUTING.markdown](CONTRIBUTING.markdown) file for information
+on how to contribute to Veracruz, where to find help, how to get in touch
+with the rest of the Veracruz development team, and how to contribute code.
+
+The Veracruz project has adopted a project-level code of conduct, the full
+text of which is available in the
+[CODE_OF_CONDUCT.markdown](CODE_OF_CONDUCT.markdown) file in the Veracruz
+root directory, or through the Github web-interface.
 
 ## Disclosure of security vulnerabilities
 
-See the `SECURITY_DISCLOSURE.markdown` file for a description of our policy
-surrounding responsible disclosure of security vulnerabilities, and a
-point-of-contact for security disclosures.
+See the [SECURITY.markdown](SECURITY.markdown) file for a description of
+our policy surrounding responsible disclosure of security vulnerabilities,
+and a point-of-contact for security disclosures.
 
 ## Build and test instructions
 
 Veracruz requires a particular environment to build correctly.  We handle this
 using a dedicated Docker container.  Please see the
-`BUILD_INSTRUCTIONS.markdown` file for details of how to download and set this
-up, as well as Veracruz's dependencies, and build and test process.
+[BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown) file for details of
+how to download and set this up, as well as Veracruz's dependencies, and build
+and test process.
 
-Note that we also maintain a dedicated `TEST_PLAN.markdown` document that
-describes all of our tests and what they cover.  If you contribute code to
-Veracruz please make sure that you do contribute tests, too, and that these
-tests are disclosed in the `TEST_PLAN.markdown` file so that we can keep track
-of what is currently being tested and what is not.
+Note that we also maintain a dedicated [TEST_PLAN.markdown](TEST_PLAN.markdown)
+document that describes all of our tests and what they cover.  If you
+contribute code to Veracruz please make sure that you do contribute tests,
+too, and that these tests are disclosed in the
+[TEST_PLAN.markdown](TEST_PLAN.markdown) file so that we can keep track of what
+is currently being tested and what is not.
