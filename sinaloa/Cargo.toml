@@ -8,6 +8,7 @@ description = "An untrusted server/bridge that allows the outside world and the 
 [features]
 sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "colima/sgx_attestation", "mexico-city-bind", "sonora-bind"]
 tz = ["veracruz-utils/std", "veracruz-utils/tz", "colima/tz", "optee-teec", "uuid"]
+nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix"]
 
 [dependencies]
 dirs = "1.0.2"
@@ -32,6 +33,10 @@ pinecone = "0.2"
 hex = "0.4"
 webpki = "0.21.0"
 rustls = "0.16.0"
+bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
+serde = { git = https://github.com/veracruz-project/serde.git", default-features = false, optional = true }
+bytorder = { version = "1.3.2", optional = true }
+nix = { version = "0.15", optional = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }

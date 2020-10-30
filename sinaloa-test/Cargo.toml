@@ -10,6 +10,7 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 [features]
 sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
 tz = ["sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz", "psa-attestation/tz"]
+nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "psa-attestation/nitro"]
 
 [dependencies]
 sinaloa = { path = "../sinaloa"}

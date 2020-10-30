@@ -29,6 +29,9 @@ mod tests {
     use sinaloa::SinaloaSGX as SinaloaEnclave;
     #[cfg(feature = "tz")]
     use sinaloa::SinaloaTZ as SinaloaEnclave;
+    #[cfg(feature = "nitro")]
+    use sinaloa::SinaloaNitro as SinaloaEnclave;
+
     use std::{
         collections::HashMap,
         collections::HashSet,

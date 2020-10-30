@@ -71,6 +71,30 @@ pub enum SinaloaError {
     #[cfg(feature = "sgx")]
     #[error(display = "Sinaloa: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: BincodeError: {:?}", _0)]
+    BincodeError(bincode::ErrorKind),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: MCMessage::Status: {:?}", _0)]
+    MCMessageStatus(veracruz_utils::MCMessage),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: NitroStatus: {:?}", _0)]
+    NitroStatus(veracruz_utils::NitroStatus),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Received Invalid MC Message: {:?}", _0)]
+    InvalidMCMessage(veracruz_utils::MCMessage),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Received Invalid Chiapas Message: {:?}", _0)]
+    InvalidChiapasMessage(veracruz_utils::ChiapasMessage),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Received Invalid Protocol Buffer Message")]
+    InvalidProtoBufMessage,
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Nix Error: {:?}", _0)]
+    NixError(#[error(source)] nix::Error),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Serde Error")]
+    SerdeError,
     #[cfg(feature = "tz")]
     #[error(display = "Sinaloa: UUIDError: {:?}.", _0)]
     UUIDError(#[error(source)] uuid::parser::ParseError),
@@ -161,6 +185,20 @@ impl error::ResponseError for SinaloaError {
         }
     }
 }
+
+#[cfg(feature = "nitro")]
++impl From<std::boxed::Box<bincode::ErrorKind>> for SinaloaError {
+        fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
+            SinaloaError::BincodeError(*error)
+        }
+}
+
+//#[cfg(feature = "nitro")]
+//impl From<nix::Error> for SinaloaError {
+    //fn from(error: nix::Error) -> Self {
+        //SinaloaError::NixError(error)
+    //}
+//}
 
 pub trait Sinaloa {
     fn new(policy: &str) -> Result<Self, SinaloaError>
