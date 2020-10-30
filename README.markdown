@@ -72,7 +72,7 @@ questions asked and answered in this document:
 - See &sect;[How does Veracruz compare to...](#how-does-veracruz-compare-to)
   for a comparison between Veracruz and two *Confidential Comput  Consortium*
   projects: **OpenEnclave** and **Enarx**.
-- See &sect;[What's next for Veracruz?](#what's-next-for-veracruz) for a
+- See &sect;[What's next for Veracruz?](#whats-next-for-veracruz) for a
   summary of potential future work.  Veracruz is still evolving, and we have big
   ideas for where the framework can go, and what it can be used for.
 - See &sect;[What do all the components do?](#what-do-all-the-components-do) for
