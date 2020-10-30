@@ -34,8 +34,8 @@ hex = "0.4"
 webpki = "0.21.0"
 rustls = "0.16.0"
 bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
-serde = { git = https://github.com/veracruz-project/serde.git", default-features = false, optional = true }
-bytorder = { version = "1.3.2", optional = true }
+serde = { git = "https://github.com/veracruz-project/serde.git", default-features = false, optional = true }
+byteorder = { version = "1.3.2", optional = true }
 nix = { version = "0.15", optional = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
