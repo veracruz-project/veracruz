@@ -50,34 +50,34 @@ The following sections explain Veracruz in more detail, and also compares
 Veracruz to other similar projects.  We provide a summary of the top-level
 questions asked and answered in this document:
 
-- See &sect;[What are Veracruz computations?](#what-are-veracruz-computations?)
+- See &sect;[What are Veracruz computations?](#what-are-veracruz-computations)
   to understand the principles behind a collaborative Veracruz computation, and
   understand the major conceptual components of the Veracruz framework.
-- See &sect;[What is the Veracruz proxied attestation service?](#what-is-the-veracruz-proxied-attestation-service?)
+- See &sect;[What is the Veracruz proxied attestation service?](#what-is-the-veracruz-proxied-attestation-service)
   to understand some of the problems with remote attestation in Veracruz, and
   why we introduced a proxied attestation service.
-- See &sect;[What are some Veracruz use-cases?](#what-are-some-veracruz-use-cases?)
+- See &sect;[What are some Veracruz use-cases?](#what-are-some-veracruz-use-cases)
   for details of potential use-cases, of both commercial and more academic
   interest, of the Veracruz framework.  These are just a small taste of
   the many potential use-cases we have in mind for Veracruz.
-- See &sect;[What is the Veracruz threat model?](#what-is-the-veracruz-threat-model?)
+- See &sect;[What is the Veracruz threat model?](#what-is-the-veracruz-threat-model)
   for details of the Veracruz threat model: what we aim to protect against, what
   we do not protect against, what must be trusted by principals in a
   computation, and what need not be trusted.  The precise threat model
   that we assume in Veracruz depends on the strong containerization technology
   in use for a particular computation.
-- See &sect;[What is the Veracruz programming model?](#what-is-the-veracruz-programming-model?)
+- See &sect;[What is the Veracruz programming model?](#what-is-the-veracruz-programming-model)
   to discover how programs are actually written for the Veracruz framework, and
   learn about the Veracruz SDK.
-- See &sect;[How does Veracruz compare to...](#how-does-veracruz-compare-to...?)
+- See &sect;[How does Veracruz compare to...](#how-does-veracruz-compare-to)
   for a comparison between Veracruz and two *Confidential Comput  Consortium*
   projects: **OpenEnclave** and **Enarx**.
-- See &sect;[What's next for Veracruz?](#what's-next-for-veracruz?) for a
+- See &sect;[What's next for Veracruz?](#what's-next-for-veracruz) for a
   summary of potential future work.  Veracruz is still evolving, and we have big
   ideas for where the framework can go, and what it can be used for.
-- See &sect;[What do all the components do?](#what-do-all-the-components-do?) for
+- See &sect;[What do all the components do?](#what-do-all-the-components-do) for
   a description of Veracruz's major components and their purpose.
-- See &sect;[Who wrote Veracruz?](#who-wrote-veracruz?) for details of who wrote
+- See &sect;[Who wrote Veracruz?](#who-wrote-veracruz) for details of who wrote
   Veracruz, along with contact details for the authors.
 - See &sect;[Copyright and licensing](#copyright-and-licensing) for copyright
   and licensing information.
