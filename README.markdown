@@ -12,7 +12,7 @@ Veracruz uses *strong isolation* technology (a mixture of *trusted hardware* and
 Concretely, Veracruz computations are special-purpose *WebAssembly* binaries, compiled against a small SDK which we provide.
 WebAssembly acts both as a sandbox, pinning down the behaviour of the program, and allows us to abstract over the different strong isolation technologies that we support.
 
-To learn more about Veracruz, the motivation, design, use-cases, and so on, please read the Veracruz project wiki.
+To learn more about Veracruz, the motivation, design, use-cases, and so on, please read the [Veracruz project wiki](https://github.com/veracruz-project/veracruz/wiki) or dive in and start playing with Veracruz using our Docker container.
 The latest project news is available on the [Veracruz project homepage](https://veracruz-project.github.io).
 
 ## Get involved!
