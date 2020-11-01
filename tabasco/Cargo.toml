@@ -24,6 +24,7 @@ sgx = ["sgx_types", "sgx_ucrypto", "sgx_urts", "psa-attestation/sgx", "colima/sg
 # Note: Final attestation is always PSA. This is just to enable platforms
 # that use PSA for their native attestation.
 psa = ["psa-attestation/tz"]
+nitro = []
 
 [dependencies]
 rouille = "3.0"

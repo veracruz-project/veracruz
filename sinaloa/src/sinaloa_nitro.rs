@@ -273,7 +273,7 @@ pub mod sinaloa_nitro {
             }
             println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to tabasco");
             let (challenge, device_id) =
-                SinaloaNitro::send_start(tabasco_url, "psa", &firmware_version)?;
+                SinaloaNitro::send_start(tabasco_url, "nitro", &firmware_version)?;
 
             println!("SinaloaNitro::native_attestation completed send to tabasco. Now sending NativeAttestation message to chiapas");
             let message = ChiapasMessage::NativeAttestation(challenge, device_id);

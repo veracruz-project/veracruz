@@ -14,6 +14,9 @@ use crate::attestation;
 use crate::attestation::psa;
 #[cfg(feature = "sgx")]
 use crate::attestation::sgx;
+#[cfg(feature = "nitro")]
+use crate::attestation::nitro;
+
 use crate::error::*;
 use actix_web::{dev::Server, middleware, web, App, HttpServer};
 use psa_attestation::{
@@ -148,6 +151,18 @@ async fn psa_router(psa_request: web::Path<String>, input_data: String) -> Tabas
     Err(TabascoError::UnimplementedRequestError)
 }
 
+#[allow(unused)]
+async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> TabascoResponder {
+    #[cfg(feature = "nitro")]
+    if nitro_request.into_inner().as_str() == "AttestationToken" {
+        nitro::attestation_token(input_data)
+    } else {
+        Err(TabascoError::UnsupportedRequestError)
+    }
+    #[cfg(not(feature = "nitro"))]
+    Err(TabascoError::UnimplementedRequestError)
+}
+
 pub fn server(url: String) -> Result<Server, String> {
     let server = HttpServer::new(move || {
         App::new()
@@ -156,6 +171,7 @@ pub fn server(url: String) -> Result<Server, String> {
             .route("/Start", web::post().to(attestation::start))
             .route("/SGX/{sgx_request}", web::post().to(sgx_router))
             .route("/PSA/{psa_request}", web::post().to(psa_router))
+            .route("/Nitro/{nitro_request}", web::post().to(nitro_router))
     })
     .bind(&url)
     .map_err(|err| format!("binding error: {:?}", err))?
