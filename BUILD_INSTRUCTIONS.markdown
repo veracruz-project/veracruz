@@ -26,7 +26,7 @@ Once you have a local copy of the Veracruz source and your token:
 
 ```
 cd veracruz-docker-image
-make VERACRUZ_ROOT=<path to your veracruz directory> IAS_TOKEN=<your Intel Attestation Service token>
+make IAS_TOKEN=<your Intel Attestation Service token>
 ````
 
 Note that building the Docker image will take a long time (we appreciate any
