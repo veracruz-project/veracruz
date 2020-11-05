@@ -1,0 +1,18 @@
+version: 0.2
+
+# Running as the root user as the default.
+#run-as: Linux-user-name
+
+env:
+  # use bash as the default shell
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - pushd /work/rust-optee-trustzone-sdk && source environment && popd
+      - make clean
+  build:
+    commands:
+      - make trustzone-sinaloa-test
+      - make trustzone-veracruz-test
