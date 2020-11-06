@@ -10,9 +10,17 @@ env:
 phases:
   pre_build:
     commands:
+      # Set up the environment for trustzone backend
       - pushd /work/rust-optee-trustzone-sdk && source environment && popd
+      # clean the repostory, which automatically downloads the rust toolchain specified in the repostory
       - make clean
   build:
     commands:
+      # compiling and running tests on trustzone
+      - make trustzone-durango-test
       - make trustzone-sinaloa-test
       - make trustzone-veracruz-test
+      # compiling and running some tests on sgx; other tests requires SGX enable machine.
+      - make sgx-durango-test
+      - make sgx-sinaloa-test-dry-run
+      - make sgx-veracruz-test-dry-run
