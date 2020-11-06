@@ -2,10 +2,10 @@
 #
 # Builds:
 #   - freestanding-chihuahua
-#   - libveracruz
-#   - veracruz-rt
-#   - veracruz-getrandom and veracruz-rand in rustlib/
-#   - all of the examples in the examples/ directory
+#   - Rust libveracruz
+#   - Rust veracruz-rt
+#   - Rust getrandom and rand libraries in lib/
+#   - all of the Rust examples in the examples/ directory
 #   - all of the datasets in data-generators/ directory
 #
 # AUTHORS
