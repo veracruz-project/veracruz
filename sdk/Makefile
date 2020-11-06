@@ -17,8 +17,8 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-# All programs
-EXAMPLES = idash2017-logistic-regression \
+# All Rust example programs
+RUST_EXAMPLES = idash2017-logistic-regression \
 	   	   linear-regression \
 		   moving-average-convergence-divergence \
 		   private-set-intersection \
@@ -28,7 +28,7 @@ EXAMPLES = idash2017-logistic-regression \
 		   nop \
 		   private-set-intersection-sum \
 		   string-edit-distance
-EXAMPLE_DIR = examples/
+RUST_EXAMPLE_DIR = rust-language-support/examples/
 # Navigate to the actual wasm programs.
 RELATIVE_EXAMPLES = $(foreach EXAMPLE,$(EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(EXAMPLE_DIR), $(EXAMPLE))))
 # All dataset filenames
@@ -55,7 +55,7 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean fmt freestanding-chihuahua libveracruz veracruz-rt tlaxcala env
+.PHONY: all clean fmt freestanding-chihuahua rust-libveracruz rust-veracruz-rt tlaxcala env
 
 all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_EXAMPLES) freestanding-chihuahua libveracruz veracruz-rt veracruz-getrandom veracruz-rand
 
@@ -70,17 +70,17 @@ $(RELATIVE_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(EXAMPLE_
 freestanding-chihuahua: env
 	$(MAKE) -C freestanding-chihuahua/
 
-libveracruz: env
-	$(MAKE) -C libveracruz/
+rust-libveracruz: env
+	$(MAKE) -C rust-language-support/libveracruz/
  
-veracruz-rt: env
-	$(MAKE) -C veracruz-rt/
+rust-veracruz-rt: env
+	$(MAKE) -C rust-language-support/veracruz-rt/
 
-veracruz-getrandom: env
-	$(MAKE) -C rustlib/veracruz-getrandom/
+rust-getrandom: env
+	$(MAKE) -C rust-language-support/lib/getrandom/
 
-veracruz-rand: env
-	$(MAKE) -C rustlib/veracruz-rand/
+rust-rand: env
+	$(MAKE) -C rust-language-support/lib/rand/
 
 # Specify the dependency for all datasets
 $(addprefix $(DATASET_PATH),hello-world-1.dat hello-world-2.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/string-generator/,Makefile src/main.rs $$(notdir %.txt))
@@ -118,8 +118,8 @@ clean:
 		$(MAKE) -C $$example clean; \
 	done
 	$(MAKE) -C freestanding-chihuahua/ clean
-	$(MAKE) -C libveracruz/ clean
-	$(MAKE) -C veracruz-rt/ clean
-	$(MAKE) -C rustlib/veracruz-getrandom/ clean
-	$(MAKE) -C rustlib/veracruz-rand/ clean
+	$(MAKE) -C rust-language-support/libveracruz/ clean
+	$(MAKE) -C rust-language-support/veracruz-rt/ clean
+	$(MAKE) -C rust-language-support/lib/getrandom/ clean
+	$(MAKE) -C rust-language-support/lib/rand/ clean
 	$(MAKE) -C tlaxcala/ clean
