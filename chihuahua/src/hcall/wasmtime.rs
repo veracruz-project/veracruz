@@ -14,7 +14,7 @@ use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 
-use std::{string::String, vec::Vec};
+use std::vec::Vec;
 
 use byteorder::{ByteOrder, LittleEndian};
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Trap, ValType};
