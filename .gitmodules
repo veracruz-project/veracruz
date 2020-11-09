@@ -10,11 +10,11 @@
 	path = psa-attestation/lib/mbed-crypto
 	url = https://github.com/veracruz-project/mbed-crypto.git
     branch = veracruz
-[submodule "sdk/rustlib/veracruz-getrandom"]
+[submodule "sdk/rust-language-support/lib/getrandom"]
 	path = sdk/rust-language-support/lib/getrandom
 	url = https://github.com/veracruz-project/getrandom.git
     branch = master
-[submodule "sdk/rustlib/veracruz-rand"]
+[submodule "sdk/rust-language-support/lib/rand"]
 	path = sdk/rust-language-support/lib/rand
 	url = https://github.com/veracruz-project/rand.git
     branch = master
