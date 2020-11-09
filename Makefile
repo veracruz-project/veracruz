@@ -57,9 +57,17 @@ sgx-sinaloa-test: sgx test_cases
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_debug --features sgx  -- --ignored --test-threads=1
 
+sgx-sinaloa-test-dry-run: sgx test_cases
+	cd sinaloa-test \
+		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run 
+
 sgx-sinaloa-performance: sgx test_cases
 	cd sinaloa-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_performance_ --features sgx -- --ignored 
+
+sgx-veracruz-test-dry-run: sgx test_cases
+	cd veracruz-test \
+		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run
 
 sgx-veracruz-test: sgx test_cases
 	cd veracruz-test \
