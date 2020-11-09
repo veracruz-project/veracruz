@@ -55,7 +55,7 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean fmt freestanding-chihuahua libveracruz veracruz-rt tlaxcala env
+.PHONY: all clean doc fmt freestanding-chihuahua libveracruz veracruz-rt tlaxcala env
 
 all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_EXAMPLES) freestanding-chihuahua libveracruz veracruz-rt veracruz-getrandom veracruz-rand
 
@@ -103,11 +103,19 @@ fmt:
 		$(MAKE) -C $$data fmt; \
 	done
 	for example in $(addprefix $(EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_EXAMPLES)))); do \
-        $(MAKE) -C $$example fmt; \
-    done
+        	$(MAKE) -C $$example fmt; \
+    	done
 	$(MAKE) -C freestanding-chihuahua/ fmt
 	$(MAKE) -C libveracruz/ fmt
 	$(MAKE) -C veracruz-rt/ fmt
+
+doc:
+	for example in $(addprefix $(EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_EXAMPLES)))); do \
+                $(MAKE) -C $$example doc; \
+        done
+	$(MAKE) -C freestanding-chihuahua/ doc
+	$(MAKE) -C libveracruz/ doc
+	$(MAKE) -C veracruz-rt/ doc
 
 clean:
 	for data in $(RELATIVE_DATA_GEN); do \
