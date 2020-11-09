@@ -16,7 +16,7 @@ use crate::return_code;
 use serde::Serialize;
 
 /// A function that writes a result back to the Veracruz host. The function
-/// fails with [`result_type::ErrorCode::InvariantFailed`] if the return value cannot be encoded as
+/// fails with [`return_code::ErrorCode::InvariantFailed`] if the return value cannot be encoded as
 /// Pinecone, or if the synthesized function has been called once already.
 pub fn write_result<T: Serialize>(result: T) -> return_code::Veracruz {
     match pinecone::to_vec(&result) {
