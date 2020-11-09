@@ -29,7 +29,7 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   private-set-intersection-sum \
 		   string-edit-distance
 RUST_EXAMPLE_DIR = rust-language-support/examples/
-# The actual WASM programs
+# The actual example WASM programs
 RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
 # All dataset filenames
 DATA = hello-world-1.dat \
