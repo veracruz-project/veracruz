@@ -1,5 +1,7 @@
 # Veracruz: privacy-preserving collaborative compute
 
+![CI build status](https://codebuild.eu-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoibDJ2ckFtVmtjcC9hSkZTV05LUHdON3hQeFRuMmFMN0RQZ0U0RTV6aVJFZVFZOHpOcHk0K3dodmhmNjk0aGN4SERjV08rRER3UURCWjFaVndOTFRHY1pVPSIsIml2UGFyYW1ldGVyU3BlYyI6ImVZRlB2aTdNcDJxQ3lsSUEiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
+
 Veracruz is a framework for defining and deploying collaborative, privacy-preserving computations amongst a group of mutually mistrusting individuals.
 Some potential use-cases for Veracruz include:
 
