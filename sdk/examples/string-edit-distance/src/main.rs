@@ -1,6 +1,6 @@
 //! String edit distance of two UTF-8 strings.
 //!
-//! ## Context
+//! ## Context
 //!
 //! Inputs:                  2.
 //! Assumed form of inputs:  UTF-8 strings to compare.
@@ -12,7 +12,7 @@
 //!
 //! The Veracruz Development Team.
 //!
-//! ## Copyright
+//! ## Copyright
 //!
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.

@@ -21,7 +21,7 @@
 //! Ensured form of outputs: A Pinecone-encoded Rust vector of `f64` values describing the parameters
 //!                          of the learnt logistic regression model.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

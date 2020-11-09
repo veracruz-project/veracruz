@@ -1,6 +1,6 @@
 //! Test of the trusted random source platform service.
 //!
-//! ## Context
+//! ## Context
 //!
 //! Test program for random number generation.
 //!
@@ -14,7 +14,7 @@
 //!
 //! The Veracruz Development Team.
 //!
-//! ## Copyright
+//! ## Copyright
 //!
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.

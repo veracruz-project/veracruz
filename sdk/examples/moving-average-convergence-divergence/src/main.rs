@@ -15,7 +15,7 @@
 //! Assumed form of inputs:  a Pinecone-encoded Rust vector of `f64` values.
 //! Ensured form of outputs: A Pinecone-encoded Rust vector of `f64` values.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

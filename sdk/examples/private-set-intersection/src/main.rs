@@ -1,6 +1,6 @@
 //! Private set intersection example.
 //!
-//! ## Context
+//! ## Context
 //!
 //! Inputs:                  an arbitrary number.
 //! Assumed form of inputs:  an arbitrary number of Pinecone-encoded `HashSet<Person>` (see below).

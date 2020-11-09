@@ -18,7 +18,7 @@
 //!                          a gradient and a Y-intercept, representing the best linear fit for the
 //!                          input data.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
