@@ -9,10 +9,13 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all clean fmt
+.PHONY: all clean doc fmt
 
 all:
 	cargo build --release
+
+doc:
+	cargo doc
 
 fmt:
 	cargo fmt

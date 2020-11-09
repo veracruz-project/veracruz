@@ -13,6 +13,9 @@ VERACRUZ_TARGET_PATH = $(shell cd ../ && pwd)
 all:
 	XARGO_RUST_SRC=$(RUST_STDLIB_SRC_DIR) RUST_TARGET_PATH=$(VERACRUZ_TARGET_PATH) xargo build --target wasm32-arm-veracruz --release
 
+doc:
+	cargo doc
+
 fmt:
 	cargo fmt
 
