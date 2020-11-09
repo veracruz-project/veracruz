@@ -19,7 +19,7 @@ https://api.portal.trustedservices.intel.com/EPID-attestation
 Clone the Veracruz repository:
 
 ```
-git clone git@github.com:veracruz-project/veracruz.git
+git clone git@github.com:veracruz-project/veracruz.git --recursive
 export VERACRUZ_ROOT=$PWD/veracruz
 ```
 Once you have a local copy of the Veracruz source and your token:
