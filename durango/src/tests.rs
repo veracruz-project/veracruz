@@ -17,9 +17,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-// NB: added to avoid a compile-failure in Rust's future's library.
-#![feature(proc_macro_hygiene)]
-
 const POLICY_FILENAME: &'static str = "../test-collateral/one_data_source_policy.json";
 const TRIPLE_POLICY_FILENAME: &'static str = "../test-collateral/triple_policy.json";
 const CLIENT_CERT_FILENAME: &'static str = "../test-collateral/client_rsa_cert.pem";
