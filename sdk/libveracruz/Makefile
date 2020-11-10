@@ -1,3 +1,14 @@
+# Makefile for Rust libveracruz
+#
+# # Authors
+#
+# The Veracruz Development Team.
+#
+# # Copyright and licensing
+#
+# See the `LICENSE.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
 PLATFORM = $(shell uname)
 
 ifeq ($(PLATFORM), Darwin)
