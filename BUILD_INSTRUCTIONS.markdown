@@ -16,11 +16,17 @@ token after creating an account here:
 
 https://api.portal.trustedservices.intel.com/EPID-attestation
 
+Clone the Veracruz repository:
+
+```
+git clone git@github.com:veracruz-project/veracruz.git --recursive
+export VERACRUZ_ROOT=$PWD/veracruz
+```
 Once you have a local copy of the Veracruz source and your token:
 
 ```
-cd SGXRustOPTEEDevelDocker
-make VERACRUZ_ROOT=<path to your veracruz directory> IAS_TOKEN=<your Intel Attestation Service token>
+cd veracruz-docker-image
+make IAS_TOKEN=<your Intel Attestation Service token>
 ````
 
 Note that building the Docker image will take a long time (we appreciate any
