@@ -1,13 +1,15 @@
 # Makefile for Rust libveracruz
 #
-# # Authors
+# AUTHORS
 #
 # The Veracruz Development Team.
 #
-# # Copyright and licensing
+# COPYRIGHT AND LICENSING
 #
 # See the `LICENSE.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
+
+.PHONY: all clean doc fmt
 
 PLATFORM = $(shell uname)
 
