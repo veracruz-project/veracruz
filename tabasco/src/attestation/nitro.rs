@@ -158,7 +158,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
         )?
         .ok_or(TabascoError::MissingFieldError("firmware version"))?
     };
-    let received_enclave_hash = &attestation_document.pcrs[4];
+    let received_enclave_hash = &attestation_document.pcrs[0];
     if expected_enclave_hash != *received_enclave_hash {
         println!("Comparision between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
         return Err(TabascoError::MismatchError {
