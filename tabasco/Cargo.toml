@@ -24,7 +24,7 @@ sgx = ["sgx_types", "sgx_ucrypto", "sgx_urts", "psa-attestation/sgx", "colima/sg
 # Note: Final attestation is always PSA. This is just to enable platforms
 # that use PSA for their native attestation.
 psa = ["psa-attestation/tz"]
-nitro = []
+nitro = [ "serde_cbor", "nitro-enclave-token" ]
 
 [dependencies]
 rouille = "3.0"
@@ -41,7 +41,7 @@ diesel = { version = "1.0.0", features = ["sqlite", "numeric" ] }
 dotenv = "0.9.0"
 hex = "0.3"
 psa-attestation = { path = "../psa-attestation" }
-ring = "0.16"
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 futures = "0.3"
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 actix-web = "2.0.0"
@@ -50,6 +50,9 @@ actix-http = "1.0"
 async-std = "1.5"
 env_logger = "0.7"
 err-derive = "0.2"
+serde_cbor = {version = "0.11", optional = true }
+nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main", optional = true }
+
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }

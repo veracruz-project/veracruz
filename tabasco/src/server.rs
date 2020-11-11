@@ -154,10 +154,14 @@ async fn psa_router(psa_request: web::Path<String>, input_data: String) -> Tabas
 #[allow(unused)]
 async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> TabascoResponder {
     #[cfg(feature = "nitro")]
-    if nitro_request.into_inner().as_str() == "AttestationToken" {
-        nitro::attestation_token(input_data)
-    } else {
-        Err(TabascoError::UnsupportedRequestError)
+    {
+        let inner = nitro_request.into_inner();
+        if inner.as_str() == "AttestationToken" {
+            nitro::attestation_token(input_data)
+        } else {
+            println!("Tabasco::nitro_router returning unsupported with into_inner:{:?}", inner.as_str());
+            Err(TabascoError::UnsupportedRequestError)
+        }
     }
     #[cfg(not(feature = "nitro"))]
     Err(TabascoError::UnimplementedRequestError)

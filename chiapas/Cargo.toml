@@ -12,3 +12,7 @@ byteorder = { version = "1.3" }
 veracruz-utils = { path = "../veracruz-utils", features = ["nitro"] }
 bincode = { git= "https://github.com/veracruz-project/bincode.git", branch= "veracruz", default-features=false }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"]}
+nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib" }
+nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io" }
+#ring = { version = "=0.16.11", feature = "dev_urandom_fallback" }
+ring = { path = "../ring", feature = "dev_urandom_fallback" }

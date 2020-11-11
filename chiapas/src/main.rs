@@ -6,6 +6,12 @@ use std::os::unix::io::RawFd;
 use veracruz_utils::{ChiapasMessage, NitroStatus};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+use ring;
+use ring::signature::{ EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING };
+use ring::signature::KeyPair;
+
+use nsm_lib;
+use nsm_io;
 
 //const CID: u32 = 17;
 const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
@@ -14,7 +20,13 @@ const PORT: u32 = 5005;
 // listen queue
 const BACKLOG: usize = 128;
 
+// the following value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
+// I've no idea where it came from (I've seen no documentation on this), but 
+// I guess I have to trust Amazon on this one
+const NSM_MAX_ATTESTATION_DOC_SIZE: usize =  (16 * 1024);
+
 lazy_static! {
+    static ref DEVICE_KEY_PAIR: Mutex<Option<EcdsaKeyPair>> = Mutex::new(None);
     static ref MEXICO_CITY_HASH: Mutex<Option<Vec<u8>>> = Mutex::new(None);
 }
 
@@ -75,10 +87,8 @@ fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, String> {
         let mut received_bytes = 0;
         println!("iterating until we receive len:{:?}", len);
         while received_bytes < len {
-            println!("iteration");
             received_bytes += match recv(fd, &mut buf[received_bytes..len], MsgFlags::empty()) {
                 Ok(size) => {
-                    println!("received:{:?}", size);
                     size
                 },
                 Err(nix::Error::Sys(EINTR)) => 0,
@@ -131,14 +141,71 @@ fn set_mexico_city_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
     Ok(NitroStatus::Success)
 }
 
+fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut att_doc: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
+
+    let mut att_doc_len: u32 = att_doc.len() as u32;
+    let device_public_key = {
+        let dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| format!("Chiapas::native_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
+        match &*dkp_guard {
+            Some(key) => key.public_key().clone(),
+            None => return Err(format!("Chiapas::native_attestation for some reason the DEVICE_KEY_PAIR is uninitialized. I don't know how you got here")),
+        }
+    };
+
+    let nsm_fd = nsm_lib::nsm_lib_init();
+    if nsm_fd < 0 {
+        return Err(format!("Chiapas::native_attestation nsm_lib_init failed:{:?}", nsm_fd));
+    }
+    let status = unsafe {
+        nsm_lib::nsm_get_attestation_doc(
+            nsm_fd, //fd
+            std::ptr::null(), // user_data
+            0, // user_data_len
+            challenge.as_ptr(), // nonce_data
+            challenge.len() as u32, // nonce_len
+            &device_public_key.as_ref()[0], // pub_key_data
+            device_public_key.as_ref().len() as u32, // pub_key_len
+            att_doc.as_mut_ptr(), // att_doc_data
+            &mut att_doc_len, // att_doc_len
+        )
+    };
+    match status {
+        nsm_io::ErrorCode::Success => (),
+        _ => return Err(format!("Chiapas::native_attestation received non-success error code from nsm_lib:{:?}", status)),
+    }
+    unsafe {
+        att_doc.set_len(att_doc_len as usize);
+    }
+    println!("chiapas::main::native_attestation returning token:{:?}", att_doc);
+    return Ok((att_doc, device_public_key.as_ref().to_vec()));
+}
+
 fn main() -> Result<(), String> {
-    let socket_fd = socket(
-        AddressFamily::Vsock,
-        SockType::Stream,
-        SockFlag::empty(),
-        None,
-    )
-    .map_err(|err| format!("Chiapas::main failed to create socket:{:?}", err))?;
+    // generate the device private key
+    // Let's try it as an EC key, because RSA is like, old, man.
+    let rng = ring::rand::SystemRandom::new();
+    println!("Chiapas::main generating key with rng. Which will probably hang, because why wouldn't it?");
+    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
+        .map_err(|err| {
+            format!("Error generating PKCS-8:{:?}", err)
+        })?
+        .as_ref().to_vec();
+    println!("Chiapas::main successfully generated key with rng. What the F do I know? I'm just a computer");
+    let device_key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &pkcs8_bytes)
+        .map_err(|err| {
+            format!("Chiapas::main from_pkcs8 failed:{:?}", err)
+        })?;
+    {
+        let mut dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| {
+            format!("Chiapas::main failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err)
+        })?;
+        *dkp_guard = Some(device_key_pair);
+    }
+
+    println!("Chiapas::main successfully did the stupid plkcs8 to \"internal\" conversion.");
+    let socket_fd = socket( AddressFamily::Vsock, SockType::Stream, SockFlag::empty(), None)
+        .map_err(|err| format!("Chiapas::main failed to create socket:{:?}", err))?;
 
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
@@ -162,13 +229,14 @@ fn main() -> Result<(), String> {
                 let status = set_mexico_city_hash_hack(hash)?;
                 ChiapasMessage::Status(status)
             },
-            //ChiapasMessage::NativeAttestation(challenge, device_id) => ,
-            _ => return Err(format!("Chiapas::main received unhandled message:{:?}", received_message)),
+            ChiapasMessage::NativeAttestation(challenge, device_id) => {
+                let (token, public_key) = native_attestation(&challenge, device_id).map_err(|err| format!("Chiapas::main native_attestation failed:{:?}", err))?;
+                ChiapasMessage::TokenData(token, public_key) 
+            },
+            _ => return Err(format!("Chiapas::main received floopy unhandled message:{:?}", received_message)),
         };
         let return_buffer = bincode::serialize(&return_message).map_err(|err| format!("Chiapas::main failed to serialize return_message:{:?}", err))?;
         println!("Chiapas::main returning return_buffer:{:?}", return_buffer);
         send_buffer(fd, &return_buffer).map_err(|err| format!("Chiapas::main failed to send return_buffer:{:?}", return_buffer))?;
     }
-
-    Ok(())
 }

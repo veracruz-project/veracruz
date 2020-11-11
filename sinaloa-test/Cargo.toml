@@ -15,10 +15,10 @@ nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "psa-attestation/nitro", "taba
 [dependencies]
 sinaloa = { path = "../sinaloa"}
 veracruz-utils = { path = "../veracruz-utils", features=["std"] }
-webpki = "0.21"                                               
-webpki-roots = "0.19"
-rustls = "0.16"
-ring = "0.16"
+webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz" }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 colima = { path = "../colima" }
 protobuf = "2.6"
 curl = "0.4.22"
@@ -50,4 +50,10 @@ sgx_ucrypto = { branch="veracruz", git = 'https://github.com/veracruz-project/in
 sgx_types = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+
+#[patch.'https://github.com/veracruz-project/webpki.git']
+#webpki = { path = "../webpki" }
+
+[patch.'https://github.com/veracruz-project/nitro-enclave-token']
+nitro-enclave-token = { path = "../nitro-enclave-token" }

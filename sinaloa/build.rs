@@ -15,7 +15,8 @@ use target_build_utils;
 
 fn main() {
     let target = target_build_utils::TargetInfo::new().expect("could not get target info");
-    if target.target_arch() == "x86_64" {
+    #[cfg(feature = "sgx")]
+    {
         let sdk_dir = env::var("SGX_SDK").unwrap_or_else(|_| "/work/sgxsdk".to_string());
         let is_sim = env::var("SGX_MODE").unwrap_or_else(|_| "HW".to_string());
 
@@ -33,7 +34,9 @@ fn main() {
             }
             _ => println!("cargo:rustc-link-lib=dylib=sgx_urts"), // Treat undefined as HW
         }
-    } else {
+    }
+    #[cfg(feature = "tz")]
+    {
         let out_dir = env::var("OUT_DIR").unwrap();
         let out_dir_arg = format!("OUT_DIR={:}", out_dir);
 

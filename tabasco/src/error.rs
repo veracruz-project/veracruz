@@ -74,6 +74,8 @@ pub enum TabascoError {
     UnsupportedRequestError,
     #[error(display = "Tabasco: Direct message {}.", _0)]
     DirectMessageError(String, StatusCode),
+    #[error(display = "Tabasco: cbor error {}.", _0)]
+    CborError(String),
 }
 
 #[cfg(feature = "sgx")]

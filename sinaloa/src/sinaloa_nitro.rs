@@ -288,22 +288,23 @@ pub mod sinaloa_nitro {
                 _ => return Err(SinaloaError::InvalidChiapasMessage(received_message)),
             };
 
-            println!("SinaloaNitro::native_attestation posting native_psa_attestation_token to tabasco");
-            SinaloaNitro::post_native_psa_attestation_token(tabasco_url, &token, device_id)?;
+            println!("SinaloaNitro::native_attestation posting native_attestation_token to tabasco");
+            SinaloaNitro::post_native_attestation_token(tabasco_url, &token, device_id)?;
             println!("sinaloa_tz::native_attestation returning Ok");
             return Ok(chiapas_enclave);
         }
 
-        fn post_native_psa_attestation_token(
+        fn post_native_attestation_token(
             tabasco_url: &String,
             token: &Vec<u8>,
             device_id: i32,
         ) -> Result<(), SinaloaError> {
-            println!("sinaloa_tz::post_psa_attestation_token started");
+            println!("sinaloa_nitro::post_native_attestation_token started");
             let serialized_tabasco_request =
                 colima::serialize_native_psa_attestation_token(token, device_id)?;
             let encoded_str = base64::encode(&serialized_tabasco_request);
-            let url = format!("{:}/PSA/AttestationToken", tabasco_url);
+            let url = format!("{:}/Nitro/AttestationToken", tabasco_url);
+            println!("sinaloa_nitro::post_native_attestation_token posting to URL{:?}", url);
             let response = crate::post_buffer(&url, &encoded_str)?;
 
             println!(

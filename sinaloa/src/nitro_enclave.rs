@@ -33,7 +33,7 @@ impl NitroEnclave {
         //}
 
         let enclave_result = Command::new("nitro-cli")
-            .args(&["run-enclave", "--eif-path", eif_path, "--cpu-count", "2", "--memory", "256", "--debug-mode=true"])
+            .args(&["run-enclave", "--eif-path", eif_path, "--cpu-count", "2", "--memory", "256",]) // "--debug-mode=true"])
             .output()?;
         let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr)?;
         println!("enclave_result_stderr:{:?}", enclave_result_stderr);
