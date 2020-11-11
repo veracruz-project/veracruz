@@ -122,7 +122,7 @@ impl ProtocolState {
             veracruz_utils::ExecutionStrategy::JIT => chihuahua::factory::ExecutionStrategy::JIT,
         };
 
-        match multi_threaded_chihuahua(
+        let host_state = multi_threaded_chihuahua(
             &execution_strategy,
             &expected_data_sources,
             expected_shutdown_sources
@@ -130,14 +130,14 @@ impl ProtocolState {
                 .map(|e| *e as u64)
                 .collect::<Vec<u64>>()
                 .as_slice(),
-        ) {
-            None => Err(MexicoCityError::InvalidExecutionStrategyError),
-            Some(host_state) => ProtocolState {
-                host_state,
-                global_policy,
-                global_policy_hash,
-            },
-        }
+        )
+        .ok_or(MexicoCityError::InvalidExecutionStrategyError)?;
+
+        Ok(ProtocolState {
+            host_state,
+            global_policy,
+            global_policy_hash,
+        })
     }
 
     /// Returns the global policy associated with the protocol state.
