@@ -4,7 +4,6 @@
 #   - freestanding-chihuahua
 #   - libveracruz
 #   - veracruz-rt
-#   - veracruz-getrandom and veracruz-rand in rustlib/
 #   - all of the examples in the examples/ directory
 #   - all of the datasets in data-generators/ directory
 #
@@ -57,7 +56,7 @@ RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
 .PHONY: all clean doc fmt freestanding-chihuahua libveracruz veracruz-rt tlaxcala env
 
-all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_EXAMPLES) freestanding-chihuahua libveracruz veracruz-rt veracruz-getrandom veracruz-rand
+all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_EXAMPLES) freestanding-chihuahua libveracruz veracruz-rt
 
 tlaxcala:
 	$(MAKE) -C tlaxcala
@@ -75,12 +74,6 @@ libveracruz: env
  
 veracruz-rt: env
 	$(MAKE) -C veracruz-rt/
-
-veracruz-getrandom: env
-	$(MAKE) -C rustlib/veracruz-getrandom/
-
-veracruz-rand: env
-	$(MAKE) -C rustlib/veracruz-rand/
 
 # Specify the dependency for all datasets
 $(addprefix $(DATASET_PATH),hello-world-1.dat hello-world-2.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/string-generator/,Makefile src/main.rs $$(notdir %.txt))
@@ -128,6 +121,4 @@ clean:
 	$(MAKE) -C freestanding-chihuahua/ clean
 	$(MAKE) -C libveracruz/ clean
 	$(MAKE) -C veracruz-rt/ clean
-	$(MAKE) -C rustlib/veracruz-getrandom/ clean
-	$(MAKE) -C rustlib/veracruz-rand/ clean
 	$(MAKE) -C tlaxcala/ clean
