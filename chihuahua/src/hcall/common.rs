@@ -3,18 +3,17 @@
 //! ## About
 //!
 //! The Veracruz H-call interface consists of the following functions:
-//!
-//!     - `__veracruz_hcall_input_count()` which returns the count of secret
-//!       data sources available to the program,
-//!     - `__veracruz_hcall_read_input()` which fills a WASM buffer with a
-//!       particular input,
-//!     - `__veracruz_hcall_input_size()` which returns the size, in bytes, of a
-//!       particular input,
-//!     - `__veracruz_hcall_write_output()` which can be used by the WASM
-//!       program to register its result by pointing the host to a WASM buffer
-//!       which is then copied into the host,
-//!     - `__veracruz_hcall_getrandom()` which fills a WASM buffer with random
-//!       bytes taken from a platform-specific entropy source.
+//! - `__veracruz_hcall_input_count()` which returns the count of secret
+//!   data sources available to the program,
+//! - `__veracruz_hcall_read_input()` which fills a WASM buffer with a
+//!   particular input,
+//! - `__veracruz_hcall_input_size()` which returns the size, in bytes, of a
+//!   particular input,
+//! - `__veracruz_hcall_write_output()` which can be used by the WASM
+//!   program to register its result by pointing the host to a WASM buffer
+//!   which is then copied into the host,
+//! - `__veracruz_hcall_getrandom()` which fills a WASM buffer with random
+//!   bytes taken from a platform-specific entropy source.
 //!
 //! The implementation of some of these functions relies on execution-engine
 //! specific details, so they are mostly implemented in the engine-specific
@@ -30,20 +29,19 @@
 //! track of the state of the host as material is provisioned into the Veracruz
 //! enclave, and is used by the host to implement some (actually, most) of the
 //! H-calls mentioned above.  In particular, the host state keeps track of:
-//!
-//!     - The number of expected data sources that the host is expecting,
-//!       derived from the policy,
-//!     - The number of expected data sources already provisioned, and various
-//!       bits of metadata about them (e.g. who provisioned them),
-//!     - The current machine state, e.g. `MachineState::ReadyToExecute`,
-//!     - Any result that the WASM program executing on Veracruz may have
-//!       written to the host with the `__veracruz_hcall_write_output()` H-call.
-//!       Note that this is stored as an uninterpreted set of bytes in the host,
-//!       the host doesn't necessarily know how to interpret it: that's a detail
-//!       to be agreed between the participants in the computation,
-//!     - Some WASM engine specific details, including a reference to the WASM
-//!       module executing and the linear memory of the module.  As these types
-//!       are engine-specific, we abstract over them with type-variables here.
+//! - The number of expected data sources that the host is expecting,
+//!   derived from the policy,
+//! - The number of expected data sources already provisioned, and various
+//!   bits of metadata about them (e.g. who provisioned them),
+//! - The current machine state, e.g. `MachineState::ReadyToExecute`,
+//! - Any result that the WASM program executing on Veracruz may have
+//!   written to the host with the `__veracruz_hcall_write_output()` H-call.
+//!   Note that this is stored as an uninterpreted set of bytes in the host,
+//!   the host doesn't necessarily know how to interpret it: that's a detail
+//!   to be agreed between the participants in the computation,
+//! - Some WASM engine specific details, including a reference to the WASM
+//!   module executing and the linear memory of the module.  As these types
+//!   are engine-specific, we abstract over them with type-variables here.
 //!
 //! We also include a lot of generic material for working with the host state,
 //! including functions for changing various values, and bumping the host state

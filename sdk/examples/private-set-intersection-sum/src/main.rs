@@ -6,7 +6,7 @@
 //! Assumed form of inputs:  an arbitrary number of Pinecone-encoded `HashSet<Person>` (see below).
 //! Ensured form of outputs: A Pinecone-encoded `HashSet<Person>` (see below).
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

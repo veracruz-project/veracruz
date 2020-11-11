@@ -1,6 +1,6 @@
 //! A trivial, no-operation example.
 //!
-//! ## Context
+//! ## Context
 //!
 //! A basic test for Veracruz.
 //!

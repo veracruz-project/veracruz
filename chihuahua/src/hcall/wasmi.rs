@@ -16,7 +16,7 @@ use platform_services::{getrandom, result};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
-    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, TrapKind, ValueType,
+    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
 
 use crate::{
