@@ -38,6 +38,8 @@ pub enum MexicoCityError {
     UnsafeCallError(&'static str, u32),
     #[error(display = "MexicoCity: Received no data.")]
     NoDataError,
+    #[error(display = "MexicoCity: Global policy requested an execution strategy unavailable on this platform.")]
+    InvalidExecutionStrategyError,
     #[error(display = "MexicoCity: Unavailable baja session with ID {}.", _0)]
     UnavailableBajaSessionError(u64),
     #[error(display = "MexicoCity: Unavailable protocol state.")]

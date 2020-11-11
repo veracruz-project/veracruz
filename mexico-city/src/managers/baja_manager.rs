@@ -24,11 +24,9 @@ pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
     }
 
     {
+        let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash.as_ref()))?;
         let mut protocol_state = super::PROTOCOL_STATE.lock()?;
-        *protocol_state = Some(ProtocolState::new(
-            policy.clone(),
-            hex::encode(policy_hash.as_ref()),
-        ));
+        *protocol_state = Some(state);
     }
 
     //TODO: change the error type
