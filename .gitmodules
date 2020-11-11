@@ -10,14 +10,6 @@
 	path = psa-attestation/lib/mbed-crypto
 	url = https://github.com/veracruz-project/mbed-crypto.git
     branch = veracruz
-[submodule "sdk/rustlib/veracruz-getrandom"]
-	path = sdk/rustlib/veracruz-getrandom
-	url = https://github.com/veracruz-project/getrandom.git
-    branch = master
-[submodule "sdk/rustlib/veracruz-rand"]
-	path = sdk/rustlib/veracruz-rand
-	url = https://github.com/veracruz-project/rand.git
-    branch = master
 [submodule "third_party/rust-sgx-sdk"]
 	path = third-party/rust-sgx-sdk
 	url = https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git
