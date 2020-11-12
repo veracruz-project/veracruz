@@ -180,7 +180,7 @@ private_set_intersection_sum.json: policy.template css.bin client_rsa_cert.pem p
 		--pi-binary private-set-intersection-sum.wasm --execution-strategy "\"Interpretation\""
 
 .SECONDEXPANSION:
-$(WASM_PROG_FILES) : %.wasm: ../sdk/examples/%/target/wasm32-arm-veracruz/release/$$@
+$(WASM_PROG_FILES) : %.wasm: ../sdk/rust-language-support/examples/%/target/wasm32-arm-veracruz/release/$$@
 	cp $< $@
 
 $(DATA_FILES) : %.dat: ../sdk/datasets/%.dat 
