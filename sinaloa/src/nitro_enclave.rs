@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use byteorder::{ByteOrder, LittleEndian};
 use crate::sinaloa::SinaloaError;
 use serde_json::Value;
-use veracruz_utils::vsocket;
+use veracruz_utils::{ receive_buffer, send_buffer, vsocket};
 
 pub struct NitroEnclave {
     enclave_id: String,
@@ -47,88 +47,16 @@ impl NitroEnclave {
         return Ok(enclave);
     }
 
-    fn read_length(&self) -> Result<usize, SinaloaError> {
-        println!("sinaloa::read_length started");
-        let mut buf = [0u8; 9];
-        let len = buf.len();
-        let mut received_bytes = 0;
-        while received_bytes < len {
-            println!("iter");
-            received_bytes += match recv(self.vsocksocket.as_raw_fd(), &mut buf[received_bytes..len], MsgFlags::empty()) {
-                Ok(size) => {
-                    println!("read some bytes:{:?}", size);
-                    size
-                },
-                Err(nix::Error::Sys(EINTR)) => {
-                    println!("EINTER");
-                    0
-                },
-                Err(err) => return Err(SinaloaError::NixError(err)),
-            }
-        }
-        println!("read_length returning");
-        Ok(LittleEndian::read_u64(&buf) as usize)
-    }
-
     pub fn send_buffer(&self, buffer: &Vec<u8>) -> Result<(), SinaloaError> {
         println!("send_buffer started");
-
-        let len = buffer.len();
-        // first, send the length of the buffer
-        {
-            let mut buf = [0u8; 9];
-            LittleEndian::write_u64(&mut buf, buffer.len() as u64);
-            let mut sent_bytes = 0;
-            while sent_bytes < buf.len() {
-                sent_bytes += match send(self.vsocksocket.as_raw_fd(), &buf[sent_bytes..buf.len()], MsgFlags::empty()) {
-                    Ok(size) => size,
-                    Err(nix::Error::Sys(EINTR)) => 0,
-                    Err(err) => {
-                        println!("send_buffer: Failed to send size.");
-                        return Err(SinaloaError::NixError(err))
-                    },
-                };
-            }
-
-        }
-        // next, send the buffer
-        {
-            let mut sent_bytes = 0;
-            while sent_bytes < len {
-                let size = match send(self.vsocksocket.as_raw_fd(), &buffer[sent_bytes..len], MsgFlags::empty()) {
-                    Ok(size) => size,
-                    Err(nix::Error::Sys(EINTR)) => 0,
-                    Err(err) => {
-                        return Err(SinaloaError::NixError(err))
-                    },
-                };
-                sent_bytes += size;
-            }
-        }
-        println!("send_buffer complete. Let's see if it's trying to close the socket (which I don't think I want it to do)");
-        return Ok(());
+        send_buffer(self.vsocksocket.as_raw_fd(), buffer)
+            .map_err(|err| SinaloaError::VeracruzSocketError(err))
     }
 
     pub fn receive_buffer(&self) -> Result<Vec<u8>, SinaloaError> {
         println!("nitro_enclave::receive_buffer started");
-
-        // first, read the length
-        let length = self.read_length()?;
-        println!("nitro_enclave::receive_buffer has received length:{:?}", length);
-        let mut buffer: Vec<u8> = vec![0; length];
-        // next, read the buffer
-        {
-            let mut received_bytes: usize = 0;
-            while received_bytes < length {
-                received_bytes += match recv(self.vsocksocket.as_raw_fd(), &mut buffer[received_bytes..length], MsgFlags::empty()) {
-                    Ok(size) => size,
-                    Err(nix::Error::Sys(EINTR)) => 0,
-                    Err(err) => return Err(SinaloaError::NixError(err)),
-                }
-            }
-        }
-        println!("nitro_enclave::receive_buffer has received buffer:{:?}", buffer);
-        return Ok(buffer);
+        receive_buffer(self.vsocksocket.as_raw_fd())
+            .map_err(|err| SinaloaError::VeracruzSocketError(err))
     }
 
     pub fn close(&self) -> Result<(), SinaloaError> {

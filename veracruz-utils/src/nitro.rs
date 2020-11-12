@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use nix::sys::socket::{accept, bind, recv, send, MsgFlags, SockAddr};
 use byteorder::{ByteOrder, LittleEndian};
 use std::os::unix::io::RawFd;
+use err_derive::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NitroStatus {
@@ -42,7 +43,13 @@ pub enum MCMessage {
     ResetEnclave,
 }
 
-pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), String> {
+#[derive(Debug, Error)]
+pub enum VeracruzSocketError {
+    #[error(display = "VeracruzSocketError: Nix Error: {:?}", _0)]
+    NixError(#[error(source)] nix::Error),
+}
+
+pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), VeracruzSocketError> {
     println!("Chiapas::send_buffer started with fd:{:?}", fd);
     let len = buffer.len();
     // first, send the length of the buffer
@@ -59,10 +66,7 @@ pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), String> {
                     //0
                 //},
                 Err(err) => {
-                    return Err(format!(
-                        "SinaloaNitro::send_buffer failed to send bytes of length:{:?}",
-                        err
-                    ))
+                    return Err(VeracruzSocketError::NixError(err));
                 }
             };
             println!("Chiapas::send_buffer has send this number of bytes so far:{:?}",sent_bytes);
@@ -77,10 +81,7 @@ pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), String> {
                 Ok(size) => size,
                 Err(nix::Error::Sys(_)) => 0,
                 Err(err) => {
-                    return Err(format!(
-                        "SinaloaNitro: send_buffer failed to send bytes:{:?}",
-                        err
-                    ))
+                    return Err(VeracruzSocketError::NixError(err));
                 }
             };
             sent_bytes += size;
@@ -90,7 +91,7 @@ pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), String> {
     return Ok(());
 }
 
-pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, String> {
+pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, VeracruzSocketError> {
     // first, read the length
     println!("Chiapas::receive_buffer started with fd:{:?}", fd);
     let length = {
@@ -106,10 +107,7 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, String> {
                 Err(nix::Error::Sys(EINTR)) => 0,
                 Err(err) => {
                     println!("I have experienced an error");
-                    return Err(format!(
-                        "SinaloaNitro::receive_buffer failed to read bytes of length:{:?}",
-                        err
-                    ))
+                    return Err(VeracruzSocketError::NixError(err));
                 }
             }
         }
@@ -129,10 +127,7 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, String> {
                 Ok(size) => size,
                 Err(nix::Error::Sys(EINTR)) => 0,
                 Err(err) => {
-                    return Err(format!(
-                        "SinaloaNitro::receive_buffer failed to read bytes to buffer:{:?}",
-                        err
-                    ))
+                    return Err(VeracruzSocketError::NixError(err));
                 }
             }
         }

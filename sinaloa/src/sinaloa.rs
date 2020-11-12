@@ -95,6 +95,9 @@ pub enum SinaloaError {
     #[cfg(feature = "nitro")]
     #[error(display = "Sinaloa: Serde Error")]
     SerdeError,
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Veracruz Socket Error:{:?}", _0)]
+    VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
     #[cfg(feature = "tz")]
     #[error(display = "Sinaloa: UUIDError: {:?}.", _0)]
     UUIDError(#[error(source)] uuid::parser::ParseError),
