@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
-#[cfg(feature = "tz")]
+#[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;

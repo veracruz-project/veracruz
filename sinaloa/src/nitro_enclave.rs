@@ -20,37 +20,16 @@ const VERACRUZ_PORT: u32 = 5005;
 impl NitroEnclave {
 
     pub fn new(eif_path: &str) -> Result<Self, SinaloaError> {
-        //#[allow(non_snake_case)]
-        // Allowing non-snake case so we can parse the JSON directly into the struct
-        //#[derive(Serialize, Deserialize)]
-        //struct StartEnclaveData {
-            //EnclaveId: String,
-            //ProcessId: i32,
-            //EnclaveCID: i32,
-            //NumberOfCPUs: u32,
-            //CPUIds: Vec<u32>,
-            //MemoryMiB: u32,
-        //}
-
         let enclave_result = Command::new("nitro-cli")
             .args(&["run-enclave", "--eif-path", eif_path, "--cpu-count", "2", "--memory", "256",]) // "--debug-mode=true"])
             .output()?;
         let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr)?;
         println!("enclave_result_stderr:{:?}", enclave_result_stderr);
         let enclave_result_stdout = enclave_result.stdout;
-            
 
         let enclave_result_text = std::str::from_utf8(&enclave_result_stdout)?;
         println!("enclave_result_text:{:?}", enclave_result_text);
         std::thread::sleep(std::time::Duration::from_millis(10000));
-
-        // Discard the first two lines
-        //let mut lines = enclave_result_text.lines();
-        //lines.next();
-        //lines.next();
-        // collect the rest in a string
-        //let enclave_result_json = 
-            //lines.fold(String::new(), |a, b| a + b + "\n");
 
         let enclave_data: Value =
             serde_json::from_str(enclave_result_text)?;
@@ -59,6 +38,7 @@ impl NitroEnclave {
         } else {
             serde_json::from_value(enclave_data["EnclaveCID"].clone()).unwrap()
         };
+
         let enclave: Self = NitroEnclave {
             enclave_id: enclave_data["EnclaveId"].to_string(),
             enclave_cid: cid,

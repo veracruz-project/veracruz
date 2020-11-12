@@ -1,3 +1,14 @@
+//! AWS Nitro-Enclaves-specific material for the Root Enclave
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+
 use byteorder::{ByteOrder, LittleEndian};
 use nix::sys::socket::listen as listen_vsock;
 use nix::sys::socket::{accept, bind, recv, send, MsgFlags, SockAddr};

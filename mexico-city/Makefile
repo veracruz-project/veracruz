@@ -12,7 +12,7 @@
 OUT_DIR?=.
 FINAL_DIR?=.
 
-.PHONY: all sgx trustzone clean deprecated
+.PHONY: all sgx trustzone clean deprecated nitro
 
 all: deprecated sgx
 
@@ -143,6 +143,18 @@ $(OUT_DIR)/mexico_city_enclave: $(TZ_Src)
 	@echo $(INFO_COLOR)"CARGO <=  $(TZ_Src)" $(RESET_COLOR)
 	@xargo build --target $(TZ_TARGET) --features tz --release --verbose --out-dir $(OUT_DIR) -Z unstable-options
 	@echo $(INFO_COLOR)"GEN   =>  mexico_city_enclave" $(RESET_COLOR)
+
+
+############# AWS Nitro Enclaves ###################
+Nitro_Src = $(COMMON_Src) src/mc_nitro.rs src/main.rs
+
+nitro: mexico_city.eif
+
+mexico_city.eif: target/x86_64-unknown-linux-musl/release/mexico_city_enclave Dockerfile
+	nitro-cli build-enclave --docker-dir . --docker-uri mexico_city --output-file mexico_city.eif
+
+target/x86_64-unknown-linux-musl/release/mexico_city_enclave: Cargo.toml $(Nitro_Src)
+	cargo build --target x86_64-unknown-linux-musl --release --features nitro
 
 clean:
 	@cargo clean
