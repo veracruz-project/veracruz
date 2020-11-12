@@ -1,3 +1,14 @@
+# Example Makefile
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
 PLATFORM = $(shell uname)
 
 ifeq ($(PLATFORM), Darwin)
@@ -8,7 +19,7 @@ ifeq ($(PLATFORM), Linux)
 	RUST_STDLIB_SRC_DIR ?= ~/.rustup/toolchains/nightly-2020-05-07-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/src
 endif
 
-VERACRUZ_TARGET_PATH = $(shell cd ../../ && pwd)
+VERACRUZ_TARGET_PATH = $(shell cd ../../../ && pwd)
 
 .PHONY: all doc clean fmt
 
