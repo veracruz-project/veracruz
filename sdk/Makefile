@@ -2,9 +2,8 @@
 #
 # Builds:
 #   - freestanding-chihuahua
-#   - libveracruz
-#   - veracruz-rt
-#   - all of the examples in the examples/ directory
+#   - Rust support libraries libveracruz and veracruz-rt
+#   - all of the Rust examples in the rust-language-support/examples/ directory
 #   - all of the datasets in data-generators/ directory
 #
 # AUTHORS
@@ -17,7 +16,7 @@
 # and copyright information.
 
 # All programs
-EXAMPLES = idash2017-logistic-regression \
+RUST_EXAMPLES = idash2017-logistic-regression \
 	   	   linear-regression \
 		   moving-average-convergence-divergence \
 		   private-set-intersection \
@@ -27,9 +26,9 @@ EXAMPLES = idash2017-logistic-regression \
 		   nop \
 		   private-set-intersection-sum \
 		   string-edit-distance
-EXAMPLE_DIR = examples/
+RUST_EXAMPLE_DIR = rust-language-support/examples/
 # Navigate to the actual wasm programs.
-RELATIVE_EXAMPLES = $(foreach EXAMPLE,$(EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(EXAMPLE_DIR), $(EXAMPLE))))
+RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
 # All dataset filenames
 DATA = hello-world-1.dat \
  	   hello-world-2.dat \
@@ -54,26 +53,26 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean doc fmt freestanding-chihuahua libveracruz veracruz-rt tlaxcala env
+.PHONY: all clean doc fmt freestanding-chihuahua rust-libveracruz rust-veracruz-rt tlaxcala env
 
-all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_EXAMPLES) freestanding-chihuahua libveracruz veracruz-rt
+all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-chihuahua rust-libveracruz rust-veracruz-rt
 
 tlaxcala:
 	$(MAKE) -C tlaxcala
 
 .SECONDEXPANSION:
-$(RELATIVE_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env tlaxcala
-	$(MAKE) -C $(addprefix $(EXAMPLE_DIR),$(basename $(notdir $@)))
+$(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUST_EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env tlaxcala
+	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@)))
 	./tlaxcala/bin/tlaxcala -c ./tlaxcala/tlaxcala_config.json $@
 
 freestanding-chihuahua: env
 	$(MAKE) -C freestanding-chihuahua/
 
-libveracruz: env
-	$(MAKE) -C libveracruz/
+rust-libveracruz: env
+	$(MAKE) -C rust-language-support/libveracruz/
  
-veracruz-rt: env
-	$(MAKE) -C veracruz-rt/
+rust-veracruz-rt: env
+	$(MAKE) -C rust-language-support/veracruz-rt/
 
 # Specify the dependency for all datasets
 $(addprefix $(DATASET_PATH),hello-world-1.dat hello-world-2.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/string-generator/,Makefile src/main.rs $$(notdir %.txt))
@@ -95,30 +94,30 @@ fmt:
 	for data in $(RELATIVE_DATA_GEN); do \
 		$(MAKE) -C $$data fmt; \
 	done
-	for example in $(addprefix $(EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_EXAMPLES)))); do \
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
         	$(MAKE) -C $$example fmt; \
     	done
 	$(MAKE) -C freestanding-chihuahua/ fmt
-	$(MAKE) -C libveracruz/ fmt
-	$(MAKE) -C veracruz-rt/ fmt
+	$(MAKE) -C rust-language-support/libveracruz/ fmt
+	$(MAKE) -C rust-language-support/veracruz-rt/ fmt
 
 doc:
-	for example in $(addprefix $(EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_EXAMPLES)))); do \
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
                 $(MAKE) -C $$example doc; \
         done
 	$(MAKE) -C freestanding-chihuahua/ doc
-	$(MAKE) -C libveracruz/ doc
-	$(MAKE) -C veracruz-rt/ doc
+	$(MAKE) -C rust-language-support/libveracruz/ doc
+	$(MAKE) -C rust-language-support/veracruz-rt/ doc
 
 clean:
 	for data in $(RELATIVE_DATA_GEN); do \
 		$(MAKE) -C $$data clean; \
 	done
 	rm -rf datasets
-	for example in $(addprefix $(EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_EXAMPLES)))); do \
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
 		$(MAKE) -C $$example clean; \
 	done
 	$(MAKE) -C freestanding-chihuahua/ clean
-	$(MAKE) -C libveracruz/ clean
-	$(MAKE) -C veracruz-rt/ clean
+	$(MAKE) -C rust-language-support/libveracruz/ clean
+	$(MAKE) -C rust-language-support/veracruz-rt/ clean
 	$(MAKE) -C tlaxcala/ clean
