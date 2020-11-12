@@ -1,3 +1,16 @@
+# Makefile for Rust libveracruz
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSE.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
+.PHONY: all clean doc fmt
+
 PLATFORM = $(shell uname)
 
 ifeq ($(PLATFORM), Darwin)
@@ -9,8 +22,6 @@ ifeq ($(PLATFORM), Linux)
 endif
 
 VERACRUZ_TARGET_PATH = $(shell cd ../../ && pwd)
-
-.PHONY: all doc clean fmt
 
 all:
 	XARGO_RUST_SRC=$(RUST_STDLIB_SRC_DIR) RUST_TARGET_PATH=$(VERACRUZ_TARGET_PATH) xargo build --target wasm32-arm-veracruz --release
