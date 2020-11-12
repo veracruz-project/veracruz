@@ -51,12 +51,17 @@ lazy_static! {
 /// **Panics** if the initialised host provisioning state is not in
 /// `LifecycleState::Initial` immediately after creation or if the global lock
 /// cannot be obtained.
-pub(crate) fn initialize(expected_data_sources: &[u64], expected_shutdown_sources: &[u64]) {
+pub(crate) fn initialize(
+    expected_data_sources: &[u64],
+    expected_stream_sources: &[u64],
+    expected_shutdown_sources: &[u64],
+) {
     let mut guard = HOST_PROVISIONING_STATE
         .lock()
         .expect("Failed to obtain lock on host provisioning state.");
 
     guard.set_expected_data_sources(expected_data_sources);
+    guard.set_expected_stream_sources(expected_stream_sources);
     guard.set_expected_shutdown_sources(expected_shutdown_sources);
 }
 

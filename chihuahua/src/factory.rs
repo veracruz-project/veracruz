@@ -82,8 +82,11 @@ pub fn single_threaded_chihuahua(
                 Some(Box::new(state))
             }
             ExecutionStrategy::JIT => {
-                //TODO change the initialize
-                wasmtime::initialize(expected_data_sources, expected_shutdown_sources);
+                wasmtime::initialize(
+                    expected_data_sources,
+                    expected_stream_sources,
+                    expected_shutdown_sources,
+                );
 
                 Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
             }
@@ -131,8 +134,11 @@ pub fn multi_threaded_chihuahua(
                 Some(Arc::new(Mutex::new(state)))
             }
             ExecutionStrategy::JIT => {
-                //TODO change the initialize
-                wasmtime::initialize(expected_data_sources, expected_shutdown_sources);
+                wasmtime::initialize(
+                    expected_data_sources,
+                    expected_stream_sources,
+                    expected_shutdown_sources,
+                );
 
                 Some(Arc::new(Mutex::new(
                     wasmtime::DummyWasmtimeHostProvisioningState::new(),
