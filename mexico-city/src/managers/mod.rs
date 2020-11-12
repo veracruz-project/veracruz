@@ -108,7 +108,10 @@ impl ProtocolState {
     /// Chihuahua factory into `Arc<Mutex<Chihuahua + 'static>>` as the latter
     /// satisfies the `Send` constraint imposed by statics in Rust whilst the
     /// former does not.
-    pub fn new(global_policy: VeracruzPolicy, global_policy_hash: String) -> Self {
+    pub fn new(
+        global_policy: VeracruzPolicy,
+        global_policy_hash: String,
+    ) -> Result<Self, MexicoCityError> {
         let expected_data_sources = global_policy.data_provision_order();
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
@@ -119,7 +122,6 @@ impl ProtocolState {
             veracruz_utils::ExecutionStrategy::JIT => chihuahua::factory::ExecutionStrategy::JIT,
         };
 
-        //TODO: use the unwrap for now.
         let host_state = multi_threaded_chihuahua(
             &execution_strategy,
             &expected_data_sources,
@@ -129,13 +131,13 @@ impl ProtocolState {
                 .collect::<Vec<u64>>()
                 .as_slice(),
         )
-        .unwrap();
+        .ok_or(MexicoCityError::InvalidExecutionStrategyError)?;
 
-        ProtocolState {
+        Ok(ProtocolState {
             host_state,
             global_policy,
             global_policy_hash,
-        }
+        })
     }
 
     /// Returns the global policy associated with the protocol state.
