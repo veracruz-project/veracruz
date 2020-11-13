@@ -13,7 +13,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use nix::sys::socket::listen as listen_vsock;
 use nix::sys::socket::{accept, bind, SockAddr};
 use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
-use veracruz_utils::{ChiapasMessage, NitroStatus};
+use veracruz_utils::{NitroRootEnclaveMessage, NitroStatus};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 use ring;
@@ -43,7 +43,7 @@ lazy_static! {
 }
 
 fn get_firmware_version() -> Result<String, String> {
-    println!("chiapas::get_firmware_version");
+    println!("nitro-root-enclave::get_firmware_version");
     let version = env!("CARGO_PKG_VERSION");
     return Ok(version.to_string());
 }
@@ -59,16 +59,16 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
 
     let mut att_doc_len: u32 = att_doc.len() as u32;
     let device_public_key = {
-        let dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| format!("Chiapas::native_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
+        let dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| format!("nitro-root-enclave::native_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
         match &*dkp_guard {
             Some(key) => key.public_key().clone(),
-            None => return Err(format!("Chiapas::native_attestation for some reason the DEVICE_KEY_PAIR is uninitialized. I don't know how you got here")),
+            None => return Err(format!("nitro-root-enclave::native_attestation for some reason the DEVICE_KEY_PAIR is uninitialized. I don't know how you got here")),
         }
     };
 
     let nsm_fd = nsm_lib::nsm_lib_init();
     if nsm_fd < 0 {
-        return Err(format!("Chiapas::native_attestation nsm_lib_init failed:{:?}", nsm_fd));
+        return Err(format!("nitro-root-enclave::native_attestation nsm_lib_init failed:{:?}", nsm_fd));
     }
     let status = unsafe {
         nsm_lib::nsm_get_attestation_doc(
@@ -85,12 +85,12 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
     };
     match status {
         nsm_io::ErrorCode::Success => (),
-        _ => return Err(format!("Chiapas::native_attestation received non-success error code from nsm_lib:{:?}", status)),
+        _ => return Err(format!("nitro-root-enclave::native_attestation received non-success error code from nsm_lib:{:?}", status)),
     }
     unsafe {
         att_doc.set_len(att_doc_len as usize);
     }
-    println!("chiapas::main::native_attestation returning token:{:?}", att_doc);
+    println!("nitro-root-enclave::main::native_attestation returning token:{:?}", att_doc);
     return Ok((att_doc, device_public_key.as_ref().to_vec()));
 }
 
@@ -98,58 +98,58 @@ fn main() -> Result<(), String> {
     // generate the device private key
     // Let's try it as an EC key, because RSA is like, old, man.
     let rng = ring::rand::SystemRandom::new();
-    println!("Chiapas::main generating key with rng. Which will probably hang, because why wouldn't it?");
+    println!("nitro-root-enclave::main generating key with rng. Which will probably hang, because why wouldn't it?");
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
         .map_err(|err| {
             format!("Error generating PKCS-8:{:?}", err)
         })?
         .as_ref().to_vec();
-    println!("Chiapas::main successfully generated key with rng. What the F do I know? I'm just a computer");
+    println!("nitro-root-enclave::main successfully generated key with rng. What the F do I know? I'm just a computer");
     let device_key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &pkcs8_bytes)
         .map_err(|err| {
-            format!("Chiapas::main from_pkcs8 failed:{:?}", err)
+            format!("nitro-root-enclave::main from_pkcs8 failed:{:?}", err)
         })?;
     {
         let mut dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| {
-            format!("Chiapas::main failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err)
+            format!("nitro-root-enclave::main failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err)
         })?;
         *dkp_guard = Some(device_key_pair);
     }
 
-    println!("Chiapas::main successfully did the stupid plkcs8 to \"internal\" conversion.");
+    println!("nitro-root-enclave::main successfully did the stupid plkcs8 to \"internal\" conversion.");
     let socket_fd = socket( AddressFamily::Vsock, SockType::Stream, SockFlag::empty(), None)
-        .map_err(|err| format!("Chiapas::main failed to create socket:{:?}", err))?;
+        .map_err(|err| format!("nitro-root-enclave::main failed to create socket:{:?}", err))?;
 
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
-    bind(socket_fd, &sockaddr).map_err(|err| format!("Chiapas::main bind failed:{:?}", err))?;
+    bind(socket_fd, &sockaddr).map_err(|err| format!("nitro-root-enclave::main bind failed:{:?}", err))?;
 
     listen_vsock(socket_fd, BACKLOG)
-        .map_err(|err| format!("Chiapas::main listen_vsock failed:{:?}", err))?;
+        .map_err(|err| format!("nitro-root-enclave::main listen_vsock failed:{:?}", err))?;
 
     let fd =
-        accept(socket_fd).map_err(|err| format!("Chiapas::main accept failed:{:?}", err))?;
+        accept(socket_fd).map_err(|err| format!("nitro-root-enclave::main accept failed:{:?}", err))?;
     loop {
         let received_buffer = receive_buffer(fd)
-            .map_err(|err| format!("Chiapas::main receive_buffer failed:{:?}", err))?;
-        let received_message: ChiapasMessage = bincode::deserialize(&received_buffer).map_err(|err| format!("Chiapas::main failed to parse received buffer as ChiapasMessage:{:?}", err))?;
+            .map_err(|err| format!("nitro-root-enclave::main receive_buffer failed:{:?}", err))?;
+        let received_message: NitroRootEnclaveMessage = bincode::deserialize(&received_buffer).map_err(|err| format!("nitro-root-enclave::main failed to parse received buffer as NitroRootEnclaveMessage:{:?}", err))?;
         let return_message = match received_message {
-            ChiapasMessage::FetchFirmwareVersion => {
-                let version = get_firmware_version().map_err(|err| format!("Chiapas::main failed to get version:{:?}", err))?;
-                ChiapasMessage::FirmwareVersion(version)
+            NitroRootEnclaveMessage::FetchFirmwareVersion => {
+                let version = get_firmware_version().map_err(|err| format!("nitro-root-enclave::main failed to get version:{:?}", err))?;
+                NitroRootEnclaveMessage::FirmwareVersion(version)
             },
-            ChiapasMessage::SetMexicoCityHashHack(hash) => {
+            NitroRootEnclaveMessage::SetMexicoCityHashHack(hash) => {
                 let status = set_mexico_city_hash_hack(hash)?;
-                ChiapasMessage::Status(status)
+                NitroRootEnclaveMessage::Status(status)
             },
-            ChiapasMessage::NativeAttestation(challenge, device_id) => {
-                let (token, public_key) = native_attestation(&challenge, device_id).map_err(|err| format!("Chiapas::main native_attestation failed:{:?}", err))?;
-                ChiapasMessage::TokenData(token, public_key) 
+            NitroRootEnclaveMessage::NativeAttestation(challenge, device_id) => {
+                let (token, public_key) = native_attestation(&challenge, device_id).map_err(|err| format!("nitro-root-enclave::main native_attestation failed:{:?}", err))?;
+                NitroRootEnclaveMessage::TokenData(token, public_key) 
             },
-            _ => return Err(format!("Chiapas::main received floopy unhandled message:{:?}", received_message)),
+            _ => return Err(format!("nitro-root-enclave::main received floopy unhandled message:{:?}", received_message)),
         };
-        let return_buffer = bincode::serialize(&return_message).map_err(|err| format!("Chiapas::main failed to serialize return_message:{:?}", err))?;
-        println!("Chiapas::main returning return_buffer:{:?}", return_buffer);
-        send_buffer(fd, &return_buffer).map_err(|err| format!("Chiapas::main failed to send return_buffer:{:?}", return_buffer))?;
+        let return_buffer = bincode::serialize(&return_message).map_err(|err| format!("nitro-root-enclave::main failed to serialize return_message:{:?}", err))?;
+        println!("nitro-root-enclave::main returning return_buffer:{:?}", return_buffer);
+        send_buffer(fd, &return_buffer).map_err(|err| format!("nitro-root-enclave::main failed to send return_buffer:{:?}", return_buffer))?;
     }
 }

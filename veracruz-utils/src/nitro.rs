@@ -13,7 +13,7 @@ pub enum NitroStatus {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum ChiapasMessage {
+pub enum NitroRootEnclaveMessage {
     Status(NitroStatus),
     FetchFirmwareVersion,
     FirmwareVersion(String),

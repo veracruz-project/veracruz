@@ -85,7 +85,7 @@ pub enum SinaloaError {
     InvalidMCMessage(veracruz_utils::MCMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "Sinaloa: Received Invalid Chiapas Message: {:?}", _0)]
-    InvalidChiapasMessage(veracruz_utils::ChiapasMessage),
+    InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "Sinaloa: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,

@@ -1,5 +1,5 @@
 [package]
-name = "chiapas"
+name = "nitro-root-enclave"
 version = "0.1.0"
 authors = ["Derek Miller <derek.miller@arm.com>"]
 edition = "2018"
