@@ -79,11 +79,8 @@ impl MexicoCityBuffer {
         &mut self,
         package: &DataPackage,
     ) -> Result<(), MexicoCityBufferError> {
-        let &DataPackage {
-            client_id,
-            package_id,
-            ..
-        } = package;
+        let client_id = package.get_client_id();
+        let package_id = package.get_package_id();
         if Self::buffer_package(&mut self.data, package) {
             Ok(())
         } else {
@@ -98,11 +95,8 @@ impl MexicoCityBuffer {
         &mut self,
         package: &DataPackage,
     ) -> Result<(), MexicoCityBufferError> {
-        let &DataPackage {
-            client_id,
-            package_id,
-            ..
-        } = package;
+        let client_id = package.get_client_id();
+        let package_id = package.get_package_id();
         if Self::buffer_package(&mut self.stream, package) {
             Ok(())
         } else {
@@ -118,11 +112,8 @@ impl MexicoCityBuffer {
         buffer: &mut HashMap<ClientID, HashMap<PackageID, DataPackage>>,
         package: &DataPackage,
     ) -> bool {
-        let &DataPackage {
-            client_id,
-            package_id,
-            ..
-        } = package;
+        let client_id = package.get_client_id();
+        let package_id = package.get_package_id();
         if !buffer.contains_key(&client_id) {
             buffer.insert(client_id, HashMap::new());
         }

@@ -91,11 +91,11 @@ pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
 #[derive(Clone, Debug)]
 pub struct DataSourceMetadata {
     /// The raw data (encoded in bytes) provisioned into the enclave.
-    pub data: Vec<u8>,
+    data: Vec<u8>,
     /// Who provisioned this data.
-    pub client_id: u64,
+    client_id: u64,
     /// The "serial number" for data issued by a single provisioner of data.
-    pub package_id: u64,
+    package_id: u64,
 }
 
 impl DataSourceMetadata {
