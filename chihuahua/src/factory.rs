@@ -75,9 +75,10 @@ pub fn single_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_stream_sources(expected_stream_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
             }
@@ -97,9 +98,10 @@ pub fn single_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_stream_sources(expected_stream_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
             }
@@ -127,9 +129,10 @@ pub fn multi_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_stream_sources(expected_stream_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(state)))
             }
@@ -151,9 +154,10 @@ pub fn multi_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_stream_sources(expected_stream_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(state)))
             }

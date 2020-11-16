@@ -356,20 +356,23 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
 
     /// Registers the number of expected data sources, `number`.
     #[inline]
-    pub(crate) fn set_expected_data_sources(&mut self, number: &[u64]) {
+    pub(crate) fn set_expected_data_sources(&mut self, number: &[u64]) -> &mut Self {
         self.expected_data_sources = number.to_vec();
+        self
     }
 
     /// Registers the number of expected stream sources, `number`.
     #[inline]
-    pub(crate) fn set_expected_stream_sources(&mut self, number: &[u64]) {
+    pub(crate) fn set_expected_stream_sources(&mut self, number: &[u64]) -> &mut Self {
         self.expected_stream_sources = number.to_vec();
+        self
     }
 
     /// Registers the number of expected data sources, `number`.
     #[inline]
-    pub(crate) fn set_expected_shutdown_sources(&mut self, client_ids: &[u64]) {
+    pub(crate) fn set_expected_shutdown_sources(&mut self, client_ids: &[u64]) -> &mut Self {
         self.expected_shutdown_sources = client_ids.to_vec();
+        self
     }
 
     /// Registers the program module.
@@ -1040,11 +1043,15 @@ pub trait Chihuahua: Send {
 
     /// Sets the expected data sources, through a list of their source IDs, that
     /// this computation is expecting.
-    fn set_expected_data_sources(&mut self, sources: &[u64]);
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
 
     /// Sets the expected stream sources, through a list of their source IDs, that
     /// this computation is expecting.
-    fn set_expected_stream_sources(&mut self, sources: &[u64]);
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+
+    /// Sets the expected shutdown sources, through a list of their source IDs, that
+    /// this computation is expecting.
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
 
     /// Registers the previous result.
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>);

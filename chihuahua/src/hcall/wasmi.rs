@@ -811,56 +811,6 @@ impl WasmiHostProvisioningState {
                     self.set_error();
                     Err(FatalHostError::WASMITrapError(trap))
                 }
-                //match trap.kind() {
-                //TrapKind::Host(host_trap) => {
-                //self.set_error();
-                //Err(format!("Host trap raised: {}.", host_trap))
-                //}
-                //TrapKind::DivisionByZero => {
-                //self.set_error();
-                //Err(format!("The WASM program divided by zero."))
-                //}
-                //TrapKind::ElemUninitialized => {
-                //self.set_error();
-                //Err(format!(
-                //"An element was not initialized in the WASM program."
-                //))
-                //}
-                //TrapKind::InvalidConversionToInt => {
-                //self.set_error();
-                //Err(format!(
-                //"The WASM program tried to execute an illegal integer conversion."
-                //))
-                //}
-                //TrapKind::MemoryAccessOutOfBounds => {
-                //self.set_error();
-                //Err(format!(
-                //"A memory access was out of bounds in the WASM program."
-                //))
-                //}
-                //TrapKind::StackOverflow => {
-                //self.set_error();
-                //Err(format!(
-                //"The WASM program exceeded the limits of its stack."
-                //))
-                //}
-                //TrapKind::TableAccessOutOfBounds => {
-                //self.set_error();
-                //Err(format!(
-                //"A table access was out of bounds in the WASM program."
-                //))
-                //}
-                //TrapKind::UnexpectedSignature => {
-                //self.set_error();
-                //Err(format!(
-                //"The WASM program contained an unexpected signature."
-                //))
-                //}
-                //TrapKind::Unreachable => {
-                //self.set_error();
-                //Err(format!("The WASM program executed unreachable code."))
-                //}
-                //},
                 Err(err) => {
                     self.set_error();
                     Err(FatalHostError::WASMIError(err))
@@ -965,13 +915,21 @@ impl Chihuahua for WasmiHostProvisioningState {
     }
 
     #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) {
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
         self.set_expected_data_sources(sources);
+        self
     }
 
     #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) {
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
         self.set_expected_stream_sources(sources);
+        self
+    }
+
+    #[inline]
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+        self.set_expected_stream_sources(sources);
+        self
     }
 
     #[inline]

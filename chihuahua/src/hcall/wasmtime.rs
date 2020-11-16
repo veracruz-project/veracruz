@@ -676,19 +676,30 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
     }
 
     #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) {
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
         HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
             .set_expected_data_sources(sources);
+        self
     }
 
     #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) {
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
         HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
             .set_expected_stream_sources(sources);
+        self
+    }
+
+    #[inline]
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .set_expected_shutdown_sources(sources);
+        self
     }
 
     #[inline]
