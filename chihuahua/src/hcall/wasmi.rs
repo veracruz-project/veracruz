@@ -674,7 +674,7 @@ impl WasmiHostProvisioningState {
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
             Some(memory) => {
-                let previous_result = self.get_previous_result();
+                let previous_result = self.get_previous_result().map(|e| e.clone());
                 let encoded_previous_result = pinecone::to_vec(&previous_result)?;
                 let encoded_previous_result_size = encoded_previous_result.len() as u32;
                 let result: Vec<u8> = encoded_previous_result_size.to_le_bytes().to_vec();
@@ -704,7 +704,7 @@ impl WasmiHostProvisioningState {
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
             Some(memory) => {
-                let previous_result = self.get_previous_result();
+                let previous_result = self.get_previous_result().map(|e| e.clone());
                 let encoded_previous_result = pinecone::to_vec(&previous_result)?;
 
                 if encoded_previous_result.len() > size as usize {

@@ -473,8 +473,8 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     /// IDs) associated with the Nth registered data source as stored in the
     /// host provisioning state, expressed by `index`.  Returns `None` iff
     /// `index` is not the index of any registered data source.
-    pub(crate) fn get_previous_result(&self) -> Option<Vec<u8>> {
-        self.previous_result.clone()
+    pub(crate) fn get_previous_result(&self) -> Option<&Vec<u8>> {
+        self.previous_result.as_ref()
     }
 
     /// Returns the client IDs of clients who are able to request platform
