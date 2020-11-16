@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use nix::sys::socket::{accept, bind, recv, send, MsgFlags, SockAddr};
+use nix::sys::socket::{recv, send, MsgFlags};
+use nix::errno::Errno::EINTR;
 use byteorder::{ByteOrder, LittleEndian};
 use std::os::unix::io::RawFd;
 use err_derive::Error;

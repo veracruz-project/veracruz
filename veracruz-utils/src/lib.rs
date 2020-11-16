@@ -38,3 +38,7 @@ pub use crate::nitro::*;
 pub mod vsocket;
 #[cfg(feature = "nitro")]
 pub use self::vsocket::*;
+#[cfg(feature = "nitro")]
+pub mod nitro_enclave;
+#[cfg(feature = "nitro")]
+pub use self::nitro_enclave::*;
