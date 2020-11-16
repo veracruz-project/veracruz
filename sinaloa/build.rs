@@ -9,14 +9,17 @@
 //! See the `LICENSE.markdown` file in the Veracruz root director for licensing
 //! and copyright information.
 
+#[cfg(any(feature = "sgx", feature = "tz"))]
 use std::env;
+#[cfg(feature = "tz")]
 use std::process::Command;
+#[cfg(feature = "sgx")]
 use target_build_utils;
 
 fn main() {
-    let target = target_build_utils::TargetInfo::new().expect("could not get target info");
     #[cfg(feature = "sgx")]
     {
+        let target = target_build_utils::TargetInfo::new().expect("could not get target info");
         let sdk_dir = env::var("SGX_SDK").unwrap_or_else(|_| "/work/sgxsdk".to_string());
         let is_sim = env::var("SGX_MODE").unwrap_or_else(|_| "HW".to_string());
 

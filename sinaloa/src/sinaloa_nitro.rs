@@ -1,4 +1,4 @@
-//! Arm Nitro-Enclave-specific material for Sinaloa
+//! Nitro-Enclave-specific material for Sinaloa
 //!
 //! ## Authors
 //!
@@ -15,9 +15,9 @@ pub mod sinaloa_nitro {
     use hex;
     use lazy_static::lazy_static;
     use std::sync::Mutex;
-    use veracruz_utils::{NitroRootEnclaveMessage, MCMessage, NitroStatus };
-    use crate::nitro_enclave::NitroEnclave;
+    use veracruz_utils::{NitroRootEnclaveMessage, NitroEnclave, MCMessage, NitroStatus };
     use crate::sinaloa::SinaloaError;
+    use crate::ec2_instance::EC2Instance;
 
     const MEXICO_CITY_EIF_PATH: &str = "../mexico-city/mexico_city.eif";
     const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "../nitro-root-enclave/nitro_root_enclave.eif";
@@ -48,7 +48,8 @@ pub mod sinaloa_nitro {
                 }
             }
 
-            let mexico_city_enclave = NitroEnclave::new(MEXICO_CITY_EIF_PATH)?;
+            let mexico_city_enclave = NitroEnclave::new(MEXICO_CITY_EIF_PATH)
+                .map_err(|err| SinaloaError::NitroError(err))?;
             let meta = Self {
                 enclave: mexico_city_enclave,
             };
@@ -245,6 +246,11 @@ pub mod sinaloa_nitro {
             mexico_city_hash: &String,
         ) -> Result<NitroEnclave, SinaloaError> {
             println!("SinaloaNitro::native_attestation started");
+
+            println!("Starting EC2 instance");
+            let instance = EC2Instance::new()
+                .map_err(|err| SinaloaError::EC2Error(err))?;
+            instance.close();
             let nre_enclave = NitroEnclave::new(NITRO_ROOT_ENCLAVE_EIF_PATH)?;
 
             println!("SinaloaNitro::native_attstation new completed. fetching firmware version");
@@ -283,7 +289,7 @@ pub mod sinaloa_nitro {
             // data returned is token, public key
             let return_buffer = nre_enclave.receive_buffer()?;
             let received_message = bincode::deserialize(&return_buffer)?;
-            let (token, public_key) = match received_message {
+            let (token, _public_key) = match received_message {
                 NitroRootEnclaveMessage::TokenData(tok, pubkey) => (tok, pubkey),
                 _ => return Err(SinaloaError::InvalidNitroRootEnclaveMessage(received_message)),
             };

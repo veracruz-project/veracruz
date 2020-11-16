@@ -11,17 +11,10 @@
 
 use crate::error::*;
 use lazy_static::lazy_static;
-use psa_attestation::{
-    q_useful_buf_c, t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA, t_cose_key,
-    t_cose_key__bindgen_ty_1, t_cose_parameters, t_cose_sign1_set_verification_key,
-    t_cose_sign1_verify, t_cose_sign1_verify_ctx, t_cose_sign1_verify_delete_public_key,
-    t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
-};
 use rand::Rng;
-use std::{collections::HashMap, ffi::c_void, sync::Mutex};
-use std::convert::TryFrom;
+use std::{collections::HashMap, sync::Mutex};
 
-use nitro_enclave_token::{ AttestationDocument, NitroToken, };
+use nitro_enclave_token::NitroToken;
 
 static AWS_NITRO_ROOT_CERTIFICATE: [u8; 533] = [
     0x30, 0x82, 0x02, 0x11, 0x30, 0x82, 0x01, 0x96, 0xa0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x11, 0x00,

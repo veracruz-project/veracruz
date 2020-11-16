@@ -15,6 +15,9 @@ use curl::easy::{Easy, List};
 use err_derive::Error;
 use log::debug;
 use std::io::Read;
+use veracruz_utils::nitro_enclave::NitroError;
+#[cfg(feature = "nitro")]
+use crate::ec2_instance::EC2Error;
 
 pub type SinaloaResponder = Result<String, SinaloaError>;
 
@@ -98,6 +101,12 @@ pub enum SinaloaError {
     #[cfg(feature = "nitro")]
     #[error(display = "Sinaloa: Veracruz Socket Error:{:?}", _0)]
     VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Nitro Error:{:?}", _0)]
+    NitroError(#[error(source)] NitroError),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: EC2 Error:{:?}", _0)]
+    EC2Error(#[error(source)] EC2Error),
     #[cfg(feature = "tz")]
     #[error(display = "Sinaloa: UUIDError: {:?}.", _0)]
     UUIDError(#[error(source)] uuid::parser::ParseError),
@@ -154,6 +163,8 @@ pub enum SinaloaError {
     DirectMessageError(String, StatusCode),
     #[error(display = "Sinaloa: Error message {}.", _0)]
     DirectStrError(&'static str),
+    #[error(display = "Sinaloa: Unimplemented")]
+    UnimplementedError,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for SinaloaError {

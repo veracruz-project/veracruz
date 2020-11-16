@@ -31,4 +31,4 @@ pub mod sinaloa_nitro;
 pub use self::sinaloa_nitro::sinaloa_nitro::*;
 
 #[cfg(feature = "nitro")]
-mod nitro_enclave;
+mod ec2_instance;
