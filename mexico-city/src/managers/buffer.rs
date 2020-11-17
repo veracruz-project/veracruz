@@ -1,22 +1,27 @@
+//! Buffer for program and data.
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+
 use err_derive::Error;
 use std::{collections::HashMap, result::Result, vec::Vec};
 
 type ClientID = u64;
 type PackageID = u64;
 type DataPackage = chihuahua::hcall::common::DataSourceMetadata;
-//pub struct DataSourceMetadata {
-///// The raw data (encoded in bytes) provisioned into the enclave.
-//pub data: Vec<u8>,
-///// Who provisioned this data.
-//pub client_id: u64,
-//pub package_id: u64,
-//}
 
-// TODO: ERROR might propagate outside of this crate?
+/// Error type for mexico-city buffer.
 #[derive(Clone, Debug, Error)]
 pub enum MexicoCityBufferError {
+    /// There is already a buffered program.
     #[error(display = "Already have a buffered program.")]
     AlreadyHaveBufferedProgram,
+    /// Duplicated (static) data package.
     #[error(
         display = "Already have a data package from client {} with id {}.",
         client_id,
@@ -26,6 +31,7 @@ pub enum MexicoCityBufferError {
         client_id: ClientID,
         package_id: PackageID,
     },
+    /// Duplicated stream package.
     #[error(
         display = "Already have a stream package from client {} with id {}.",
         client_id,
@@ -35,8 +41,10 @@ pub enum MexicoCityBufferError {
         client_id: ClientID,
         package_id: PackageID,
     },
+    /// No buffered program.
     #[error(display = "There is no buffered program.")]
     NoBufferedProgram,
+    /// No buffered (static) data.
     #[error(
         display = "There is no buffered data package from client {} with id {}.",
         client_id,
@@ -46,8 +54,19 @@ pub enum MexicoCityBufferError {
         client_id: ClientID,
         package_id: PackageID,
     },
+    /// No buffered (static) data.
+    #[error(
+        display = "There is no buffered stream package from client {} with id {}.",
+        client_id,
+        package_id
+    )]
+    NoBufferedStream {
+        client_id: ClientID,
+        package_id: PackageID,
+    },
 }
 
+/// Buffer for storing program, (static) data, and stream data.
 pub(crate) struct MexicoCityBuffer {
     // Program in binary form, initially None.
     program: Option<Vec<u8>>,
@@ -58,6 +77,7 @@ pub(crate) struct MexicoCityBuffer {
 }
 
 impl MexicoCityBuffer {
+    /// Initialize a new empty buffer.
     pub(crate) fn new() -> Self {
         MexicoCityBuffer {
             program: None,
@@ -66,6 +86,7 @@ impl MexicoCityBuffer {
         }
     }
 
+    /// Buffer a program. Raise an error if there is already a program.
     pub(crate) fn buffer_program(&mut self, prog: &[u8]) -> Result<(), MexicoCityBufferError> {
         if self.program.is_some() {
             Err(MexicoCityBufferError::AlreadyHaveBufferedProgram)
@@ -75,6 +96,7 @@ impl MexicoCityBuffer {
         }
     }
 
+    /// Buffer a (static) data package. Raise an error if it is a duplicated data package.
     pub(crate) fn buffer_data(
         &mut self,
         package: &DataPackage,
@@ -91,6 +113,7 @@ impl MexicoCityBuffer {
         }
     }
 
+    /// Buffer a stream data package. Raise an error if it is a duplicated stream package.
     pub(crate) fn buffer_stream(
         &mut self,
         package: &DataPackage,
@@ -107,7 +130,7 @@ impl MexicoCityBuffer {
         }
     }
 
-    // Add the data package into buffer and return true if it does not exist, otherwise false
+    /// Add the data package into `buffer` and return true if it does not exist, otherwise false.
     fn buffer_package(
         buffer: &mut HashMap<ClientID, HashMap<PackageID, DataPackage>>,
         package: &DataPackage,
@@ -140,6 +163,8 @@ impl MexicoCityBuffer {
             .ok_or(MexicoCityBufferError::NoBufferedProgram)
     }
 
+    /// Fetch a buffered (static) data of a client and a package ID.
+    /// Return an error if the data does not exist.
     pub(crate) fn get_data(
         &self,
         client_id: ClientID,
@@ -153,7 +178,7 @@ impl MexicoCityBuffer {
         )
     }
 
-    /// Fetch all (initial) data packages
+    /// Fetch all (static) data packages
     pub(crate) fn all_data(&self) -> Result<Vec<DataPackage>, MexicoCityBufferError> {
         Ok(self
             .data
@@ -163,20 +188,22 @@ impl MexicoCityBuffer {
             .concat())
     }
 
+    /// Fetch a buffered stream data of a client and a package ID.
+    /// Return an error if the data does not exist.
     pub(crate) fn get_stream(
         &self,
         client_id: ClientID,
         package_id: PackageID,
     ) -> Result<&DataPackage, MexicoCityBufferError> {
         Self::get_package(&self.data, client_id, package_id).ok_or(
-            MexicoCityBufferError::NoBufferedData {
+            MexicoCityBufferError::NoBufferedStream {
                 client_id,
                 package_id,
             },
         )
     }
 
-    // Fetch the buffered package. If the package does not exist, return None.
+    /// Fetch the buffered package. If the package does not exist, return None.
     fn get_package(
         buffer: &HashMap<ClientID, HashMap<PackageID, DataPackage>>,
         client_id: ClientID,
