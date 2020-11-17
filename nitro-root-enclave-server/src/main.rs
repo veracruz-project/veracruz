@@ -13,6 +13,7 @@ use base64;
 use bincode;
 use colima;
 use curl::easy::{Easy, List};
+use clap::{Arg, App};
 use err_derive::Error;
 use hex;
 use nix::sys::socket::{
@@ -60,9 +61,15 @@ pub enum NitroServerError {
 
 fn main() {
     println!("Hello, world!");
+    let matches = App::new("nitro-root-enclave-server")
+        .arg(Arg::with_name("tabasco")
+            .takes_value(true)
+            .help("URL for Tabasco server"))
+        .get_matches();
+    let tabasco_url = matches.value_of("tabasco").unwrap();
 
     // first, start the nitro-root-enclave
-    let enclave = native_attestation(TABASCO_URL, NITRO_ROOT_ENCLAVE_EIF_PATH)
+    let enclave = native_attestation(tabasco_url, NITRO_ROOT_ENCLAVE_EIF_PATH)
         .expect("Failed to perform native attestion");
 
     let socket_fd = socket(
