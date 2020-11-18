@@ -654,8 +654,8 @@ mod tests {
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
-        data_id_pathes: &[(u64, &str)],
-        stream_id_pathes: &[(u64, &str)],
+        data_id_paths: &[(u64, &str)],
+        stream_id_paths: &[(u64, &str)],
         // if there is an attestation
         attestation_flag: bool,
     ) -> Result<(), SinaloaError> {
@@ -726,18 +726,18 @@ mod tests {
             time_server_boot.elapsed().as_micros()
         );
 
-        // Need to clone pathes to concreate strings,
+        // Need to clone paths to concreate strings,
         // so the ownership can be transferred into a client thread.
         let program_path: Option<String> = program_path.map(|p| p.to_string());
         // Assuming we are using single data provider,
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
-        let data_id_pathes: Vec<_> = data_id_pathes
+        let data_id_paths: Vec<_> = data_id_paths
             .iter()
             .map(|(number, path)| (number.clone(), path.to_string()))
             .collect();
-        let stream_id_pathes: Vec<_> = stream_id_pathes
+        let stream_id_paths: Vec<_> = stream_id_paths
             .iter()
             .map(|(number, path)| (number.clone(), path.to_string()))
             .collect();
@@ -807,7 +807,7 @@ mod tests {
             }
 
             info!("### Step 6.  Data providers provision secret data.");
-            for (package_id, data_path) in data_id_pathes.iter() {
+            for (package_id, data_path) in data_id_paths.iter() {
                 info!(
                     "             Data providers provision secret data #{}.",
                     package_id
@@ -860,14 +860,14 @@ mod tests {
                     time_data.elapsed().as_micros()
                 );
             }
-            // If stream_id_pathes is NOT empty, we are in streaming mode
-            if !stream_id_pathes.is_empty() {
+            // If stream_id_paths is NOT empty, we are in streaming mode
+            if !stream_id_paths.is_empty() {
                 info!("### Step 7.  Stream providers request the program hash.");
 
                 let mut id_vec = Vec::new();
                 let mut stream_data_vec = Vec::new();
 
-                for (package_id, data_path) in stream_id_pathes.iter() {
+                for (package_id, data_path) in stream_id_paths.iter() {
                     id_vec.push(*package_id);
                     let data = {
                         let mut data_file = std::fs::File::open(data_path)?;
@@ -1127,16 +1127,6 @@ mod tests {
             .join()
             .map_err(|e| SinaloaError::JoinError(e))??;
         Ok(())
-        // Check if the debug flag is correct. This test only makes sense for SGX
-        // in which the enclave debug information is dumped out via ocall to log environment
-        // in the host.
-        //.and_then(|_| {
-        //if *DEBUG_IS_CALLED_HASH.lock().unwrap().get(&ticket).unwrap() && !debug_flag {
-        //Err("The debug flag is not set in policy while there are debug messages. Something is wrong inside enclave.".to_string())
-        //} else {
-        //Ok(())
-        //}
-        //})
     }
 
     /// Auxiliary function: apply functor to all the policy file (json file) in the path
