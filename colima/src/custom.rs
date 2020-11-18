@@ -30,12 +30,14 @@ pub enum ColimaError {
 }
 type ColimaResult = Result<std::vec::Vec<u8>, ColimaError>;
 
+/// Parse a request to mexico-city.
 pub fn parse_mexico_city_request(buffer: &[u8]) -> Result<colima::MexicoCityRequest, ColimaError> {
     Ok(protobuf::parse_from_bytes::<colima::MexicoCityRequest>(
         buffer,
     )?)
 }
 
+/// Parse a response from mexico-city.
 pub fn parse_mexico_city_response(
     buffer: &[u8],
 ) -> Result<colima::MexicoCityResponse, ColimaError> {
@@ -167,6 +169,7 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> colima::SgxQuote {
     result
 }
 
+/// Serialize a program binary.
 pub fn serialize_program(program_buffer: &[u8]) -> ColimaResult {
     let mut program = colima::Program::new();
     program.set_code(program_buffer.to_vec());
@@ -176,6 +179,7 @@ pub fn serialize_program(program_buffer: &[u8]) -> ColimaResult {
     Ok(abs.write_to_bytes()?)
 }
 
+/// Serialize a (static) data package and its package ID.
 pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> ColimaResult {
     let mut data = colima::Data::new();
     data.set_data(data_buffer.to_vec());
@@ -186,6 +190,7 @@ pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> ColimaResu
     Ok(colima.write_to_bytes()?)
 }
 
+/// Serialize the request for querying enclave state.
 pub fn serialize_request_enclave_state() -> ColimaResult {
     let command = colima::RequestState::new();
     let mut request = colima::MexicoCityRequest::new();
@@ -194,6 +199,7 @@ pub fn serialize_request_enclave_state() -> ColimaResult {
     Ok(request.write_to_bytes()?)
 }
 
+/// Serialize a stream data package and its package ID.
 pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> ColimaResult {
     let mut data = colima::Data::new();
     data.set_data(data_buffer.to_vec());
@@ -204,6 +210,7 @@ pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> ColimaResult {
     Ok(colima.write_to_bytes()?)
 }
 
+/// Serialize the request for querying the result.
 pub fn serialize_request_result() -> ColimaResult {
     let command = colima::RequestResult::new();
     let mut request = colima::MexicoCityRequest::new();
@@ -212,6 +219,7 @@ pub fn serialize_request_result() -> ColimaResult {
     Ok(request.write_to_bytes()?)
 }
 
+/// Serialize the request for shutting down the enclave.
 pub fn serialize_request_shutdown() -> ColimaResult {
     let command = colima::RequestShutdown::new();
     let mut request = colima::MexicoCityRequest::new();
@@ -229,6 +237,7 @@ pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> Colima
     Ok(request.write_to_bytes()?)
 }
 
+/// Serialize the request for signalling the next round of computation.
 pub fn serialize_request_next_round() -> ColimaResult {
     let command = colima::RequestNextRound::new();
     let mut request = colima::MexicoCityRequest::new();
@@ -368,6 +377,7 @@ pub fn parse_psa_attestation_init(
     Ok((pai.get_challenge().to_vec(), pai.get_device_id()))
 }
 
+/// Serialize the request for querying the hash of the provisioned program.
 pub fn serialize_request_pi_hash() -> ColimaResult {
     let mut request = colima::MexicoCityRequest::new();
     let rph = colima::RequestPiHash::new();
@@ -375,6 +385,7 @@ pub fn serialize_request_pi_hash() -> ColimaResult {
     Ok(request.write_to_bytes()?)
 }
 
+/// Serialize the request for querying the enclave policy.
 pub fn serialize_request_policy_hash() -> ColimaResult {
     let mut request = colima::MexicoCityRequest::new();
     let rph = colima::RequestPolicyHash::new();
@@ -382,6 +393,7 @@ pub fn serialize_request_policy_hash() -> ColimaResult {
     Ok(request.write_to_bytes()?)
 }
 
+/// Serialize the request for querying state of the enclave.
 pub fn serialize_machine_state(machine_state: u8) -> ColimaResult {
     let mut response = colima::MexicoCityResponse::new();
 
@@ -395,6 +407,7 @@ pub fn serialize_machine_state(machine_state: u8) -> ColimaResult {
     Ok(response.write_to_bytes()?)
 }
 
+/// Serialize a response containing the program hash.
 pub fn serialize_pi_hash(hash: &[u8]) -> ColimaResult {
     let mut response = colima::MexicoCityResponse::new();
 
@@ -406,6 +419,7 @@ pub fn serialize_pi_hash(hash: &[u8]) -> ColimaResult {
     Ok(response.write_to_bytes()?)
 }
 
+/// Serialize a response containing the policy hash.
 pub fn serialize_policy_hash(hash: &[u8]) -> ColimaResult {
     let mut response = colima::MexicoCityResponse::new();
 
@@ -417,6 +431,7 @@ pub fn serialize_policy_hash(hash: &[u8]) -> ColimaResult {
     Ok(response.write_to_bytes()?)
 }
 
+/// Serialize an empty response.
 pub fn serialize_empty_response(status: i32) -> ColimaResult {
     let mut response = colima::MexicoCityResponse::new();
     let encoded_status =
@@ -426,6 +441,7 @@ pub fn serialize_empty_response(status: i32) -> ColimaResult {
     Ok(response.write_to_bytes()?)
 }
 
+/// Serialize a response containing the computation result.
 pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> ColimaResult {
     let mut response = colima::MexicoCityResponse::new();
 
