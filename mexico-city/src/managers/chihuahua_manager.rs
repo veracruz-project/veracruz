@@ -242,7 +242,8 @@ fn dispatch_on_program(
 /// data then we stay in state `LifecycleState::DataSourcesLoading`, otherwise
 /// if this represents the last data provisioning step then the host
 /// provisioning state automatically switches to
-/// `LifecycleState::ReadyToExecute`.
+/// `LifecycleState::ReadyToExecute` or `LifecycleState::StreamSourcesLoading`
+/// if stream data is required.
 fn dispatch_on_data(
     protocol_state: &ProtocolState,
     colima::Data {
@@ -291,10 +292,12 @@ fn dispatch_on_data(
     }
 }
 
-//TODO CHANGE to match the new structure
-/// We must be in the correct data sources loading state to be able to continue
-/// provisioning data into the machine.  Check this now to avoid nasty runtime
-/// failures...
+/// Provisions a stream source into the host provisioning state.  Fails if we are
+/// not in `LifecycleState::StreamSourcesLoading`.  If we are still expecting more
+/// data then we stay in state `LifecycleState::StreamSourcesLoading`, otherwise
+/// if this represents the last data provisioning step then the host
+/// provisioning state automatically switches to
+/// `LifecycleState::ReadyToExecute`.
 fn dispatch_on_stream(
     protocol_state: &ProtocolState,
     colima::Data {
@@ -339,6 +342,9 @@ fn dispatch_on_stream(
     }
 }
 
+/// Signals the next round of computation. It will reload the program and all (static) data,
+/// and load the current result as the `previous_result` for the next round.
+/// Fails if the enclave is not in `LifecycleState::FinishedExecuting`.
 fn dispatch_on_next_round(
     protocol_state: &mut ProtocolState,
 ) -> (Option<ProtocolState>, ProvisioningResult) {
@@ -361,7 +367,8 @@ fn dispatch_on_next_round(
     }
 }
 
-/// Allocate a new protocol state
+/// Allocates a new protocol state, reloads the program and all (static) data,
+/// and loads the current result as the `previous_result` for the new instance.
 fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, MexicoCityError> {
     let mut new_protocol_state = ProtocolState::new(
         old_protocol_state.get_policy().clone(),
