@@ -224,6 +224,7 @@ impl ProtocolState {
         Ok(self.host_state.lock()?.get_result().map(|o| o.clone()))
     }
 
+    /// Sets the `previous_result` field.
     pub(crate) fn set_previous_result(
         &mut self,
         result: &Option<Vec<u8>>,
