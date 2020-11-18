@@ -354,7 +354,7 @@ extern "C" {
     /// Fills a buffer with random bytes taken from a platform-specific trusted
     /// entropy source.
     fn __veracruz_hcall_getrandom(buffer: *mut u8, size: u32) -> i32;
-    /// Reads previous result the given buffer
+    /// Reads the previous result into the given buffer
     fn __veracruz_hcall_read_previous_result(buffer: *mut u8, size: u32) -> i32;
     /// Reads the size of previous result encoded by pinecone
     fn __veracruz_hcall_previous_result_size(count: *mut u8) -> i32;
