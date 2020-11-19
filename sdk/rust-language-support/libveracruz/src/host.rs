@@ -15,7 +15,6 @@ use alloc::vec::Vec;
 use byteorder::{ByteOrder, LittleEndian};
 use core::convert::TryFrom;
 use core::fmt;
-use pinecone;
 
 ///////////////////////////////////////////////////////////////////////////////
 // The raw H-call error return type.
@@ -356,8 +355,10 @@ extern "C" {
     fn __veracruz_hcall_getrandom(buffer: *mut u8, size: u32) -> i32;
     /// Reads the previous result into the given buffer
     fn __veracruz_hcall_read_previous_result(buffer: *mut u8, size: u32) -> i32;
-    /// Reads the size of previous result encoded by pinecone
+    /// Reads the size of previous result
     fn __veracruz_hcall_previous_result_size(count: *mut u8) -> i32;
+    /// Returns non-zero if there is a previous result, otherwise returns zero.
+    fn __veracruz_hcall_has_previous_result(flag: *mut u8) -> i32;
     /// Returns the number of stream sources that are available to this program
     fn __veracruz_hcall_stream_count(count: *mut u8) -> i32;
     /// Returns the size of stream source N, in bytes
@@ -526,11 +527,34 @@ pub fn previous_result_size() -> HCallReturnCode<u32> {
     lift(retcode, LittleEndian::read_u32(&buffer)).unwrap()
 }
 
+/// Returns the size of previous result
+pub fn has_previous_result() -> HCallReturnCode<u32> {
+    let retcode;
+    let mut buffer = vec![0u8; 4];
+
+    unsafe {
+        retcode = __veracruz_hcall_has_previous_result(buffer.as_mut_ptr() as *mut u8);
+    };
+
+    lift(retcode, LittleEndian::read_u32(&buffer)).unwrap()
+}
+
 /// Reads the previous result, returned Option<Vec<u8>>.
-/// The program is assumed to understand how to parse the array of bytes, wrapped in Some(-)
+/// Returns None if no previous result and returns Some(BYTES) otherwise.
+/// The program is assumed to understand how to parse the array of bytes
 /// returned into something more meaningful, e.g. by fixing an assumed encoding
 /// between data source providers and the program owner.
 pub fn read_previous_result() -> HCallReturnCode<Option<Vec<u8>>> {
+    match has_previous_result() {
+        HCallReturnCode::Success(flag) => {
+            // No previous result
+            if flag == 0 {
+                return HCallReturnCode::Success(None);
+            }
+        }
+        _otherwise => return HCallReturnCode::ErrorBadInput,
+    }
+    // Read the size of the previous result and then load the bytes into the buffer.
     previous_result_size().and_then(|size| {
         let mut buffer = vec![0u8; size as usize];
         let retcode;
@@ -539,7 +563,7 @@ pub fn read_previous_result() -> HCallReturnCode<Option<Vec<u8>>> {
             retcode = __veracruz_hcall_read_previous_result(buffer.as_mut_ptr() as *mut u8, size)
         };
 
-        let result: Option<Vec<u8>> = pinecone::from_bytes(&buffer).unwrap();
+        let result: Option<Vec<u8>> = Some(buffer);
 
         lift(retcode, result).unwrap()
     })

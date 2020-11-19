@@ -27,9 +27,10 @@ use crate::{
     hcall::common::{
         sha_256_digest, Chihuahua, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
         HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
-        HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_PREVIOUS_RESULT_SIZE_NAME,
-        HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME, HCALL_READ_STREAM_NAME,
-        HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME, HCALL_WRITE_OUTPUT_NAME,
+        HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
+        HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
+        HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
+        HCALL_WRITE_OUTPUT_NAME,
     },
 };
 
@@ -65,6 +66,8 @@ const HCALL_GETRANDOM_CODE: usize = 4;
 const HCALL_READ_PREVIOUS_RESULT_CODE: usize = 5;
 /// H-call code for the `__veracruz_hcall_previous_result_size` H-call.
 const HCALL_PREVIOUS_RESULT_SIZE_CODE: usize = 6;
+/// H-call code for the `__veracruz_hcall_has_previous_result` H-call.
+const HCALL_HAS_PREVIOUS_RESULT_CODE: usize = 10;
 /// H-call code for the `__veracruz_hcall_stream_count` H-call.
 const HCALL_STREAM_COUNT_CODE: usize = 7;
 /// H-call code for the `__veracruz_hcall_stream_size` H-call.
@@ -146,6 +149,15 @@ fn check_previous_result_size_signature(signature: &Signature) -> bool {
 }
 
 /// Checks the function signature `signature` has the correct type for the
+/// `__veracruz_hcall_has_previous_result()` function.  This is:
+///
+///     enum veracruz_status_t __veracruz_hcall_has_previous_result(uint8_t* buffer)
+#[inline]
+fn check_has_previous_result_signature(signature: &Signature) -> bool {
+    signature.params() == [ValueType::I32] && signature.return_type() == Some(ValueType::I32)
+}
+
+/// Checks the function signature `signature` has the correct type for the
 /// `__veracruz_hcall_stream_count()` function.  This is:
 ///
 /// ```C
@@ -204,6 +216,7 @@ fn check_signature(index: usize, signature: &Signature) -> bool {
         HCALL_GETRANDOM_CODE => check_getrandom_signature(signature),
         HCALL_READ_PREVIOUS_RESULT_CODE => check_read_previous_result_signature(signature),
         HCALL_PREVIOUS_RESULT_SIZE_CODE => check_previous_result_size_signature(signature),
+        HCALL_HAS_PREVIOUS_RESULT_CODE => check_has_previous_result_signature(signature),
         HCALL_STREAM_COUNT_CODE => check_stream_count_signature(signature),
         HCALL_STREAM_SIZE_CODE => check_stream_size_signature(signature),
         HCALL_READ_STREAM_CODE => check_read_stream_signature(signature),
@@ -265,6 +278,7 @@ impl ModuleImportResolver for WasmiHostProvisioningState {
             HCALL_WRITE_OUTPUT_NAME => HCALL_WRITE_OUTPUT_CODE,
             HCALL_GETRANDOM_NAME => HCALL_GETRANDOM_CODE,
             HCALL_READ_PREVIOUS_RESULT_NAME => HCALL_READ_PREVIOUS_RESULT_CODE,
+            HCALL_HAS_PREVIOUS_RESULT_NAME => HCALL_HAS_PREVIOUS_RESULT_CODE,
             HCALL_PREVIOUS_RESULT_SIZE_NAME => HCALL_PREVIOUS_RESULT_SIZE_CODE,
             HCALL_STREAM_COUNT_NAME => HCALL_STREAM_COUNT_CODE,
             HCALL_STREAM_SIZE_NAME => HCALL_STREAM_SIZE_CODE,
@@ -360,6 +374,10 @@ impl Externals for WasmiHostProvisioningState {
                 Err(host_trap) => mk_host_trap(host_trap),
             },
             HCALL_PREVIOUS_RESULT_SIZE_CODE => match self.previous_result_size(args) {
+                Ok(return_code) => mk_error_code(return_code),
+                Err(host_trap) => mk_host_trap(host_trap),
+            },
+            HCALL_HAS_PREVIOUS_RESULT_CODE => match self.has_previous_result(args) {
                 Ok(return_code) => mk_error_code(return_code),
                 Err(host_trap) => mk_host_trap(host_trap),
             },
@@ -674,10 +692,11 @@ impl WasmiHostProvisioningState {
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
             Some(memory) => {
-                let previous_result = self.get_previous_result().map(|e| e.clone());
-                let encoded_previous_result = pinecone::to_vec(&previous_result)?;
-                let encoded_previous_result_size = encoded_previous_result.len() as u32;
-                let result: Vec<u8> = encoded_previous_result_size.to_le_bytes().to_vec();
+                let previous_result = self
+                    .get_previous_result()
+                    .map(|e| e.clone())
+                    .unwrap_or(vec![]);
+                let result: Vec<u8> = previous_result.len().to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
                     return Err(FatalHostError::MemoryWriteFailed {
@@ -704,17 +723,50 @@ impl WasmiHostProvisioningState {
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
             Some(memory) => {
-                let previous_result = self.get_previous_result().map(|e| e.clone());
-                let encoded_previous_result = pinecone::to_vec(&previous_result)?;
+                let previous_result = self
+                    .get_previous_result()
+                    .map(|e| e.clone())
+                    .unwrap_or(vec![]);
 
-                if encoded_previous_result.len() > size as usize {
+                if previous_result.len() > size as usize {
                     return Ok(VeracruzError::PreviousResultSize);
                 }
 
-                if let Err(_) = memory.set(address, &encoded_previous_result) {
+                if let Err(_) = memory.set(address, &previous_result) {
                     return Err(FatalHostError::MemoryWriteFailed {
                         memory_address: address as usize,
-                        bytes_to_be_written: encoded_previous_result.len(),
+                        bytes_to_be_written: previous_result.len(),
+                    });
+                }
+                Ok(VeracruzError::Success)
+            }
+        }
+    }
+
+    /// The WASMI implementation of the `__veracruz_hcall_has_previous_result()`.
+    fn has_previous_result(&mut self, args: RuntimeArgs) -> HCallError {
+        if args.len() != 1 {
+            return Err(FatalHostError::BadArgumentsToHostFunction {
+                function_name: HCALL_HAS_PREVIOUS_RESULT_NAME.to_string(),
+            });
+        }
+
+        let address: u32 = args.nth(0);
+
+        match self.get_memory() {
+            None => Err(FatalHostError::NoMemoryRegistered),
+            Some(memory) => {
+                let previous_result = self.get_previous_result();
+                let flag: u32 = match previous_result {
+                    Some(_) => 1,
+                    None => 0,
+                };
+                let result: Vec<u8> = flag.to_le_bytes().to_vec();
+
+                if let Err(_) = memory.set(address, &result) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: result.len() as usize,
                     });
                 }
                 Ok(VeracruzError::Success)

@@ -201,6 +201,8 @@ pub(crate) const HCALL_GETRANDOM_NAME: &'static str = "__veracruz_hcall_getrando
 pub(crate) const HCALL_READ_PREVIOUS_RESULT_NAME: &str = "__veracruz_hcall_read_previous_result";
 /// Name of the `__veracruz_hcall_previous_result_size` H-call.
 pub(crate) const HCALL_PREVIOUS_RESULT_SIZE_NAME: &str = "__veracruz_hcall_previous_result_size";
+/// Name of the `__veracruz_hcall_has_previous_result` H-call.
+pub(crate) const HCALL_HAS_PREVIOUS_RESULT_NAME: &str = "__veracruz_hcall_has_previous_result";
 /// H-call code for the `__veracruz_hcall_stream_count` H-call.
 pub(crate) const HCALL_STREAM_COUNT_NAME: &str = "__veracruz_hcall_stream_count";
 /// H-call code for the `__veracruz_hcall_stream_size` H-call.
@@ -341,15 +343,15 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
 
     /// Registers the previous result.
     /// If the previous computation does not produce any result, ie returning none,
-    /// it is converted to a pinecone encode of an empty vector.
+    /// it is converted to an empty vector.
     /// This distinguishes from `None`, which indicates that it is the first round of computation.
     #[inline]
     pub(crate) fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
-        // pinecone of vec![] cannot fail.
         self.previous_result = Some(
             result
                 .as_ref()
-                .unwrap_or(&pinecone::to_vec::<Vec<u8>>(&vec![]).unwrap())
+                .unwrap_or(&vec![])
+                //.unwrap_or(&pinecone::to_vec::<Vec<u8>>(&vec![]).unwrap())
                 .to_vec(),
         );
     }
@@ -889,10 +891,6 @@ pub enum FatalHostError {
     /// information.
     #[error(display = "FatalVeracruzHostError: Unknown error.")]
     Generic,
-    /// Pinecone::Error. It does not implement Serialize and Deserialize,
-    /// hence is converted to String.
-    #[error(display = "FatalVeracruzHostError: Pinecone Error: {:?}.", _0)]
-    PineconeError(String),
 }
 
 impl From<String> for FatalHostError {
@@ -904,12 +902,6 @@ impl From<String> for FatalHostError {
 impl From<&str> for FatalHostError {
     fn from(err: &str) -> Self {
         FatalHostError::DirectErrorMessage(err.to_string())
-    }
-}
-
-impl From<pinecone::Error> for FatalHostError {
-    fn from(err: pinecone::Error) -> Self {
-        FatalHostError::PineconeError(format!("{:?}", err))
     }
 }
 

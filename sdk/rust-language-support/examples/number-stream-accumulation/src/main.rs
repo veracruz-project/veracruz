@@ -47,7 +47,6 @@ fn read_last_result() -> Result<Option<f64>, i32> {
     }
 }
 
-// TODO: implement
 fn read_stream() -> Result<(f64, f64), i32> {
     if host::stream_count() < 2 {
         return return_code::fail_data_source_count();

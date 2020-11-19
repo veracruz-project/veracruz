@@ -32,7 +32,6 @@ wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "verac
 hex = { version = "0.4.1", default-features = false }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 err-derive = "0.2"
-pinecone = "*"
 
 
 [build-dependencies]

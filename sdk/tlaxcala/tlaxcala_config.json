@@ -7,6 +7,7 @@
         "__veracruz_hcall_getrandom",
         "__veracruz_hcall_previous_result_size",
         "__veracruz_hcall_read_previous_result",
+        "__veracruz_hcall_has_previous_result",
         "__veracruz_hcall_stream_count",
         "__veracruz_hcall_stream_size",
         "__veracruz_hcall_read_stream"
