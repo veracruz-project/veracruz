@@ -21,9 +21,11 @@ pub mod sinaloa_nitro {
 
     const MEXICO_CITY_EIF_PATH: &str = "../mexico-city/mexico_city.eif";
     const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "../nitro-root-enclave/nitro_root_enclave.eif";
+    const NITRO_ROOT_ENCLAVE_SERVER_PATH: &str = "../nitro-root-enclave-server/target/debug/nitro-root-enclave-server";
 
     lazy_static! {
-        static ref NRE_CONTEXT: Mutex<Option<NitroEnclave>> = Mutex::new(None);
+        //static ref NRE_CONTEXT: Mutex<Option<NitroEnclave>> = Mutex::new(None);
+        static ref NRE_CONTEXT: Mutex<Option<EC2Instance>> = Mutex::new(None);
     }
 
     pub struct SinaloaNitro {
@@ -48,11 +50,16 @@ pub mod sinaloa_nitro {
                 }
             }
 
-            let mexico_city_enclave = NitroEnclave::new(MEXICO_CITY_EIF_PATH)
+            println!("SinaloaNitro::new native_attestation complete. instantiating Mexico City");
+            let mexico_city_enclave = NitroEnclave::new(MEXICO_CITY_EIF_PATH, true)
                 .map_err(|err| SinaloaError::NitroError(err))?;
+            println!("SinaloaNitro::new NitroEnclave::new returned");
             let meta = Self {
                 enclave: mexico_city_enclave,
             };
+            println!("SinaloaNitro::new Mexico City instantiated. Calling initialize");
+            std::thread::sleep(std::time::Duration::from_millis(10000));
+
 
             let initialize: MCMessage = MCMessage::Initialize(policy_json.to_string());
 
@@ -61,6 +68,7 @@ pub mod sinaloa_nitro {
 
             // read the response
             let status_buffer = meta.enclave.receive_buffer()?;
+            println!("SinaloaNitro::new Mexicy City initialize returned. CHecking status");
 
             let message: MCMessage = bincode::deserialize(&status_buffer[..])?;
             let status = match message {
@@ -71,7 +79,7 @@ pub mod sinaloa_nitro {
                 NitroStatus::Success => (),
                 _ => return Err(SinaloaError::NitroStatus(status)),
             }
-
+            println!("SinaloaNitro::new complete. Returning");
             return Ok(meta);
         }
 
@@ -242,66 +250,92 @@ pub mod sinaloa_nitro {
         }
 
         fn native_attestation(
-            tabasco_url: &String,
-            mexico_city_hash: &String,
-        ) -> Result<NitroEnclave, SinaloaError> {
+            tabasco_url: &str,
+            mexico_city_hash: &str,
+        //) -> Result<NitroEnclave, SinaloaError> {
+        ) -> Result<EC2Instance, SinaloaError> {
             println!("SinaloaNitro::native_attestation started");
 
             println!("Starting EC2 instance");
-            let instance = EC2Instance::new()
+            let nre_instance = EC2Instance::new()
                 .map_err(|err| SinaloaError::EC2Error(err))?;
-            instance.close();
-            let nre_enclave = NitroEnclave::new(NITRO_ROOT_ENCLAVE_EIF_PATH)?;
+
+            nre_instance.upload_file(NITRO_ROOT_ENCLAVE_EIF_PATH, "/home/ec2-user/nitro_root_enclave.eif")
+                .map_err(|err| SinaloaError::EC2Error(err))?;
+            nre_instance.upload_file(NITRO_ROOT_ENCLAVE_SERVER_PATH, "/home/ec2-user/nitro-root-enclave-server")
+                .map_err(|err| SinaloaError::EC2Error(err))?;
+
+            nre_instance.execute_command("nitro-cli-config -t 2 -m 512")
+                .map_err(|err| SinaloaError::EC2Error(err))?;
+            let server_command: String = format!("nohup /home/ec2-user/nitro-root-enclave-server {:}", tabasco_url);
+            nre_instance.execute_command(&server_command)
+                .map_err(|err| SinaloaError::EC2Error(err))?;
+            // let nre_instance = EC2Instance {
+            //     instance_id: "i-023b3ab5f067109bd".to_string(),
+            //     private_ip: "192.168.46.82:22".to_string(),
+            //     socket_port: 9090,
+            // };
+            //nre_instance.close();
+            //let nre_enclave = NitroEnclave::new(NITRO_ROOT_ENCLAVE_EIF_PATH)?;
+            println!("Waiting for NRE Instance to authenticate. Now is the time for you to start it manually, Derek");
+            println!("Here's your command: nitro-root-enclave-server {:?}", tabasco_url);
+            std::thread::sleep(std::time::Duration::from_millis(20000));
 
             println!("SinaloaNitro::native_attstation new completed. fetching firmware version");
-            let firmware_version = SinaloaNitro::fetch_firmware_version(&nre_enclave)?;
-            println!("SinaloaNitro::native_attestation fetch_firmware_version complete. Now setting mexico city hash");
+            //let firmware_version = SinaloaNitro::fetch_firmware_version(&nre_enclave)?;
+            // let firmware_version = SinaloaNitro::fetch_firmware_version(&nre_instance)?;
+            // println!("SinaloaNitro::native_attestation fetch_firmware_version complete. Now setting mexico city hash");
 
-            {
-                let mexico_city_hash_vec =
-                    hex::decode(mexico_city_hash.as_str())?;
+            // {
+            //     let mexico_city_hash_vec =
+            //         hex::decode(mexico_city_hash)?;
                 
-                let message = NitroRootEnclaveMessage::SetMexicoCityHashHack(mexico_city_hash_vec);
-                let message_buffer = bincode::serialize(&message)?;
-                println!("SinaloaNitro::native_attestation sending buffer:{:?}", message_buffer);
-                nre_enclave.send_buffer(&message_buffer)?;
+            //     let message = NitroRootEnclaveMessage::SetMexicoCityHashHack(mexico_city_hash_vec);
+            //     let message_buffer = bincode::serialize(&message)?;
+            //     println!("SinaloaNitro::native_attestation sending buffer:{:?}", message_buffer);
+            //     //nre_enclave.send_buffer(&message_buffer)?;
+            //     nre_instance.send_buffer(&message_buffer)?;
 
-                let return_buffer = nre_enclave.receive_buffer()?;
-                let received_message = bincode::deserialize(&return_buffer)?;
-                let status = match received_message {
-                    NitroRootEnclaveMessage::Status(status) => status,
-                    _ => return Err(SinaloaError::InvalidNitroRootEnclaveMessage(received_message))?,
-                };
-                match status {
-                    NitroStatus::Success => (),
-                    _ => return Err(SinaloaError::NitroStatus(status)),
-                }
-            }
-            println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to tabasco");
-            let (challenge, device_id) =
-                SinaloaNitro::send_start(tabasco_url, "nitro", &firmware_version)?;
+            //     //let return_buffer = nre_enclave.receive_buffer()?;
+            //     let return_buffer = nre_instance.receive_buffer()?;
+            //     let received_message = bincode::deserialize(&return_buffer)?;
+            //     let status = match received_message {
+            //         NitroRootEnclaveMessage::Status(status) => status,
+            //         _ => return Err(SinaloaError::InvalidNitroRootEnclaveMessage(received_message))?,
+            //     };
+            //     match status {
+            //         NitroStatus::Success => (),
+            //         _ => return Err(SinaloaError::NitroStatus(status)),
+            //     }
+            // }
+            // println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to tabasco");
+            // let (challenge, device_id) =
+            //     SinaloaNitro::send_start(tabasco_url, "nitro", &firmware_version)?;
 
-            println!("SinaloaNitro::native_attestation completed send to tabasco. Now sending NativeAttestation message to Nitro Root Enclave");
-            let message = NitroRootEnclaveMessage::NativeAttestation(challenge, device_id);
-            let message_buffer = bincode::serialize(&message)?;
-            nre_enclave.send_buffer(&message_buffer)?;
+            // println!("SinaloaNitro::native_attestation completed send to tabasco. Now sending NativeAttestation message to Nitro Root Enclave");
+            // let message = NitroRootEnclaveMessage::NativeAttestation(challenge, device_id);
+            // let message_buffer = bincode::serialize(&message)?;
+            // //nre_enclave.send_buffer(&message_buffer)?;
+            // nre_instance.send_buffer(&message_buffer)?;
 
-            // data returned is token, public key
-            let return_buffer = nre_enclave.receive_buffer()?;
-            let received_message = bincode::deserialize(&return_buffer)?;
-            let (token, _public_key) = match received_message {
-                NitroRootEnclaveMessage::TokenData(tok, pubkey) => (tok, pubkey),
-                _ => return Err(SinaloaError::InvalidNitroRootEnclaveMessage(received_message)),
-            };
+            // // data returned is token, public key
+            // //let return_buffer = nre_enclave.receive_buffer()?;
+            // let return_buffer = nre_instance.receive_buffer()?;
+            // let received_message = bincode::deserialize(&return_buffer)?;
+            // let (token, _public_key) = match received_message {
+            //     NitroRootEnclaveMessage::TokenData(tok, pubkey) => (tok, pubkey),
+            //     _ => return Err(SinaloaError::InvalidNitroRootEnclaveMessage(received_message)),
+            // };
 
-            println!("SinaloaNitro::native_attestation posting native_attestation_token to tabasco");
-            SinaloaNitro::post_native_attestation_token(tabasco_url, &token, device_id)?;
+            // println!("SinaloaNitro::native_attestation posting native_attestation_token to tabasco");
+            // SinaloaNitro::post_native_attestation_token(tabasco_url, &token, device_id)?;
             println!("sinaloa_tz::native_attestation returning Ok");
-            return Ok(nre_enclave);
+            //return Ok(nre_enclave);
+            return Ok(nre_instance);
         }
 
         fn post_native_attestation_token(
-            tabasco_url: &String,
+            tabasco_url: &str,
             token: &Vec<u8>,
             device_id: i32,
         ) -> Result<(), SinaloaError> {
@@ -320,16 +354,19 @@ pub mod sinaloa_nitro {
             return Ok(());
         }
 
-        fn fetch_firmware_version(nre_enclave: &NitroEnclave) -> Result<String, SinaloaError> {
+        //fn fetch_firmware_version(nre_enclave: &NitroEnclave) -> Result<String, SinaloaError> {
+        fn fetch_firmware_version(nre_instance: &EC2Instance) -> Result<String, SinaloaError> {
             println!("SInaloaNitro::fetch_firmware_version started");
 
             let firmware_version: String = {
                 let message = NitroRootEnclaveMessage::FetchFirmwareVersion;
                 let message_buffer = bincode::serialize(&message)?;
                 println!("SinaloaNitro::Fetch_firmware_version sending message_buffer:{:?}", message_buffer);
-                nre_enclave.send_buffer(&message_buffer)?;
+                //nre_enclave.send_buffer(&message_buffer)?;
+                nre_instance.send_buffer(&message_buffer)?;
 
-                let returned_buffer = nre_enclave.receive_buffer()?;
+                //let returned_buffer = nre_enclave.receive_buffer()?;
+                let returned_buffer = nre_instance.receive_buffer()?;
                 let response: NitroRootEnclaveMessage = bincode::deserialize(&returned_buffer)?;
                 match response {
                     NitroRootEnclaveMessage::FirmwareVersion(version) => version,

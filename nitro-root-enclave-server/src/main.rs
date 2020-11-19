@@ -30,8 +30,8 @@ use veracruz_utils::{
 // listen queue
 const BACKLOG: usize = 128;
 
-const TABASCO_URL: &str = "127.0.0.1:80";
 const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "./nitro_root_enclave.eif";
+const INBOUND_PORT: u16 = 9090;
 
 #[derive(Debug, Error)]
 pub enum NitroServerError {
@@ -69,7 +69,7 @@ fn main() {
     let tabasco_url = matches.value_of("tabasco").unwrap();
 
     // first, start the nitro-root-enclave
-    let enclave = native_attestation(tabasco_url, NITRO_ROOT_ENCLAVE_EIF_PATH)
+    let enclave = native_attestation(tabasco_url, "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
         .expect("Failed to perform native attestion");
 
     let socket_fd = socket(
@@ -80,7 +80,7 @@ fn main() {
     )
     .expect("Failed to create socket_td");
 
-    let my_ip_address = InetAddr::new(IpAddr::new_v4(127, 0, 0, 1), 9090);
+    let my_ip_address = InetAddr::new(IpAddr::new_v4(127, 0, 0, 1), INBOUND_PORT);
     let sockaddr = SockAddr::new_inet(my_ip_address);
 
     bind(socket_fd, &sockaddr).expect("Failed to bind socket");
@@ -114,31 +114,31 @@ fn native_attestation(
     let firmware_version = fetch_firmware_version(&nre_enclave)?;
     println!("nitro-root-enclave-server::native_attestation fetch_firmware_version complete. Now setting mexico city hash");
 
-    {
-        let mexico_city_hash_vec =
-            hex::decode(mexico_city_hash).map_err(|err| NitroServerError::HexError(err))?;
-
-        let message = NitroRootEnclaveMessage::SetMexicoCityHashHack(mexico_city_hash_vec);
-        let message_buffer =
-            bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
-        println!(
-            "nitro-root-enclave-server::native_attestation sending buffer:{:?}",
-            message_buffer
-        );
-        nre_enclave.send_buffer(&message_buffer)?;
-
-        let return_buffer = nre_enclave.receive_buffer()?;
-        let received_message =
-            bincode::deserialize(&return_buffer).map_err(|err| NitroServerError::Bincode(*err))?;
-        let status = match received_message {
-            NitroRootEnclaveMessage::Status(status) => status,
-            _ => return Err(NitroServerError::InvalidRootEnclaveMessage)?,
-        };
-        match status {
-            NitroStatus::Success => (),
-            _ => return Err(NitroServerError::NonSuccessStatus),
-        }
-    }
+    //{
+        //let mexico_city_hash_vec =
+            //hex::decode(mexico_city_hash).map_err(|err| NitroServerError::HexError(err))?;
+//
+        //let message = NitroRootEnclaveMessage::SetMexicoCityHashHack(mexico_city_hash_vec);
+        //let message_buffer =
+            //bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
+        //println!(
+            //"nitro-root-enclave-server::native_attestation sending buffer:{:?}",
+            //message_buffer
+        //);
+        //nre_enclave.send_buffer(&message_buffer)?;
+//
+        //let return_buffer = nre_enclave.receive_buffer()?;
+        //let received_message =
+            //bincode::deserialize(&return_buffer).map_err(|err| NitroServerError::Bincode(*err))?;
+        //let status = match received_message {
+            //NitroRootEnclaveMessage::Status(status) => status,
+            //_ => return Err(NitroServerError::InvalidRootEnclaveMessage)?,
+        //};
+        //match status {
+            //NitroStatus::Success => (),
+            //_ => return Err(NitroServerError::NonSuccessStatus),
+        //}
+    //}
     println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to tabasco");
     let (challenge, device_id) = send_start(tabasco_url, "nitro", &firmware_version)?;
 
@@ -316,11 +316,14 @@ pub fn send_tabasco_start(
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
 
+    println!("nitro-root-enclave-server::send_tabasco_start sending to url:{:?}", url);
     let received_body: String = post_buffer(&url, &encoded_start_msg)?;
+    println!("nitro-root-enclave-server::send_tabasco_start completed post command");
 
     let body_vec =
         base64::decode(&received_body).map_err(|err| NitroServerError::Base64Decode(err))?;
     let response =
         colima::parse_tabasco_response(&body_vec).map_err(|err| NitroServerError::Colima(err))?;
+    println!("nitro-root-enclave-server::send_tabasco_start completed. Returning.");
     return Ok(response);
 }

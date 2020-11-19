@@ -43,17 +43,23 @@ const VERACRUZ_PORT: u32 = 5005;
 
 impl NitroEnclave {
 
-    pub fn new(eif_path: &str) -> Result<Self, NitroError> {
+    pub fn new(eif_path: &str, debug: bool) -> Result<Self, NitroError> {
+        let mut args = vec!["run-enclave",
+                        "--eif-path", eif_path,
+                        "--cpu-count", "2", 
+                        "--memory", "256",];
+        if debug {
+            args.push("--debug-mode=true");
+        }
         let enclave_result = Command::new("nitro-cli")
-            .args(&["run-enclave", "--eif-path", eif_path, "--cpu-count", "2", "--memory", "256",]) // "--debug-mode=true"])
+            .args(&args)
             .output()?;
         let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr)?;
-        println!("enclave_result_stderr:{:?}", enclave_result_stderr);
         let enclave_result_stdout = enclave_result.stdout;
 
         let enclave_result_text = std::str::from_utf8(&enclave_result_stdout)?;
         println!("enclave_result_text:{:?}", enclave_result_text);
-        std::thread::sleep(std::time::Duration::from_millis(10000));
+        std::thread::sleep(std::time::Duration::from_millis(5000));
 
         let enclave_data: Value =
             serde_json::from_str(enclave_result_text)?;
@@ -63,11 +69,13 @@ impl NitroEnclave {
             serde_json::from_value(enclave_data["EnclaveCID"].clone()).unwrap()
         };
 
+        println!("NitroEnclave::new calling vsock_connect, among other things, cid:{:?}, port:{:?}", cid, VERACRUZ_PORT);
         let enclave: Self = NitroEnclave {
             enclave_id: enclave_data["EnclaveId"].to_string(),
             //enclave_cid: cid,
             vsocksocket: crate::vsocket::vsock_connect(cid, VERACRUZ_PORT)?,
         };
+        println!("NitroEnclave::new succeeded");
         return Ok(enclave);
     }
 
