@@ -539,7 +539,63 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     ////////////////////////////////////////////////////////////////////////////
     // Progressing through the state machine.
     ////////////////////////////////////////////////////////////////////////////
-
+    // The state transition, where events, [...], and conditions, <...>, are either above or left to the edges.
+    //
+    //                   Initial (State)
+    //                        |
+    //                        | [Provisioning a program]
+    //     <No data>          |
+    //    --------------------| 
+    //    |                   | <Need data>
+    //    |                   |
+    //    |                  \ /
+    //    |             DataSourcesLoading  <-------------------
+    //    |                   |                                |
+    //    |                   | [Provisioning a (static) data  | 
+    //    |                   |                                |
+    //    |                   | <More data>                    |
+    //    |                   |---------------------------------
+    //    ------------------->|
+    //                        | <-------------------------------
+    //     <No stream>        |                                |
+    //    --------------------|                                |
+    //    |                   | [Need stream]                  |
+    //    |                   |                                |
+    //    |                  \ /                               |
+    //    |           StreamSourcesLoading  <----------------- |
+    //    |                   |                              | |
+    //    |                   | [Provisioning a stream data] | |
+    //    |                   |                              | |
+    //    |                   | <More stream>                | |
+    //    |                   |------------------------------- |
+    //    ------------------->|                                |
+    //                        |                                |
+    //                       \ /                               |
+    //                ReadyToExecute                           |
+    //                        |                                |
+    //                        | [Request result]               |
+    //                        |                                |
+    //                       \ /                               |
+    // ------------>  FinishedExecuting  <----------           |
+    // |                      |                    |           |
+    // |                      |                    |           |
+    // |                      | [Request result]   |           |
+    // |                      |---------------------           |
+    // |                      |                                |
+    // |                      | [Request next round]           |
+    // |                      |---------------------------------
+    // |                      |
+    // |   [Request shutdown] |
+    // |                      | 
+    // | <More shutdown req>  | 
+    // -----------------------| 
+    //                        | <All shutdown requests received>
+    //                        |
+    //                       \ /
+    //                   Bottom state
+    //   
+    //
+    
     /// Sets the machine state to `MachineState::Error`.
     ///
     /// Does not panic: an error state can be reached from any Veracruz state
