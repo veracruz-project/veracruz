@@ -90,6 +90,8 @@ mod tests {
     const MACD_WASM: &'static str = "../test-collateral/moving-average-convergence-divergence.wasm";
     const INTERSECTION_SET_SUM_WASM: &'static str =
         "../test-collateral/private-set-intersection-sum.wasm";
+    const NUMBER_STREM_WASM: &'static str = 
+        "../test-collateral/number-stream-accumulation.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "../test-collateral/linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str =
@@ -100,6 +102,9 @@ mod tests {
     const STRING_2_DATA: &'static str = "../test-collateral/hello-world-2.dat";
     const PERSON_SET_1_DATA: &'static str = "../test-collateral/private-set-1.dat";
     const PERSON_SET_2_DATA: &'static str = "../test-collateral/private-set-2.dat";
+    const SINGLE_F64_DATA: &'static str = "../test-collateral/number-stream-init.dat";
+    const VEC_F64_1_DATA: &'static str = "../test-collateral/number-stream-1.dat";
+    const VEC_F64_2_DATA: &'static str = "../test-collateral/number-stream-2.dat";
     const LOGISTICS_REGRESSION_DATA_PATH: &'static str = "../test-collateral/idash2017/";
     const MACD_DATA_PATH: &'static str = "../test-collateral/macd/";
 
@@ -509,6 +514,11 @@ mod tests {
     }
 
     #[test]
+    /// Integration test:
+    /// policy: PiProvider, DataProvider and ResultReader is the same party
+    /// compuatation: set intersection, computing the intersection of two sets of persons.
+    /// data sources: two vecs of persons, representing by Vec<Person>
+    /// A standard two data sources scenario with attestation.
     fn test_phase3_private_set_intersection_two_data_with_attestation() {
         let result = test_template::<HashSet<Person>>(
             TWO_DATA_SOURCE_PRIVATE_SET_INTERSECTION_POLICY,
@@ -523,20 +533,77 @@ mod tests {
     }
 
     #[test]
-    fn test_phase4_number_stream_accumulation_three_data_with_attestation() {
+    /// Integration test:
+    /// policy: PiProvider, DataProvider, StreamProvider and ResultReader is the same party
+    /// compuatation: sum of an initial f64 number and two streams of f64 numbers.
+    /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
+    /// A standard one data source and two stream sources scenario with attestation.
+    fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
         let result = test_template::<f64>(
             NUMBER_STREAM_ACCUMULATION_POLICY,
             CLIENT_CERT,
             CLIENT_KEY,
-            Some("../test-collateral/number-stream-accumulation.wasm"),
-            &[(0, "../test-collateral/number-stream-init.dat")],
+            Some(NUMBER_STREM_WASM),
+            &[(0, SINGLE_F64_DATA)],
             &[
-                (0, "../test-collateral/number-stream-1.dat"),
-                (1, "../test-collateral/number-stream-2.dat"),
+                (0, VEC_F64_1_DATA),
+                (1, VEC_F64_2_DATA),
             ],
             true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
+    }
+
+    #[test]
+    /// Attempt to fetch result without enough stream data.
+    fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
+        let result = test_template::<f64>(
+            NUMBER_STREAM_ACCUMULATION_POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            Some(NUMBER_STREM_WASM),
+            &[(0, SINGLE_F64_DATA)],
+            &[(0, VEC_F64_1_DATA)],
+            true,
+        );
+        assert!(result.is_err(), "An error should occur");
+    }
+
+    #[test]
+    /// Attempt to provision stream data in the state of loading static data.
+    fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
+        let result = test_template::<f64>(
+            NUMBER_STREAM_ACCUMULATION_POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            Some(NUMBER_STREM_WASM),
+            &[],
+            &[
+                (0, VEC_F64_1_DATA),
+                (1, VEC_F64_2_DATA),
+            ],
+            true,
+        );
+        assert!(result.is_err(), "An error should occur");
+    }
+
+    #[test]
+    /// Attempt to provision more stream data.
+    fn test_phase4_number_stream_accumulation_no_data_three_stream_with_attestation() {
+        let result = test_template::<f64>(
+            NUMBER_STREAM_ACCUMULATION_POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            Some(NUMBER_STREM_WASM),
+            &[],
+            &[
+                (0, VEC_F64_1_DATA),
+                (1, VEC_F64_2_DATA),
+                (2, VEC_F64_1_DATA),
+            ],
+            true,
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
