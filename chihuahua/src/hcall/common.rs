@@ -351,7 +351,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             result
                 .as_ref()
                 .unwrap_or(&vec![])
-                //.unwrap_or(&pinecone::to_vec::<Vec<u8>>(&vec![]).unwrap())
                 .to_vec(),
         );
     }
