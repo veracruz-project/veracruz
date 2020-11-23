@@ -400,7 +400,7 @@ mod tests {
     #[test]
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: linear regression, computing the grandient and intercept, ie the LinearRegression struct,
+    /// computation: linear regression, computing the grandient and intercept, ie the LinearRegression struct,
     /// given a series of point in the two-dimension space.
     /// data sources: linear-regression, a vec of points in two-dimention space, representing by
     /// Vec<(f64, f64)>
@@ -435,7 +435,7 @@ mod tests {
     #[test]
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: intersection sum, intersection of two data sources
+    /// computation: intersection sum, intersection of two data sources
     /// and then the sum of the values in the intersection.
     /// data sources: customer and advertisement, vecs of AdvertisementViewer and Customer
     /// respectively.
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: string-edit-distance, computing the string edit distance.
+    /// computation: string-edit-distance, computing the string edit distance.
     /// data sources: two strings
     fn test_phase2_string_edit_distance_two_data_no_attestation() {
         let result = test_template::<usize>(
@@ -483,7 +483,7 @@ mod tests {
     #[test]
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: linear regression, computing the grandient and intercept, ie the LinearRegression struct,
+    /// computation: linear regression, computing the grandient and intercept, ie the LinearRegression struct,
     /// given a series of point in the two-dimension space.
     /// data sources: linear-regression, a vec of points in two-dimention space, representing by
     /// Vec<(f64, f64)>
@@ -610,7 +610,7 @@ mod tests {
     #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: logistic regression, https://github.com/kimandrik/IDASH2017.
+    /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn test_performance_idash2017_with_attestation() {
         iterate_over_data(LOGISTICS_REGRESSION_DATA_PATH, |data_path| {
@@ -633,7 +633,7 @@ mod tests {
     #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
+    /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
     fn test_performance_macd_with_attestation() {
         iterate_over_data(MACD_DATA_PATH, |data_path| {
@@ -687,7 +687,7 @@ mod tests {
     #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// compuatation: intersection-sum, matching the setting in .
+    /// computation: intersection-sum, matching the setting in .
     /// data sources: private-set-inter-sum/*.dat
     fn test_performance_set_intersection_sum_with_attestation() {
         iterate_over_data("../test-collateral/private-set-inter-sum/", |data_path| {
