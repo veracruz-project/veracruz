@@ -27,6 +27,8 @@ pub enum MexicoCityError {
     FatalHostError(#[error(source)] chihuahua::hcall::common::FatalHostError),
     #[error(display = "MexicoCity: HostProvisioningError: {:?}.", _0)]
     HostProvisioningError(#[error(source)] chihuahua::hcall::common::HostProvisioningError),
+    #[error(display = "MexicoCity: MexicoCityBufferError: {:?}.", _0)]
+    MexicoCityBufferError(#[error(source)] crate::managers::buffer::MexicoCityBufferError),
     #[error(display = "MexicoCity: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
     #[error(display = "MexicoCity: Uninitialized baja session in function {}.", _0)]
@@ -38,7 +40,9 @@ pub enum MexicoCityError {
     UnsafeCallError(&'static str, u32),
     #[error(display = "MexicoCity: Received no data.")]
     NoDataError,
-    #[error(display = "MexicoCity: Global policy requested an execution strategy unavailable on this platform.")]
+    #[error(
+        display = "MexicoCity: Global policy requested an execution strategy unavailable on this platform."
+    )]
     InvalidExecutionStrategyError,
     #[error(display = "MexicoCity: Unavailable baja session with ID {}.", _0)]
     UnavailableBajaSessionError(u64),

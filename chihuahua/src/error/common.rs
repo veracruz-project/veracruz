@@ -41,6 +41,17 @@ pub enum VeracruzError {
     DataSourceSize,
     /// The H-call failed because it was passed bad inputs.
     BadInput,
+    /// The H-call failed because an index was passed that exceeded the number
+    /// of stream sources.
+    StreamSourceCount,
+    /// The H-call failed because it was passed a buffer whose size did not
+    /// match the size of the stream source.
+    StreamSourceSize,
+    /// The H-call failed because it was passed bad streams.
+    BadStream,
+    /// The H-call failed because it was passed a buffer whose size did not
+    /// match the size of the previous result.
+    PreviousResultSize,
     /// An internal invariant was violated (i.e. we are morally "panicking").
     InvariantFailed,
     /// The H-call failed because a result had already previously been written.
@@ -66,6 +77,10 @@ impl Display for VeracruzError {
             VeracruzError::InvariantFailed => write!(f, "InvariantFailed"),
             VeracruzError::ResultAlreadyWritten => write!(f, "ResultAlreadyWritten"),
             VeracruzError::ServiceUnavailable => write!(f, "ServiceUnavailable"),
+            VeracruzError::StreamSourceSize => write!(f, "StreamSourceSize"),
+            VeracruzError::StreamSourceCount => write!(f, "StreamSourceCount"),
+            VeracruzError::BadStream => write!(f, "BadStream"),
+            VeracruzError::PreviousResultSize => write!(f, "PreviousResultSize"),
         }
     }
 }
@@ -85,6 +100,10 @@ impl From<VeracruzError> for i32 {
             VeracruzError::InvariantFailed => -5,
             VeracruzError::ResultAlreadyWritten => -6,
             VeracruzError::ServiceUnavailable => -7,
+            VeracruzError::StreamSourceCount => -8,
+            VeracruzError::StreamSourceSize => -9,
+            VeracruzError::BadStream => -10,
+            VeracruzError::PreviousResultSize => -11,
         }
     }
 }
@@ -103,6 +122,10 @@ impl TryFrom<i32> for VeracruzError {
             -5 => Ok(VeracruzError::InvariantFailed),
             -6 => Ok(VeracruzError::ResultAlreadyWritten),
             -7 => Ok(VeracruzError::ServiceUnavailable),
+            -8 => Ok(VeracruzError::StreamSourceCount),
+            -9 => Ok(VeracruzError::StreamSourceSize),
+            -10 => Ok(VeracruzError::BadStream),
+            -11 => Ok(VeracruzError::PreviousResultSize),
             otherwise => Err(format!(
                 "Error converting i32 value '{}' to VeracruzError value.",
                 otherwise

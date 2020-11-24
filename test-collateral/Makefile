@@ -31,7 +31,8 @@ POLICY_FILES ?= get_random_policy.json \
 				test_multiple_key_policy.json \
  				idash2017_logistic_regression_policy.json \
 				moving_average_convergence_divergence.json \
- 				private_set_intersection_sum.json
+ 				private_set_intersection_sum.json \
+ 				number-stream-accumulation.json
 
 WASM_PROG_FILES = random-source.wasm \
 				  linear-regression.wasm \
@@ -40,7 +41,8 @@ WASM_PROG_FILES = random-source.wasm \
 				  private-set-intersection.wasm \
 				  idash2017-logistic-regression.wasm \
 				  moving-average-convergence-divergence.wasm \
-				  private-set-intersection-sum.wasm 
+				  private-set-intersection-sum.wasm \
+ 				  number-stream-accumulation.wasm
 
 DATA_FILES = linear-regression.dat \
  			 hello-world-1.dat \
@@ -48,7 +50,10 @@ DATA_FILES = linear-regression.dat \
 			 intersection-customer.dat \
              intersection-advertisement-viewer.dat \
 			 private-set-1.dat \
-			 private-set-2.dat
+			 private-set-2.dat \
+			 number-stream-init.dat \
+			 number-stream-1.dat \
+			 number-stream-2.dat
 
 
 all: policy-files $(WASM_PROG_FILES) $(DATA_FILES)
@@ -178,6 +183,12 @@ private_set_intersection_sum.json: policy.template css.bin client_rsa_cert.pem p
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
 		--sinaloa-url 127.0.0.1:3025 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary private-set-intersection-sum.wasm --execution-strategy "\"Interpretation\""
+
+number-stream-accumulation.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem number-stream-accumulation.wasm generate_policy.py
+	python ./generate_policy.py --data-provision-order 0  --streaming-order 0 0 --template-file policy.template \
+		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
+		--sinaloa-url 127.0.0.1:3026 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--pi-binary number-stream-accumulation.wasm --debug-flag True --execution-strategy "\"Interpretation\""
 
 .SECONDEXPANSION:
 $(WASM_PROG_FILES) : %.wasm: ../sdk/rust-language-support/examples/%/target/wasm32-arm-veracruz/release/$$@

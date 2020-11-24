@@ -22,6 +22,7 @@ typetag = { git = "https://github.com/veracruz-project/typetag.git", branch="ver
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch="veracruz" }
 wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
 err-derive = "0.2"
+pinecone = "0.2"
 
 [lib]
 name = "chihuahua"

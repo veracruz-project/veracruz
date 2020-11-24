@@ -37,6 +37,7 @@ use chihuahua::{
 use veracruz_utils::VeracruzPolicy;
 
 pub mod baja_manager;
+pub mod buffer;
 pub mod chihuahua_manager;
 pub mod error;
 pub use error::MexicoCityError;
@@ -113,6 +114,7 @@ impl ProtocolState {
         global_policy_hash: String,
     ) -> Result<Self, MexicoCityError> {
         let expected_data_sources = global_policy.data_provision_order();
+        let expected_stream_sources = global_policy.stream_provision_order();
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let execution_strategy = match global_policy.execution_strategy() {
@@ -125,6 +127,7 @@ impl ProtocolState {
         let host_state = multi_threaded_chihuahua(
             &execution_strategy,
             &expected_data_sources,
+            &expected_stream_sources,
             expected_shutdown_sources
                 .iter()
                 .map(|e| *e as u64)
@@ -176,13 +179,27 @@ impl ProtocolState {
     /// Provisions a new data source, described using a `DataSourceMetadata`
     /// frame into the host state.  Will fail if the lifecycle state is not
     /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
-    /// `LifecycleState::ReadyToExecute` when the call represents the last
-    /// data source to be loaded, or maintains the current lifecycle state.
+    /// `LifecycleState::StreamSourcesLoading` when the call represents the last
+    /// data source to be loaded,
+    /// `LifecycleState::ReadyToExecute` if no stream data is required,
+    /// or maintains the current lifecycle state.
     pub(crate) fn add_new_data_source(
         &self,
         metadata: DataSourceMetadata,
     ) -> Result<(), MexicoCityError> {
         Ok(self.host_state.lock()?.add_new_data_source(metadata)?)
+    }
+
+    /// Provisions a new stream source, described using a `DataSourceMetadata`
+    /// frame into the host state.  Will fail if the lifecycle state is not
+    /// `LifecycleState::StreamSourcesLoading`.  Will bump the lifecycle state to
+    /// `LifecycleState::ReadyToExecute` when the call represents the last
+    /// data source to be loaded, or maintains the current lifecycle state.
+    pub(crate) fn add_new_stream_source(
+        &self,
+        metadata: DataSourceMetadata,
+    ) -> Result<(), MexicoCityError> {
+        Ok(self.host_state.lock()?.add_new_stream_source(metadata)?)
     }
 
     /// Invokes the entry point of the provisioned WASM program.  Will fail if
@@ -205,6 +222,15 @@ impl ProtocolState {
     /// registered.
     pub(crate) fn get_result(&self) -> Result<Option<Vec<u8>>, MexicoCityError> {
         Ok(self.host_state.lock()?.get_result().map(|o| o.clone()))
+    }
+
+    /// Sets the `previous_result` field.
+    pub(crate) fn set_previous_result(
+        &mut self,
+        result: &Option<Vec<u8>>,
+    ) -> Result<(), MexicoCityError> {
+        self.host_state.lock()?.set_previous_result(result);
+        Ok(())
     }
 
     /// Returns an SHA-256 digest of the bytes loaded into the host provisioning

@@ -67,6 +67,7 @@ pub enum ExecutionStrategy {
 pub fn single_threaded_chihuahua(
     strategy: &ExecutionStrategy,
     expected_data_sources: &[u64],
+    expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
 ) -> Option<Box<dyn Chihuahua + 'static>> {
     #[cfg(feature = "std")]
@@ -74,13 +75,19 @@ pub fn single_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
             }
             ExecutionStrategy::JIT => {
-                wasmtime::initialize(expected_data_sources, expected_shutdown_sources);
+                wasmtime::initialize(
+                    expected_data_sources,
+                    expected_stream_sources,
+                    expected_shutdown_sources,
+                );
 
                 Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
             }
@@ -91,8 +98,10 @@ pub fn single_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
             }
@@ -112,6 +121,7 @@ pub fn single_threaded_chihuahua(
 pub fn multi_threaded_chihuahua(
     strategy: &ExecutionStrategy,
     expected_data_sources: &[u64],
+    expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
 ) -> Option<Arc<Mutex<dyn Chihuahua + 'static>>> {
     #[cfg(feature = "std")]
@@ -119,13 +129,19 @@ pub fn multi_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(state)))
             }
             ExecutionStrategy::JIT => {
-                wasmtime::initialize(expected_data_sources, expected_shutdown_sources);
+                wasmtime::initialize(
+                    expected_data_sources,
+                    expected_stream_sources,
+                    expected_shutdown_sources,
+                );
 
                 Some(Arc::new(Mutex::new(
                     wasmtime::DummyWasmtimeHostProvisioningState::new(),
@@ -138,8 +154,10 @@ pub fn multi_threaded_chihuahua(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
-                state.set_expected_data_sources(expected_data_sources);
-                state.set_expected_shutdown_sources(expected_shutdown_sources);
+                state
+                    .set_expected_data_sources(expected_data_sources)
+                    .set_expected_stream_sources(expected_stream_sources)
+                    .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Arc::new(Mutex::new(state)))
             }

@@ -155,7 +155,11 @@ pub enum LifecycleState {
     /// sources are in the process of being provisioned.  Not all data sources
     /// are yet provisioned, per the global policy.
     DataSourcesLoading,
-    /// All data sources (and the program) have now been provisioned according
+    /// The program and (initial) data have been provisioned into the machine,
+    /// and now the stream sources are in the process of being provisioned.
+    /// Not all stream sources are yet provisioned, per the global policy.
+    StreamSourcesLoading,
+    /// All data and stream sources (and the program) have now been provisioned according
     /// to the global policy.  The machine is now ready to execute.
     ReadyToExecute,
     /// The machine has executed, and finished successfully.  The result of the
@@ -171,6 +175,7 @@ impl Display for LifecycleState {
         match self {
             LifecycleState::Initial => write!(f, "Initial"),
             LifecycleState::DataSourcesLoading => write!(f, "DataSourcesLoading"),
+            LifecycleState::StreamSourcesLoading => write!(f, "StreamSourcesLoading"),
             LifecycleState::ReadyToExecute => write!(f, "ReadyToExecute"),
             LifecycleState::FinishedExecuting => write!(f, "FinishedExecuting"),
             LifecycleState::Error => write!(f, "Error"),
@@ -192,6 +197,18 @@ pub(crate) const HCALL_READ_INPUT_NAME: &'static str = "__veracruz_hcall_read_in
 pub(crate) const HCALL_WRITE_OUTPUT_NAME: &'static str = "__veracruz_hcall_write_output";
 /// Name of the `__veracruz_hcall_getrandom` H-call.
 pub(crate) const HCALL_GETRANDOM_NAME: &'static str = "__veracruz_hcall_getrandom";
+/// Name of the `__veracruz_hcall_read_previous_result` H-call.
+pub(crate) const HCALL_READ_PREVIOUS_RESULT_NAME: &str = "__veracruz_hcall_read_previous_result";
+/// Name of the `__veracruz_hcall_previous_result_size` H-call.
+pub(crate) const HCALL_PREVIOUS_RESULT_SIZE_NAME: &str = "__veracruz_hcall_previous_result_size";
+/// Name of the `__veracruz_hcall_has_previous_result` H-call.
+pub(crate) const HCALL_HAS_PREVIOUS_RESULT_NAME: &str = "__veracruz_hcall_has_previous_result";
+/// H-call code for the `__veracruz_hcall_stream_count` H-call.
+pub(crate) const HCALL_STREAM_COUNT_NAME: &str = "__veracruz_hcall_stream_count";
+/// H-call code for the `__veracruz_hcall_stream_size` H-call.
+pub(crate) const HCALL_STREAM_SIZE_NAME: &str = "__veracruz_hcall_stream_size";
+/// H-call code for the `__veracruz_hcall_read_stream` H-call.
+pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Provisioning errors
@@ -244,6 +261,11 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
     )]
     HostProvisioningStateNotInitialized,
+    /// The data or stream data cannot be sorted. This should never happen and is a bug.
+    #[error(
+        display = "HostProvisioningError: Failed to sort the incoming data or incoming stream (this is a potential bug)."
+    )]
+    CannotSortDataOrStream,
 }
 
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
@@ -252,61 +274,6 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
         HostProvisioningError::FailedToObtainLock(format!("{:?}", error))
     }
 }
-
-///// Pretty-printing for host provisioning errors.
-//impl Display for HostProvisioningError {
-//fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-//match self {
-//HostProvisioningError::FailedToSortIncomingData => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(f, "  The host failed to sort incoming data.\n")?;
-//write!(
-//f,
-//"  Please raise a bug report: this should never happen.\n"
-//)
-//}
-//HostProvisioningError::InvalidLifeCycleState { found, expected } => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(f, "  Host is in an invalid state: {}.\n", found)?;
-//write!(
-//f,
-//"  Expecting the host to be in one of the following states: {:?}.\n",
-//expected
-//)
-//}
-//HostProvisioningError::InvalidWASMModule => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(
-//f,
-//"  The supplied WASM module is invalid or could not be parsed.\n"
-//)
-//}
-//HostProvisioningError::NoLinearMemoryFound => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(
-//f,
-//"  No linear memory could be found in the supplied WASM module.\n"
-//)
-//}
-//HostProvisioningError::ModuleInstantiationFailure => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(f, "  The WASM module could not be instantiated.\n")
-//}
-//HostProvisioningError::FailedToObtainLock => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(f, "  The Veracruz runtime failed to obtain a lock or other synchronization primitive.\n")
-//}
-//HostProvisioningError::HostProvisioningStateNotInitialized => {
-//write!(f, "Host provisioning error.\n")?;
-//write!(f, "  The host provisioning state is not initialized.\n")?;
-//write!(
-//f,
-//"  Please raise a bug report: this should never happen.\n"
-//)
-//}
-//}
-//}
-//}
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Veracruz provisioning state.
@@ -319,9 +286,14 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
 pub struct HostProvisioningState<Module, Memory> {
     /// The data sources that have been provisioned into the machine.
     data_sources: Vec<DataSourceMetadata>,
+    /// The stream sources that have been provisioned into the machine.
+    stream_sources: Vec<DataSourceMetadata>,
     /// The expected list of data sources, derived from the global policy
     /// parameterising the computation.
     expected_data_sources: Vec<u64>,
+    /// The expected list of stream sources, derived from the global policy
+    /// parameterising the computation.
+    expected_stream_sources: Vec<u64>,
     /// The current lifecycle state of the machine.
     lifecycle_state: LifecycleState,
     /// A reference to the WASM program module that will actually execute on
@@ -331,6 +303,8 @@ pub struct HostProvisioningState<Module, Memory> {
     program_digest: Option<Vec<u8>>,
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<Memory>,
+    /// The result of the previous execution.
+    previous_result: Option<Vec<u8>>,
     /// The result of the WASM program's computation on the input sources above.
     result: Option<Vec<u8>>,
     /// The list of clients (their IDs) that can request shutdown of the
@@ -349,10 +323,13 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         HostProvisioningState {
             data_sources: Vec::new(),
             expected_data_sources: Vec::new(),
+            stream_sources: Vec::new(),
+            expected_stream_sources: Vec::new(),
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
             program_digest: None,
             memory: None,
+            previous_result: None,
             result: None,
             expected_shutdown_sources: Vec::new(),
         }
@@ -364,16 +341,39 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.result = Some(result.to_vec());
     }
 
-    /// Registers the number of expected data sources, `number`.
+    /// Registers the previous result.
+    /// If the previous computation does not produce any result, ie returning none,
+    /// it is converted to an empty vector.
+    /// This distinguishes from `None`, which indicates that it is the first round of computation.
     #[inline]
-    pub(crate) fn set_expected_data_sources(&mut self, number: &[u64]) {
-        self.expected_data_sources = number.to_vec();
+    pub(crate) fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
+        self.previous_result = Some(
+            result
+                .as_ref()
+                .unwrap_or(&vec![])
+                .to_vec(),
+        );
     }
 
     /// Registers the number of expected data sources, `number`.
     #[inline]
-    pub(crate) fn set_expected_shutdown_sources(&mut self, client_ids: &[u64]) {
+    pub(crate) fn set_expected_data_sources(&mut self, number: &[u64]) -> &mut Self {
+        self.expected_data_sources = number.to_vec();
+        self
+    }
+
+    /// Registers the number of expected stream sources, `number`.
+    #[inline]
+    pub(crate) fn set_expected_stream_sources(&mut self, number: &[u64]) -> &mut Self {
+        self.expected_stream_sources = number.to_vec();
+        self
+    }
+
+    /// Registers the number of expected data sources, `number`.
+    #[inline]
+    pub(crate) fn set_expected_shutdown_sources(&mut self, client_ids: &[u64]) -> &mut Self {
         self.expected_shutdown_sources = client_ids.to_vec();
+        self
     }
 
     /// Registers the program module.
@@ -423,6 +423,24 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.data_sources.len()
     }
 
+    /// Returns the stream sources that the provisioning process is expecting.
+    #[inline]
+    pub(crate) fn get_expected_stream_sources(&self) -> &Vec<u64> {
+        &self.expected_stream_sources
+    }
+
+    /// Returns the number of stream sources that the provisioning process is expecting.
+    #[inline]
+    pub(crate) fn get_expected_stream_source_count(&self) -> usize {
+        self.expected_stream_sources.len()
+    }
+
+    /// Returns that number of stream sources that have been provisioned so far.
+    #[inline]
+    pub(crate) fn get_current_stream_source_count(&self) -> usize {
+        self.stream_sources.len()
+    }
+
     /// Returns the program digest, if it has been computed.  Returns `None` iff
     /// the digest has not yet been computed.
     #[inline]
@@ -439,6 +457,25 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             return None;
         }
         Some(&self.data_sources[index])
+    }
+
+    /// Returns the data source frame (containing raw data, source and package
+    /// IDs) associated with the Nth registered data source as stored in the
+    /// host provisioning state, expressed by `index`.  Returns `None` iff
+    /// `index` is not the index of any registered data source.
+    pub(crate) fn get_current_stream_source(&self, index: usize) -> Option<&DataSourceMetadata> {
+        if index > self.get_current_stream_source_count() {
+            return None;
+        }
+        Some(&self.stream_sources[index])
+    }
+
+    /// Returns the data source frame (containing raw data, source and package
+    /// IDs) associated with the Nth registered data source as stored in the
+    /// host provisioning state, expressed by `index`.  Returns `None` iff
+    /// `index` is not the index of any registered data source.
+    pub(crate) fn get_previous_result(&self) -> Option<&Vec<u8>> {
+        self.previous_result.as_ref()
     }
 
     /// Returns the client IDs of clients who are able to request platform
@@ -501,7 +538,63 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     ////////////////////////////////////////////////////////////////////////////
     // Progressing through the state machine.
     ////////////////////////////////////////////////////////////////////////////
-
+    // The state transition, where events, [...], and conditions, <...>, are either above or left to the edges.
+    //
+    //                   Initial (State)
+    //                        |
+    //                        | [Provisioning a program]
+    //     <No data>          |
+    //    --------------------| 
+    //    |                   | <Need data>
+    //    |                   |
+    //    |                  \ /
+    //    |             DataSourcesLoading  <-------------------
+    //    |                   |                                |
+    //    |                   | [Provisioning a (static) data  | 
+    //    |                   |                                |
+    //    |                   | <More data>                    |
+    //    |                   |---------------------------------
+    //    ------------------->|
+    //                        | <-------------------------------
+    //     <No stream>        |                                |
+    //    --------------------|                                |
+    //    |                   | [Need stream]                  |
+    //    |                   |                                |
+    //    |                  \ /                               |
+    //    |           StreamSourcesLoading  <----------------- |
+    //    |                   |                              | |
+    //    |                   | [Provisioning a stream data] | |
+    //    |                   |                              | |
+    //    |                   | <More stream>                | |
+    //    |                   |------------------------------- |
+    //    ------------------->|                                |
+    //                        |                                |
+    //                       \ /                               |
+    //                ReadyToExecute                           |
+    //                        |                                |
+    //                        | [Request result]               |
+    //                        |                                |
+    //                       \ /                               |
+    // ------------>  FinishedExecuting  <----------           |
+    // |                      |                    |           |
+    // |                      |                    |           |
+    // |                      | [Request result]   |           |
+    // |                      |---------------------           |
+    // |                      |                                |
+    // |                      | [Request next round]           |
+    // |                      |---------------------------------
+    // |                      |
+    // |   [Request shutdown] |
+    // |                      | 
+    // | <More shutdown req>  | 
+    // -----------------------| 
+    //                        | <All shutdown requests received>
+    //                        |
+    //                       \ /
+    //                   Bottom state
+    //   
+    //
+    
     /// Sets the machine state to `MachineState::Error`.
     ///
     /// Does not panic: an error state can be reached from any Veracruz state
@@ -514,7 +607,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     /// Sets the machine state to `LifecycleState::ReadyToExecute`.
     ///
     /// PANICS: will panic if the current machine state is neither
-    /// `LifecycleState::Initial` nor `LifecycleState::DataSourcesLoading`.
+    /// `LifecycleState::Initial`, `LifecycleState::DataSourcesLoading` nor `LifecycleState::StreamSourcesLoading`.
     #[inline]
     pub(crate) fn set_ready_to_execute(&mut self) {
         // This should have been checked before now, to provide a more
@@ -523,6 +616,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         assert!(
             self.lifecycle_state == LifecycleState::Initial
                 || self.lifecycle_state == LifecycleState::DataSourcesLoading
+                || self.lifecycle_state == LifecycleState::StreamSourcesLoading
         );
         self.lifecycle_state = LifecycleState::ReadyToExecute;
     }
@@ -541,6 +635,23 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
                 || self.lifecycle_state == LifecycleState::Initial
         );
         self.lifecycle_state = LifecycleState::DataSourcesLoading;
+    }
+
+    /// Sets the machine state to `LifecycleState::DataSourcesLoading`.
+    ///
+    /// PANICS: will panic if the current machine state is neither
+    /// `LifecycleState::Initial` nor `LifecycleState::DataSourcesLoading`.
+    #[inline]
+    pub(crate) fn set_stream_sources_loading(&mut self) {
+        // This should have been checked before now, to provide a more
+        // meaningful error.  This is here just to ensure nothing slips through,
+        // and if it does, terminate.
+        assert!(
+            self.lifecycle_state == LifecycleState::StreamSourcesLoading
+                || self.lifecycle_state == LifecycleState::DataSourcesLoading
+                || self.lifecycle_state == LifecycleState::Initial
+        );
+        self.lifecycle_state = LifecycleState::StreamSourcesLoading;
     }
 
     /// Sets the machine state to `LifecycleState::FinishedExecuting`.
@@ -563,63 +674,17 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     /// Sort the input data provided to the host to match the order specified in
     /// the policy file.
     fn sort_incoming_data(&mut self) -> Result<(), HostProvisioningError> {
-        // Pre-sort the incoming by client id and then package id
-        self.data_sources.sort_by(|lhs, rhs| {
-            lhs.client_id
-                .cmp(&rhs.client_id)
-                .then_with(|| lhs.package_id.cmp(&rhs.package_id))
-        });
-
-        // Iterate over self.expected_data_sources.  In each iteration, search
-        // the next package in `self.data_sources` and add the result to
-        // `new_data_sources`. Variable `previous_packages` tracks the previous
-        // package_id for each client, initially being undefined and being
-        // updated in each iteration.
-        let mut new_data_sources: std::vec::Vec<DataSourceMetadata> = Vec::new();
-        let mut previous_packages: std::collections::HashMap<u64, u64> = HashMap::new();
-
-        for next_client_id in self.expected_data_sources.iter() {
-            let next_package_iter = match previous_packages.get(&next_client_id) {
-                Some(previous_package_id) => self.data_sources.iter().find(|data_item| {
-                    data_item.client_id == *next_client_id
-                        && data_item.package_id > *previous_package_id
-                }),
-                None => {
-                    // Because the data_sources are sorted, the first package in
-                    // the vec for client_id will be the first package
-                    self.data_sources
-                        .iter()
-                        .find(|data_item| data_item.client_id == *next_client_id)
-                }
-            };
-
-            match next_package_iter {
-                Some(next_package) => {
-                    previous_packages.insert(*next_client_id, next_package.package_id);
-
-                    new_data_sources.push(DataSourceMetadata {
-                        data: next_package.data.iter().cloned().collect(),
-                        client_id: next_package.client_id,
-                        package_id: next_package.package_id,
-                    });
-                }
-                None => {
-                    self.set_error();
-                    return Err(HostProvisioningError::FailedToSortIncomingData);
-                }
-            };
-        }
-
-        self.data_sources = new_data_sources;
-
-        Ok(())
+        Self::sorting_functor(&mut self.data_sources, &self.expected_data_sources)
     }
 
     /// Registers the data source `metadata`` in the host state.  Host state
     /// must be in the state `LifecycleState::DataSourcesLoading` otherwise an
     /// error is returned.  Progresses the provisioning process to either
-    /// `LifecycleState::ReadyToExecute` if all data sources are loaded on
-    /// completion of this call, or `LifecycleState::DataSourcesLoading` if more
+    /// - `LifecycleState::ReadyToExecute` if all data sources are loaded on
+    /// completion of this call, and stream data is NOT required
+    /// -  `LifecycleState::StreamSourcesLoading` if all data sources are loaded on
+    /// completion of this call, and stream data is required
+    /// - or `LifecycleState::DataSourcesLoading` if more
     /// data sources need to be loaded.
     ///
     /// PANICS: if the invariant that we are only ever in
@@ -635,7 +700,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
                 /* This is an invariant checking guard: we should not be still
                  * in LifecycleState::DataSourcesLoading if we have all the data
                  * that we need --- we should have moved into
-                 * LifecycleState::ReadyToExecute by now!
+                 * LifecycleState::ReadyToExecute or LifecycleState::StreamSourcesLoading by now!
                  */
                 assert!(self.get_current_data_source_count() < expected_data_sources);
 
@@ -646,7 +711,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
                  * state and signal success.
                  */
                 if self.get_current_data_source_count() == expected_data_sources {
-                    self.set_ready_to_execute();
+                    if self.get_expected_stream_source_count() == 0 {
+                        self.set_ready_to_execute();
+                    } else {
+                        self.set_stream_sources_loading();
+                    }
                     self.sort_incoming_data()
                 } else {
                     Ok(())
@@ -657,6 +726,117 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
                 found: otherwise.clone(),
             }),
         }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Registering stream sources.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Sort the input stream provided to the host to match the order specified in
+    /// the policy file.
+    fn sort_incoming_stream(&mut self) -> Result<(), HostProvisioningError> {
+        Self::sorting_functor(&mut self.stream_sources, &self.expected_stream_sources)
+    }
+
+    /// Registers the data source [`metadata`] in the host state.  Host state must be in
+    /// the state [`MachineState::DataSourcesLoading`] otherwise an error is returned.
+    /// Progresses the provisioning process to either [`MachineState::ReadyToExecute`] if
+    /// all data sources are loaded on completion of this call, or
+    /// [`MachineState::DataSourcesLoading`] if more data sources need to be loaded.
+    ///
+    ///
+    /// Registers the stream source `metadata`` in the host state.  Host state
+    /// must be in the state `LifecycleState::StreamSourcesLoading` otherwise an
+    /// error is returned.  Progresses the provisioning process to either
+    /// `LifecycleState::ReadyToExecute` if all stream sources are loaded on
+    /// completion of this call, or `LifecycleState::StreamSourcesLoading` if more
+    /// data sources need to be loaded.
+    ///
+    /// PANICS: if the invariant that we are only ever in
+    /// `LifecycleState::StreamSourcesLoading` whenever we still have data left to
+    /// load is broken.
+    pub(crate) fn add_new_stream_source(
+        &mut self,
+        metadata: DataSourceMetadata,
+    ) -> Result<(), HostProvisioningError> {
+        match self.get_lifecycle_state() {
+            LifecycleState::StreamSourcesLoading => {
+                let expected_stream_sources = self.get_expected_stream_source_count();
+                /* This is an invariant checking guard: we should not be still
+                 * in LifecycleState::StreamSourcesLoading if we have all the data
+                 * that we need --- we should have moved into
+                 * LifecycleState::ReadyToExecute by now!
+                 */
+                assert!(self.get_current_stream_source_count() < expected_stream_sources);
+
+                self.stream_sources.push(metadata);
+
+                /* If we have loaded everything, bunp the state and sort the
+                 * incoming data, otherwise remain in the data sources loading
+                 * state and signal success.
+                 */
+                if self.get_current_stream_source_count() == expected_stream_sources {
+                    self.set_ready_to_execute();
+                    self.sort_incoming_stream()
+                } else {
+                    Ok(())
+                }
+            }
+            otherwise => Err(HostProvisioningError::InvalidLifeCycleState {
+                expected: vec![LifecycleState::StreamSourcesLoading],
+                found: otherwise.clone(),
+            }),
+        }
+    }
+
+    /// Sort the incoming data against pattern, against the expected_data_sources provided in the policy file
+    fn sorting_functor(
+        data: &mut Vec<DataSourceMetadata>,
+        pattern: &Vec<u64>,
+    ) -> Result<(), HostProvisioningError> {
+        // pre-sort the incoming data by client id then package id
+        data.sort_by(|lhs, rhs| {
+            lhs.client_id
+                .cmp(&rhs.client_id)
+                .then_with(|| lhs.package_id.cmp(&rhs.package_id))
+        });
+
+        // Iterate over pattern.
+        // In each iteration, search the next package in `data` and add the result to
+        // `new_data_sources`. Variable `previous_packages` tracks the previous package_id for each
+        // client, initially being undefined and then updated in each iteration.
+        let mut new_data_sources: std::vec::Vec<DataSourceMetadata> = Vec::new();
+        let mut previous_packages: std::collections::HashMap<u64, u64> = HashMap::new();
+        for next_client_id in pattern.iter() {
+            let next_package_iter = match previous_packages.get(&next_client_id) {
+                Some(previous_package_id) => data.iter().find(|data_item| {
+                    data_item.client_id == *next_client_id
+                        && data_item.package_id > *previous_package_id
+                }),
+                None => {
+                    // because the data_sources is sorted, the first package in the vec for client_id will be the first package
+                    data.iter()
+                        .find(|data_item| data_item.client_id == *next_client_id)
+                }
+            };
+
+            match next_package_iter {
+                Some(next_package) => {
+                    previous_packages.insert(*next_client_id, next_package.package_id);
+
+                    new_data_sources.push(DataSourceMetadata {
+                        data: next_package.data.iter().cloned().collect(),
+                        client_id: next_package.client_id,
+                        package_id: next_package.package_id,
+                    });
+                }
+                None => {
+                    return Err(HostProvisioningError::CannotSortDataOrStream);
+                }
+            };
+        }
+        *data = new_data_sources;
+        Ok(())
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -780,76 +960,6 @@ impl From<&str> for FatalHostError {
     }
 }
 
-///// Pretty-printing host errors.
-//impl Display for FatalHostError {
-//fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-//match self {
-//FatalHostError::BadArgumentsToHostFunction { function_name } => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(
-//f,
-//"  Bad arguments passed to host function '{}'.\n",
-//function_name
-//)
-//}
-//FatalHostError::MemoryReadFailed {
-//memory_address,
-//bytes_to_be_read,
-//} => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(f, "  Could not read from WASM memory.\n")?;
-//write!(
-//f,
-//"  Error occurred when reading {} bytes from address {}.\n",
-//bytes_to_be_read, memory_address
-//)
-//}
-//FatalHostError::UnknownHostFunction { index } => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(f, "  Unknown H-call invoked: '{}'.\n", index)?;
-//write!(
-//f,
-//"  This is a bug in the WASM program executing on Veracruz.\n"
-//)
-//}
-//FatalHostError::MemoryWriteFailed {
-//memory_address,
-//bytes_to_be_written,
-//} => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(f, "  Could not write to WASM memory.\n")?;
-//write!(
-//f,
-//"  Error occurred when writing {} bytes at address {}.\n",
-//bytes_to_be_written, memory_address
-//)
-//}
-//FatalHostError::NoMemoryRegistered => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(f, "  No WASM memory registered.\n")?;
-//write!(f, "  Please file a bug report: this should never happen.\n")
-//}
-//FatalHostError::NoProgramModuleRegistered => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(f, "  No WASM program module registered.\n")?;
-//write!(f, "  Please file a bug report: this should never happen.\n")
-//}
-//FatalHostError::NoProgramEntryPoint => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(
-//f,
-//"  The registered WASM program's entry point was missing or malformed.\n"
-//)
-//}
-//FatalHostError::Generic => {
-//write!(f, "Fatal Veracruz host error!\n")?;
-//write!(f, "  An unknown or generic error occurred.\n")?;
-//write!(f, "  Please file a bug report: this should never happen.\n")
-//}
-//}
-//}
-//}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation of the H-calls.
 ////////////////////////////////////////////////////////////////////////////////
@@ -912,6 +1022,16 @@ pub trait Chihuahua: Send {
         metadata: DataSourceMetadata,
     ) -> Result<(), HostProvisioningError>;
 
+    /// Provisions a new stream source, described using a `DataSourceMetadata`
+    /// frame into the host state.  Will fail if the lifecycle state is not
+    /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
+    /// `LifecycleState::ReadyToExecute` when the call represents the last
+    /// data source to be loaded, or maintains the current lifecycle state.
+    fn add_new_stream_source(
+        &mut self,
+        metadata: DataSourceMetadata,
+    ) -> Result<(), HostProvisioningError>;
+
     /// Invokes the entry point of the provisioned WASM program.  Will fail if
     /// the current lifecycle state is not `LifecycleState::ReadyToExecute` or
     /// if the WASM program fails at runtime.  On success, bumps the lifecycle
@@ -951,6 +1071,14 @@ pub trait Chihuahua: Send {
     /// the platform.
     fn get_expected_shutdown_sources(&self) -> Vec<u64>;
 
+    /// Returns the current number of stream sources provisioned into the host
+    /// provisioning state.
+    fn get_current_stream_source_count(&self) -> usize;
+
+    /// Returns the expected stream sources, as identified by their client IDs,
+    /// that we expect to be provisioned into the host state.
+    fn get_expected_stream_sources(&self) -> Vec<u64>;
+
     /// Returns a result of a WASM computation that has executed on the host
     /// provisioning state.  Returns `None` iff no such result has been
     /// registered.
@@ -962,7 +1090,18 @@ pub trait Chihuahua: Send {
 
     /// Sets the expected data sources, through a list of their source IDs, that
     /// this computation is expecting.
-    fn set_expected_data_sources(&mut self, sources: &[u64]);
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+
+    /// Sets the expected stream sources, through a list of their source IDs, that
+    /// this computation is expecting.
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+
+    /// Sets the expected shutdown sources, through a list of their source IDs, that
+    /// this computation is expecting.
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+
+    /// Registers the previous result.
+    fn set_previous_result(&mut self, result: &Option<Vec<u8>>);
 
     /// Moves the host provisioning state's lifecycle state into
     /// `LifecycleState::Error`, a state which it cannot ever escape,
@@ -1010,9 +1149,10 @@ impl From<LifecycleState> for u8 {
         match state {
             LifecycleState::Initial => 0,
             LifecycleState::DataSourcesLoading => 1,
-            LifecycleState::ReadyToExecute => 2,
-            LifecycleState::FinishedExecuting => 3,
-            LifecycleState::Error => 4,
+            LifecycleState::StreamSourcesLoading => 2,
+            LifecycleState::ReadyToExecute => 3,
+            LifecycleState::FinishedExecuting => 4,
+            LifecycleState::Error => 5,
         }
     }
 }
@@ -1027,9 +1167,10 @@ impl From<&LifecycleState> for u8 {
         match state {
             LifecycleState::Initial => 0,
             LifecycleState::DataSourcesLoading => 1,
-            LifecycleState::ReadyToExecute => 2,
-            LifecycleState::FinishedExecuting => 3,
-            LifecycleState::Error => 4,
+            LifecycleState::StreamSourcesLoading => 2,
+            LifecycleState::ReadyToExecute => 3,
+            LifecycleState::FinishedExecuting => 4,
+            LifecycleState::Error => 5,
         }
     }
 }
@@ -1047,9 +1188,10 @@ impl TryFrom<u8> for LifecycleState {
         match code {
             0 => Ok(LifecycleState::Initial),
             1 => Ok(LifecycleState::DataSourcesLoading),
-            2 => Ok(LifecycleState::ReadyToExecute),
-            3 => Ok(LifecycleState::FinishedExecuting),
-            4 => Ok(LifecycleState::Error),
+            2 => Ok(LifecycleState::StreamSourcesLoading),
+            3 => Ok(LifecycleState::ReadyToExecute),
+            4 => Ok(LifecycleState::FinishedExecuting),
+            5 => Ok(LifecycleState::Error),
             _otherwise => Err(()),
         }
     }

@@ -475,7 +475,7 @@ fn main() {
 
     let expected_data_sources: Vec<u64> = (0..config.data_source_count as u64).collect();
     let mut provisioning_state: Box<dyn Chihuahua + 'static> =
-        single_threaded_chihuahua(&cmdline.execution_strategy, &expected_data_sources, &[])
+        single_threaded_chihuahua(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
             .unwrap();
 
     provisioning_state.set_expected_data_sources(&expected_data_sources);

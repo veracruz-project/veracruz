@@ -1,0 +1,6 @@
+[target.wasm32-arm-veracruz.dependencies]
+std = {}
+compiler_builtins = {version = "=0.1.32"}
+
+[patch.crates-io]
+compiler_builtins = { git = "https://github.com/veracruz-project/compiler-builtins.git", branch = "veracruz" }
