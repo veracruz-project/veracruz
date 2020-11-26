@@ -331,7 +331,7 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     /// Veracruz runtime should only allow these sorts of registration acts to
     /// happen once.
     #[inline]
-    fn set_program_module(&mut self, module: Module) -> &mut Self {
+    pub(super) fn set_program_module(&mut self, module: Module) -> &mut Self {
         // The program module should really never change, once it is set.  If it
         // does then something suspicious is happening, and should be examined.
         assert_eq!(self.program_digest, None);
@@ -346,7 +346,7 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     /// Veracruz runtime should only allow these sorts of registration acts to
     /// happen once.
     #[inline]
-    fn set_program_digest(&mut self, digest: Vec<u8>) -> &mut Self {
+    pub(super) fn set_program_digest(&mut self, digest: Vec<u8>) -> &mut Self {
         // The program digest should really never change, once it is set.  If it
         // does then something suspicious is happening, and should be examined.
         assert_eq!(self.program_digest, None);
@@ -361,7 +361,7 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     /// Veracruz runtime should only allow these sorts of registration acts to
     /// happen once.
     #[inline]
-    fn set_memory(&mut self, memory: Memory) -> &mut Self {
+    pub(super) fn set_memory(&mut self, memory: Memory) -> &mut Self {
         // The program memory should really never change, once it is set.  If it
         // does then something suspicious is happening, and should be examined.
         assert_eq!(self.program_digest, None);
@@ -633,7 +633,7 @@ pub enum RuntimePanic {
 /// succeeds with the desired effect and a success error code returned, or
 /// fails with a recoverable error in which case the error code details what
 /// went wrong and what can be done to fix it.
-pub(crate) type HCallError = Result<ErrNo, RuntimePanic>;
+pub(crate) type WASIError = Result<ErrNo, RuntimePanic>;
 
 /// Details the arguments expected by the module's entry point, if any is found.
 pub(crate) enum EntrySignature {
