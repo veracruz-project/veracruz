@@ -9,7 +9,23 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use crate::hcall::wasi::common::{EntrySignature, RuntimeState};
+use super::error::{mk_error_code, mk_host_trap};
+use crate::hcall::wasi::common::{
+    EntrySignature, RuntimePanic, RuntimeState, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME,
+    WASI_CLOCK_RES_GET_NAME, WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME,
+    WASI_ENVIRON_SIZES_GET_NAME, WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME,
+    WASI_FD_DATASYNC_NAME, WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME,
+    WASI_FD_FDSTAT_SET_RIGHTS_NAME, WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME,
+    WASI_FD_FILESTAT_SET_TIMES_NAME, WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME,
+    WASI_FD_PRESTAT_GET_NAME, WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME,
+    WASI_FD_RENUMBER_NAME, WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME,
+    WASI_FD_WRITE_NAME, WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
+    WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME, WASI_PATH_OPEN_NAME,
+    WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME, WASI_PATH_RENAME_NAME,
+    WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME, WASI_PROC_EXIT_NAME,
+    WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME, WASI_SOCK_RECV_NAME,
+    WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
+};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
@@ -22,7 +38,7 @@ use wasmi::{
 
 /// The WASMI runtime state: the `RuntimeState` with the `Module` and `Memory`
 /// type-variables specialised to WASMI's `ModuleRef` and `MemoryRef` type.
-pub(crate) type WasmiHostProvisioningState = RuntimeState<ModuleRef, MemoryRef>;
+pub(crate) type WASMIRuntimeState = RuntimeState<ModuleRef, MemoryRef>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -34,95 +50,95 @@ const ENTRY_POINT_NAME: &str = "main";
 const LINEAR_MEMORY_NAME: &str = "memory";
 
 /// Index of the WASI `args_get` function.
-const WASI_ARGS_GET_NAME: usize = 0;
+const WASI_ARGS_GET_INDEX: usize = 0;
 /// Index of the WASI `args_get` function.
-const WASI_ARGS_SIZES_GET_NAME: usize = 1;
+const WASI_ARGS_SIZES_GET_INDEX: usize = 1;
 /// Index of the WASI `environ_get` function.
-const WASI_ENVIRON_GET_NAME: usize = 2;
+const WASI_ENVIRON_GET_INDEX: usize = 2;
 /// Index of the WASI `environ_sizes_get` function.
-const WASI_ENVIRON_SIZES_GET_NAME: usize = 3;
+const WASI_ENVIRON_SIZES_GET_INDEX: usize = 3;
 /// Index of the WASI `clock_res_get` function.
-const WASI_CLOCK_RES_GET_NAME: usize = 4;
+const WASI_CLOCK_RES_GET_INDEX: usize = 4;
 /// Index of the WASI `clock_time_get` function.
-const WASI_CLOCK_TIME_GET_NAME: usize = 5;
+const WASI_CLOCK_TIME_GET_INDEX: usize = 5;
 /// Index of the WASI `fd_advise` function.
-const WASI_FD_ADVISE_NAME: usize = 6;
+const WASI_FD_ADVISE_INDEX: usize = 6;
 /// Index of the WASI `fd_allocate` function.
-const WASI_FD_ALLOCATE_NAME: usize = 7;
+const WASI_FD_ALLOCATE_INDEX: usize = 7;
 /// Index of the WASI `fd_close` function.
-const WASI_FD_CLOSE_NAME: usize = 8;
+const WASI_FD_CLOSE_INDEX: usize = 8;
 /// Index of the WASI `fd_datasync` function.
-const WASI_FD_DATASYNC_NAME: usize = 9;
+const WASI_FD_DATASYNC_INDEX: usize = 9;
 /// Index of the WASI `fd_fdstat_get` function.
-const WASI_FD_FDSTAT_GET_NAME: usize = 10;
+const WASI_FD_FDSTAT_GET_INDEX: usize = 10;
 /// Index of the WASI `fd_filestat_set_flags` function.
-const WASI_FD_FDSTAT_SET_FLAGS_NAME: usize = 11;
+const WASI_FD_FDSTAT_SET_FLAGS_INDEX: usize = 11;
 /// Index of the WASI `fd_filestat_set_rights` function.
-const WASI_FD_FDSTAT_SET_RIGHTS_NAME: usize = 12;
+const WASI_FD_FDSTAT_SET_RIGHTS_INDEX: usize = 12;
 /// Index of the WASI `fd_filestat_get` function.
-const WASI_FD_FILESTAT_GET_NAME: usize = 13;
+const WASI_FD_FILESTAT_GET_INDEX: usize = 13;
 /// Index of the WASI `fd_filestat_set_size` function.
-const WASI_FD_FILESTAT_SET_SIZE_NAME: usize = 14;
+const WASI_FD_FILESTAT_SET_SIZE_INDEX: usize = 14;
 /// Index of the WASI `fd_filestat_set_times` function.
-const WASI_FD_FILESTAT_SET_TIMES_NAME: usize = 15;
+const WASI_FD_FILESTAT_SET_TIMES_INDEX: usize = 15;
 /// Index of the WASI `fd_pread` function.
-const WASI_FD_PREAD_NAME: usize = 16;
-/// Index of the WASI `fd_prestat_get_name` function.
-const WASI_FD_PRESTAT_GET_NAME: usize = 17;
-/// Index of the WASI `fd_prestat_dir_name` function.
-const WASI_FD_PRESTAT_DIR_NAME_NAME: usize = 18;
+const WASI_FD_PREAD_INDEX: usize = 16;
+/// Index of the WASI `fd_prestat_get_INDEX` function.
+const WASI_FD_PRESTAT_GET_INDEX: usize = 17;
+/// Index of the WASI `fd_prestat_dir_INDEX` function.
+const WASI_FD_PRESTAT_DIR_INDEX_INDEX: usize = 18;
 /// Index of the WASI `fd_pwrite` function.
-const WASI_FD_PWRITE_NAME: usize = 19;
+const WASI_FD_PWRITE_INDEX: usize = 19;
 /// Index of the WASI `fd_read` function.
-const WASI_FD_READ_NAME: usize = 20;
+const WASI_FD_READ_INDEX: usize = 20;
 /// Index of the WASI `fd_readdir` function.
-const WASI_FD_READDIR_NAME: usize = 21;
+const WASI_FD_READDIR_INDEX: usize = 21;
 /// Index of the WASI `fd_renumber` function.
-const WASI_FD_RENUMBER_NAME: usize = 22;
+const WASI_FD_RENUMBER_INDEX: usize = 22;
 /// Index of the WASI `fd_seek` function.
-const WASI_FD_SEEK_NAME: usize = 23;
+const WASI_FD_SEEK_INDEX: usize = 23;
 /// Index of the WASI `fd_sync` function.
-const WASI_FD_SYNC_NAME: usize = 24;
+const WASI_FD_SYNC_INDEX: usize = 24;
 /// Index of the WASI `fd_tell` function.
-const WASI_FD_TELL_NAME: usize = 25;
+const WASI_FD_TELL_INDEX: usize = 25;
 /// Index of the WASI `fd_write` function.
-const WASI_FD_WRITE_NAME: usize = 26;
+const WASI_FD_WRITE_INDEX: usize = 26;
 /// Index of the WASI `path_crate_directory` function.
-const WASI_PATH_CREATE_DIRECTORY_NAME: usize = 27;
+const WASI_PATH_CREATE_DIRECTORY_INDEX: usize = 27;
 /// Index of the WASI `path_filestat_get` function.
-const WASI_PATH_FILESTAT_GET_NAME: usize = 28;
+const WASI_PATH_FILESTAT_GET_INDEX: usize = 28;
 /// Index of the WASI `path_filestat_set_times` function.
-const WASI_PATH_FILESTAT_SET_TIMES_NAME: usize = 29;
+const WASI_PATH_FILESTAT_SET_TIMES_INDEX: usize = 29;
 /// Index of the WASI `path_link` function.
-const WASI_PATH_LINK_NAME: usize = 30;
+const WASI_PATH_LINK_INDEX: usize = 30;
 /// Index of the WASI `path_open` function.
-const WASI_PATH_OPEN_NAME: usize = 31;
+const WASI_PATH_OPEN_INDEX: usize = 31;
 /// Index of the WASI `path_readlink` function.
-const WASI_PATH_READLINK_NAME: usize = 32;
+const WASI_PATH_READLINK_INDEX: usize = 32;
 /// Index of the WASI `path_remove_directory` function.
-const WASI_PATH_REMOVE_DIRECTORY_NAME: usize = 33;
+const WASI_PATH_REMOVE_DIRECTORY_INDEX: usize = 33;
 /// Index of the WASI `path_rename` function.
-const WASI_PATH_RENAME_NAME: usize = 34;
+const WASI_PATH_RENAME_INDEX: usize = 34;
 /// Index of the WASI `path_symlink` function.
-const WASI_PATH_SYMLINK_NAME: usize = 35;
+const WASI_PATH_SYMLINK_INDEX: usize = 35;
 /// Index of the WASI `path_unlink_file` function.
-const WASI_PATH_UNLINK_FILE_NAME: usize = 36;
+const WASI_PATH_UNLINK_FILE_INDEX: usize = 36;
 /// Index of the WASI `poll_oneoff` function.
-const WASI_POLL_ONEOFF_NAME: usize = 37;
+const WASI_POLL_ONEOFF_INDEX: usize = 37;
 /// Index of the WASI `proc_exit` function.
-const WASI_PROC_EXIT_NAME: usize = 38;
+const WASI_PROC_EXIT_INDEX: usize = 38;
 /// Index of the WASI `proc_raise` function.
-const WASI_PROC_RAISE_NAME: usize = 39;
+const WASI_PROC_RAISE_INDEX: usize = 39;
 /// Index of the WASI `sched_yield` function.
-const WASI_SCHED_YIELD_NAME: usize = 40;
+const WASI_SCHED_YIELD_INDEX: usize = 40;
 /// Index of the WASI `random_get` function.
-const WASI_RANDOM_GET_NAME: usize = 41;
+const WASI_RANDOM_GET_INDEX: usize = 41;
 /// Index of the WASI `sock_recv` function.
-const WASI_SOCK_RECV_NAME: usize = 42;
+const WASI_SOCK_RECV_INDEX: usize = 42;
 /// Index of the WASI `sock_send` function.
-const WASI_SOCK_SEND_NAME: usize = 43;
+const WASI_SOCK_SEND_INDEX: usize = 43;
 /// Index of the WASI `sock_shutdown` function.
-const WASI_SOCK_SHUTDOWN_NAME: usize = 44;
+const WASI_SOCK_SHUTDOWN_INDEX: usize = 44;
 
 /// The representation type of the WASI `Advice` type.
 const REPRESENTATION_WASI_ADVICE: ValueType = ValueType::I32;
@@ -974,5 +990,165 @@ fn check_main(module: &ModuleInstance) -> EntrySignature {
     match module.export_by_name(ENTRY_POINT_NAME) {
         Some(ExternVal::Func(funcref)) => check_main_signature(&funcref.signature()),
         _otherwise => EntrySignature::NoEntryFound,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Finding important module exports.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Finds the linear memory of the WASM module, `module`, and returns it,
+/// otherwise creating a fatal runtime panic that will kill the Veracruz
+/// instance.
+fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, RuntimePanic> {
+    match module.export_by_name(LINEAR_MEMORY_NAME) {
+        Some(ExternVal::Memory(memoryref)) => Ok(memoryref),
+        _otherwise => Err(RuntimePanic::NoMemoryRegistered),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// The H-call interface.
+////////////////////////////////////////////////////////////////////////////////
+
+impl ModuleImportResolver for WASMIRuntimeState {
+    /// "Resolves" a H-call by translating from a H-call name, `field_name` to
+    /// the corresponding H-call code, and dispatching appropriately.
+    fn resolve_func(&self, field_name: &str, signature: &Signature) -> Result<FuncRef, Error> {
+        let index = match field_name {
+            WASI_ARGS_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_ARGS_SIZES_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_ENVIRON_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_ENVIRON_SIZES_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_CLOCK_RES_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_CLOCK_TIME_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_ADVISE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_ALLOCATE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_CLOSE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_DATASYNC_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_FDSTAT_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_FDSTAT_SET_FLAGS_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_FDSTAT_SET_RIGHTS_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_FILESTAT_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_FILESTAT_SET_SIZE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_FILESTAT_SET_TIMES_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_PREAD_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_PRESTAT_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_PRESTAT_DIR_NAME_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_PWRITE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_READ_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_READDIR_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_RENUMBER_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_SEEK_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_SYNC_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_TELL_NAME => WASI_ARGS_GET_INDEX,
+            WASI_FD_WRITE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_CREATE_DIRECTORY_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_FILESTAT_GET_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_FILESTAT_SET_TIMES_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_LINK_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_OPEN_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_READLINK_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_REMOVE_DIRECTORY_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_RENAME_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_SYMLINK_NAME => WASI_ARGS_GET_INDEX,
+            WASI_PATH_UNLINK_FILE_NAME => WASI_ARGS_GET_INDEX,
+            _otherwise => {
+                return Err(Error::Instantiation(format!(
+                    "Unknown function {} with signature: {:?}.",
+                    otherwise, signature
+                )));
+            }
+        };
+
+        if !check_signature(index, signature) {
+            Err(Error::Instantiation(format!(
+                "Function {} has an unexpected type-signature: {:?}.",
+                field_name, signature
+            )))
+        } else {
+            Ok(FuncInstance::alloc_host(signature.clone(), index))
+        }
+    }
+
+    fn resolve_global(
+        &self,
+        field_name: &str,
+        _descriptor: &GlobalDescriptor,
+    ) -> Result<GlobalRef, Error> {
+        Err(Error::Instantiation(field_name.to_string()))
+    }
+
+    fn resolve_memory(
+        &self,
+        field_name: &str,
+        _descriptor: &MemoryDescriptor,
+    ) -> Result<MemoryRef, Error> {
+        Err(Error::Instantiation(field_name.to_string()))
+    }
+
+    fn resolve_table(
+        &self,
+        field_name: &str,
+        _descriptor: &TableDescriptor,
+    ) -> Result<TableRef, Error> {
+        Err(Error::Instantiation(field_name.to_string()))
+    }
+}
+
+impl Externals for WASMIRuntimeState {
+    fn invoke_index(
+        &mut self,
+        index: usize,
+        args: RuntimeArgs,
+    ) -> Result<Option<RuntimeValue>, Trap> {
+        match index {
+            WASI_ARGS_GET_INDEX => unimplemented!(),
+            WASI_ARGS_SIZES_GET_INDEX => unimplemented!(),
+            WASI_ENVIRON_GET_INDEX => unimplemented!(),
+            WASI_ENVIRON_SIZES_GET_INDEX => unimplemented!(),
+            WASI_CLOCK_RES_GET_INDEX => unimplemented!(),
+            WASI_CLOCK_TIME_GET_INDEX => unimplemented!(),
+            WASI_FD_ADVISE_INDEX => unimplemented!(),
+            WASI_FD_ALLOCATE_INDEX => unimplemented!(),
+            WASI_FD_CLOSE_INDEX => unimplemented!(),
+            WASI_FD_DATASYNC_INDEX => unimplemented!(),
+            WASI_FD_FDSTAT_GET_INDEX => unimplemented!(),
+            WASI_FD_FDSTAT_SET_FLAGS_INDEX => unimplemented!(),
+            WASI_FD_FDSTAT_SET_RIGHTS_INDEX => unimplemented!(),
+            WASI_FD_FILESTAT_GET_INDEX => unimplemented!(),
+            WASI_FD_FILESTAT_SET_SIZE_INDEX => unimplemented!(),
+            WASI_FD_FILESTAT_SET_TIMES_INDEX => unimplemented!(),
+            WASI_FD_PREAD_INDEX => unimplemented!(),
+            WASI_FD_PRESTAT_GET_INDEX => unimplemented!(),
+            WASI_FD_PRESTAT_DIR_INDEX_INDEX => unimplemented!(),
+            WASI_FD_PWRITE_INDEX => unimplemented!(),
+            WASI_FD_READ_INDEX => unimplemented!(),
+            WASI_FD_READDIR_INDEX => unimplemented!(),
+            WASI_FD_RENUMBER_INDEX => unimplemented!(),
+            WASI_FD_SEEK_INDEX => unimplemented!(),
+            WASI_FD_SYNC_INDEX => unimplemented!(),
+            WASI_FD_TELL_INDEX => unimplemented!(),
+            WASI_FD_WRITE_INDEX => unimplemented!(),
+            WASI_PATH_CREATE_DIRECTORY_INDEX => unimplemented!(),
+            WASI_PATH_FILESTAT_GET_INDEX => unimplemented!(),
+            WASI_PATH_FILESTAT_SET_TIMES_INDEX => unimplemented!(),
+            WASI_PATH_LINK_INDEX => unimplemented!(),
+            WASI_PATH_OPEN_INDEX => unimplemented!(),
+            WASI_PATH_READLINK_INDEX => unimplemented!(),
+            WASI_PATH_REMOVE_DIRECTORY_INDEX => unimplemented!(),
+            WASI_PATH_RENAME_INDEX => unimplemented!(),
+            WASI_PATH_SYMLINK_INDEX => unimplemented!(),
+            WASI_PATH_UNLINK_FILE_INDEX => unimplemented!(),
+            WASI_POLL_ONEOFF_INDEX => unimplemented!(),
+            WASI_PROC_EXIT_INDEX => unimplemented!(),
+            WASI_PROC_RAISE_INDEX => unimplemented!(),
+            WASI_SCHED_YIELD_INDEX => unimplemented!(),
+            WASI_RANDOM_GET_INDEX => unimplemented!(),
+            WASI_SOCK_RECV_INDEX => unimplemented!(),
+            WASI_SOCK_SEND_INDEX => unimplemented!(),
+            WASI_SOCK_SHUTDOWN_INDEX => unimplemented!(),
+            otherwise => mk_host_trap(RuntimePanic::UnknownHostFunction { index: otherwise }),
+        }
     }
 }
