@@ -1333,4 +1333,62 @@ impl WASMIRuntimeState {
             },
         }
     }
+
+    /// The implementation of the WASI `sock_send` function.  This is not
+    /// supported by Veracruz and returns `ErrNo::NotSupported`, writing back
+    /// `0` as the length of the transmission.
+    fn sock_send(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_SOCK_SEND_NAME),
+            });
+        }
+
+        let address = args.nth(4);
+
+        match self.get_memory() {
+            None => Err(RuntimePanic::NoMemoryRegistered),
+            Some(memory) => {
+                if let Err(_) = memory.set(address, 0) {
+                    return Err(RuntimePanic::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: size as usize,
+                    });
+                } else {
+                    Ok(ErrNo::NotSupported)
+                }
+            }
+        }
+    }
+
+    /// The implementation of the WASI `sock_recv` function.  This is not
+    /// supported by Veracruz and returns `ErrNo::NotSupported`, writing back
+    /// `0` as the length of the transmission.
+    fn sock_recv(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 5 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_SOCK_RECV_NAME),
+            });
+        }
+
+        let datalen_address: u32 = args.nth(3);
+        let flags_address: u32 = args.nth(4);
+
+        self.write_value(datalen_address, 0u32)?;
+        self.write_value(flags_address, 0u16)?;
+
+        Ok(ErrNo::NotSupported)
+    }
+
+    /// The implementation of the WASI `sock_shutdown` function.  This is
+    /// not supported by Veracruz and simply returns `ErrNo::NotSupported`.
+    fn sock_shutdown(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_SOCK_SHUTDOWN_NAME),
+            });
+        }
+
+        Ok(ErrNo::NotSupported)
+    }
 }
