@@ -18,12 +18,13 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
-    path::Path,
+    path::{Path, PathBuf},
     string::{String, ToString},
     vec::Vec,
 };
 
-use super::_types::ErrNo;
+use super::{types::ErrNo, fs::FileSystem};
+>>>>>>> wasi-abi: dispatch code for WASI host calls
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common types and utility functions that don't fit elsewhere.
@@ -220,6 +221,13 @@ pub enum ProvisioningError {
     display = "ProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
     )]
     HostProvisioningStateNotInitialized,
+    /// The runtime was trying to register two inputs at the same path in the
+    /// synthetic filesystem.
+    #[error(
+        display = "ProvisioningError: The global policy ascribes two inputs the same filename {}.",
+        _0
+    )]
+    InputNameClash(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -670,11 +678,7 @@ pub trait Chihuahua: Send {
     /// `LifecycleState::StreamSourcesLoading` if `buffer` represented the last
     /// block-oriented input to load but more stream-oriented inputs are
     /// expected, or maintains the current lifecycle state.
-    fn add_data_source(
-        &mut self,
-        fname: String,
-        buffer: Vec<u8>
-    ) -> Result<(), ProvisioningError>;
+    fn add_data_source(&mut self, fname: String, buffer: Vec<u8>) -> Result<(), ProvisioningError>;
 
     /// Provisions a new stream-oriented data source into the machine state,
     /// storing the `buffer` in the block-oriented input directory at filename
@@ -686,7 +690,7 @@ pub trait Chihuahua: Send {
     fn add_stream_source(
         &mut self,
         fname: String,
-        buffer: Vec<u8>
+        buffer: Vec<u8>,
     ) -> Result<(), ProvisioningError>;
 
     /// Invokes the entry point of the provisioned WASM program.  Will fail if
