@@ -41,6 +41,101 @@ pub(crate) const BLOCK_INPUT_DIRECTORY_NAME: &str = "block";
 /// stream-oriented inputs will be stored and can be read by the WASM program.
 pub(crate) const STREAM_INPUT_DIRECTORY_NAME: &str = "stream";
 
+/// Name of the WASI `args_get` function.
+pub(crate) const WASI_ARGS_GET_NAME: &str = "args_get";
+/// Name of the WASI `args_get` function.
+pub(crate) const WASI_ARGS_SIZES_GET_NAME: &str = "args_sizes_get";
+/// Name of the WASI `environ_get` function.
+pub(crate) const WASI_ENVIRON_GET_NAME: &str = "environ_get";
+/// Name of the WASI `environ_sizes_get` function.
+pub(crate) const WASI_ENVIRON_SIZES_GET_NAME: &str = "environ_sizes_get";
+/// Name of the WASI `clock_res_get` function.
+pub(crate) const WASI_CLOCK_RES_GET_NAME: &str = "clock_res_get";
+/// Name of the WASI `clock_time_get` function.
+pub(crate) const WASI_CLOCK_TIME_GET_NAME: &str = "clock_time_get";
+/// Name of the WASI `fd_advise` function.
+pub(crate) const WASI_FD_ADVISE_NAME: &str = "fd_advise";
+/// Name of the WASI `fd_allocate` function.
+pub(crate) const WASI_FD_ALLOCATE_NAME: &str = "fd_allocate";
+/// Name of the WASI `fd_close` function.
+pub(crate) const WASI_FD_CLOSE_NAME: &str = "fd_close";
+/// Name of the WASI `fd_datasync` function.
+pub(crate) const WASI_FD_DATASYNC_NAME: &str = "fd_datasync";
+/// Name of the WASI `fd_fdstat_get` function.
+pub(crate) const WASI_FD_FDSTAT_GET_NAME: &str = "fd_fdstat_get";
+/// Name of the WASI `fd_filestat_set_flags` function.
+pub(crate) const WASI_FD_FDSTAT_SET_FLAGS_NAME: &str = "fd_fdstat_set_flags";
+/// Name of the WASI `fd_filestat_set_rights` function.
+pub(crate) const WASI_FD_FDSTAT_SET_RIGHTS_NAME: &str = "fd_fdstat_set_rights";
+/// Name of the WASI `fd_filestat_get` function.
+pub(crate) const WASI_FD_FILESTAT_GET_NAME: &str = "fd_filestat_get";
+/// Name of the WASI `fd_filestat_set_size` function.
+pub(crate) const WASI_FD_FILESTAT_SET_SIZE_NAME: &str = "fd_filestat_set_size";
+/// Name of the WASI `fd_filestat_set_times` function.
+pub(crate) const WASI_FD_FILESTAT_SET_TIMES_NAME: &str = "fd_filestat_set_times";
+/// Name of the WASI `fd_pread` function.
+pub(crate) const WASI_FD_PREAD_NAME: &str = "fd_pread";
+/// Name of the WASI `fd_prestat_get_name` function.
+pub(crate) const WASI_FD_PRESTAT_GET_NAME: &str = "fd_prestat_get";
+/// Name of the WASI `fd_prestat_dir_name` function.
+pub(crate) const WASI_FD_PRESTAT_DIR_NAME_NAME: &str = "fd_prestat_dir_name";
+/// Name of the WASI `fd_pwrite` function.
+pub(crate) const WASI_FD_PWRITE_NAME: &str = "fd_pwrite";
+/// Name of the WASI `fd_read` function.
+pub(crate) const WASI_FD_READ_NAME: &str = "fd_read";
+/// Name of the WASI `fd_readdir` function.
+pub(crate) const WASI_FD_READDIR_NAME: &str = "fd_readdir";
+/// Name of the WASI `fd_renumber` function.
+pub(crate) const WASI_FD_RENUMBER_NAME: &str = "fd_renumber";
+/// Name of the WASI `fd_seek` function.
+pub(crate) const WASI_FD_SEEK_NAME: &str = "fd_seek";
+/// Name of the WASI `fd_sync` function.
+pub(crate) const WASI_FD_SYNC_NAME: &str = "fd_sync";
+/// Name of the WASI `fd_tell` function.
+pub(crate) const WASI_FD_TELL_NAME: &str = "fd_tell";
+/// Name of the WASI `fd_write` function.
+pub(crate) const WASI_FD_WRITE_NAME: &str = "fd_write";
+/// Name of the WASI `path_crate_directory` function.
+pub(crate) const WASI_PATH_CREATE_DIRECTORY_NAME: &str = "path_create_directory";
+/// Name of the WASI `path_filestat_get` function.
+pub(crate) const WASI_PATH_FILESTAT_GET_NAME: &str = "path_filestat_get";
+/// Name of the WASI `path_filestat_set_times` function.
+pub(crate) const WASI_PATH_FILESTAT_SET_TIMES_NAME: &str = "path_filestat_set_times";
+/// Name of the WASI `path_link` function.
+pub(crate) const WASI_PATH_LINK_NAME: &str = "path_link";
+/// Name of the WASI `path_open` function.
+pub(crate) const WASI_PATH_OPEN_NAME: &str = "path_open";
+/// Name of the WASI `path_readlink` function.
+pub(crate) const WASI_PATH_READLINK_NAME: &str = "path_readlink";
+/// Name of the WASI `path_remove_directory` function.
+pub(crate) const WASI_PATH_REMOVE_DIRECTORY_NAME: &str = "path_remove_directory";
+/// Name of the WASI `path_rename` function.
+pub(crate) const WASI_PATH_RENAME_NAME: &str = "path_rename";
+/// Name of the WASI `path_symlink` function.
+pub(crate) const WASI_PATH_SYMLINK_NAME: &str = "path_symlink";
+/// Name of the WASI `path_unlink_file` function.
+pub(crate) const WASI_PATH_UNLINK_FILE_NAME: &str = "path_unlink_file";
+/// Name of the WASI `poll_oneoff` function.
+pub(crate) const WASI_POLL_ONEOFF_NAME: &str = "poll_oneoff";
+/// Name of the WASI `proc_exit` function.
+pub(crate) const WASI_PROC_EXIT_NAME: &str = "proc_exit";
+/// Name of the WASI `proc_raise` function.
+pub(crate) const WASI_PROC_RAISE_NAME: &str = "proc_raise";
+/// Name of the WASI `sched_yield` function.
+pub(crate) const WASI_SCHED_YIELD_NAME: &str = "sched_yield";
+/// Name of the WASI `random_get` function.
+pub(crate) const WASI_RANDOM_GET_NAME: &str = "random_get";
+/// Name of the WASI `sock_recv` function.
+pub(crate) const WASI_SOCK_RECV_NAME: &str = "sock_recv";
+/// Name of the WASI `sock_send` function.
+pub(crate) const WASI_SOCK_SEND_NAME: &str = "sock_send";
+/// Name of the WASI `sock_shutdown` function.
+pub(crate) const WASI_SOCK_SHUTDOWN_NAME: &str = "sock_shutdown";
+
+////////////////////////////////////////////////////////////////////////////////
+// Miscellanea that doesn't fit elsewhere.
+////////////////////////////////////////////////////////////////////////////////
+
 /// Computes a SHA-256 digest of the bytes passed to it in `buffer`.
 pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
     ring::digest::digest(&ring::digest::SHA256, buffer)
@@ -51,54 +146,6 @@ pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
 ////////////////////////////////////////////////////////////////////////////////
 // Metadata for data sources.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// A data source "node" containing data and various bits of metadata.
-#[derive(Clone, Debug)]
-pub struct DataNode {
-    /// The raw data (encoded in bytes) provisioned into the enclave.
-    data: Vec<u8>,
-    /// The cursor, a pointer to within the buffer above, from where to read
-    /// next.
-    cursor: usize,
-    /// Who provisioned this data.
-    client_id: u64,
-    /// The "serial number" for data issued by a single provisioner of data.
-    package_id: u64,
-}
-
-impl DataNode {
-    /// Creates a new `DataMetadata` frame from a source of raw bytes, and
-    /// client and package IDs.
-    #[inline]
-    pub fn new(data: &[u8], client_id: u64, package_id: u64) -> Self {
-        DataNode {
-            data: data.to_vec(),
-            cursor: 0usize,
-            client_id: client_id,
-            package_id: package_id,
-        }
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Querying the data node.
-    ////////////////////////////////////////////////////////////////////////////
-
-    /// Gets the client ID associated with this metadata frame.
-    #[inline]
-    pub fn client_id(&self) -> u64 {
-        self.client_id
-    }
-
-    /// Gets the package ID associated with this metadata frame.
-    #[inline]
-    pub fn package_id(&self) -> u64 {
-        self.package_id
-    }
-
-    /// Returns the size, in bytes, of the data stored in this frame.
-    #[inline]
-    pub fn data_size(&self) -> usize { self.data.len() }
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // The machine lifecycle state.
