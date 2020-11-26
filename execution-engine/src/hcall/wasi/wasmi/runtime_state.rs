@@ -10,22 +10,25 @@
 //! and copyright information.
 
 use super::error::{mk_error_code, mk_host_trap};
+use crate::hcall::wasi::_types::ErrNo;
 use crate::hcall::wasi::common::{
-    EntrySignature, RuntimePanic, RuntimeState, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME,
-    WASI_CLOCK_RES_GET_NAME, WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME,
-    WASI_ENVIRON_SIZES_GET_NAME, WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME,
-    WASI_FD_DATASYNC_NAME, WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME,
-    WASI_FD_FDSTAT_SET_RIGHTS_NAME, WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME,
-    WASI_FD_FILESTAT_SET_TIMES_NAME, WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME,
-    WASI_FD_PRESTAT_GET_NAME, WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME,
-    WASI_FD_RENUMBER_NAME, WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME,
-    WASI_FD_WRITE_NAME, WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
+    sha_256_digest, EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState,
+    WASIError, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
+    WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
+    WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
+    WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
+    WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME,
+    WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME,
+    WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME,
+    WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME,
+    WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
     WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME, WASI_PATH_OPEN_NAME,
     WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME, WASI_PATH_RENAME_NAME,
     WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME, WASI_PROC_EXIT_NAME,
     WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME, WASI_SOCK_RECV_NAME,
     WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
 };
+use platform_services::{getrandom, result};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
@@ -48,6 +51,8 @@ pub(crate) type WASMIRuntimeState = RuntimeState<ModuleRef, MemoryRef>;
 const ENTRY_POINT_NAME: &str = "main";
 /// The name of the WASM program's linear memory.
 const LINEAR_MEMORY_NAME: &str = "memory";
+/// The name of the containing module for all WASI imports.
+const WASI_SNAPSHOT_MODULE_NAME: &str = "wasi_snapshot_preview1";
 
 /// Index of the WASI `args_get` function.
 const WASI_ARGS_GET_INDEX: usize = 0;
@@ -1149,6 +1154,183 @@ impl Externals for WASMIRuntimeState {
             WASI_SOCK_SEND_INDEX => unimplemented!(),
             WASI_SOCK_SHUTDOWN_INDEX => unimplemented!(),
             otherwise => mk_host_trap(RuntimePanic::UnknownHostFunction { index: otherwise }),
+        }
+    }
+}
+
+/// Functionality of the `WASMIRuntimeState` type that relies on it satisfying
+/// the `Externals` and `ModuleImportResolver` constraints.
+impl WASMIRuntimeState {
+    ////////////////////////////////////////////////////////////////////////////
+    // Provisioning and program execution-related material.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Loads a compiled program into the host state.  Tries to parse `buffer`
+    /// to obtain a WASM `Module` struct.  Returns an appropriate error if this
+    /// fails.
+    ///
+    /// The provisioning process must be in the `LifecycleState::Initial` state
+    /// otherwise an error is returned.  Progresses the provisioning process to
+    /// the state `LifecycleState::DataSourcesLoading` or
+    /// `LifecycleState::ReadyToExecute` on success, depending on how many
+    /// sources of input data are expected.
+    fn load_program(&mut self, buffer: &[u8]) -> Result<(), ProvisioningError> {
+        if self.get_lifecycle_state() == &LifecycleState::Initial {
+            if let Ok(module) = Module::from_buffer(buffer) {
+                let env_resolver =
+                    wasmi::ImportsBuilder::new().with_resolver(WASI_SNAPSHOT_MODULE_NAME, self);
+
+                if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
+                    if not_started_module_ref.has_start() {
+                        self.set_error();
+                        return Err(ProvisioningError::InvalidWASMModule);
+                    }
+
+                    let module_ref = not_started_module_ref.assert_no_start();
+
+                    if let Ok(linear_memory) = get_module_memory(&module_ref) {
+                        // Everything has now gone well, so register the module,
+                        // linear memory, and the program digest, then work out
+                        // which state we should be in.
+
+                        self.set_program_module(module_ref);
+                        self.set_memory(linear_memory);
+                        self.set_program_digest(sha_256_digest(buffer));
+
+                        if self.get_expected_data_source_count() == 0 {
+                            if self.get_expected_stream_source_count() == 0 {
+                                self.set_ready_to_execute();
+                            } else {
+                                self.set_stream_sources_loading();
+                            }
+                        } else {
+                            self.set_data_sources_loading();
+                        }
+                        return Ok(());
+                    }
+
+                    self.set_error();
+                    return Err(ProvisioningError::NoLinearMemoryFound);
+                }
+
+                self.set_error();
+                Err(ProvisioningError::ModuleInstantiationFailure)
+            } else {
+                self.set_error();
+                Err(ProvisioningError::InvalidWASMModule)
+            }
+        } else {
+            self.set_error();
+            Err(ProvisioningError::InvalidLifeCycleState {
+                expected: vec![LifecycleState::Initial],
+                found: self.get_lifecycle_state().clone(),
+            })
+        }
+    }
+
+    /// Invokes an exported entry point function with a given name,
+    /// `export_name`, in the WASM program provisioned into the Veracruz host
+    /// state.
+    fn invoke_export(&mut self, export_name: &str) -> Result<Option<RuntimeValue>, Error> {
+        match self.program_module() {
+            None => {
+                return Err(Error::Host(Box::new(
+                    RuntimePanic::NoProgramModuleRegistered,
+                )))
+            }
+            Some(not_started) => match check_main(not_started) {
+                EntrySignature::NoEntryFound => {
+                    return Err(Error::Host(Box::new(RuntimePanic::NoProgramEntryPoint)))
+                }
+                EntrySignature::ArgvAndArgc => {
+                    let program_arguments = vec![RuntimeValue::I32(0), RuntimeValue::I32(0)];
+                    not_started.invoke_export(export_name, &program_arguments, self)
+                }
+                EntrySignature::NoParameters => {
+                    let program_arguments = Vec::new();
+                    not_started.invoke_export(export_name, &program_arguments, self)
+                }
+            },
+        }
+    }
+
+    /// Executes the entry point of the WASM program provisioned into the
+    /// Veracruz host.
+    ///
+    /// Returns an error if no program is registered, the program registered
+    /// does not have an appropriate entry point, or if the machine is not
+    /// in the `LifecycleState::ReadyToExecute` state prior to being called.
+    ///
+    /// Also returns an error if the WASM program or the Veracruz instance
+    /// create a runtime trap during program execution (e.g. if the program
+    /// executes an abort instruction, or passes bad parameters to the Veracruz
+    /// host).
+    ///
+    /// Otherwise, returns the return value of the entry point function of the
+    /// program, along with a host state capturing the result of the program's
+    /// execution.
+    pub(crate) fn invoke_entry_point(&mut self) -> Result<i32, RuntimePanic> {
+        if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
+            match self.invoke_export(ENTRY_POINT_NAME) {
+                Ok(Some(RuntimeValue::I32(return_code))) => {
+                    self.finished_executing();
+                    Ok(return_code)
+                }
+                Ok(_) => {
+                    self.error();
+                    Err(RuntimePanic::ReturnedCodeError)
+                }
+                Err(Error::Trap(trap)) => {
+                    self.error();
+                    Err(RuntimePanic::WASMITrapError(trap))
+                }
+                Err(err) => {
+                    self.error();
+                    Err(RuntimePanic::WASMIError(err))
+                }
+            }
+        } else {
+            Err(RuntimePanic::EngineIsNotReady)
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The WASI host call implementations.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// The implementation of the WASI `random_get` function, which calls
+    /// through to the random number generator provided by `platform_services`.
+    /// Returns `ErrNo::Success` on successful execution of the random number
+    /// generator, or `ErrNo::NoSystem` if a random number generator is not
+    /// available on this platform, or if the call to the random number
+    /// generator fails for some reason.
+    fn random_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_RANDOM_GET_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(0);
+        let size: u32 = args.nth(1);
+        let mut buffer = vec![0; size as usize];
+
+        match self.get_memory() {
+            None => Err(RuntimePanic::NoMemoryRegistered),
+            Some(memory) => {
+                if let result::Result::Success = getrandom(&mut buffer) {
+                    if let Err(_) = memory.set(address, &buffer) {
+                        return Err(RuntimePanic::MemoryWriteFailed {
+                            memory_address: address as usize,
+                            bytes_to_be_written: size as usize,
+                        });
+                    }
+
+                    Ok(ErrNo::Success)
+                } else {
+                    Ok(ErrNo::NoSystem)
+                }
+            },
         }
     }
 }
