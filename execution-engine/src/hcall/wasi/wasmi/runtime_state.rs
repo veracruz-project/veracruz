@@ -29,10 +29,11 @@ use crate::hcall::wasi::common::{
     WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
 };
 use platform_services::{getrandom, result};
+use std::mem::size_of;
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
-    MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
-    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
+    LittleEndianConvert, MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance,
+    ModuleRef, RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1108,51 +1109,186 @@ impl Externals for WASMIRuntimeState {
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
         match index {
-            WASI_ARGS_GET_INDEX => unimplemented!(),
-            WASI_ARGS_SIZES_GET_INDEX => unimplemented!(),
-            WASI_ENVIRON_GET_INDEX => unimplemented!(),
-            WASI_ENVIRON_SIZES_GET_INDEX => unimplemented!(),
-            WASI_CLOCK_RES_GET_INDEX => unimplemented!(),
-            WASI_CLOCK_TIME_GET_INDEX => unimplemented!(),
-            WASI_FD_ADVISE_INDEX => unimplemented!(),
-            WASI_FD_ALLOCATE_INDEX => unimplemented!(),
-            WASI_FD_CLOSE_INDEX => unimplemented!(),
-            WASI_FD_DATASYNC_INDEX => unimplemented!(),
-            WASI_FD_FDSTAT_GET_INDEX => unimplemented!(),
-            WASI_FD_FDSTAT_SET_FLAGS_INDEX => unimplemented!(),
-            WASI_FD_FDSTAT_SET_RIGHTS_INDEX => unimplemented!(),
-            WASI_FD_FILESTAT_GET_INDEX => unimplemented!(),
-            WASI_FD_FILESTAT_SET_SIZE_INDEX => unimplemented!(),
-            WASI_FD_FILESTAT_SET_TIMES_INDEX => unimplemented!(),
-            WASI_FD_PREAD_INDEX => unimplemented!(),
-            WASI_FD_PRESTAT_GET_INDEX => unimplemented!(),
-            WASI_FD_PRESTAT_DIR_INDEX_INDEX => unimplemented!(),
-            WASI_FD_PWRITE_INDEX => unimplemented!(),
-            WASI_FD_READ_INDEX => unimplemented!(),
-            WASI_FD_READDIR_INDEX => unimplemented!(),
-            WASI_FD_RENUMBER_INDEX => unimplemented!(),
-            WASI_FD_SEEK_INDEX => unimplemented!(),
-            WASI_FD_SYNC_INDEX => unimplemented!(),
-            WASI_FD_TELL_INDEX => unimplemented!(),
-            WASI_FD_WRITE_INDEX => unimplemented!(),
-            WASI_PATH_CREATE_DIRECTORY_INDEX => unimplemented!(),
-            WASI_PATH_FILESTAT_GET_INDEX => unimplemented!(),
-            WASI_PATH_FILESTAT_SET_TIMES_INDEX => unimplemented!(),
-            WASI_PATH_LINK_INDEX => unimplemented!(),
-            WASI_PATH_OPEN_INDEX => unimplemented!(),
-            WASI_PATH_READLINK_INDEX => unimplemented!(),
-            WASI_PATH_REMOVE_DIRECTORY_INDEX => unimplemented!(),
-            WASI_PATH_RENAME_INDEX => unimplemented!(),
-            WASI_PATH_SYMLINK_INDEX => unimplemented!(),
-            WASI_PATH_UNLINK_FILE_INDEX => unimplemented!(),
-            WASI_POLL_ONEOFF_INDEX => unimplemented!(),
-            WASI_PROC_EXIT_INDEX => unimplemented!(),
-            WASI_PROC_RAISE_INDEX => unimplemented!(),
-            WASI_SCHED_YIELD_INDEX => unimplemented!(),
-            WASI_RANDOM_GET_INDEX => unimplemented!(),
-            WASI_SOCK_RECV_INDEX => unimplemented!(),
-            WASI_SOCK_SEND_INDEX => unimplemented!(),
-            WASI_SOCK_SHUTDOWN_INDEX => unimplemented!(),
+            WASI_ARGS_GET_INDEX => self
+                .args_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_ARGS_SIZES_GET_INDEX => self
+                .args_sizes_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_ENVIRON_GET_INDEX =>  self
+                .environ_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_ENVIRON_SIZES_GET_INDEX => self
+                .environ_sizes_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_CLOCK_RES_GET_INDEX => self
+                .clock_res_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_CLOCK_TIME_GET_INDEX => self
+                .clock_time_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_ADVISE_INDEX => self
+                .fd_advise(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_ALLOCATE_INDEX => self
+                .fd_allocate(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_CLOSE_INDEX => self
+                .fd_close(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_DATASYNC_INDEX => self
+                .fd_datasync(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_FDSTAT_GET_INDEX => self
+                .fd_fdstat_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_FDSTAT_SET_FLAGS_INDEX => self
+                .fd_fdstat_set_flags(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_FDSTAT_SET_RIGHTS_INDEX => self
+                .fd_fdstat_set_rights(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_FILESTAT_GET_INDEX => self
+                .fd_filestat_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_FILESTAT_SET_SIZE_INDEX => self
+                .fd_filestat_set_size(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_FILESTAT_SET_TIMES_INDEX => self
+                .fd_filestat_set_times(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_PREAD_INDEX => self
+                .fd_pread(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_PRESTAT_GET_INDEX => self
+                .fd_prestat_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_PRESTAT_DIR_INDEX_INDEX => self
+                .fd_prestat_dir(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_PWRITE_INDEX => self
+                .fd_pwrite(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_READ_INDEX => self
+                .fd_read(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_READDIR_INDEX => self
+                .fd_readdir(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_RENUMBER_INDEX => self
+                .fd_renumber(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_SEEK_INDEX => self
+                .fd_seek(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_SYNC_INDEX => self
+                .fd_sync(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_TELL_INDEX => self
+                .fd_tell(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_FD_WRITE_INDEX => self
+                .fd_write(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_CREATE_DIRECTORY_INDEX => self
+                .path_create_directory(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_FILESTAT_GET_INDEX => self
+                .path_filestat_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_FILESTAT_SET_TIMES_INDEX => self
+                .path_filestat_set_times(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_LINK_INDEX => self
+                .path_link(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_OPEN_INDEX => self
+                .path_open(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_READLINK_INDEX => self
+                .path_readlink(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_REMOVE_DIRECTORY_INDEX => self
+                .path_remove_directory(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_RENAME_INDEX => self
+                .path_rename(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_SYMLINK_INDEX => self
+                .path_symlink(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PATH_UNLINK_FILE_INDEX => self
+                .path_unlink_file(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_POLL_ONEOFF_INDEX => self
+                .poll_oneoff(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PROC_EXIT_INDEX => self
+                .proc_exit(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_PROC_RAISE_INDEX => self
+                .proc_raise(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_SCHED_YIELD_INDEX => self
+                .sched_yield(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_RANDOM_GET_INDEX => self
+                .random_get(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_SOCK_RECV_INDEX => self
+                .sock_recv(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_SOCK_SEND_INDEX => self
+                .sock_send(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
+            WASI_SOCK_SHUTDOWN_INDEX => self
+                .sock_shutdown(args)
+                .and_then(|c| mk_error_code(c))
+                .or_else(|e| mk_host_trap(e)),
             otherwise => mk_host_trap(RuntimePanic::UnknownHostFunction { index: otherwise }),
         }
     }
@@ -1295,8 +1431,651 @@ impl WASMIRuntimeState {
     }
 
     ////////////////////////////////////////////////////////////////////////////
+    // Common code for implementating the WASI functionality.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Writes any value, `value`, that can be converted into a little-endian
+    /// byte representation to the runtime state's memory at address, `address`.
+    /// Fails with `Err(RuntimePanic::NoMemoryRegistered)` if no memory is
+    /// registered in the runtime state, or
+    /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
+    /// to the address for some reason.
+    fn write_value<T>(&mut self, address: u32, value: T) -> Result<(), RuntimePanic>
+    where
+        T: LittleEndianConvert,
+    {
+        match self.get_memory() {
+            None => Err(RuntimePanic::NoMemoryRegistered),
+            Some(memory) => {
+                if let Err(_) = memory.set_value(address, T) {
+                    Err(RuntimePanic::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: size_of::<T>(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    /// Writes a buffer of bytes, `buffer`, to the runtime state's memory at
+    /// address, `address`.  Fails with `Err(RuntimePanic::NoMemoryRegistered)`
+    /// if no memory is registered in the runtime state, or
+    /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
+    /// to the address for some reason.
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> Result<(), RuntimePanic> {
+        match self.get_memory() {
+            None => Err(RuntimePanic::NoMemoryRegistered),
+            Some(memory) => {
+                if let Err(_) = memory.set(address, buffer) {
+                    Err(RuntimePanic::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: buffer.len(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
     // The WASI host call implementations.
     ////////////////////////////////////////////////////////////////////////////
+
+    /// The implementation of the WASI `args_get` function.
+    ///
+    /// TODO: complete this.
+    fn args_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_ARGS_GET_NAME),
+            });
+        }
+
+        let address0: u32 = args.nth(0);
+        let address1: u32 = args.nth(1);
+        self.write_value(address0, 0u32)?;
+        self.write_value(address1, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `args_sizes_get` function.
+    ///
+    /// TODO: complete this.
+    fn args_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_ARGS_SIZES_GET_NAME),
+            });
+        }
+
+        let address0: u32 = args.nth(0);
+        let address1: u32 = args.nth(1);
+        self.write_value(address0, 0u32)?;
+        self.write_value(address1, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `environ_get` function.
+    ///
+    /// TODO: complete this.
+    fn environ_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_ENVIRON_GET_NAME),
+            });
+        }
+
+        let address0: u32 = args.nth(0);
+        let address1: u32 = args.nth(1);
+        self.write_value(address0, 0u32)?;
+        self.write_value(address1, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `environ_sizes_get` function.
+    ///
+    /// TODO: complete this.
+    fn environ_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_ENVIRON_SIZES_GET_NAME),
+            });
+        }
+
+        let address0: u32 = args.nth(0);
+        let address1: u32 = args.nth(1);
+        self.write_value(address0, 0u32)?;
+        self.write_value(address1, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `clock_res_get` function.  This is not
+    /// supported by Veracruz.  We write `0` as the resolution and return
+    /// `ErrNo::NoSystem`.
+    fn clock_res_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_CLOCK_RES_GET_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(1);
+        self.write_value(address, 0u64)?;
+
+        Ok(ErrNo::NoSystem)
+    }
+
+    /// The implementation of the WASI `clock_time_get` function.  This is not
+    /// supported by Veracruz.  We write `0` as the timestamp and return
+    /// `ErrNo::NoSystem`.
+    fn clock_time_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_CLOCK_TIME_GET_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(2);
+        self.write_value(address, 0u64)?;
+
+        Ok(ErrNo::NoSystem)
+    }
+
+    /// The implementation of the WASI `fd_advise` function.
+    ///
+    /// TODO: complete this.
+    fn fd_advise(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_ADVISE_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_allocate` function.
+    ///
+    /// TODO: complete this.
+    fn fd_allocate(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_ALLOCATE_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_close` function.
+    ///
+    /// TODO: complete this.
+    fn fd_close(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 1 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_CLOSE_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_datasync` function.  This is not
+    /// supported by Veracruz and we simply return `ErrNo::Success`.
+    fn fd_datasync(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 1 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_DATASYNC_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_fdstat_get` function.
+    ///
+    /// TODO: complete this.
+    fn fd_fdstat_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 1 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_FDSTAT_GET_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_fdstat_set_flags` function.
+    ///
+    /// TODO: complete this.
+    fn fd_fdstat_set_flags(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_FDSTAT_SET_FLAGS_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_fdstat_set_rights` function.
+    ///
+    /// TODO: complete this.
+    fn fd_fdstat_set_rights(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_FDSTAT_SET_RIGHTS_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_filestat_get` function.
+    ///
+    /// TODO: complete this.
+    fn fd_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_FILESTAT_GET_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(1);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_filestat_set_size` function.
+    ///
+    /// TODO: complete this.
+    fn fd_filestat_set_size(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_FILESTAT_SET_SIZE_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_filestat_set_times` function.  This
+    /// is not supported by Veracruz and we simply return `ErrNo::Success`.
+    fn fd_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_FILESTAT_SET_TIMES_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_pread` function.
+    ///
+    /// TODO: complete this.
+    fn fd_pread(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_PREAD_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(3);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_prestat_get` function.
+    ///
+    /// TODO: complete this.
+    fn fd_prestat_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_PRESTAT_GET_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(1);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_prestat_dir_name` function.
+    ///
+    /// TODO: complete this.
+    fn fd_prestat_dir_name(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_PRESTAT_DIR_NAME_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_pwrite` function.
+    ///
+    /// TODO: complete this.
+    fn fd_pwrite(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_PWRITE_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(3);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_read` function.
+    ///
+    /// TODO: complete this.
+    fn fd_read(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_READ_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(2);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_readdir` function.
+    ///
+    /// TODO: complete this.
+    fn fd_readdir(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 5 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_RENUMBER_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(4);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_renumber` function.
+    ///
+    /// TODO: complete this.
+    fn fd_renumber(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_RENUMBER_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_sync` function.
+    ///
+    /// TODO: complete this.
+    fn fd_seek(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_SEEK),
+            });
+        }
+
+        let address: u32 = args.nth(3);
+        self.write_value(address, 0u64)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_sync` function.  This is not
+    /// supported by Veracruz.  We simply return `ErrNo::Success`.
+    fn fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 1 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_SYNC),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_tell` function.
+    ///
+    /// TODO: complete this.
+    fn fd_tell(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_TELL_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(1);
+        self.write_value(address, 0u64)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `fd_write` function.
+    ///
+    /// TODO: complete this.
+    fn fd_write(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_FD_WRITE_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(3);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_create_directory` function.
+    ///
+    /// TODO: complete this.
+    fn path_create_directory(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_CREATE_DIRECTORY_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_filestat_get` function.
+    ///
+    /// TODO: complete this.
+    fn path_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_FILESTAT_GET_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_filestat_set_times` function.  This
+    /// is not supported by Veracruz.  We simply return `ErrNo::Success`.
+    fn path_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 6 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_FILESTAT_SET_TIMES_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_readlink` function.  This
+    /// is not supported by Veracruz.  We simply return `ErrNo::Success`.
+    ///
+    /// XXX: re-assess whether we want to support this.
+    fn path_link(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 5 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_LINK_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_readlink` function.
+    ///
+    /// TODO: complete this.
+    fn path_open(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 8 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_OPEN_NAME),
+            });
+        }
+
+        let address: u32 = args.nth(7);
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_readlink` function.  This
+    /// is not supported by Veracruz.  We simply return `ErrNo::Success`.
+    ///
+    /// XXX: re-assess whether we want to support this.
+    fn path_readlink(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 5 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_READLINK_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_remove_directory` function.
+    ///
+    /// TODO: complete this.
+    fn path_remove_directory(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_REMOVE_DIRECTORY_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_rename` function.
+    ///
+    /// TODO: complete this.
+    fn path_rename(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_RENAME_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_symlink` function.  This is not
+    /// supported by Veracruz.  We simply return `ErrNo::Success`.
+    ///
+    /// XXX: re-assess whether we want to support this.
+    fn path_symlink(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 3 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_SYMLINK_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `path_unlink_file` function.  This is not
+    /// supported by Veracruz.  We simply return `ErrNo::Success`.
+    ///
+    /// XXX: re-assess whether we want to support this.
+    fn path_unlink_file(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 2 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PATH_UNLINK_FILE_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `poll_oneoff` function.  This is not
+    /// supported by Veracruz.  We write `0` as the number of subscriptions that
+    /// were registered and return `ErrNo::Success`.
+    fn poll_oneoff(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 4 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_POLL_ONEOFF_NAME),
+            });
+        }
+
+        let address: u32 = args[3];
+        self.write_value(address, 0u32)?;
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `proc_raise` function.  This halts
+    /// termination of the interpreter, returning an error code.  No return code
+    /// is returned to the calling WASM process.
+    fn proc_exit(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 1 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PROC_RAISE_NAME),
+            });
+        }
+
+        let exit_code: i32 = args.nth(0);
+
+        Err(RuntimePanic::EarlyExit(exit_code))
+    }
+
+    /// The implementation of the WASI `proc_raise` function.  This is not
+    /// supported by Veracruz and implemented as a no-op, simply returning
+    /// `ErrNo::Success`.
+    fn proc_raise(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 1 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_PROC_RAISE_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
+
+    /// The implementation of the WASI `sched_yield` function.  This is
+    /// implemented as a no-op and simply returns `ErrNo::Success`.
+    fn sched_yield(&mut self, args: RuntimeArgs) -> WASIError {
+        if args.len() != 0 {
+            return Err(RuntimePanic::BadArgumentsToHostFunction {
+                function_name: String::from(WASI_SCHED_YIELD_NAME),
+            });
+        }
+
+        Ok(ErrNo::Success)
+    }
 
     /// The implementation of the WASI `random_get` function, which calls
     /// through to the random number generator provided by `platform_services`.
@@ -1315,22 +2094,12 @@ impl WASMIRuntimeState {
         let size: u32 = args.nth(1);
         let mut buffer = vec![0; size as usize];
 
-        match self.get_memory() {
-            None => Err(RuntimePanic::NoMemoryRegistered),
-            Some(memory) => {
-                if let result::Result::Success = getrandom(&mut buffer) {
-                    if let Err(_) = memory.set(address, &buffer) {
-                        return Err(RuntimePanic::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: size as usize,
-                        });
-                    }
+        if let result::Result::Success = getrandom(&mut buffer) {
+            self.write_buffer(address, &buffer)?;
 
-                    Ok(ErrNo::Success)
-                } else {
-                    Ok(ErrNo::NoSystem)
-                }
-            },
+            Ok(ErrNo::Success)
+        } else {
+            Ok(ErrNo::NoSystem)
         }
     }
 
@@ -1345,20 +2114,9 @@ impl WASMIRuntimeState {
         }
 
         let address = args.nth(4);
+        self.write_value(address, 0u32)?;
 
-        match self.get_memory() {
-            None => Err(RuntimePanic::NoMemoryRegistered),
-            Some(memory) => {
-                if let Err(_) = memory.set(address, 0) {
-                    return Err(RuntimePanic::MemoryWriteFailed {
-                        memory_address: address as usize,
-                        bytes_to_be_written: size as usize,
-                    });
-                } else {
-                    Ok(ErrNo::NotSupported)
-                }
-            }
-        }
+        Ok(ErrNo::Success)
     }
 
     /// The implementation of the WASI `sock_recv` function.  This is not
