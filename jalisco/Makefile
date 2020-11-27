@@ -49,7 +49,6 @@ $(OUT_DIR)/stripped_ta: $(OUT_DIR)/jalisco
 
 $(OUT_DIR)/jalisco: $(TZ_Src)
 	@echo $(INFO_COLOR)"XARGO <=  $(TZ_Src)" $(RESET_COLOR)
-	cargo fmt
 	@xargo build --target $(TZ_TARGET) --release -vv --out-dir $(OUT_DIR) -Z unstable-options
 	@echo $(INFO_COLOR)"GEN   =>  jalisco" $(RESET_COLOR)
 
