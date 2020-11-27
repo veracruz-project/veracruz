@@ -532,6 +532,10 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
 /// about what is going on inside the enclave.
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum RuntimePanic {
+    /// The WASM program called `proc_exit`, or similar, to signal an early exit
+    /// from the program, returning a specific error code.
+    #[error(display = "RuntimePanic: Early exit requested by program, error code returned: '{}'.", _0)]
+    EarlyExit(i32),
     /// The Veracruz host was passed bad arguments by the WASM program running
     /// on the platform.  This should never happen if the WASM program uses
     /// `libveracruz` as the platform should ensure H-Calls are always
