@@ -11,6 +11,7 @@
 
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
+use wasi_types::{ErrNo, Fd, FileSize, Advice, FdStat, FdFlags, Rights, FileStat, Timestamp, Size, Prestat, IoVec, DirCookie, FileDelta, Whence, LookupFlags, OpenFlags};
 
 use std::{
     borrow::Borrow,
@@ -23,8 +24,6 @@ use std::{
     vec::Vec,
 };
 
-use super::{types::ErrNo, fs::FileSystem};
->>>>>>> wasi-abi: dispatch code for WASI host calls
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common types and utility functions that don't fit elsewhere.
@@ -454,32 +453,129 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // Filesystem actions.
+    // Filesystem operations.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Writes a new entry to the filesystem, consisting of `d` a metadata
-    /// frame, at location `fname`.
     #[inline]
-    pub(crate) fn write_filesystem(&mut self, fname: Filename, d: DataNode) -> &mut Self {
-        self.filesystem.insert(fname, d);
-        self
+    pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
+        self.filesystem.fd_close(fd)
     }
 
-    /// Reads from the filesystem at `fname`.  Returns `None` iff no such file
-    /// exists in the filesystem.  Returns `Some(data)`, for `data` a metadata
-    /// frame, otherwise.
     #[inline]
-    pub(crate) fn read_filesystem(&self, fname: Filename) -> Option<&DataNode> {
-        self.filesystem.get(fname)
+    pub(crate) fn fd_advise(&mut self, fd: &Fd, offset: FileSize, len: FileSize, advice: Advice) -> ErrNo {
+        self.filesystem.fd_advise(fd, offset, len, advice)
     }
 
-    /// Returns `true` iff all of the file names in `fnames` have been written
-    /// to the filesystem in the trusted runtime.
+    #[inline]
+    pub(crate) fn fd_allocate(&mut self, fd: &Fd, offset: FileSize, len: FileSize) -> ErrNo {
+        self.filesystem.fd_allocate(fd, offset, len)
+    }
+
+    #[inline]
+    pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
+        self.filesystem.fd_fdstat_get(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
+        self.filesystem.fd_fdstat_set_flags(fd, flags)
+    }
+
+    #[inline]
+    pub(crate) fn fd_fdstat_set_rights(&mut self, fd: &Fd, rights_base: Rights, rights_inheriting: Rights) -> ErrNo {
+        self.filesystem.fd_fdstat_set_rights(fd, rights_base, rights_inheriting)
+    }
+
+    #[inline]
+    pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
+        self.filesystem.fd_filestat_get(fd)
+    }
+
     #[inline]
     pub(crate) fn files_exist(&self, fnames: &[Filename]) -> bool {
         fnames.iter().all(|f| {
             self.filesystem.get(f).is_some()
         })
+    }
+
+    pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
+        self.filesystem.fd_filestat_set_size(fd, size)
+    }
+
+    #[inline]
+    pub(crate) fn fd_pread(&mut self, fd: &Fd, iovs: IoVec, offset: &FileSize) -> FileSystemError<Size> {
+        self.filesystem.fd_pread(fd, iovs, offset)
+    }
+
+    #[inline]
+    pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
+        self.filesystem.fd_prestat_get(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
+        self.filesystem.fd_prestat_dir_name(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_pwrite(&mut self, fd: &Fd, ciovec: Vec<IoVec>, offset: FileSize) -> FileSystemError<Size> {
+        self.filesystem.fd_pwrite(fd, ciovec, offset)
+    }
+
+    #[inline]
+    pub(crate) fn fd_read(&mut self, fd: &Fd, iovec: Vec<IoVec>) -> FileSystemError<Size> {
+        self.filesystem.fd_read(fd, iovec)
+    }
+
+    #[inline]
+    pub(crate) fn fd_readdir(&mut self, fd: &Fd, cookie: DirCookie) -> FileSystemError<Vec<String>> {
+        self.filesystem.fd_readdir(fd, cookie)
+    }
+
+    #[inline]
+    pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
+        self.filesystem.fd_renumber(old_fd, new_fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_seek(&mut self, offset: FileDelta, whence: Whence) -> FileSystemError<FileSize> {
+        self.filesystem.fd_seek(offset, whence)
+    }
+
+    #[inline]
+    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<&FileSize> {
+        self.filesystem.fd_tell(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_write(&mut self, fd: &Fd, iovs: Vec<IoVec>) -> FileSystemError<Size> {
+        self.filesystem.fd_write(fd, iovs)
+    }
+
+    #[inline]
+    pub(crate) fn path_create_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+        self.filesystem.path_create_directory(fd, path)
+    }
+
+    #[inline]
+    pub(crate) fn path_filestat_get(&mut self, fd: &Fd, flags: LookupFlags, path: String) -> FileSystemError<FileStat> {
+        self.filesystem.path_filestat_get(fd, flags, path)
+    }
+
+    #[inline]
+    pub(crate) fn path_open(&mut self, fd: &Fd, dirflags: LookupFlags, path: String, oflags: OpenFlags, fs_rights_base: Rights,
+        fs_rights_inheriting: Rights, fdflags: FdFlags) -> FileSystemError<Fd> {
+        self.filesystem.path_open(fd, dirflags, path, oflags, fs_rights_base, fs_rights_inheriting, fdflags)
+    }
+
+    #[inline]
+    pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+        self.filesystem.path_remove_directory(fd, path)
+    }
+
+    #[inline]
+    pub(crate) fn path_rename(&mut self, old_fd: &Fd, old_path: String, new_fd: &Fd, new_path: String) -> ErrNo {
+        self.filesystem.path_rename(old_fd, old_path, new_fd, new_path)
     }
 
     ////////////////////////////////////////////////////////////////////////////
