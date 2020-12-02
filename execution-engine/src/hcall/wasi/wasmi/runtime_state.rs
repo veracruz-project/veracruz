@@ -1628,7 +1628,9 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_datasync` function.  This is not
-    /// supported by Veracruz and we simply return `ErrNo::Success`.
+    /// supported by Veracruz and we simply return `ErrNo::NotSupported`.
+    ///
+    /// XXX: consider whether this should just return `ErrNo::Success`, instead.
     fn fd_datasync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -1636,7 +1638,7 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `fd_fdstat_get` function.
@@ -1708,7 +1710,7 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_filestat_set_times` function.  This
-    /// is not supported by Veracruz and we simply return `ErrNo::Success`.
+    /// is not supported by Veracruz and we simply return `ErrNo::NotSupported`.
     fn fd_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -1716,7 +1718,7 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `fd_pread` function.
@@ -1842,7 +1844,9 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_sync` function.  This is not
-    /// supported by Veracruz.  We simply return `ErrNo::Success`.
+    /// supported by Veracruz.  We simply return `ErrNo::NotSupported`.
+    ///
+    /// XXX: consider whether this should just return `ErrNo::Success`, instead.
     fn fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -1850,7 +1854,7 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `fd_tell` function.
@@ -1912,7 +1916,7 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_filestat_set_times` function.  This
-    /// is not supported by Veracruz.  We simply return `ErrNo::Success`.
+    /// is not supported by Veracruz.  We simply return `ErrNo::NotSupported`.
     fn path_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 6 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -1920,13 +1924,11 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `path_readlink` function.  This
-    /// is not supported by Veracruz.  We simply return `ErrNo::Success`.
-    ///
-    /// XXX: re-assess whether we want to support this.
+    /// is not supported by Veracruz.  We simply return `ErrNo::NotSupported`.
     fn path_link(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 5 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -1934,10 +1936,10 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
-    /// The implementation of the WASI `path_readlink` function.
+    /// The implementation of the WASI `path_open` function.
     ///
     /// TODO: complete this.
     fn path_open(&mut self, args: RuntimeArgs) -> WASIError {
@@ -1954,7 +1956,7 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_readlink` function.  This
-    /// is not supported by Veracruz.  We simply return `ErrNo::Success`.
+    /// is not supported by Veracruz.  We simply return `ErrNo::NotSupported`.
     ///
     /// XXX: re-assess whether we want to support this.
     fn path_readlink(&mut self, args: RuntimeArgs) -> WASIError {
@@ -1964,7 +1966,7 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `path_remove_directory` function.
@@ -1994,7 +1996,7 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_symlink` function.  This is not
-    /// supported by Veracruz.  We simply return `ErrNo::Success`.
+    /// supported by Veracruz.  We simply return `ErrNo::NotSupported`.
     ///
     /// XXX: re-assess whether we want to support this.
     fn path_symlink(&mut self, args: RuntimeArgs) -> WASIError {
@@ -2004,11 +2006,11 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `path_unlink_file` function.  This is not
-    /// supported by Veracruz.  We simply return `ErrNo::Success`.
+    /// supported by Veracruz.  We simply return `ErrNo::NotSupported`.
     ///
     /// XXX: re-assess whether we want to support this.
     fn path_unlink_file(&mut self, args: RuntimeArgs) -> WASIError {
@@ -2018,12 +2020,12 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `poll_oneoff` function.  This is not
     /// supported by Veracruz.  We write `0` as the number of subscriptions that
-    /// were registered and return `ErrNo::Success`.
+    /// were registered and return `ErrNo::NotSupported`.
     fn poll_oneoff(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -2034,7 +2036,7 @@ impl WASMIRuntimeState {
         let address: u32 = args[3];
         self.write_value(address, 0u32)?;
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `proc_raise` function.  This halts
@@ -2049,12 +2051,14 @@ impl WASMIRuntimeState {
 
         let exit_code: i32 = args.nth(0);
 
+        // NB: this gets routed to the runtime, not the calling WASM program,
+        // for handling.
         Err(RuntimePanic::EarlyExit(exit_code))
     }
 
     /// The implementation of the WASI `proc_raise` function.  This is not
     /// supported by Veracruz and implemented as a no-op, simply returning
-    /// `ErrNo::Success`.
+    /// `ErrNo::NotSupported`.
     fn proc_raise(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -2062,11 +2066,11 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `sched_yield` function.  This is
-    /// implemented as a no-op and simply returns `ErrNo::Success`.
+    /// not supported by Veracruz and simply returns `ErrNo::NotSupported`.
     fn sched_yield(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 0 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -2074,7 +2078,7 @@ impl WASMIRuntimeState {
             });
         }
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `random_get` function, which calls
@@ -2116,7 +2120,7 @@ impl WASMIRuntimeState {
         let address = args.nth(4);
         self.write_value(address, 0u32)?;
 
-        Ok(ErrNo::Success)
+        Ok(ErrNo::NotSupported)
     }
 
     /// The implementation of the WASI `sock_recv` function.  This is not
