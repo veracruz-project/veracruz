@@ -11,9 +11,10 @@
 
 use std::boxed::Box;
 
-use super::super::{_types::ErrNo, common::RuntimePanic};
+use super::super::common::RuntimePanic;
 
 use wasmi::{HostError, RuntimeValue, Trap, TrapKind};
+use wasi_types::ErrNo;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Veracruz host errors.
