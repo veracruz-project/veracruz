@@ -30,7 +30,7 @@ use veracruz_utils::{
 // listen queue
 const BACKLOG: usize = 128;
 
-const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "./nitro_root_enclave.eif";
+const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "/home/ec2-user/nitro_root_enclave.eif";
 const INBOUND_PORT: u16 = 9090;
 
 #[derive(Debug, Error)]
@@ -80,22 +80,31 @@ fn main() {
     )
     .expect("Failed to create socket_td");
 
-    let my_ip_address = InetAddr::new(IpAddr::new_v4(127, 0, 0, 1), INBOUND_PORT);
+    let ip_string = local_ipaddress::get()
+        .expect("Failed to get local ip address");
+    let ip_addr: Vec<u8> = ip_string.split(".")
+        .map(|s| s.parse().expect("Parse error")).collect();
+    let my_ip_address = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), INBOUND_PORT);
     let sockaddr = SockAddr::new_inet(my_ip_address);
 
     bind(socket_fd, &sockaddr).expect("Failed to bind socket");
 
     listen(socket_fd, BACKLOG).expect("Failed to listen to socket");
 
+    println!("nitro-root-enclave-server::main waiting for someone to connect on the socket");
     let fd = accept(socket_fd).expect("Failed to accept socket");
     loop {
+        println!("nitro-root-enclave-server::main reading buffer from other instance");
         let received_buffer = receive_buffer(fd).expect("Failed to receive buffer");
+        println!("nitro-root-enclave-server::main forwarding buffer to enclave");
         enclave
             .send_buffer(&received_buffer)
             .expect("Failed to send buffer to enclave");
+        println!("nitro-root-enclave-server::main reading buffer from enclave");
         let buffer_to_return = enclave
             .receive_buffer()
             .expect("Failed to receive buffer from enclave");
+        println!("nitro-root-enclave-server::main forwarding return buffer to other instance");
         send_buffer(fd, &buffer_to_return).expect("Failed to return buffer to caller");
     }
 }
@@ -105,7 +114,7 @@ fn native_attestation(
     mexico_city_hash: &str,
 ) -> Result<NitroEnclave, NitroServerError> {
     println!("nitro-root-enclave-server::native_attestation started");
-    let nre_enclave = NitroEnclave::new(NITRO_ROOT_ENCLAVE_EIF_PATH)
+    let nre_enclave = NitroEnclave::new(NITRO_ROOT_ENCLAVE_EIF_PATH, true, None)
         .map_err(|err| NitroServerError::EnclaveError(err))?;
 
     println!(
@@ -183,7 +192,7 @@ fn post_native_attestation_token(
     let response = post_buffer(&url, &encoded_str)?;
 
     println!(
-        "sinaloa_tz::post_psa_attestation_token received buffer:{:?}",
+        "nitro-root-enclave-server::post_psa_attestation_token received buffer:{:?}",
         response
     );
     return Ok(());
