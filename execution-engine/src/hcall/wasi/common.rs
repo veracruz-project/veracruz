@@ -240,8 +240,15 @@ pub enum ProvisioningError {
 /// adopted as our ABI.
 #[derive(Clone)]
 pub struct RuntimeState<Module, Memory> {
-    /// The data sources that have been provisioned into the machine.
-    filesystem: HashMap<FileName, DataNode>,
+    /// The synthetic filesystem associated with this machine.
+    filesystem: FileSystem,
+    /// The environment variables that have been passed to this program from the
+    /// global policy file.  These are stored as a key-value mapping from
+    /// variable name to value.
+    environment_variables: Vec<(String, String)>,
+    /// The array of program arguments that have been passed to this program,
+    /// again from the global policy file.
+    program_arguments: Vec<String>,
     /// The expected number of data sources, derived from the global policy
     /// parameterising the computation.  This is included as a sanity check.  By
     /// the time the program is ready to execute, the filesystem should contain
@@ -286,7 +293,9 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            filesystem: HashMap::new(),
+            filesystem: FileSystem::new(),
+            environment_variables: Vec::new(),
+            program_arguments: Vec::new(),
             expected_data_source_count: 0usize,
             expected_stream_source_count: 0usize,
             registered_data_source_count: 0usize,
@@ -376,6 +385,72 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     pub(crate) fn error(&mut self) -> &mut Self {
         self.lifecycle_state = LifecycleState::Error;
         self
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The program's environment.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Pushes a new argument, `argument`, to the list of program arguments that
+    /// will be made available to the program.
+    #[inline]
+    pub(super) fn push_program_argument(&mut self, argument: String) -> &mut Self {
+        self.program_arguments.push(argument);
+        self
+    }
+
+    /// Returns the count of program arguments that will be supplied to the
+    /// program.
+    #[inline]
+    pub(super) fn program_argument_count(&self) -> usize {
+        self.program_arguments.len()
+    }
+
+    /// Registers a new environment variable, `key`, with a particular value,
+    /// `value`, in the program's environment.  Returns `None` iff the key was
+    /// already associated with a value (in which case the key-value pair are
+    /// not registered in the environment), and `Some(state)`, for `state` a
+    /// modified runtime state with the pair registered, otherwise.
+    #[inline]
+    pub(super) fn register_environment_variable(
+        &mut self,
+        key: String,
+        value: String,
+    ) -> Option<&mut Self> {
+        let keys: Vec<String> = self
+            .environment_variables
+            .iter()
+            .map(|(k, v)| k)
+            .cloned()
+            .collect();
+
+        if keys.contains(&key) {
+            None
+        } else {
+            self.environment_variables.push((key, value));
+            Ok(self)
+        }
+    }
+
+    /// Returns the number of environment variables stored in the program's
+    /// environment.
+    #[inline]
+    pub(super) fn environment_variable_count(&self) -> usize {
+        self.environment_variables.len()
+    }
+
+    /// Returns the sizes (in bytes) of the key-value pairs stored in the
+    /// program's environment.
+    pub(super) fn environment_variable_sizes(&self) -> Vec<(usize, usize)> {
+        let mut sizes = Vec::new();
+
+        for (k, v) in self.environment_variables.iter() {
+            sizes.push((k.as_bytes().len(), v.as_bytes().len()));
+        }
+
+        sizes.reverse();
+
+        sizes
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -534,7 +609,10 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
 pub enum RuntimePanic {
     /// The WASM program called `proc_exit`, or similar, to signal an early exit
     /// from the program, returning a specific error code.
-    #[error(display = "RuntimePanic: Early exit requested by program, error code returned: '{}'.", _0)]
+    #[error(
+        display = "RuntimePanic: Early exit requested by program, error code returned: '{}'.",
+        _0
+    )]
     EarlyExit(i32),
     /// The Veracruz host was passed bad arguments by the WASM program running
     /// on the platform.  This should never happen if the WASM program uses
