@@ -20,11 +20,16 @@ use std::io::Write;
 use std::io::Read;
 use std::fs::File;
 use veracruz_utils;
+use nix::sys::socket::{connect,
+    accept, bind, listen, socket, AddressFamily, InetAddr, IpAddr, SockAddr, SockFlag, SockType,
+};
+use std::os::unix::io::RawFd;
 
 pub struct EC2Instance {
     pub instance_id: String,
     pub private_ip: String,
-    pub socket_port: u32,
+    pub socket_port: u16,
+    pub socket_fd: Option<RawFd>,
 }
 
 #[derive(Debug, Error)]
@@ -41,6 +46,8 @@ pub enum EC2Error {
     SSH2Error(ssh2::Error),
     #[error(display = "EC2: No Host Key")]
     NoHostKeyError,
+    #[error(display = "EC2: Not connected")]
+    NotConnectedError,
     #[error(display = "EC2: Veracruz Socket Error:{:?}", _0)]
     VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
     #[error(display = "EC2: Unimplemented")]
@@ -86,11 +93,30 @@ impl EC2Instance {
 
         std::thread::sleep(std::time::Duration::from_millis(30000));
 
+        let socket_port: u16 = 9090;
+
         Ok(EC2Instance {
             instance_id: instance_id.to_string(),
             private_ip: private_ip.to_string(),
-            socket_port: 9090,
+            socket_port: socket_port,
+            socket_fd: None,
         })
+    }
+
+    fn socket_connect(&mut self) -> Result<RawFd, EC2Error> {
+        let ip_addr: Vec<u8> = self.private_ip.split(".")
+            .map(|s| s.parse().expect("Parse error")).collect();
+        println!("ec2_instance:send_buffer connecting to ip:{:?}, port:{:?}", ip_addr, self.socket_port);
+        let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
+        let sockaddr = SockAddr::new_inet(inet_addr); 
+
+        let socket_fd = socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None)
+            .expect("Failed to create socket");
+        connect(socket_fd, &sockaddr).expect("Failed to connect to socket");
+
+        self.socket_fd = Some(socket_fd);
+
+        return Ok(socket_fd);
     }
 
     pub fn close(&self)-> Result<(), EC2Error> {
@@ -126,7 +152,7 @@ impl EC2Instance {
         let mut known_hosts = session.known_hosts()
             .map_err(|err| EC2Error::SSH2Error(err))?;
         known_hosts.add(&full_ip, key, &full_ip, key_type.into())
-            .map_err(|err| EC2Error::SSH2Error(err));
+            .map_err(|err| EC2Error::SSH2Error(err))?;
 
         let privkey_path: &Path = Path::new(PRIVATE_KEY_FILENAME);
         session.userauth_pubkey_file("ec2-user",
@@ -171,7 +197,7 @@ impl EC2Instance {
         let mut known_hosts = session.known_hosts()
             .map_err(|err| EC2Error::SSH2Error(err))?;
         known_hosts.add(&full_ip, key, &full_ip, key_type.into())
-            .map_err(|err| EC2Error::SSH2Error(err));
+            .map_err(|err| EC2Error::SSH2Error(err))?;
 
         let privkey_path: &Path = Path::new(PRIVATE_KEY_FILENAME);
         session.userauth_pubkey_file("ec2-user",
@@ -203,25 +229,34 @@ impl EC2Instance {
         Ok(buffer)
     }
 
-    pub fn send_buffer(&self, buffer: &Vec<u8>) -> Result<(), EC2Error> {
+    pub fn send_buffer(&mut self, buffer: &Vec<u8>) -> Result<(), EC2Error> {
+
         println!("ec2_instance:send_buffer started");
-        let instance_url: String = format!("{:}:{:}", self.private_ip, self.socket_port);
-        let mut stream = TcpStream::connect(instance_url)
-            .map_err(|err| EC2Error::IOError(err))?;
-        stream.write(buffer)
-            .map_err(|err| EC2Error::IOError(err))?;
-        Ok(())
+        let socket_fd = match self.socket_fd {
+            Some(socket_fd) => socket_fd,
+            None => {
+                println!("EC2Instance::send_buffer connecting socket. This is a right and good thing");
+                self.socket_connect()?
+            }
+        };
+        println!("EC2Instance::send_buffer calling veracruz_utils::send_buffer with socket_fd:{:?}", socket_fd);
+        veracruz_utils::send_buffer(socket_fd, buffer).expect("send buffer failed");
+        return Ok(());
     }
 
-    pub fn receive_buffer(&self) -> Result<Vec<u8>, EC2Error> {
+    pub fn receive_buffer(&mut self) -> Result<Vec<u8>, EC2Error> {
         println!("ec2_instance::receive_buffer started");
-        let instance_url: String = format!("{:}:{:}", self.private_ip, self.socket_port);
-        let mut stream = TcpStream::connect(instance_url)
-            .map_err(|err| EC2Error::IOError(err))?;
-        let mut buffer: Vec<u8> = Vec::new();
-        stream.read(&mut buffer)
-            .map_err(|err| EC2Error::IOError(err))?;
-        Ok(buffer)
+
+        let socket_fd = match self.socket_fd {
+            Some(socket_fd) => socket_fd,
+            None => {
+                println!("EC2Instance::receive_buffer connecting socket. I don't think this should happen");
+                self.socket_connect()?
+            },
+        };
+        println!("EC2Instance::receive_buffer calling veracruz_utils::receive_buffer, socket_fd:{:?}", socket_fd);
+        let received_buffer = veracruz_utils::receive_buffer(socket_fd).expect("Failed to receive buffer");
+        return Ok(received_buffer);
     }
 }
 

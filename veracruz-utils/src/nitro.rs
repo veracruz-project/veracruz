@@ -21,6 +21,8 @@ pub enum NitroRootEnclaveMessage {
     SetMexicoCityHashHack(Vec<u8>), // hash
     NativeAttestation(Vec<u8>, i32), // challenge, device_id
     TokenData(Vec<u8>, Vec<u8>), // token, public_key
+    ProxyAttestation(Vec<u8>, Vec<u8>, Vec<u8>), // challenge, native_token, enclave_cert
+    PSAToken(Vec<u8>, Vec<u8>, u32), // token, public_key, device_id
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -51,29 +53,29 @@ pub enum VeracruzSocketError {
 }
 
 pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), VeracruzSocketError> {
-    println!("Chiapas::send_buffer started with fd:{:?}", fd);
+    println!("veracruz-utils::nitro::send_buffer started with fd:{:?}", fd);
     let len = buffer.len();
     // first, send the length of the buffer
     {
         let mut buf = [0u8; 9];
         LittleEndian::write_u64(&mut buf, buffer.len() as u64);
         let mut sent_bytes = 0;
-        println!("Chiapas::send_buffer sending this number of bytes:{:?}", buf.len());
+        println!("veracruz-utils::nitro::send_buffer sending this number of bytes:{:?}", buf.len());
         while sent_bytes < buf.len() {
             sent_bytes += match send(fd, &buf[sent_bytes..buf.len()], MsgFlags::empty()) {
                 Ok(size) => size,
                 //Err(nix::Error::Sys(EINTR)) =>{
-                    //println!("Chiapas::send_buffer as encountered EINTR error");
+                    //println!("veracruz-utils::nitro::send_buffer as encountered EINTR error");
                     //0
                 //},
                 Err(err) => {
                     return Err(VeracruzSocketError::NixError(err));
                 }
             };
-            println!("Chiapas::send_buffer has send this number of bytes so far:{:?}",sent_bytes);
+            println!("veracruz-utils::nitro::send_buffer has send this number of bytes so far:{:?}",sent_bytes);
         }
     }
-    println!("Chiapas::send_buffer has sent the length:{:?}", len);
+    println!("veracruz-utils::nitro::send_buffer has sent the length:{:?}", len);
     // next, send the buffer
     {
         let mut sent_bytes = 0;
@@ -88,13 +90,13 @@ pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), VeracruzSocketErro
             sent_bytes += size;
         }
     }
-    println!("Chiapas::send_buffer has completed.");
+    println!("veracruz-utils::nitro::send_buffer has completed.");
     return Ok(());
 }
 
 pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, VeracruzSocketError> {
     // first, read the length
-    println!("Chiapas::receive_buffer started with fd:{:?}", fd);
+    println!("veracruz-utils::nitro::receive_buffer started with fd:{:?}", fd);
     let length = {
         let mut buf = [0u8; 9];
         let len = buf.len();
@@ -107,17 +109,14 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, VeracruzSocketError> {
                 },
                 Err(nix::Error::Sys(EINTR)) => 0,
                 Err(err) => {
-                    println!("I have experienced an error");
+                    println!("I have experienced an error:{:?}", err);
                     return Err(VeracruzSocketError::NixError(err));
                 }
             }
         }
-        println!("Received num bytes:{:?}", received_bytes);
-        println!("Received buffer:{:?}", buf);
-        println!("Attempting little endian conversion");
         LittleEndian::read_u64(&buf) as usize
     };
-    println!("CHiapas::receive_buffer has read length:{:?}", length);
+    println!("veracruz-utils::nitro::receive_buffer has read length:{:?}", length);
     let mut buffer: Vec<u8> = vec![0; length];
     // next, read the buffer
     {
@@ -133,6 +132,6 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, VeracruzSocketError> {
             }
         }
     }
-    println!("Chiapas::receive_buffer has finished:{:?}", buffer);
+    println!("veracruz-utils::nitro::receive_buffer has finished");
     return Ok(buffer);
 }

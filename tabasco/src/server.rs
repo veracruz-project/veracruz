@@ -29,28 +29,46 @@ use std::{ffi::c_void, ptr::null};
 
 async fn verify_iat(input_data: String) -> TabascoResponder {
     if input_data.is_empty() {
+        println!("tabasco::verify_iat input_data is empty");
         return Err(TabascoError::MissingFieldError("tabasco::verify_iat data"));
     }
 
-    let proto_bytes = base64::decode(&input_data)?;
+    let proto_bytes = base64::decode(&input_data)
+        .map_err(|err| {
+            println!("tabasco::verify_iat decode of input data failed:{:?}", err);
+            err
+        })?;
 
-    let proto = colima::parse_tabasco_request(&proto_bytes)?;
+    let proto = colima::parse_tabasco_request(&proto_bytes)
+        .map_err(|err| {
+            println!("tabasco::verify_iat parse_tabasco_request failed:{:?}", err);
+            err
+        })?;
     if !proto.has_proxy_psa_attestation_token() {
+        println!("tabasco::verify_iat proto does not have proxy psa attestation token");
         return Err(TabascoError::NoProxyPSAAttestationTokenError);
     }
 
     let (token, pubkey, device_id) =
         colima::parse_proxy_psa_attestation_token(proto.get_proxy_psa_attestation_token());
-
     let pubkey_hash = {
-        let conn = crate::orm::establish_connection()?;
-        crate::orm::query_device(&conn, device_id)?
+        let conn = crate::orm::establish_connection()
+            .map_err(|err| {
+                println!("tabasco::verify_iat orm::establish_connection failed:{:?}", err);
+                err
+            })?;
+        crate::orm::query_device(&conn, device_id)
+            .map_err(|err| {
+                println!("tabasco::verify_iat orm::query_device failed:{:?}", err);
+                err
+            })?
     };
 
     // verify that the pubkey we received matches the hash we received
     // during native attestation
     let calculated_pubkey_hash = ring::digest::digest(&ring::digest::SHA256, pubkey.as_ref());
     if calculated_pubkey_hash.as_ref().to_vec() != pubkey_hash {
+        println!("tabasco::verify_iat hashes didn't match");
         return Err(TabascoError::MismatchError {
             variable: "Tabasco::server public key",
             received: calculated_pubkey_hash.as_ref().to_vec(),
@@ -70,6 +88,7 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
         )
     };
     if lpk_ret != 0 {
+        println!("tabasco::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}", lpk_ret);
         return Err(TabascoError::UnsafeCallError(
             "tabasco::server::verify_iat t_cose_sign1_verify_load_public_key",
             lpk_ret,
@@ -104,6 +123,7 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
         )
     };
     if sv_ret != 0 {
+        println!("tabasco::verify_iat sv_ret != 0");
         return Err(TabascoError::UnsafeCallError(
             "tabasco::server::verify_iat t_cose_sign1_verify",
             sv_ret,
@@ -118,6 +138,7 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
     }
 
     if payload.ptr == null() {
+        println!("tabasco::verify_iat payload.ptr is null");
         return Err(TabascoError::MissingFieldError("payload.ptr"));
     }
 

@@ -14,5 +14,7 @@ bincode = { git= "https://github.com/veracruz-project/bincode.git", branch= "ver
 lazy_static = { version = "1.4.0", features = ["spin_no_std"]}
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib" }
 nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io" }
-#ring = { version = "=0.16.11", feature = "dev_urandom_fallback" }
-ring = { path = "../ring", feature = "dev_urandom_fallback" }
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["nitro"]}
+nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main" }
+psa-attestation = { path = "../psa-attestation/", features =["nitro"]}
+
