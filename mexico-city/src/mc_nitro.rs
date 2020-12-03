@@ -26,6 +26,7 @@ const PORT: u32 = 5005;
 // max number of outstanding connectiosn in the socket listen queue
 const BACKLOG: usize = 128;
 const OCALL_PORT: u32 = 5006;
+use crate::managers;
 
 // the following value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
 // I've no idea where it came from (I've seen no documentation on this), but
@@ -62,34 +63,68 @@ pub fn nitro_main() -> Result<(), String> {
             },
             MCMessage::GetEnclaveCert => {
                 println!("mc_nitro::main GetEnclaveCert");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let return_message = match managers::baja_manager::get_enclave_cert_pem() {
+                    Ok(cert) => MCMessage::EnclaveCert(cert),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
+                };
+                return_message
             },
             MCMessage::GetEnclaveName => {
                 println!("mc_nitro::main GetEnclaveName");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let return_message = match managers::baja_manager::get_enclave_name() {
+                    Ok(name) => MCMessage::EnclaveName(name),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
+                };
+                return_message
             },
             MCMessage::NewTLSSession => {
                 println!("mc_nitro::main NewTLSSession");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let ns_result = managers::baja_manager::new_session();
+                let return_message: MCMessage = match ns_result {
+                    Ok(session_id) => {
+                        MCMessage::TLSSession(session_id)
+                    }
+                    Err(_) => {
+                        MCMessage::Status(NitroStatus::Fail)
+                    },
+                };
+                return_message
             },
-            MCMessage::CloseTLSSession(_session_id) => {
+            MCMessage::CloseTLSSession(session_id) => {
                 println!("mc_nitro::main CloseTLSSession");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let cs_result = managers::baja_manager::close_session(session_id);
+                let return_message: MCMessage = match cs_result {
+                    Ok(_) => MCMessage::Status(NitroStatus::Success),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
+                };
+                return_message
             },
-            MCMessage::GetTLSDataNeeded(_session_id) => {
+            MCMessage::GetTLSDataNeeded(session_id) => {
                 println!("mc_nitro::main GetTLSDataNeeded");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let return_message = match managers::baja_manager::get_data_needed(session_id) {
+                    Ok(needed) => MCMessage::TLSDataNeeded(needed),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
+                };
+                return_message
             },
-            MCMessage::SendTLSData(_session_id, _tls_data) => {
+            MCMessage::SendTLSData(session_id, tls_data) => {
                 println!("mc_nitro::main SendTLSData");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let return_message = match managers::baja_manager::send_data(session_id, &tls_data) {
+                    Ok(_) => MCMessage::Status(NitroStatus::Success),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
+                };
+                return_message
             },
-            MCMessage::GetTLSData(_session_id) => {
+            MCMessage::GetTLSData(session_id) => {
                 println!("mc_nitro::main GetTLSData");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                let return_message = match managers::baja_manager::get_data(session_id) {
+                    Ok((active, output_data)) => MCMessage::TLSData(output_data, active),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
+                };
+                return_message
             },
             MCMessage::GetPSAAttestationToken(challenge) => {
-                
+                println!("mc_nitro::main GetPSAAttestationToken");
                 get_psa_attestation_token(&challenge)
                     .map_err(|err| format!("mc_nitro::nitro_main get_psa_attestation_failed:{:?}", err))?
             },
@@ -112,7 +147,7 @@ pub fn nitro_main() -> Result<(), String> {
 
 fn initialize(policy_json: &String) -> Result<MCMessage, String> {
     println!("mc_nitro::initialize started");
-    crate::managers::baja_manager::init_baja(&policy_json)
+    managers::baja_manager::init_baja(&policy_json)
         .map_err(|err| format!("mc_nitro::main init_baja failed:{:?}", err))?;
     println!("mc_nitro::main init_baja completed");
     return Ok(MCMessage::Status(NitroStatus::Success));
@@ -122,7 +157,7 @@ fn get_psa_attestation_token(challenge: &Vec<u8>) -> Result<MCMessage, String> {
     println!("mc_nitro::get_psa_attestation_token started");
     println!("nc_nitro::get_psa_attestation_token received challenge:{:?}", challenge);
 
-    let enclave_cert = crate::managers::baja_manager::get_enclave_cert_pem()
+    let enclave_cert = managers::baja_manager::get_enclave_cert_pem()
         .map_err(|err| format!("mc_nitro::get_psa_attestation_token failed to get enclave cert:{:?}", err))?;
 
     let nitro_token: Vec<u8> = {

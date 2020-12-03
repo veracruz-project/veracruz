@@ -117,7 +117,7 @@ pub mod sinaloa_nitro {
                     _ => return Err(SinaloaError::InvalidMCMessage(received_message))?,
                 }
             };
-            Ok(certificate)
+            return Ok(certificate);
         }
 
         // Note: This function will go away
@@ -135,7 +135,7 @@ pub mod sinaloa_nitro {
                     _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
                 }
             };
-            Ok(name)
+            return Ok(name);
         }
 
         fn proxy_psa_attestation_get_token(
@@ -152,31 +152,37 @@ pub mod sinaloa_nitro {
                 MCMessage::PSAAttestationToken(token, public_key, device_id) => (token, public_key, device_id),
                 _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
             };
-            Ok((token, public_key, device_id))
+            return Ok((token, public_key, device_id));
         }
 
         fn new_tls_session(&self) -> Result<u32, SinaloaError> {
-            let protobuf: Vec<u8> = Vec::new();
-            // TODO: fill protobuf with NewTLSSession
-            self.enclave.send_buffer(&protobuf)?;
+            let nls_message = MCMessage::NewTLSSession;
+            let nls_buffer = bincode::serialize(&nls_message)?;
+            self.enclave.send_buffer(&nls_buffer)?;
             
-            let return_buffer = self.enclave.receive_buffer()?;
-            // TODO: Parse return buffer, extract session_id
-            let session_id: u32 = 0;
+            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            Ok(session_id)
+            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let session_id = match received_message {
+                MCMessage::TLSSession(sid) => sid,
+                _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
+            };
+            return Ok(session_id);
         }
 
         fn close_tls_session(&self, session_id: u32) -> Result<(), SinaloaError> {
-            let protobuf: Vec<u8> = Vec::new();
-            // TODO: Fill protobuf with CloseTLSSession, session_id
+            let cts_message = MCMessage::CloseTLSSession(session_id);
+            let cts_buffer = bincode::serialize(&cts_message)?;
 
-            self.enclave.send_buffer(&protobuf)?;
+            self.enclave.send_buffer(&cts_buffer)?;
 
-            let return_buffer = self.enclave.receive_buffer()?;
-            // TODO: parse return_buffer, check status
+            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            Ok(())
+            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            return match received_message {
+                MCMessage::Status(status) => Ok(()),
+                _ => Err(SinaloaError::NitroStatus(NitroStatus::Fail)),
+            };
         }
 
         fn tls_data(
@@ -184,26 +190,44 @@ pub mod sinaloa_nitro {
             session_id: u32,
             input: Vec<u8>,
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), SinaloaError> {
-            let protobuf: Vec<u8> = Vec::new();
-            // TODO: Fill protobuf with SendTLSData, input_data
-            self.enclave.send_buffer(&protobuf)?;
+            let std_message: MCMessage = MCMessage::SendTLSData(session_id, input);
+            let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
 
-            let return_buffer = self.enclave.receive_buffer()?;
-            // TODO: parse return_buffer, check status
+            self.enclave.send_buffer(&std_buffer)?;
 
-            let active_flag = true;
+            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
+
+            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            match received_message {
+                MCMessage::Status(status) => {
+                    match status {
+                        NitroStatus::Success => (),
+                        _ => return Err(SinaloaError::NitroStatus(status)),
+                    }
+                },
+                _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
+            }
+
+            let mut active_flag = true;
             let mut ret_array = Vec::new();
             while self.tls_data_needed(session_id)? {
-                let protobuf: Vec<u8> = Vec::new();
-                // TODO: Fill protobuf with GetTLSData, session_id, active_flag
-                self.enclave.send_buffer(&protobuf)?;
+                let gtd_message = MCMessage::GetTLSData(session_id);
+                let gtd_buffer: Vec<u8> = bincode::serialize(&gtd_message)?;
 
-                let return_buffer = self.enclave.receive_buffer()?;
-                // TODO parse return_buffer into active_flag, output_data
-                // TODO: update active_flag with new value
-                let output_data: Vec<u8> = Vec::new();
-                ret_array.push(output_data.to_vec());
+                self.enclave.send_buffer(&gtd_buffer)?;
+
+                let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
+
+                let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+                match received_message {
+                    MCMessage::TLSData(data, alive) => {
+                        active_flag = alive;
+                        ret_array.push(data);
+                    },
+                    _ => return Err(SinaloaError::NitroStatus(NitroStatus::Fail)),
+                }
             }
+                
 
             Ok((
                 active_flag,
@@ -216,13 +240,20 @@ pub mod sinaloa_nitro {
         }
 
         fn close(&mut self) -> Result<bool, SinaloaError> {
-            let protobuf: Vec<u8> = Vec::new();
-            // TODO: fill protobuf with  ResetEnclave
-            self.enclave.send_buffer(&protobuf)?;
+            let re_message: MCMessage = MCMessage::ResetEnclave;
+            let re_buffer: Vec<u8> = bincode::serialize(&re_message)?;
 
-            let return_buffer = self.enclave.receive_buffer()?;
-            // TODO: Parse return status, do something with it
-            Ok(true)
+            self.enclave.send_buffer(&re_buffer)?;
+
+            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
+            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            return match received_message {
+                MCMessage::Status(status) => match status {
+                    NitroStatus::Success => Ok(true),
+                    _ => Err(SinaloaError::NitroStatus(status)),
+                },
+                _ => Err(SinaloaError::InvalidMCMessage(received_message)),
+            };
         }
     }
 
@@ -262,16 +293,19 @@ pub mod sinaloa_nitro {
         }
 
         fn tls_data_needed(&self, session_id: u32) -> Result<bool, SinaloaError> {
-            let protobuf: Vec<u8> = Vec::new();
-            // TODO: fill protobuf with GetTLSDataNeeded, session_id
+            let gtdn_message = MCMessage::GetTLSDataNeeded(session_id);
+            let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
 
-            self.enclave.send_buffer(&protobuf)?;
+            self.enclave.send_buffer(&gtdn_buffer)?;
 
-            let return_buffer = self.enclave.receive_buffer()?;
-            // TODO: parse result as true/false
-            // set data_needed to result
-            let data_needed = true;
-            Ok(data_needed)
+            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
+
+            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let tls_data_needed = match received_message {
+                MCMessage::TLSDataNeeded(needed) => needed,
+                _ => return Err(SinaloaError::NitroStatus(NitroStatus::Fail)),
+            };
+            return Ok(tls_data_needed);
         }
 
         fn native_attestation(
