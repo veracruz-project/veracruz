@@ -17,7 +17,8 @@ RUN apt-get update && \
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        cmake
+        cmake=3.18.4-0kitware1 \
+        cmake-data=3.18.4-0kitware1
 
 # Zephyr dependencies
 RUN apt-get update && \
