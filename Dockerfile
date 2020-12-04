@@ -5,6 +5,8 @@ ARG USER
 ARG UID
 
 ENV DEBIAN_FRONTEND noninteractive
+# Needed for Zephyr's tools
+ENV PYTHONIOENCODING "UTF-8"
 
 # Need different version of cmake from kitware
 RUN apt-get update && \
@@ -58,7 +60,17 @@ RUN wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.11.4/
     chmod +x /tmp/zephyr-sdk-0.11.4-setup.run && \
     /tmp/zephyr-sdk-0.11.4-setup.run -- -d /opt/zephyr-sdk-0.11.4
 
-# Extra config needed for Zephyr's tools
-ENV PYTHONIOENCODING "UTF-8"
+# Setup emulated network connection
+# These aren't all needed, but are useful for debugging
+WORKDIR /zephyr-workspace/tools/net-tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        iproute2 \
+        iptables \
+        iputils-ping \
+        net-tools \
+        socat \
+        tcpdump
+RUN make tunslip6
 
 WORKDIR /zephyr-workspace/$TARGET

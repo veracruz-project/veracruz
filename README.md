@@ -18,9 +18,9 @@ Then, build/run the Mini-Durango client:
 make build run
 ```
 
-If everything goes well, you should see QEMU run and print hello:
+If everything goes well, you should see QEMU run and print something:
 
 ``` bash
 *** Booting Zephyr OS build zephyr-v2.4.0  ***
-Hello World! qemu_cortex_m3
+blah blah blah
 ```

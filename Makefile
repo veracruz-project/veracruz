@@ -15,8 +15,10 @@ QEMU_FLAGS += -pidfile qemu.pid
 QEMU_FLAGS += -chardev stdio,id=con,mux=on
 QEMU_FLAGS += -serial chardev:con
 QEMU_FLAGS += -mon chardev=con,mode=readline
-QEMU_FLAGS += -icount shift=6,align=off,sleep=off
+#QEMU_FLAGS += -icount shift=6,align=off,sleep=off
 QEMU_FLAGS += -rtc clock=vm
+#QEMU_FLAGS += -nic tap,model=stellaris,script=no,downscript=no,ifname=zeth
+QEMU_FLAGS += -serial unix:/tmp/slip.sock
 QEMU_FLAGS += -kernel /zephyr-workspace/$(TARGET)/build/zephyr/zephyr.elf
 QEMU_FLAGS += -semihosting
 
@@ -31,8 +33,9 @@ docker: Dockerfile
 		-t $(DOCKER_IMAGE) -f $< .)
 	$(strip docker run -it --rm \
 		-v $(DOCKER_ROOT):/zephyr-workspace/$(TARGET) \
+		--cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
 		--name $(DOCKER_CONTAINER) \
-		$(DOCKER_IMAGE) bash)
+		$(DOCKER_IMAGE) bash -c "./slip-setup.sh ; bash")
 
 # Zephyr west commands
 .PHONY: update
@@ -60,3 +63,9 @@ ram_report: build
 .PHONY: run
 run: build
 	$(QEMU) $(QEMU_FLAGS)
+
+# Network tracing
+.PHONY: tcpdump
+tcpdump:
+	tcpdump -i tap0 &
+	sleep 0.1
