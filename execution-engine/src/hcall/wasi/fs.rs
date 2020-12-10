@@ -11,35 +11,42 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::collections::HashMap;
+use std::{string::String, collections::HashMap};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, IoVec,
-    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
+    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Inode
 };
 
 pub(crate) type FileSystemError<T> = Result<T, ErrNo>;
 
-struct INode {
+struct InodeImpl {
+    /// The status of this file.
+    file_stat: FileStat,
+    /// The content of the file in bytes.
     buffer: Vec<u8>,
 }
 
+/// Each file table entry contains an index into the inode
+/// table, pointing to an `InodeImpl`, where the static file data is stored. 
 struct FileTableEntry {
-    /// The index into the open file table where the data associated with this
-    /// file is stored.
-    inode_index: usize,
+    /// The index to `inode_table` in FileSystem.
+    inode : Inode,
+    /// Metadata for the file descriptor.
+    fd_stat : FdStat,
     /// The current offset of the file descriptor.
-    offset: FileSize
+    offset: FileSize,
 }
 
 pub struct FileSystem {
     /// A table of file descriptor table entries.  This is indexed by file
-    /// descriptors.  Each file table entry contains an index into the inode
-    /// table, pointing to an `INode`, where the data is stored.
+    /// descriptors.  
     file_table: HashMap<Fd, FileTableEntry>,
+    /// The structure of the file system.
+    /// NOTE: this will evolve to a full directory (tree) structure.
+    path_table: HashMap<String, Inode>,
     /// The inode table, which points to the actual data associated with a file
-    /// and other metadata.  This table is indexed by the indices stored in a
-    /// file table entry.
-    inode_table: Vec<INode>,
+    /// and other metadata.  This table is indexed by the Inode.
+    inode_table: HashMap<Inode, InodeImpl>,
 }
 
 impl FileSystem {
@@ -56,7 +63,8 @@ impl FileSystem {
     pub(crate) fn new() -> Self {
         Self {
             file_table: HashMap::new(),
-            inode_table: Vec::new()
+            path_table: HashMap::new(),
+            inode_table: HashMap::new(),
         }
     }
 
@@ -72,7 +80,10 @@ impl FileSystem {
     /// 2. `ErrNo::Success` if `fd` is a current file-descriptor.  In this case,
     ///    the file-descriptor is closed and no longer a valid file-descriptor.
     pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
-        unimplemented!()
+        match self.file_descriptors.remove(fd) {
+            Some(_) => ErrNo::Success,
+            None => ErrNo:BadF,
+        }
     }
 
     pub(crate) fn fd_advise(
@@ -89,29 +100,65 @@ impl FileSystem {
         unimplemented!()
     }
 
+    /// Return a copy of the status of the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
-        unimplemented!()
+        self.file_table.get(fd).map(|FileTableEntry{ file_stat, .. }| {
+            fd_stat.clone()
+        })
+        .ok_or(ErrNo::BadF) 
     }
 
+    /// Change the flag associated with the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        unimplemented!()
+        self.file_descriptors.get_mut(fd).map(|FileTableEntry{ fd_stat, .. }| {
+            fd_stat.flags = flags;
+            ErrNo::Success
+        })
+        .unwrap_or(ErrNo::BadF) 
     }
 
+    /// Change the right associated with the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_set_rights(
         &mut self,
         fd: &Fd,
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> ErrNo {
-        unimplemented!()
+        self.file_table.get_mut(fd).map(|FileTableEntry{ fd_stat, .. }| {
+            fd_stat.rights_base = rights_base;
+            ErrNo::Success
+        })
+        .unwrap_or(ErrNo::BadF) 
     }
 
+    /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
     pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
-        unimplemented!()
+
+        let inode = match self.file_table.get(fd) {
+            Some(FileTableEntry{ inode, .. }) => inode,
+            None => return ErrNo::BadF,
+        };
+
+        self.inode_table.get_mut(inode).map(|InodeImpl{file_stat, .. }| {
+            file_stat.clone()
+        })
+        .ok_or(ErrNo::BadF) 
     }
 
+    /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bypes are
+    /// filled with ZERO.
     pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
-        unimplemented!()
+        let inode = match self.file_table.get(fd) {
+            Some(FileTableEntry{ inode, .. }) => inode,
+            None => return ErrNo::BadF,
+        };
+
+        self.inode_table.get_mut(inode).map(|InodeImpl{file_stat, buffer}| {
+            file_stat.file_size = size;
+            buffer.resize(size,0);
+            ErrNo::Success
+        })
+        .unwrap_or(ErrNo::BadF) 
     }
 
     pub(crate) fn fd_pread(
