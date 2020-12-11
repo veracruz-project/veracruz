@@ -9,7 +9,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::sinaloa::SinaloaError;
 use std::process::Command;
 use std::net::TcpStream;
 use serde_json::Value;
@@ -21,7 +20,8 @@ use std::io::Read;
 use std::fs::File;
 use veracruz_utils;
 use nix::sys::socket::{connect,
-    accept, bind, listen, socket, AddressFamily, InetAddr, IpAddr, SockAddr, SockFlag, SockType,
+    socket, AddressFamily, InetAddr, IpAddr, SockAddr, SockFlag, SockType,
+    shutdown, Shutdown
 };
 use std::os::unix::io::RawFd;
 
@@ -72,7 +72,6 @@ impl EC2Instance {
             .map_err(|err| EC2Error::IOError(err))?;
         let ec2_result_stderr = std::str::from_utf8(&ec2_result.stderr)
             .map_err(|err| EC2Error::Utf8Error(err))?;
-        println!("ec2_result_stderr:{:?}", ec2_result_stderr);
         let ec2_result_stdout = ec2_result.stdout;
         let ec2_result_text = std::str::from_utf8(&ec2_result_stdout)
             .map_err(|err| EC2Error::Utf8Error(err))?;
@@ -89,8 +88,6 @@ impl EC2Instance {
             _ => return Err(EC2Error::IncorrectJson),
         };
 
-        println!("EC2 Instance ID: {:?}", instance_id);
-
         std::thread::sleep(std::time::Duration::from_millis(30000));
 
         let socket_port: u16 = 9090;
@@ -106,7 +103,6 @@ impl EC2Instance {
     fn socket_connect(&mut self) -> Result<RawFd, EC2Error> {
         let ip_addr: Vec<u8> = self.private_ip.split(".")
             .map(|s| s.parse().expect("Parse error")).collect();
-        println!("ec2_instance:send_buffer connecting to ip:{:?}, port:{:?}", ip_addr, self.socket_port);
         let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
         let sockaddr = SockAddr::new_inet(inet_addr); 
 
@@ -119,23 +115,22 @@ impl EC2Instance {
         return Ok(socket_fd);
     }
 
-    pub fn close(&self)-> Result<(), EC2Error> {
+    pub fn close(&mut self)-> Result<(), EC2Error> {
+        
+        if let Some(socket_fd) = self.socket_fd.take() {
+            shutdown(socket_fd, Shutdown::Both);
+        }
         println!("EC2Instance::close attempting to shutdown instance");
         let ec2_result = Command::new("/usr/local/bin/aws")
             .args(&["ec2", "terminate-instances", "--instance-ids", &self.instance_id]).output()
                 .map_err(|err| EC2Error::IOError(err))?;
-        let ec2_result_stderr = std::str::from_utf8(&ec2_result.stderr)
-            .map_err(|err| EC2Error::Utf8Error(err))?;
-        let ec2_result_stdout = ec2_result.stdout;
-        let ec2_result_text = std::str::from_utf8(&ec2_result_stdout)
-            .map_err(|err| EC2Error::Utf8Error(err))?;
+
         println!("EC2Instance::close succeeded");
         return Ok(());
     }
 
     pub fn execute_command(&self, command: &str) -> Result<(), EC2Error> {
         let full_ip = format!("{:}:{:}", self.private_ip, 22);
-        println!("EC2Instance::execute_command attempting to connect to {:?}", full_ip);
         let tcp = TcpStream::connect(full_ip.clone())
             .map_err(|err| EC2Error::IOError(err))?;
 
@@ -168,11 +163,10 @@ impl EC2Instance {
         let mut s = String::new();
         channel.read_to_string(&mut s)
             .map_err(|err| EC2Error::IOError(err))?;
-        println!("Command result:{:?}", s);
-        channel.wait_close();
+        channel.wait_close()
+            .map_err(|err| EC2Error::SSH2Error(err))?;
         let exit_status = channel.exit_status()
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        println!("channel exit status:{:?}", exit_status);
         Ok(())
     }
 
@@ -180,7 +174,6 @@ impl EC2Instance {
 
         let file_data: Vec<u8> = self.read_file(filename)?;
         let full_ip = format!("{:}:{:}", self.private_ip, 22);
-        println!("EC2Instance::upload_file attempting to connect to {:?}", full_ip);
         let tcp = TcpStream::connect(full_ip.clone())
             .map_err(|err| EC2Error::IOError(err))?;
 
@@ -207,13 +200,10 @@ impl EC2Instance {
             )
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
-        println!("EC2Instance::upload_file attempting to upload {:?} bytes", file_data.len());
         let mut remote_file = session.scp_send(Path::new(dest), 0o777, file_data.len() as u64, None)
             .map_err(|err| EC2Error::SSH2Error(err))?;
         let num_written = remote_file.write_all(&file_data)
             .map_err(|err| EC2Error::IOError(err))?;
-        println!("EC2Instance::upload_file wrote {:?} bytes", num_written);
-        println!("EC2Instance::upload_file done");
         Ok(())
     }
 
@@ -230,8 +220,6 @@ impl EC2Instance {
     }
 
     pub fn send_buffer(&mut self, buffer: &Vec<u8>) -> Result<(), EC2Error> {
-
-        println!("ec2_instance:send_buffer started");
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
             None => {
@@ -239,13 +227,11 @@ impl EC2Instance {
                 self.socket_connect()?
             }
         };
-        println!("EC2Instance::send_buffer calling veracruz_utils::send_buffer with socket_fd:{:?}", socket_fd);
         veracruz_utils::send_buffer(socket_fd, buffer).expect("send buffer failed");
         return Ok(());
     }
 
     pub fn receive_buffer(&mut self) -> Result<Vec<u8>, EC2Error> {
-        println!("ec2_instance::receive_buffer started");
 
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
@@ -254,7 +240,6 @@ impl EC2Instance {
                 self.socket_connect()?
             },
         };
-        println!("EC2Instance::receive_buffer calling veracruz_utils::receive_buffer, socket_fd:{:?}", socket_fd);
         let received_buffer = veracruz_utils::receive_buffer(socket_fd).expect("Failed to receive buffer");
         return Ok(received_buffer);
     }

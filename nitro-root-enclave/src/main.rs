@@ -200,7 +200,8 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
 fn proxy_attestation(
     challenge: &Vec<u8>,
     native_token: &Vec<u8>,
-    enclave_cert: &Vec<u8>,
+    enclave_cert_hash: &Vec<u8>,
+    enclave_name: String,
 ) -> Result<Vec<u8>, String> {
     // first authenticate the native token
     let document: AttestationDocument =
@@ -237,18 +238,18 @@ fn proxy_attestation(
     if status != 0 {
         return Err(format!("nitro-root-enclave:proxy_attestation psa_initial_attest_load_key failed with status code:{:?}", status));
     }
-    // generate the PSA Attestation token using challenge, measurement from the native token, and the enclave_cert
-    let enclave_cert_hash = ring::digest::digest(&ring::digest::SHA256, &enclave_cert);
+    // generate the PSA Attestation token using challenge, measurement from the native token, and the enclave_cert_hash
     let mut token: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
     let mut token_len: u64 = 0;
+    let enclave_name_len: usize = enclave_name.len();
     let status = unsafe {
         psa_initial_attest_get_token(
             document.pcrs[0].as_ptr() as *const u8,
             document.pcrs[0].len() as u64,
-            enclave_cert_hash.as_ref().as_ptr() as *const u8,
-            enclave_cert_hash.as_ref().len() as u64,
-            std::ptr::null() as *const i8,
-            0,
+            enclave_cert_hash.as_ptr() as *const u8,
+            enclave_cert_hash.len() as u64,
+            enclave_name.into_bytes().as_ptr() as *const i8,
+            enclave_name_len as u64,
             challenge.as_ptr() as *const u8,
             challenge.len() as u64,
             token.as_mut_ptr() as *mut u8,
@@ -336,9 +337,9 @@ fn main() -> Result<(), String> {
                     })?;
                 NitroRootEnclaveMessage::TokenData(proxy_token, public_key)
             }
-            NitroRootEnclaveMessage::ProxyAttestation(challenge, native_token, enclave_cert) => {
+            NitroRootEnclaveMessage::ProxyAttestation(challenge, native_token, enclave_cert_hash, enclave_name) => {
                 println!("nitro-root-enclave::main received ProxyAttesstation message");
-                let proxy_token = proxy_attestation(&challenge, &native_token, &enclave_cert)
+                let proxy_token = proxy_attestation(&challenge, &native_token, &enclave_cert_hash, enclave_name)
                     .map_err(|err| {
                         println!("proxy_attestation failed");
                         format!(

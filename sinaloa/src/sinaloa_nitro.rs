@@ -12,10 +12,9 @@
 #[cfg(feature = "nitro")]
 pub mod sinaloa_nitro {
     use crate::sinaloa::Sinaloa;
-    use hex;
     use lazy_static::lazy_static;
     use std::sync::Mutex;
-    use veracruz_utils::{NitroRootEnclaveMessage, OCallHandler, NitroError, NitroEnclave, MCMessage, NitroStatus };
+    use veracruz_utils::{NitroError, NitroEnclave, MCMessage, NitroStatus };
     use crate::sinaloa::SinaloaError;
     use crate::ec2_instance::EC2Instance;
 
@@ -146,7 +145,7 @@ pub mod sinaloa_nitro {
             let message_buffer = bincode::serialize(&message)?;
             self.enclave.send_buffer(&message_buffer)?;
             
-            let mut received_buffer = self.enclave.receive_buffer()?;
+            let received_buffer = self.enclave.receive_buffer()?;
             let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
             let (token, public_key, device_id) = match received_message {
                 MCMessage::PSAAttestationToken(token, public_key, device_id) => (token, public_key, device_id),
@@ -180,7 +179,7 @@ pub mod sinaloa_nitro {
 
             let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
             return match received_message {
-                MCMessage::Status(status) => Ok(()),
+                MCMessage::Status(_status) => Ok(()),
                 _ => Err(SinaloaError::NitroStatus(NitroStatus::Fail)),
             };
         }
@@ -271,7 +270,7 @@ pub mod sinaloa_nitro {
             println!("SinaloaNitro::sinaloa_ocall_handler started");
             let return_buffer: Vec<u8> = {
                 let mut nre_guard = NRE_CONTEXT.lock()
-                    .map_err(|err| NitroError::MutexError)?;
+                    .map_err(|_| NitroError::MutexError)?;
                 match &mut *nre_guard {
                     Some(nre) => {
                         nre.send_buffer(&input_buffer)
@@ -310,13 +309,13 @@ pub mod sinaloa_nitro {
 
         fn native_attestation(
             tabasco_url: &str,
-            mexico_city_hash: &str,
+            _mexico_city_hash: &str,
         //) -> Result<NitroEnclave, SinaloaError> {
         ) -> Result<EC2Instance, SinaloaError> {
             println!("SinaloaNitro::native_attestation started");
 
             println!("Starting EC2 instance");
-            let mut nre_instance = EC2Instance::new()
+            let nre_instance = EC2Instance::new()
                 .map_err(|err| SinaloaError::EC2Error(err))?;
 
             nre_instance.upload_file(NITRO_ROOT_ENCLAVE_EIF_PATH, "/home/ec2-user/nitro_root_enclave.eif")
@@ -335,26 +334,6 @@ pub mod sinaloa_nitro {
 
             println!("sinaloa_tz::native_attestation returning Ok");
             return Ok(nre_instance);
-        }
-
-        fn post_native_attestation_token(
-            tabasco_url: &str,
-            token: &Vec<u8>,
-            device_id: i32,
-        ) -> Result<(), SinaloaError> {
-            println!("sinaloa_nitro::post_native_attestation_token started");
-            let serialized_tabasco_request =
-                colima::serialize_native_psa_attestation_token(token, device_id)?;
-            let encoded_str = base64::encode(&serialized_tabasco_request);
-            let url = format!("{:}/Nitro/AttestationToken", tabasco_url);
-            println!("sinaloa_nitro::post_native_attestation_token posting to URL{:?}", url);
-            let response = crate::post_buffer(&url, &encoded_str)?;
-
-            println!(
-                "sinaloa_nitro::post_psa_attestation_token received buffer:{:?}",
-                response
-            );
-            return Ok(());
         }
     }
 }

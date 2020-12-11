@@ -47,7 +47,6 @@ pub fn nitro_main() -> Result<(), String> {
     listen_vsock(socket_fd, BACKLOG)
         .map_err(|err| format!("mc_nistro::main listen_vsock failed:{:?}", err))?;
 
-    std::thread::sleep(std::time::Duration::from_millis(20000));
     let fd = accept(socket_fd)
         .map_err(|err| format!("mc_nitro::main accept failed:{:?}", err))?;
     println!("mc_nitro::nitro_main accept succeeded. looping");
@@ -130,7 +129,7 @@ pub fn nitro_main() -> Result<(), String> {
             },
             MCMessage::ResetEnclave => {
                 println!("mc_nitro::main ResetEnclave");
-                MCMessage::Status(NitroStatus::Unimplemented)
+                MCMessage::Status(NitroStatus::Success)
             },
             _ => {
                 println!("mc_nitro::main Unknown Opcode");
@@ -160,6 +159,7 @@ fn get_psa_attestation_token(challenge: &Vec<u8>) -> Result<MCMessage, String> {
     let enclave_cert = managers::baja_manager::get_enclave_cert_pem()
         .map_err(|err| format!("mc_nitro::get_psa_attestation_token failed to get enclave cert:{:?}", err))?;
 
+    let enclave_cert_hash = ring::digest::digest(&ring::digest::SHA256, &enclave_cert);
     let nitro_token: Vec<u8> = {
         let mut att_doc: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
         let mut att_doc_len: u32 = att_doc.len() as u32;
@@ -174,8 +174,8 @@ fn get_psa_attestation_token(challenge: &Vec<u8>) -> Result<MCMessage, String> {
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
                 nsm_fd,                                  //fd
-                enclave_cert.as_ptr() as *const u8,      // user_data
-                enclave_cert.len() as u32,               // user_data_len
+                enclave_cert_hash.as_ref().as_ptr() as *const u8,      // user_data
+                enclave_cert_hash.as_ref().len() as u32,               // user_data_len
                 challenge.as_ptr(),                      // nonce_data
                 challenge.len() as u32,                  // nonce_len
                 std::ptr::null() as *const u8,          // pub_key_data
@@ -193,8 +193,9 @@ fn get_psa_attestation_token(challenge: &Vec<u8>) -> Result<MCMessage, String> {
         }
         att_doc.clone()
     };
-
-    let nre_message = NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_cert);
+    let enclave_name: String = managers::baja_manager::get_enclave_name()
+        .map_err(|err| format!("mc_nitro::nitro_main failed to get enclave name from baja_manager:{:?}", err))?;
+    let nre_message = NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_cert_hash.as_ref().to_vec(), enclave_name);
     let nre_message_buffer = bincode::serialize(&nre_message)
         .map_err(|err| format!("mc_nitro::get_psa_attestation_token failed to serialize NRE message:{:?}", err))?;
     
