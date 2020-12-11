@@ -200,7 +200,6 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
 fn proxy_attestation(
     challenge: &Vec<u8>,
     native_token: &Vec<u8>,
-    enclave_cert_hash: &Vec<u8>,
     enclave_name: String,
 ) -> Result<Vec<u8>, String> {
     // first authenticate the native token
@@ -213,6 +212,10 @@ fn proxy_attestation(
                 )
             },
         )?;
+    let enclave_cert_hash: Vec<u8> = match document.user_data {
+        Some(hash) => hash,
+        None => return Err(format!("nitro-root-enclave::proxy_attestation AttestationDocument does not contain user_data")),
+    };
 
     // load the PSA key into PSA Crypto
     let device_private_key = {
@@ -246,7 +249,7 @@ fn proxy_attestation(
         psa_initial_attest_get_token(
             document.pcrs[0].as_ptr() as *const u8,
             document.pcrs[0].len() as u64,
-            enclave_cert_hash.as_ptr() as *const u8,
+            enclave_cert_hash.as_ptr() as *const u8, // user_data in the document is the certificate hash
             enclave_cert_hash.len() as u64,
             enclave_name.into_bytes().as_ptr() as *const i8,
             enclave_name_len as u64,
@@ -337,9 +340,9 @@ fn main() -> Result<(), String> {
                     })?;
                 NitroRootEnclaveMessage::TokenData(proxy_token, public_key)
             }
-            NitroRootEnclaveMessage::ProxyAttestation(challenge, native_token, enclave_cert_hash, enclave_name) => {
+            NitroRootEnclaveMessage::ProxyAttestation(challenge, native_token, enclave_name) => {
                 println!("nitro-root-enclave::main received ProxyAttesstation message");
-                let proxy_token = proxy_attestation(&challenge, &native_token, &enclave_cert_hash, enclave_name)
+                let proxy_token = proxy_attestation(&challenge, &native_token, enclave_name)
                     .map_err(|err| {
                         println!("proxy_attestation failed");
                         format!(

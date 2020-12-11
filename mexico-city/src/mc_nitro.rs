@@ -195,7 +195,7 @@ fn get_psa_attestation_token(challenge: &Vec<u8>) -> Result<MCMessage, String> {
     };
     let enclave_name: String = managers::baja_manager::get_enclave_name()
         .map_err(|err| format!("mc_nitro::nitro_main failed to get enclave name from baja_manager:{:?}", err))?;
-    let nre_message = NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_cert_hash.as_ref().to_vec(), enclave_name);
+    let nre_message = NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_name);
     let nre_message_buffer = bincode::serialize(&nre_message)
         .map_err(|err| format!("mc_nitro::get_psa_attestation_token failed to serialize NRE message:{:?}", err))?;
     

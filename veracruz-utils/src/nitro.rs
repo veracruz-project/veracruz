@@ -21,7 +21,7 @@ pub enum NitroRootEnclaveMessage {
     SetMexicoCityHashHack(Vec<u8>), // hash
     NativeAttestation(Vec<u8>, i32), // challenge, device_id
     TokenData(Vec<u8>, Vec<u8>), // token, public_key
-    ProxyAttestation(Vec<u8>, Vec<u8>, Vec<u8>, String), // challenge, native_token, enclave_cert_hash, enclave_name
+    ProxyAttestation(Vec<u8>, Vec<u8>, String), // challenge, native_token, enclave_name
     PSAToken(Vec<u8>, Vec<u8>, u32), // token, public_key, device_id
 }
 
