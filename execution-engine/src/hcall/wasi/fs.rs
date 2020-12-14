@@ -23,6 +23,7 @@ struct InodeImpl {
     /// The status of this file.
     file_stat: FileStat,
     /// The content of the file in bytes.
+    /// The buffer.size() must match with file_stat.file_size.
     buffer: Vec<u8>,
 }
 
@@ -35,6 +36,35 @@ struct FileTableEntry {
     fd_stat : FdStat,
     /// The current offset of the file descriptor.
     offset: FileSize,
+    /// Advice on how regions of the file are to be used.
+    advice: Vec<(FileSize, FileSize, Advice)>
+}
+
+impl FileTableEntry {
+    /// Returns the INode associated with the file table entry.
+    #[inline]
+    pub fn inode(&self) -> &Inode {
+        &self.inode
+    }
+
+    /// Returns the FD stat structure associated with the file table entry.
+    #[inline]
+    pub fn fd_stat(&self) -> &FdStat {
+        &self.fd_stat
+    }
+
+    /// Returns the current file (seek) offset associated with the file table
+    /// entry.
+    #[inline]
+    pub fn offset(&self) -> &FileSize {
+        &self.offset
+    }
+
+    /// Returns the regions of advice applied to this file.
+    #[inline]
+    pub fn advice(&self) -> &Vec<(FileSize, FileSize, Advice)> {
+        &self.advice
+    }
 }
 
 pub struct FileSystem {
@@ -42,7 +72,8 @@ pub struct FileSystem {
     /// descriptors.  
     file_table: HashMap<Fd, FileTableEntry>,
     /// The structure of the file system.
-    /// NOTE: this will evolve to a full directory (tree) structure.
+    /// NOTE: This is a flatten map from files to Inodes for now. 
+    ///       It will evolve to a full directory (tree) structure.
     path_table: HashMap<String, Inode>,
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
@@ -86,23 +117,25 @@ impl FileSystem {
         }
     }
 
+    /// Allows the programmer to declare how they intend to use various parts of
+    /// a file to the runtime.  At the moment, we just keep this information,
+    /// and don't yet act on it (but may need to start doing for for e.g.
+    /// streaming).
     pub(crate) fn fd_advise(
         &mut self,
         fd: &Fd,
         offset: FileSize,
         len: FileSize,
-        advice: Advice,
+        adv: Advice,
     ) -> ErrNo {
-        unimplemented!()
-    }
-
-    pub(crate) fn fd_allocate(&mut self, fd: &Fd, offset: FileSize, len: FileSize) -> ErrNo {
-        unimplemented!()
+        self.file_table.get_mut(fd).map(|FileTableEntry { mut advice, .. }| {
+            advice.push((offset, len, adv))
+        }).ok_or(ErrNo::BadF)
     }
 
     /// Return a copy of the status of the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
-        self.file_table.get(fd).map(|FileTableEntry{ file_stat, .. }| {
+        self.file_table.get(fd).map(|FileTableEntry{ mut fd_stat, .. }| {
             fd_stat.clone()
         })
         .ok_or(ErrNo::BadF) 
@@ -110,7 +143,7 @@ impl FileSystem {
 
     /// Change the flag associated with the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        self.file_descriptors.get_mut(fd).map(|FileTableEntry{ fd_stat, .. }| {
+        self.file_descriptors.get_mut(fd).map(|FileTableEntry{ mut fd_stat, .. }| {
             fd_stat.flags = flags;
             ErrNo::Success
         })
@@ -124,8 +157,9 @@ impl FileSystem {
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> ErrNo {
-        self.file_table.get_mut(fd).map(|FileTableEntry{ fd_stat, .. }| {
+        self.file_table.get_mut(fd).map(|FileTableEntry{ mut fd_stat, .. }| {
             fd_stat.rights_base = rights_base;
+            fd_stat.rights_inheriting = rights_inheriting;
             ErrNo::Success
         })
         .unwrap_or(ErrNo::BadF) 
@@ -134,12 +168,10 @@ impl FileSystem {
     /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
     pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
 
-        let inode = match self.file_table.get(fd) {
-            Some(FileTableEntry{ inode, .. }) => inode,
-            None => return ErrNo::BadF,
-        };
+        let inode =
+            self.file_table.get(fd).map(|fte| fte.inode()).ok_or(ErrNo::BadF)?;
 
-        self.inode_table.get_mut(inode).map(|InodeImpl{file_stat, .. }| {
+        self.inode_table.get(inode).map(|InodeImpl{file_stat, .. }| {
             file_stat.clone()
         })
         .ok_or(ErrNo::BadF) 
@@ -153,9 +185,9 @@ impl FileSystem {
             None => return ErrNo::BadF,
         };
 
-        self.inode_table.get_mut(inode).map(|InodeImpl{file_stat, buffer}| {
+        self.inode_table.get_mut(inode).map(|InodeImpl{mut file_stat, mut buffer}| {
             file_stat.file_size = size;
-            buffer.resize(size,0);
+            buffer.resize(size as usize, 0);
             ErrNo::Success
         })
         .unwrap_or(ErrNo::BadF) 
@@ -214,10 +246,50 @@ impl FileSystem {
 
     pub(crate) fn fd_seek(
         &mut self,
+        fd: &Fd,
         offset: FileDelta,
         whence: Whence,
     ) -> FileSystemError<FileSize> {
-        unimplemented!()
+
+        let (inode, cur_file_offset) = match self.file_table.get(fd) {
+            // Use temporary variable `o` to reduce the ambiguity with the function parameter `offset`.
+            Some(FileTableEntry{ inode, offset : o, .. }) => (inode, o),
+            None => return Err(ErrNo::BadF),
+        };
+
+        let file_size = match self.inode_table.get(inode) {
+            Some(InodeImpl{ file_stat, .. }) => file_stat.file_size,
+            None => return Err(ErrNo::BadF),
+        };
+
+        let new_base_offset = match whence {
+            Whence::Current => cur_file_offset,
+            Whence::End => file_size,
+            Whence::Start => 0,
+        };
+
+        // NOTE: Ensure the computation does not overflow.
+        let new_offset: FileSize = if offset >= 0 {
+            let t_offset = new_base_offset + offset.abs();
+            if t_offset >= file_size {
+                return Err(ErrNo::Inval)
+            }
+            t_offset
+        } else {
+            if offset.abs() > new_base_offset.into() {
+                return Err(ErrNo::Inval)
+            }
+            new_base_offset - offset.abs()
+        };
+
+        // Update the offset
+        self.file_table.get_mut(fd)
+            // Use temporary variable `o` to reduce the ambiguity with the function parameter `offset`.
+            .map(|&mut FileTableEntry{offset : mut o, .. }| o = new_offset)
+            .ok_or(ErrNo::BadF);
+
+        Ok(new_offset)
+
     }
 
     /// Returns the current offset associated with the file descriptor.

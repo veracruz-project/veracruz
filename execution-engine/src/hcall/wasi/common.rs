@@ -467,11 +467,6 @@ impl<Module, Memory> RuntimeState<Module, Memory> {
     }
 
     #[inline]
-    pub(crate) fn fd_allocate(&mut self, fd: &Fd, offset: FileSize, len: FileSize) -> ErrNo {
-        self.filesystem.fd_allocate(fd, offset, len)
-    }
-
-    #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
         self.filesystem.fd_fdstat_get(fd)
     }
