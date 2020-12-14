@@ -106,9 +106,30 @@ impl EC2Instance {
         let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
         let sockaddr = SockAddr::new_inet(inet_addr); 
 
-        let socket_fd = socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None)
-            .expect("Failed to create socket");
-        connect(socket_fd, &sockaddr).expect("Failed to connect to socket");
+        // let socket_fd = socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None)
+        //     .expect("Failed to create socket");
+        let socket_fd = {
+            loop {
+                match socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None) {
+                    Ok(fd) => break fd,
+                    Err(nix::Error::Sys(err)) => {
+                        match err {
+                            ECONNREFUSED => {
+                                println!("EC2Instance::socket failed, ECONNREFUSED, trying again");
+                                continue
+                            },
+                            _ => panic!(format!("Failed to create socket:{:?}", err)),
+                        }
+                    },
+                    Err(err) => panic!(format!("Failed to create socket:{:?}", err)),
+                }
+            }
+        };
+        while let Err(err) = connect(socket_fd, &sockaddr) {
+                ;
+            }
+        //connect(socket_fd, &sockaddr).expect("Failed to connect to socket");
+
 
         self.socket_fd = Some(socket_fd);
 

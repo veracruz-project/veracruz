@@ -15,9 +15,11 @@ use serde_json::Value;
 use err_derive::Error;
 use std::thread::JoinHandle;
 use nix::sys::socket::{
-    AddressFamily, SockType, SockFlag, SockAddr, socket, bind, listen, accept,
-    shutdown, Shutdown
+    AddressFamily, setsockopt, SockType, SockFlag, SockAddr, socket, bind, listen, accept,
+    shutdown, Shutdown,
 };
+use nix::unistd::close;
+use nix::sys::socket::sockopt::{ ReuseAddr, ReusePort };
 
 #[derive(Debug, Error)]
 pub enum NitroError {
@@ -108,26 +110,37 @@ impl NitroEnclave {
     }
 
     fn ocall_loop(handler: OCallHandler, terminate_rx: std::sync::mpsc::Receiver<bool>) {
+        println!("ocall_loop started");
         let socket_fd = socket(AddressFamily::Vsock, SockType::Stream, SockFlag::SOCK_NONBLOCK, None)
             .expect("NitroEnclave::ocall_loop failed to create a socket");
+
+        setsockopt(socket_fd, ReuseAddr, &true);
+        setsockopt(socket_fd, ReusePort, &true);
+
         let sockaddr = SockAddr::new_vsock(VMADDR_CID_ANY, OCALL_PORT);
 
         let mut im_done: bool = false;
 
+        println!("NitroEnclave::ocall_loop binding to socket");
         while let Err(err) = bind(socket_fd, &sockaddr) {
+            println!("NitroEnclave::ocall_loop failed to bind to socket:{:?}", err);
             if err == nix::Error::Sys(nix::errno::Errno::EADDRINUSE) {
                 // before we continue, check to see if we should terminate
                 if let Ok(terminate) = terminate_rx.try_recv() {
                     if terminate {
+                        println!("ocall_loop terminating before we even start");
                         im_done = true;
                         break;
                     }
                 }
+                println!("sleeping before trying again");
+                std::thread::sleep(std::time::Duration::from_millis(5000));
             } else {
                 panic!("I don't know what to do here");
             }
         }
 
+        println!("ocall_loop listening");
         if !im_done {
             listen(socket_fd, BACKLOG)
                 .map_err(|err| NitroError::NixError(err)).expect("NitroEnclave::ocall_loop listen failed");
@@ -158,6 +171,7 @@ impl NitroEnclave {
         }
 
         shutdown(socket_fd, Shutdown::Both);
+        close(socket_fd);
         println!("ocall_loop terminating ?gracefully?");
     }
 
