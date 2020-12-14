@@ -1604,7 +1604,8 @@ impl WASMIRuntimeState {
         Ok(self.fd_advise(&fd, offset, len, advice))
     }
 
-    /// The implementation of the WASI `fd_allocate` function.
+    /// The implementation of the WASI `fd_allocate` function.  This function is
+    /// not supported by Veracruz so we simply return `ErrNo::NoSys`.
     fn wasi_fd_allocate(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
             return Err(RuntimePanic::BadArgumentsToHostFunction {
@@ -1612,11 +1613,7 @@ impl WASMIRuntimeState {
             });
         }
 
-        let fd: Fd = args.nth(0).into();
-        let offset: FileSize = args.nth(1).into();
-        let len: FileSize = args.nth(2).into();
-
-        Ok(self.fd_allocate(&fd, offset, len))
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `fd_close` function.
