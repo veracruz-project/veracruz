@@ -1,0 +1,16 @@
+{
+    "identities": [<IDENTITIES>
+    ],
+    "programs": [<PROGRAMS>
+    ],
+    "sinaloa_url": "<SINALOA_URL>",
+    "enclave_cert_expiry": { "year": <YEAR>, "month": <MONTH>, "day": <DAY>, "hour":<HOUR>, "minute": <MINUTE>},
+    "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+<MEXICO_CITY_HASHES>
+    "proxy_attestation_server_url": "<PROXY_ATTESTATION_SERVER_URL>",
+    "data_provision_order": <DATA_PROVISION_ORDER>,
+    "streaming_order": <STREAMING_ORDER>,
+    "debug": <DEBUG_FLAG>,
+    "execution_strategy": <EXECUTION_STRATEGY>
+
+}
