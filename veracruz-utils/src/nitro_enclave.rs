@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::os::unix::io::{ AsRawFd, RawFd};
+use std::os::unix::io::{ AsRawFd};
 use std::process::Command;
 use serde_json::Value;
 use err_derive::Error;
@@ -31,6 +31,8 @@ pub enum NitroError {
     NixError(#[error(source)] nix::Error),
     #[error(display = "Nitro: IO Error:{:?}", _0)]
     IOError(#[error(source)] std::io::Error),
+    #[error(display = "Nitro: CLI error")]
+    CLIError,
     #[error(display = "Nitro: Veracruz Socket Error:{:?}", _0)]
     VeracruzSocketError(#[error(source)] crate::VeracruzSocketError),
     #[error(display = "Nitro: Utf8Error:{:?}", _0)]
@@ -59,10 +61,6 @@ const OCALL_PORT: u32 = 5006;
 const BACKLOG: usize = 128;
 
 pub type OCallHandler = fn(Vec<u8>) -> Result<Vec<u8>, NitroError>;
-enum OcallWaitResult {
-    FileDescriptor(RawFd),
-    Terminate,
-}
 
 impl NitroEnclave {
     pub fn new(eif_path: &str, debug: bool, ocall_handler: Option<OCallHandler>) -> Result<Self, NitroError> {
@@ -73,11 +71,18 @@ impl NitroEnclave {
         if debug {
             args.push("--debug-mode=true");
         }
-        let enclave_result = Command::new("/usr/sbin/nitro-cli")
+        let enclave_result = Command::new("/usr/bin/nitro-cli")
             .args(&args)
-            .output()?;
-        //let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr);
-        //println!("enclave_result_stderr:{:?}", enclave_result_stderr);
+            .output()
+            .map_err(|err| {
+                println!("NitroEnclave::new failed to start enclave:{:?}", err);
+                err
+            })?;
+        let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr)?;
+        if !enclave_result_stderr.is_empty() {
+            println!("NitroEnclave::new CLI error:{:?}", enclave_result_stderr);
+            return Err(NitroError::CLIError);
+        }
 
         let enclave_result_stdout = std::str::from_utf8(&enclave_result.stdout)?;
         println!("enclave_result_stdout:{:?}", enclave_result_stdout);
@@ -114,8 +119,14 @@ impl NitroEnclave {
         let socket_fd = socket(AddressFamily::Vsock, SockType::Stream, SockFlag::SOCK_NONBLOCK, None)
             .expect("NitroEnclave::ocall_loop failed to create a socket");
 
-        setsockopt(socket_fd, ReuseAddr, &true);
-        setsockopt(socket_fd, ReusePort, &true);
+        if let Err(err) = setsockopt(socket_fd, ReuseAddr, &true) {
+            println!("NitroEnclave::ocall_loop setsockopt failed for ReuseAddr({:?}). Terminating loop.", err);
+            return;
+        }
+        if let Err(err) = setsockopt(socket_fd, ReusePort, &true) {
+            println!("NitroEnclave::ocall_loop setsockopt failed for ReusePort({:?}). Terminating loop.", err);
+            return;
+        }
 
         let sockaddr = SockAddr::new_vsock(VMADDR_CID_ANY, OCALL_PORT);
 
@@ -157,7 +168,7 @@ impl NitroEnclave {
                             .expect("NitroEnclave::ocall_loop failed to send buffer");
                     },
                     Err(err) => match err {
-                        nix::Error::Sys(errno) => {
+                        nix::Error::Sys(_) => {
                             if let Ok(terminate) = terminate_rx.try_recv() {
                                 if terminate {
                                     break;
@@ -170,8 +181,14 @@ impl NitroEnclave {
             }
         }
 
-        shutdown(socket_fd, Shutdown::Both);
-        close(socket_fd);
+        if let Err(err) = shutdown(socket_fd, Shutdown::Both) {
+            println!("NitroEnclave::ocall_loop failed to shutdown socket({:?}. This might cause you problems in the future.", err);
+            return;
+        }
+        if let Err(err) = close(socket_fd) {
+            println!("NitroEnclave::ocall_loop failed to close socket file handle({:?}). This might cause you problems in the future", err);
+            return;
+        }
         println!("ocall_loop terminating ?gracefully?");
     }
 
@@ -191,22 +208,27 @@ impl Drop for NitroEnclave {
         // first, tell the ocall loop to terminate
         if let Some(tx_mutex) = &self.ocall_terminate_sender {
             let sender_guard = tx_mutex.lock().unwrap();
-            sender_guard.send(true);
+            if let Err(err) = sender_guard.send(true) {
+                println!("NitroEnclave::drop failed to send terminate message to ocall_thread. You can't do anything about this, since we are in the drop method, but I thought you would want to know:{:?}", err);
+            }
         }
 
         // second, wait for the ocall loop to terminate
         // This is referred to as the "Option dance" - https://users.rust-lang.org/t/spawn-threads-and-join-in-destructor/1613
         // we can only do the "take" because we are effectively a destructor
         if let Some(thread_handle) = self.ocall_thread.take() {
-                thread_handle.join();
+                if let Err(err) = thread_handle.join() {
+                    println!("NitroEnclave::drop failed to join to the ocall_thread. You can't do anything about this, since we are in the drop method, but I thought you would want to know:{:?}", err);
+                }
         }
 
         // now, shutdown the enclave
         let enclave_result = Command::new("/usr/sbin/nitro-cli")
             .args(&["terminate-enclave", "--enclave-id", &self.enclave_id])
             .output().unwrap();
-        let stdout = std::str::from_utf8(&enclave_result.stdout).unwrap();
-        let stderr = std::str::from_utf8(&enclave_result.stderr).unwrap();
         let exit_status = enclave_result.status;
+        if !exit_status.success() {
+            println!("NitroEnclave::drop failed to terminate the enclave (exit_status:{:?}. You will need to terminate it yourself.", exit_status);
+        }
     }
 }

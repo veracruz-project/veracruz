@@ -42,7 +42,7 @@ pub enum EC2Error {
     SerdeJsonError(serde_json::Error),
     #[error(display = "EC2: Incorrect JSON")]
     IncorrectJson,
-    #[error(display = "EC2: SSH2 ERror:{:?}", _0)]
+    #[error(display = "EC2: SSH2 Error:{:?}", _0)]
     SSH2Error(ssh2::Error),
     #[error(display = "EC2: No Host Key")]
     NoHostKeyError,
@@ -50,6 +50,10 @@ pub enum EC2Error {
     NotConnectedError,
     #[error(display = "EC2: Veracruz Socket Error:{:?}", _0)]
     VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    #[error(display = "EC2: Command non-zero status error:{:?}", _0)]
+    CommandNonZeroStatus(i32),
+    #[error(display = "EC2: Nix error:{:?}", _0)]
+    NixError(nix::Error),
     #[error(display = "EC2: Unimplemented")]
     Unimplemented,
 }
@@ -69,9 +73,10 @@ impl EC2Instance {
                     "--subnet-id=subnet-09dec26c52ea2f0c1", "--security-group-ids", SECURITY_GROUP_ID,
                     "--associate-public-ip-address"])
                         .output()
-            .map_err(|err| EC2Error::IOError(err))?;
-        let ec2_result_stderr = std::str::from_utf8(&ec2_result.stderr)
-            .map_err(|err| EC2Error::Utf8Error(err))?;
+            .map_err(|err| {
+                println!("EC2Instance::new failed to start ec2 instance:{:?}", err);
+                EC2Error::IOError(err)
+            })?;
         let ec2_result_stdout = ec2_result.stdout;
         let ec2_result_text = std::str::from_utf8(&ec2_result_stdout)
             .map_err(|err| EC2Error::Utf8Error(err))?;
@@ -114,7 +119,7 @@ impl EC2Instance {
                     Ok(fd) => break fd,
                     Err(nix::Error::Sys(err)) => {
                         match err {
-                            ECONNREFUSED => {
+                            nix::errno::Errno::ECONNREFUSED => {
                                 println!("EC2Instance::socket failed, ECONNREFUSED, trying again");
                                 continue
                             },
@@ -125,9 +130,8 @@ impl EC2Instance {
                 }
             }
         };
-        while let Err(err) = connect(socket_fd, &sockaddr) {
-                ;
-            }
+        while let Err(_err) = connect(socket_fd, &sockaddr) {
+        }
         //connect(socket_fd, &sockaddr).expect("Failed to connect to socket");
 
 
@@ -139,14 +143,15 @@ impl EC2Instance {
     pub fn close(&mut self)-> Result<(), EC2Error> {
         
         if let Some(socket_fd) = self.socket_fd.take() {
-            shutdown(socket_fd, Shutdown::Both);
+            shutdown(socket_fd, Shutdown::Both)
+                .map_err(|err| EC2Error::NixError(err))?;
         }
-        println!("EC2Instance::close attempting to shutdown instance");
-        let ec2_result = Command::new("/usr/local/bin/aws")
+        println!("EC2InstanFce::close attempting to shutdown instance");
+        let _ec2_result = Command::new("/usr/local/bin/aws")
             .args(&["ec2", "terminate-instances", "--instance-ids", &self.instance_id]).output()
                 .map_err(|err| EC2Error::IOError(err))?;
 
-        println!("EC2Instance::close succeeded");
+        println!("EC2Instance::close completed");
         return Ok(());
     }
 
@@ -188,20 +193,34 @@ impl EC2Instance {
             .map_err(|err| EC2Error::SSH2Error(err))?;
         let exit_status = channel.exit_status()
             .map_err(|err| EC2Error::SSH2Error(err))?;
+        if exit_status != 0 {
+            println!("EC2Instance::excute_command SSH2 Session returned with non-zero exit-status:{:?}", exit_status);
+            return Err(EC2Error::CommandNonZeroStatus(exit_status));
+        }
         Ok(())
     }
 
     pub fn upload_file(&self, filename: &str, dest: &str) -> Result<(), EC2Error> {
 
-        let file_data: Vec<u8> = self.read_file(filename)?;
+        let file_data: Vec<u8> = self.read_file(filename)
+            .map_err(|err| {
+                println!("EC2Instance::upload_file failed to read file:{:?}, received error:{:?}", filename, err);
+                err
+            })?;
         let full_ip = format!("{:}:{:}", self.private_ip, 22);
         let tcp = TcpStream::connect(full_ip.clone())
-            .map_err(|err| EC2Error::IOError(err))?;
+            .map_err(|err| {
+                println!("EC2Instance::upload_file Failed to connect to EC2instance:{:?}", err);
+                EC2Error::IOError(err)
+            })?;
 
         let mut session: Session = Session::new().unwrap();
         session.set_tcp_stream(tcp);
         session.handshake()
-            .map_err(|err| EC2Error::SSH2Error(err))?;
+            .map_err(|err| {
+                println!("EC2Instance::upload_file failed handshake:{:?}", err);
+                EC2Error::SSH2Error(err)
+            })?;
 
         let (key, key_type) = match session.host_key() {
             Some((k, kt)) => (k, kt),
@@ -223,8 +242,11 @@ impl EC2Instance {
 
         let mut remote_file = session.scp_send(Path::new(dest), 0o777, file_data.len() as u64, None)
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        let num_written = remote_file.write_all(&file_data)
-            .map_err(|err| EC2Error::IOError(err))?;
+        let _num_written = remote_file.write_all(&file_data)
+            .map_err(|err| {
+                println!("EC2Instance::upload_file failed to write file data:{:?}", err);
+                EC2Error::IOError(err)
+            })?;
         Ok(())
     }
 
