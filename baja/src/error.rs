@@ -1,6 +1,9 @@
 //! Baja error
 //!
-//! ## Authors
+//! Various Baja-specific errors produced by the Baja session and Baja contexts,
+//! and operations on them.
+//!
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -11,31 +14,48 @@
 
 use err_derive::Error;
 
+/// The various different error modes associated with the Baja module.
+///
+/// NOTE: `protobuf` does not implement `Clone`, so deriving `Clone` for this
+/// type is impossible.
 #[derive(Debug, Error)]
 pub enum BajaError {
-    // NOTE: Protobuf does not implement clone, hence derive(clone) is impossible.
-    #[error(display = "Baja: TLSError: {:?}.", _0)]
+    /// A TLS error originating in the `RusTLS` library occurred, with an
+    /// accompanying error code.
+    #[error(display = "Baja: a TLS error occurred: {:?}.", _0)]
     TLSError(#[error(source)] rustls::TLSError),
-    #[error(display = "Baja: TLSError: unspecified.")]
+    /// A generic, unspecified TLS error occurred.
+    #[error(display = "Baja: an unspecified or unknown TLS error occurred.")]
     TLSUnspecifiedError,
-    #[error(display = "Baja: TLSError: invalid cyphersuite {:?}.", _0)]
+    /// An invalid, or unknown, ciphersuite was requested.
+    #[error(display = "Baja: an invalid cyphersuite was requested in the TLS handshake: {:?}.", _0)]
     TLSInvalidCyphersuiteError(std::string::String),
-    #[error(display = "Baja: TLSError: unsupported cyphersuite {:?}.", _0)]
+    /// An unsupported ciphersuite was requested.
+    #[error(display = "Baja: an unsupported cyphersuite was requested in the TLS handshake: {:?}.", _0)]
     TLSUnsupportedCyphersuiteError(rustls::CipherSuite),
-    #[error(display = "Baja: IOError: {:?}.", _0)]
+    /// An IO error occurred, with an accompanying error code.
+    #[error(display = "Baja: an IO error occurred: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
-    #[error(display = "Baja: RingUnspecifiedError: {:?}.", _0)]
+    /// A generic error occurred in the Ring library.
+    #[error(display = "Baja: an unspecified error occurred in the Ring library: {:?}.", _0)]
     RingUnspecifiedError(#[error(source)] ring::error::Unspecified),
-    #[error(display = "Baja: RingKeyRejectedError: {:?}.", _0)]
+    /// A cryptographic key was rejected by the Ring library.
+    #[error(display = "Baja: the Ring library rejected a cryptographic key: {:?}.", _0)]
     RingKeyRejectedError(#[error(source)] ring::error::KeyRejected),
-    #[error(display = "Baja: Webpki: {:?}.", _0)]
+    /// A WebPKI error occurred with an accompanying error code.
+    #[error(display = "Baja: a WebPKI error occurred: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),
-    #[error(display = "Baja: Failed to retrieve peer certificates.")]
+    /// The runtime failed to obtain the peer certificates from the TLS session.
+    #[error(display = "Baja: failed to retrieve peer certificates.")]
     PeerCertificateError,
-    #[error(display = "Baja: Invalid length of variable `{}`, expected {}", _0, _1)]
+    /// The length of a variable (e.g. the number of expected peer certificates)
+    /// did not match expectations.
+    #[error(display = "Baja: invalid length of variable `{}`, expected {}", _0, _1)]
     InvalidLengthError(&'static str, usize),
-    #[error(display = "Baja: Client {} has no role.", _0)]
+    /// A principal has not been assigned any roles in the Veracruz computation.
+    #[error(display = "Baja: principal {} has not been assigned any role in the computation.", _0)]
     EmptyRoleError(u64),
-    #[error(display = "Baja: No certificate")]
+    /// A cryptographic certificate was missing.
+    #[error(display = "Baja: no certificate was found.")]
     NoCertificateError,
 }

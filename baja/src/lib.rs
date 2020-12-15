@@ -1,6 +1,9 @@
 //! The Baja library
 //!
-//! ## Authors
+//! Code for sending and receiving data over a TLS-encrypted link, inside the
+//! Veracruz runtime.
+//!
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
