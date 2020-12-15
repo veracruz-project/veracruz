@@ -69,7 +69,11 @@ const CERTIFICATE_TEMPLATE: [u8; 536] = [
     0xa1, 0xdb, 0x6e, 0x10, 0x33, 0x91, 0x91, 0x8f,
 ];
 
-/// The
+/// The fixed server name.  Note that, strictly speaking, this should be
+/// randomly generated, however there is currently a problem on the TrustZone
+/// platform where this is impossible.  As a result, we use a fixed arbitrary
+/// value for our server name.  Note that this **does not** have any security
+/// implications.
 const FIXED_SERVER_NAME: &str = "ac40a0c";
 
 /// The byte range in the certificate template where the issuer common name is
