@@ -12,7 +12,7 @@
 //! information on licensing and copyright.
 
 use crate::error::BajaError;
-use veracruz_utils::VeracruzRole;
+use veracruz_utils::{VeracruzIdentity, VeracruzRole};
 
 use std::{
     io::{Read, Write},
@@ -22,80 +22,13 @@ use std::{
 use rustls::{Certificate, ServerSession, Session};
 
 ////////////////////////////////////////////////////////////////////////////////
-// Principals.
+// Baja sessions.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A principal is an individual identified with a cryptographic certificate,
 /// and assigned a set of roles that dictate what that principal can and cannot
 /// do in a Veracruz computation.
-pub struct Principal {
-    /// The unique client ID of the principal.
-    client_id: u32,
-    /// The identifying cryptographic certificate associated with the principal.
-    certificate: Certificate,
-    /// The set of roles that the principal possesses.
-    roles: Vec<VeracruzRole>,
-}
-
-impl Principal {
-    /// Creates a new principal from a client ID and a certificate.  Assigns the
-    /// principal an empty set of roles.
-    #[inline]
-    pub fn new(client_id: u32, certificate: rustls::Certificate) -> Self {
-        Self {
-            client_id,
-            certificate,
-            roles: Vec::new(),
-        }
-    }
-
-    /// Adds a new role to the principal's set of assigned roles.
-    #[inline]
-    pub fn add_role(&mut self, role: VeracruzRole) -> &mut Self {
-        self.roles.push(role);
-        self
-    }
-
-    /// Adds multiple new roles to the principal's set of assigned roles,
-    /// reading them from an iterator.
-    pub fn add_roles<T>(&mut self, roles: T) -> &mut Self
-    where
-        T: IntoIterator<Item = VeracruzRole>,
-    {
-        for role in roles {
-            self.add_role(role);
-        }
-        self
-    }
-
-    /// Returns `true` iff the principal has the role, `role`.
-    #[inline]
-    pub fn has_role(&self, role: &VeracruzRole) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-
-    /// Returns the unique client ID associated with this principal.
-    #[inline]
-    pub fn client_id(&self) -> u32 {
-        self.client_id
-    }
-
-    /// Returns the cryptographic certificate associated with this principal.
-    #[inline]
-    pub fn certificate(&self) -> &Certificate {
-        &self.certificate
-    }
-
-    /// Returns the set of roles associated with this principal.
-    #[inline]
-    pub fn roles(&self) -> &Vec<VeracruzRole> {
-        &self.roles
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Baja sessions.
-////////////////////////////////////////////////////////////////////////////////
+pub type Principal = VeracruzIdentity<Certificate>;
 
 /// A Baja session consists of a TLS server session with a list of principals
 /// and their identifying information.
