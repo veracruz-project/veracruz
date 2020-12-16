@@ -30,7 +30,7 @@ pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
     }
 
     //TODO: change the error type
-    let new_baja = Baja::new(policy.clone())?;
+    let new_baja = Baja::new(policy)?;
 
     {
         let mut baja_state = super::MY_BAJA.lock()?;
@@ -48,7 +48,7 @@ pub fn new_session() -> Result<u32, MexicoCityError> {
     };
 
     let session = match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => my_baja.new_session()?,
+        Some(my_baja) => my_baja.create_session()?,
         None => {
             return Err(MexicoCityError::UninitializedBajaSessionError(
                 "new_session",
@@ -92,11 +92,11 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), MexicoCityErr
 
     match proc_ret {
         super::ProvisioningResponse::ProtocolError { response } => {
-            Ok(this_session.return_data(response)?)
+            Ok(this_session.return_data(&response)?)
         }
         super::ProvisioningResponse::WaitForMoreData => Ok(()),
         super::ProvisioningResponse::Success { response } => {
-            Ok(this_session.return_data(response)?)
+            Ok(this_session.return_data(&response)?)
         }
     }
 }
@@ -135,7 +135,7 @@ pub fn get_data_needed(session_id: u32) -> Result<bool, MexicoCityError> {
 
 pub fn get_enclave_cert_pem() -> Result<Vec<u8>, MexicoCityError> {
     match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.get_server_cert_pem()),
+        Some(my_baja) => Ok(my_baja.server_certificate_buffer().clone()),
         None => Err(MexicoCityError::UninitializedBajaSessionError(
             "get_enclave_cert_pem",
         )),
@@ -144,7 +144,7 @@ pub fn get_enclave_cert_pem() -> Result<Vec<u8>, MexicoCityError> {
 
 pub fn get_enclave_cert() -> Result<rustls::Certificate, MexicoCityError> {
     match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.get_server_cert()),
+        Some(my_baja) => Ok(my_baja.server_certificate().clone()),
         None => Err(MexicoCityError::UninitializedBajaSessionError(
             "get_enclave_cert",
         )),
@@ -153,7 +153,7 @@ pub fn get_enclave_cert() -> Result<rustls::Certificate, MexicoCityError> {
 
 pub fn get_enclave_name() -> Result<std::string::String, MexicoCityError> {
     match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.get_name()),
+        Some(my_baja) => Ok(my_baja.name().clone()),
         None => Err(MexicoCityError::UninitializedBajaSessionError(
             "get_enclave_name",
         )),

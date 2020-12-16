@@ -1,6 +1,6 @@
 //! Custom and derived functionality relating to Colima.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

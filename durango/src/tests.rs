@@ -8,7 +8,7 @@
 //!
 //! when invoking these tests with Cargo.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

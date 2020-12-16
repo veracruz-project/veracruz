@@ -571,7 +571,7 @@ impl VeracruzPolicy {
     /// TODO: where is this used, and why is it needed if we have access to
     /// the identities through `self.identities()`?
     #[inline]
-    pub fn iter_on_client<'a>(&'a self) -> Iter<'a, VeracruzIdentity> {
+    pub fn iter_on_client<'a>(&'a self) -> Iter<'a, VeracruzIdentity<String>> {
         self.identities().iter()
     }
 

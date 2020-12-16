@@ -1,6 +1,6 @@
 //! The Durango error
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

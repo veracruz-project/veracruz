@@ -14,7 +14,7 @@ use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 
-use std::vec::Vec;
+use std::{time::Instant, vec::Vec};
 
 use byteorder::{ByteOrder, LittleEndian};
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Trap, ValType};
@@ -30,7 +30,6 @@ use crate::{
         HCALL_WRITE_OUTPUT_NAME,
     },
 };
-use std::time::Instant;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime host provisioning state.
