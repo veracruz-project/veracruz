@@ -53,6 +53,7 @@ pub struct NitroEnclave {
     vsocksocket: crate::vsocket::VsockSocket,
     ocall_thread: Option<JoinHandle<()>>,
     ocall_terminate_sender: Option<std::sync::Mutex<std::sync::mpsc::Sender<bool>>>,
+    nitro_cli_path: String,
 }
 
 const VERACRUZ_PORT: u32 = 5005;
@@ -116,6 +117,7 @@ impl NitroEnclave {
             vsocksocket: crate::vsocket::vsock_connect(cid, VERACRUZ_PORT)?,
             ocall_thread: ocall_thread_opt,
             ocall_terminate_sender: sender,
+            nitro_cli_path: nitro_cli_path.to_string(),
         };
         return Ok(enclave);
     }
@@ -177,6 +179,7 @@ impl NitroEnclave {
                         nix::Error::Sys(_) => {
                             if let Ok(terminate) = terminate_rx.try_recv() {
                                 if terminate {
+                                    println!("NitroEnclave::ocall_loop is terminating because you told me to");
                                     break;
                                 }
                             }
@@ -189,11 +192,9 @@ impl NitroEnclave {
 
         if let Err(err) = shutdown(socket_fd, Shutdown::Both) {
             println!("NitroEnclave::ocall_loop failed to shutdown socket({:?}. This might cause you problems in the future.", err);
-            return;
         }
         if let Err(err) = close(socket_fd) {
             println!("NitroEnclave::ocall_loop failed to close socket file handle({:?}). This might cause you problems in the future", err);
-            return;
         }
         println!("ocall_loop terminating ?gracefully?");
     }
@@ -229,7 +230,7 @@ impl Drop for NitroEnclave {
         }
 
         // now, shutdown the enclave
-        let enclave_result = Command::new("/usr/sbin/nitro-cli")
+        let enclave_result = Command::new(&self.nitro_cli_path)
             .args(&["terminate-enclave", "--enclave-id", &self.enclave_id])
             .output().unwrap();
         let exit_status = enclave_result.status;
