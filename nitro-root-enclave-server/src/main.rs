@@ -69,7 +69,7 @@ fn main() {
     let tabasco_url = matches.value_of("tabasco").unwrap();
 
     // first, start the nitro-root-enclave
-    let enclave = native_attestation(tabasco_url, "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+    let enclave = native_attestation(tabasco_url)
         .expect("Failed to perform native attestion");
 
     let socket_fd = socket(
@@ -111,10 +111,9 @@ fn main() {
 
 fn native_attestation(
     tabasco_url: &str,
-    mexico_city_hash: &str,
 ) -> Result<NitroEnclave, NitroServerError> {
     println!("nitro-root-enclave-server::native_attestation started");
-    let nre_enclave = NitroEnclave::new(NITRO_ROOT_ENCLAVE_EIF_PATH, true, None)
+    let nre_enclave = NitroEnclave::new(true, NITRO_ROOT_ENCLAVE_EIF_PATH, true, None)
         .map_err(|err| NitroServerError::EnclaveError(err))?;
 
     println!(
@@ -123,31 +122,6 @@ fn native_attestation(
     let firmware_version = fetch_firmware_version(&nre_enclave)?;
     println!("nitro-root-enclave-server::native_attestation fetch_firmware_version complete. Now setting mexico city hash");
 
-    //{
-        //let mexico_city_hash_vec =
-            //hex::decode(mexico_city_hash).map_err(|err| NitroServerError::HexError(err))?;
-//
-        //let message = NitroRootEnclaveMessage::SetMexicoCityHashHack(mexico_city_hash_vec);
-        //let message_buffer =
-            //bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
-        //println!(
-            //"nitro-root-enclave-server::native_attestation sending buffer:{:?}",
-            //message_buffer
-        //);
-        //nre_enclave.send_buffer(&message_buffer)?;
-//
-        //let return_buffer = nre_enclave.receive_buffer()?;
-        //let received_message =
-            //bincode::deserialize(&return_buffer).map_err(|err| NitroServerError::Bincode(*err))?;
-        //let status = match received_message {
-            //NitroRootEnclaveMessage::Status(status) => status,
-            //_ => return Err(NitroServerError::InvalidRootEnclaveMessage)?,
-        //};
-        //match status {
-            //NitroStatus::Success => (),
-            //_ => return Err(NitroServerError::NonSuccessStatus),
-        //}
-    //}
     println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to tabasco");
     let (challenge, device_id) = send_start(tabasco_url, "nitro", &firmware_version)?;
 

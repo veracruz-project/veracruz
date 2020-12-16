@@ -50,7 +50,7 @@ pub mod sinaloa_nitro {
             }
 
             println!("SinaloaNitro::new native_attestation complete. instantiating Mexico City");
-            let mexico_city_enclave = NitroEnclave::new(MEXICO_CITY_EIF_PATH, true, Some(SinaloaNitro::sinaloa_ocall_handler))
+            let mexico_city_enclave = NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, true, Some(SinaloaNitro::sinaloa_ocall_handler))
                 .map_err(|err| SinaloaError::NitroError(err))?;
             println!("SinaloaNitro::new NitroEnclave::new returned");
             let meta = Self {

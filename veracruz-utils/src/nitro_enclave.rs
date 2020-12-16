@@ -63,7 +63,7 @@ const BACKLOG: usize = 128;
 pub type OCallHandler = fn(Vec<u8>) -> Result<Vec<u8>, NitroError>;
 
 impl NitroEnclave {
-    pub fn new(eif_path: &str, debug: bool, ocall_handler: Option<OCallHandler>) -> Result<Self, NitroError> {
+    pub fn new(nitro_sbin: bool, eif_path: &str, debug: bool, ocall_handler: Option<OCallHandler>) -> Result<Self, NitroError> {
         let mut args = vec!["run-enclave",
                         "--eif-path", eif_path,
                         "--cpu-count", "2", 
@@ -71,15 +71,21 @@ impl NitroEnclave {
         if debug {
             args.push("--debug-mode=true");
         }
-        let enclave_result = Command::new("/usr/bin/nitro-cli")
+        let nitro_cli_path = {
+            match nitro_sbin {
+                true => "/usr/sbin/nitro-cli",
+                false => "/usr/bin/nitro-cli",
+            }
+        };
+        let enclave_result = Command::new(nitro_cli_path)
             .args(&args)
             .output()
             .map_err(|err| {
                 println!("NitroEnclave::new failed to start enclave:{:?}", err);
                 err
             })?;
-        let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr)?;
-        if !enclave_result_stderr.is_empty() {
+        if !enclave_result.status.success() {
+            let enclave_result_stderr = std::str::from_utf8(&enclave_result.stderr)?;
             println!("NitroEnclave::new CLI error:{:?}", enclave_result_stderr);
             return Err(NitroError::CLIError);
         }
