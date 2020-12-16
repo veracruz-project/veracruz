@@ -33,8 +33,8 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
-    string::{String, ToString},
     slice::Iter,
+    string::{String, ToString},
     vec::Vec,
 };
 
@@ -167,8 +167,8 @@ impl<U> VeracruzIdentity<U> {
     /// Adds multiple new roles to the principal's set of assigned roles,
     /// reading them from an iterator.
     pub fn add_roles<T>(&mut self, roles: T) -> &mut Self
-        where
-            T: IntoIterator<Item = VeracruzRole>,
+    where
+        T: IntoIterator<Item = VeracruzRole>,
     {
         for role in roles {
             self.add_role(role);
@@ -217,18 +217,18 @@ impl VeracruzIdentity<String> {
         }
 
         #[cfg(features = "std")]
-            {
-                let parsed_cert =
-                    x509_parser::pem::Pem::read(std::io::Cursor::new(self.certificate().as_bytes()))?;
+        {
+            let parsed_cert =
+                x509_parser::pem::Pem::read(std::io::Cursor::new(self.certificate().as_bytes()))?;
 
-                let parsed_cert = parsed_cert.0.parse_x509()?.tbs_certificate;
+            let parsed_cert = parsed_cert.0.parse_x509()?.tbs_certificate;
 
-                if parsed_cert.validity.time_to_expiration().is_none() {
-                    return Err(VeracruzUtilError::CertificateExpireError(
-                        self.certificate().clone(),
-                    ));
-                }
+            if parsed_cert.validity.time_to_expiration().is_none() {
+                return Err(VeracruzUtilError::CertificateExpireError(
+                    self.certificate().clone(),
+                ));
             }
+        }
 
         Ok(())
     }

@@ -22,7 +22,7 @@ use crate::{
     baja_session::{BajaSession, Principal},
     error::BajaError,
 };
-use veracruz_utils::{VeracruzPolicy, VeracruzRole};
+use veracruz_utils::VeracruzPolicy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use rustls::{AllowAnyAuthenticatedClient, Certificate, CipherSuite, RootCertStore, ServerConfig};
@@ -156,9 +156,10 @@ fn generate_certificate(
                 VALIDITY_VALID_FROM_LOCATION.1 - VALIDITY_VALID_FROM_LOCATION.0,
             ));
         }
+
         constructed_cert.splice(
             VALIDITY_VALID_FROM_LOCATION.0..VALIDITY_VALID_FROM_LOCATION.1,
-            valid_from_bytes.iter(),
+            valid_from_bytes.iter().cloned(),
         );
     }
 
@@ -179,7 +180,7 @@ fn generate_certificate(
         }
         constructed_cert.splice(
             VALIDITY_VALID_TO_LOCATION.0..VALIDITY_VALID_TO_LOCATION.1,
-            valid_to_bytes.iter(),
+            valid_to_bytes.iter().cloned(),
         );
     };
 
@@ -262,10 +263,10 @@ fn generate_certificate(
         signature_second_vec.iter().cloned(),
     );
 
-    if constructed_cert.len() != cert_template.len() {
+    if constructed_cert.len() != CERTIFICATE_TEMPLATE.len() {
         return Err(BajaError::InvalidLengthError(
             "constructed_cert",
-            cert_template.len(),
+            CERTIFICATE_TEMPLATE.len(),
         ));
     } else {
         Ok(constructed_cert.clone())
@@ -322,10 +323,10 @@ impl Baja {
         let mut principals = Vec::new();
 
         for identity in policy.identities().iter() {
-            let cert = convert_cert_buffer(&identity.certificate())?;
-            let mut principal = Principal::new(*identity.id(), cert);
+            let cert = convert_cert_buffer(identity.certificate())?;
+            let mut principal = Principal::new(cert, *identity.id());
 
-            principal.add_roles(identity.roles().iter());
+            principal.add_roles(identity.roles().iter().cloned());
             root_cert_store.add(&cert)?;
 
             principals.push(principal);
@@ -433,14 +434,17 @@ impl Baja {
         &self.server_config
     }
 
+    /// Returns the principals associated with the server.
+    #[inline]
+    pub fn principals(&self) -> &Vec<Principal> {
+        &self.principals
+    }
+
     /// Creates a new Baja session, using server configuration and information
     /// about the principals that are stored in this Baja context.  Fails iff
     /// the creation of the new Baja session fails.
     #[inline]
-    pub fn create_session(&self) -> Result<BajaSession, BajaError> {
-        Ok(BajaSession::new(
-            self.server_config().clone(),
-            self.principals().clone(),
-        )?)
+    pub fn create_session(&self) -> BajaSession {
+        BajaSession::new(self.server_config().clone(), self.principals().clone())
     }
 }

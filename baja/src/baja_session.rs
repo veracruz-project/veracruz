@@ -43,10 +43,7 @@ pub struct BajaSession {
 impl BajaSession {
     /// Creates a new Baja session from a server configuration and a list of
     /// principals.
-    pub fn new(
-        config: rustls::ServerConfig,
-        principals: Vec<Principal>,
-    ) -> Self {
+    pub fn new(config: rustls::ServerConfig, principals: Vec<Principal>) -> Self {
         let tls_session = ServerSession::new(&std::sync::Arc::new(config));
 
         BajaSession {
@@ -107,9 +104,9 @@ impl BajaSession {
             let mut client_id = 0;
 
             for principal in self.principals.iter() {
-                if principal.certificate() == peer_certs[0] {
+                if principal.certificate() == &peer_certs[0] {
                     roles = principal.roles().clone();
-                    client_id = principal.client_id();
+                    client_id = principal.id().clone();
                 }
             }
 

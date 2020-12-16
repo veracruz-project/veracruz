@@ -48,7 +48,7 @@ pub fn new_session() -> Result<u32, MexicoCityError> {
     };
 
     let session = match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => my_baja.create_session()?,
+        Some(my_baja) => my_baja.create_session(),
         None => {
             return Err(MexicoCityError::UninitializedBajaSessionError(
                 "new_session",
