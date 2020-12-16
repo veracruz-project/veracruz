@@ -19,7 +19,7 @@ impl VsockSocket {
 impl Drop for VsockSocket {
     fn drop(&mut self) {
         shutdown(self.socket_fd, Shutdown::Both)
-            .unwrap_or_else(|e| eprintln!("Failed to shut socket down: {:?}", e));
+            .unwrap_or_else(|_| ()); // Do nothing on failure. It's non fatal and a warning message is just confusing
         close(self.socket_fd).unwrap_or_else(|e| eprintln!("Failed to close socket: {:?}", e));
     }
 }
