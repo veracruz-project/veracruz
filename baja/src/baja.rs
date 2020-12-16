@@ -324,7 +324,7 @@ impl Baja {
 
         for identity in policy.identities().iter() {
             let cert = convert_cert_buffer(identity.certificate())?;
-            let mut principal = Principal::new(cert, *identity.id());
+            let mut principal = Principal::new(cert.clone(), *identity.id());
 
             principal.add_roles(identity.roles().iter().cloned());
             root_cert_store.add(&cert)?;
@@ -362,7 +362,7 @@ impl Baja {
         };
 
         let server_certificate_buffer = generate_certificate(
-            name.into_bytes(),
+            name.clone().into_bytes(),
             server_private_key.clone(),
             server_public_key.clone(),
             &policy,
