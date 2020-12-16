@@ -145,8 +145,12 @@ impl EC2Instance {
     pub fn close(&mut self)-> Result<(), EC2Error> {
         
         if let Some(socket_fd) = self.socket_fd.take() {
-            shutdown(socket_fd, Shutdown::Both)
-                .map_err(|err| EC2Error::NixError(err))?;
+            match shutdown(socket_fd, Shutdown::Both) {
+                Ok(_) => (), // shutdown was successful, continue on your merry way
+                Err(err) => { // shutdown was not successful, still attmept to finish the close operation
+                    println!("EC2Instance::close failed to shutdown socket({:?}). We're gonna keep going, though", err);
+                },
+            }
         }
         println!("EC2InstanFce::close attempting to shutdown instance");
         let _ec2_result = Command::new("/usr/local/bin/aws")
