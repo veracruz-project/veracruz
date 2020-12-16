@@ -92,6 +92,8 @@ impl EC2Instance {
             Value::String(value) => value,
             _ => return Err(EC2Error::IncorrectJson),
         };
+        println!("EC2Instance instance_id:{:?}", instance_id);
+        println!("EC2Instance private_ip:{:?}", private_ip);
 
         std::thread::sleep(std::time::Duration::from_millis(30000));
 
