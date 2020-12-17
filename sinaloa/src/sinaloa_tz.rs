@@ -42,12 +42,16 @@ pub mod sinaloa_tz {
             let jalisco_uuid = Uuid::parse_str(&JALISCO_UUID.to_string())?;
             {
                 let mut ji_guard = JALISCO_INITIALIZED.lock()?;
+                let mexico_city_hash = match policy.mexico_city_hash_tz() {
+                    Some(hash) => hash,
+                    None => return Err(SinaloaError::MissingFieldError("mexico_city_hash_tz")),
+                };
                 if !*ji_guard {
                     debug!("Jalisco is uninitialized.");
                     SinaloaTZ::native_attestation(
                         &policy.tabasco_url(),
                         jalisco_uuid,
-                        &policy.mexico_city_hash(),
+                        &mexico_city_hash,
                     )?;
                     *ji_guard = true;
                 }

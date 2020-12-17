@@ -151,7 +151,8 @@ Nitro_Src = $(COMMON_Src) src/mc_nitro.rs src/main.rs
 nitro: mexico_city.eif
 
 mexico_city.eif: target/x86_64-unknown-linux-musl/release/mexico_city_enclave Dockerfile
-	nitro-cli build-enclave --docker-dir . --docker-uri mexico_city --output-file mexico_city.eif
+	nitro-cli build-enclave --docker-dir . --docker-uri mexico_city --output-file mexico_city.eif > measurements.json
+	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
 
 target/x86_64-unknown-linux-musl/release/mexico_city_enclave: Cargo.toml $(Nitro_Src)
 	cargo build --target x86_64-unknown-linux-musl --release --features nitro

@@ -14,7 +14,7 @@ pub mod sinaloa_nitro {
     use crate::sinaloa::Sinaloa;
     use lazy_static::lazy_static;
     use std::sync::Mutex;
-    use veracruz_utils::{NitroError, NitroEnclave, MCMessage, NitroStatus };
+    use veracruz_utils::{NitroError, NitroEnclave, MCMessage, NitroStatus, policy::EnclavePlatform };
     use crate::sinaloa::SinaloaError;
     use crate::ec2_instance::EC2Instance;
 
@@ -41,9 +41,11 @@ pub mod sinaloa_nitro {
                 let mut nre_guard = NRE_CONTEXT.lock()?;
                 if nre_guard.is_none() {
                     println!("NITRO ROOT ENCLAVE IS UNINITIALIZED.");
+                    let mexico_city_hash = policy.mexico_city_hash(&EnclavePlatform::Nitro)
+                        .map_err(|err| SinaloaError::VeracruzUtilError(err))?;
                     let nre_context = SinaloaNitro::native_attestation(
                         &policy.tabasco_url(),
-                        &policy.mexico_city_hash(),
+                        &mexico_city_hash,
                     )?;
                     *nre_guard = Some(nre_context);
                 }
