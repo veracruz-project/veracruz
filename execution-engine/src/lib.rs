@@ -25,7 +25,6 @@ extern crate sgx_tstd as std;
 #[macro_use]
 extern crate std;
 
-#[macro_use]
 extern crate lazy_static;
 
 pub mod factory;

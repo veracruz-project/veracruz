@@ -11,7 +11,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{collections::HashMap, string::String};
+use std::{collections::HashMap, convert::TryFrom, string::String};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode, IoVec,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
@@ -19,16 +19,51 @@ use wasi_types::{
 
 pub(crate) type FileSystemError<T> = Result<T, ErrNo>;
 
+////////////////////////////////////////////////////////////////////////////////
+// INodes.
+////////////////////////////////////////////////////////////////////////////////
+
+/// INodes wrap the actual raw file data, and associate meta-data with that raw
+/// data buffer.
+#[derive(Clone)]
 struct InodeImpl {
     /// The status of this file.
     file_stat: FileStat,
-    /// The content of the file in bytes.
-    /// The buffer.size() must match with file_stat.file_size.
-    buffer: Vec<u8>,
+    /// The content of the file in bytes.  NOTE: the buffer.size() *must* match
+    /// with `file_stat.file_size`.
+    raw_file_data: Vec<u8>,
 }
 
-/// Each file table entry contains an index into the inode
-/// table, pointing to an `InodeImpl`, where the static file data is stored.
+impl InodeImpl {
+    /// Returns `true` iff the size of the inode's raw data buffer matches the
+    /// length stored in the file stat structure.
+    ///
+    /// XXX: may panic if `usize` and `u64` bitwidths are different!
+    #[inline]
+    pub(crate) fn valid(&self) -> bool {
+        self.raw_file_data.len() == usize::try_from(self.file_stat.file_size).unwrap()
+    }
+
+    /// Returns the file stat structure associated with this inode.
+    #[inline]
+    pub(crate) fn file_stat(&self) -> &FileStat {
+        &self.file_stat
+    }
+
+    /// Returns the raw file data associated with this inode.
+    #[inline]
+    pub(crate) fn raw_file_data(&self) -> &Vec<u8> {
+        &self.raw_file_data
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// File-table entries.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Each file table entry contains an index into the inode table, pointing to an
+/// `InodeImpl`, where the static file data is stored.
+#[derive(Clone)]
 struct FileTableEntry {
     /// The index to `inode_table` in FileSystem.
     inode: Inode,
@@ -41,7 +76,7 @@ struct FileTableEntry {
 }
 
 impl FileTableEntry {
-    /// Returns the INode associated with the file table entry.
+    /// Returns the inode associated with the file table entry.
     #[inline]
     pub fn inode(&self) -> &Inode {
         &self.inode
@@ -67,6 +102,13 @@ impl FileTableEntry {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Filesystems.
+////////////////////////////////////////////////////////////////////////////////
+
+/// The filesystem proper, which collects together various tables and bits of
+/// meta-data.
+#[derive(Clone)]
 pub struct FileSystem {
     /// A table of file descriptor table entries.  This is indexed by file
     /// descriptors.  
@@ -111,9 +153,9 @@ impl FileSystem {
     /// 2. `ErrNo::Success` if `fd` is a current file-descriptor.  In this case,
     ///    the file-descriptor is closed and no longer a valid file-descriptor.
     pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
-        match self.file_descriptors.remove(fd) {
+        match self.file_table.remove(fd) {
             Some(_) => ErrNo::Success,
-            None => ErrNo: BadF,
+            None => ErrNo::BadF,
         }
     }
 
@@ -130,8 +172,8 @@ impl FileSystem {
     ) -> ErrNo {
         self.file_table
             .get_mut(fd)
-            .map(|FileTableEntry { mut advice, .. }| advice.push((offset, len, adv)))
-            .ok_or(ErrNo::BadF)
+            .map(|FileTableEntry { mut advice, .. }| {advice.push((offset, len, adv)); ErrNo::Success})
+            .unwrap_or(ErrNo::BadF)
     }
 
     /// Return a copy of the status of the file descriptor, `fd`.
@@ -144,7 +186,7 @@ impl FileSystem {
 
     /// Change the flag associated with the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        self.file_descriptors
+        self.file_table
             .get_mut(fd)
             .map(|FileTableEntry { mut fd_stat, .. }| {
                 fd_stat.flags = flags;
@@ -197,7 +239,7 @@ impl FileSystem {
             .map(
                 |InodeImpl {
                      mut file_stat,
-                     mut buffer,
+                     raw_file_data: mut buffer,
                  }| {
                     file_stat.file_size = size;
                     buffer.resize(size as usize, 0);
@@ -228,14 +270,15 @@ impl FileSystem {
 
         self.inode_table
             .get(inode)
-            .map(|InodeImpl { buffer, .. }| {
-                let (_, to_read) = buffer.split_at(cur_offset);
+            .map(|InodeImpl { raw_file_data: buffer, .. }| {
+                // It should be save to convert a u64 to usize.
+                let (_, to_read) = buffer.split_at(*cur_offset as usize);
                 let (rst, _) = to_read.split_at(if *offset <= to_read.len() as u64 {
                     *offset as usize
                 } else {
                     to_read.len()
                 });
-                rst.clone();
+                rst.to_vec()
             })
             .ok_or(ErrNo::BadF)
     }
@@ -269,11 +312,12 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?;
         self.inode_table
             .get_mut(inode)
-            .map(|InodeImpl { mut buffer, mut file_stat }| {
-                let rst = ciovec.size();
+            .map(|InodeImpl { raw_file_data: mut buffer, mut file_stat }| {
+                let rst = ciovec.len();
                 buffer.append(&mut ciovec);
-                file_stat.file_size += rst;
-                rst
+                file_stat.file_size += rst as u64;
+                //TODO: check this convertion from usize to u32 is safe.
+                rst as u32
             })
             .ok_or(ErrNo::BadF)
     }
@@ -294,10 +338,14 @@ impl FileSystem {
     /// Chihuahua is single-threaded this is atomic from the WASM program's
     /// point of view.
     pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
-        if let Some(entry) = self.file_table.get(old_fd) && self.file_table.get(new_fd).is_none() {
-            self.file_table.insert(new_fd, entry.clone());
-            self.file_table.remove(old_fd);
-            ErrNo::Success
+        if let Some(entry) = self.file_table.get(old_fd) { 
+            if self.file_table.get(&new_fd).is_none() {
+                self.file_table.insert(new_fd, entry.clone());
+                self.file_table.remove(old_fd);
+                ErrNo::Success
+            } else {
+                ErrNo::BadF
+            }
         } else {
             ErrNo::BadF
         }
@@ -323,23 +371,25 @@ impl FileSystem {
         };
 
         let new_base_offset = match whence {
-            Whence::Current => cur_file_offset,
+            Whence::Current => *cur_file_offset,
             Whence::End => file_size,
             Whence::Start => 0,
         };
 
         // NOTE: Ensure the computation does not overflow.
         let new_offset: FileSize = if offset >= 0 {
-            let t_offset = new_base_offset + offset.abs();
+            // It is safe to convert a positive i64 to u64.
+            let t_offset = new_base_offset + (offset.abs() as u64);
             if t_offset >= file_size {
                 return Err(ErrNo::Inval);
             }
             t_offset
         } else {
-            if offset.abs() > new_base_offset.into() {
+            // It is safe to convert a positive i64 to u64.
+            if (offset.abs() as u64) > new_base_offset {
                 return Err(ErrNo::Inval);
             }
-            new_base_offset - offset.abs()
+            new_base_offset - (offset.abs() as u64)
         };
 
         // Update the offset
@@ -354,8 +404,8 @@ impl FileSystem {
 
     /// Returns the current offset associated with the file descriptor.
     pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<&FileSize> {
-        if let Some(entry) = self.file_table.get::<FileTableEntry>(fd) {
-            Ok(entry.offset)
+        if let Some(entry) = self.file_table.get(fd) {
+            Ok(&entry.offset)
         } else {
             Err(ErrNo::BadF)
         }
@@ -395,27 +445,27 @@ impl FileSystem {
         // This parameter is ignored
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
-        let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?;
+        let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
         // TODO: It is an insecure implementation of choosing a new FD.
         //       The new FD should be choisen randomly.
         // NOTE: the FD 0,1 and 2 are reserved to in out err.
-        let next_fd = self.file_table.keys().max().map(|Fd(fd_num)| Fd(fd+1)).unwrap_or(Fd(3));
-        let (file_type,file_size) = self.inode_table.get(inode).map(|InodeImpl{ file_stat, .. }|{
+        let next_fd = self.file_table.keys().max().map(|Fd(fd_num)| Fd(fd_num+1)).unwrap_or(Fd(3));
+        let (file_type,file_size) = self.inode_table.get(&inode).map(|InodeImpl{ file_stat, .. }|{
             (file_stat.file_type.clone(), file_stat.file_size.clone())
-        })
+        }).ok_or(ErrNo::BadF)?;
         let fd_stat = FdStat{
             file_type,
             flags,
             rights_base,
             rights_inheriting,
-        }
+        };
         self.file_table.insert(next_fd, FileTableEntry{
             inode,
             fd_stat,
             offset : 0,
             advice : vec![(0,file_size,Advice::Normal)],
         });
-        next_fd
+        Ok(next_fd)
     }
 
     pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
