@@ -11,8 +11,8 @@
 
 use super::error::{mk_error_code, mk_host_trap};
 use crate::hcall::common::{
-    sha_256_digest, EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState,
-    WASIError, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
+    sha_256_digest, Chihuahua, EntrySignature, LifecycleState, ProvisioningError, RuntimePanic,
+    RuntimeState, WASIError, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
     WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
     WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
     WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
@@ -29,12 +29,12 @@ use crate::hcall::common::{
 };
 use platform_services::{getrandom, result};
 use std::mem::size_of;
+use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     LittleEndianConvert, MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance,
     ModuleRef, RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
-use wasi_types::{ErrNo, Fd, FileSize, Advice, FdStat, FdFlags, Rights, FileStat, IoVec, Size};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -90,7 +90,7 @@ const WASI_FD_FILESTAT_SET_TIMES_INDEX: usize = 15;
 /// Index of the WASI `fd_pread` function.
 const WASI_FD_PREAD_INDEX: usize = 16;
 /// Index of the WASI `fd_prestat_get_name` function.
-const WASI_FD_PRESTAT_GET_NAME_INDEX: usize = 17;
+const WASI_FD_PRESTAT_GET_INDEX: usize = 17;
 /// Index of the WASI `fd_prestat_dir_name` function.
 const WASI_FD_PRESTAT_DIR_NAME_INDEX: usize = 18;
 /// Index of the WASI `fd_pwrite` function.
@@ -924,51 +924,51 @@ fn check_sock_shutdown_signature(signature: &Signature) -> bool {
 /// host call coded by `index`.
 fn check_signature(index: usize, signature: &Signature) -> bool {
     match index {
-        WASI_ARGS_GET_NAME => check_args_get_signature(signature),
-        WASI_ARGS_SIZES_GET_NAME => check_args_sizes_get_signature(signature),
-        WASI_ENVIRON_GET_NAME => check_environ_get_signature(signature),
-        WASI_ENVIRON_SIZES_GET_NAME => check_environ_sizes_get_signature(signature),
-        WASI_CLOCK_RES_GET_NAME => check_clock_res_get_signature(signature),
-        WASI_CLOCK_TIME_GET_NAME => check_clock_time_get_signature(signature),
-        WASI_FD_ADVISE_NAME => check_fd_advise_signature(signature),
-        WASI_FD_ALLOCATE_NAME => check_fd_allocate_signature(signature),
-        WASI_FD_CLOSE_NAME => check_fd_close_signature(signature),
-        WASI_FD_DATASYNC_NAME => check_fd_datasync_signature(signature),
-        WASI_FD_FDSTAT_GET_NAME => check_fd_fdstat_get_signature(signature),
-        WASI_FD_FDSTAT_SET_FLAGS_NAME => check_fd_fdstat_set_flags_signature(signature),
-        WASI_FD_FDSTAT_SET_RIGHTS_NAME => check_fd_fdstat_set_rights_signature(signature),
-        WASI_FD_FILESTAT_GET_NAME => check_fd_filestat_get_name_signature(signature),
-        WASI_FD_FILESTAT_SET_SIZE_NAME => check_fd_filestat_set_sizes_signature(signature),
-        WASI_FD_FILESTAT_SET_TIMES_NAME => check_fd_filestat_set_times_signature(signature),
-        WASI_FD_PREAD_NAME => check_fd_pread_signature(signature),
-        WASI_FD_PRESTAT_GET_NAME => check_fd_prestat_get_signature(signature),
-        WASI_FD_PRESTAT_DIR_NAME_NAME => check_fd_prestat_dir_name_signature(signature),
-        WASI_FD_PWRITE_NAME => check_fd_pwrite_signature(signature),
-        WASI_FD_READ_NAME => check_fd_read_signature(signature),
-        WASI_FD_READDIR_NAME => check_fd_readdir_signature(signature),
-        WASI_FD_RENUMBER_NAME => check_fd_renumber_signature(signature),
-        WASI_FD_SEEK_NAME => check_fd_seek_signature(signature),
-        WASI_FD_SYNC_NAME => check_fd_sync_signature(signature),
-        WASI_FD_TELL_NAME => check_fd_tell_signature(signature),
-        WASI_FD_WRITE_NAME => check_fd_write_signature(signature),
-        WASI_PATH_CREATE_DIRECTORY_NAME => check_path_crate_directory_signature(signature),
-        WASI_PATH_FILESTAT_GET_NAME => check_path_filestat_get_signature(signature),
-        WASI_PATH_FILESTAT_SET_TIMES_NAME => check_path_filestat_set_times_signature(signature),
-        WASI_PATH_LINK_NAME => check_path_link_signature(signature),
-        WASI_PATH_OPEN_NAME => check_path_open_signature(signature),
-        WASI_PATH_READLINK_NAME => check_path_readlink_signature(signature),
-        WASI_PATH_REMOVE_DIRECTORY_NAME => check_path_remove_directory_signature(signature),
-        WASI_PATH_RENAME_NAME => check_path_rename_signature(signature),
-        WASI_PATH_SYMLINK_NAME => check_path_symlink_signature(signature),
-        WASI_PATH_UNLINK_FILE_NAME => check_path_unlink_signature(signature),
-        WASI_POLL_ONEOFF_NAME => check_poll_oneoff_signature(signature),
-        WASI_PROC_EXIT_NAME => check_proc_exit_signature(signature),
-        WASI_PROC_RAISE_NAME => check_proc_raise_signature(signature),
-        WASI_SCHED_YIELD_NAME => check_sched_yield_signature(signature),
-        WASI_RANDOM_GET_NAME => check_random_get_signature(signature),
-        WASI_SOCK_RECV_NAME => check_sock_recv_signature(signature),
-        WASI_SOCK_SEND_NAME => check_sock_send_signature(signature),
-        WASI_SOCK_SHUTDOWN_NAME => check_sock_shutdown_signature(signature),
+        WASI_ARGS_GET_INDEX => check_args_get_signature(signature),
+        WASI_ARGS_SIZES_GET_INDEX => check_args_sizes_get_signature(signature),
+        WASI_ENVIRON_GET_INDEX => check_environ_get_signature(signature),
+        WASI_ENVIRON_SIZES_GET_INDEX => check_environ_sizes_get_signature(signature),
+        WASI_CLOCK_RES_GET_INDEX => check_clock_res_get_signature(signature),
+        WASI_CLOCK_TIME_GET_INDEX => check_clock_time_get_signature(signature),
+        WASI_FD_ADVISE_INDEX => check_fd_advise_signature(signature),
+        WASI_FD_ALLOCATE_INDEX => check_fd_allocate_signature(signature),
+        WASI_FD_CLOSE_INDEX => check_fd_close_signature(signature),
+        WASI_FD_DATASYNC_INDEX => check_fd_datasync_signature(signature),
+        WASI_FD_FDSTAT_GET_INDEX => check_fd_fdstat_get_signature(signature),
+        WASI_FD_FDSTAT_SET_FLAGS_INDEX => check_fd_fdstat_set_flags_signature(signature),
+        WASI_FD_FDSTAT_SET_RIGHTS_INDEX => check_fd_fdstat_set_rights_signature(signature),
+        WASI_FD_FILESTAT_GET_INDEX => check_fd_filestat_get_name_signature(signature),
+        WASI_FD_FILESTAT_SET_SIZE_INDEX => check_fd_filestat_set_sizes_signature(signature),
+        WASI_FD_FILESTAT_SET_TIMES_INDEX => check_fd_filestat_set_times_signature(signature),
+        WASI_FD_PREAD_INDEX => check_fd_pread_signature(signature),
+        WASI_FD_PRESTAT_GET_INDEX => check_fd_prestat_get_signature(signature),
+        WASI_FD_PRESTAT_DIR_NAME_INDEX => check_fd_prestat_dir_name_signature(signature),
+        WASI_FD_PWRITE_INDEX => check_fd_pwrite_signature(signature),
+        WASI_FD_READ_INDEX => check_fd_read_signature(signature),
+        WASI_FD_READDIR_INDEX => check_fd_readdir_signature(signature),
+        WASI_FD_RENUMBER_INDEX => check_fd_renumber_signature(signature),
+        WASI_FD_SEEK_INDEX => check_fd_seek_signature(signature),
+        WASI_FD_SYNC_INDEX => check_fd_sync_signature(signature),
+        WASI_FD_TELL_INDEX => check_fd_tell_signature(signature),
+        WASI_FD_WRITE_INDEX => check_fd_write_signature(signature),
+        WASI_PATH_CREATE_DIRECTORY_INDEX => check_path_crate_directory_signature(signature),
+        WASI_PATH_FILESTAT_GET_INDEX => check_path_filestat_get_signature(signature),
+        WASI_PATH_FILESTAT_SET_TIMES_INDEX => check_path_filestat_set_times_signature(signature),
+        WASI_PATH_LINK_INDEX => check_path_link_signature(signature),
+        WASI_PATH_OPEN_INDEX => check_path_open_signature(signature),
+        WASI_PATH_READLINK_INDEX => check_path_readlink_signature(signature),
+        WASI_PATH_REMOVE_DIRECTORY_INDEX => check_path_remove_directory_signature(signature),
+        WASI_PATH_RENAME_INDEX => check_path_rename_signature(signature),
+        WASI_PATH_SYMLINK_INDEX => check_path_symlink_signature(signature),
+        WASI_PATH_UNLINK_FILE_INDEX => check_path_unlink_signature(signature),
+        WASI_POLL_ONEOFF_INDEX => check_poll_oneoff_signature(signature),
+        WASI_PROC_EXIT_INDEX => check_proc_exit_signature(signature),
+        WASI_PROC_RAISE_INDEX => check_proc_raise_signature(signature),
+        WASI_SCHED_YIELD_INDEX => check_sched_yield_signature(signature),
+        WASI_RANDOM_GET_INDEX => check_random_get_signature(signature),
+        WASI_SOCK_RECV_INDEX => check_sock_recv_signature(signature),
+        WASI_SOCK_SEND_INDEX => check_sock_send_signature(signature),
+        WASI_SOCK_SHUTDOWN_INDEX => check_sock_shutdown_signature(signature),
         _otherwise => false,
     }
 }
@@ -1117,7 +1117,7 @@ impl Externals for WASMIRuntimeState {
                 .wasi_args_sizes_get(args)
                 .and_then(|c| mk_error_code(c))
                 .or_else(|e| mk_host_trap(e)),
-            WASI_ENVIRON_GET_INDEX =>  self
+            WASI_ENVIRON_GET_INDEX => self
                 .wasi_environ_get(args)
                 .and_then(|c| mk_error_code(c))
                 .or_else(|e| mk_host_trap(e)),
@@ -1177,7 +1177,7 @@ impl Externals for WASMIRuntimeState {
                 .wasi_fd_pread(args)
                 .and_then(|c| mk_error_code(c))
                 .or_else(|e| mk_host_trap(e)),
-            WASI_FD_PRESTAT_GET_NAME_INDEX => self
+            WASI_FD_PRESTAT_GET_INDEX => self
                 .wasi_fd_prestat_get(args)
                 .and_then(|c| mk_error_code(c))
                 .or_else(|e| mk_host_trap(e)),
@@ -2178,5 +2178,125 @@ impl WASMIRuntimeState {
         }
 
         Ok(ErrNo::NotSup)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// The Chihuahua trait implementation.
+////////////////////////////////////////////////////////////////////////////////
+
+impl Chihuahua for WASMIRuntimeState {
+    #[inline]
+    fn load_program(&mut self, buffer: &[u8]) -> Result<(), ProvisioningError> {
+        self.load_program(buffer)
+    }
+
+    #[inline]
+    fn add_data_source(&mut self, fname: String, buffer: Vec<u8>) -> Result<(), ProvisioningError> {
+        self.add_data_source(fname, buffer)
+    }
+
+    #[inline]
+    fn add_stream_source(
+        &mut self,
+        fname: String,
+        buffer: Vec<u8>,
+    ) -> Result<(), ProvisioningError> {
+        self.add_stream_source(fname, buffer)
+    }
+
+    #[inline]
+    fn invoke_entry_point(&mut self) -> Result<i32, RuntimePanic> {
+        self.invoke_entry_point()
+    }
+
+    #[inline]
+    fn is_program_module_registered(&self) -> bool {
+        self.is_program_module_registered()
+    }
+
+    #[inline]
+    fn is_result_registered(&self) -> bool {
+        unimplemented!()
+    }
+
+    #[inline]
+    fn is_memory_registered(&self) -> bool {
+        self.is_memory_registered()
+    }
+
+    #[inline]
+    fn is_able_to_shutdown(&self) -> bool {
+        self.is_able_to_shutdown()
+    }
+
+    #[inline]
+    fn lifecycle_state(&self) -> &LifecycleState {
+        self.lifecycle_state()
+    }
+
+    #[inline]
+    fn current_data_source_count(&self) -> usize {
+        unimplemented!()
+    }
+
+    #[inline]
+    fn current_stream_source_count(&self) -> usize {
+        unimplemented!()
+    }
+
+    #[inline]
+    fn expected_data_source_count(&self) -> usize {
+        self.expected_data_source_count()
+    }
+
+    #[inline]
+    fn expected_stream_source_count(&self) -> usize {
+        self.expected_stream_source_count()
+    }
+
+    #[inline]
+    fn expected_shutdown_sources(&self) -> &Vec<u64> {
+        self.expected_shutdown_sources()
+    }
+
+    #[inline]
+    fn result(&self) -> Option<Vec<u8>> {
+        unimplemented!()
+    }
+
+    #[inline]
+    fn program_digest(&self) -> Option<&Vec<u8>> {
+        self.program_digest()
+    }
+
+    #[inline]
+    fn set_expected_data_source_count(&mut self, sources: usize) -> &mut dyn Chihuahua {
+        self.set_expected_data_source_count(sources)
+    }
+
+    #[inline]
+    fn set_expected_stream_source_count(&mut self, sources: usize) -> &mut dyn Chihuahua {
+        self.set_expected_stream_source_count(sources)
+    }
+
+    #[inline]
+    fn set_expected_shutdown_sources(&mut self, sources: Vec<u64>) -> &mut dyn Chihuahua {
+        self.set_expected_shutdown_sources(sources)
+    }
+
+    #[inline]
+    fn set_previous_result(&mut self, result: &Option<Vec<u8>>) -> &mut dyn Chihuahua {
+        unimplemented!()
+    }
+
+    #[inline]
+    fn error(&mut self) -> &mut dyn Chihuahua {
+        self.error()
+    }
+
+    #[inline]
+    fn request_shutdown(&mut self, client_id: &u64) -> &mut dyn Chihuahua {
+        self.request_shutdown(client_id)
     }
 }
