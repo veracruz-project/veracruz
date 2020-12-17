@@ -38,8 +38,7 @@ use std::{
 
 use execution_engine::{
     factory::{single_threaded_execution_engine, ExecutionStrategy},
-    hcall::buffer::VFS,
-    hcall::common::EngineReturnCode,
+    hcall::{buffer::VFS, common::{EngineReturnCode, ExecutionEngine}},
 };
 use veracruz_utils::policy::principal::Principal;
 
@@ -70,9 +69,6 @@ const VERSION: &'static str = "pre-alpha";
 /// Name of the field in the TOML file detailing the number of data sources to
 /// be expected.
 const TOML_DATA_SOURCE_COUNT: &'static str = "data-source-count";
-/// Name of the field in the TOML file detailing the maximum call stack size.
-/// Not currently enforced!
-const TOML_CALL_STACK_SIZE: &'static str = "call-stack-size";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Error codes.
@@ -105,12 +101,8 @@ pub enum ErrorCode {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The static configuration, which in this case fulfills a similar role to the
-/// Veracruz policy file.  This contains various important bits of static
-/// configuration for a Veracruz computation, such as whether performance
-/// statistics should be suppressed, the number of data sources expected, etc.
+/// Veracruz policy file.
 struct Configuration {
-    /// The maximum call stack size of the WASM engine.
-    call_stack_size: u32,
     /// The number of data sources expected.
     data_source_count: u32,
 }
@@ -120,8 +112,8 @@ impl fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(
             f,
-            "{{ call-stack-size: {}, data-source-count: {} }}",
-            self.call_stack_size, self.data_source_count
+            "{{ data-source-count: {} }}",
+            self.data_source_count
         )
     }
 }
@@ -357,11 +349,9 @@ fn read_configuration_file(fname: &str) -> Configuration {
 
     info!("TOML file parsed successfully.");
 
-    let call_stack_size = toml_read_u32(&toml, TOML_CALL_STACK_SIZE);
     let data_source_count = toml_read_u32(&toml, TOML_DATA_SOURCE_COUNT);
 
     Configuration {
-        call_stack_size,
         data_source_count,
     }
 }
