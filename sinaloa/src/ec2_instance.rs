@@ -54,6 +54,8 @@ pub enum EC2Error {
     CommandNonZeroStatus(i32),
     #[error(display = "EC2: Nix error:{:?}", _0)]
     NixError(nix::Error),
+    #[error(display = "EC2: CLI error")]
+    CLIError,
     #[error(display = "EC2: Unimplemented")]
     Unimplemented,
 }
@@ -71,16 +73,22 @@ impl EC2Instance {
                     "--instance-type", "m5.xlarge", "--enclave-options", "Enabled=true",
                     "--region",  "us-east-1", "--key-name", AWS_KEY_NAME,
                     "--subnet-id=subnet-09dec26c52ea2f0c1", "--security-group-ids", SECURITY_GROUP_ID,
-                    "--associate-public-ip-address"])
+                    "--associate-public-ip-address",
+                    "--tag-specifications",  "ResourceType=instance,Tags=[{Key=Veracruz,Value=RootEnclave}]"])
                         .output()
             .map_err(|err| {
                 println!("EC2Instance::new failed to start ec2 instance:{:?}", err);
                 EC2Error::IOError(err)
             })?;
-        let ec2_result_stdout = ec2_result.stdout;
-        let ec2_result_text = std::str::from_utf8(&ec2_result_stdout)
-            .map_err(|err| EC2Error::Utf8Error(err))?;
+        if !ec2_result.status.success() {
+            let ec2_result_text = std::str::from_utf8(&ec2_result.stderr)
+                .map_err(|err| EC2Error::Utf8Error(err))?;
+            println!("ec2 result Stdout:{:}", ec2_result_text);
+            return Err(EC2Error::CLIError);
+        }
 
+        let ec2_result_text = std::str::from_utf8(&ec2_result.stdout)
+            .map_err(|err| EC2Error::Utf8Error(err))?;
         let ec2_data: Value = serde_json::from_str(ec2_result_text)
             .map_err(|err| EC2Error::SerdeJsonError(err))?;
 
