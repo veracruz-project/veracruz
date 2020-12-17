@@ -378,17 +378,44 @@ impl FileSystem {
         unimplemented!()
     }
 
+    /// Open a file or directory.
+    /// TODO: It provides the minimum functionality of opening a file.
+    ///       Finish the rest functionality required the WASI spec.
     pub(crate) fn path_open(
         &mut self,
+        // This parameter is ignored
         fd: &Fd,
+        // This parameter is ignored
         dirflags: LookupFlags,
         path: String,
+        // This parameter is ignored
         oflags: OpenFlags,
-        fs_rights_base: Rights,
-        fs_rights_inheriting: Rights,
-        fdflags: FdFlags,
+        rights_base: Rights,
+        rights_inheriting: Rights,
+        // This parameter is ignored
+        flags: FdFlags,
     ) -> FileSystemError<Fd> {
-        unimplemented!()
+        let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?;
+        // TODO: It is an insecure implementation of choosing a new FD.
+        //       The new FD should be choisen randomly.
+        // NOTE: the FD 0,1 and 2 are reserved to in out err.
+        let next_fd = self.file_table.keys().max().map(|Fd(fd_num)| Fd(fd+1)).unwrap_or(Fd(3));
+        let (file_type,file_size) = self.inode_table.get(inode).map(|InodeImpl{ file_stat, .. }|{
+            (file_stat.file_type.clone(), file_stat.file_size.clone())
+        })
+        let fd_stat = FdStat{
+            file_type,
+            flags,
+            rights_base,
+            rights_inheriting,
+        }
+        self.file_table.insert(next_fd, FileTableEntry{
+            inode,
+            fd_stat,
+            offset : 0,
+            advice : vec![(0,file_size,Advice::Normal)],
+        });
+        next_fd
     }
 
     pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
