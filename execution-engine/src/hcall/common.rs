@@ -11,15 +11,15 @@
 
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
-use wasi_types::{ErrNo, Fd, FileSize, Advice, FdStat, FdFlags, Rights, FileStat, Timestamp, Size, Prestat, IoVec, DirCookie, FileDelta, Whence, LookupFlags, OpenFlags};
+use wasi_types::{
+    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, IoVec,
+    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
+};
 use veracruz_util::policy::principal::{Principal, FileOperation};
 use std::{
-    borrow::Borrow,
-    cmp::Ord,
-    collections::{HashMap,HashSet},
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
-    path::{Path, PathBuf},
+    path::PathBuf,
     string::{String, ToString},
     fmt::{Formatter, Display, Error},
     string::{String, ToString},
@@ -270,7 +270,365 @@ impl From<wasmi::Error> for HostProvisioningError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Fatal host errors
+// The host runtime state.
+////////////////////////////////////////////////////////////////////////////////
+
+/// A wrapper for VFS, which provides common API used by execution engine.
+#[derive(Clone)]
+pub struct VFSService {
+}
+
+impl VFSService {
+    ////////////////////////////////////////////////////////////////////////////
+    // Creating and modifying runtime states.
+    ////////////////////////////////////////////////////////////////////////////
+    
+    /// Creates a new initial `HostProvisioningState`.
+    pub fn new(
+        vfs : Arc<Mutex<VFS>>,
+    ) -> Self {
+        Self { vfs }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // The program's environment.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Pushes a new argument, `argument`, to the list of program arguments that
+    /// will be made available to the program.
+    #[inline]
+    pub(super) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
+    where
+        U: Into<String>
+    {
+        self.program_arguments.push(argument.into());
+        self
+    }
+
+    /// Returns the count of program arguments that will be supplied to the
+    /// program.
+    #[inline]
+    pub(super) fn program_argument_count(&self) -> usize {
+        self.program_arguments.len()
+    }
+
+    /// Registers a new environment variable, `key`, with a particular value,
+    /// `value`, in the program's environment.  Returns `None` iff the key was
+    /// already associated with a value (in which case the key-value pair are
+    /// not registered in the environment), and `Some(state)`, for `state` a
+    /// modified runtime state with the pair registered, otherwise.
+    #[inline]
+    pub(super) fn register_environment_variable<U>(
+        &mut self,
+        key: U,
+        value: U,
+    ) -> Option<&mut Self>
+    where
+        U: Into<String>
+    {
+        let keys: Vec<String> = self
+            .environment_variables
+            .iter()
+            .map(|(k, v)| k)
+            .cloned()
+            .collect();
+
+        let k = key.into();
+
+        if keys.contains(&k) {
+            None
+        } else {
+            self.environment_variables.push((k, value.into()));
+            Some(self)
+        }
+    }
+
+    /// Returns the number of environment variables stored in the program's
+    /// environment.
+    #[inline]
+    pub(super) fn environment_variable_count(&self) -> usize {
+        self.environment_variables.len()
+    }
+
+    /// Returns the sizes (in bytes) of the key-value pairs stored in the
+    /// program's environment.
+    pub(super) fn environment_variable_sizes(&self) -> Vec<(usize, usize)> {
+        let mut sizes = Vec::new();
+
+        for (k, v) in self.environment_variables.iter() {
+            sizes.push((k.as_bytes().len(), v.as_bytes().len()));
+        }
+
+        sizes.reverse();
+
+        sizes
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Filesystem operations.
+    ////////////////////////////////////////////////////////////////////////////
+
+    #[inline]
+    pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
+        self.filesystem.fd_close(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_advise(
+        &mut self,
+        fd: &Fd,
+        offset: FileSize,
+        len: FileSize,
+        advice: Advice,
+    ) -> ErrNo {
+        self.filesystem.fd_advise(fd, offset, len, advice)
+    }
+
+    #[inline]
+    pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
+        self.filesystem.fd_fdstat_get(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
+        self.filesystem.fd_fdstat_set_flags(fd, flags)
+    }
+
+    #[inline]
+    pub(crate) fn fd_fdstat_set_rights(
+        &mut self,
+        fd: &Fd,
+        rights_base: Rights,
+        rights_inheriting: Rights,
+    ) -> ErrNo {
+        self.filesystem
+            .fd_fdstat_set_rights(fd, rights_base, rights_inheriting)
+    }
+
+    #[inline]
+    pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
+        self.filesystem.fd_filestat_get(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
+        self.filesystem.fd_filestat_set_size(fd, size)
+    }
+
+    #[inline]
+    pub(crate) fn fd_pread(
+        &mut self,
+        fd: &Fd,
+        iovs: IoVec,
+        offset: &FileSize,
+    ) -> FileSystemError<Size> {
+        self.filesystem.fd_pread(fd, iovs, offset)
+    }
+
+    #[inline]
+    pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
+        self.filesystem.fd_prestat_get(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
+        self.filesystem.fd_prestat_dir_name(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_pwrite(
+        &mut self,
+        fd: &Fd,
+        ciovec: Vec<IoVec>,
+        offset: FileSize,
+    ) -> FileSystemError<Size> {
+        self.filesystem.fd_pwrite(fd, ciovec, offset)
+    }
+
+    #[inline]
+    pub(crate) fn fd_read(&mut self, fd: &Fd, iovec: Vec<IoVec>) -> FileSystemError<Size> {
+        self.filesystem.fd_read(fd, iovec)
+    }
+
+    #[inline]
+    pub(crate) fn fd_readdir(
+        &mut self,
+        fd: &Fd,
+        cookie: DirCookie,
+    ) -> FileSystemError<Vec<String>> {
+        self.filesystem.fd_readdir(fd, cookie)
+    }
+
+    #[inline]
+    pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
+        self.filesystem.fd_renumber(old_fd, new_fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_seek(
+        &mut self,
+        fd: &Fd,
+        offset: FileDelta,
+        whence: Whence,
+    ) -> FileSystemError<FileSize> {
+        self.filesystem.fd_seek(fd, offset, whence)
+    }
+
+    #[inline]
+    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<&FileSize> {
+        self.filesystem.fd_tell(fd)
+    }
+
+    #[inline]
+    pub(crate) fn fd_write(&mut self, fd: &Fd, iovs: Vec<IoVec>) -> FileSystemError<Size> {
+        self.filesystem.fd_write(fd, iovs)
+    }
+
+    #[inline]
+    pub(crate) fn path_create_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+        self.filesystem.path_create_directory(fd, path)
+    }
+
+    #[inline]
+    pub(crate) fn path_filestat_get(
+        &mut self,
+        fd: &Fd,
+        flags: LookupFlags,
+        path: String,
+    ) -> FileSystemError<FileStat> {
+        self.filesystem.path_filestat_get(fd, flags, path)
+    }
+
+    #[inline]
+    pub(crate) fn path_open(
+        &mut self,
+        fd: &Fd,
+        dirflags: LookupFlags,
+        path: String,
+        oflags: OpenFlags,
+        fs_rights_base: Rights,
+        fs_rights_inheriting: Rights,
+        fdflags: FdFlags,
+    ) -> FileSystemError<Fd> {
+        self.filesystem.path_open(
+            fd,
+            dirflags,
+            path,
+            oflags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            fdflags,
+        )
+    }
+
+    #[inline]
+    pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+        self.filesystem.path_remove_directory(fd, path)
+    }
+
+    #[inline]
+    pub(crate) fn path_rename(
+        &mut self,
+        old_fd: &Fd,
+        old_path: String,
+        new_fd: &Fd,
+        new_path: String,
+    ) -> ErrNo {
+        self.filesystem
+            .path_rename(old_fd, old_path, new_fd, new_path)
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Querying the host state.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /// Queries the current lifecycle transition system state of the runtime
+    /// state.
+    #[inline]
+    pub(crate) fn lifecycle_state(&self) -> &LifecycleState {
+        &self.lifecycle_state
+    }
+
+    /// Returns the number of expected data sources that we are expecting.  This
+    /// is specified in the global policy file.
+    #[inline]
+    pub(crate) fn expected_data_source_count(&self) -> usize {
+        self.expected_data_source_count
+    }
+
+    /// Returns the number of expected stream sources that we are expecting.
+    /// This is specified in the global policy file.
+    #[inline]
+    pub(crate) fn expected_stream_source_count(&self) -> usize {
+        self.expected_data_source_count
+    }
+
+    /// Returns the number of data sources that have so far been registered with
+    /// the runtime state.  This value should never exceed
+    /// `expected_data_source_count`.
+    #[inline]
+    pub(crate) fn registered_data_source_count(&self) -> usize {
+        self.registered_data_source_count
+    }
+
+    /// Returns the number of stream sources that have so far been registered
+    /// with the runtime state.  This value should never exceed
+    /// `expected_stream_source_count`.
+    #[inline]
+    pub(crate) fn registered_stream_source_count(&self) -> usize {
+        self.registered_stream_source_count
+    }
+
+    /// Returns `Some(digest)`, for `digest` a SHA-256 digest of the program
+    /// module, iff a digest has been registered with the runtime state.
+    #[inline]
+    pub(crate) fn program_digest(&self) -> Option<&Vec<u8>> {
+        self.program_digest.as_ref()
+    }
+
+    /// Returns `Some(memory)`, for `memory` a WASM heap or "linear memory", iff
+    /// a memory has been registered with the runtime state.
+    #[inline]
+    pub(crate) fn memory(&self) -> Option<&Memory> {
+        self.memory.as_ref()
+    }
+
+    /// Returns `Some(fname)`, for `fname` a filename in the state's synthetic
+    /// filesystem, iff a result filename has been registered.  Otherwise, if
+    /// the WASM program is not expected to produce a result, returns `None`.
+    #[inline]
+    pub(crate) fn result_filename(&self) -> Option<&String> {
+        self.result_filename.as_ref()
+    }
+
+    /// Returns `Some(module)`, for `module` a WASM program module, iff a module
+    /// has been registered with the runtime state.
+    #[inline]
+    pub(crate) fn program_module(&self) -> Option<&Module> {
+        self.program_module.as_ref()
+    }
+
+    /// Append to a file.
+    pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        self.vfs.lock()?.append(file_name,data)?;
+        Ok(())
+    }
+
+    /// Read from a file
+    pub(crate) fn read_file_base(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
+        Ok(self.vfs.lock()?.read(file_name)?)
+    }
+    
+    /// Read from a file
+    pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        Ok(self.vfs.lock()?.count(prefix)?)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Fatal host errors/runtime panics.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A fatal, runtime error that terminates the Veracruz host immediately.  This
@@ -301,7 +659,6 @@ pub enum FatalEngineError {
         function_name
     )]
     BadArgumentsToHostFunction {
-        //NOTE: use `String` instead of `&'static str` to make serde happy.
         /// The name of the host function that was being invoked.
         function_name: String,
     },
@@ -390,6 +747,27 @@ impl From<String> for FatalEngineError {
 impl From<&str> for FatalEngineError {
     fn from(err: &str) -> Self {
         FatalEngineError::DirectErrorMessage(err.to_string())
+
+impl RuntimePanic {
+    /// Constructs a `RuntimePanic::DirectErrorMessage` out of anything that can
+    /// be converted into a string.
+    #[inline]
+    pub fn direct_error_message<T>(message: T) -> Self
+    where
+        T: Into<String>
+    {
+        RuntimePanic::DirectErrorMessage(message.into())
+    }
+
+    /// Constructs a `RuntimePanic::BadArgumentsToHostFunction` out of anything
+    /// that can be converted into a string.
+    pub fn bad_arguments_to_host_function<T>(fname: T) -> Self
+    where
+        T: Into<String>
+    {
+        RuntimePanic::BadArgumentsToHostFunction {
+            function_name: fname.into()
+        }
     }
 }
 
@@ -443,9 +821,6 @@ pub trait ExecutionEngine: Send {
         -> Result<EngineReturnCode, FatalEngineError>;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// H-call return codes.
-////////////////////////////////////////////////////////////////////////////////
 
 /// These are return codes that the host passes back to the Veracruz WASM program
 /// when something goes wrong with a host-call.  Any error is assumed to be

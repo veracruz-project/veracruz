@@ -1,13 +1,13 @@
-//! The WASMI-specific implementation of the WASI API.
+//! An implementation of the WebAssembly System Interface for WASMI.
 //!
-//! ## Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!
-//! ## Licensing and copyright notice
+//! # Copyright
 //!
-//! See the `LICENSE.markdown` file in the Veracruz root directory for
-//! information on licensing and copyright.
+//! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
+//! and copyright information.
 
-mod error;
-mod runtime_state;
+pub mod error;
+pub mod runtime_state;

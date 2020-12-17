@@ -28,7 +28,7 @@ use crate::hcall::common::{
     WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
 };
 use platform_services::{getrandom, result};
-use std::mem::size_of;
+use std::{convert::TryFrom, mem::size_of};
 use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
@@ -211,7 +211,7 @@ fn check_args_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASM_POINTER, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `args_sizes_get` function:
@@ -224,7 +224,7 @@ fn check_args_sizes_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASM_POINTER, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `environ_get` function:
@@ -237,7 +237,7 @@ fn check_environ_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASM_POINTER, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `environ_sizes_get` function:
@@ -250,7 +250,7 @@ fn check_environ_sizes_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASM_POINTER, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `clock_res_get` function:
@@ -263,7 +263,7 @@ fn check_clock_res_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_CLOCKID, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `clock_time_get` function:
@@ -281,7 +281,7 @@ fn check_clock_time_get_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_TIMESTAMP,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_advise` function:
@@ -300,7 +300,7 @@ fn check_fd_advise_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FILESIZE,
             REPRESENTATION_WASI_ADVICE,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_allocate` function:
@@ -318,7 +318,7 @@ fn check_fd_allocate_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FILESIZE,
             REPRESENTATION_WASI_FILESIZE,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_close` function:
@@ -330,7 +330,7 @@ fn check_fd_close_signature(signature: &Signature) -> bool {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    params == &[REPRESENTATION_WASI_FD] && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+    params == &[REPRESENTATION_WASI_FD] && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_datasync` function:
@@ -342,7 +342,7 @@ fn check_fd_datasync_signature(signature: &Signature) -> bool {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    params == &[REPRESENTATION_WASI_FD] && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+    params == &[REPRESENTATION_WASI_FD] && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_fdstat_get` function:
@@ -355,7 +355,7 @@ fn check_fd_fdstat_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_fdstat_set_flags` function:
@@ -368,7 +368,7 @@ fn check_fd_fdstat_set_flags_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASI_FDFLAGS]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_fdstat_set_rights` function:
@@ -386,7 +386,7 @@ fn check_fd_fdstat_set_rights_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_RIGHTS,
             REPRESENTATION_WASI_RIGHTS,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_filestat_get` function:
@@ -399,7 +399,7 @@ fn check_fd_filestat_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_filestat_set_size` function:
@@ -412,7 +412,7 @@ fn check_fd_filestat_set_size_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASI_FILESIZE]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_filestat_set_size` function:
@@ -431,7 +431,7 @@ fn check_fd_filestat_set_times_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_TIMESTAMP,
             REPRESENTATION_WASI_FSTFLAGS,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_pread` function:
@@ -450,7 +450,7 @@ fn check_fd_pread_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FILESIZE,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_prestat_get` function:
@@ -463,7 +463,7 @@ fn check_fd_prestat_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_prestat_dir_name` function:
@@ -481,7 +481,7 @@ fn check_fd_prestat_dir_name_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASM_POINTER,
             REPRESENTATION_WASI_SIZE,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_pwrite` function:
@@ -500,7 +500,7 @@ fn check_fd_pwrite_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FILESIZE,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_read` function:
@@ -518,7 +518,7 @@ fn check_fd_read_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_IOVEC_ARRAY,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_readdir` function:
@@ -538,7 +538,7 @@ fn check_fd_readdir_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_DIRCOOKIE,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_renumber` function:
@@ -551,7 +551,7 @@ fn check_fd_renumber_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASI_FD]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_seek` function:
@@ -570,7 +570,7 @@ fn check_fd_seek_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_WHENCE,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_sync` function:
@@ -582,7 +582,7 @@ fn check_fd_sync_signature(signature: &Signature) -> bool {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    params == &[REPRESENTATION_WASI_FD] && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+    params == &[REPRESENTATION_WASI_FD] && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_tell` function:
@@ -595,7 +595,7 @@ fn check_fd_tell_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `fd_write` function:
@@ -613,7 +613,7 @@ fn check_fd_write_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_CIOVEC_ARRAY,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_create_directory` function:
@@ -626,7 +626,7 @@ fn check_path_create_directory_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_filestat_get` function:
@@ -645,7 +645,7 @@ fn check_path_filestat_get_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASM_POINTER,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_filestat_set_times` function:
@@ -667,7 +667,7 @@ fn check_path_filestat_set_times_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_TIMESTAMP,
             REPRESENTATION_WASI_FSTFLAGS,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_link` function:
@@ -688,7 +688,7 @@ fn check_path_link_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FD,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_open` function:
@@ -712,7 +712,7 @@ fn check_path_open_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FDFLAGS,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_readlink` function:
@@ -733,7 +733,7 @@ fn check_path_readlink_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_SIZE,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_remove_directory` function:
@@ -746,7 +746,7 @@ fn check_path_remove_directory_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_rename` function:
@@ -765,7 +765,7 @@ fn check_path_rename_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FD,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_symlink` function:
@@ -783,7 +783,7 @@ fn check_path_symlink_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FD,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `path_unlink_file` function:
@@ -796,7 +796,7 @@ fn check_path_unlink_file_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASM_POINTER]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `poll_oneoff` function:
@@ -816,7 +816,7 @@ fn check_poll_oneoff_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_SIZE,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `proc_exit` function:
@@ -828,7 +828,7 @@ fn check_proc_exit_signature(signature: &Signature) -> bool {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    params == &[REPRESENTATION_WASI_EXITCODE] && return_type == &None
+    params == &[REPRESENTATION_WASI_EXITCODE] && return_type == None
 }
 
 /// Checks the signature of the WASI `proc_raise` function:
@@ -840,7 +840,7 @@ fn check_proc_raise_signature(signature: &Signature) -> bool {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    params == &[REPRESENTATION_WASI_SIGNAL] && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+    params == &[REPRESENTATION_WASI_SIGNAL] && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `sched_yield` function:
@@ -852,7 +852,7 @@ fn check_sched_yield_signature(signature: &Signature) -> bool {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    params == &[] && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+    params == &[] && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `random_get` function:
@@ -865,7 +865,7 @@ fn check_random_get_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASM_POINTER, REPRESENTATION_WASI_SIZE]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `sock_recv` function:
@@ -885,7 +885,7 @@ fn check_sock_recv_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASM_POINTER,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `sock_send` function:
@@ -904,7 +904,7 @@ fn check_sock_send_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_SIFLAGS,
             REPRESENTATION_WASM_POINTER,
         ]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the signature of the WASI `sock_shutdown` function:
@@ -917,7 +917,7 @@ fn check_sock_shutdown_signature(signature: &Signature) -> bool {
     let return_type = signature.return_type();
 
     params == &[REPRESENTATION_WASI_FD, REPRESENTATION_WASI_SDFLAGS]
-        && return_type == &Some(REPRESENTATION_WASI_ERRNO)
+        && return_type == Some(REPRESENTATION_WASI_ERRNO)
 }
 
 /// Checks the function signature, `signature`, has the correct type for the
@@ -937,8 +937,8 @@ fn check_signature(index: usize, signature: &Signature) -> bool {
         WASI_FD_FDSTAT_GET_INDEX => check_fd_fdstat_get_signature(signature),
         WASI_FD_FDSTAT_SET_FLAGS_INDEX => check_fd_fdstat_set_flags_signature(signature),
         WASI_FD_FDSTAT_SET_RIGHTS_INDEX => check_fd_fdstat_set_rights_signature(signature),
-        WASI_FD_FILESTAT_GET_INDEX => check_fd_filestat_get_name_signature(signature),
-        WASI_FD_FILESTAT_SET_SIZE_INDEX => check_fd_filestat_set_sizes_signature(signature),
+        WASI_FD_FILESTAT_GET_INDEX => check_fd_filestat_get_signature(signature),
+        WASI_FD_FILESTAT_SET_SIZE_INDEX => check_fd_filestat_set_size_signature(signature),
         WASI_FD_FILESTAT_SET_TIMES_INDEX => check_fd_filestat_set_times_signature(signature),
         WASI_FD_PREAD_INDEX => check_fd_pread_signature(signature),
         WASI_FD_PRESTAT_GET_INDEX => check_fd_prestat_get_signature(signature),
@@ -951,7 +951,7 @@ fn check_signature(index: usize, signature: &Signature) -> bool {
         WASI_FD_SYNC_INDEX => check_fd_sync_signature(signature),
         WASI_FD_TELL_INDEX => check_fd_tell_signature(signature),
         WASI_FD_WRITE_INDEX => check_fd_write_signature(signature),
-        WASI_PATH_CREATE_DIRECTORY_INDEX => check_path_crate_directory_signature(signature),
+        WASI_PATH_CREATE_DIRECTORY_INDEX => check_path_create_directory_signature(signature),
         WASI_PATH_FILESTAT_GET_INDEX => check_path_filestat_get_signature(signature),
         WASI_PATH_FILESTAT_SET_TIMES_INDEX => check_path_filestat_set_times_signature(signature),
         WASI_PATH_LINK_INDEX => check_path_link_signature(signature),
@@ -960,7 +960,7 @@ fn check_signature(index: usize, signature: &Signature) -> bool {
         WASI_PATH_REMOVE_DIRECTORY_INDEX => check_path_remove_directory_signature(signature),
         WASI_PATH_RENAME_INDEX => check_path_rename_signature(signature),
         WASI_PATH_SYMLINK_INDEX => check_path_symlink_signature(signature),
-        WASI_PATH_UNLINK_FILE_INDEX => check_path_unlink_signature(signature),
+        WASI_PATH_UNLINK_FILE_INDEX => check_path_unlink_file_signature(signature),
         WASI_POLL_ONEOFF_INDEX => check_poll_oneoff_signature(signature),
         WASI_PROC_EXIT_INDEX => check_proc_exit_signature(signature),
         WASI_PROC_RAISE_INDEX => check_proc_raise_signature(signature),
@@ -1059,7 +1059,7 @@ impl ModuleImportResolver for WASMIRuntimeState {
             WASI_PATH_RENAME_NAME => WASI_ARGS_GET_INDEX,
             WASI_PATH_SYMLINK_NAME => WASI_ARGS_GET_INDEX,
             WASI_PATH_UNLINK_FILE_NAME => WASI_ARGS_GET_INDEX,
-            _otherwise => {
+            otherwise => {
                 return Err(Error::Instantiation(format!(
                     "Unknown function {} with signature: {:?}.",
                     otherwise, signature
@@ -1311,14 +1311,14 @@ impl WASMIRuntimeState {
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), ProvisioningError> {
-        if self.get_lifecycle_state() == &LifecycleState::Initial {
+        if self.lifecycle_state() == &LifecycleState::Initial {
             if let Ok(module) = Module::from_buffer(buffer) {
                 let env_resolver =
                     wasmi::ImportsBuilder::new().with_resolver(WASI_SNAPSHOT_MODULE_NAME, self);
 
                 if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
                     if not_started_module_ref.has_start() {
-                        self.set_error();
+                        self.error();
                         return Err(ProvisioningError::InvalidWASMModule);
                     }
 
@@ -1329,37 +1329,37 @@ impl WASMIRuntimeState {
                         // linear memory, and the program digest, then work out
                         // which state we should be in.
 
-                        self.set_program_module(module_ref);
-                        self.set_memory(linear_memory);
-                        self.set_program_digest(sha_256_digest(buffer));
+                        self.set_program_module(module_ref)
+                            .set_memory(linear_memory)
+                            .set_program_digest(sha_256_digest(buffer));
 
-                        if self.get_expected_data_source_count() == 0 {
-                            if self.get_expected_stream_source_count() == 0 {
-                                self.set_ready_to_execute();
+                        if self.expected_data_source_count() == 0 {
+                            if self.expected_stream_source_count() == 0 {
+                                self.ready_to_execute();
                             } else {
-                                self.set_stream_sources_loading();
+                                self.stream_sources_loading();
                             }
                         } else {
-                            self.set_data_sources_loading();
+                            self.data_sources_loading();
                         }
                         return Ok(());
                     }
 
-                    self.set_error();
+                    self.error();
                     return Err(ProvisioningError::NoLinearMemoryFound);
                 }
 
-                self.set_error();
+                self.error();
                 Err(ProvisioningError::ModuleInstantiationFailure)
             } else {
-                self.set_error();
+                self.error();
                 Err(ProvisioningError::InvalidWASMModule)
             }
         } else {
-            self.set_error();
+            self.error();
             Err(ProvisioningError::InvalidLifeCycleState {
                 expected: vec![LifecycleState::Initial],
-                found: self.get_lifecycle_state().clone(),
+                found: self.lifecycle_state().clone(),
             })
         }
     }
@@ -1406,7 +1406,7 @@ impl WASMIRuntimeState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     pub(crate) fn invoke_entry_point(&mut self) -> Result<i32, RuntimePanic> {
-        if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
+        if self.lifecycle_state() == &LifecycleState::ReadyToExecute {
             match self.invoke_export(ENTRY_POINT_NAME) {
                 Ok(Some(RuntimeValue::I32(return_code))) => {
                     self.finished_executing();
@@ -1444,10 +1444,10 @@ impl WASMIRuntimeState {
     where
         T: LittleEndianConvert,
     {
-        match self.get_memory() {
+        match self.memory() {
             None => Err(RuntimePanic::NoMemoryRegistered),
             Some(memory) => {
-                if let Err(_) = memory.set_value(address, T) {
+                if let Err(_) = memory.set_value(address, value) {
                     Err(RuntimePanic::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: size_of::<T>(),
@@ -1465,7 +1465,7 @@ impl WASMIRuntimeState {
     /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
     /// to the address for some reason.
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> Result<(), RuntimePanic> {
-        match self.get_memory() {
+        match self.memory() {
             None => Err(RuntimePanic::NoMemoryRegistered),
             Some(memory) => {
                 if let Err(_) = memory.set(address, buffer) {
@@ -1489,9 +1489,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_args_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_ARGS_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_ARGS_GET_NAME,
+            ));
         }
 
         let address0: u32 = args.nth(0);
@@ -1507,9 +1507,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_args_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_ARGS_SIZES_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_ARGS_SIZES_GET_NAME,
+            ));
         }
 
         let address0: u32 = args.nth(0);
@@ -1525,9 +1525,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_environ_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_ENVIRON_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_ENVIRON_GET_NAME,
+            ));
         }
 
         let address0: u32 = args.nth(0);
@@ -1543,9 +1543,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_environ_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_ENVIRON_SIZES_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_ENVIRON_SIZES_GET_NAME,
+            ));
         }
 
         let address0: u32 = args.nth(0);
@@ -1561,9 +1561,9 @@ impl WASMIRuntimeState {
     /// `ErrNo::NoSys`.
     fn wasi_clock_res_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_CLOCK_RES_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_CLOCK_RES_GET_NAME,
+            ));
         }
 
         let address: u32 = args.nth(1);
@@ -1577,9 +1577,9 @@ impl WASMIRuntimeState {
     /// `ErrNo::NoSys`.
     fn wasi_clock_time_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_CLOCK_TIME_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_CLOCK_TIME_GET_NAME,
+            ));
         }
 
         let address: u32 = args.nth(2);
@@ -1591,9 +1591,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_advise` function.
     fn wasi_fd_advise(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_ADVISE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_ADVISE_NAME,
+            ));
         }
 
         let fd: Fd = args.nth(0).into();
@@ -1608,9 +1608,9 @@ impl WASMIRuntimeState {
     /// not supported by Veracruz so we simply return `ErrNo::NoSys`.
     fn wasi_fd_allocate(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_ALLOCATE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_ALLOCATE_NAME,
+            ));
         }
 
         Ok(ErrNo::NoSys)
@@ -1619,9 +1619,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_close` function.
     fn wasi_fd_close(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_CLOSE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_CLOSE_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1635,9 +1635,9 @@ impl WASMIRuntimeState {
     /// XXX: consider whether this should just return `ErrNo::Success`, instead.
     fn wasi_fd_datasync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_DATASYNC_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_DATASYNC_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -1646,9 +1646,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_fdstat_get` function.
     fn wasi_fd_fdstat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_FDSTAT_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_FDSTAT_GET_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1664,9 +1664,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_fdstat_set_flags` function.
     fn wasi_fd_fdstat_set_flags(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_FDSTAT_SET_FLAGS_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_FDSTAT_SET_FLAGS_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1678,9 +1678,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_fdstat_set_rights` function.
     fn wasi_fd_fdstat_set_rights(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_FDSTAT_SET_RIGHTS_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_FDSTAT_SET_RIGHTS_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1693,9 +1693,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_filestat_get` function.
     fn wasi_fd_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_FILESTAT_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_FILESTAT_GET_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1711,9 +1711,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_filestat_set_size` function.
     fn wasi_fd_filestat_set_size(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_FILESTAT_SET_SIZE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_FILESTAT_SET_SIZE_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1726,9 +1726,9 @@ impl WASMIRuntimeState {
     /// is not supported by Veracruz and we simply return `ErrNo::NotSup`.
     fn wasi_fd_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_FILESTAT_SET_TIMES_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_FILESTAT_SET_TIMES_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -1737,9 +1737,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_pread` function.
     fn wasi_fd_pread(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_PREAD_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_PREAD_NAME,
+            ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1756,9 +1756,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_prestat_get` function.
     fn wasi_fd_prestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_PRESTAT_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_PRESTAT_GET_NAME,
+            ));
         }
 
         let fd: Fd = args.nth(0);
@@ -1771,11 +1771,13 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_prestat_dir_name` function.
+    ///
+    /// XXX: may panic if `u32` and `usize` bitwidths are different!
     fn wasi_fd_prestat_dir_name(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_PRESTAT_DIR_NAME_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_PRESTAT_DIR_NAME_NAME,
+            ));
         }
 
         let fd: Fd = args.nth(0);
@@ -1784,7 +1786,7 @@ impl WASMIRuntimeState {
 
         let result = self.fd_prestat_dir_name(&fd)?;
 
-        if result.len() > usize::from(size) {
+        if result.len() > usize::try_from(size).unwrap() {
             Ok(ErrNo::NameTooLong)
         } else {
             self.write_value(address, result)?;
@@ -1797,9 +1799,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_pwrite(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_PWRITE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_PWRITE_NAME,
+            ));
         }
 
         let address: u32 = args.nth(3);
@@ -1813,9 +1815,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_read(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_READ_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_READ_NAME,
+            ));
         }
 
         let address: u32 = args.nth(2);
@@ -1829,9 +1831,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_readdir(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 5 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_RENUMBER_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_READDIR_NAME,
+            ));
         }
 
         let address: u32 = args.nth(4);
@@ -1845,9 +1847,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_renumber(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_RENUMBER_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_RENUMBER_NAME,
+            ));
         }
 
         Ok(ErrNo::Success)
@@ -1858,9 +1860,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_seek(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_SEEK),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_SEEK_NAME,
+            ));
         }
 
         let address: u32 = args.nth(3);
@@ -1875,9 +1877,9 @@ impl WASMIRuntimeState {
     /// XXX: consider whether this should just return `ErrNo::Success`, instead.
     fn wasi_fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_SYNC),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_SEEK_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -1888,9 +1890,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_tell(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_TELL_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_TELL_NAME,
+            ));
         }
 
         let address: u32 = args.nth(1);
@@ -1904,9 +1906,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_write(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_FD_WRITE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_FD_WRITE_NAME,
+            ));
         }
 
         let address: u32 = args.nth(3);
@@ -1920,9 +1922,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_path_create_directory(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_CREATE_DIRECTORY_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_CREATE_DIRECTORY_NAME,
+            ));
         }
 
         Ok(ErrNo::Success)
@@ -1933,9 +1935,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_path_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_FILESTAT_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_FILESTAT_GET_NAME,
+            ));
         }
 
         Ok(ErrNo::Success)
@@ -1945,9 +1947,9 @@ impl WASMIRuntimeState {
     /// is not supported by Veracruz.  We simply return `ErrNo::NotSup`.
     fn wasi_path_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 6 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_FILESTAT_SET_TIMES_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_FILESTAT_SET_TIMES_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -1957,9 +1959,9 @@ impl WASMIRuntimeState {
     /// is not supported by Veracruz.  We simply return `ErrNo::NotSup`.
     fn wasi_path_link(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 5 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_LINK_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_LINK_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -1970,9 +1972,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_path_open(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 8 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_OPEN_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_OPEN_NAME,
+            ));
         }
 
         let address: u32 = args.nth(7);
@@ -1987,9 +1989,9 @@ impl WASMIRuntimeState {
     /// XXX: re-assess whether we want to support this.
     fn wasi_path_readlink(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 5 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_READLINK_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_READLINK_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -2000,9 +2002,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_path_remove_directory(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_REMOVE_DIRECTORY_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_REMOVE_DIRECTORY_NAME,
+            ));
         }
 
         Ok(ErrNo::Success)
@@ -2013,9 +2015,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_path_rename(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_RENAME_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_RENAME_NAME,
+            ));
         }
 
         Ok(ErrNo::Success)
@@ -2027,9 +2029,9 @@ impl WASMIRuntimeState {
     /// XXX: re-assess whether we want to support this.
     fn wasi_path_symlink(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_SYMLINK_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_SYMLINK_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -2041,9 +2043,9 @@ impl WASMIRuntimeState {
     /// XXX: re-assess whether we want to support this.
     fn wasi_path_unlink_file(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PATH_UNLINK_FILE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PATH_UNLINK_FILE_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -2054,9 +2056,9 @@ impl WASMIRuntimeState {
     /// were registered and return `ErrNo::NotSup`.
     fn wasi_poll_oneoff(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_POLL_ONEOFF_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_POLL_ONEOFF_NAME,
+            ));
         }
 
         let address: u32 = args[3];
@@ -2070,9 +2072,9 @@ impl WASMIRuntimeState {
     /// is returned to the calling WASM process.
     fn wasi_proc_exit(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PROC_RAISE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PROC_EXIT_NAME,
+            ));
         }
 
         let exit_code: i32 = args.nth(0);
@@ -2087,9 +2089,9 @@ impl WASMIRuntimeState {
     /// `ErrNo::NotSup`.
     fn wasi_proc_raise(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_PROC_RAISE_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_PROC_RAISE_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -2099,9 +2101,9 @@ impl WASMIRuntimeState {
     /// not supported by Veracruz and simply returns `ErrNo::NotSup`.
     fn wasi_sched_yield(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 0 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_SCHED_YIELD_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_SCHED_YIELD_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -2115,9 +2117,9 @@ impl WASMIRuntimeState {
     /// generator fails for some reason.
     fn wasi_random_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_RANDOM_GET_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_RANDOM_GET_NAME,
+            ));
         }
 
         let address: u32 = args.nth(0);
@@ -2138,9 +2140,9 @@ impl WASMIRuntimeState {
     /// `0` as the length of the transmission.
     fn wasi_sock_send(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_SOCK_SEND_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_SOCK_SEND_NAME,
+            ));
         }
 
         let address = args.nth(4);
@@ -2154,9 +2156,9 @@ impl WASMIRuntimeState {
     /// `0` as the length of the transmission.
     fn wasi_sock_recv(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 5 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_SOCK_RECV_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_SOCK_RECV_NAME,
+            ));
         }
 
         let datalen_address: u32 = args.nth(3);
@@ -2172,9 +2174,9 @@ impl WASMIRuntimeState {
     /// not supported by Veracruz and simply returns `ErrNo::NotSup`.
     fn wasi_sock_shutdown(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
-            return Err(RuntimePanic::BadArgumentsToHostFunction {
-                function_name: String::from(WASI_SOCK_SHUTDOWN_NAME),
-            });
+            return Err(RuntimePanic::bad_arguments_to_host_function(
+                WASI_SOCK_SHUTDOWN_NAME,
+            ));
         }
 
         Ok(ErrNo::NotSup)
@@ -2261,8 +2263,8 @@ impl Chihuahua for WASMIRuntimeState {
     }
 
     #[inline]
-    fn result(&self) -> Option<Vec<u8>> {
-        unimplemented!()
+    fn result_filename(&self) -> Option<&String> {
+        self.result_filename()
     }
 
     #[inline]
