@@ -40,8 +40,8 @@ use std::sync::SgxMutex as Mutex;
 use crate::hcall::wasmtime;
 use crate::hcall::{
     buffer::VFS,
-    common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
-    wasmi,
+    common::{EngineReturnCode, ExecutionEngine, FatalEngineError, RuntimeState},
+    wasmi::runtime_state::WASMIRuntimeState,
 };
 use std::{
     boxed::Box,
@@ -49,6 +49,8 @@ use std::{
     sync::Arc,
 };
 
+/// The following type captures the execution strategy which is being requested,
+/// for the WASM program, from ExecutionEngine.
 #[derive(Debug)]
 pub enum ExecutionStrategy {
     /// An interpretation execution strategy should be used, running the WASM

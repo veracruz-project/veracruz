@@ -1,98 +1,184 @@
-//! Common code for implementing Veracruz host-calls
-//!
-//! ## About
-//!
-//! The Veracruz H-call interface consists of the following functions:
-//! - `__veracruz_hcall_input_count()` which returns the count of secret
-//!   data sources available to the program,
-//! - `__veracruz_hcall_read_input()` which fills a WASM buffer with a
-//!   particular input,
-//! - `__veracruz_hcall_input_size()` which returns the size, in bytes, of a
-//!   particular input,
-//! - `__veracruz_hcall_write_output()` which can be used by the WASM
-//!   program to register its result by pointing the host to a WASM buffer
-//!   which is then copied into the host,
-//! - `__veracruz_hcall_getrandom()` which fills a WASM buffer with random
-//!   bytes taken from a platform-specific entropy source.
-//!
-//! The implementation of some of these functions relies on execution-engine
-//! specific details, so they are mostly implemented in the engine-specific
-//! files in this directory.  This file contains material common to all
-//! implementations.
-//!
-//! Also defined in this file is the Veracruz state machine state.  The Veracruz
-//! host progresses through a particular series of states during provisioning
-//! to ensure that Veracruz is secure, and also that it acts a little like a
-//! function which can be partially-applied.
-//!
-//! Finally, the Veracruz host state is also defined in this file.  This keeps
-//! track of the state of the host as material is provisioned into the Veracruz
-//! enclave, and is used by the host to implement some (actually, most) of the
-//! H-calls mentioned above.  In particular, the host state keeps track of:
-//! - The number of expected data sources that the host is expecting,
-//!   derived from the policy,
-//! - The number of expected data sources already provisioned, and various
-//!   bits of metadata about them (e.g. who provisioned them),
-//! - The current machine state, e.g. `MachineState::ReadyToExecute`,
-//! - Any result that the WASM program executing on Veracruz may have
-//!   written to the host with the `__veracruz_hcall_write_output()` H-call.
-//!   Note that this is stored as an uninterpreted set of bytes in the host,
-//!   the host doesn't necessarily know how to interpret it: that's a detail
-//!   to be agreed between the participants in the computation,
-//! - Some WASM engine specific details, including a reference to the WASM
-//!   module executing and the linear memory of the module.  As these types
-//!   are engine-specific, we abstract over them with type-variables here.
-//!
-//! We also include a lot of generic material for working with the host state,
-//! including functions for changing various values, and bumping the host state
-//! around the state machine.
+//! Common code for any implementation of WASI.
 //!
 //! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
-//! ## Copyright
+//! ## Licensing and copyright notice
 //!
-//! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
-//! and copyright information.
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
 
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
+use wasi_types::{ErrNo, Fd, FileSize, Advice, FdStat, FdFlags, Rights, FileStat, Timestamp, Size, Prestat, IoVec, DirCookie, FileDelta, Whence, LookupFlags, OpenFlags};
+use veracruz_util::policy::principal::{Principal, FileOperation};
 use std::{
+    borrow::Borrow,
+    cmp::Ord,
+    collections::{HashMap,HashSet},
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
+    path::{Path, PathBuf},
+    string::{String, ToString},
+    fmt::{Formatter, Display, Error},
     string::{String, ToString},
 };
+use crate::hcall::buffer::VFSError;
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+use std::sync::Mutex;
+#[cfg(feature = "sgx")]
+use std::sync::SgxMutex as Mutex;
+use super::{fs::FileSystem, fs::FileSystemError};
 
 ////////////////////////////////////////////////////////////////////////////////
-// The H-Call API
+// Common constants.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Name of the `__veracruz_hcall_input_count` H-call.
-pub(crate) const HCALL_INPUT_COUNT_NAME: &'static str = "__veracruz_hcall_input_count";
-/// Name of the `__veracruz_hcall_input_size` H-call.
-pub(crate) const HCALL_INPUT_SIZE_NAME: &'static str = "__veracruz_hcall_input_size";
-/// Name of the `__veracruz_hcall_read_input` H-call.
-pub(crate) const HCALL_READ_INPUT_NAME: &'static str = "__veracruz_hcall_read_input";
-/// Name of the `__veracruz_hcall_write_output` H-call.
-pub(crate) const HCALL_WRITE_OUTPUT_NAME: &'static str = "__veracruz_hcall_write_output";
-/// Name of the `__veracruz_hcall_getrandom` H-call.
-pub(crate) const HCALL_GETRANDOM_NAME: &'static str = "__veracruz_hcall_getrandom";
-/// Name of the `__veracruz_hcall_read_previous_result` H-call.
-pub(crate) const HCALL_READ_PREVIOUS_RESULT_NAME: &str = "__veracruz_hcall_read_previous_result";
-/// Name of the `__veracruz_hcall_previous_result_size` H-call.
-pub(crate) const HCALL_PREVIOUS_RESULT_SIZE_NAME: &str = "__veracruz_hcall_previous_result_size";
-/// Name of the `__veracruz_hcall_has_previous_result` H-call.
-pub(crate) const HCALL_HAS_PREVIOUS_RESULT_NAME: &str = "__veracruz_hcall_has_previous_result";
-/// H-call code for the `__veracruz_hcall_stream_count` H-call.
-pub(crate) const HCALL_STREAM_COUNT_NAME: &str = "__veracruz_hcall_stream_count";
-/// H-call code for the `__veracruz_hcall_stream_size` H-call.
-pub(crate) const HCALL_STREAM_SIZE_NAME: &str = "__veracruz_hcall_stream_size";
-/// H-call code for the `__veracruz_hcall_read_stream` H-call.
-pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
+/// The directory in the synthetic filesystem where all inputs will be stored.
+pub(crate) const INPUT_DIRECTORY: &str = "/vcrz/in/";
+/// The directory in the synthetic filesystem where the WASM program will write
+/// its outputs.
+pub(crate) const OUTPUT_DIRECTORY: &str = "/vcrz/out";
+/// The directory, under `INPUT_DIRECTORY`, in the synthetic filesystem where
+/// block-oriented inputs will be stored and can be read by the WASM program.
+pub(crate) const BLOCK_INPUT_DIRECTORY_NAME: &str = "block";
+/// The directory, under `INPUT_DIRECTORY`, in the synthetic filesystem where
+/// stream-oriented inputs will be stored and can be read by the WASM program.
+pub(crate) const STREAM_INPUT_DIRECTORY_NAME: &str = "stream";
+
+/// Name of the WASI `args_get` function.
+pub(crate) const WASI_ARGS_GET_NAME: &str = "args_get";
+/// Name of the WASI `args_get` function.
+pub(crate) const WASI_ARGS_SIZES_GET_NAME: &str = "args_sizes_get";
+/// Name of the WASI `environ_get` function.
+pub(crate) const WASI_ENVIRON_GET_NAME: &str = "environ_get";
+/// Name of the WASI `environ_sizes_get` function.
+pub(crate) const WASI_ENVIRON_SIZES_GET_NAME: &str = "environ_sizes_get";
+/// Name of the WASI `clock_res_get` function.
+pub(crate) const WASI_CLOCK_RES_GET_NAME: &str = "clock_res_get";
+/// Name of the WASI `clock_time_get` function.
+pub(crate) const WASI_CLOCK_TIME_GET_NAME: &str = "clock_time_get";
+/// Name of the WASI `fd_advise` function.
+pub(crate) const WASI_FD_ADVISE_NAME: &str = "fd_advise";
+/// Name of the WASI `fd_allocate` function.
+pub(crate) const WASI_FD_ALLOCATE_NAME: &str = "fd_allocate";
+/// Name of the WASI `fd_close` function.
+pub(crate) const WASI_FD_CLOSE_NAME: &str = "fd_close";
+/// Name of the WASI `fd_datasync` function.
+pub(crate) const WASI_FD_DATASYNC_NAME: &str = "fd_datasync";
+/// Name of the WASI `fd_fdstat_get` function.
+pub(crate) const WASI_FD_FDSTAT_GET_NAME: &str = "fd_fdstat_get";
+/// Name of the WASI `fd_filestat_set_flags` function.
+pub(crate) const WASI_FD_FDSTAT_SET_FLAGS_NAME: &str = "fd_fdstat_set_flags";
+/// Name of the WASI `fd_filestat_set_rights` function.
+pub(crate) const WASI_FD_FDSTAT_SET_RIGHTS_NAME: &str = "fd_fdstat_set_rights";
+/// Name of the WASI `fd_filestat_get` function.
+pub(crate) const WASI_FD_FILESTAT_GET_NAME: &str = "fd_filestat_get";
+/// Name of the WASI `fd_filestat_set_size` function.
+pub(crate) const WASI_FD_FILESTAT_SET_SIZE_NAME: &str = "fd_filestat_set_size";
+/// Name of the WASI `fd_filestat_set_times` function.
+pub(crate) const WASI_FD_FILESTAT_SET_TIMES_NAME: &str = "fd_filestat_set_times";
+/// Name of the WASI `fd_pread` function.
+pub(crate) const WASI_FD_PREAD_NAME: &str = "fd_pread";
+/// Name of the WASI `fd_prestat_get_name` function.
+pub(crate) const WASI_FD_PRESTAT_GET_NAME: &str = "fd_prestat_get";
+/// Name of the WASI `fd_prestat_dir_name` function.
+pub(crate) const WASI_FD_PRESTAT_DIR_NAME_NAME: &str = "fd_prestat_dir_name";
+/// Name of the WASI `fd_pwrite` function.
+pub(crate) const WASI_FD_PWRITE_NAME: &str = "fd_pwrite";
+/// Name of the WASI `fd_read` function.
+pub(crate) const WASI_FD_READ_NAME: &str = "fd_read";
+/// Name of the WASI `fd_readdir` function.
+pub(crate) const WASI_FD_READDIR_NAME: &str = "fd_readdir";
+/// Name of the WASI `fd_renumber` function.
+pub(crate) const WASI_FD_RENUMBER_NAME: &str = "fd_renumber";
+/// Name of the WASI `fd_seek` function.
+pub(crate) const WASI_FD_SEEK_NAME: &str = "fd_seek";
+/// Name of the WASI `fd_sync` function.
+pub(crate) const WASI_FD_SYNC_NAME: &str = "fd_sync";
+/// Name of the WASI `fd_tell` function.
+pub(crate) const WASI_FD_TELL_NAME: &str = "fd_tell";
+/// Name of the WASI `fd_write` function.
+pub(crate) const WASI_FD_WRITE_NAME: &str = "fd_write";
+/// Name of the WASI `path_crate_directory` function.
+pub(crate) const WASI_PATH_CREATE_DIRECTORY_NAME: &str = "path_create_directory";
+/// Name of the WASI `path_filestat_get` function.
+pub(crate) const WASI_PATH_FILESTAT_GET_NAME: &str = "path_filestat_get";
+/// Name of the WASI `path_filestat_set_times` function.
+pub(crate) const WASI_PATH_FILESTAT_SET_TIMES_NAME: &str = "path_filestat_set_times";
+/// Name of the WASI `path_link` function.
+pub(crate) const WASI_PATH_LINK_NAME: &str = "path_link";
+/// Name of the WASI `path_open` function.
+pub(crate) const WASI_PATH_OPEN_NAME: &str = "path_open";
+/// Name of the WASI `path_readlink` function.
+pub(crate) const WASI_PATH_READLINK_NAME: &str = "path_readlink";
+/// Name of the WASI `path_remove_directory` function.
+pub(crate) const WASI_PATH_REMOVE_DIRECTORY_NAME: &str = "path_remove_directory";
+/// Name of the WASI `path_rename` function.
+pub(crate) const WASI_PATH_RENAME_NAME: &str = "path_rename";
+/// Name of the WASI `path_symlink` function.
+pub(crate) const WASI_PATH_SYMLINK_NAME: &str = "path_symlink";
+/// Name of the WASI `path_unlink_file` function.
+pub(crate) const WASI_PATH_UNLINK_FILE_NAME: &str = "path_unlink_file";
+/// Name of the WASI `poll_oneoff` function.
+pub(crate) const WASI_POLL_ONEOFF_NAME: &str = "poll_oneoff";
+/// Name of the WASI `proc_exit` function.
+pub(crate) const WASI_PROC_EXIT_NAME: &str = "proc_exit";
+/// Name of the WASI `proc_raise` function.
+pub(crate) const WASI_PROC_RAISE_NAME: &str = "proc_raise";
+/// Name of the WASI `sched_yield` function.
+pub(crate) const WASI_SCHED_YIELD_NAME: &str = "sched_yield";
+/// Name of the WASI `random_get` function.
+pub(crate) const WASI_RANDOM_GET_NAME: &str = "random_get";
+/// Name of the WASI `sock_recv` function.
+pub(crate) const WASI_SOCK_RECV_NAME: &str = "sock_recv";
+/// Name of the WASI `sock_send` function.
+pub(crate) const WASI_SOCK_SEND_NAME: &str = "sock_send";
+/// Name of the WASI `sock_shutdown` function.
+pub(crate) const WASI_SOCK_SHUTDOWN_NAME: &str = "sock_shutdown";
 
 ////////////////////////////////////////////////////////////////////////////////
-// Provisioning errors
+// Miscellanea that doesn't fit elsewhere.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Computes a SHA-256 digest of the bytes passed to it in `buffer`.
+pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
+    ring::digest::digest(&ring::digest::SHA256, buffer)
+        .as_ref()
+        .to_vec()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// The machine lifecycle state.
+////////////////////////////////////////////////////////////////////////////////
+
+/// The lifecycle state of the Veracruz host.
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum LifecycleState {
+    /// The initial state: nothing yet has been provisioned into the Veracruz
+    /// machine.  The state is essentially "pristine", having just been created.
+    Initial,
+    /// The program has been provisioned into the machine, and now the data
+    /// sources are in the process of being provisioned.  Not all data sources
+    /// are yet provisioned, per the global policy.
+    DataSourcesLoading,
+    /// The program and (initial) data have been provisioned into the machine,
+    /// and now the stream sources are in the process of being provisioned.
+    /// Not all stream sources are yet provisioned, per the global policy.
+    StreamSourcesLoading,
+    /// All data sources (and the program) have now been provisioned according
+    /// to the global policy.  The machine is now ready to execute.
+    ReadyToExecute,
+    /// The machine has executed, and finished successfully.  The result of the
+    /// machine's execution can now be extracted.
+    FinishedExecuting,
+    /// An error occurred during the provisioning or machine execution process.
+    Error,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Provisioning errors.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Errors that can occur during host provisioning.  These are errors that may
@@ -102,13 +188,25 @@ pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
 /// errors due to programming bugs.
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum HostProvisioningError {
+    /// The host state was in an unexpected, or invalid, lifecycle state and
+    /// there is a mismatch between actual provisioning state and what was
+    /// expected.
+    #[error(
+        display = "ProvisioningError: Invalid host state, found {:?}, expected {:?}.",
+        found,
+        expected
+    )]
+    InvalidLifeCycleState {
+        found: LifecycleState,
+        expected: Vec<LifecycleState>,
+    },
     /// The WASM module supplied by the program supplier was invalid and could
     /// not be parsed.
-    #[error(display = "HostProvisioningError: Invalid WASM program (e.g. failed to parse it).")]
+    #[error(display = "ProvisioningError: Invalid WASM program (e.g. failed to parse it).")]
     InvalidWASMModule,
     /// No linear memory/heap could be identified in the WASM module.
     #[error(
-        display = "HostProvisioningError: No linear memory could be found in the supplied WASM module."
+        display = "ProvisioningError: No linear memory could be found in the supplied WASM module."
     )]
     NoLinearMemoryFound,
     /// No wasm memory registered in the execution engine
@@ -116,28 +214,46 @@ pub enum HostProvisioningError {
     NoMemoryRegistered,
     /// The program module could not be properly instantiated by the WASM engine
     /// for some reason.
-    #[error(display = "HostProvisioningError: Failed to instantiate the WASM module.")]
+    #[error(display = "ProvisioningError: Failed to instantiate the WASM module.")]
     ModuleInstantiationFailure,
     /// A lock could not be obtained for some reason.
-    #[error(display = "HostProvisioningError: Failed to obtain lock {:?}.", _0)]
+    #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
     FailedToObtainLock(String),
     #[error(display = "HostProvisioningError: Wasmi Error: {}.", _0)]
     WasmiError(String),
     /// The host provisioning state has not been initialized.  This should never
     /// happen and is a bug.
     #[error(
-        display = "HostProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
+        display = "ProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
     )]
     HostProvisioningStateNotInitialized,
-    /// The data or stream data cannot be sorted. This should never happen and is a bug.
+    /// The runtime was trying to register two inputs at the same path in the
+    /// synthetic filesystem.
     #[error(
-        display = "HostProvisioningError: Failed to sort the incoming data or incoming stream (this is a potential bug)."
+        display = "ProvisioningError: The global policy ascribes two inputs the same filename {}.",
+        _0
     )]
     CannotSortDataOrStream,
     #[error(display = "HostProvisioningError: VFS Error {}.", _0)]
     VFSError(#[error(source)] crate::hcall::buffer::VFSError),
     #[error(display = "HostProvisioningError: File {} cannot be found.", _0)]
     FileNotFound(String),
+    #[error(
+        display = "HostProvisioningError: Principal or program {:?} cannot be found.",_0
+    )]
+    PrincipalNotFound(Principal),
+    #[error(
+        display = "HostProvisioningError: Client {:?} is disallowed to {:?}.",client_id,operation
+    )]
+    CapabilityDenial {
+        client_id: Principal,
+        operation : FileOperation,
+    },
+    #[error(
+        display = "ProvisioningError: The global policy ascribes two inputs the same filename {}.",
+        _0
+    )]
+    InputNameClash(String),
 }
 
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
@@ -167,6 +283,13 @@ impl From<wasmi::Error> for HostProvisioningError {
 /// about what is going on inside the enclave.
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum FatalEngineError {
+    /// The WASM program called `proc_exit`, or similar, to signal an early exit
+    /// from the program, returning a specific error code.
+    #[error(
+        display = "RuntimePanic: Early exit requested by program, error code returned: '{}'.",
+        _0
+    )]
+    EarlyExit(i32),
     /// The Veracruz host was passed bad arguments by the WASM program running
     /// on the platform.  This should never happen if the WASM program uses
     /// `libveracruz` as the platform should ensure H-Calls are always
@@ -174,7 +297,7 @@ pub enum FatalEngineError {
     /// programming error in the source that originated the WASM programming if
     /// `libveracruz` was not used.
     #[error(
-        display = "FatalVeracruzHostError: Bad arguments passed to host function '{}'.",
+        display = "RuntimePanic: Bad arguments passed to host function '{}'.",
         function_name
     )]
     BadArgumentsToHostFunction {
@@ -183,10 +306,7 @@ pub enum FatalEngineError {
         function_name: String,
     },
     /// The WASM program tried to invoke an unknown H-call on the Veracruz host.
-    #[error(
-        display = "FatalVeracruzHostError: Unknown H-call invoked: '{}'.",
-        index
-    )]
+    #[error(display = "RuntimePanic: Unknown H-call invoked: '{}'.", index)]
     UnknownHostFunction {
         /// The host call index of the unknown function that was invoked.
         index: usize,
@@ -194,7 +314,7 @@ pub enum FatalEngineError {
     /// The host failed to read a range of bytes, starting at a base address,
     /// from the running WASM program's linear memory.
     #[error(
-        display = "FatalVeracruzHostError: Failed to read {} byte(s) from WASM memory at address {}.",
+        display = "RuntimePanic: Failed to read {} byte(s) from WASM memory at address {}.",
         bytes_to_be_read,
         memory_address
     )]
@@ -207,7 +327,7 @@ pub enum FatalEngineError {
     /// The host failed to write a range of bytes, starting from a base address,
     /// to the running WASM program's linear memory.
     #[error(
-        display = "FatalVeracruzHostError: Failed to write {} byte(s) to WASM memory at address {}.",
+        display = "RuntimePanic: Failed to write {} byte(s) to WASM memory at address {}.",
         bytes_to_be_written,
         memory_address
     )]
@@ -219,28 +339,26 @@ pub enum FatalEngineError {
     },
     /// No linear memory was registered: this is a programming error (a bug)
     /// that should be fixed.
-    #[error(display = "FatalVeracruzHostError: No WASM memory registered.")]
+    #[error(display = "RuntimePanic: No WASM memory registered.")]
     NoMemoryRegistered,
     /// No program module was registered: this is a programming error (a bug)
     /// that should be fixed.
-    #[error(display = "FatalVeracruzHostError: No WASM program module registered.")]
+    #[error(display = "RuntimePanic: No WASM program module registered.")]
     NoProgramModuleRegistered,
     /// The WASM program's entry point was missing or malformed.
-    #[error(
-        display = "FatalVeracruzHostError: Failed to find the entry point in the WASM program."
-    )]
+    #[error(display = "RuntimePanic: Failed to find the entry point in the WASM program.")]
     NoProgramEntryPoint,
     /// The WASM program's entry point was missing or malformed.
-    #[error(display = "FatalVeracruzHostError: Execution engine is not ready.")]
+    #[error(display = "RuntimePanic: Execution engine is not ready.")]
     EngineIsNotReady,
     /// Wrapper for direct error message.
-    #[error(display = "FatalVeracruzHostError: WASM program returns code other than i32.")]
+    #[error(display = "RuntimePanic: WASM program returns code other than i32.")]
     ReturnedCodeError,
     /// Wrapper for WASI Trap.
-    #[error(display = "FatalVeracruzHostError: WASMIError: Trap: {:?}.", _0)]
+    #[error(display = "RuntimePanic: WASMIError: Trap: {:?}.", _0)]
     WASMITrapError(#[source(error)] wasmi::Trap),
     /// Wrapper for WASI Error other than Trap.
-    #[error(display = "FatalVeracruzHostError: WASMIError {:?}.", _0)]
+    #[error(display = "RuntimePanic: WASMIError {:?}.", _0)]
     WASMIError(#[source(error)] wasmi::Error),
     /// Program cannot be found in VFS, when any principal (programs or participants) try to access
     /// the `file_name`.
@@ -253,13 +371,13 @@ pub enum FatalEngineError {
     #[error(display = "FatalVeracruzHostError: VFS Error: {:?}.", _0)]
     VFSError(#[error(source)] crate::hcall::buffer::VFSError),
     /// Wrapper for direct error message.
-    #[error(display = "FatalVeracruzHostError: Error message {:?}.", _0)]
+    #[error(display = "RuntimePanic: Error message {:?}.", _0)]
     DirectErrorMessage(String),
     #[error(display = "FatalVeracruzHostError: provisioning error {:?}.", _0)]
     ProvisionError(#[error(source)] HostProvisioningError),
     /// Something unknown or unexpected went wrong, and there's no more detailed
     /// information.
-    #[error(display = "FatalVeracruzHostError: Unknown error.")]
+    #[error(display = "RuntimePanic: Unknown error.")]
     Generic,
 }
 
@@ -278,6 +396,21 @@ impl From<&str> for FatalEngineError {
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation of the H-calls.
 ////////////////////////////////////////////////////////////////////////////////
+
+/// The return type for H-Call implementations.
+///
+/// From *the viewpoint of the host* a H-call can either fail spectacularly
+/// with a runtime trap, in which case `Err(err)` is returned, with `err`
+/// detailing what went wrong, and the Veracruz host thereafter terminating
+/// or otherwise entering an error state, or succeeds with `Ok(())`.
+///
+/// From *the viewpoint of the WASM program* a H-call can either fail
+/// spectacularly, as above, in which case WASM program execution is aborted
+/// with the WASM program itself not being able to do anything about this,
+/// succeeds with the desired effect and a success error code returned, or
+/// fails with a recoverable error in which case the error code details what
+/// went wrong and what can be done to fix it.
+pub(crate) type WASIError = Result<ErrNo, RuntimePanic>;
 
 /// Details the arguments expected by the module's entry point, if any is found.
 pub(crate) enum EntrySignature {
@@ -423,5 +556,40 @@ impl TryFrom<i32> for EngineReturnCode {
             -11 => Ok(EngineReturnCode::PreviousResultSize),
             _otherwise => Err(FatalEngineError::ReturnedCodeError),
         }
+    }
+}
+
+/// Pretty printing for `LifecycleState`.
+impl Display for LifecycleState {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        match self {
+            LifecycleState::Initial => write!(f, "Initial"),
+            LifecycleState::DataSourcesLoading => write!(f, "DataSourcesLoading"),
+            LifecycleState::StreamSourcesLoading => write!(f, "StreamSourcesLoading"),
+            LifecycleState::ReadyToExecute => write!(f, "ReadyToExecute"),
+            LifecycleState::FinishedExecuting => write!(f, "FinishedExecuting"),
+            LifecycleState::Error => write!(f, "Error"),
+        }
+    }
+}
+
+// Conversion from any error raised by any `Mutex<T>` to `ProvisioningError`.
+impl<T> From<std::sync::PoisonError<T>> for ProvisioningError {
+    fn from(error: std::sync::PoisonError<T>) -> Self {
+        ProvisioningError::FailedToObtainLock(format!("{:?}", error))
+    }
+}
+
+/// Lifting string error messages into `RuntimePanic`.
+impl From<String> for RuntimePanic {
+    fn from(err: String) -> Self {
+        RuntimePanic::DirectErrorMessage(err)
+    }
+}
+
+/// Lifting string error messages into `RuntimePanic`.
+impl From<&str> for RuntimePanic {
+    fn from(err: &str) -> Self {
+        RuntimePanic::DirectErrorMessage(err.to_string())
     }
 }

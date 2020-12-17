@@ -1,13 +1,13 @@
-//! The Veracruz host-call interface, and its implementation.
+//! An implementation of the WASI API for Chihuahua.
 //!
 //! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
-//! ## Copyright
+//! ## Licensing and copyright notice
 //!
-//! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
-//! and copyright information.
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
 
 pub mod buffer;
 pub mod common;
@@ -15,3 +15,5 @@ pub mod wasi;
 pub mod wasmi;
 #[cfg(feature = "std")]
 pub mod wasmtime;
+pub mod buffer;
+pub mod fs;
