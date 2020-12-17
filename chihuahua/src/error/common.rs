@@ -1,5 +1,6 @@
 //! Common error handling code for all Chihuahua execution engines.
-//! ## Authors
+//!
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

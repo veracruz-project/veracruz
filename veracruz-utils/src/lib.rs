@@ -2,7 +2,7 @@
 //!
 //! Material that doesn't fit anywhere else, or is common across many modules.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

@@ -1,6 +1,6 @@
 //! Remote attestation functionality
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

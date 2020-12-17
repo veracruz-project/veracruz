@@ -33,6 +33,7 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
+    slice::Iter,
     string::{String, ToString},
     vec::Vec,
 };
@@ -124,11 +125,18 @@ pub enum VeracruzRole {
     StreamProvider,
 }
 
-/// A notion of identitity for Veracruz principals.
+/// A notion of identitity for Veracruz principals.  Note that in different
+/// contexts we require different representations from our cryptographic
+/// certificates: in some contexts these should be unparsed text representations
+/// of the certificates (e.g. in the material below), and in other circumstances
+/// a parsed format is more appropriate, e.g. the `Certificate` type from the
+/// `RusTLS` library, as used in Baja.  We therefore abstract over the concrete
+/// types of certificates to obtain a single type that suits both contexts.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct VeracruzIdentity {
-    /// The cryptographic (X509) certificate associated with this identity.
-    certificate: String,
+pub struct VeracruzIdentity<U> {
+    /// The cryptographic certificate associated with this identity.  Note that
+    /// the actual implementation of this is kept abstract.
+    certificate: U,
     /// The ID associated with this identity.
     /// TODO: what is this?  Explain it properly.
     id: u32,
@@ -137,21 +145,46 @@ pub struct VeracruzIdentity {
     roles: Vec<VeracruzRole>,
 }
 
-impl VeracruzIdentity {
-    /// Creates a new identity from a certificate, and identifier, and a mix
-    /// of Veracruz roles.
+impl<U> VeracruzIdentity<U> {
+    /// Creates a new identity from a certificate, and identifier.  Initially,
+    /// we keep the set of roles empty.
     #[inline]
-    pub fn new(certificate: String, id: u32, roles: Vec<VeracruzRole>) -> Self {
+    pub fn new(certificate: U, id: u32) -> Self {
         Self {
             certificate,
             id,
-            roles,
+            roles: Vec::new(),
         }
+    }
+
+    /// Adds a new role to the principal's set of assigned roles.
+    #[inline]
+    pub fn add_role(&mut self, role: VeracruzRole) -> &mut Self {
+        self.roles.push(role);
+        self
+    }
+
+    /// Adds multiple new roles to the principal's set of assigned roles,
+    /// reading them from an iterator.
+    pub fn add_roles<T>(&mut self, roles: T) -> &mut Self
+    where
+        T: IntoIterator<Item = VeracruzRole>,
+    {
+        for role in roles {
+            self.add_role(role);
+        }
+        self
+    }
+
+    /// Returns `true` iff the principal has the role, `role`.
+    #[inline]
+    pub fn has_role(&self, role: &VeracruzRole) -> bool {
+        self.roles.iter().any(|r| r == role)
     }
 
     /// Returns the certificate associated with this identity.
     #[inline]
-    pub fn certificate(&self) -> &String {
+    pub fn certificate(&self) -> &U {
         &self.certificate
     }
 
@@ -166,7 +199,9 @@ impl VeracruzIdentity {
     pub fn roles(&self) -> &Vec<VeracruzRole> {
         &self.roles
     }
+}
 
+impl VeracruzIdentity<String> {
     /// Checks the validity of the identity, including well-formedness checks on
     /// the structure of the X509 certificate.  Returns `Err(reason)` iff the
     /// identity is malformed.  Returns `Ok(())` in all other cases.
@@ -295,7 +330,7 @@ impl VeracruzExpiry {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VeracruzPolicy {
     /// The identities of every principal involved in a computation.
-    identities: std::vec::Vec<VeracruzIdentity>,
+    identities: Vec<VeracruzIdentity<String>>,
     /// The URL of the Sinaloa server.
     sinaloa_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -313,7 +348,7 @@ pub struct VeracruzPolicy {
     /// all are provisioned, however, we reorder these inputs into this fixed
     /// declared order so that the Veracruz host ABI, which allows access to
     /// inputs via an index, remains well-defined.
-    data_provision_order: std::vec::Vec<u64>,
+    data_provision_order: Vec<u64>,
     /// The URL of the Tabasco attestation service.
     tabasco_url: String,
     /// The hash of the program which will be provisioned into Veracruz by the
@@ -331,7 +366,7 @@ pub struct VeracruzPolicy {
     /// all are provisioned, however, we reorder these inputs into this fixed
     /// declared order so that the Veracruz host ABI, which allows access to
     /// inputs via an index, remains well-defined.
-    streaming_order: std::vec::Vec<u64>,
+    streaming_order: Vec<u64>,
 }
 
 impl VeracruzPolicy {
@@ -339,7 +374,7 @@ impl VeracruzPolicy {
     /// the resulting policy in the process.  Returns `Ok(policy)` iff these
     /// well-formedness checks pass.
     pub fn new(
-        identities: Vec<VeracruzIdentity>,
+        identities: Vec<VeracruzIdentity<String>>,
         sinaloa_url: String,
         enclave_cert_expiry: VeracruzExpiry,
         ciphersuite: String,
@@ -381,7 +416,7 @@ impl VeracruzPolicy {
 
     /// Returns the identities associated with this policy.
     #[inline]
-    pub fn identities(&self) -> &Vec<VeracruzIdentity> {
+    pub fn identities(&self) -> &Vec<VeracruzIdentity<String>> {
         &self.identities
     }
 
@@ -536,7 +571,7 @@ impl VeracruzPolicy {
     /// TODO: where is this used, and why is it needed if we have access to
     /// the identities through `self.identities()`?
     #[inline]
-    pub fn iter_on_client<'a>(&'a self) -> std::slice::Iter<'a, VeracruzIdentity> {
+    pub fn iter_on_client<'a>(&'a self) -> Iter<'a, VeracruzIdentity<String>> {
         self.identities().iter()
     }
 
