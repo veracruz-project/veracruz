@@ -190,6 +190,7 @@ impl NitroEnclave {
             }
         }
 
+        // TODO: Use veracruz-utils::VsockSocket, which should handle shutdown, close itself in it's Drop function
         if let Err(err) = shutdown(socket_fd, Shutdown::Both) {
             match err {
                 nix::Error::Sys(err) => {
@@ -197,7 +198,7 @@ impl NitroEnclave {
                         nix::errno::Errno::ENOTCONN => (), // this is normal
                         _ =>  println!("NitroEnclave::ocall_loop failed to shutdown socket({:?}. This might cause you problems in the future.", err),
                     }
-                }, // This is normal
+                },
                 _ => println!("NitroEnclave::ocall_loop failed to shutdown socket({:?}. This might cause you problems in the future.", err),
             }
         }
