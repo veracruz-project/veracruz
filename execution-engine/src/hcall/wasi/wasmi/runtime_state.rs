@@ -2218,11 +2218,6 @@ impl Chihuahua for WASMIRuntimeState {
     }
 
     #[inline]
-    fn is_result_registered(&self) -> bool {
-        unimplemented!()
-    }
-
-    #[inline]
     fn is_memory_registered(&self) -> bool {
         self.is_memory_registered()
     }
@@ -2238,13 +2233,13 @@ impl Chihuahua for WASMIRuntimeState {
     }
 
     #[inline]
-    fn current_data_source_count(&self) -> usize {
-        unimplemented!()
+    fn registered_data_source_count(&self) -> usize {
+        self.registered_data_source_count()
     }
 
     #[inline]
-    fn current_stream_source_count(&self) -> usize {
-        unimplemented!()
+    fn registered_stream_source_count(&self) -> usize {
+        self.registered_stream_source_count()
     }
 
     #[inline]
@@ -2285,11 +2280,6 @@ impl Chihuahua for WASMIRuntimeState {
     #[inline]
     fn set_expected_shutdown_sources(&mut self, sources: Vec<u64>) -> &mut dyn Chihuahua {
         self.set_expected_shutdown_sources(sources)
-    }
-
-    #[inline]
-    fn set_previous_result(&mut self, result: &Option<Vec<u8>>) -> &mut dyn Chihuahua {
-        unimplemented!()
     }
 
     #[inline]
