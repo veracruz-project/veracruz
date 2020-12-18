@@ -245,10 +245,20 @@ fn proxy_attestation(
     let mut token: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
     let mut token_len: u64 = 0;
     let enclave_name_len: usize = enclave_name.len();
+    // AWS Nitro PCRs are SHA384 hashes. The rest of our hashes are SHA256.
+    // We are truncating it in the PSA token so the offsets don't change between
+    // platforms
+    let pcr_len: u64 = if document.pcrs[0].len() > 32 {
+        32
+    } else {
+        return Err(format!(
+            "nitro-root-enclave:proxy_attestation document.pcrs[0] is too short. Wanted > 32, got:{:?}", document.pcrs[0].len()
+        ));
+    };
     let status = unsafe {
         psa_initial_attest_get_token(
             document.pcrs[0].as_ptr() as *const u8,
-            document.pcrs[0].len() as u64,
+            pcr_len as u64,
             enclave_cert_hash.as_ptr() as *const u8, // user_data in the document is the certificate hash
             enclave_cert_hash.len() as u64,
             enclave_name.into_bytes().as_ptr() as *const i8,
