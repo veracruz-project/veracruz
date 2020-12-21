@@ -1480,6 +1480,38 @@ impl WASMIRuntimeState {
         }
     }
 
+    /// Read several IoVec.
+    fn read_iovec(&mut self, address: u32, ciovec: Vec<IoVec>) -> Result<Vec<u8>, RuntimePanic> {
+        ciovec.iter().fold(Ok(Vec::new()), |mut acc, IoVec{buf, len}| {
+            match acc {
+                Ok(mut rst) => {
+                    let mut new_rst = self.read_buffer(*buf,*len as usize)?;
+                    rst.append(&mut new_rst);
+                    Ok(rst)
+                }
+                Err(e) => Err(e),
+            }
+        })
+    }
+
+    /// Read a buffer of bytes from the runtime state's memory at
+    /// address, `address`.  Fails with `Err(RuntimePanic::NoMemoryRegistered)`
+    /// if no memory is registered in the runtime state, or
+    /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
+    /// to the address for some reason.
+    fn read_buffer(&mut self, address: u32, length: usize) -> Result<Vec<u8>, RuntimePanic> {
+        match self.memory() {
+            None => Err(RuntimePanic::NoMemoryRegistered),
+            Some(memory) => match memory.get(address, length) {
+                Err(_) => Err(RuntimePanic::MemoryReadFailed {
+                    memory_address: address as usize,
+                    bytes_to_be_read: length,
+                }),
+                Ok(buf) => Ok(buf.to_vec()),
+            },
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // The WASI host call implementations.
     ////////////////////////////////////////////////////////////////////////////
@@ -1743,15 +1775,15 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let IoVec{buf, len}: IoVec = args.nth(1).into();
+        let IoVec { buf, len }: IoVec = args.nth(1).into();
         let offset: FileSize = args.nth(2).into();
         let address: u32 = args.nth(3).into();
 
         match self.fd_pread_base(&fd, len as usize, &offset) {
-            Ok(content) =>  {
+            Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
                 self.write_value(address, ErrNo::Success)?;
-            },
+            }
             Err(e) => self.write_value(address, e)?,
         };
 
@@ -1826,14 +1858,14 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let IoVec{buf, len}: IoVec = args.nth(1).into();
+        let IoVec { buf, len }: IoVec = args.nth(1).into();
         let address: u32 = args.nth(2).into();
 
         match self.fd_read_base(&fd, len as usize) {
-            Ok(content) =>  {
+            Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
                 self.write_value(address, ErrNo::Success)?;
-            },
+            }
             Err(e) => self.write_value(address, e)?,
         };
 

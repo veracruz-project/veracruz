@@ -436,13 +436,13 @@ impl VFSService {
     }
 
     #[inline]
-    pub(crate) fn fd_pwrite(
+    pub(crate) fn fd_pwrite_base(
         &mut self,
         fd: &Fd,
-        ciovec: Vec<IoVec>,
+        mut buf: Vec<u8>,
         offset: &FileSize,
     ) -> FileSystemError<Size> {
-        self.filesystem.fd_pwrite(fd, ciovec, offset)
+        self.filesystem.fd_pwrite_base(fd, buf, *offset)
     }
 
     #[inline]
@@ -480,8 +480,8 @@ impl VFSService {
     }
 
     #[inline]
-    pub(crate) fn fd_write(&mut self, fd: &Fd, iovs: Vec<IoVec>) -> FileSystemError<Size> {
-        self.filesystem.fd_write(fd, iovs)
+    pub(crate) fn fd_write_base(&mut self, fd: &Fd, buf: Vec<u8>) -> FileSystemError<Size> {
+        self.filesystem.fd_write_base(fd, buf)
     }
 
     #[inline]

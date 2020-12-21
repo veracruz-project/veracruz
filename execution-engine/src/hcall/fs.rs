@@ -303,12 +303,12 @@ impl FileSystem {
                      raw_file_data: buffer,
                      ..
                  }| {
-                    // It should be save to convert a u64 to usize.
+                    // TODO: It should be safe to convert a u64 to usize.
                     let usize_offset = *offset as usize;
                     let (_, to_read) = buffer.split_at(if usize_offset < buffer.len() {
                         usize_offset
                     } else {
-                        buffer.leng()
+                        buffer.len()
                     });
                     let read_length = vec![usize_offset, buffer_len, to_read.len()]
                         .iter()
@@ -338,11 +338,9 @@ impl FileSystem {
     pub(crate) fn fd_pwrite_base(
         &mut self,
         fd: &Fd,
-        ciovec: Vec<u8>,
+        mut buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemError<Size> {
-        let mut ciovec = ciovec;
-
         let inode = self
             .file_table
             .get(fd)
@@ -355,11 +353,14 @@ impl FileSystem {
                      raw_file_data: mut buffer,
                      mut file_stat,
                  }| {
-                    let rst = ciovec.len();
-                    buffer.append(&mut ciovec);
+                    let rst = buf.len();
+                    // Trim off the tail and append.
+                    // if the offset is out of range, it fill with zero.
+                    buffer.remove(offset as usize);
+                    buffer.append(&mut buf);
                     file_stat.file_size += rst as u64;
-                    //TODO: check this convertion from usize to u32 is safe.
-                    rst as u32
+                    //TODO: check if this convertion from usize to u32 is safe.
+                    rst as Size
                 },
             )
             .ok_or(ErrNo::BadF)
@@ -372,30 +373,12 @@ impl FileSystem {
             .map(|FileTableEntry { offset, .. }| offset)
             .ok_or(ErrNo::BadF)?;
 
-        match self.fd_pread_base(fd, len, offset) {
-            Err(e) => Err(e),
-            Ok(rst) => {
-                // The entry of `fd` must exist.
-                self.file_table
-                    .get_mut(fd)
-                    .map(|FileTableEntry { offset, .. }| *offset += rst.len());
-                Ok(rst)
-            }
-        }
+        let rst = self.fd_pread_base(fd, len, offset)?;
+        self.fd_seek(fd, rst.len() as i64, Whence::Current);
+        Ok(rst)
     }
 
     pub(crate) fn fd_read(&mut self, fd: &Fd, iovec: Vec<IoVec>) -> FileSystemError<Size> {
-        unimplemented!()
-    }
-
-    /// Writes to a file-descriptor without using or updating the file
-    /// descriptor's offset.
-    pub(crate) fn fd_pwrite(
-        &mut self,
-        fd: &Fd,
-        iovs: Vec<IoVec>,
-        offset: &FileSize,
-    ) -> FileSystemError<Size> {
         unimplemented!()
     }
 
@@ -484,8 +467,15 @@ impl FileSystem {
         }
     }
 
-    pub(crate) fn fd_write(&mut self, fd: &Fd, iovs: Vec<IoVec>) -> FileSystemError<Size> {
-        unimplemented!()
+    pub(crate) fn fd_write_base(&mut self, fd: &Fd, mut buf: Vec<u8>) -> FileSystemError<Size> {
+        let offset = self
+            .file_table
+            .get(fd)
+            .map(|FileTableEntry { offset, .. }| offset)
+            .ok_or(ErrNo::BadF)?;
+        let rst = self.fd_pwrite_base(fd, buf, *offset)?;
+        self.fd_seek(fd, rst as i64, Whence::Current);
+        Ok(rst)
     }
 
     pub(crate) fn path_create_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
