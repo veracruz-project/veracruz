@@ -1567,7 +1567,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(1);
-        self.write_value(address, 0u64)?;
+        self.write_value(address, 0i64)?;
 
         Ok(ErrNo::NoSys)
     }
@@ -1583,7 +1583,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(2);
-        self.write_value(address, 0u64)?;
+        self.write_value(address, 0u32)?;
 
         Ok(ErrNo::NoSys)
     }
@@ -1743,12 +1743,17 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let iovs: IoVec = args.nth(1).into();
+        let IoVec{buf, len}: IoVec = args.nth(1).into();
         let offset: FileSize = args.nth(2).into();
         let address: u32 = args.nth(3).into();
 
-        let result = self.fd_pread(&fd, iovs, &offset)?;
-        self.write_value(address, result)?;
+        match self.fd_pread_base(&fd, len as usize, &offset) {
+            Ok(content) =>  {
+                self.write_buffer(buf, content.as_slice());
+                self.write_value(address, ErrNo::Success)?;
+            },
+            Err(e) => self.write_value(address, e)?,
+        };
 
         Ok(ErrNo::Success)
     }
@@ -1820,8 +1825,17 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let address: u32 = args.nth(2);
-        self.write_value(address, 0u32)?;
+        let fd: Fd = args.nth::<u32>(0).into();
+        let IoVec{buf, len}: IoVec = args.nth(1).into();
+        let address: u32 = args.nth(2).into();
+
+        match self.fd_read_base(&fd, len as usize) {
+            Ok(content) =>  {
+                self.write_buffer(buf, content.as_slice());
+                self.write_value(address, ErrNo::Success)?;
+            },
+            Err(e) => self.write_value(address, e)?,
+        };
 
         Ok(ErrNo::Success)
     }
@@ -1866,7 +1880,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(3);
-        self.write_value(address, 0u64)?;
+        self.write_value(address, 0i64)?;
 
         Ok(ErrNo::Success)
     }
@@ -1896,7 +1910,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(1);
-        self.write_value(address, 0u64)?;
+        self.write_value(address, 0i64)?;
 
         Ok(ErrNo::Success)
     }
