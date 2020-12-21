@@ -11,6 +11,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use std::path::PathBuf;
 use std::{collections::HashMap, convert::TryFrom, string::String};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode, IoVec,
@@ -142,6 +143,18 @@ impl FileSystem {
     }
 
     ////////////////////////////////////////////////////////////////////////////
+    // XXX: remove and replace with wasi-functionality
+    ////////////////////////////////////////////////////////////////////////////
+
+    pub(crate) fn file_exists(&self, path: &PathBuf) -> bool {
+        unimplemented!()
+    }
+
+    pub(crate) fn write_file(&mut self, path: &PathBuf, data: Vec<u8>) {
+        unimplemented!()
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
     // Operations on the filesystem.
     ////////////////////////////////////////////////////////////////////////////
 
@@ -172,7 +185,10 @@ impl FileSystem {
     ) -> ErrNo {
         self.file_table
             .get_mut(fd)
-            .map(|FileTableEntry { mut advice, .. }| {advice.push((offset, len, adv)); ErrNo::Success})
+            .map(|FileTableEntry { mut advice, .. }| {
+                advice.push((offset, len, adv));
+                ErrNo::Success
+            })
             .unwrap_or(ErrNo::BadF)
     }
 
@@ -226,6 +242,17 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)
     }
 
+    /// Reads from a file descriptor without using or updating the file
+    /// descriptor's offset.
+    pub(crate) fn fd_pread(
+        &self,
+        fd: &Fd,
+        iovs: IoVec,
+        offset: &FileSize,
+    ) -> FileSystemError<Size> {
+        unimplemented!()
+    }
+
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bypes are
     /// filled with ZERO.
     pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
@@ -257,29 +284,40 @@ impl FileSystem {
     /// how a particular execution engine handles the memory.
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM.
-    pub(crate) fn fd_pread_base(&mut self, fd: &Fd, offset: &FileSize) -> FileSystemError<Vec<u8>> {
-        let (inode, cur_offset) = self
+    pub(crate) fn fd_pread_base(
+        &mut self,
+        fd: &Fd,
+        buffer_len: usize,
+        offset: &FileSize,
+    ) -> FileSystemError<Vec<u8>> {
+        let inode = self
             .file_table
             .get(fd)
-            .map(
-                |FileTableEntry {
-                     inode, offset: o, ..
-                 }| (inode, o),
-            )
+            .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
 
         self.inode_table
             .get(inode)
-            .map(|InodeImpl { raw_file_data: buffer, .. }| {
-                // It should be save to convert a u64 to usize.
-                let (_, to_read) = buffer.split_at(*cur_offset as usize);
-                let (rst, _) = to_read.split_at(if *offset <= to_read.len() as u64 {
-                    *offset as usize
-                } else {
-                    to_read.len()
-                });
-                rst.to_vec()
-            })
+            .map(
+                |InodeImpl {
+                     raw_file_data: buffer,
+                     ..
+                 }| {
+                    // It should be save to convert a u64 to usize.
+                    let usize_offset = *offset as usize;
+                    let (_, to_read) = buffer.split_at(if usize_offset < buffer.len() {
+                        usize_offset
+                    } else {
+                        buffer.leng()
+                    });
+                    let read_length = vec![usize_offset, buffer_len, to_read.len()]
+                        .iter()
+                        .min()
+                        .unwrap_or(&0);
+                    let (rst, _) = to_read.split_at(*read_length);
+                    rst.to_vec()
+                },
+            )
             .ok_or(ErrNo::BadF)
     }
 
@@ -305,24 +343,59 @@ impl FileSystem {
     ) -> FileSystemError<Size> {
         let mut ciovec = ciovec;
 
-        let (inode, cur_offset) = self
+        let inode = self
             .file_table
             .get(fd)
-            .map(|FileTableEntry { inode, offset: o, .. }| (inode, o))
+            .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
         self.inode_table
             .get_mut(inode)
-            .map(|InodeImpl { raw_file_data: mut buffer, mut file_stat }| {
-                let rst = ciovec.len();
-                buffer.append(&mut ciovec);
-                file_stat.file_size += rst as u64;
-                //TODO: check this convertion from usize to u32 is safe.
-                rst as u32
-            })
+            .map(
+                |InodeImpl {
+                     raw_file_data: mut buffer,
+                     mut file_stat,
+                 }| {
+                    let rst = ciovec.len();
+                    buffer.append(&mut ciovec);
+                    file_stat.file_size += rst as u64;
+                    //TODO: check this convertion from usize to u32 is safe.
+                    rst as u32
+                },
+            )
             .ok_or(ErrNo::BadF)
     }
 
+    pub(crate) fn fd_read_base(&mut self, fd: &Fd, len: usize) -> FileSystemError<Vec<u8>> {
+        let offset = self
+            .file_table
+            .get(fd)
+            .map(|FileTableEntry { offset, .. }| offset)
+            .ok_or(ErrNo::BadF)?;
+
+        match self.fd_pread_base(fd, len, offset) {
+            Err(e) => Err(e),
+            Ok(rst) => {
+                // The entry of `fd` must exist.
+                self.file_table
+                    .get_mut(fd)
+                    .map(|FileTableEntry { offset, .. }| *offset += rst.len());
+                Ok(rst)
+            }
+        }
+    }
+
     pub(crate) fn fd_read(&mut self, fd: &Fd, iovec: Vec<IoVec>) -> FileSystemError<Size> {
+        unimplemented!()
+    }
+
+    /// Writes to a file-descriptor without using or updating the file
+    /// descriptor's offset.
+    pub(crate) fn fd_pwrite(
+        &mut self,
+        fd: &Fd,
+        iovs: Vec<IoVec>,
+        offset: &FileSize,
+    ) -> FileSystemError<Size> {
         unimplemented!()
     }
 
@@ -338,7 +411,7 @@ impl FileSystem {
     /// Chihuahua is single-threaded this is atomic from the WASM program's
     /// point of view.
     pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
-        if let Some(entry) = self.file_table.get(old_fd) { 
+        if let Some(entry) = self.file_table.get(old_fd) {
             if self.file_table.get(&new_fd).is_none() {
                 self.file_table.insert(new_fd, entry.clone());
                 self.file_table.remove(old_fd);
@@ -449,22 +522,34 @@ impl FileSystem {
         // TODO: It is an insecure implementation of choosing a new FD.
         //       The new FD should be choisen randomly.
         // NOTE: the FD 0,1 and 2 are reserved to in out err.
-        let next_fd = self.file_table.keys().max().map(|Fd(fd_num)| Fd(fd_num+1)).unwrap_or(Fd(3));
-        let (file_type,file_size) = self.inode_table.get(&inode).map(|InodeImpl{ file_stat, .. }|{
-            (file_stat.file_type.clone(), file_stat.file_size.clone())
-        }).ok_or(ErrNo::BadF)?;
-        let fd_stat = FdStat{
+        let next_fd = self
+            .file_table
+            .keys()
+            .max()
+            .map(|Fd(fd_num)| Fd(fd_num + 1))
+            .unwrap_or(Fd(3));
+        let (file_type, file_size) = self
+            .inode_table
+            .get(&inode)
+            .map(|InodeImpl { file_stat, .. }| {
+                (file_stat.file_type.clone(), file_stat.file_size.clone())
+            })
+            .ok_or(ErrNo::BadF)?;
+        let fd_stat = FdStat {
             file_type,
             flags,
             rights_base,
             rights_inheriting,
         };
-        self.file_table.insert(next_fd, FileTableEntry{
-            inode,
-            fd_stat,
-            offset : 0,
-            advice : vec![(0,file_size,Advice::Normal)],
-        });
+        self.file_table.insert(
+            next_fd,
+            FileTableEntry {
+                inode,
+                fd_stat,
+                offset: 0,
+                advice: vec![(0, file_size, Advice::Normal)],
+            },
+        );
         Ok(next_fd)
     }
 

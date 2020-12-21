@@ -416,13 +416,13 @@ impl VFSService {
     }
 
     #[inline]
-    pub(crate) fn fd_pread(
+    pub(crate) fn fd_pread_base(
         &mut self,
         fd: &Fd,
-        iovs: IoVec,
+        len: usize,
         offset: &FileSize,
-    ) -> FileSystemError<Size> {
-        self.filesystem.fd_pread(fd, iovs, offset)
+    ) -> FileSystemError<Vec<u8>> {
+        self.filesystem.fd_pread_base(fd, len, offset)
     }
 
     #[inline]
@@ -440,14 +440,14 @@ impl VFSService {
         &mut self,
         fd: &Fd,
         ciovec: Vec<IoVec>,
-        offset: FileSize,
+        offset: &FileSize,
     ) -> FileSystemError<Size> {
         self.filesystem.fd_pwrite(fd, ciovec, offset)
     }
 
     #[inline]
-    pub(crate) fn fd_read(&mut self, fd: &Fd, iovec: Vec<IoVec>) -> FileSystemError<Size> {
-        self.filesystem.fd_read(fd, iovec)
+    pub(crate) fn fd_read_base(&mut self, fd: &Fd, len: usize) -> FileSystemError<Vec<u8>> {
+        self.filesystem.fd_read_base(fd, len)
     }
 
     #[inline]
