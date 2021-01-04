@@ -66,6 +66,10 @@ const CONFIGURATION_FILE: &'static str = "config/execution-engine.toml";
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
 
+/// The root directory where the various input data sources are stored in the
+/// runtime's synthetic filesystem.
+const INPUT_DATA_SOURCE_DIRECTORY_ROOT: &'static str = "/vcrz/in/";
+
 /// Name of the field in the TOML file detailing the number of data sources to
 /// be expected.
 const TOML_DATA_SOURCE_COUNT: &'static str = "data-source-count";
@@ -110,11 +114,7 @@ struct Configuration {
 /// Pretty-printing for `Configuration` types.
 impl fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{{ data-source-count: {} }}",
-            self.data_source_count
-        )
+        write!(f, "{{ data-source-count: {} }}", self.data_source_count)
     }
 }
 
@@ -351,9 +351,7 @@ fn read_configuration_file(fname: &str) -> Configuration {
 
     let data_source_count = toml_read_u32(&toml, TOML_DATA_SOURCE_COUNT);
 
-    Configuration {
-        data_source_count,
-    }
+    Configuration { data_source_count }
 }
 
 
@@ -388,7 +386,13 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs : Arc<Mutex<VFS>>) {
         let file_name = format!("input-{}",id);
         vfs.lock().unwrap().write(&Principal::InternalSuperUser, &file_name,&buffer).unwrap();
 
-        info!("Loading '{}' as file_name '{}' into vfs.", file_path, file_name);
+        info!(
+            "Loading '{}' as file_name '{}' into vfs.",
+            file_path, file_name
+        );
+        //let file_name = format!("{}/{}", INPUT_DATA_SOURCE_DIRECTORY_ROOT, id);
+
+        //rets.push(InputFile::new(file_name, buffer))
     }
 }
 
@@ -416,6 +420,59 @@ fn main() {
 
     info!("Data sources loaded.");
 
+    //let module = read_program_file(&cmdline.binary);
+
+    //info!("WASM module loaded.");
+
+    //let expected_data_sources = usize::try_from(config.data_source_count)
+        //.expect("The bitwidth of Rust type 'usize' is not 64 bits on this platform.");
+
+    //let mut provisioning_state: Box<dyn Chihuahua + 'static> = match single_threaded_chihuahua(
+        //&cmdline.execution_strategy,
+        //expected_data_sources,
+        //0usize,
+        //Vec::new(),
+    //) {
+        //Some(sigma) => sigma,
+        //None => {
+            //error!("No execution engine is available.");
+            //exit(-1);
+        //}
+    //};
+
+    //info!(
+        //"Machine state before loading program: {:?}",
+        //provisioning_state.lifecycle_state()
+    //);
+
+    //if let Err(error) = provisioning_state.load_program(&module) {
+        //eprintln!("Failed to register program.  Error '{}' returned.", error);
+        //exit(-1);
+    //}
+
+    //info!("WASM program loaded.");
+
+    //let sources = load_data_sources(&cmdline);
+
+    //info!(
+        //"Machine state after loading program: {:?}",
+        //provisioning_state.lifecycle_state()
+    //);
+
+    //for source in sources {
+        //if let Err(err) =
+            //provisioning_state.add_data_source(source.file_name().clone(), source.buffer().clone())
+        //{
+            //eprintln!("Failed to register data source.  Error '{}' produced.", err);
+            //exit(-1);
+        //}
+    //}
+
+    //info!("Data sources loaded.");
+    //info!(
+        //"Machine state after loading data sources: {:?}",
+        //provisioning_state.lifecycle_state()
+    //);
     info!("Invoking main.");
 
     let start = Instant::now();
@@ -439,6 +496,28 @@ fn main() {
             if cmdline.time_computation {
                 println!("WASM program finished execution in '{:?}.", start.elapsed());
             }
+            //if err_code == 0 {
+                //println!("WASM program executed successfully.");
+
+                //match provisioning_state.result_filename() {
+                    //None => println!("Program produced no result data."),
+                    //Some(result) => {
+                        //println!("Retrieving result from {}.", result);
+                        //// XXX: todo
+                    //}
+                //}
+            //} else {
+                //let pretty = ErrorCode::try_from(err_code)
+                    //.map(|e| format!("{}", e))
+                    //.unwrap_or_else(|_| "<unknown error code>".to_string());
+                //println!(
+                    //"Veracruz program returned error code '{}' (return code = {}).",
+                    //pretty, err_code
+                //);
+                //if cmdline.time_computation {
+                    //println!("WASM program finished execution in '{:?}.", start.elapsed());
+                //}
+            //}
         }
         Err(error) => {
             eprintln!("Veracruz program returned unexpected result '{:?}'.", error);

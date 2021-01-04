@@ -146,11 +146,11 @@ impl FileSystem {
     // XXX: remove and replace with wasi-functionality
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) fn file_exists(&self, path: &PathBuf) -> bool {
+    pub(crate) fn file_exists(&self, _path: &PathBuf) -> bool {
         unimplemented!()
     }
 
-    pub(crate) fn write_file(&mut self, path: &PathBuf, data: Vec<u8>) {
+    pub(crate) fn write_file(&mut self, _path: &PathBuf, _data: Vec<u8>) {
         unimplemented!()
     }
 
@@ -183,20 +183,19 @@ impl FileSystem {
         len: FileSize,
         adv: Advice,
     ) -> ErrNo {
-        self.file_table
-            .get_mut(fd)
-            .map(|FileTableEntry { mut advice, .. }| {
-                advice.push((offset, len, adv));
-                ErrNo::Success
-            })
-            .unwrap_or(ErrNo::BadF)
+        if let Some(entry) = self.file_table.get_mut(fd) {
+            entry.advice.push((offset, len, adv));
+            return ErrNo::Success;
+        } else {
+            return ErrNo::BadF;
+        }
     }
 
     /// Return a copy of the status of the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
         self.file_table
             .get(fd)
-            .map(|FileTableEntry { mut fd_stat, .. }| fd_stat.clone())
+            .map(|FileTableEntry { fd_stat, .. }| fd_stat.clone())
             .ok_or(ErrNo::BadF)
     }
 
@@ -250,19 +249,13 @@ impl FileSystem {
             None => return ErrNo::BadF,
         };
 
-        self.inode_table
-            .get_mut(inode)
-            .map(
-                |InodeImpl {
-                     mut file_stat,
-                     raw_file_data: mut buffer,
-                 }| {
-                    file_stat.file_size = size;
-                    buffer.resize(size as usize, 0);
-                    ErrNo::Success
-                },
-            )
-            .unwrap_or(ErrNo::BadF)
+        if let Some(inode) = self.inode_table.get_mut(inode) {
+            inode.file_stat.file_size = size;
+            inode.raw_file_data.resize(size as usize, 0);
+            return ErrNo::Success;
+        } else {
+            return ErrNo::BadF;
+        }
     }
 
     /// This is a rust-style base implementation for fd_pread.
@@ -299,10 +292,8 @@ impl FileSystem {
                     } else {
                         buffer.len()
                     });
-                    let read_length = vec![usize_offset, buffer_len, to_read.len()]
-                        .iter()
-                        .min()
-                        .unwrap_or(&0);
+                    let segment = vec![usize_offset, buffer_len, to_read.len()];
+                    let read_length = segment.iter().min().unwrap_or(&0);
                     let (rst, _) = to_read.split_at(*read_length);
                     rst.to_vec()
                 },
@@ -310,11 +301,11 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)
     }
 
-    pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
+    pub(crate) fn fd_prestat_get(&mut self, _fd: &Fd) -> FileSystemError<Prestat> {
         unimplemented!()
     }
 
-    pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
+    pub(crate) fn fd_prestat_dir_name(&mut self, _fd: &Fd) -> FileSystemError<String> {
         unimplemented!()
     }
 
@@ -335,42 +326,34 @@ impl FileSystem {
             .get(fd)
             .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
-        self.inode_table
-            .get_mut(inode)
-            .map(
-                |InodeImpl {
-                     raw_file_data: mut buffer,
-                     mut file_stat,
-                 }| {
-                    let rst = buf.len();
-                    // Trim off the tail and append.
-                    // if the offset is out of range, it fill with zero.
-                    buffer.remove(offset as usize);
-                    buffer.append(&mut buf);
-                    file_stat.file_size += rst as u64;
-                    //TODO: check if this convertion from usize to u32 is safe.
-                    rst as Size
-                },
-            )
-            .ok_or(ErrNo::BadF)
+
+        if let Some(inode) = self.inode_table.get_mut(inode) {
+            let rst = buf.len();
+            inode.raw_file_data.remove(offset as usize);
+            inode.raw_file_data.append(&mut buf);
+            inode.file_stat.file_size += rst as u64;
+            return Ok(rst as Size);
+        } else {
+            return Err(ErrNo::BadF);
+        }
     }
 
     pub(crate) fn fd_read_base(&mut self, fd: &Fd, len: usize) -> FileSystemError<Vec<u8>> {
-        let offset = self
-            .file_table
-            .get(fd)
-            .map(|FileTableEntry { offset, .. }| offset)
-            .ok_or(ErrNo::BadF)?;
+        let offset = if let Some(entry) = self.file_table.get(fd) {
+            entry.offset
+        } else {
+            return Err(ErrNo::BadF);
+        };
 
-        let rst = self.fd_pread_base(fd, len, offset)?;
+        let rst = self.fd_pread_base(fd, len, &offset)?;
         self.fd_seek(fd, rst.len() as i64, Whence::Current);
         Ok(rst)
     }
 
     pub(crate) fn fd_readdir(
         &mut self,
-        fd: &Fd,
-        cookie: DirCookie,
+        _fd: &Fd,
+        _cookie: DirCookie,
     ) -> FileSystemError<Vec<String>> {
         unimplemented!()
     }
@@ -381,15 +364,13 @@ impl FileSystem {
     pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
         if let Some(entry) = self.file_table.get(old_fd) {
             if self.file_table.get(&new_fd).is_none() {
-                self.file_table.insert(new_fd, entry.clone());
+                let entry = entry.clone();
+                self.file_table.insert(new_fd, entry);
                 self.file_table.remove(old_fd);
-                ErrNo::Success
-            } else {
-                ErrNo::BadF
+                return ErrNo::Success;
             }
-        } else {
-            ErrNo::BadF
         }
+        ErrNo::BadF
     }
 
     pub(crate) fn fd_seek(
@@ -434,11 +415,11 @@ impl FileSystem {
         };
 
         // Update the offset
-        self.file_table
-            .get_mut(fd)
-            // Use temporary variable `o` to reduce the ambiguity with the function parameter `offset`.
-            .map(|&mut FileTableEntry { offset: mut o, .. }| o = new_offset)
-            .ok_or(ErrNo::BadF);
+        if let Some(entry) = self.file_table.get_mut(fd) {
+            entry.offset = new_offset;
+        } else {
+            return Err(ErrNo::BadF);
+        };
 
         Ok(new_offset)
     }
@@ -452,34 +433,33 @@ impl FileSystem {
         }
     }
 
-    pub(crate) fn fd_write_base(&mut self, fd: &Fd, mut buf: Vec<u8>) -> FileSystemError<Size> {
-        let offset = self
-            .file_table
-            .get(fd)
-            .map(|FileTableEntry { offset, .. }| offset)
-            .ok_or(ErrNo::BadF)?;
-        let rst = self.fd_pwrite_base(fd, buf, *offset)?;
+    pub(crate) fn fd_write_base(&mut self, fd: &Fd, buf: Vec<u8>) -> FileSystemError<Size> {
+        let offset =
+            if let Some(entry) = self.file_table.get(fd) {
+                entry.offset
+            } else {
+                return Err(ErrNo::BadF);
+            };
+
+        let rst = self.fd_pwrite_base(fd, buf, offset)?;
         self.fd_seek(fd, rst as i64, Whence::Current);
         Ok(rst)
     }
 
-    pub(crate) fn path_create_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+    pub(crate) fn path_create_directory(&mut self, _fd: &Fd, _path: String) -> ErrNo {
         unimplemented!()
     }
 
     pub(crate) fn path_filestat_get(
         &mut self,
-        fd: &Fd,
-        flags: LookupFlags,
+        _fd: &Fd,
+        _flags: LookupFlags,
         path: String,
     ) -> FileSystemError<FileStat> {
         let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
-        self
-            .inode_table
+        self.inode_table
             .get(&inode)
-            .map(|InodeImpl { file_stat, .. }| {
-                file_stat.clone()
-            })
+            .map(|InodeImpl { file_stat, .. }| file_stat.clone())
             .ok_or(ErrNo::BadF)
     }
 
@@ -489,12 +469,12 @@ impl FileSystem {
     pub(crate) fn path_open(
         &mut self,
         // This parameter is ignored
-        fd: &Fd,
+        _fd: &Fd,
         // This parameter is ignored
-        dirflags: LookupFlags,
+        _dirflags: LookupFlags,
         path: String,
         // This parameter is ignored
-        oflags: OpenFlags,
+        _oflags: OpenFlags,
         rights_base: Rights,
         rights_inheriting: Rights,
         // This parameter is ignored
@@ -535,16 +515,16 @@ impl FileSystem {
         Ok(next_fd)
     }
 
-    pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+    pub(crate) fn path_remove_directory(&mut self, _fd: &Fd, _path: String) -> ErrNo {
         unimplemented!()
     }
 
     pub(crate) fn path_rename(
         &mut self,
-        old_fd: &Fd,
-        old_path: String,
-        new_fd: &Fd,
-        new_path: String,
+        _old_fd: &Fd,
+        _old_path: String,
+        _new_fd: &Fd,
+        _new_path: String,
     ) -> ErrNo {
         unimplemented!()
     }
