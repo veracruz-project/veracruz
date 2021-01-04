@@ -35,6 +35,7 @@ use wasmi::{
     LittleEndianConvert, MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance,
     ModuleRef, RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
+use std::convert::TryInto;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -1628,10 +1629,14 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth(0).into();
-        let offset: FileSize = args.nth(1).into();
-        let len: FileSize = args.nth(2).into();
-        let advice: Advice = args.nth(3).into();
+        let fd: Fd = args.nth::<u32>(0).into();
+        let offset: FileSize = args.nth::<u64>(1);
+        let len: FileSize = args.nth::<u64>(2);
+        let advice: Advice =
+            match args.nth::<u8>(3).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(advice) => advice
+            };
 
         Ok(self.fd_advise(&fd, offset, len, advice))
     }
