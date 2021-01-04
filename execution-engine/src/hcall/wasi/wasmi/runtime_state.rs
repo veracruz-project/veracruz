@@ -11,8 +11,9 @@
 
 use super::error::{mk_error_code, mk_host_trap};
 use crate::hcall::common::{
-    sha_256_digest, Chihuahua, EntrySignature, LifecycleState, ProvisioningError, RuntimePanic,
-    RuntimeState, WASIError, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
+    fd_stat_le_bytes, filestat_le_bytes, prestat_le_bytes, sha_256_digest, Chihuahua,
+    EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
+    WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
     WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
     WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
     WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
@@ -28,14 +29,13 @@ use crate::hcall::common::{
     WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
 };
 use platform_services::{getrandom, result};
-use std::{convert::TryFrom, mem::size_of};
-use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, Prestat};
+use std::convert::TryInto;
+use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
-    LittleEndianConvert, MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance,
-    ModuleRef, RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
+    MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
+    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
-use std::convert::{TryInto, TryFrom};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -1369,26 +1369,22 @@ impl WASMIRuntimeState {
     /// `export_name`, in the WASM program provisioned into the Veracruz host
     /// state.
     fn invoke_export(&mut self, export_name: &str) -> Result<Option<RuntimeValue>, Error> {
-        match self.program_module() {
-            None => {
-                return Err(Error::Host(Box::new(
-                    RuntimePanic::NoProgramModuleRegistered,
-                )))
-            }
-            Some(not_started) => match check_main(not_started) {
-                EntrySignature::NoEntryFound => {
-                    return Err(Error::Host(Box::new(RuntimePanic::NoProgramEntryPoint)))
-                }
-                EntrySignature::ArgvAndArgc => {
-                    let program_arguments = vec![RuntimeValue::I32(0), RuntimeValue::I32(0)];
-                    not_started.invoke_export(export_name, &program_arguments, self)
-                }
-                EntrySignature::NoParameters => {
-                    let program_arguments = Vec::new();
-                    not_started.invoke_export(export_name, &program_arguments, self)
-                }
-            },
-        }
+        let not_started = match self.program_module() {
+            Some(not_started) => not_started.clone(),
+            None =>
+            return Err(Error::Host(Box::new(
+                RuntimePanic::NoProgramModuleRegistered,
+            )))
+        };
+
+        let program_arguments =
+            match check_main(&not_started) {
+                EntrySignature::NoEntryFound => return Err(Error::Host(Box::new(RuntimePanic::NoProgramEntryPoint))),
+                EntrySignature::ArgvAndArgc => vec![RuntimeValue::I32(0), RuntimeValue::I32(0)],
+                EntrySignature::NoParameters => Vec::new(),
+            };
+
+        not_started.invoke_export(export_name, &program_arguments, self)
     }
 
     /// Executes the entry point of the WASM program provisioned into the
@@ -1457,17 +1453,17 @@ impl WASMIRuntimeState {
     }
 
     /// Read several IoVec.
-    fn read_iovec(&mut self, address: u32, ciovec: Vec<IoVec>) -> Result<Vec<u8>, RuntimePanic> {
-        ciovec.iter().fold(Ok(Vec::new()), |mut acc, IoVec{buf, len}| {
-            match acc {
+    fn read_iovec(&mut self, _address: u32, ciovec: Vec<IoVec>) -> Result<Vec<u8>, RuntimePanic> {
+        ciovec
+            .iter()
+            .fold(Ok(Vec::new()), |acc, IoVec { buf, len }| match acc {
                 Ok(mut rst) => {
-                    let mut new_rst = self.read_buffer(*buf,*len as usize)?;
+                    let mut new_rst = self.read_buffer(*buf, *len as usize)?;
                     rst.append(&mut new_rst);
                     Ok(rst)
                 }
                 Err(e) => Err(e),
-            }
-        })
+            })
     }
 
     /// Read a buffer of bytes from the runtime state's memory at
@@ -1612,11 +1608,10 @@ impl WASMIRuntimeState {
         let fd: Fd = args.nth::<u32>(0).into();
         let offset: FileSize = args.nth::<u64>(1);
         let len: FileSize = args.nth::<u64>(2);
-        let advice: Advice =
-            match args.nth::<u8>(3).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(advice) => advice
-            };
+        let advice: Advice = match args.nth::<u8>(3).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(advice) => advice,
+        };
 
         Ok(self.fd_advise(&fd, offset, len, advice))
     }
@@ -1660,18 +1655,6 @@ impl WASMIRuntimeState {
         Ok(ErrNo::NotSup)
     }
 
-    fn fd_stat_le_bytes(fd: &FdState) -> Vec<u8> {
-        unimplemented!()
-    }
-
-    fn filestat_le_bytes(stat: &FileStat) -> Vec<u8> {
-        unimplemented!()
-    }
-
-    fn prestat_le_bytes(stat: Prestat) -> Vec<u8> {
-        unimplemented!()
-    }
-
     /// The implementation of the WASI `fd_fdstat_get` function.
     fn wasi_fd_fdstat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
@@ -1685,7 +1668,7 @@ impl WASMIRuntimeState {
 
         let result: FdStat = self.fd_fdstat_get(&fd)?;
 
-        self.write_buffer(address0, &fd_state_le_bytes(&fd))?;
+        self.write_buffer(address, &fd_stat_le_bytes(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1699,7 +1682,10 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let flags: FdFlags = args.nth::<u16>(1).into();
+        let flags: FdFlags = match args.nth::<u16>(1).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(flags) => flags,
+        };
 
         Ok(self.fd_fdstat_set_flags(&fd, flags))
     }
@@ -1713,8 +1699,14 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let rights_base: Rights = args.nth::<u64>(1).into();
-        let rights_inheriting: Rights = args.nth::<u64>(2).into();
+        let rights_base: Rights = match args.nth::<u64>(1).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(rights) => rights,
+        };
+        let rights_inheriting: Rights = match args.nth::<u64>(2).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(rights) => rights,
+        };
 
         Ok(self.fd_fdstat_set_rights(&fd, rights_base, rights_inheriting))
     }
@@ -1732,7 +1724,7 @@ impl WASMIRuntimeState {
 
         let result: FileStat = self.fd_filestat_get(&fd)?;
 
-        self.write_buffer(address, &filestat_le_bytes(result))?;
+        self.write_buffer(address, &filestat_le_bytes(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1765,24 +1757,24 @@ impl WASMIRuntimeState {
 
     /// The implementation of the WASI `fd_pread` function.
     fn wasi_fd_pread(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 4 {
+        if args.len() != 5 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_FD_PREAD_NAME,
             ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let IoVec { buf, len }: IoVec = args.nth(1).into();
-        let offset: FileSize = args.nth(2).into();
-        let address: u32 = args.nth(3).into();
+        let buf: u32 = args.nth(1);
+        let len: u32 = args.nth(2);
+        let offset: FileSize = args.nth(3);
+        let address: u32 = args.nth(4);
 
         match self.fd_pread_base(&fd, len as usize, &offset) {
             Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
-                self.write_buffer(address, &u16::try_from(ErrNo::Success).unwrap().to_le_bytes())?;
+                self.write_buffer(address, &(ErrNo::Success as u16).to_le_bytes())?;
             }
-            //TODO: decide if we use i32 or u32 as err/succ code 
-            Err(e) => self.write_buffer(address, &i32::from(e).to_le_bytes())?,
+            Err(e) => self.write_buffer(address, &u16::from(e).to_le_bytes())?,
         };
 
         Ok(ErrNo::Success)
@@ -1796,7 +1788,10 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth(0);
+        let fd: Fd = match args.nth::<u32>(0).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(fd) => fd,
+        };
         let address: u32 = args.nth(1);
 
         let result = self.fd_prestat_get(&fd)?;
@@ -1816,13 +1811,16 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth(0);
+        let fd: Fd = match args.nth::<u32>(0).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(fd) => fd,
+        };
         let address: u32 = args.nth(1);
         let size: Size = args.nth(2);
 
         let result = self.fd_prestat_dir_name(&fd)?;
 
-        if result.len() > usize::try_from(size).unwrap() {
+        if result.len() > size as usize {
             Ok(ErrNo::NameTooLong)
         } else {
             self.write_buffer(address, &result.into_bytes())?;
@@ -1850,22 +1848,23 @@ impl WASMIRuntimeState {
     ///
     /// TODO: complete this.
     fn wasi_fd_read(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 3 {
+        if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_FD_READ_NAME,
             ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let IoVec { buf, len }: IoVec = args.nth(1).into();
-        let address: u32 = args.nth(2).into();
+        let buf: u32 = args.nth(1);
+        let len: u32 = args.nth(2);
+        let address: u32 = args.nth(3);
 
         match self.fd_read_base(&fd, len as usize) {
             Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
-                self.write_buffer(address, &u16::try_from(ErrNo::Success).unwrap().to_le_bytes())?;
+                self.write_buffer(address, &(ErrNo::Success as u16).to_le_bytes())?;
             }
-            Err(e) => self.write_buffer(address, &u16::try_from(e).unwrap().to_le_bytes())?,
+            Err(e) => self.write_buffer(address, &(e as u16).to_le_bytes())?,
         };
 
         Ok(ErrNo::Success)
@@ -2106,7 +2105,7 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let address: u32 = args[3];
+        let address: u32 = args.nth(3);
         self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NotSup)
@@ -2209,8 +2208,8 @@ impl WASMIRuntimeState {
         let datalen_address: u32 = args.nth(3);
         let flags_address: u32 = args.nth(4);
 
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
-        self.write_buffer(address, &u16::to_le_bytes(0u16))?;
+        self.write_buffer(datalen_address, &u32::to_le_bytes(0u32))?;
+        self.write_buffer(flags_address, &u16::to_le_bytes(0u16))?;
 
         Ok(ErrNo::NotSup)
     }

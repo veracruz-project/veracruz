@@ -149,6 +149,18 @@ pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
+pub(crate) fn fd_stat_le_bytes(_fd: &FdStat) -> Vec<u8> {
+    unimplemented!()
+}
+
+pub(crate) fn filestat_le_bytes(_stat: &FileStat) -> Vec<u8> {
+    unimplemented!()
+}
+
+pub(crate) fn prestat_le_bytes(_stat: Prestat) -> Vec<u8> {
+    unimplemented!()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // The machine lifecycle state.
 ////////////////////////////////////////////////////////////////////////////////
@@ -329,7 +341,7 @@ impl VFSService {
         let keys: Vec<String> = self
             .environment_variables
             .iter()
-            .map(|(k, v)| k)
+            .map(|(k, _v)| k)
             .cloned()
             .collect();
 
@@ -439,7 +451,7 @@ impl VFSService {
     pub(crate) fn fd_pwrite_base(
         &mut self,
         fd: &Fd,
-        mut buf: Vec<u8>,
+        buf: Vec<u8>,
         offset: &FileSize,
     ) -> FileSystemError<Size> {
         self.filesystem.fd_pwrite_base(fd, buf, *offset)
