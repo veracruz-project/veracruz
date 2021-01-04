@@ -31,7 +31,8 @@ impl HostError for RuntimePanic {}
 /// to be passed back to the running WASM program executing on the WASMI engine.
 #[inline]
 pub(crate) fn mk_error_code<T>(e: ErrNo) -> Result<Option<RuntimeValue>, T> {
-    Ok(Some(RuntimeValue::I32(e.into())))
+    // Safe as `ErrNo` is `repr(u16)`.
+    Ok(Some(RuntimeValue::I32(i32::from(e as u16))))
 }
 
 /// Utility function which simplifies building a Veracruz host trap from a
