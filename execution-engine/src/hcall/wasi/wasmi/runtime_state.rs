@@ -29,13 +29,13 @@ use crate::hcall::common::{
 };
 use platform_services::{getrandom, result};
 use std::{convert::TryFrom, mem::size_of};
-use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size};
+use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, Prestat};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     LittleEndianConvert, MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance,
     ModuleRef, RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
-use std::convert::TryInto;
+use std::convert::{TryInto, TryFrom};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -1435,31 +1435,6 @@ impl WASMIRuntimeState {
     // Common code for implementating the WASI functionality.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Writes any value, `value`, that can be converted into a little-endian
-    /// byte representation to the runtime state's memory at address, `address`.
-    /// Fails with `Err(RuntimePanic::NoMemoryRegistered)` if no memory is
-    /// registered in the runtime state, or
-    /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
-    /// to the address for some reason.
-    fn write_value<T>(&mut self, address: u32, value: T) -> Result<(), RuntimePanic>
-    where
-        T: LittleEndianConvert,
-    {
-        match self.memory() {
-            None => Err(RuntimePanic::NoMemoryRegistered),
-            Some(memory) => {
-                if let Err(_) = memory.set_value(address, value) {
-                    Err(RuntimePanic::MemoryWriteFailed {
-                        memory_address: address as usize,
-                        bytes_to_be_written: size_of::<T>(),
-                    })
-                } else {
-                    Ok(())
-                }
-            }
-        }
-    }
-
     /// Writes a buffer of bytes, `buffer`, to the runtime state's memory at
     /// address, `address`.  Fails with `Err(RuntimePanic::NoMemoryRegistered)`
     /// if no memory is registered in the runtime state, or
@@ -1529,8 +1504,9 @@ impl WASMIRuntimeState {
 
         let address0: u32 = args.nth(0);
         let address1: u32 = args.nth(1);
-        self.write_value(address0, 0u32)?;
-        self.write_value(address1, 0u32)?;
+
+        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
+        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1547,8 +1523,9 @@ impl WASMIRuntimeState {
 
         let address0: u32 = args.nth(0);
         let address1: u32 = args.nth(1);
-        self.write_value(address0, 0u32)?;
-        self.write_value(address1, 0u32)?;
+
+        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
+        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1565,8 +1542,9 @@ impl WASMIRuntimeState {
 
         let address0: u32 = args.nth(0);
         let address1: u32 = args.nth(1);
-        self.write_value(address0, 0u32)?;
-        self.write_value(address1, 0u32)?;
+
+        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
+        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1583,8 +1561,9 @@ impl WASMIRuntimeState {
 
         let address0: u32 = args.nth(0);
         let address1: u32 = args.nth(1);
-        self.write_value(address0, 0u32)?;
-        self.write_value(address1, 0u32)?;
+
+        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
+        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1600,7 +1579,8 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(1);
-        self.write_value(address, 0i64)?;
+
+        self.write_buffer(address, &i64::to_le_bytes(0i64))?;
 
         Ok(ErrNo::NoSys)
     }
@@ -1616,7 +1596,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(2);
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NoSys)
     }
@@ -1680,6 +1660,18 @@ impl WASMIRuntimeState {
         Ok(ErrNo::NotSup)
     }
 
+    fn fd_stat_le_bytes(fd: &FdState) -> Vec<u8> {
+        unimplemented!()
+    }
+
+    fn filestat_le_bytes(stat: &FileStat) -> Vec<u8> {
+        unimplemented!()
+    }
+
+    fn prestat_le_bytes(stat: Prestat) -> Vec<u8> {
+        unimplemented!()
+    }
+
     /// The implementation of the WASI `fd_fdstat_get` function.
     fn wasi_fd_fdstat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
@@ -1693,7 +1685,7 @@ impl WASMIRuntimeState {
 
         let result: FdStat = self.fd_fdstat_get(&fd)?;
 
-        self.write_value(address, result)?;
+        self.write_buffer(address0, &fd_state_le_bytes(&fd))?;
 
         Ok(ErrNo::Success)
     }
@@ -1740,7 +1732,7 @@ impl WASMIRuntimeState {
 
         let result: FileStat = self.fd_filestat_get(&fd)?;
 
-        self.write_value(address, result)?;
+        self.write_buffer(address, &filestat_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1787,11 +1779,10 @@ impl WASMIRuntimeState {
         match self.fd_pread_base(&fd, len as usize, &offset) {
             Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
-                //TODO: decide if we use i32 or u32 as err/succ code 
-                self.write_value(address, ErrNo::Success as i32)?;
+                self.write_buffer(address, &u16::try_from(ErrNo::Success).unwrap().to_le_bytes())?;
             }
             //TODO: decide if we use i32 or u32 as err/succ code 
-            Err(e) => self.write_value(address, e as i32)?,
+            Err(e) => self.write_buffer(address, &i32::from(e).to_le_bytes())?,
         };
 
         Ok(ErrNo::Success)
@@ -1809,7 +1800,8 @@ impl WASMIRuntimeState {
         let address: u32 = args.nth(1);
 
         let result = self.fd_prestat_get(&fd)?;
-        self.write_value(address, result)?;
+
+        self.write_buffer(address, &prestat_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1833,7 +1825,7 @@ impl WASMIRuntimeState {
         if result.len() > usize::try_from(size).unwrap() {
             Ok(ErrNo::NameTooLong)
         } else {
-            self.write_value(address, result)?;
+            self.write_buffer(address, &result.into_bytes())?;
             Ok(ErrNo::Success)
         }
     }
@@ -1849,7 +1841,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(3);
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1871,11 +1863,9 @@ impl WASMIRuntimeState {
         match self.fd_read_base(&fd, len as usize) {
             Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
-                //TODO: decide if we use i32 or u32 as err/succ code 
-                self.write_value(address, ErrNo::Success as i32)?;
+                self.write_buffer(address, &u16::try_from(ErrNo::Success).unwrap().to_le_bytes())?;
             }
-            //TODO: decide if we use i32 or u32 as err/succ code 
-            Err(e) => self.write_value(address, e as i32)?,
+            Err(e) => self.write_buffer(address, &u16::try_from(e).unwrap().to_le_bytes())?,
         };
 
         Ok(ErrNo::Success)
@@ -1892,7 +1882,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(4);
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1921,7 +1911,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(3);
-        self.write_value(address, 0i64)?;
+        self.write_buffer(address, &i64::to_le_bytes(0i64))?;
 
         Ok(ErrNo::Success)
     }
@@ -1951,7 +1941,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(1);
-        self.write_value(address, 0i64)?;
+        self.write_buffer(address, &i64::to_le_bytes(0i64))?;
 
         Ok(ErrNo::Success)
     }
@@ -1967,7 +1957,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(3);
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -2033,7 +2023,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(7);
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -2117,7 +2107,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args[3];
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NotSup)
     }
@@ -2201,7 +2191,7 @@ impl WASMIRuntimeState {
         }
 
         let address = args.nth(4);
-        self.write_value(address, 0u32)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NotSup)
     }
@@ -2219,8 +2209,8 @@ impl WASMIRuntimeState {
         let datalen_address: u32 = args.nth(3);
         let flags_address: u32 = args.nth(4);
 
-        self.write_value(datalen_address, 0u32)?;
-        self.write_value(flags_address, 0u16)?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        self.write_buffer(address, &u16::to_le_bytes(0u16))?;
 
         Ok(ErrNo::NotSup)
     }
