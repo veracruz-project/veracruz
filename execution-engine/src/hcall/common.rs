@@ -12,7 +12,7 @@
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use wasi_types::{
-    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, IoVec,
+    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
 };
 use veracruz_util::policy::principal::{Principal, FileOperation};
@@ -726,7 +726,9 @@ pub enum FatalEngineError {
     ProgramCannotFound { file_name: String },
     /// Wrapper for Virtual FS Error.
     #[error(display = "FatalVeracruzHostError: VFS Error: {:?}.", _0)]
-    VFSError(#[error(source)] crate::hcall::buffer::VFSError),
+    VFSError(#[error(source)] VFSError),
+    #[error(display = "RuntimePanic: Wasi-ErrNo {:?}.", _0)]
+    WASIError(#[source(error)] wasi_types::ErrNo),
     /// Wrapper for direct error message.
     #[error(display = "RuntimePanic: Error message {:?}.", _0)]
     DirectErrorMessage(String),

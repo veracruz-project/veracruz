@@ -1782,9 +1782,11 @@ impl WASMIRuntimeState {
         match self.fd_pread_base(&fd, len as usize, &offset) {
             Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
-                self.write_value(address, ErrNo::Success)?;
+                //TODO: decide if we use i32 or u32 as err/succ code 
+                self.write_value(address, ErrNo::Success as i32)?;
             }
-            Err(e) => self.write_value(address, e)?,
+            //TODO: decide if we use i32 or u32 as err/succ code 
+            Err(e) => self.write_value(address, e as i32)?,
         };
 
         Ok(ErrNo::Success)
@@ -1864,9 +1866,11 @@ impl WASMIRuntimeState {
         match self.fd_read_base(&fd, len as usize) {
             Ok(content) => {
                 self.write_buffer(buf, content.as_slice());
-                self.write_value(address, ErrNo::Success)?;
+                //TODO: decide if we use i32 or u32 as err/succ code 
+                self.write_value(address, ErrNo::Success as i32)?;
             }
-            Err(e) => self.write_value(address, e)?,
+            //TODO: decide if we use i32 or u32 as err/succ code 
+            Err(e) => self.write_value(address, e as i32)?,
         };
 
         Ok(ErrNo::Success)
