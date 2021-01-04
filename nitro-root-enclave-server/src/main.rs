@@ -65,11 +65,18 @@ fn main() {
         .arg(Arg::with_name("tabasco")
             .takes_value(true)
             .help("URL for Tabasco server"))
+        .arg(
+            Arg::with_name("debug")
+                .long("debug")
+                .takes_value(false)
+                .help("Enables debug mode in the enclave")
+        )
         .get_matches();
     let tabasco_url = matches.value_of("tabasco").unwrap();
+    let enclave_debug = matches.is_present("debug");
 
     // first, start the nitro-root-enclave
-    let enclave = native_attestation(tabasco_url)
+    let enclave = native_attestation(tabasco_url, enclave_debug)
         .expect("Failed to perform native attestion");
 
     let socket_fd = socket(
@@ -111,9 +118,10 @@ fn main() {
 
 fn native_attestation(
     tabasco_url: &str,
+    enclave_debug: bool,
 ) -> Result<NitroEnclave, NitroServerError> {
     println!("nitro-root-enclave-server::native_attestation started");
-    let nre_enclave = NitroEnclave::new(true, NITRO_ROOT_ENCLAVE_EIF_PATH, true, None)
+    let nre_enclave = NitroEnclave::new(true, NITRO_ROOT_ENCLAVE_EIF_PATH, enclave_debug, None)
         .map_err(|err| NitroServerError::EnclaveError(err))?;
 
     println!(
