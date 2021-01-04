@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 use std::{collections::HashMap, convert::TryFrom, string::String};
 use wasi_types::{
-    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode, IoVec,
+    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
 };
 
@@ -242,17 +242,6 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)
     }
 
-    /// Reads from a file descriptor without using or updating the file
-    /// descriptor's offset.
-    pub(crate) fn fd_pread(
-        &self,
-        fd: &Fd,
-        iovs: IoVec,
-        offset: &FileSize,
-    ) -> FileSystemError<Size> {
-        unimplemented!()
-    }
-
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bypes are
     /// filled with ZERO.
     pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
@@ -378,10 +367,6 @@ impl FileSystem {
         Ok(rst)
     }
 
-    pub(crate) fn fd_read(&mut self, fd: &Fd, iovec: Vec<IoVec>) -> FileSystemError<Size> {
-        unimplemented!()
-    }
-
     pub(crate) fn fd_readdir(
         &mut self,
         fd: &Fd,
@@ -488,7 +473,14 @@ impl FileSystem {
         flags: LookupFlags,
         path: String,
     ) -> FileSystemError<FileStat> {
-        unimplemented!()
+        let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
+        self
+            .inode_table
+            .get(&inode)
+            .map(|InodeImpl { file_stat, .. }| {
+                file_stat.clone()
+            })
+            .ok_or(ErrNo::BadF)
     }
 
     /// Open a file or directory.
