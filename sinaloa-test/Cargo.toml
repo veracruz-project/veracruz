@@ -11,6 +11,10 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
 tz = ["sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz", "psa-attestation/tz"]
 nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "tabasco/nitro"]
+# debug feature means the enclaves will be started in debug mode (when available)
+# which changes behaviors depending on the platform (for example in Debug mode,
+# Nitro enclave attestation documents have the PCRs zeroed out)
+debug = ["sinaloa/debug"]
 
 [dependencies]
 sinaloa = { path = "../sinaloa"}
@@ -39,6 +43,8 @@ actix-rt = "1.0.0"
 env_logger = "0.7"
 log = "0.4"
 lazy_static = "1.4"
+regex = "1.4"
+local_ipaddress = "0.1.3"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }

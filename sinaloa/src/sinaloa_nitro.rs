@@ -52,7 +52,11 @@ pub mod sinaloa_nitro {
             }
 
             println!("SinaloaNitro::new native_attestation complete. instantiating Mexico City");
+            #[cfg(feature = "debug")]
             let mexico_city_enclave = NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, true, Some(SinaloaNitro::sinaloa_ocall_handler))
+                .map_err(|err| SinaloaError::NitroError(err))?;
+            #[cfg(not(feature = "debug"))]
+            let mexico_city_enclave = NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, false, Some(SinaloaNitro::sinaloa_ocall_handler))
                 .map_err(|err| SinaloaError::NitroError(err))?;
             println!("SinaloaNitro::new NitroEnclave::new returned");
             let meta = Self {
@@ -327,6 +331,9 @@ pub mod sinaloa_nitro {
 
             nre_instance.execute_command("nitro-cli-config -t 2 -m 512")
                 .map_err(|err| SinaloaError::EC2Error(err))?;
+            #[cfg(feature = "debug")]
+            let server_command: String = format!("nohup /home/ec2-user/nitro-root-enclave-server --debug {:} &> nitro_server.log &", tabasco_url);
+            #[cfg(not(feature = "debug"))]
             let server_command: String = format!("nohup /home/ec2-user/nitro-root-enclave-server {:} &> nitro_server.log &", tabasco_url);
             nre_instance.execute_command(&server_command)
                 .map_err(|err| SinaloaError::EC2Error(err))?;
