@@ -33,9 +33,13 @@ cfg_if! {
     } else if #[cfg(feature = "tz")] {
         #[path="tz_platform_services.rs"]
         mod imp;
+    } else if #[cfg(feature = "nitro")] {
+        #[path="nitro_platform_services.rs"]
+        mod imp;
     } else if #[cfg(feature = "std")] {
         #[path="std_platform_services.rs"]
         mod imp;
+    
     } else {
         compile_error!(
             "Unrecognised feature: platforms supported are SGX, TZ, and std.");
