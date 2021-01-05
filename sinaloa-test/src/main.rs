@@ -1572,7 +1572,7 @@ mod tests {
             }
         }
         Err(SinaloaError::DirectStrError(
-            "Terminate due to server crush",
+            "Terminate due to server crash",
         ))
     }
 
@@ -1687,11 +1687,10 @@ mod tests {
         // SHA384 (Nitro Enclaves, I'm talking about you)
         // but the PSA attestation token only contains 32 bytes of it in order
         // to keep the offsets the same
-        TODO: THis isn't working
         if hash_bin[0..32] != received_payload[47..79] {
             #[cfg(all(feature = "debug", feature = "nitro"))]
             {
-                println("sinaloa-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
+                println!("sinaloa-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
             }
             #[cfg(not(feature = "debug"))]
             {
