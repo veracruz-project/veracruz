@@ -345,7 +345,7 @@ impl Baja {
             )
         };
 
-        let common_name = {
+        let name = {
             // This should be randomly generated as below. But this is causing
             // temporary problems on Trustzone, so instead of randomly generating
             // it, we're using a static value for now.
@@ -362,10 +362,10 @@ impl Baja {
             //full_string[..7].to_string()
             FIXED_SERVER_NAME.to_string()
         };
-        let server_cert_buffer = generate_certificate(
-            &common_name,
-            &server_private_key,
-            &server_public_key,
+        let server_certificate_buffer = generate_certificate(
+            name.as_bytes().to_vec(),
+            server_private_key.clone(),
+            server_public_key,
             &policy,
         )?;
 
