@@ -53,11 +53,17 @@ pub mod sinaloa_nitro {
 
             println!("SinaloaNitro::new native_attestation complete. instantiating Mexico City");
             #[cfg(feature = "debug")]
-            let mexico_city_enclave = NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, true, Some(SinaloaNitro::sinaloa_ocall_handler))
-                .map_err(|err| SinaloaError::NitroError(err))?;
+            let mexico_city_enclave = {
+                println!("Starting mexico city enclave in debug mode");
+                NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, true, Some(SinaloaNitro::sinaloa_ocall_handler))
+                    .map_err(|err| SinaloaError::NitroError(err))?
+            };
             #[cfg(not(feature = "debug"))]
-            let mexico_city_enclave = NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, false, Some(SinaloaNitro::sinaloa_ocall_handler))
-                .map_err(|err| SinaloaError::NitroError(err))?;
+            let mexico_city_enclave = {
+                println!("Starting mexico city enclave in release mode");
+                NitroEnclave::new(false, MEXICO_CITY_EIF_PATH, false, Some(SinaloaNitro::sinaloa_ocall_handler))
+                    .map_err(|err| SinaloaError::NitroError(err))?
+            };
             println!("SinaloaNitro::new NitroEnclave::new returned");
             let meta = Self {
                 enclave: mexico_city_enclave,
