@@ -13,7 +13,8 @@ tz = ["sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz", "psa-attest
 nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "tabasco/nitro"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
-# Nitro enclave attestation documents have the PCRs zeroed out)
+# Nitro enclave attestation documents have the PCRs zeroed out and the console
+# cannot connect)
 debug = ["sinaloa/debug"]
 
 [dependencies]
