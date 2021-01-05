@@ -11,7 +11,7 @@
 
 use super::error::{mk_error_code, mk_host_trap};
 use crate::hcall::common::{
-    fd_stat_le_bytes, filestat_le_bytes, prestat_le_bytes, sha_256_digest, Chihuahua,
+    pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, Chihuahua,
     EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
     WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
     WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
@@ -1668,7 +1668,7 @@ impl WASMIRuntimeState {
 
         let result: FdStat = self.fd_fdstat_get(&fd)?;
 
-        self.write_buffer(address, &fd_stat_le_bytes(&result))?;
+        self.write_buffer(address, &pack_fdstat(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1724,7 +1724,7 @@ impl WASMIRuntimeState {
 
         let result: FileStat = self.fd_filestat_get(&fd)?;
 
-        self.write_buffer(address, &filestat_le_bytes(&result))?;
+        self.write_buffer(address, &pack_filestat(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1796,7 +1796,7 @@ impl WASMIRuntimeState {
 
         let result = self.fd_prestat_get(&fd)?;
 
-        self.write_buffer(address, &prestat_le_bytes(result))?;
+        self.write_buffer(address, &pack_prestat(&result))?;
 
         Ok(ErrNo::Success)
     }
