@@ -12,14 +12,16 @@
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use wasi_types::{
-    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
-    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
+    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, LookupFlags,
+    OpenFlags, Prestat, Rights, Size, Whence,
 };
 use veracruz_util::policy::principal::{Principal, FileOperation};
 use std::{
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
+    mem::size_of,
     path::PathBuf,
+    slice::from_raw_parts,
     string::{String, ToString},
     fmt::{Formatter, Display, Error},
     string::{String, ToString},
@@ -149,16 +151,35 @@ pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
-pub(crate) fn fd_stat_le_bytes(_fd: &FdStat) -> Vec<u8> {
-    unimplemented!()
+/// A generic function that takes any reference to a sized type and returns a
+/// byte-representation of that type.
+unsafe fn pack_sized_as_bytes<T>(element: &T) -> Vec<u8>
+where
+    T: Sized,
+{
+    let slice: &[u8] = unsafe {
+        from_raw_parts((element as *const T) as *const u8, size_of::<T>())
+    };
+
+    slice.to_vec()
 }
 
-pub(crate) fn filestat_le_bytes(_stat: &FileStat) -> Vec<u8> {
-    unimplemented!()
+/// Packs an `FdStat` type into a vector of bytes.  For writing `FdStat`
+/// structures into memory, across the ABI boundary.
+pub(crate) fn pack_fdstat(fd: &FdStat) -> Vec<u8> {
+    unsafe { pack_sized_as_bytes(fd) }
 }
 
-pub(crate) fn prestat_le_bytes(_stat: Prestat) -> Vec<u8> {
-    unimplemented!()
+/// Packs a `FileStat` type into a vector of bytes.  For writing `FileStat`
+/// structures into memory, across the ABI boundary.
+pub(crate) fn pack_filestat(stat: &FileStat) -> Vec<u8> {
+    unsafe { pack_sized_as_bytes(stat) }
+}
+
+/// Packs a `PreStat` type into a vector of bytes.  For writing `PreStat`
+/// structures into memory, across the ABI boundary.
+pub(crate) fn pack_prestat(stat: &Prestat) -> Vec<u8> {
+    unsafe { pack_sized_as_bytes(stat) }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -311,7 +332,7 @@ impl VFSService {
     #[inline]
     pub(super) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
     where
-        U: Into<String>
+        U: Into<String>,
     {
         self.program_arguments.push(argument.into());
         self
@@ -330,13 +351,9 @@ impl VFSService {
     /// not registered in the environment), and `Some(state)`, for `state` a
     /// modified runtime state with the pair registered, otherwise.
     #[inline]
-    pub(super) fn register_environment_variable<U>(
-        &mut self,
-        key: U,
-        value: U,
-    ) -> Option<&mut Self>
+    pub(super) fn register_environment_variable<U>(&mut self, key: U, value: U) -> Option<&mut Self>
     where
-        U: Into<String>
+        U: Into<String>,
     {
         let keys: Vec<String> = self
             .environment_variables
@@ -768,7 +785,7 @@ impl RuntimePanic {
     #[inline]
     pub fn direct_error_message<T>(message: T) -> Self
     where
-        T: Into<String>
+        T: Into<String>,
     {
         RuntimePanic::DirectErrorMessage(message.into())
     }
@@ -777,10 +794,10 @@ impl RuntimePanic {
     /// that can be converted into a string.
     pub fn bad_arguments_to_host_function<T>(fname: T) -> Self
     where
-        T: Into<String>
+        T: Into<String>,
     {
         RuntimePanic::BadArgumentsToHostFunction {
-            function_name: fname.into()
+            function_name: fname.into(),
         }
     }
 }
