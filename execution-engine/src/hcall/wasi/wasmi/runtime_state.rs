@@ -1485,26 +1485,11 @@ impl WASMIRuntimeState {
         }
     }
 
-    fn read_string(&self, address: u32) -> Result<String, RuntimePanic> {
-        match self.memory() {
-            None => Err(RuntimePanic::NoMemoryRegistered),
-            Some(memory) => match memory. {
-                Err(_) => Err(RuntimePanic::MemoryReadFailed {
-                    memory_address: address as usize,
-                    bytes_to_be_read: length,
-                }),
-                Ok(buf) => Ok(buf.to_vec()),
-            },
-        }
-    }
-
     ////////////////////////////////////////////////////////////////////////////
     // The WASI host call implementations.
     ////////////////////////////////////////////////////////////////////////////
 
     /// The implementation of the WASI `args_get` function.
-    ///
-    /// TODO: complete this.
     fn wasi_args_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1512,11 +1497,17 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let address0: u32 = args.nth(0);
-        let address1: u32 = args.nth(1);
+        let mut argv_address: u32 = args.nth(0);
+        let mut argv_buff_address: u32 = args.nth(1);
 
-        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
-        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
+        for argument in self.args_get() {
+            let length = argument.len() as u32;
+            self.write_buffer(argv_address, &argument);
+            self.write_buffer(argv_buff_address, &u32::to_le_bytes(length));
+
+            argv_address += length;
+            argv_buff_address += 4;
+        }
 
         Ok(ErrNo::Success)
     }
@@ -1529,13 +1520,13 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let address0: u32 = args.nth(0);
-        let address1: u32 = args.nth(1);
+        let argc_address: u32 = args.nth(0);
+        let argv_buff_size_address: u32 = args.nth(1);
 
-        let (argc, argv_buf_size) = self.arg_sizes_get()?;
+        let (argc, argv_buff_size) = self.args_sizes_get();
 
-        self.write_buffer(address0, &u32::to_le_bytes(argc))?;
-        self.write_buffer(address1, &u32::to_le_bytes(argv_buf_size))?;
+        self.write_buffer(argc_address, &u32::to_le_bytes(argc))?;
+        self.write_buffer(argv_buff_size_address, &u32::to_le_bytes(argv_buff_size))?;
 
         Ok(ErrNo::Success)
     }
@@ -1548,20 +1539,22 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let address0: u32 = args.nth(0);
-        let address1: u32 = args.nth(1);
+        let mut environ_address: u32 = args.nth(0);
+        let mut environ_buff_address: u32 = args.nth(1);
 
-        let (environc, environ_buf_size) = self.environ_sizes_get()?;
+        for environ in self.args_get() {
+            let length = environ.len() as u32;
+            self.write_buffer(environ_address, &environ);
+            self.write_buffer(environ_buff_address, &u32::to_le_bytes(length));
 
-        self.write_buffer(address0, &u32::to_le_bytes(environc))?;
-        self.write_buffer(address1, &u32::to_le_bytes(environ_buf_size))?;
+            environ_address += length;
+            environ_buff_address += 4;
+        }
 
         Ok(ErrNo::Success)
     }
 
     /// The implementation of the WASI `environ_sizes_get` function.
-    ///
-    /// TODO: complete this.
     fn wasi_environ_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1569,11 +1562,13 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let address0: u32 = args.nth(0);
-        let address1: u32 = args.nth(1);
+        let (environc, environ_buff_size) = self.environ_sizes_get();
 
-        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
-        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
+        let environc_address: u32 = args.nth(0);
+        let environ_buff_size_address: u32 = args.nth(1);
+
+        self.write_buffer(environc_address, &u32::to_le_bytes(environc))?;
+        self.write_buffer(environ_buff_size_address, &u32::to_le_bytes(environ_buff_size))?;
 
         Ok(ErrNo::Success)
     }
@@ -2033,48 +2028,9 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd = args.nth::<u32>(0).into();
-        let dirflags: LookupFlags =
-            match args.nth::<u32>(1).try_into() {
-                Ok(dirflags) => dirflags,
-                Err(_err) => return Ok(ErrNo::Inval)
-            };
-        let path = args.nth(2);
-        let oflags: OpenFlags =
-            match args.nth::<u16>(3).try_into() {
-                Ok(oflags) => oflags,
-                Err(_err) => return Ok(ErrNo::Inval)
-            };
-        let fs_rights_base: Rights =
-            match args.nth::<u64>(4).try_into() {
-                Ok(fs_rights_base) => fs_rights_base,
-                Err(_err) => return Ok(ErrNo::Inval)
-            };
-        let fs_rights_inheriting: Rights =
-            match args.nth::<u64>(5).try_into() {
-                Ok(fs_rights_inheriting) => fs_rights_inheriting,
-                Err(_err) => return Ok(ErrNo::Inval)
-            };
-        let fdflags: FdFlags =
-            match args.nth::<u16>(6).try_into() {
-                Ok(fdflags) => fdflags,
-                Err(_err) => return Ok(ErrNo::Inval)
-            };
-
         let address: u32 = args.nth(7);
 
-        let result: u32 = self
-            .path_open(
-                &fd,
-                dirflags,
-                path,
-                oflags,
-                fs_rights_base,
-                fs_rights_inheriting,
-                fdflags,
-            )?.into();
-
-        self.write_buffer(address, &u32::to_le_bytes(result))?;
+        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
     }
