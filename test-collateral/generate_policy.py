@@ -18,8 +18,8 @@ import datetime
 import os.path
 from os import path
 
-identity_template = '\n\t\t{"certificate": "<CERT>",\n\t\t"id": <ID_NUM>,\n\t\t"roles": [<ROLES>],\n\t\t"file_permission": [<FILE_PERMISSIONS>]}'
-program_template = '\n\t\t{"program_file_name": "<PROGRAM_FILE_NAME>",\n\t\t"id": <ID_NUM>,\n\t\t"pi_hash": "<PI_HASH>",\n\t\t"file_permission": [<FILE_PERMISSIONS>]}'
+identity_template = '\n\t\t{"certificate": "<CERT>",\n\t\t"id": <ID_NUM>,\n\t\t"roles": [<ROLES>],\n\t\t"file_permissions": [<FILE_PERMISSIONS>]}'
+program_template = '\n\t\t{"program_file_name": "<PROGRAM_FILE_NAME>",\n\t\t"id": <ID_NUM>,\n\t\t"pi_hash": "<PI_HASH>",\n\t\t"file_permissions": [<FILE_PERMISSIONS>]}'
 file_permission_template = '{"file_name": "<FILE_NAME>", "read": <READ_PERMISSION>, "write": <WRITE_PERMISSION>, "execute": <EXECUTE_PERMISSION>}'
 
 def get_enclave_hashes(template):
