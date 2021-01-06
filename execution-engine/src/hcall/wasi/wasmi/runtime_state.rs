@@ -1854,8 +1854,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_read` function.
-    ///
-    /// TODO: complete this.
     fn wasi_fd_read(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1864,17 +1862,15 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
+        // The following two arguments correspond to the `iovec` input.
         let buf: u32 = args.nth(1);
         let len: u32 = args.nth(2);
         let address: u32 = args.nth(3);
 
-        match self.fd_read_base(&fd, len as usize) {
-            Ok(content) => {
-                self.write_buffer(buf, content.as_slice())?;
-                self.write_buffer(address, &(ErrNo::Success as u16).to_le_bytes())?;
-            }
-            Err(e) => self.write_buffer(address, &(e as u16).to_le_bytes())?,
-        };
+        let result = self.fd_read_base(&fd, len as usize)?;
+
+        self.write_buffer(buf, &result)?;
+        self.write_buffer(address, &u32::to_le_bytes(result.len() as u32))?;
 
         Ok(ErrNo::Success)
     }
@@ -1896,8 +1892,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_renumber` function.
-    ///
-    /// TODO: complete this.
     fn wasi_fd_renumber(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1905,7 +1899,10 @@ impl WASMIRuntimeState {
             ));
         }
 
-        Ok(ErrNo::Success)
+        let old_fd: Fd = args.nth::<u32>(0).into();
+        let new_fd: Fd = args.nth::<u32>(1).into();
+
+        Ok(self.fd_renumber(&old_fd, new_fd))
     }
 
     /// The implementation of the WASI `fd_seek` function.
@@ -1976,6 +1973,7 @@ impl WASMIRuntimeState {
         }
 
         let address: u32 = args.nth(3);
+
         self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::Success)
