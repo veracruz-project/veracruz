@@ -11,26 +11,25 @@
 
 use super::error::{mk_error_code, mk_host_trap};
 use crate::hcall::common::{
-    pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, Chihuahua,
-    EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
-    WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
-    WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
-    WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
-    WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
-    WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME,
-    WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME,
-    WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME,
-    WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME,
-    WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
-    WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME, WASI_PATH_OPEN_NAME,
-    WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME, WASI_PATH_RENAME_NAME,
-    WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME, WASI_PROC_EXIT_NAME,
-    WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME, WASI_SOCK_RECV_NAME,
-    WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
+    pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, Chihuahua, EntrySignature,
+    LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError, WASI_ARGS_GET_NAME,
+    WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME, WASI_CLOCK_TIME_GET_NAME,
+    WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME, WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME,
+    WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME, WASI_FD_FDSTAT_GET_NAME,
+    WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME, WASI_FD_FILESTAT_GET_NAME,
+    WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME, WASI_FD_PREAD_NAME,
+    WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME, WASI_FD_PWRITE_NAME,
+    WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME, WASI_FD_SEEK_NAME,
+    WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME, WASI_PATH_CREATE_DIRECTORY_NAME,
+    WASI_PATH_FILESTAT_GET_NAME, WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME,
+    WASI_PATH_OPEN_NAME, WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME,
+    WASI_PATH_RENAME_NAME, WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME,
+    WASI_POLL_ONEOFF_NAME, WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME,
+    WASI_SCHED_YIELD_NAME, WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
 };
 use platform_services::{getrandom, result};
 use std::convert::TryInto;
-use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size};
+use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, LookupFlags, OpenFlags};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
@@ -1371,18 +1370,20 @@ impl WASMIRuntimeState {
     fn invoke_export(&mut self, export_name: &str) -> Result<Option<RuntimeValue>, Error> {
         let not_started = match self.program_module() {
             Some(not_started) => not_started.clone(),
-            None =>
-            return Err(Error::Host(Box::new(
-                RuntimePanic::NoProgramModuleRegistered,
-            )))
+            None => {
+                return Err(Error::Host(Box::new(
+                    RuntimePanic::NoProgramModuleRegistered,
+                )))
+            }
         };
 
-        let program_arguments =
-            match check_main(&not_started) {
-                EntrySignature::NoEntryFound => return Err(Error::Host(Box::new(RuntimePanic::NoProgramEntryPoint))),
-                EntrySignature::ArgvAndArgc => vec![RuntimeValue::I32(0), RuntimeValue::I32(0)],
-                EntrySignature::NoParameters => Vec::new(),
-            };
+        let program_arguments = match check_main(&not_started) {
+            EntrySignature::NoEntryFound => {
+                return Err(Error::Host(Box::new(RuntimePanic::NoProgramEntryPoint)))
+            }
+            EntrySignature::ArgvAndArgc => vec![RuntimeValue::I32(0), RuntimeValue::I32(0)],
+            EntrySignature::NoParameters => Vec::new(),
+        };
 
         not_started.invoke_export(export_name, &program_arguments, self)
     }
@@ -1471,10 +1472,23 @@ impl WASMIRuntimeState {
     /// if no memory is registered in the runtime state, or
     /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
     /// to the address for some reason.
-    fn read_buffer(&mut self, address: u32, length: usize) -> Result<Vec<u8>, RuntimePanic> {
+    fn read_buffer(&self, address: u32, length: usize) -> Result<Vec<u8>, RuntimePanic> {
         match self.memory() {
             None => Err(RuntimePanic::NoMemoryRegistered),
             Some(memory) => match memory.get(address, length) {
+                Err(_) => Err(RuntimePanic::MemoryReadFailed {
+                    memory_address: address as usize,
+                    bytes_to_be_read: length,
+                }),
+                Ok(buf) => Ok(buf.to_vec()),
+            },
+        }
+    }
+
+    fn read_string(&self, address: u32) -> Result<String, RuntimePanic> {
+        match self.memory() {
+            None => Err(RuntimePanic::NoMemoryRegistered),
+            Some(memory) => match memory. {
                 Err(_) => Err(RuntimePanic::MemoryReadFailed {
                     memory_address: address as usize,
                     bytes_to_be_read: length,
@@ -1508,8 +1522,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `args_sizes_get` function.
-    ///
-    /// TODO: complete this.
     fn wasi_args_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1520,15 +1532,15 @@ impl WASMIRuntimeState {
         let address0: u32 = args.nth(0);
         let address1: u32 = args.nth(1);
 
-        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
-        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
+        let (argc, argv_buf_size) = self.arg_sizes_get()?;
+
+        self.write_buffer(address0, &u32::to_le_bytes(argc))?;
+        self.write_buffer(address1, &u32::to_le_bytes(argv_buf_size))?;
 
         Ok(ErrNo::Success)
     }
 
     /// The implementation of the WASI `environ_get` function.
-    ///
-    /// TODO: complete this.
     fn wasi_environ_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1539,8 +1551,10 @@ impl WASMIRuntimeState {
         let address0: u32 = args.nth(0);
         let address1: u32 = args.nth(1);
 
-        self.write_buffer(address0, &u32::to_le_bytes(0u32))?;
-        self.write_buffer(address1, &u32::to_le_bytes(0u32))?;
+        let (environc, environ_buf_size) = self.environ_sizes_get()?;
+
+        self.write_buffer(address0, &u32::to_le_bytes(environc))?;
+        self.write_buffer(address1, &u32::to_le_bytes(environ_buf_size))?;
 
         Ok(ErrNo::Success)
     }
@@ -2012,8 +2026,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_open` function.
-    ///
-    /// TODO: complete this.
     fn wasi_path_open(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 8 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2021,8 +2033,48 @@ impl WASMIRuntimeState {
             ));
         }
 
+        let fd = args.nth::<u32>(0).into();
+        let dirflags: LookupFlags =
+            match args.nth::<u32>(1).try_into() {
+                Ok(dirflags) => dirflags,
+                Err(_err) => return Ok(ErrNo::Inval)
+            };
+        let path = args.nth(2);
+        let oflags: OpenFlags =
+            match args.nth::<u16>(3).try_into() {
+                Ok(oflags) => oflags,
+                Err(_err) => return Ok(ErrNo::Inval)
+            };
+        let fs_rights_base: Rights =
+            match args.nth::<u64>(4).try_into() {
+                Ok(fs_rights_base) => fs_rights_base,
+                Err(_err) => return Ok(ErrNo::Inval)
+            };
+        let fs_rights_inheriting: Rights =
+            match args.nth::<u64>(5).try_into() {
+                Ok(fs_rights_inheriting) => fs_rights_inheriting,
+                Err(_err) => return Ok(ErrNo::Inval)
+            };
+        let fdflags: FdFlags =
+            match args.nth::<u16>(6).try_into() {
+                Ok(fdflags) => fdflags,
+                Err(_err) => return Ok(ErrNo::Inval)
+            };
+
         let address: u32 = args.nth(7);
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+
+        let result: u32 = self
+            .path_open(
+                &fd,
+                dirflags,
+                path,
+                oflags,
+                fs_rights_base,
+                fs_rights_inheriting,
+                fdflags,
+            )?.into();
+
+        self.write_buffer(address, &u32::to_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
