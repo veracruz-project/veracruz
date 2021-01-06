@@ -29,7 +29,7 @@ use crate::hcall::common::{
 };
 use platform_services::{getrandom, result};
 use std::convert::TryInto;
-use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, LookupFlags, OpenFlags, FileDelta, Whence};
+use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, FileDelta, Whence};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
@@ -1542,7 +1542,7 @@ impl WASMIRuntimeState {
         let mut environ_address: u32 = args.nth(0);
         let mut environ_buff_address: u32 = args.nth(1);
 
-        for environ in self.args_get() {
+        for environ in self.environ_get() {
             let length = environ.len() as u32;
             self.write_buffer(environ_address, &environ)?;
             self.write_buffer(environ_buff_address, &u32::to_le_bytes(length))?;
@@ -1961,9 +1961,9 @@ impl WASMIRuntimeState {
         let fd: Fd = args.nth::<u32>(0).into();
         let address: u32 = args.nth(1);
 
-        let result = self.fd_tell(&fd)?;
+        let result = self.fd_tell(&fd)?.clone();
 
-        self.write_buffer(address, &u64::to_le_bytes(*result))?;
+        self.write_buffer(address, &u64::to_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }

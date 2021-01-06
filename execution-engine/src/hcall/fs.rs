@@ -14,7 +14,6 @@
 use std::{
     collections::HashMap,
     convert::TryFrom,
-    path::{Path, PathBuf},
     string::String,
 };
 use wasi_types::{
@@ -165,16 +164,14 @@ impl FileSystem {
     // XXX: remove and replace with wasi-functionality
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) fn file_exists<U>(&self, path: U) -> bool
+    pub(crate) fn file_exists<U>(&self, _fname: &U) -> bool
     where
-        U: AsRef<Path>,
+        U: Into<String>,
     {
-        let path = path.as_ref();
-
         unimplemented!()
     }
 
-    pub(crate) fn write_file(&mut self, _path: &PathBuf, _data: Vec<u8>) {
+    pub(crate) fn write_file<U>(&mut self, _fname: &U, _data: Vec<u8>) where U: Into<String> {
         unimplemented!()
     }
 

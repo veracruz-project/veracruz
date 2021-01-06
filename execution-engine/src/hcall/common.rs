@@ -20,7 +20,6 @@ use std::{
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
     mem::size_of,
-    path::PathBuf,
     slice::from_raw_parts,
     string::{String, ToString},
     fmt::{Formatter, Display, Error},
@@ -157,9 +156,8 @@ unsafe fn pack_sized_as_bytes<T>(element: &T) -> Vec<u8>
 where
     T: Sized,
 {
-    let slice: &[u8] = unsafe {
-        from_raw_parts((element as *const T) as *const u8, size_of::<T>())
-    };
+    let slice: &[u8] =
+        from_raw_parts((element as *const T) as *const u8, size_of::<T>());
 
     slice.to_vec()
 }
