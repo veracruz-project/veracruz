@@ -11,13 +11,25 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::path::PathBuf;
-use std::{collections::HashMap, convert::TryFrom, string::String};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    path::{Path, PathBuf},
+    string::String,
+};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Filesystem errors.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Filesystem errors either return a result of type `T` or a defined error
+/// code.  The return code `ErrNo::Success` is implicit if `Ok(result)` is ever
+/// returned from a filesystem function.  The result `Err(ErrNo::Success)`
+/// should never be returned.
 pub(crate) type FileSystemError<T> = Result<T, ErrNo>;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -39,10 +51,16 @@ impl InodeImpl {
     /// Returns `true` iff the size of the inode's raw data buffer matches the
     /// length stored in the file stat structure.
     ///
-    /// XXX: may panic if `usize` and `u64` bitwidths are different!
+    /// TODO: may panic if `usize` and `u64` bitwidths are different!  This
+    /// should probably be checked using a static assertion somewhere
+    /// once-and-for-all to make sure Veracruz is used only on platforms where
+    /// `sizeof::<usize>()` returns `8`, as this assumption is baked-in to the
+    /// Veracruz source code in a few different places.
     #[inline]
     pub(crate) fn valid(&self) -> bool {
-        self.raw_file_data.len() == usize::try_from(self.file_stat.file_size).unwrap()
+        self.raw_file_data.len()
+            == usize::try_from(self.file_stat.file_size)
+                .expect("The bitwidth of the Rust `usize` type is not 64-bits.")
     }
 
     /// Returns the file stat structure associated with this inode.
@@ -115,8 +133,9 @@ pub struct FileSystem {
     /// descriptors.  
     file_table: HashMap<Fd, FileTableEntry>,
     /// The structure of the file system.
-    /// NOTE: This is a flatten map from files to Inodes for now.
-    ///       It will evolve to a full directory (tree) structure.
+    ///
+    /// NOTE: This is a flat map from files to inodes for now.  It will evolve
+    /// to a full directory (tree) structure.
     path_table: HashMap<String, Inode>,
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
@@ -146,7 +165,12 @@ impl FileSystem {
     // XXX: remove and replace with wasi-functionality
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) fn file_exists(&self, _path: &PathBuf) -> bool {
+    pub(crate) fn file_exists<U>(&self, path: U) -> bool
+    where
+        U: AsRef<Path>,
+    {
+        let path = path.as_ref();
+
         unimplemented!()
     }
 
@@ -434,12 +458,11 @@ impl FileSystem {
     }
 
     pub(crate) fn fd_write_base(&mut self, fd: &Fd, buf: Vec<u8>) -> FileSystemError<Size> {
-        let offset =
-            if let Some(entry) = self.file_table.get(fd) {
-                entry.offset
-            } else {
-                return Err(ErrNo::BadF);
-            };
+        let offset = if let Some(entry) = self.file_table.get(fd) {
+            entry.offset
+        } else {
+            return Err(ErrNo::BadF);
+        };
 
         let rst = self.fd_pwrite_base(fd, buf, offset)?;
         self.fd_seek(fd, rst as i64, Whence::Current);
@@ -468,16 +491,12 @@ impl FileSystem {
     ///       Finish the rest functionality required the WASI spec.
     pub(crate) fn path_open(
         &mut self,
-        // This parameter is ignored
         _fd: &Fd,
-        // This parameter is ignored
         _dirflags: LookupFlags,
         path: String,
-        // This parameter is ignored
         _oflags: OpenFlags,
         rights_base: Rights,
         rights_inheriting: Rights,
-        // This parameter is ignored
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
         let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();

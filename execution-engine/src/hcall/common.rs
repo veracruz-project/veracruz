@@ -330,7 +330,7 @@ impl VFSService {
     /// Pushes a new argument, `argument`, to the list of program arguments that
     /// will be made available to the program.
     #[inline]
-    pub(super) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
+    pub(crate) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
     where
         U: Into<String>,
     {
@@ -341,8 +341,30 @@ impl VFSService {
     /// Returns the count of program arguments that will be supplied to the
     /// program.
     #[inline]
-    pub(super) fn program_argument_count(&self) -> usize {
+    fn program_argument_count(&self) -> usize {
         self.program_arguments.len()
+    }
+
+    /// Returns the number of program arguments as well as the maximum size (in
+    /// bytes) that needs to be allocated for a buffer to receive any argument.
+    fn program_argument_sizes(&self) -> (usize, usize) {
+        let mut sizes = Vec::new();
+
+        for k in self.program_arguments.iter() {
+            sizes.push(k.as_bytes().len());
+        }
+
+        (sizes.len(), sizes.iter().map(|v| v.len()).max().unwrap_or(0))
+    }
+
+    /// Implementation of the WASI `arg_sizes_get` function.
+    pub(crate) fn arg_sizes_get(&self) -> FileSystemError<(Size, Size)> {
+        let (argc, argv_buf_size) = self.program_argument_sizes();
+
+        let argc = argc as Size;
+        let argv_buf_size = argv_buf_size as Size;
+
+        Ok((argc, argv_buf_size))
     }
 
     /// Registers a new environment variable, `key`, with a particular value,
@@ -375,22 +397,31 @@ impl VFSService {
     /// Returns the number of environment variables stored in the program's
     /// environment.
     #[inline]
-    pub(super) fn environment_variable_count(&self) -> usize {
+    fn environment_variable_count(&self) -> usize {
         self.environment_variables.len()
     }
 
-    /// Returns the sizes (in bytes) of the key-value pairs stored in the
-    /// program's environment.
-    pub(super) fn environment_variable_sizes(&self) -> Vec<(usize, usize)> {
+    /// Returns the number of environment variables, as well as the maximum size
+    /// (in bytes) of a buffer that needs to be allocated in order to take
+    /// receipt of any key-value pair.
+    fn environment_variable_sizes(&self) -> (usize, usize) {
         let mut sizes = Vec::new();
 
         for (k, v) in self.environment_variables.iter() {
             sizes.push((k.as_bytes().len(), v.as_bytes().len()));
         }
 
-        sizes.reverse();
+        (sizes.len(), sizes.iter().map(|(_, v)| v.len()).max().unwrap_or(0))
+    }
 
-        sizes
+    /// Implementation of the WASI `environ_sizes_get` function.
+    pub(crate) fn environ_sizes_get(&self) -> FileSystemError<(Size, Size)> {
+        let (environc, environ_buf_size) = self.environment_variable_sizes();
+
+        let environc = environc as Size;
+        let environ_buf_size = environ_buf_size as Size;
+
+        Ok((environc, environ_buf_size))
     }
 
     ////////////////////////////////////////////////////////////////////////////
