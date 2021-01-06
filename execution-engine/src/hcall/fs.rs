@@ -370,7 +370,7 @@ impl FileSystem {
         };
 
         let rst = self.fd_pread_base(fd, len, &offset)?;
-        self.fd_seek(fd, rst.len() as i64, Whence::Current);
+        self.fd_seek(fd, rst.len() as i64, Whence::Current)?;
         Ok(rst)
     }
 
@@ -465,7 +465,7 @@ impl FileSystem {
         };
 
         let rst = self.fd_pwrite_base(fd, buf, offset)?;
-        self.fd_seek(fd, rst as i64, Whence::Current);
+        self.fd_seek(fd, rst as i64, Whence::Current)?;
         Ok(rst)
     }
 

@@ -29,7 +29,7 @@ use crate::hcall::common::{
 };
 use platform_services::{getrandom, result};
 use std::convert::TryInto;
-use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, LookupFlags, OpenFlags};
+use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, LookupFlags, OpenFlags, FileDelta, Whence};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
@@ -1502,8 +1502,8 @@ impl WASMIRuntimeState {
 
         for argument in self.args_get() {
             let length = argument.len() as u32;
-            self.write_buffer(argv_address, &argument);
-            self.write_buffer(argv_buff_address, &u32::to_le_bytes(length));
+            self.write_buffer(argv_address, &argument)?;
+            self.write_buffer(argv_buff_address, &u32::to_le_bytes(length))?;
 
             argv_address += length;
             argv_buff_address += 4;
@@ -1544,8 +1544,8 @@ impl WASMIRuntimeState {
 
         for environ in self.args_get() {
             let length = environ.len() as u32;
-            self.write_buffer(environ_address, &environ);
-            self.write_buffer(environ_buff_address, &u32::to_le_bytes(length));
+            self.write_buffer(environ_address, &environ)?;
+            self.write_buffer(environ_buff_address, &u32::to_le_bytes(length))?;
 
             environ_address += length;
             environ_buff_address += 4;
@@ -1780,7 +1780,7 @@ impl WASMIRuntimeState {
 
         match self.fd_pread_base(&fd, len as usize, &offset) {
             Ok(content) => {
-                self.write_buffer(buf, content.as_slice());
+                self.write_buffer(buf, content.as_slice())?;
                 self.write_buffer(address, &(ErrNo::Success as u16).to_le_bytes())?;
             }
             Err(e) => self.write_buffer(address, &u16::from(e).to_le_bytes())?,
@@ -1870,7 +1870,7 @@ impl WASMIRuntimeState {
 
         match self.fd_read_base(&fd, len as usize) {
             Ok(content) => {
-                self.write_buffer(buf, content.as_slice());
+                self.write_buffer(buf, content.as_slice())?;
                 self.write_buffer(address, &(ErrNo::Success as u16).to_le_bytes())?;
             }
             Err(e) => self.write_buffer(address, &(e as u16).to_le_bytes())?,
@@ -1908,9 +1908,7 @@ impl WASMIRuntimeState {
         Ok(ErrNo::Success)
     }
 
-    /// The implementation of the WASI `fd_sync` function.
-    ///
-    /// TODO: complete this.
+    /// The implementation of the WASI `fd_seek` function.
     fn wasi_fd_seek(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1918,8 +1916,18 @@ impl WASMIRuntimeState {
             ));
         }
 
+        let fd: Fd = args.nth::<u32>(0).into();
+        let offset: FileDelta = args.nth::<i64>(1);
+        let whence: Whence =
+            match args.nth::<u8>(2).try_into() {
+                Ok(whence) => whence,
+                Err(_err) => return Ok(ErrNo::Inval)
+            };
         let address: u32 = args.nth(3);
-        self.write_buffer(address, &i64::to_le_bytes(0i64))?;
+
+        let result = self.fd_seek(&fd, offset, whence)?;
+
+        self.write_buffer(address, &u64::to_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1927,7 +1935,8 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_sync` function.  This is not
     /// supported by Veracruz.  We simply return `ErrNo::NotSup`.
     ///
-    /// XXX: consider whether this should just return `ErrNo::Success`, instead.
+    /// TODO: consider whether this should just return `ErrNo::Success`,
+    /// instead.
     fn wasi_fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1939,8 +1948,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_tell` function.
-    ///
-    /// TODO: complete this.
     fn wasi_fd_tell(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1948,8 +1955,12 @@ impl WASMIRuntimeState {
             ));
         }
 
+        let fd: Fd = args.nth::<u32>(0).into();
         let address: u32 = args.nth(1);
-        self.write_buffer(address, &i64::to_le_bytes(0i64))?;
+
+        let result = self.fd_tell(&fd)?;
+
+        self.write_buffer(address, &u64::to_le_bytes(*result))?;
 
         Ok(ErrNo::Success)
     }
@@ -2078,7 +2089,7 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `path_symlink` function.  This is not
     /// supported by Veracruz.  We simply return `ErrNo::NotSup`.
     ///
-    /// XXX: re-assess whether we want to support this.
+    /// TODO: re-assess whether we want to support this.
     fn wasi_path_symlink(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2092,7 +2103,7 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `path_unlink_file` function.  This is not
     /// supported by Veracruz.  We simply return `ErrNo::NotSup`.
     ///
-    /// XXX: re-assess whether we want to support this.
+    /// TODO: re-assess whether we want to support this.
     fn wasi_path_unlink_file(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
