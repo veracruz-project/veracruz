@@ -9,21 +9,24 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::process::Command;
+use std::env;
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 use std::net::TcpStream;
+use std::os::unix::io::RawFd;
+use std::path::Path;
+use std::process::Command;
+
 use serde_json::Value;
 use err_derive::Error;
-use std::path::Path;
 use ssh2::{ Session};
-use std::io::Write;
-use std::io::Read;
-use std::fs::File;
+
 use veracruz_utils;
 use nix::sys::socket::{connect,
     socket, AddressFamily, InetAddr, IpAddr, SockAddr, SockFlag, SockType,
     shutdown, Shutdown
 };
-use std::os::unix::io::RawFd;
 
 pub struct EC2Instance {
     pub instance_id: String,
@@ -60,19 +63,20 @@ pub enum EC2Error {
     Unimplemented,
 }
 
-const AWS_KEY_NAME: &str = "NitroNode2NodeKey";
-const PRIVATE_KEY_FILENAME: &str = "/home/ec2-user/.ssh/nitro_node_2_node.pem";
-
-//const SECURITY_GROUP_ID: &str = "sg-0db44c78b54499d6d";
-const SECURITY_GROUP_ID: &str = "sg-04983d4be43f84550";
-
 impl EC2Instance {
     pub fn new() -> Result<Self, EC2Error> {
+        let aws_key_name = env::var("AWS_KEY_NAME").expect("Failed to read AWS_KEY_NAME environment variable.");
+        let aws_subnet = env::var("AWS_SUBNET").expect("Failed to read AWS_SUBNET environment variable.");
+        let aws_region = env::var("AWS_REGION").expect("Failed to read AWS_REGION environment variable.");
+        let aws_security_group_id = env::var("AWS_SECURITY_GROUP_ID").expect("Failed to read AWS_SECURITY_GROUP_ID environment variable.");
+
+        let subnet_option = format!("--subnet-id={:}", aws_subnet);
+
         let ec2_result = Command::new("/usr/local/bin/aws")
             .args(&["ec2", "run-instances", "--image-id", "ami-037dd1d3f98da4d50",
                     "--instance-type", "m5.xlarge", "--enclave-options", "Enabled=true",
-                    "--region",  "us-east-1", "--key-name", AWS_KEY_NAME,
-                    "--subnet-id=subnet-09dec26c52ea2f0c1", "--security-group-ids", SECURITY_GROUP_ID,
+                    "--region",  &aws_region, "--key-name", &aws_key_name,
+                    &subnet_option, "--security-group-ids", &aws_security_group_id,
                     "--associate-public-ip-address",
                     "--tag-specifications",  "ResourceType=instance,Tags=[{Key=Veracruz,Value=RootEnclave}]"])
                         .output()
@@ -189,7 +193,8 @@ impl EC2Instance {
         known_hosts.add(&full_ip, key, &full_ip, key_type.into())
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
-        let privkey_path: &Path = Path::new(PRIVATE_KEY_FILENAME);
+        let aws_private_key_filename = env::var("AWS_PRIVATE_KEY_FILENAME").expect("Failed to read AWS_PRIVATE_KEY_FILENAME environment variable.");
+        let privkey_path: &Path = Path::new(&aws_private_key_filename);
         session.userauth_pubkey_file("ec2-user",
             None,
             privkey_path,
@@ -246,7 +251,8 @@ impl EC2Instance {
         known_hosts.add(&full_ip, key, &full_ip, key_type.into())
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
-        let privkey_path: &Path = Path::new(PRIVATE_KEY_FILENAME);
+        let aws_private_key_filename = env::var("AWS_PRIVATE_KEY_FILENAME").expect("Failed to read AWS_PRIVATE_KEY_FILENAME environment variable.");
+        let privkey_path: &Path = Path::new(&aws_private_key_filename);
         session.userauth_pubkey_file("ec2-user",
             None,
             privkey_path,
