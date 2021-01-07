@@ -164,8 +164,8 @@ where
 
 /// Packs an `FdStat` type into a vector of bytes.  For writing `FdStat`
 /// structures into memory, across the ABI boundary.
-pub(crate) fn pack_fdstat(fd: &FdStat) -> Vec<u8> {
-    unsafe { pack_sized_as_bytes(fd) }
+pub(crate) fn pack_fdstat(fdstat: &FdStat) -> Vec<u8> {
+    unsafe { pack_sized_as_bytes(fdstat) }
 }
 
 /// Packs a `FileStat` type into a vector of bytes.  For writing `FileStat`
