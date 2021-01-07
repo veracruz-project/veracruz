@@ -105,7 +105,7 @@ fn response_invalid_request() -> super::ProvisioningResult {
 
 /// Returns the SHA-256 digest of the provisioned program.  Fails if no hash has
 /// yet been computed.
-fn dispatch_on_pi_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
+fn dispatch_on_pi_hash(colima::RequestPiHash {file_name, .. } : colima::RequestPiHash, protocol_state: &ProtocolState) -> ProvisioningResult {
     // The digest is computed by Veracruz when the program is provisioned.  If
     // there's no digest, then we must not have been given a program yet.
     match protocol_state.get_program_digest()? {
@@ -135,7 +135,8 @@ fn dispatch_on_request_state(protocol_state: &ProtocolState) -> ProvisioningResu
 
 /// Returns the result of a computation, computing the result first.  Fails if
 /// we are not in the `LifecycleState::ReadyToExecute` state.
-fn dispatch_on_result(protocol_state: &ProtocolState) -> ProvisioningResult {
+fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &ProtocolState) -> ProvisioningResult {
+    //TODO: USE THE FILE_NAME 
     if check_state(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::ReadyToExecute],
@@ -248,10 +249,12 @@ fn dispatch_on_program(
 fn dispatch_on_data(
     protocol_state: &ProtocolState,
     transport_protocol::Data {
-        data, package_id, ..
+        data, file_name, ..
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
+    //TODO: REPLACE BY FS API
+    let package_id = file_name.parse::<u64>()?;
     let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
     PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame);
 
@@ -302,7 +305,7 @@ fn dispatch_on_data(
 fn dispatch_on_stream(
     protocol_state: &ProtocolState,
     transport_protocol::Data {
-        data, package_id, ..
+        data, file_name, ..
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
@@ -310,6 +313,8 @@ fn dispatch_on_stream(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::StreamSourcesLoading],
     ) {
+        //TODO: REPLACE BY FS API
+        let package_id = file_name.parse::<u64>()?;
         let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
 
         if let Err(error) = protocol_state.add_new_stream_source(frame) {
@@ -417,11 +422,11 @@ fn dispatch_on_request(
                 response_invalid_role()
             }
         }
-        MESSAGE::request_pi_hash(_) => dispatch_on_pi_hash(protocol_state),
+        MESSAGE::request_pi_hash(pi_hash_request) => dispatch_on_pi_hash(pi_hash_request, protocol_state),
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
-        MESSAGE::request_result(_) => {
+        MESSAGE::request_result(result_request) => {
             if check_roles(roles, &[Role::ResultReader]) {
-                dispatch_on_result(protocol_state)
+                dispatch_on_result(result_request,protocol_state)
             } else {
                 response_invalid_role()
             }

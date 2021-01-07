@@ -40,6 +40,8 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "sgx")]
     #[error(display = "RuntimeManager: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
+    #[error(display = "RuntimeManager: ParseIntError: {:?}", _0)] 
+    ParseIntError(#[error(source)] core::num::ParseIntError),
     #[error(display = "RuntimeManager: {} failed with error code {:?}.", _0, _1)]
     UnsafeCallError(&'static str, u32),
     #[error(display = "RuntimeManager: Received no data.")]
