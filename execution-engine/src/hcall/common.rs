@@ -574,7 +574,7 @@ impl VFSService {
     }
 
     #[inline]
-    pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
+    pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: &String) -> ErrNo {
         self.filesystem.path_remove_directory(fd, path)
     }
 
@@ -582,7 +582,7 @@ impl VFSService {
     pub(crate) fn path_rename(
         &mut self,
         old_fd: &Fd,
-        old_path: String,
+        old_path: &String,
         new_fd: &Fd,
         new_path: String,
     ) -> ErrNo {
