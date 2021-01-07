@@ -473,10 +473,10 @@ impl FileSystem {
     pub(crate) fn path_filestat_get(
         &mut self,
         _fd: &Fd,
-        _flags: LookupFlags,
-        path: String,
+        _flags: &LookupFlags,
+        path: &String,
     ) -> FileSystemError<FileStat> {
-        let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
+        let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?.clone();
         self.inode_table
             .get(&inode)
             .map(|InodeImpl { file_stat, .. }| file_stat.clone())
