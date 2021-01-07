@@ -531,14 +531,14 @@ impl FileSystem {
         Ok(next_fd)
     }
 
-    pub(crate) fn path_remove_directory(&mut self, _fd: &Fd, _path: String) -> ErrNo {
+    pub(crate) fn path_remove_directory(&mut self, _fd: &Fd, _path: &String) -> ErrNo {
         unimplemented!()
     }
 
     pub(crate) fn path_rename(
         &mut self,
         _old_fd: &Fd,
-        _old_path: String,
+        _old_path: &String,
         _new_fd: &Fd,
         _new_path: String,
     ) -> ErrNo {

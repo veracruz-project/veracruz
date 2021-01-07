@@ -2075,8 +2075,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_create_directory` function.
-    ///
-    /// TODO: complete this.
     fn wasi_path_create_directory(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2084,7 +2082,12 @@ impl WASMIRuntimeState {
             ));
         }
 
-        Ok(ErrNo::Success)
+        let fd: Fd = args.nth::<u32>(0).into();
+        let path_address: u32 = args.nth::<u32>(1);
+
+        let path = self.read_cstring(path_address)?;
+
+        Ok(self.path_create_directory(&fd, path))
     }
 
     /// The implementation of the WASI `path_filestat_get` function.
@@ -2184,7 +2187,7 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `path_readlink` function.  This
     /// is not supported by Veracruz.  We simply return `ErrNo::NotSup`.
     ///
-    /// XXX: re-assess whether we want to support this.
+    /// TODO: re-assess whether we want to support this.
     fn wasi_path_readlink(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 5 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2196,8 +2199,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_remove_directory` function.
-    ///
-    /// TODO: complete this.
     fn wasi_path_remove_directory(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 2 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2205,12 +2206,15 @@ impl WASMIRuntimeState {
             ));
         }
 
-        Ok(ErrNo::Success)
+        let fd: Fd = args.nth::<u32>(0).into();
+        let path_address: u32 = args.nth::<u32>(1).into();
+
+        let path = self.read_cstring(path_address)?;
+
+        Ok(self.path_remove_directory(&fd, &path))
     }
 
     /// The implementation of the WASI `path_rename` function.
-    ///
-    /// TODO: complete this.
     fn wasi_path_rename(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2218,7 +2222,15 @@ impl WASMIRuntimeState {
             ));
         }
 
-        Ok(ErrNo::Success)
+        let old_fd: Fd = args.nth::<u32>(0).into();
+        let old_path_address: u32 = args.nth::<u32>(1);
+        let new_fd: Fd = args.nth::<u32>(2).into();
+        let new_path_address = args.nth::<u32>(3);
+
+        let old_path = self.read_cstring(old_path_address)?;
+        let new_path = self.read_cstring(new_path_address)?;
+
+        Ok(self.path_rename(&old_fd, &old_path, &new_fd, new_path))
     }
 
     /// The implementation of the WASI `path_symlink` function.  This is not
