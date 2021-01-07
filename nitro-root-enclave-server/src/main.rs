@@ -152,7 +152,7 @@ fn native_attestation(
         "nitro-root-enclave-server::native_attestation posting native_attestation_token to tabasco"
     );
     post_native_attestation_token(tabasco_url, &token, device_id)?;
-    println!("sinaloa_tz::native_attestation returning Ok");
+    println!("nitro-root-enclave-server::native_attestation returning Ok");
     return Ok(nre_enclave);
 }
 
