@@ -136,6 +136,7 @@ mod tests {
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
             std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
+            env_logger::init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 #[cfg(feature="debug")]
@@ -397,7 +398,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(RANDOM_SOURCE_WASM),
-            &[(0, LINEAR_REGRESSION_DATA)],
+            &[("0", LINEAR_REGRESSION_DATA)],
             &[],
             false,
         );
@@ -425,7 +426,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
-            &[(0, LINEAR_REGRESSION_DATA)],
+            &[("0", LINEAR_REGRESSION_DATA)],
             &[],
             false,
         );
@@ -468,8 +469,8 @@ mod tests {
             Some(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
             &[
                 // message sends out in the reversed order
-                (1, INTERSECTION_SET_SUM_CUSTOMER_DATA),
-                (0, INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                ("1", INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                ("0", INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
             ],
             &[],
             false,
@@ -488,7 +489,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
-            &[(0, STRING_1_DATA), (1, STRING_2_DATA)],
+            &[("0", STRING_1_DATA), ("1", STRING_2_DATA)],
             &[],
             false,
         );
@@ -509,7 +510,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
-            &[(0, LINEAR_REGRESSION_DATA)],
+            &[("0", LINEAR_REGRESSION_DATA)],
             &[],
             true,
         );
@@ -540,7 +541,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(PERSON_SET_INTERSECTION_WASM),
-            &[(0, PERSON_SET_1_DATA), (1, PERSON_SET_2_DATA)],
+            &[("0", PERSON_SET_1_DATA), ("1", PERSON_SET_2_DATA)],
             &[],
             true,
         );
@@ -559,10 +560,10 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
-            &[(0, SINGLE_F64_DATA)],
+            &[("0", SINGLE_F64_DATA)],
             &[
-                (0, VEC_F64_1_DATA),
-                (1, VEC_F64_2_DATA),
+                ("0", VEC_F64_1_DATA),
+                ("1", VEC_F64_2_DATA),
             ],
             true,
         );
@@ -577,8 +578,8 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
-            &[(0, SINGLE_F64_DATA)],
-            &[(0, VEC_F64_1_DATA)],
+            &[("0", SINGLE_F64_DATA)],
+            &[("0", VEC_F64_1_DATA)],
             true,
         );
         assert!(result.is_err(), "An error should occur");
@@ -594,8 +595,8 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[],
             &[
-                (0, VEC_F64_1_DATA),
-                (1, VEC_F64_2_DATA),
+                ("0", VEC_F64_1_DATA),
+                ("1", VEC_F64_2_DATA),
             ],
             true,
         );
@@ -612,9 +613,9 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[],
             &[
-                (0, VEC_F64_1_DATA),
-                (1, VEC_F64_2_DATA),
-                (2, VEC_F64_1_DATA),
+                ("0", VEC_F64_1_DATA),
+                ("1", VEC_F64_2_DATA),
+                ("2", VEC_F64_1_DATA),
             ],
             true,
         );
@@ -635,7 +636,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(LOGISTICS_REGRESSION_WASM),
-                &[(0, data_path)],
+                &[("0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -660,7 +661,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(MACD_WASM),
-                &[(0, data_path)],
+                &[("0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -690,7 +691,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(MACD_DATA_PATH),
-                &[(0, data_path)],
+                &[("0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -715,7 +716,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(INTERSECTION_SET_SUM_WASM),
-                &[(0, data_path)],
+                &[("0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -737,8 +738,8 @@ mod tests {
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
-        data_id_paths: &[(u64, &str)],
-        stream_id_paths: &[(u64, &str)],
+        data_id_paths: &[(&str, &str)],
+        stream_id_paths: &[(&str, &str)],
         // if there is an attestation
         attestation_flag: bool,
     ) -> Result<(), VeracruzServerError> {
@@ -826,24 +827,32 @@ mod tests {
         // Each element contains the package id (u64) and the path to the data
         let data_id_paths: Vec<_> = data_id_paths
             .iter()
-            .map(|(number, path)| (number.clone(), path.to_string()))
+            .map(|(number, path)| (number.to_string(), path.to_string()))
             .collect();
         let stream_id_paths: Vec<_> = stream_id_paths
             .iter()
-            .map(|(number, path)| (number.clone(), path.to_string()))
+            .map(|(number, path)| (number.to_string(), path.to_string()))
             .collect();
 
         // This is a closure, containing instructions from clients.
         // A sperate thread is spawn and direcly call this closure.
         // However if an Error pop up, the thread set the CONTINUE_FLAG to false,
         // hence stopping the server thread.
-        let client_body = move || {
+        let mut client_body = move || {
             info!(
                 "### Step 4.  Client provisions program at {:?}.",
                 program_path
             );
+
+            //TODO: change to the actually remote filename
+            let program_file_name = 
+            if let Some(path) = program_path.as_ref() {
+                Path::new(path).file_name().unwrap().to_str().unwrap()
+            } else {
+                "no_program"
+            };
             // if there is a program provided
-            if let Some(path) = program_path {
+            if let Some(path) = program_path.as_ref() {
                 let time_provosion_data = Instant::now();
                 check_enclave_state(
                     client_session_id,
@@ -862,7 +871,7 @@ mod tests {
                     &client_tls_rx,
                 )?;
                 let response = provision_program(
-                    path.as_str(),
+                    path,
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -880,7 +889,8 @@ mod tests {
                 info!("### Step 5.  Program provider requests program hash.");
                 let time_hash = Instant::now();
                 let _response = request_program_hash(
-                    policy.pi_hash().as_str(),
+                    program_file_name,
+                    policy.pi_hash(program_file_name)?,
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -898,10 +908,10 @@ mod tests {
             }
 
             info!("### Step 6.  Data providers provision secret data.");
-            for (package_id, data_path) in data_id_paths.iter() {
+            for (remote_file_name, data_path) in data_id_paths.iter() {
                 info!(
                     "             Data providers provision secret data #{}.",
-                    package_id
+                    remote_file_name
                 );
                 let time_data_hash = Instant::now();
                 check_enclave_state(
@@ -913,7 +923,8 @@ mod tests {
                     ENCLAVE_STATE_DATA_SOURCES_LOADING,
                 )?;
                 let _response = request_program_hash(
-                    policy.pi_hash().as_str(),
+                    program_file_name,
+                    policy.pi_hash(program_file_name)?,
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -940,7 +951,7 @@ mod tests {
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
-                    *package_id,
+                    remote_file_name,
                 )?;
                 info!(
                     "             Client received acknowledgement after sending data: {:?},",
@@ -958,8 +969,8 @@ mod tests {
                 let mut id_vec = Vec::new();
                 let mut stream_data_vec = Vec::new();
 
-                for (package_id, data_path) in stream_id_paths.iter() {
-                    id_vec.push(*package_id);
+                for (remote_file_name, data_path) in stream_id_paths.iter() {
+                    id_vec.push(remote_file_name);
                     let data = {
                         let mut data_file = std::fs::File::open(data_path)?;
                         let mut data_buffer = std::vec::Vec::new();
@@ -992,7 +1003,7 @@ mod tests {
                     };
                     info!("------------ Streaming Round # {} ------------", count);
                     count += 1;
-                    for (package_id, data) in next_round_data.iter() {
+                    for (remote_file_name, data) in next_round_data.iter() {
                         let time_stream_hash = Instant::now();
                         check_enclave_state(
                             client_session_id,
@@ -1003,7 +1014,8 @@ mod tests {
                             ENCLAVE_STATE_STREAM_SOURCE_SLOADING,
                         )?;
                         let _response = request_program_hash(
-                            policy.pi_hash().as_str(),
+                            program_file_name,
+                            policy.pi_hash(program_file_name)?,
                             client_session_id,
                             &mut client_session,
                             ticket,
@@ -1024,7 +1036,7 @@ mod tests {
                         );
                         info!(
                             "             Stream provider provision secret data #{}.",
-                            package_id
+                            remote_file_name
                         );
                         let time_stream = Instant::now();
                         let response = provision_stream(
@@ -1034,7 +1046,7 @@ mod tests {
                             ticket,
                             &client_tls_tx,
                             &client_tls_rx,
-                            *package_id,
+                            remote_file_name,
                         )?;
                         info!(
                             "             Stream provider received acknowledgement after sending stream data: {:?},",
@@ -1056,7 +1068,8 @@ mod tests {
                         ENCLAVE_STATE_READY_TO_EXECUTE,
                     )?;
                     let _response = request_program_hash(
-                        policy.pi_hash().as_str(),
+                        program_file_name,
+                        policy.pi_hash(program_file_name)?,
                         client_session_id,
                         &mut client_session,
                         ticket,
@@ -1083,7 +1096,8 @@ mod tests {
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        &transport_protocol::serialize_request_result()?.as_slice(),
+                        //TODO: change to the output file specified in policy
+                        &transport_protocol::serialize_request_result("output")?.as_slice(),
                     )
                     .and_then(|response| {
                         // decode the result
@@ -1127,7 +1141,8 @@ mod tests {
                     ENCLAVE_STATE_READY_TO_EXECUTE,
                 )?;
                 let _response = request_program_hash(
-                    policy.pi_hash().as_str(),
+                    program_file_name,
+                    policy.pi_hash(program_file_name)?,
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -1154,7 +1169,8 @@ mod tests {
                     client_session_id,
                     &mut client_session,
                     ticket,
-                    &transport_protocol::serialize_request_result()?.as_slice(),
+                    //TODO: change to the output file specified in policy
+                    &transport_protocol::serialize_request_result("output")?.as_slice(),
                 )
                 .and_then(|response| {
                     // decode the result
@@ -1382,6 +1398,7 @@ mod tests {
     }
 
     fn request_program_hash(
+        remote_file_name : &str,
         expected_program_hash: &str,
         client_session_id: u32,
         client_session: &mut dyn rustls::Session,
@@ -1389,7 +1406,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
     ) -> Result<bool, VeracruzServerError> {
-        let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash()?;
+        let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash(remote_file_name)?;
         let data = client_tls_send(
             client_tls_tx,
             client_tls_rx,
@@ -1447,7 +1464,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        package_id: u64,
+        remote_file_name: &str,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
         let data = {
@@ -1456,7 +1473,7 @@ mod tests {
             data_file.read_to_end(&mut data_buffer)?;
             data_buffer
         };
-        let serialized_data = transport_protocol::serialize_program_data(&data, package_id as u32)?;
+        let serialized_data = transport_protocol::serialize_program_data(&data, remote_file_name)?;
 
         client_tls_send(
             client_tls_tx,
@@ -1475,10 +1492,10 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        package_id: u64,
+        remote_file_name: &str,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
-        let serialized_stream = transport_protocol::serialize_stream(data, package_id as u32)?;
+        let serialized_stream = transport_protocol::serialize_stream(data, remote_file_name)?;
 
         client_tls_send(
             client_tls_tx,
