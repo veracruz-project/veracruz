@@ -85,11 +85,12 @@ message SgxQuote {
 }
 
 message Program {
-  bytes code = 1;
+  string file_name = 1;
+  bytes code = 2;
 }
 
 message Data {
-  uint32 package_id = 1;
+  string file_name = 1;
   bytes data = 2;
 }
 
@@ -144,9 +145,11 @@ message State {
 }
 
 message RequestPiHash {
+  string file_name = 1;
 }
 
 message RequestResult {
+  string file_name = 1;
 }
 
 message RequestProxyPsaAttestationToken {

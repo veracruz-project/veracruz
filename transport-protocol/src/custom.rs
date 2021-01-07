@@ -180,10 +180,10 @@ pub fn serialize_program(program_buffer: &[u8]) -> TransportProtocolResult {
 }
 
 /// Serialize a (static) data package and its package ID.
-pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> TransportProtocolResult {
+pub fn serialize_program_data(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
-    data.set_package_id(package_id);
+    data.set_file_name(file_name.to_string());
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_data(data);
 
@@ -200,10 +200,10 @@ pub fn serialize_request_enclave_state() -> TransportProtocolResult {
 }
 
 /// Serialize a stream data package and its package ID.
-pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> TransportProtocolResult {
+pub fn serialize_stream(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
-    data.set_package_id(package_id);
+    data.set_file_name(file_name.to_string());
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_stream(data);
 
@@ -211,8 +211,9 @@ pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> TransportProtoco
 }
 
 /// Serialize the request for querying the result.
-pub fn serialize_request_result() -> TransportProtocolResult {
-    let command = transport_protocol::RequestResult::new();
+pub fn serialize_request_result(file_name : &str) -> TransportProtocolResult {
+    let mut command = transport_protocol::RequestResult::new();
+    command.set_file_name(file_name.to_string());
     let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_result(command);
 
@@ -378,9 +379,11 @@ pub fn parse_psa_attestation_init(
 }
 
 /// Serialize the request for querying the hash of the provisioned program.
-pub fn serialize_request_pi_hash() -> TransportProtocolResult {
+#[deprecated]
+pub fn serialize_request_pi_hash(file_name : &str) -> TransportProtocolResult {
     let mut request = transport_protocol::RuntimeManagerRequest::new();
-    let rph = transport_protocol::RequestPiHash::new();
+    let mut rph = transport_protocol::RequestPiHash::new();
+    rph.set_file_name(file_name.to_string());
     request.set_request_pi_hash(rph);
     Ok(request.write_to_bytes()?)
 }
