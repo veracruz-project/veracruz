@@ -459,7 +459,7 @@ impl VFSService {
 
     #[inline]
     pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
-        self.filesystem.fd_filestat_get(fd)
+        self.filesystem.fd_filestat_get(fd, )
     }
 
     #[inline]
@@ -545,8 +545,8 @@ impl VFSService {
     pub(crate) fn path_filestat_get(
         &mut self,
         fd: &Fd,
-        flags: LookupFlags,
-        path: String,
+        flags: &LookupFlags,
+        path: &String,
     ) -> FileSystemError<FileStat> {
         self.filesystem.path_filestat_get(fd, flags, path)
     }

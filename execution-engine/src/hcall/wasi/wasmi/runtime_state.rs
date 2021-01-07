@@ -9,27 +9,35 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use super::error::{mk_error_code, mk_host_trap};
-use crate::hcall::common::{
-    pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, Chihuahua, EntrySignature,
-    LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError, WASI_ARGS_GET_NAME,
-    WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME, WASI_CLOCK_TIME_GET_NAME,
-    WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME, WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME,
-    WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME, WASI_FD_FDSTAT_GET_NAME,
-    WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME, WASI_FD_FILESTAT_GET_NAME,
-    WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME, WASI_FD_PREAD_NAME,
-    WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME, WASI_FD_PWRITE_NAME,
-    WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME, WASI_FD_SEEK_NAME,
-    WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME, WASI_PATH_CREATE_DIRECTORY_NAME,
-    WASI_PATH_FILESTAT_GET_NAME, WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME,
-    WASI_PATH_OPEN_NAME, WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME,
-    WASI_PATH_RENAME_NAME, WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME,
-    WASI_POLL_ONEOFF_NAME, WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME,
-    WASI_SCHED_YIELD_NAME, WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
+use std::convert::TryInto;
+
+use crate::hcall::{
+    common::{
+        pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, Chihuahua, EntrySignature,
+        LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
+        WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
+        WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
+        WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
+        WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
+        WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME,
+        WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME,
+        WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME,
+        WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME,
+        WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
+        WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME, WASI_PATH_OPEN_NAME,
+        WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME, WASI_PATH_RENAME_NAME,
+        WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
+        WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
+        WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
+    },
+    wasmi::error::{mk_error_code, mk_host_trap},
 };
 use platform_services::{getrandom, result};
-use std::convert::TryInto;
-use wasi_types::{Advice, ErrNo, Fd, FdFlags, FdStat, FileSize, FileStat, IoVec, Rights, Size, FileDelta, Whence};
+
+use wasi_types::{
+    Advice, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, IoVec, LookupFlags, Rights,
+    Size, Whence,
+};
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
@@ -1438,18 +1446,70 @@ impl WASMIRuntimeState {
     /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
     /// to the address for some reason.
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> Result<(), RuntimePanic> {
-        match self.memory() {
-            None => Err(RuntimePanic::NoMemoryRegistered),
-            Some(memory) => {
-                if let Err(_) = memory.set(address, buffer) {
-                    Err(RuntimePanic::MemoryWriteFailed {
-                        memory_address: address as usize,
-                        bytes_to_be_written: buffer.len(),
-                    })
-                } else {
-                    Ok(())
+        if let Some(memory) = self.memory() {
+            memory
+                .set(address, buffer)
+                .map_err(|_e| RuntimePanic::MemoryWriteFailed {
+                    memory_address: address as usize,
+                    bytes_to_be_written: buffer.len(),
+                })
+                .map(|_r| ())
+        } else {
+            Err(RuntimePanic::NoMemoryRegistered)
+        }
+    }
+
+    /// Read a buffer of bytes from the runtime state's memory at
+    /// address, `address`.  Fails with `Err(RuntimePanic::NoMemoryRegistered)`
+    /// if no memory is registered in the runtime state, or
+    /// `Err(RuntimePanic::MemoryReadFailed)` if the value could not be read
+    /// from the address for some reason.
+    fn read_buffer(&self, address: u32, length: usize) -> Result<Vec<u8>, RuntimePanic> {
+        if let Some(memory) = self.memory() {
+            memory
+                .get(address, length)
+                .map_err(|_e| RuntimePanic::MemoryReadFailed {
+                    memory_address: address as usize,
+                    bytes_to_be_read: length,
+                })
+                .map(|buf| buf.to_vec())
+        } else {
+            Err(RuntimePanic::NoMemoryRegistered)
+        }
+    }
+
+    /// Reads a null-terminated C-style string from the runtime state's memory,
+    /// starting at base address `address`.  Fails with
+    /// `Err(RuntimePanic::NoMemoryRegistered)` if no memory is registered in
+    /// the runtime state, or `Err(RuntimePanic::MemoryReadFailed)` if the value
+    /// could not be read from the address for some reason (e.g. if the bytes
+    /// read are not valid UTF-8.)
+    ///
+    /// TODO: should this not be OsStr rather than a valid UTF-8 string?  Most
+    /// POSIX-style implementations allow arbitrary nonsense filenames/paths and
+    /// do not mandate valid UTF-8.  How "real" do we really want to be, here?
+    fn read_cstring(&self, mut address: u32) -> Result<String, RuntimePanic> {
+        if let Some(memory) = self.memory() {
+            let mut buffer = Vec::new();
+
+            while let Ok(byte) = memory.get(address, 1) {
+                let byte = byte[0].clone();
+
+                if byte == 0 {
+                    break;
                 }
+
+                buffer.push(byte);
             }
+
+            buffer.push(0);
+
+            String::from_utf8(buffer).map_err(|_e| RuntimePanic::MemoryReadFailed {
+                memory_address: address as usize,
+                bytes_to_be_read: 1,
+            })
+        } else {
+            Err(RuntimePanic::NoMemoryRegistered)
         }
     }
 
@@ -1465,24 +1525,6 @@ impl WASMIRuntimeState {
                 }
                 Err(e) => Err(e),
             })
-    }
-
-    /// Read a buffer of bytes from the runtime state's memory at
-    /// address, `address`.  Fails with `Err(RuntimePanic::NoMemoryRegistered)`
-    /// if no memory is registered in the runtime state, or
-    /// `Err(RuntimePanic::MemoryWriteFailed)` if the value could not be written
-    /// to the address for some reason.
-    fn read_buffer(&self, address: u32, length: usize) -> Result<Vec<u8>, RuntimePanic> {
-        match self.memory() {
-            None => Err(RuntimePanic::NoMemoryRegistered),
-            Some(memory) => match memory.get(address, length) {
-                Err(_) => Err(RuntimePanic::MemoryReadFailed {
-                    memory_address: address as usize,
-                    bytes_to_be_read: length,
-                }),
-                Ok(buf) => Ok(buf.to_vec()),
-            },
-        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1568,7 +1610,10 @@ impl WASMIRuntimeState {
         let environ_buff_size_address: u32 = args.nth(1);
 
         self.write_buffer(environc_address, &u32::to_le_bytes(environc))?;
-        self.write_buffer(environ_buff_size_address, &u32::to_le_bytes(environ_buff_size))?;
+        self.write_buffer(
+            environ_buff_size_address,
+            &u32::to_le_bytes(environ_buff_size),
+        )?;
 
         Ok(ErrNo::Success)
     }
@@ -1653,7 +1698,8 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_datasync` function.  This is not
     /// supported by Veracruz and we simply return `ErrNo::NotSup`.
     ///
-    /// XXX: consider whether this should just return `ErrNo::Success`, instead.
+    /// TODO: consider whether this should just return `ErrNo::Success`,
+    /// instead.
     fn wasi_fd_datasync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -1921,11 +1967,10 @@ impl WASMIRuntimeState {
 
         let fd: Fd = args.nth::<u32>(0).into();
         let offset: FileDelta = args.nth::<i64>(1);
-        let whence: Whence =
-            match args.nth::<u8>(2).try_into() {
-                Ok(whence) => whence,
-                Err(_err) => return Ok(ErrNo::Inval)
-            };
+        let whence: Whence = match args.nth::<u8>(2).try_into() {
+            Ok(whence) => whence,
+            Err(_err) => return Ok(ErrNo::Inval),
+        };
         let address: u32 = args.nth(3);
 
         let result = self.fd_seek(&fd, offset, whence)?;
@@ -1999,14 +2044,26 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_filestat_get` function.
-    ///
-    /// TODO: complete this.
     fn wasi_path_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_PATH_FILESTAT_GET_NAME,
             ));
         }
+
+        let fd: Fd = args.nth::<u32>(0).into();
+        let flags: LookupFlags = match args.nth::<u32>(1).try_into() {
+            Ok(flags) => flags,
+            Err(_err) => return Ok(ErrNo::Inval),
+        };
+        let path_address = args.nth::<u32>(2);
+        let path = self.read_cstring(path_address)?;
+
+        let address = args.nth::<u32>(3);
+
+        let result = self.path_filestat_get(&fd, &flags, &path)?;
+
+        self.write_buffer(address, &pack_filestat(&result))?;
 
         Ok(ErrNo::Success)
     }
