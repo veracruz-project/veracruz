@@ -75,14 +75,14 @@ Now, start a shell in the container:
 docker exec -u dermil01 -it veracruz bash
 ```
 
-Install the AWS Nitro Enclaves CLI (source: https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave-cli-install.html) (TODO: This should be done by the docker build process:
+Install the AWS Nitro Enclaves CLI (source: https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave-cli-install.html) (TODO: This should be done by the docker build process):
 ```bash
 sudo amazon-linux-extras install aws-nitro-enclaves-cli
 sudo yum install aws-nitro-enclaves-cli-devel -y
 sudo usermod -aG ne ec2-user
 ```
 
-Configure nitro enclaves (source: From <https://docs.aws.amazon.com/enclaves/latest/user/enclaves-user.pdf> ).
+Configure nitro enclaves (source: From <https://docs.aws.amazon.com/enclaves/latest/user/enclaves-user.pdf> ) (TODO: Find out if this will work from inside a docker container).
 Edit `/etc/nitro_enclaves/allocator.yaml` and set cpus = 2, memory to 256MB
 
 preparing the build environment inside the container (TODO: This should be done in the container build process):
