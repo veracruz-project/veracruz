@@ -1513,18 +1513,53 @@ impl WASMIRuntimeState {
         }
     }
 
-    /// Read several IoVec.
-    fn read_iovec(&mut self, _address: u32, ciovec: Vec<IoVec>) -> Result<Vec<u8>, RuntimePanic> {
-        ciovec
-            .iter()
-            .fold(Ok(Vec::new()), |acc, IoVec { buf, len }| match acc {
-                Ok(mut rst) => {
-                    let mut new_rst = self.read_buffer(*buf, *len as usize)?;
-                    rst.append(&mut new_rst);
-                    Ok(rst)
-                }
-                Err(e) => Err(e),
-            })
+    /// Performs a scattered read from several locations, as specified by a list
+    /// of `IoVec` structures, `scatters`, from the runtime state's memory.
+    /// Fails with `Err(RuntimePanic::NoMemoryRegistered)` if no memory is
+    /// registered in the runtime state, or
+    /// `Err(RuntimePanic::MemoryReadFailed)` if any scattered read could not be
+    /// performed, for some reason.
+    fn read_iovec_scattered(&self, scatters: Vec<IoVec>) -> Result<Vec<Vec<u8>>, RuntimePanic> {
+        if let Some(memory) = self.memory() {
+            let mut result = Vec::new();
+
+            for scatter in scatters.iter() {
+                let buffer = self.read_buffer(scatter.buf, scatter.len as usize)?;
+                result.push(buffer);
+            }
+
+            Ok(result)
+        } else {
+            Err(RuntimePanic::NoMemoryRegistered)
+        }
+    }
+
+    /// Performs a scattered write to several locations, as specified by a list
+    /// of `IoVec` structures, `scatters`, from the runtime state's memory.
+    /// Fails with `Err(RuntimePanic::NoMemoryRegistered)` if no memory is
+    /// registered in the runtime state, or
+    /// `Err(RuntimePanic::MemoryWriteFailed)` if any scattered write could not be
+    /// performed, for some reason.
+    ///
+    /// Note that for each scatter-gather write pair, `(iovec, buf)`, the length
+    /// of the written buffer, `buf`, is truncated to `iovec.len`, as
+    /// appropriate.
+    fn write_iovec_scattered(&mut self, scatters: Vec<(IoVec, Vec<u8>)>) -> Result<(), RuntimePanic> {
+        if let Some(memory) = self.memory() {
+            for (scatter, buf) in scatters.iter() {
+                let buf =
+                    if buf.len() < scatter.len as usize {
+                        buf
+                    } else {
+                        buf[0..scatter.len]
+                    };
+                self.write_buffer(scatter.buf, buf)?;
+            }
+
+            Ok(())
+        } else {
+            Err(RuntimePanic::NoMemoryRegistered)
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -2017,15 +2052,24 @@ impl WASMIRuntimeState {
     ///
     /// TODO: complete this.
     fn wasi_fd_write(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 3 {
+        if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_FD_WRITE_NAME,
             ));
         }
 
-        let address: u32 = args.nth(3);
+        let fd: Fd = args.nth::<u32>(0).into();
+        let buf_base_address: u32 = args.nth::<u32>(1);
+        let buf_len: u32 = args.nth::<u32>(2);
+        let address: u32 = args.nth::<u32>(3);
 
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        let buffer = self.read_buffer(buf_base_address, buf_len as usize)?;
+        let ciovec: Vec<IoVec> = unpack_iovec(buffer);
+
+        let result = self.fd_write_base(&fd, &ciovec)?;
+        let bufs = self.read_iovec_scattered()
+
+        self.write_buffer(address, &u32::to_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
@@ -2100,9 +2144,39 @@ impl WASMIRuntimeState {
             ));
         }
 
+        let fd: Fd = args.nth::<u32>(0).into();
+        let dirflags =
+            match args.nth::<u32>(1).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(dirflags) => dirflags
+            };
+        let path_address = args.nth::<u32>(2);
+        let path = self.read_cstring(path_address)?;
+        let oflags =
+            match args.nth::<u16>(3).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(oflags) => oflags
+            };
+        let fs_rights_base =
+            match args.nth::<u64>(4).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(fs_rights_base) => fs_rights_base
+            };
+        let fs_rights_inheriting =
+            match args.nth::<u64>(5).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(fs_rights_inheriting) => fs_rights_inheriting
+            };
+        let fd_flags =
+            match args.nth::<u16>(6).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(fd_flags) => fd_flags
+            };
         let address: u32 = args.nth(7);
 
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        let result = self.path_open(&fd, dirflags, path, oflags, fs_rights_base, fs_rights_inheriting, fd_flags)?;
+
+        self.write_buffer(address, &u32::to_le_bytes(result.into()))?;
 
         Ok(ErrNo::Success)
     }
