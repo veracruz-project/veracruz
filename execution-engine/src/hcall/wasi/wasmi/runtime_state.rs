@@ -13,9 +13,9 @@ use std::convert::TryInto;
 
 use crate::hcall::{
     common::{
-        pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, unpack_iovec_array, Chihuahua,
-        EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
-        WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
+        pack_dirent, pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, unpack_iovec_array,
+        Chihuahua, EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState,
+        WASIError, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
         WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
         WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
         WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
@@ -1548,36 +1548,6 @@ impl WASMIRuntimeState {
         }
     }
 
-    /// Performs a scattered write to several locations, as specified by a list
-    /// of `IoVec` structures, `scatters`, from the runtime state's memory.
-    /// Fails with `Err(RuntimePanic::NoMemoryRegistered)` if no memory is
-    /// registered in the runtime state, or
-    /// `Err(RuntimePanic::MemoryWriteFailed)` if any scattered write could not be
-    /// performed, for some reason.
-    ///
-    /// Note that for each scatter-gather write pair, `(iovec, buf)`, the length
-    /// of the written buffer, `buf`, is truncated to `iovec.len`, as
-    /// appropriate.
-    fn write_iovec_scattered(
-        &mut self,
-        scatters: Vec<(IoVec, Vec<u8>)>,
-    ) -> Result<(), RuntimePanic> {
-        if let Some(memory) = self.memory() {
-            for (scatter, buf) in scatters.iter() {
-                let buf = if buf.len() < scatter.len as usize {
-                    buf
-                } else {
-                    &buf[0..scatter.len as usize]
-                };
-                self.write_buffer(scatter.buf, buf)?;
-            }
-
-            Ok(())
-        } else {
-            Err(RuntimePanic::NoMemoryRegistered)
-        }
-    }
-
     ////////////////////////////////////////////////////////////////////////////
     // The WASI host call implementations.
     ////////////////////////////////////////////////////////////////////////////
@@ -1948,11 +1918,10 @@ impl WASMIRuntimeState {
         let fd: Fd = args.nth::<u32>(0).into();
         let iovec_base = args.nth::<u32>(1);
         let iovec_length = args.nth::<u32>(2);
-        let filesize: FileSize =
-            match args.nth::<u64>(3).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(filesize) => filesize
-            };
+        let filesize: FileSize = match args.nth::<u64>(3).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(filesize) => filesize,
+        };
         let address: u32 = args.nth(4);
 
         let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
@@ -2011,8 +1980,35 @@ impl WASMIRuntimeState {
             ));
         }
 
+        let fd: Fd = args.nth::<u32>(0).into();
+        let dirent_base: u32 = args.nth::<u32>(1);
+        let dirent_length: u32 = args.nth::<u32>(2);
+        let cookie = match args.nth::<u32>(3).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(cookie) => cookie,
+        };
         let address: u32 = args.nth(4);
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+
+        let dirents = self.fd_readdir(&fd, &cookie)?;
+
+        let mut size_written = 0u32;
+
+        for dirent in dirents.iter() {
+            let packed = pack_dirent(dirent);
+
+            if (size_written as usize) <= (dirent_length as usize) - packed.len() {
+                self.write_buffer(dirent_base + size_written, &packed)?;
+                size_written += packed.len() as u32;
+            } else {
+                let diff = size_written - dirent_length;
+                let packed = &packed[0..diff as usize];
+                self.write_buffer(dirent_base + size_written, packed)?;
+                size_written += diff;
+                break;
+            }
+        }
+
+        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
