@@ -1519,7 +1519,7 @@ impl WASMIRuntimeState {
     /// registered in the runtime state, or
     /// `Err(RuntimePanic::MemoryReadFailed)` if any scattered read could not be
     /// performed, for some reason.
-    fn read_iovec_scattered(&self, scatters: Vec<IoVec>) -> Result<Vec<Vec<u8>>, RuntimePanic> {
+    fn read_iovec_scattered(&self, scatters: &[IoVec]) -> Result<Vec<Vec<u8>>, RuntimePanic> {
         if let Some(memory) = self.memory() {
             let mut result = Vec::new();
 
@@ -2049,8 +2049,6 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_write` function.
-    ///
-    /// TODO: complete this.
     fn wasi_fd_write(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 4 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
@@ -2066,10 +2064,15 @@ impl WASMIRuntimeState {
         let buffer = self.read_buffer(buf_base_address, buf_len as usize)?;
         let ciovec: Vec<IoVec> = unpack_iovec(buffer);
 
-        let result = self.fd_write_base(&fd, &ciovec)?;
-        let bufs = self.read_iovec_scattered()
+        let bufs = self.read_iovec_scattered(&ciovec)?;
 
-        self.write_buffer(address, &u32::to_le_bytes(result))?;
+        let mut size_written = 0;
+
+        for buf in bufs.iter() {
+            size_written += self.fd_write_base(&fd, buf.clone())?;
+        }
+
+        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
