@@ -19,7 +19,7 @@ use veracruz_util::policy::principal::{Principal, FileOperation};
 use std::{
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
-    mem::{transmute_copy, size_of},
+    mem::size_of,
     slice::from_raw_parts,
     string::{String, ToString},
     fmt::{Formatter, Display, Error},
@@ -163,28 +163,41 @@ where
 
 /// Packs an `FdStat` type into a vector of bytes.  For writing `FdStat`
 /// structures into memory, across the ABI boundary.
+#[inline]
 pub(crate) fn pack_fdstat(fdstat: &FdStat) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(fdstat) }
 }
 
 /// Packs a `FileStat` type into a vector of bytes.  For writing `FileStat`
 /// structures into memory, across the ABI boundary.
+#[inline]
 pub(crate) fn pack_filestat(stat: &FileStat) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(stat) }
 }
 
 /// Packs a `PreStat` type into a vector of bytes.  For writing `PreStat`
 /// structures into memory, across the ABI boundary.
+#[inline]
 pub(crate) fn pack_prestat(stat: &Prestat) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(stat) }
 }
 
+/// Packs a `DirEnt` type into a vector of bytes.  For writing `DirEnt`
+/// structures into memory, across the ABI boundary.
+#[inline]
+pub(crate) fn pack_dirent(dirent: &DirEnt) -> Vec<u8> {
+    unsafe { pack_sized_as_bytes(dirent) }
+}
+
+/// Unpacks an `IoVec` structure from a series of bytes, starting at the offset,
+/// `offset`.  Returns `None` iff the structure cannot be unpacked, for example
+/// if `offset` lies too close to the end of `bytes`.
 unsafe fn unpack_iovec(bytes: &[u8], offset: usize) -> Option<IoVec> {
     unimplemented!()
 }
 
 /// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
-/// any `IoVec` fails.
+/// any `IoVec` fails, for any reason.
 pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
     let mut offset = 0;
     let mut iovecs = Vec::new();
@@ -527,8 +540,8 @@ impl VFSService {
     pub(crate) fn fd_readdir(
         &mut self,
         fd: &Fd,
-        cookie: DirCookie,
-    ) -> FileSystemError<Vec<String>> {
+        cookie: &DirCookie,
+    ) -> FileSystemError<Vec<DirEnt>> {
         self.filesystem.fd_readdir(fd, cookie)
     }
 

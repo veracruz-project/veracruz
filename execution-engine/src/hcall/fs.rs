@@ -11,13 +11,9 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    string::String,
-};
+use std::{collections::HashMap, convert::TryFrom, string::String};
 use wasi_types::{
-    Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
+    Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
 };
 
@@ -171,7 +167,10 @@ impl FileSystem {
         unimplemented!()
     }
 
-    pub(crate) fn write_file<U>(&mut self, _fname: &U, _data: Vec<u8>) where U: Into<String> {
+    pub(crate) fn write_file<U>(&mut self, _fname: &U, _data: Vec<u8>)
+    where
+        U: Into<String>,
+    {
         unimplemented!()
     }
 
@@ -374,8 +373,8 @@ impl FileSystem {
     pub(crate) fn fd_readdir(
         &mut self,
         _fd: &Fd,
-        _cookie: DirCookie,
-    ) -> FileSystemError<Vec<String>> {
+        _cookie: &DirCookie,
+    ) -> FileSystemError<Vec<DirEnt>> {
         unimplemented!()
     }
 
