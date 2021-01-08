@@ -13,8 +13,8 @@ use std::convert::TryInto;
 
 use crate::hcall::{
     common::{
-        pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, Chihuahua, EntrySignature,
-        LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
+        pack_fdstat, pack_filestat, pack_prestat, sha_256_digest, unpack_iovec_array, Chihuahua,
+        EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState, WASIError,
         WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
         WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
         WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
@@ -156,8 +156,12 @@ const WASI_SOCK_SHUTDOWN_INDEX: usize = 44;
 
 /// The representation type of the WASI `Advice` type.
 const REPRESENTATION_WASI_ADVICE: ValueType = ValueType::I32;
-/// The representation type of the WASI `CIOVecArray` type.
-const REPRESENTATION_WASI_CIOVEC_ARRAY: ValueType = ValueType::I64;
+/// The base pointer representation type of the WASI `CIOVecArray` type, which
+/// is passed as a pair of base address and length.
+const REPRESENTATION_WASI_CIOVEC_ARRAY_BASE: ValueType = ValueType::I32;
+/// The length representation type of the WASI `CIOVecArray` type, which is
+/// passed as a pair of base address and length.
+const REPRESENTATION_WASI_CIOVEC_ARRAY_LENGTH: ValueType = ValueType::I32;
 /// The representation type of the WASI `ClockID` type.
 const REPRESENTATION_WASI_CLOCKID: ValueType = ValueType::I32;
 /// The representation type of the WASI `DirCookie` type.
@@ -176,8 +180,12 @@ const REPRESENTATION_WASI_FILEDELTA: ValueType = ValueType::I64;
 const REPRESENTATION_WASI_FILESIZE: ValueType = ValueType::I32;
 /// The representation type of the WASI `FSTFlags` type.
 const REPRESENTATION_WASI_FSTFLAGS: ValueType = ValueType::I32;
-/// The representation type of the WASI `IOVecArray` type.
-const REPRESENTATION_WASI_IOVEC_ARRAY: ValueType = ValueType::I64;
+/// The base pointer representation type of the WASI `IOVecArray` type, which
+/// is passed as a pair of base address and length.
+const REPRESENTATION_WASI_IOVEC_ARRAY_BASE: ValueType = ValueType::I32;
+/// The length representation type of the WASI `IOVecArray` type, which is
+/// passed as a pair of base address and length.
+const REPRESENTATION_WASI_IOVEC_ARRAY_LENGTH: ValueType = ValueType::I32;
 /// The representation type of the WASI `LookupFlags` type.
 const REPRESENTATION_WASI_LOOKUP_FLAGS: ValueType = ValueType::I32;
 /// The representation type of the WASI `OFlags` type.
@@ -454,7 +462,8 @@ fn check_fd_pread_signature(signature: &Signature) -> bool {
     params
         == &[
             REPRESENTATION_WASI_FD,
-            REPRESENTATION_WASI_IOVEC_ARRAY,
+            REPRESENTATION_WASI_IOVEC_ARRAY_BASE,
+            REPRESENTATION_WASI_IOVEC_ARRAY_LENGTH,
             REPRESENTATION_WASI_FILESIZE,
             REPRESENTATION_WASM_POINTER,
         ]
@@ -504,7 +513,8 @@ fn check_fd_pwrite_signature(signature: &Signature) -> bool {
     params
         == &[
             REPRESENTATION_WASI_FD,
-            REPRESENTATION_WASI_CIOVEC_ARRAY,
+            REPRESENTATION_WASI_CIOVEC_ARRAY_BASE,
+            REPRESENTATION_WASI_CIOVEC_ARRAY_LENGTH,
             REPRESENTATION_WASI_FILESIZE,
             REPRESENTATION_WASM_POINTER,
         ]
@@ -523,7 +533,8 @@ fn check_fd_read_signature(signature: &Signature) -> bool {
     params
         == &[
             REPRESENTATION_WASI_FD,
-            REPRESENTATION_WASI_IOVEC_ARRAY,
+            REPRESENTATION_WASI_IOVEC_ARRAY_BASE,
+            REPRESENTATION_WASI_IOVEC_ARRAY_LENGTH,
             REPRESENTATION_WASM_POINTER,
         ]
         && return_type == Some(REPRESENTATION_WASI_ERRNO)
@@ -618,7 +629,8 @@ fn check_fd_write_signature(signature: &Signature) -> bool {
     params
         == &[
             REPRESENTATION_WASI_FD,
-            REPRESENTATION_WASI_CIOVEC_ARRAY,
+            REPRESENTATION_WASI_CIOVEC_ARRAY_BASE,
+            REPRESENTATION_WASI_CIOVEC_ARRAY_LENGTH,
             REPRESENTATION_WASM_POINTER,
         ]
         && return_type == Some(REPRESENTATION_WASI_ERRNO)
@@ -888,7 +900,8 @@ fn check_sock_recv_signature(signature: &Signature) -> bool {
     params
         == &[
             REPRESENTATION_WASI_FD,
-            REPRESENTATION_WASI_IOVEC_ARRAY,
+            REPRESENTATION_WASI_IOVEC_ARRAY_BASE,
+            REPRESENTATION_WASI_IOVEC_ARRAY_LENGTH,
             REPRESENTATION_WASI_RIFLAGS,
             REPRESENTATION_WASM_POINTER,
             REPRESENTATION_WASM_POINTER,
@@ -908,7 +921,8 @@ fn check_sock_send_signature(signature: &Signature) -> bool {
     params
         == &[
             REPRESENTATION_WASI_FD,
-            REPRESENTATION_WASI_CIOVEC_ARRAY,
+            REPRESENTATION_WASI_CIOVEC_ARRAY_BASE,
+            REPRESENTATION_WASI_CIOVEC_ARRAY_LENGTH,
             REPRESENTATION_WASI_SIFLAGS,
             REPRESENTATION_WASM_POINTER,
         ]
@@ -1544,15 +1558,17 @@ impl WASMIRuntimeState {
     /// Note that for each scatter-gather write pair, `(iovec, buf)`, the length
     /// of the written buffer, `buf`, is truncated to `iovec.len`, as
     /// appropriate.
-    fn write_iovec_scattered(&mut self, scatters: Vec<(IoVec, Vec<u8>)>) -> Result<(), RuntimePanic> {
+    fn write_iovec_scattered(
+        &mut self,
+        scatters: Vec<(IoVec, Vec<u8>)>,
+    ) -> Result<(), RuntimePanic> {
         if let Some(memory) = self.memory() {
             for (scatter, buf) in scatters.iter() {
-                let buf =
-                    if buf.len() < scatter.len as usize {
-                        buf
-                    } else {
-                        buf[0..scatter.len]
-                    };
+                let buf = if buf.len() < scatter.len as usize {
+                    buf
+                } else {
+                    &buf[0..scatter.len as usize]
+                };
                 self.write_buffer(scatter.buf, buf)?;
             }
 
@@ -1854,20 +1870,23 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let buf: u32 = args.nth(1);
-        let len: u32 = args.nth(2);
+        let iovec_base: u32 = args.nth(1);
+        let iovec_length: u32 = args.nth(2);
         let offset: FileSize = args.nth(3);
         let address: u32 = args.nth(4);
 
-        let result = self.fd_pread_base(&fd, len as usize, &offset)?;
+        let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
+        let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
 
-        if result.len() < len as usize {
-            self.write_buffer(buf, &result)?;
-            self.write_buffer(address, &u32::to_le_bytes(result.len() as u32))?;
-        } else {
-            self.write_buffer(buf, &result[0..len as usize])?;
-            self.write_buffer(address, &u32::to_le_bytes(len))?;
+        let mut size_written = 0;
+
+        for iovec in iovec_array.iter() {
+            let to_write = self.fd_pread_base(&fd, iovec.len as usize, &offset)?;
+            self.write_buffer(iovec.buf, &to_write)?;
+            size_written += iovec.len;
         }
+
+        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
@@ -1919,18 +1938,35 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_pwrite` function.
-    ///
-    /// TODO: complete this.
     fn wasi_fd_pwrite(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 4 {
+        if args.len() != 5 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_FD_PWRITE_NAME,
             ));
         }
 
-        let address: u32 = args.nth(3);
+        let fd: Fd = args.nth::<u32>(0).into();
+        let iovec_base = args.nth::<u32>(1);
+        let iovec_length = args.nth::<u32>(2);
+        let filesize: FileSize =
+            match args.nth::<u64>(3).try_into() {
+                Err(_err) => return Ok(ErrNo::Inval),
+                Ok(filesize) => filesize
+            };
+        let address: u32 = args.nth(4);
 
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
+        let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
+
+        let scatters = self.read_iovec_scattered(&iovec_array)?;
+
+        let mut size_written = 0;
+
+        for to_write in scatters.iter().cloned() {
+            size_written += self.fd_pwrite_base(&fd, to_write, &filesize)?;
+        }
+
+        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
@@ -1945,19 +1981,22 @@ impl WASMIRuntimeState {
 
         let fd: Fd = args.nth::<u32>(0).into();
         // The following two arguments correspond to the `iovec` input.
-        let buf: u32 = args.nth(1);
-        let len: u32 = args.nth(2);
+        let iovec_base: u32 = args.nth(1);
+        let iovec_len: u32 = args.nth(2);
         let address: u32 = args.nth(3);
 
-        let result = self.fd_read_base(&fd, len as usize)?;
+        let buffer = self.read_buffer(iovec_base, iovec_len as usize)?;
+        let iovecs = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
 
-        if result.len() < len as usize {
-            self.write_buffer(buf, &result)?;
-            self.write_buffer(address, &u32::to_le_bytes(result.len() as u32))?;
-        } else {
-            self.write_buffer(buf, &result[0..(len as usize)])?;
-            self.write_buffer(address, &u32::to_le_bytes(len))?;
+        let mut size_read = 0;
+
+        for iovec in iovecs.iter() {
+            let to_write = self.fd_read_base(&fd, iovec.len as usize)?;
+            self.write_buffer(iovec.buf, &to_write)?;
+            size_read += iovec.len;
         }
+
+        self.write_buffer(address, &u32::to_le_bytes(size_read))?;
 
         Ok(ErrNo::Success)
     }
@@ -2057,14 +2096,14 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let buf_base_address: u32 = args.nth::<u32>(1);
-        let buf_len: u32 = args.nth::<u32>(2);
+        let iovec_base: u32 = args.nth::<u32>(1);
+        let iovec_length: u32 = args.nth::<u32>(2);
         let address: u32 = args.nth::<u32>(3);
 
-        let buffer = self.read_buffer(buf_base_address, buf_len as usize)?;
-        let ciovec: Vec<IoVec> = unpack_iovec(buffer);
+        let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
+        let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
 
-        let bufs = self.read_iovec_scattered(&ciovec)?;
+        let bufs = self.read_iovec_scattered(&iovec_array)?;
 
         let mut size_written = 0;
 
@@ -2151,36 +2190,39 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
-        let dirflags =
-            match args.nth::<u32>(1).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(dirflags) => dirflags
-            };
+        let dirflags = match args.nth::<u32>(1).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(dirflags) => dirflags,
+        };
         let path_address = args.nth::<u32>(2);
         let path = self.read_cstring(path_address)?;
-        let oflags =
-            match args.nth::<u16>(3).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(oflags) => oflags
-            };
-        let fs_rights_base =
-            match args.nth::<u64>(4).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(fs_rights_base) => fs_rights_base
-            };
-        let fs_rights_inheriting =
-            match args.nth::<u64>(5).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(fs_rights_inheriting) => fs_rights_inheriting
-            };
-        let fd_flags =
-            match args.nth::<u16>(6).try_into() {
-                Err(_err) => return Ok(ErrNo::Inval),
-                Ok(fd_flags) => fd_flags
-            };
+        let oflags = match args.nth::<u16>(3).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(oflags) => oflags,
+        };
+        let fs_rights_base = match args.nth::<u64>(4).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(fs_rights_base) => fs_rights_base,
+        };
+        let fs_rights_inheriting = match args.nth::<u64>(5).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(fs_rights_inheriting) => fs_rights_inheriting,
+        };
+        let fd_flags = match args.nth::<u16>(6).try_into() {
+            Err(_err) => return Ok(ErrNo::Inval),
+            Ok(fd_flags) => fd_flags,
+        };
         let address: u32 = args.nth(7);
 
-        let result = self.path_open(&fd, dirflags, path, oflags, fs_rights_base, fs_rights_inheriting, fd_flags)?;
+        let result = self.path_open(
+            &fd,
+            dirflags,
+            path,
+            oflags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            fd_flags,
+        )?;
 
         self.write_buffer(address, &u32::to_le_bytes(result.into()))?;
 
@@ -2352,7 +2394,7 @@ impl WASMIRuntimeState {
     /// supported by Veracruz and returns `ErrNo::NotSup`, writing back
     /// `0` as the length of the transmission.
     fn wasi_sock_send(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 4 {
+        if args.len() != 5 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_SOCK_SEND_NAME,
             ));
@@ -2368,7 +2410,7 @@ impl WASMIRuntimeState {
     /// supported by Veracruz and returns `ErrNo::NotSup`, writing back
     /// `0` as the length of the transmission.
     fn wasi_sock_recv(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 5 {
+        if args.len() != 6 {
             return Err(RuntimePanic::bad_arguments_to_host_function(
                 WASI_SOCK_RECV_NAME,
             ));

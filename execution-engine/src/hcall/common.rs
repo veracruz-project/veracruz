@@ -13,13 +13,13 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, LookupFlags,
-    OpenFlags, Prestat, Rights, Size, Whence,
+    OpenFlags, Prestat, Rights, Size, Whence, IoVec
 };
 use veracruz_util::policy::principal::{Principal, FileOperation};
 use std::{
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
-    mem::size_of,
+    mem::{transmute_copy, size_of},
     slice::from_raw_parts,
     string::{String, ToString},
     fmt::{Formatter, Display, Error},
@@ -156,8 +156,7 @@ unsafe fn pack_sized_as_bytes<T>(element: &T) -> Vec<u8>
 where
     T: Sized,
 {
-    let slice: &[u8] =
-        from_raw_parts((element as *const T) as *const u8, size_of::<T>());
+    let slice: &[u8] = from_raw_parts((element as *const T) as *const u8, size_of::<T>());
 
     slice.to_vec()
 }
@@ -178,6 +177,24 @@ pub(crate) fn pack_filestat(stat: &FileStat) -> Vec<u8> {
 /// structures into memory, across the ABI boundary.
 pub(crate) fn pack_prestat(stat: &Prestat) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(stat) }
+}
+
+unsafe fn unpack_iovec(bytes: &[u8], offset: usize) -> Option<IoVec> {
+    unimplemented!()
+}
+
+/// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
+/// any `IoVec` fails.
+pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
+    let mut offset = 0;
+    let mut iovecs = Vec::new();
+
+    while offset < bytes.len() {
+        let iovec = unsafe { unpack_iovec(bytes, offset)? };
+        iovecs.push(iovec);
+    }
+
+    Some(iovecs)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -339,7 +356,11 @@ impl VFSService {
     /// Implementation of the WASI `args_sizes_get` function.
     pub(crate) fn args_sizes_get(&self) -> (Size, Size) {
         let argc = self.program_arguments.len();
-        let size: usize = self.program_arguments.iter().map(|s| s.as_bytes().len()).sum();
+        let size: usize = self
+            .program_arguments
+            .iter()
+            .map(|s| s.as_bytes().len())
+            .sum();
 
         (argc as Size, size as Size)
     }
@@ -459,7 +480,7 @@ impl VFSService {
 
     #[inline]
     pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
-        self.filesystem.fd_filestat_get(fd, )
+        self.filesystem.fd_filestat_get(fd)
     }
 
     #[inline]
