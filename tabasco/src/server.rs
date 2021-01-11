@@ -17,6 +17,13 @@ use crate::attestation::sgx;
 #[cfg(feature = "nitro")]
 use crate::attestation::nitro;
 
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+lazy_static! {
+    pub static ref DEBUG_MODE: Mutex<bool> = Mutex::new(false);
+}
+
 use crate::error::*;
 use actix_web::{dev::Server, middleware, web, App, HttpServer};
 use psa_attestation::{
@@ -188,7 +195,12 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> T
     Err(TabascoError::UnimplementedRequestError)
 }
 
-pub fn server(url: String) -> Result<Server, String> {
+pub fn server(url: String, debug: bool) -> Result<Server, String> {
+    if debug {
+        let mut debug_mode_wrapper = DEBUG_MODE.lock()
+            .map_err(|err| format!("tabasco::server failed to obtain lock on DEBUG_MODE:{:?}", err))?;
+        *debug_mode_wrapper = true;
+    }
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())

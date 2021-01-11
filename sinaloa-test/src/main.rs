@@ -141,7 +141,10 @@ mod tests {
             std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Tabasco Server");
-                let server = tabasco::server::server(tabasco_url).unwrap();
+                #[cfg(feature="debug")]
+                let server = tabasco::server::server(tabasco_url, true).unwrap();
+                #[cfg(not(feature="debug"))]
+                let server = tabasco::server::server(tabasco_url, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });

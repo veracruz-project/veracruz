@@ -25,7 +25,6 @@ lazy_static! {
 }
 
 pub async fn start(body_string: String) -> TabascoResponder {
-    println!("Tabasco::attestation::start started:{:?}", body_string);
     let received_bytes = base64::decode(&body_string)?;
 
     let parsed = colima::parse_tabasco_request(&received_bytes)?;

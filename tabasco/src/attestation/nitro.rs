@@ -13,6 +13,7 @@ use crate::error::*;
 use lazy_static::lazy_static;
 use rand::Rng;
 use std::{collections::HashMap, sync::Mutex};
+use std::io::Write;
 
 use nitro_enclave_token::NitroToken;
 
@@ -65,7 +66,6 @@ lazy_static! {
 }
 
 pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
-    println!("tabasco::attestation::nitro::start started");
     let mut challenge: [u8; 32] = [0; 32];
     let mut rng = rand::thread_rng();
 
@@ -85,12 +85,24 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
 }
 
 pub fn attestation_token(body_string: String) -> TabascoResponder {
-    println!("tabasco::attestation::nitro::attestation_token started");
-    let received_bytes = base64::decode(&body_string)?;
+    let _ignore = std::io::stdout().flush();
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)?;
+    let received_bytes = base64::decode(&body_string)
+        .map_err(|err| {
+            println!("tabasco::attestation::nitro::attestation_token failed to decode base64:{:?}", err);
+            let _ignore = std::io::stdout().flush();
+            err
+        })?;
+
+    let parsed = colima::parse_tabasco_request(&received_bytes)
+        .map_err(|err| {
+            println!("tabasco::attestation::nitro::attestation_token failed to parse tabasco request:{:?}", err);
+            let _ignore = std::io::stdout().flush();
+            err
+        })?;
     if !parsed.has_native_psa_attestation_token() {
         println!("tabasco::attestation::psa::attestation_token received data is incorrect.");
+        let _ignore = std::io::stdout().flush();
         return Err(TabascoError::MissingFieldError(
             "native_psa_attestation_token",
         ));
@@ -100,26 +112,39 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
 
     let attestation_document = NitroToken::authenticate_token(&token, &AWS_NITRO_ROOT_CERTIFICATE).map_err(|err| {
         println!("Tabasco::nitro::attestation_token authenticate_token failed:{:?}", err);
+        let _ignore = std::io::stdout().flush();
         TabascoError::CborError(format!("parse_nitro_token failed to parse token data:{:?}", err))
     })?;
 
     let attestation_context = {
-        let ac_hash = ATTESTATION_CONTEXT.lock()?;
-        let context = ac_hash
-            .get(&device_id)
-            .ok_or(TabascoError::NoDeviceError(device_id))?;
-        (*context).clone()
+        let ac_hash = ATTESTATION_CONTEXT.lock()
+            .map_err(|err| {
+                println!("Tabasco::nitro::attestation_token failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                let _ignore = std::io::stdout().flush();
+                err
+            })?;
+        println!("ac_hash:{:?}", ac_hash[&device_id].firmware_version);
+        if ac_hash.contains_key(&device_id) {
+            let context = &ac_hash[&device_id];
+            context.clone()
+        } else {
+            println!("Tabasco::nitro::attestation_token device not found. device_id:{:?}", device_id);
+            let _ignore = std::io::stdout().flush();
+            return Err(TabascoError::NoDeviceError(device_id));
+        }
     };
 
     // check the nonce of the attestation document
     match attestation_document.nonce {
         None => {
             println!("tabasco::attestation::nitro::attestation_token attestation document did not contain a nonce. We require it.");
+            let _ignore = std::io::stdout().flush();
             return Err(TabascoError::MissingFieldError("nonce"));
         },
         Some(nonce) => {
             if nonce != attestation_context.challenge {
                 println!("Challenge failed to match. Wanted:{:02x?}, got:{:02x?}", nonce, attestation_context.challenge);
+                let _ignore = std::io::stdout().flush();
                 return Err(TabascoError::MismatchError {
                     variable: "nonce/challenge",
                     expected: attestation_context.challenge.to_vec(),
@@ -132,22 +157,48 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
 
     let expected_enclave_hash: Vec<u8> = {
         let connection = crate::orm::establish_connection()?;
-        crate::orm::get_firmware_version_hash(
+        let hash_option = crate::orm::get_firmware_version_hash(
             &connection,
             &"nitro".to_string(),
             &attestation_context.firmware_version,
-        )?
-        .ok_or(TabascoError::MissingFieldError("firmware version"))?
+        )
+            .map_err(|err| {
+                println!("tabasco::attestation::nitro::attestation_token get_firmware_version_hash failed:{:?}", err);
+                let _ignore = std::io::stdout().flush();
+                err
+            })?;
+        match hash_option {
+            None => {
+                println!("tabasco::attestation::nitro_attestation_token firmware version hash not found in database");
+                let _ignore = std::io::stdout().flush();
+                return Err(TabascoError::MissingFieldError("firmware version"));
+            },
+            Some(hash) => hash,
+        }
     };
     let received_enclave_hash = &attestation_document.pcrs[0];
     if expected_enclave_hash != *received_enclave_hash {
-        println!("Comparision between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
-        println!("We're not going to fail you, but we should. If you see this, something didn't get fixed when it should have");
-        // return Err(TabascoError::MismatchError {
-        //     variable: "received_enclave_hash",
-        //     expected: expected_enclave_hash,
-        //     received: received_enclave_hash.to_vec(),
-        // });
+        let debug_mode_wrapper = crate::server::DEBUG_MODE.lock()
+            .map_err(|err| {
+                println!("tabasco::attestation::nitro_attestation_token failed to obtain lock on DEBUG_MODE mutex");
+                let _ignore = std::io::stdout().flush();
+                TabascoError::MutexError(format!("tabasco::attestation::nitro::attestation_token failed to objtain lock on DEBUG_MODE:{:?}", err))
+            }
+            )?;
+        if *debug_mode_wrapper {
+            println!("Comparison between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
+            println!("This is debug mode, so this is expected, so we're not going to fail you, but you should feel bad.");
+            let _ignore = std::io::stdout().flush();
+        } else {
+            println!("tabasco::attestation::nitro_attestation_token debug mode is off, so we're gonna return an error for this mismatch");
+            let _ignore = std::io::stdout().flush();
+
+            return Err(TabascoError::MismatchError {
+                variable: "received_enclave_hash",
+                expected: expected_enclave_hash,
+                received: received_enclave_hash.to_vec(),
+            });
+        }
     }
 
     let digest = match attestation_document.public_key {
@@ -169,6 +220,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
         enclave_name,
     ).map_err(|err| {
         println!("nitro:: failed to add device to database:{:?}", err);
+        let _ignore = std::io::stdout().flush();
         err
     })?;
     Ok("Pass".to_string())
