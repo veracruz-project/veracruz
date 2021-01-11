@@ -14,8 +14,6 @@ use std::process::Command;
 use serde_json::Value;
 use err_derive::Error;
 use std::thread::JoinHandle;
-use std::io;
-use std::io::Write;
 use nix::sys::socket::{
     AddressFamily, setsockopt, SockType, SockFlag, SockAddr, socket, bind, listen, accept,
     shutdown, Shutdown,
@@ -92,7 +90,7 @@ impl NitroEnclave {
                 Err(err) => {
                     println!("NitroEnclave::new failed to start enclave:{:?}", err);
                     println!("sleeping before trying again");
-                    std::thread::sleep(std::time::Duration::from_millis(5000));
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
                     continue;
                 },
                 Ok(result) => {
@@ -100,7 +98,7 @@ impl NitroEnclave {
                         let enclave_result_stderr = std::str::from_utf8(&result.stderr)?;
                         println!("NitroEnclave::new CLI error:{:?}", enclave_result_stderr);
                         println!("sleeping before trying again");
-                        std::thread::sleep(std::time::Duration::from_millis(5000));
+                        std::thread::sleep(std::time::Duration::from_millis(1000));
                         continue;
                     } else {
                         break result.stdout;
@@ -141,7 +139,6 @@ impl NitroEnclave {
     }
 
     fn ocall_loop(handler: OCallHandler, terminate_rx: std::sync::mpsc::Receiver<bool>) {
-        println!("ocall_loop started");
         let socket_fd = socket(AddressFamily::Vsock, SockType::Stream, SockFlag::SOCK_NONBLOCK, None)
             .expect("NitroEnclave::ocall_loop failed to create a socket");
 
@@ -158,38 +155,33 @@ impl NitroEnclave {
 
         let mut im_done: bool = false;
 
-        println!("NitroEnclave::ocall_loop binding to socket");
         while let Err(err) = bind(socket_fd, &sockaddr) {
             println!("NitroEnclave::ocall_loop failed to bind to socket:{:?}", err);
             if err == nix::Error::Sys(nix::errno::Errno::EADDRINUSE) {
                 // before we continue, check to see if we should terminate
                 if let Ok(terminate) = terminate_rx.try_recv() {
                     if terminate {
-                        println!("ocall_loop terminating before we even start");
                         im_done = true;
                         break;
                     }
                 }
                 println!("sleeping before trying again");
-                std::thread::sleep(std::time::Duration::from_millis(5000));
+                std::thread::sleep(std::time::Duration::from_millis(1000));
             } else {
                 panic!("I don't know what to do here");
             }
         }
 
-        println!("ocall_loop listening");
         if !im_done {
             listen(socket_fd, BACKLOG)
                 .map_err(|err| NitroError::NixError(err)).expect("NitroEnclave::ocall_loop listen failed");
             loop {
                 match accept(socket_fd) {
                     Ok(fd) => {
-                        println!("NitroEnclave::ocall_loop calling receive_buffer");
                         let received_buffer = crate::nitro::receive_buffer(fd)
                             .expect("NitroEnclave::ocall_loop failed to receive buffer");
                         // call the handler
                         let return_buffer = handler(received_buffer).expect("NitroEnclave::ocall_loop handler failed");
-                        println!("NitroEnclave::ocall_loop calling send_buffer");
                         crate::nitro::send_buffer(fd, &return_buffer)
                             .expect("NitroEnclave::ocall_loop failed to send buffer");
                     },
@@ -197,7 +189,6 @@ impl NitroEnclave {
                         nix::Error::Sys(_) => {
                             if let Ok(terminate) = terminate_rx.try_recv() {
                                 if terminate {
-                                    println!("NitroEnclave::ocall_loop is terminating because you told me to");
                                     break;
                                 }
                             }
@@ -223,7 +214,6 @@ impl NitroEnclave {
         if let Err(err) = close(socket_fd) {
             println!("NitroEnclave::ocall_loop failed to close socket file handle({:?}). This might cause you problems in the future", err);
         }
-        println!("ocall_loop terminating ?gracefully?");
     }
 
     pub fn send_buffer(&self, buffer: &Vec<u8>) -> Result<(), NitroError> {
@@ -239,7 +229,6 @@ impl NitroEnclave {
 
 impl Drop for NitroEnclave {
     fn drop(&mut self) {
-        println!("NitroEnclave::drop started");
         // first, tell the ocall loop to terminate
         if let Some(tx_mutex) = &self.ocall_terminate_sender {
             let sender_guard = tx_mutex.lock().unwrap();
@@ -248,7 +237,6 @@ impl Drop for NitroEnclave {
             }
         }
 
-        println!("NitroEnclave::drop waiting for ocall loop to terminate");
         // second, wait for the ocall loop to terminate
         // This is referred to as the "Option dance" - https://users.rust-lang.org/t/spawn-threads-and-join-in-destructor/1613
         // we can only do the "take" because we are effectively a destructor
@@ -258,8 +246,6 @@ impl Drop for NitroEnclave {
                 }
         }
 
-        println!("NitroEnclave::drop shutting down the enclave, complicated");
-        io::stdout().flush();
         // now, shutdown the enclave
         loop {
             let enclave_result = Command::new(&self.nitro_cli_path)
@@ -268,25 +254,18 @@ impl Drop for NitroEnclave {
             match enclave_result {
                 Err(err) => {
                     println!("NitroEnclave::drop Command::new returned err:{:?}, sleeping and trying again", err);
-                    io::stdout().flush();
-                    std::thread::sleep(std::time::Duration::from_millis(2000));
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
                     continue;
                 },
                 Ok(result) => {
-                    println!("NitroEnclave::drop ran the command, passed the unwrap");
-                    io::stdout().flush();
                     if !result.status.success() {
                         println!("NitroEnclave::drop failed to terminate the enclave (exit_status:{:?}. You will need to terminate it yourself.", result.status);
-                        io::stdout().flush();
                         let result_stderr = std::str::from_utf8(&result.stderr).unwrap();
                         println!("NitroEnclave::drop CLI error:{:?}", result_stderr);
-                        io::stdout().flush();
                     }
                     break;
                 },
             }
         }
-        println!("NitroEnclave::drop completed.");
-        io::stdout().flush();
     }
 }

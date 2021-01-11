@@ -301,7 +301,7 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, SinaloaError> {
         let lines = received_header.split("\n");
         lines.collect()
     };
-    println!("sinaloa::send_tabasco_start reeceived header:{:?}", received_header);
+    println!("sinaloa::send_tabasco_start received header:{:?}", received_header);
     if !received_header.contains("HTTP/1.1 200 OK\r") {
         return Err(SinaloaError::ReceivedNonSuccessPostStatusError);
     }

@@ -71,7 +71,6 @@ pub mod sinaloa_nitro {
             println!("SinaloaNitro::new Mexico City instantiated. Calling initialize");
             std::thread::sleep(std::time::Duration::from_millis(10000));
 
-
             let initialize: MCMessage = MCMessage::Initialize(policy_json.to_string());
 
             let encoded_buffer: Vec<u8> = bincode::serialize(&initialize)?;
@@ -79,7 +78,6 @@ pub mod sinaloa_nitro {
 
             // read the response
             let status_buffer = meta.enclave.receive_buffer()?;
-            println!("SinaloaNitro::new Mexicy City initialize returned. CHecking status");
 
             let message: MCMessage = bincode::deserialize(&status_buffer[..])?;
             let status = match message {
@@ -279,7 +277,6 @@ pub mod sinaloa_nitro {
 
     impl SinaloaNitro {
         fn sinaloa_ocall_handler(input_buffer: Vec<u8>) -> Result<Vec<u8>, NitroError> {
-            println!("SinaloaNitro::sinaloa_ocall_handler started");
             let return_buffer: Vec<u8> = {
                 let mut nre_guard = NRE_CONTEXT.lock()
                     .map_err(|_| NitroError::MutexError)?;
