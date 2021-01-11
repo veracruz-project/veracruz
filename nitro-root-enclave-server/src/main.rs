@@ -76,8 +76,16 @@ fn main() {
     let enclave_debug = matches.is_present("debug");
 
     // first, start the nitro-root-enclave
-    let enclave = native_attestation(tabasco_url, enclave_debug)
-        .expect("Failed to perform native attestion");
+    let enclave = loop {
+        match native_attestation(tabasco_url, enclave_debug) {
+            Err(err) => {
+                println!("nitro-root-enclave-server::main native_attestation failed({:?}). Sleeping and trying again.", err);
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                continue;
+            },
+            Ok(enc) => break enc,
+        }
+    };
 
     let socket_fd = socket(
         AddressFamily::Inet,
@@ -282,7 +290,7 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerErro
         lines.collect()
     };
     println!(
-        "nitro-root-enclave-server::send_tabasco_start reeceived header:{:?}",
+        "nitro-root-enclave-server::send_tabasco_start received header:{:?}",
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
