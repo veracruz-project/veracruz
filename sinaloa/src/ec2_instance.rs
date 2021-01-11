@@ -286,7 +286,6 @@ impl EC2Instance {
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
             None => {
-                println!("EC2Instance::send_buffer connecting socket. This is a right and good thing");
                 self.socket_connect()?
             }
         };
