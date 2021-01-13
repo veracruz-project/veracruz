@@ -93,7 +93,7 @@ Veracruz on SGX, first setup your local environment:
 ```
 cd /work/rust-optee-trustzone-sdk/
 source environment
-source ~/.cargo/env
+source $CARGO_HOME/env
 ```
 
 Now that your environment is set up, build the enclave binary by executing the

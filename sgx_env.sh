@@ -1,4 +1,4 @@
 unset CC
 unset OPENSSL_DIR
 export SGX_SDK=/work/sgxsdk/
-source ~/.cargo/env
+source $CARGO_HOME/env
