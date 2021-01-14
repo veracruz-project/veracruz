@@ -324,9 +324,8 @@ impl SessionContext {
 
         for identity in policy.identities().iter() {
             let cert = convert_cert_buffer(identity.certificate())?;
-            let mut principal = Principal::new(cert.clone(), *identity.id());
+            let principal = Principal::new(cert.clone(), *identity.id(), identity.roles().clone(), identity.file_permissions().to_vec());
 
-            principal.add_roles(identity.roles().iter().cloned());
             root_cert_store.add(&cert)?;
 
             principals.push(principal);
