@@ -544,6 +544,15 @@ impl DummyWasmtimeHostProvisioningState {
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
     /// ExecutionEngine wrapper of load_program implementation in WasmtimeHostProvisioningState.
+    #[inline]
+    fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .append_file(client_id,file_name,data)
+    }
+
+    /// Chihuahua wrapper of load_program implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {

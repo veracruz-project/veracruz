@@ -171,6 +171,11 @@ impl ProtocolState {
         Ok(self.host_state.lock()?.load_program(buffer)?)
     }
 
+    //TODO: add description
+    pub(crate) fn append_file(&self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), MexicoCityError> {
+        Ok(self.host_state.lock()?.append_file(client_id,file_name,data)?)
+    }
+
     /// Provisions a new data source, described using a `DataSourceMetadata`
     /// frame into the host state.  Will fail if the lifecycle state is not
     /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to

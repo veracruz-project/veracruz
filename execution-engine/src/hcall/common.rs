@@ -275,6 +275,23 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
     }
 }
 
+//NOTE: This type is very similar to the one use in VeracruzUtil.
+//      However, for the purpose of self-contain, we define a seperate type.
+#[derive(Clone)]
+pub struct PermissionFlags {
+    read : bool,
+    write : bool,
+    execute : bool,
+}
+
+#[derive(Clone,Hash,PartialEq,Eq)]
+pub enum PermissionIndex {
+    // Client ID
+    Principal(u64),
+    // Program
+    Program(String),
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // The Veracruz provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
@@ -283,6 +300,9 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
 /// state is gradually "provisioned" by the data and program providers.  Also
 /// contains enough data to properly implement the Veracruz H-calls.
 #[derive(Clone)]
+// TODO: remove MOST, except:
+// - memory
+// in the favour of FS.
 pub struct HostProvisioningState<Module, Memory> {
     /// The data sources that have been provisioned into the machine.
     data_sources: Vec<DataSourceMetadata>,
@@ -310,6 +330,12 @@ pub struct HostProvisioningState<Module, Memory> {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
+    //NOTE: the following will move to an external component.
+    //TODO: integrate into FS
+    //      Index -> FilePath -> Permission
+    file_permissions: HashMap<PermissionIndex, HashMap<String,PermissionFlags>>,
+    //      Program_file_name -> Digest
+    program_digests: HashMap<String, Vec<u8>>, 
 }
 
 impl<Module, Memory> HostProvisioningState<Module, Memory> {
@@ -318,6 +344,10 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Creates a new initial `HostProvisioningState`.
+    //TODO: Deprecated semi-valid HostProvisioningState.
+    //      Pass:
+    //      - file permission, which controls and replace, stream_sources, data_sources, program_digest, previous_result, result, expected_data_sources, expected_stream_sources
+    //      - expected_shutdown_sources
     #[inline]
     pub fn new() -> Self {
         HostProvisioningState {
@@ -332,7 +362,54 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             previous_result: None,
             result: None,
             expected_shutdown_sources: Vec::new(),
+            file_permissions: HashMap::new(),
+            program_digests: HashMap::new(),
         }
+    }
+
+    //TODO: THIS will replace the use of `new` in the future commits.
+    pub fn valid_new(expected_shutdown_sources: Vec<u64>, 
+        file_permissions: HashMap<PermissionIndex,HashMap<String,PermissionFlags>>,
+        program_digests: HashMap<String, Vec<u8>>, 
+    ) -> Self {
+        HostProvisioningState {
+            data_sources: Vec::new(),
+            expected_data_sources: Vec::new(),
+            stream_sources: Vec::new(),
+            expected_stream_sources: Vec::new(),
+            lifecycle_state: LifecycleState::Initial,
+            program_module: None,
+            program_digest: None,
+            memory: None,
+            previous_result: None,
+            result: None,
+            expected_shutdown_sources,
+            file_permissions,
+            program_digests,
+        }
+    }
+
+    // NOTE: the following will move to an external component.
+    /// Return Some(PermissionFlags) if `id` has the permission 
+    /// to read, write and execute on the `file_name`.
+    /// Return None if `id` or `file_name` do not exist.
+    pub(crate) fn check_permission(&self, id: PermissionIndex, file_name: &str) -> Option<PermissionFlags> {
+        self.file_permissions
+            .get(&id)
+            .and_then(|permission_hashmap| permission_hashmap.get(file_name))
+            .map(|p| p.clone())
+    }
+
+    /// Append to a file.
+    pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        //TODO: link to the actually fs API.
+        let package_id = file_name.parse::<u64>().unwrap();
+        let metadata = DataSourceMetadata::new(
+            data,
+            client_id,
+            package_id,
+        );
+        self.add_new_data_source(metadata)
     }
 
     /// Registers the program result.
@@ -1003,6 +1080,29 @@ pub(crate) enum EntrySignature {
 /// Note that a factory method, in the file `hcall/factory.rs` will return an
 /// opaque instance of this trait depending on the
 pub trait ExecutionEngine: Send {
+    //TODO: these API will be replaced by FS API -- strart
+    /// Append `buf` to `file_name` in the file system
+    /// on behalf of the client identified by `client_id`.
+    /// The client must has the write permission to the file.
+    /// It createa a new file, if the file does not exists.
+    fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
+
+    ///// Read `file_name` in the file system
+    ///// on behalf of the client identified by `client_id`.
+    ///// The client must has the read permission to the file.
+    ///// It createa a new file, if the file does not exists.
+    /////
+    ///// TODO: Add the range selector
+    //fn read_file(&mut self, client_id: u64, file_name: String) -> Result<Vec<u8>, HostProvisioningError>;
+
+    ///// Register a program `file_name` 
+    ///// on behalf of the client identified by `client_id`.
+    ///// The client must has the read permission to `file_name`.
+    ///// This program must be specified in the permission system
+    ///// and the hash of `prog` must match the requirement.
+    //fn register_program(&mut self, client_id: u64, file_name: String, prog: &[u8]) -> Result<(), HostProvisioningError>; 
+
+
     /// Loads a raw WASM program from a buffer of received or parsed bytes.
     /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
     /// if the buffer cannot be parsed.  On success bumps the lifecycle state to
@@ -1031,6 +1131,7 @@ pub trait ExecutionEngine: Send {
         &mut self,
         metadata: DataSourceMetadata,
     ) -> Result<(), HostProvisioningError>;
+    //TODO: these API will be replaced by FS API -- end
 
     /// Invokes the entry point of the provisioned WASM program.  Will fail if
     /// the current lifecycle state is not `LifecycleState::ReadyToExecute` or

@@ -33,6 +33,7 @@ use veracruz_utils::policy::principal::Role;
 
 lazy_static! {
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
+    //TODO: replace by dedicated FS with meta-data, e.g. permission.
     static ref PROG_AND_DATA_BUFFER: Mutex<RuntimeManagerBuffer> = Mutex::new(RuntimeManagerBuffer::new());
 }
 
@@ -202,10 +203,11 @@ fn dispatch_on_shutdown(
 /// which seems benign.  Should this change?
 fn dispatch_on_program(
     protocol_state: &ProtocolState,
-    transport_protocol::Program { code, .. }: transport_protocol::Program,
+    transport_protocol::Program { file_name, code, .. }: transport_protocol::Program,
 ) -> ProvisioningResult {
     // Buffer the program, it will be used in batch process
-    PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice());
+    PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice())?;
+    PROG_AND_DATA_BUFFER.lock()?.fs.insert(file_name.clone(),code.clone());
 
     if check_state(
         &protocol_state.get_lifecycle_state()?,
@@ -256,7 +258,7 @@ fn dispatch_on_data(
     //TODO: REPLACE BY FS API
     let package_id = file_name.parse::<u64>()?;
     let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
-    PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame);
+    PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame)?;
 
     if check_state(
         &protocol_state.get_lifecycle_state()?,
@@ -264,7 +266,7 @@ fn dispatch_on_data(
     ) {
         let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
 
-        if let Err(error) = protocol_state.add_new_data_source(frame) {
+        if let Err(error) = protocol_state.append_file(client_id,file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
             // then we should be in an error state, otherwise we remain in the

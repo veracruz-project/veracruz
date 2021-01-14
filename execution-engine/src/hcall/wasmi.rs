@@ -878,6 +878,12 @@ impl WasmiHostProvisioningState {
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmiHostProvisioningState {
     /// ExecutionEngine wrapper of load_program implementation in WasmiHostProvisioningState.
+    fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.append_file(client_id,file_name,data)
+    }
+
+
+    /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.
     #[inline]
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
         self.load_program(buffer)
