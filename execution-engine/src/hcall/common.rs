@@ -266,6 +266,11 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: Failed to sort the incoming data or incoming stream (this is a potential bug)."
     )]
     CannotSortDataOrStream,
+    //TODO: potential remove this 
+    #[error(
+        display = "HostProvisioningError: FileNotFound."
+    )]
+    FileNotFound,
 }
 
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
@@ -403,13 +408,37 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     /// Append to a file.
     pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         //TODO: link to the actually fs API.
-        let package_id = file_name.parse::<u64>().unwrap();
-        let metadata = DataSourceMetadata::new(
-            data,
-            client_id,
-            package_id,
-        );
-        self.add_new_data_source(metadata)
+        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        if file_name.starts_with("input-") {
+            let package_id = file_name.strip_prefix("input-").unwrap().parse::<u64>().unwrap();
+            let metadata = DataSourceMetadata::new(
+                data,
+                client_id,
+                package_id,
+            );
+            self.add_new_data_source(metadata)
+        } else if file_name.starts_with("stream-") {
+            let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
+            let metadata = DataSourceMetadata::new(
+                data,
+                client_id,
+                package_id,
+            );
+            self.add_new_stream_source(metadata)
+        } else {
+            Err(HostProvisioningError::FileNotFound)
+        }
+    }
+
+    /// Read from a file
+    pub(crate) fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        //TODO: link to the actually fs API.
+        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        if file_name.starts_with("output") {
+            Ok(self.get_result().map(|v| v.to_vec()))
+        } else {
+            Err(HostProvisioningError::FileNotFound)
+        }
     }
 
     /// Registers the program result.
@@ -1087,13 +1116,13 @@ pub trait ExecutionEngine: Send {
     /// It createa a new file, if the file does not exists.
     fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
 
-    ///// Read `file_name` in the file system
-    ///// on behalf of the client identified by `client_id`.
-    ///// The client must has the read permission to the file.
-    ///// It createa a new file, if the file does not exists.
-    /////
-    ///// TODO: Add the range selector
-    //fn read_file(&mut self, client_id: u64, file_name: String) -> Result<Vec<u8>, HostProvisioningError>;
+    /// Read `file_name` in the file system
+    /// on behalf of the client identified by `client_id`.
+    /// The client must has the read permission to the file.
+    /// It createa a new file, if the file does not exists.
+    ///
+    /// TODO: Add the range selector
+    fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError>;
 
     ///// Register a program `file_name` 
     ///// on behalf of the client identified by `client_id`.
@@ -1103,6 +1132,7 @@ pub trait ExecutionEngine: Send {
     //fn register_program(&mut self, client_id: u64, file_name: String, prog: &[u8]) -> Result<(), HostProvisioningError>; 
 
 
+    //TODO: these API will be replaced by FS API -- strart
     /// Loads a raw WASM program from a buffer of received or parsed bytes.
     /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
     /// if the buffer cannot be parsed.  On success bumps the lifecycle state to

@@ -136,7 +136,7 @@ fn dispatch_on_request_state(protocol_state: &ProtocolState) -> ProvisioningResu
 
 /// Returns the result of a computation, computing the result first.  Fails if
 /// we are not in the `LifecycleState::ReadyToExecute` state.
-fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &ProtocolState) -> ProvisioningResult {
+fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &ProtocolState, client_id: u64,) -> ProvisioningResult {
     //TODO: USE THE FILE_NAME 
     if check_state(
         &protocol_state.get_lifecycle_state()?,
@@ -170,7 +170,7 @@ fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestRe
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::FinishedExecuting],
     ) {
-        let result = protocol_state.get_result()?;
+        let result = protocol_state.read_file(client_id,&file_name)?;
         let response = response_success(result);
         Ok(ProvisioningResponse::Success { response })
     } else {
@@ -256,7 +256,7 @@ fn dispatch_on_data(
     client_id: u64,
 ) -> ProvisioningResult {
     //TODO: REPLACE BY FS API
-    let package_id = file_name.parse::<u64>()?;
+    let package_id = file_name.strip_prefix("input-").unwrap().parse::<u64>().unwrap();
     let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
     PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame)?;
 
@@ -264,8 +264,6 @@ fn dispatch_on_data(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::DataSourcesLoading],
     ) {
-        let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
-
         if let Err(error) = protocol_state.append_file(client_id,file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
@@ -316,10 +314,10 @@ fn dispatch_on_stream(
         &[LifecycleState::StreamSourcesLoading],
     ) {
         //TODO: REPLACE BY FS API
-        let package_id = file_name.parse::<u64>()?;
+        let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
         let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
 
-        if let Err(error) = protocol_state.add_new_stream_source(frame) {
+        if let Err(error) = protocol_state.append_file(client_id,file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
             // then we should be in an error state, otherwise we remain in the
@@ -428,7 +426,7 @@ fn dispatch_on_request(
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
         MESSAGE::request_result(result_request) => {
             if check_roles(roles, &[Role::ResultReader]) {
-                dispatch_on_result(result_request,protocol_state)
+                dispatch_on_result(result_request,protocol_state,client_id)
             } else {
                 response_invalid_role()
             }

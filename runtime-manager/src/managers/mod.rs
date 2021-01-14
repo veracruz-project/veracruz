@@ -176,6 +176,11 @@ impl ProtocolState {
         Ok(self.host_state.lock()?.append_file(client_id,file_name,data)?)
     }
 
+    //TODO: add description
+    pub(crate) fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, MexicoCityError> {
+        Ok(self.host_state.lock()?.read_file(client_id,file_name)?)
+    }
+
     /// Provisions a new data source, described using a `DataSourceMetadata`
     /// frame into the host state.  Will fail if the lifecycle state is not
     /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to

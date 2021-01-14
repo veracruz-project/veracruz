@@ -882,6 +882,11 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.append_file(client_id,file_name,data)
     }
 
+    /// Chihuahua wrapper of read_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        self.read_file(client_id,file_name)
+    }
 
     /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.
     #[inline]

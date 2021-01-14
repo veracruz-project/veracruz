@@ -12,6 +12,8 @@
 #![crate_name = "runtime_manager_enclave"]
 #![cfg_attr(feature = "sgx", no_std)]
 #![feature(rustc_private)]
+//TODO REMOVE. Use this feature for temporary glue code in fs.
+#![feature(str_strip)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
