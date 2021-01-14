@@ -34,10 +34,8 @@ pub enum DurangoError {
     TLSUnspecifiedError,
     #[error(display = "Durango: TLSError: invalid cyphersuite {:?}.", _0)]
     TLSInvalidCyphersuiteError(std::string::String),
-    #[error(display = "Durango: RingUnspecifiedError: {:?}.", _0)]
-    RingUnspecifiedError(#[error(source)] ring::error::Unspecified),
-    #[error(display = "Durango: RingKeyRejectedError: {:?}.", _0)]
-    RingKeyRejectedError(#[error(source)] ring::error::KeyRejected),
+    #[error(display = "Durango: RingError: {:?}", _0)]
+    RingError(std::string::String),
     #[error(display = "Durango: SerdeJsonError: {:?}.", _0)]
     SerdeJsonError(#[error(source)] serde_json::error::Error),
     #[error(display = "Durango: X509Error: {:?}.", _0)]

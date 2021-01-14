@@ -53,9 +53,21 @@ static QUOTE_TYPE: u16 = 1; //SAMPLE_QUOTE_LINKABLE_SIGNATURE
 
 pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
     let sgx_ecc_handle = SgxEccHandle::new();
-    sgx_ecc_handle.open()?;
-    let (private_key, public_key) = sgx_ecc_handle.create_key_pair()?;
-    sgx_ecc_handle.close()?;
+    sgx_ecc_handle.open()
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::start failed to open sgx_ecc_handle:{:?}", err);
+            err
+        })?;
+    let (private_key, public_key) = sgx_ecc_handle.create_key_pair()
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::start failed to create key pair:{:?}", err);
+            err
+        })?;
+    sgx_ecc_handle.close()
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::start failed to close sgx_ecc_Handle:{:?}", err);
+            err
+        })?;
 
     let mut serialized_pubkey = Vec::new();
 
@@ -72,18 +84,34 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
             msg2: None,
             pubkey_challenge: None,
         };
-        let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+        let mut ac_hash = ATTESTATION_CONTEXT.lock()
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::start failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                err
+            })?;
         ac_hash.insert(device_id, attestation_context);
     }
     let serialized_attestation_init =
-        colima::serialize_sgx_attestation_init(&serialized_pubkey, device_id)?;
+        colima::serialize_sgx_attestation_init(&serialized_pubkey, device_id)
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::start serialize_sgx_attestation_init failed:{:?}", err);
+                err
+            })?;
     Ok(base64::encode(&serialized_attestation_init))
 }
 
 pub fn msg1(body_string: String) -> TabascoResponder {
-    let received_bytes = base64::decode(&body_string)?;
+    let received_bytes = base64::decode(&body_string)
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::msg1 failed to decode body_string as base64:{:?}", err);
+            err
+        })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)?;
+    let parsed = colima::parse_tabasco_request(&received_bytes)
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::msg1 failed to parse_tabasco_request:{:?}", err);
+            err
+        })?;
     if !parsed.has_msg1() {
         return Err(TabascoError::MissingFieldError("msg1"));
     }
@@ -94,27 +122,59 @@ pub fn msg1(body_string: String) -> TabascoResponder {
 
         rng.fill(&mut pubkey_challenge);
         let sgx_ecc_handle = SgxEccHandle::new();
-        sgx_ecc_handle.open()?;
+        sgx_ecc_handle.open()
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg1 failed to open sgx_ecc_handle:{:?}", err);
+                err
+            })?;
         let (private_key, public_key) = {
-            let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+            let mut ac_hash = ATTESTATION_CONTEXT.lock()
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg1 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    err
+                })?;
 
             let attestation_context = ac_hash
                 .get_mut(&device_id)
-                .ok_or(TabascoError::NoDeviceError(device_id))?;
+                .ok_or(TabascoError::NoDeviceError(device_id)) 
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg1 NoDeviceError:{:?}", err);
+                    err
+                })?;
             (
                 attestation_context.private_key.clone(),
                 attestation_context.public_key.clone(),
             )
         };
         let dh_key = sgx_ecc_handle.compute_shared_dhkey(&private_key, &msg1.g_a)?;
-        sgx_ecc_handle.close()?;
-        let (smk, vk) = generate_sgx_symmetric_keys(&dh_key)?;
-        let msg2 = proc_msg1(&msg1, &smk, &private_key, &public_key)?;
+        sgx_ecc_handle.close()
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg1 failed to close sgx_ecc_handle:{:?}", err);
+                err
+            })?;
+        let (smk, vk) = generate_sgx_symmetric_keys(&dh_key)
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg1 generate_sgx_symmetric_keys failed:{:?}", err);
+                err
+            })?;
+        let msg2 = proc_msg1(&msg1, &smk, &private_key, &public_key)
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg1 proc_msg1 failed:{:?}", err);
+                err
+            })?;
         {
-            let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+            let mut ac_hash = ATTESTATION_CONTEXT.lock()
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg1 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    err
+                })?;
             let mut attestation_context = ac_hash
                 .get_mut(&device_id)
-                .ok_or(TabascoError::NoDeviceError(device_id))?;
+                .ok_or(TabascoError::NoDeviceError(device_id))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg1 NoDeviceError:{:?}", err);
+                    err
+                })?;
 
             attestation_context.smk = Some(smk);
             attestation_context.vk = Some(vk);
@@ -126,63 +186,119 @@ pub fn msg1(body_string: String) -> TabascoResponder {
     };
 
     let serialized_challenge =
-        colima::serialize_sgx_attestation_challenge(context, &msg2, &pubkey_challenge)?;
+        colima::serialize_sgx_attestation_challenge(context, &msg2, &pubkey_challenge)
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::msg1 serialize_sgx_attestation_challenge failed:{:?}", err);
+            err
+        })?;
 
     Ok(base64::encode(&serialized_challenge))
 }
 
 pub fn msg3(body_string: String) -> TabascoResponder {
-    let received_bytes = base64::decode(&body_string)?;
+    let received_bytes = base64::decode(&body_string)
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::msg3 base64 decode ov body_string failed:{:?}", err);
+            err
+        })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)?;
+    let parsed = colima::parse_tabasco_request(&received_bytes)
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::msg3 parse_tabasco_request failed:{:?}", err);
+            err
+        })?;
     if !parsed.has_sgx_attestation_tokens() {
         println!("received data is incorrect. TODO: Handle this");
         return Err(TabascoError::NoSGXAttestationTokenError);
     }
     let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_sig, device_id) =
-        colima::parse_attestation_tokens(&parsed)?;
+        colima::parse_attestation_tokens(&parsed)
+        .map_err(|err| {
+            println!("tabasco::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
+            err
+        })?;
     {
         let attestation_context = {
-            let ac_hash = ATTESTATION_CONTEXT.lock()?;
+            let ac_hash = ATTESTATION_CONTEXT.lock()
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    err
+                })?;
             let context = ac_hash
                 .get(&device_id)
-                .ok_or(TabascoError::NoDeviceError(device_id))?;
+                .ok_or(TabascoError::NoDeviceError(device_id))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 NoDeviceError:{:?}", err);
+                    err
+                })?;
             (*context).clone()
         };
 
         let expected_enclave_hash = {
-            let connection = crate::orm::establish_connection()?;
+            let connection = crate::orm::establish_connection()
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 establish_connection failed:{:?}", err);
+                    err
+                })?;
             crate::orm::get_firmware_version_hash(
                 &connection,
                 &"sgx".to_string(),
                 &attestation_context.firmware_version,
-            )?
-            .ok_or(TabascoError::MissingFieldError("firmware version"))?
+            )
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg3 get_firmware_version_hash failed:{:?}", err);
+                err
+            })?
+            .ok_or(TabascoError::MissingFieldError("firmware version"))
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                err
+            })?
         };
 
         let msg3_epid_pseudonym = authenticate_msg3(
             &attestation_context
                 .msg1
-                .ok_or(TabascoError::MissingFieldError("attestation_context.msg1"))?,
+                .ok_or(TabascoError::MissingFieldError("attestation_context.msg1"))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
             &attestation_context
                 .msg2
-                .ok_or(TabascoError::MissingFieldError("attestation_context.msg2"))?,
+                .ok_or(TabascoError::MissingFieldError("attestation_context.msg2"))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
             &msg3,
             &msg3_quote,
             &msg3_sig,
             &attestation_context
                 .smk
-                .ok_or(TabascoError::MissingFieldError("attestation_context.smk"))?,
+                .ok_or(TabascoError::MissingFieldError("attestation_context.smk"))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
             &attestation_context
                 .vk
-                .ok_or(TabascoError::MissingFieldError("attestation_context.vk"))?,
+                .ok_or(TabascoError::MissingFieldError("attestation_context.vk"))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
             &expected_enclave_hash,
         )?;
 
         let (pubkey_epid_pseudonym, pubkey_hash, enclave_name) = authenticate_pubkey_quote(
             &attestation_context
                 .pubkey_challenge
-                .ok_or(TabascoError::MissingFieldError("pubkey_challenge"))?,
+                .ok_or(TabascoError::MissingFieldError("pubkey_challenge"))
+                .map_err(|err| {
+                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
             &pubkey_quote,
             &pubkey_sig,
         )?;
@@ -210,8 +326,16 @@ pub fn msg3(body_string: String) -> TabascoResponder {
             });
         }
 
-        let connection = crate::orm::establish_connection()?;
-        crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)?;
+        let connection = crate::orm::establish_connection()
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg3 establish_connection failed:{:?}", err);
+                err
+            })?;
+        crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)
+            .map_err(|err| {
+                println!("tabasco::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
+                err
+            })?
     }
 
     // clean up the Attestation Context by removing this context

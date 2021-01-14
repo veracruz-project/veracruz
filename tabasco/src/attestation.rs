@@ -25,9 +25,17 @@ lazy_static! {
 }
 
 pub async fn start(body_string: String) -> TabascoResponder {
-    let received_bytes = base64::decode(&body_string)?;
+    let received_bytes = base64::decode(&body_string)
+        .map_err(|err| {
+            println!("tabasco::attestation::start failed to decode body_string as base64:{:?}", err);
+            err
+        })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)?;
+    let parsed = colima::parse_tabasco_request(&received_bytes)
+        .map_err(|err| {
+            println!("tabasco::attestation::start failed to parse_tabasco_request:{:?}", err);
+            err
+        })?;
 
     if !parsed.has_start_msg() {
         println!("Tabasco::attestation::start it don't have start_msg");
@@ -36,7 +44,11 @@ pub async fn start(body_string: String) -> TabascoResponder {
     let (protocol, firmware_version) = colima::parse_start_msg(&parsed);
 
     let device_id = {
-        let mut device_id_wrapper = DEVICE_ID.lock()?;
+        let mut device_id_wrapper = DEVICE_ID.lock()
+            .map_err(|err| {
+                println!("tabasco::attestation::start failed to obtain lock on DEVICE_ID:{:?}", err);
+                err
+            })?;
         *device_id_wrapper = *device_id_wrapper + 1;
         *device_id_wrapper
     };

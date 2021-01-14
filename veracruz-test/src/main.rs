@@ -69,7 +69,7 @@ mod tests {
     use sinaloa;
     use std::{io::Read, sync::Once};
     use tabasco;
-    use veracruz_utils;
+    use veracruz_utils::{EnclavePlatform, policy, VeracruzPolicy};
 
     #[derive(Debug, Error)]
     pub enum VeracruzTestError {
@@ -80,7 +80,7 @@ mod tests {
         #[error(display = "VeracruzTest: DurangoError: {:?}.", _0)]
         DurangoError(#[error(source)] durango::DurangoError),
         #[error(display = "VeracruzTest: VeracruzUtilError: {:?}.", _0)]
-        VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
+        VeracruzUtilError(#[error(source)] policy::VeracruzUtilError),
         #[error(display = "VeracruzTest: SinaloaError: {:?}.", _0)]
         SinaloaError(#[error(source)] sinaloa::SinaloaError),
         #[error(display = "VeracruzTest: ColimaError: {:?}.", _0)]
@@ -98,7 +98,7 @@ mod tests {
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Tabasco Server");
-                let server = tabasco::server::server(tabasco_url).unwrap();
+                let server = tabasco::server::server(tabasco_url, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -287,18 +287,26 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
         let policy_json = std::fs::read_to_string(LINEAR_REGRESSION_PARALLEL_POLICY).unwrap();
-        let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
+        let policy = VeracruzPolicy::from_json(&policy_json).unwrap();
 
         setup(policy.tabasco_url().clone());
 
         task::sleep(std::time::Duration::from_millis(5000)).await;
         let server_handle = server_tls_loop(LINEAR_REGRESSION_PARALLEL_POLICY);
 
+        #[cfg(feature = "sgx")]
+        let target_platform = EnclavePlatform::SGX;
+        #[cfg(feature = "tz")]
+        let target_platform = EnclavePlatform::TrustZone;
+        #[cfg(feature = "nitro")]
+        let target_platform = EnclavePlatform::Nitro;
+
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
-
             let mut client =
-                durango::Durango::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY, &policy_json)?;
+                durango::Durango::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
+                                      &policy_json,
+                                      &target_platform)?;
             let program_filename = LINEAR_REGRESSION_WASM;
             let program_data = read_binary_file(&program_filename)?;
             client.send_program(&program_data)?;
@@ -307,7 +315,7 @@ mod tests {
         let data_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(11000)).await;
             let mut client =
-                durango::Durango::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json)?;
+                durango::Durango::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json, &target_platform)?;
 
             let data_filename = LINEAR_REGRESSION_DATA;
             let data = read_binary_file(&data_filename)?;
@@ -341,7 +349,7 @@ mod tests {
         result_retrievers: &[usize],
     ) -> Result<(), VeracruzTestError> {
         let policy_json = std::fs::read_to_string(policy_path)?;
-        let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json)?;
+        let policy = VeracruzPolicy::from_json(&policy_json)?;
         setup(policy.tabasco_url().clone());
         info!("### Step 0. Read the policy file {}.", policy_path);
 
@@ -357,7 +365,14 @@ mod tests {
             info!("### Step 2. Set up all durango sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
-                clients.push(durango::Durango::new(cert, key, &policy_json)?);
+                #[cfg(feature = "sgx")]
+                let target_platform = EnclavePlatform::SGX;
+                #[cfg(feature = "tz")]
+                let target_platform = EnclavePlatform::TrustZone;
+                #[cfg(feature = "nitro")]
+                let target_platform = EnclavePlatform::Nitro;
+
+                clients.push(durango::Durango::new(cert, key, &policy_json, &target_platform)?);
             }
 
             info!(

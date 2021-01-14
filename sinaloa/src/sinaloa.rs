@@ -15,6 +15,7 @@ use curl::easy::{Easy, List};
 use err_derive::Error;
 use log::debug;
 use std::io::Read;
+#[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
 #[cfg(feature = "nitro")]
 use crate::ec2_instance::EC2Error;

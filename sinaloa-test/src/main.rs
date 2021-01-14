@@ -34,6 +34,7 @@ mod tests {
 
     use veracruz_utils::policy::EnclavePlatform;
 
+    #[cfg(feature = "nitro")]
     use regex::Regex;
 
     use std::{
@@ -245,7 +246,13 @@ mod tests {
 
         let sinaloa = ret.unwrap();
 
+        #[cfg(feature = "nitro")]
         let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
+        #[cfg(feature = "sgx")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::SGX;
+        #[cfg(feature = "tz")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
+
         let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
             attestation_flow(&policy.tabasco_url(), &mexico_city_hash, &sinaloa);
@@ -769,7 +776,13 @@ mod tests {
                 Ok(id)
             }
         })?;
+        #[cfg(feature = "nitro")]
         let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
+        #[cfg(feature = "sgx")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::SGX;
+        #[cfg(feature = "tz")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
+
         let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
             attestation_flow(&policy.tabasco_url(), &mexico_city_hash, &sinaloa)?
@@ -1267,17 +1280,29 @@ mod tests {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
-        // replace the tabasco_url field in the policy json string with our IP address.
-        let ip_string = local_ipaddress::get()
+        // Since we need to run the root enclave on another system for nitro enclaves
+        // we can't use localhost for the URL of tabasco (like we do in the policy
+        // files. so we need to replace it with the private IP of the current instance
+        #[cfg(feature = "nitro")]
+        {
+            let ip_string = local_ipaddress::get()
             .expect("Failed to get local ip address");
-        let ip_address = format!("\"tabasco_url\": \"{:}:3010\"", ip_string);
-        let re = Regex::new(r#""tabasco_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
-        let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
+            let ip_address = format!("\"tabasco_url\": \"{:}:3010\"", ip_string);
+            let re = Regex::new(r#""tabasco_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
-        let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
-        let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
-        let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json_cow.as_ref())?;
-        Ok((policy, policy_json_cow.as_ref().to_string(), policy_hash_str))
+            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
+            let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
+            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json_cow.as_ref())?;
+            Ok((policy, policy_json_cow.as_ref().to_string(), policy_hash_str))
+        }
+        #[cfg(not(feature = "nitro"))]
+        {
+            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
+            let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
+            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json.as_ref())?;
+            Ok((policy, policy_json.to_string(), policy_hash_str))
+        }
     }
 
     /// Auxiliary function: initialise sinaloa from policy and open a tls session

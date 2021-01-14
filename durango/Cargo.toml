@@ -8,14 +8,16 @@ description = "Client code for provisioning secrets into, and otherwise interact
 [features]
 sgx = ["sgx_types", "sgx_ucrypto", "colima/sgx_attestation"]
 tz = []
+nitro = []
 mock = ["mockall", "mockito"]
 
 [dependencies]
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
-webpki = "0.21"                                               
-webpki-roots = "0.19"
-ring = { version = "0.16", features = ["std"] }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+
+webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz"}
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz"}
 reqwest = { version = "0.9", default-features=false }
 colima = { path = "../colima" }
 base64 = "0.10.1"

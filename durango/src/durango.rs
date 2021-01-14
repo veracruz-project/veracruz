@@ -16,7 +16,7 @@ use std::{
     io::{Read, Write},
     str::from_utf8,
 };
-use veracruz_utils::{VeracruzPolicy, VeracruzRole};
+use veracruz_utils::{EnclavePlatform, VeracruzPolicy, VeracruzRole};
 use webpki;
 use webpki_roots;
 
@@ -176,6 +176,7 @@ impl Durango {
         client_cert_filename: &str,
         client_key_filename: &str,
         policy_json: &str,
+        target_platform: &EnclavePlatform
     ) -> Result<Durango, DurangoError> {
         let policy_hash = hex::encode(ring::digest::digest(
             &ring::digest::SHA256,
@@ -186,10 +187,13 @@ impl Durango {
         let client_priv_key = Self::read_private_key(client_key_filename)?;
 
         // check if the certificate is valid
-        let key_pair = ring::signature::RsaKeyPair::from_der(client_priv_key.0.as_slice())?;
+        let key_pair = ring::signature::RsaKeyPair::from_der(client_priv_key.0.as_slice())
+            .map_err(|err| {
+                DurangoError::RingError(format!("from_der failed:{:?}", err))
+            })?;
         Self::check_certificate_validity(client_cert_filename, key_pair.public_key().as_ref())?;
 
-        let (enclave_cert_hash, enclave_name) = AttestationHandler::attestation(&policy)?;
+        let (enclave_cert_hash, enclave_name) = AttestationHandler::attestation(&policy, target_platform)?;
 
         let policy_ciphersuite_string = policy.ciphersuite().as_str();
 
