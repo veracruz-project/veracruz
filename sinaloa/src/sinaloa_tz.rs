@@ -21,7 +21,7 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
-    use veracruz_utils::{JaliscoOpcode, MCOpcode, JALISCO_UUID, MC_UUID};
+    use veracruz_utils::{EnclavePlatform, JaliscoOpcode, MCOpcode, JALISCO_UUID, MC_UUID};
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
@@ -41,11 +41,13 @@ pub mod sinaloa_tz {
 
             let jalisco_uuid = Uuid::parse_str(&JALISCO_UUID.to_string())?;
             {
-                let mut ji_guard = JALISCO_INITIALIZED.lock()?;
-                let mexico_city_hash = match policy.mexico_city_hash_tz() {
-                    Some(hash) => hash,
-                    None => return Err(SinaloaError::MissingFieldError("mexico_city_hash_tz")),
+                let mexico_city_hash = {
+                    match policy.mexico_city_hash(&EnclavePlatform::TrustZone) {
+                        Ok(hash) => hash,
+                        Err(_) => return Err(SinaloaError::MissingFieldError("mexico_city_hash_tz")),
+                    }
                 };
+                let mut ji_guard = JALISCO_INITIALIZED.lock()?;
                 if !*ji_guard {
                     debug!("Jalisco is uninitialized.");
                     SinaloaTZ::native_attestation(
