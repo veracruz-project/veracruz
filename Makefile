@@ -159,6 +159,7 @@ clean:
 	cd veracruz-utils && cargo clean
 	cd sinaloa-test && cargo clean
 	cd veracruz-test && cargo clean
+	cd nitro-root-enclave-server && cargo clean
 	$(MAKE) clean -C mexico-city
 	$(MAKE) clean -C jalisco
 	$(MAKE) clean -C sinaloa
@@ -166,7 +167,6 @@ clean:
 	$(MAKE) clean -C sonora
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
-	$(MAKE) clean -C nitro-root-enclave-server
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
