@@ -43,6 +43,7 @@ use actix_session::Session;
 use actix_web::http::StatusCode;
 use actix_web::{post, App, HttpRequest, HttpResponse, HttpServer};
 use futures;
+use veracruz_utils::EnclavePlatform;
 
 #[test]
 fn test_internal_read_all_bytes_in_file_succ() {
@@ -91,7 +92,7 @@ fn test_internal_read_cert_invalid_private_key() {
 fn test_set_up_mock_object_for_attestation_handler() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -103,7 +104,7 @@ fn test_set_up_mock_object_for_attestation_handler() {
     let policy: veracruz_utils::VeracruzPolicy =
         serde_json::from_str(policy_json.as_str()).unwrap();
 
-    assert!(crate::attestation::MockAttestation::attestation(&policy).is_ok());
+    assert!(crate::attestation::MockAttestation::attestation(&policy, &EnclavePlatform::Mock).is_ok());
 }
 
 fn load_client_cert_and_private_key(
@@ -132,7 +133,7 @@ fn load_client_cert_and_private_key(
 fn test_internal_init_self_signed_cert_client_config_succ() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -148,8 +149,9 @@ fn test_internal_init_self_signed_cert_client_config_succ() {
     ) {
         Err(s) => panic!(s),
         Ok((cert, pkey, policy)) => {
+
             let (enclave_cert, enclave_name) =
-                crate::attestation::MockAttestation::attestation(&policy).unwrap();
+                crate::attestation::MockAttestation::attestation(&policy, &EnclavePlatform::Mock).unwrap();
             let policy_ciphersuite_string = policy.ciphersuite().as_str();
             assert!(Durango::pub_init_self_signed_cert_client_config(
                 cert,
@@ -167,7 +169,7 @@ fn test_internal_init_self_signed_cert_client_config_succ() {
 fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -184,7 +186,7 @@ fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
         Err(s) => panic!(s),
         Ok((cert, pkey, policy)) => {
             let (enclave_cert, enclave_name) =
-                crate::attestation::MockAttestation::attestation(&policy).unwrap();
+                crate::attestation::MockAttestation::attestation(&policy, &EnclavePlatform::Mock).unwrap();
             let policy_ciphersuite_string = "WRONG CIPHERSUITE";
             assert!(Durango::pub_init_self_signed_cert_client_config(
                 cert,
@@ -234,7 +236,7 @@ fn iterate_over_policy(path: &str, f: fn(Result<String, DurangoError>) -> ()) {
 fn test_durango_new_succ() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -244,9 +246,10 @@ fn test_durango_new_succ() {
     });
 
     iterate_over_policy("../test-collateral/", |policy| {
+
         assert!(policy.is_ok());
         let policy = policy.unwrap();
-        assert!(Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy).is_ok());
+        assert!(Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &EnclavePlatform::Mock).is_ok());
     });
 }
 
@@ -256,7 +259,7 @@ fn test_durango_new_succ() {
 fn test_durango_new_fail() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -268,7 +271,7 @@ fn test_durango_new_fail() {
     iterate_over_policy("../test-collateral/invalid_policy/", |policy| {
         if let Ok(policy) = policy {
             assert!(
-                Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy).is_err(),
+                Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &EnclavePlatform::Mock).is_err(),
                 format!("{:?}", policy)
             );
         }
@@ -279,7 +282,7 @@ fn test_durango_new_fail() {
 fn test_durango_new_unmatched_client_certificate() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -289,7 +292,8 @@ fn test_durango_new_unmatched_client_certificate() {
     });
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
-    let rst = Durango::new(DATA_CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json);
+
+    let rst = Durango::new(DATA_CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
     assert!(rst.is_err());
 }
 
@@ -297,7 +301,7 @@ fn test_durango_new_unmatched_client_certificate() {
 fn test_durango_new_unmatched_client_key() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -307,7 +311,8 @@ fn test_durango_new_unmatched_client_key() {
     });
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
-    let rst = Durango::new(CLIENT_CERT_FILENAME, DATA_CLIENT_KEY_FILENAME, &policy_json);
+
+    let rst = Durango::new(CLIENT_CERT_FILENAME, DATA_CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
     assert!(rst.is_err());
 }
 
@@ -315,7 +320,7 @@ fn test_durango_new_unmatched_client_key() {
 fn test_durango_new_invalid_enclave_name() {
     // set up the attestation result as a mock object with an invalid host url
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_, _| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -325,7 +330,8 @@ fn test_durango_new_invalid_enclave_name() {
     });
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
-    let rst = Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json);
+
+    let rst = Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
     assert!(rst.is_err());
 }
 
@@ -338,7 +344,7 @@ async fn durango_policy_violations() {
     // tabasco server or communicate with IAS. This means that we are NOT
     // testing the attestation flow
     let handler = crate::attestation::MockAttestation::attestation_context();
-    handler.expect().returning(|_| {
+    handler.expect().returning(|_policy, _target_platform| {
         Ok((
             Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
@@ -389,10 +395,12 @@ async fn durango_policy_violations() {
 
 async fn policy_client_loop() -> Result<(), DurangoError> {
     let policy_json = std::fs::read_to_string(TRIPLE_POLICY_FILENAME).unwrap(); // TODO: Use a different policy file?
+
     let mut data_client = Durango::new(
         DATA_CLIENT_CERT_FILENAME,
         DATA_CLIENT_KEY_FILENAME,
         &policy_json,
+        &EnclavePlatform::Mock,
     )?;
 
     let fake_data = vec![0xde, 0xad, 0xbe, 0xef];
@@ -407,6 +415,7 @@ async fn policy_client_loop() -> Result<(), DurangoError> {
         PROGRAM_CLIENT_CERT_FILENAME,
         PROGRAM_CLIENT_KEY_FILENAME,
         &policy_json,
+        &EnclavePlatform::Mock,
     )?;
 
     let sd_ret = program_client.send_data(&fake_data.to_vec());
@@ -459,7 +468,7 @@ fn durango_session() {
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
     let mut _durango =
-        crate::durango::Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json)
+        crate::durango::Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock)
             .unwrap();
 
     let client_cert = {

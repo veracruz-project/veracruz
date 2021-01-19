@@ -379,6 +379,7 @@ pub enum EnclavePlatform {
     SGX,
     TrustZone,
     Nitro,
+    Mock, // The Mock platform is for unit testing (durango unit tests, at the moment)
 }
 
 impl VeracruzPolicy {
@@ -472,6 +473,10 @@ impl VeracruzPolicy {
             EnclavePlatform::Nitro => match &self.mexico_city_hash_nitro {
                 Some(hash) => hash,
                 None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_nitro".to_string())),
+            },
+            EnclavePlatform::Mock => match &self.mexico_city_hash_sgx {
+                Some(hash) => hash,
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_sgx".to_string())),
             },
         };
         return Ok(&hash);
