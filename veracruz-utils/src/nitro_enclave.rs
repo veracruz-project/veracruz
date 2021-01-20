@@ -166,7 +166,7 @@ impl NitroEnclave {
                 println!("sleeping before trying again");
                 std::thread::sleep(std::time::Duration::from_millis(1000));
             } else {
-                panic!("I don't know what to do here");
+                panic!("NitroEnclave::ocall_loop received an unhandled error from bind:{:?}", err);
             }
         }
 
