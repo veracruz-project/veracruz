@@ -330,7 +330,7 @@ impl WasmtimeHostProvisioningState {
 /// Otherwise, returns the return value of the entry point function of the
 /// program, along with a host state capturing the result of the program's
 /// execution.
-pub(crate) fn invoke_entry_point() -> Result<i32, Trap> {
+pub(crate) fn invoke_entry_point(file_name: &str) -> Result<i32, Trap> {
     let start = Instant::now();
 
     let binary;
@@ -552,13 +552,23 @@ impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
             .append_file(client_id,file_name,data)
     }
 
-    /// Chihuahua wrapper of read_file implementation in WasmiHostProvisioningState.
+    /// Chihuahua wrapper of read_file implementation in WasmtimeHostProvisioningState.
     #[inline]
     fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
             .read_file(client_id,file_name)
+    }
+
+    /// Chihuahua wrapper of register_program implementation in WasmtimeHostProvisioningState.
+    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        //TODO: link to the actually fs API.
+        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        HOST_PROVISIONING_STATE
+            .lock()
+            .expect("Failed to obtain lock on host provisioning state.")
+            .load_program(prog)
     }
 
     /// Chihuahua wrapper of load_program implementation in WasmtimeHostProvisioningState.
@@ -600,8 +610,8 @@ impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
-        invoke_entry_point()
+    fn invoke_entry_point(&mut self,file_name:&str) -> Result<i32, FatalHostError> {
+        invoke_entry_point(file_name)
             //TODO: Change the error of invoke_entry_point to FatalHostError.
             //      Add better error type to FatalHostErorr.
             .map_err(|e| format!("WASM program issued trap: {}.", e))

@@ -515,7 +515,7 @@ fn main() {
 
     let start = Instant::now();
 
-    match provisioning_state.invoke_entry_point() {
+    match provisioning_state.invoke_entry_point("program.wasm") {
         Ok(err_code) => {
             if cmdline.time_computation {
                 println!("WASM program finished execution in '{:?}.", start.elapsed());

@@ -441,6 +441,13 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         }
     }
 
+    /// Register program
+    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        //TODO: link to the actually fs API.
+        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        Ok(())
+    }
+
     /// Registers the program result.
     #[inline]
     pub(crate) fn set_result(&mut self, result: &[u8]) {
@@ -1124,13 +1131,12 @@ pub trait ExecutionEngine: Send {
     /// TODO: Add the range selector
     fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError>;
 
-    ///// Register a program `file_name` 
-    ///// on behalf of the client identified by `client_id`.
-    ///// The client must has the read permission to `file_name`.
-    ///// This program must be specified in the permission system
-    ///// and the hash of `prog` must match the requirement.
-    //fn register_program(&mut self, client_id: u64, file_name: String, prog: &[u8]) -> Result<(), HostProvisioningError>; 
-
+    /// Register a program `file_name` 
+    /// on behalf of the client identified by `client_id`.
+    /// The client must has the read permission to `file_name`.
+    /// This program must be specified in the permission system
+    /// and the hash of `prog` must match the requirement.
+    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError>; 
 
     //TODO: these API will be replaced by FS API -- strart
     /// Loads a raw WASM program from a buffer of received or parsed bytes.
@@ -1168,16 +1174,19 @@ pub trait ExecutionEngine: Send {
     /// if the WASM program fails at runtime.  On success, bumps the lifecycle
     /// state to `LifecycleState::FinishedExecuting` and returns the error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError>;
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError>;
 
+    //TODO: do we need this 
     /// Returns `true` iff a program module has been registered in the host
     /// provisioning state.
     fn is_program_registered(&self) -> bool;
 
+    //TODO: do we need this 
     /// Returns `true` iff a result has been registered with the host
     /// provisioning state by a WASM program.
     fn is_result_registered(&self) -> bool;
 
+    //TODO: do we need this 
     /// Returns `true` iff a memory is registered with the host provisioning
     /// state from the program module.
     fn is_memory_registered(&self) -> bool;
@@ -1190,47 +1199,58 @@ pub trait ExecutionEngine: Send {
     /// in.
     fn get_lifecycle_state(&self) -> LifecycleState;
 
+    //TODO: do we need this 
     /// Returns the current number of data sources provisioned into the host
     /// provisioning state.
     fn get_current_data_source_count(&self) -> usize;
 
+    //TODO: do we need this 
     /// Returns the expected data sources, as identified by their client IDs,
     /// that we expect to be provisioned into the host state.
     fn get_expected_data_sources(&self) -> Vec<u64>;
 
+    //TODO: do we need this 
     /// Returns the list of client IDs of clients who can request shutdown of
     /// the platform.
     fn get_expected_shutdown_sources(&self) -> Vec<u64>;
 
+    //TODO: do we need this 
     /// Returns the current number of stream sources provisioned into the host
     /// provisioning state.
     fn get_current_stream_source_count(&self) -> usize;
 
+    //TODO: do we need this 
     /// Returns the expected stream sources, as identified by their client IDs,
     /// that we expect to be provisioned into the host state.
     fn get_expected_stream_sources(&self) -> Vec<u64>;
 
+    //TODO: do we need this 
     /// Returns a result of a WASM computation that has executed on the host
     /// provisioning state.  Returns `None` iff no such result has been
     /// registered.
     fn get_result(&self) -> Option<Vec<u8>>;
 
+    //TODO: do we need this 
     /// Returns an SHA-256 digest of the bytes loaded into the host provisioning
     /// state.  Returns `None` iff no such program has yet been loaded.
     fn get_program_digest(&self) -> Option<Vec<u8>>;
 
+    //TODO: do we need this 
     /// Sets the expected data sources, through a list of their source IDs, that
     /// this computation is expecting.
     fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
+    //TODO: do we need this 
     /// Sets the expected stream sources, through a list of their source IDs, that
     /// this computation is expecting.
     fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
+    //TODO: do we need this 
     /// Sets the expected shutdown sources, through a list of their source IDs, that
     /// this computation is expecting.
     fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
+    //TODO: do we need this 
     /// Registers the previous result.
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>);
 

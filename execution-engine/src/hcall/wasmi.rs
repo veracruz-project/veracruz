@@ -848,7 +848,7 @@ impl WasmiHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
+    pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
         if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
             match self.invoke_export(ENTRY_POINT_NAME) {
                 Ok(Some(RuntimeValue::I32(return_code))) => {
@@ -888,6 +888,14 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.read_file(client_id,file_name)
     }
 
+    /// Chihuahua wrapper of register_program implementation in WasmiHostProvisioningState.
+    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        //TODO: link to the actually fs API.
+        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        //self.register_program(client_id, file_name, prog)?;
+        self.load_program(prog)
+    }
+
     /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.
     #[inline]
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
@@ -914,8 +922,8 @@ impl ExecutionEngine for WasmiHostProvisioningState {
 
     /// ExecutionEngine wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
     #[inline]
-    fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
-        self.invoke_entry_point()
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
+        self.invoke_entry_point(file_name)
     }
 
     /// ExecutionEngine wrapper of is_program_registered implementation in WasmiHostProvisioningState.

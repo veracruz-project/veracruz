@@ -142,7 +142,7 @@ fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestRe
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::ReadyToExecute],
     ) {
-        match protocol_state.invoke_entry_point() {
+        match protocol_state.invoke_entry_point(&file_name) {
             Ok(return_code) => {
                 assert!(check_state(
                     &protocol_state.get_lifecycle_state()?,
@@ -204,6 +204,7 @@ fn dispatch_on_shutdown(
 fn dispatch_on_program(
     protocol_state: &ProtocolState,
     transport_protocol::Program { file_name, code, .. }: transport_protocol::Program,
+    client_id: u64,
 ) -> ProvisioningResult {
     // Buffer the program, it will be used in batch process
     PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice())?;
@@ -213,7 +214,8 @@ fn dispatch_on_program(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::Initial],
     ) {
-        if let Err(reason) = protocol_state.load_program(&code) {
+        if let Err(reason) = protocol_state.register_program(client_id,&file_name,&code) {
+        //if let Err(reason) = protocol_state.load_program(&code) {
             // If program loading fails we stay in the initial state as the
             // program provisioner can just try again.
             assert!(check_state(

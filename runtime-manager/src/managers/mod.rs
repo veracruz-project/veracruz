@@ -181,6 +181,12 @@ impl ProtocolState {
         Ok(self.host_state.lock()?.read_file(client_id,file_name)?)
     }
 
+    //TODO: add description
+    pub(crate) fn register_program(&self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), MexicoCityError> {
+        Ok(self.host_state.lock()?.register_program(client_id,file_name,prog)?)
+        //Ok(self.host_state.lock()?.load_program(prog)?)
+    }
+
     /// Provisions a new data source, described using a `DataSourceMetadata`
     /// frame into the host state.  Will fail if the lifecycle state is not
     /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
@@ -212,8 +218,8 @@ impl ProtocolState {
     /// if the WASM program fails at runtime.  On success, bumps the lifecycle
     /// state to `LifecycleState::FinishedExecuting` and returns the error code
     /// returned by the WASM program entry point as an `i32` value.
-    pub(crate) fn invoke_entry_point(&self) -> Result<i32, RuntimeManagerError> {
-        Ok(self.host_state.lock()?.invoke_entry_point()?)
+    pub(crate) fn invoke_entry_point(&self,file_name:&str) -> Result<i32, RuntimeManagerError> {
+        Ok(self.host_state.lock()?.invoke_entry_point(file_name)?)
     }
 
     /// Returns the current lifecycle state that the host provisioning state is
