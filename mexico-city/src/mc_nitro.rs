@@ -152,7 +152,7 @@ fn initialize(policy_json: &str) -> Result<MCMessage, String> {
     return Ok(MCMessage::Status(NitroStatus::Success));
 }
 
-fn get_psa_attestation_token(challenge: &Vec<u8>) -> Result<MCMessage, String> {
+fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, String> {
     println!("mc_nitro::get_psa_attestation_token started");
     println!("nc_nitro::get_psa_attestation_token received challenge:{:?}", challenge);
 
