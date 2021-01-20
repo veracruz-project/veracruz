@@ -42,7 +42,7 @@ cfg_if! {
     
     } else {
         compile_error!(
-            "Unrecognised feature: platforms supported are SGX, TZ, and std.");
+            "Unrecognised feature: platforms supported are SGX, TZ, Nitro, and std.");
     }
 }
 
