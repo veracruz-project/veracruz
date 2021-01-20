@@ -268,9 +268,27 @@ pub enum HostProvisioningError {
     CannotSortDataOrStream,
     //TODO: potential remove this 
     #[error(
-        display = "HostProvisioningError: FileNotFound."
+        display = "HostProvisioningError: File {} cannot be found.", _0
     )]
-    FileNotFound,
+    FileNotFound(String),
+    #[error(
+        display = "HostProvisioningError: Principal or program {:?} cannot be found.",_0
+    )]
+    IndexNotFound(PermissionIndex),
+    #[error(
+        display = "HostProvisioningError: Client {} is disallowed to {:?}.",client_id,operation
+    )]
+    PermissionDenial {
+        client_id: u64,
+        operation : FileOperation,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum FileOperation {
+    Read,
+    Write,
+    Execute,
 }
 
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
@@ -289,7 +307,21 @@ pub struct PermissionFlags {
     execute : bool,
 }
 
-#[derive(Clone,Hash,PartialEq,Eq)]
+impl PermissionFlags {
+    pub fn read(&self) -> bool {
+        self.read
+    }
+
+    pub fn write(&self) -> bool {
+        self.write
+    }
+
+    pub fn execute(&self) -> bool {
+        self.execute
+    }
+}
+
+#[derive(Clone,Hash,PartialEq,Eq,Debug)]
 pub enum PermissionIndex {
     // Client ID
     Principal(u64),
@@ -398,15 +430,28 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     /// Return Some(PermissionFlags) if `id` has the permission 
     /// to read, write and execute on the `file_name`.
     /// Return None if `id` or `file_name` do not exist.
-    pub(crate) fn check_permission(&self, id: PermissionIndex, file_name: &str) -> Option<PermissionFlags> {
+    pub(crate) fn get_permission(&self, id: &PermissionIndex, file_name: &str) -> Result<PermissionFlags, HostProvisioningError> {
         self.file_permissions
-            .get(&id)
-            .and_then(|permission_hashmap| permission_hashmap.get(file_name))
-            .map(|p| p.clone())
+            .get(id)
+            .ok_or(HostProvisioningError::IndexNotFound(id.clone()))?
+            .get(file_name)
+            .ok_or(HostProvisioningError::FileNotFound(file_name.to_string()))
+            .map(|permission| permission.clone())
     }
 
     /// Append to a file.
     pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.get_permission(&PermissionIndex::Principal(client_id),file_name)
+            .and_then(|p| {
+                if p.read() {
+                    Ok(())
+                } else {
+                    Err(HostProvisioningError::PermissionDenial{
+                        client_id,
+                        operation: FileOperation::Read,
+                    })
+                }
+            })?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         if file_name.starts_with("input-") {
@@ -426,7 +471,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             );
             self.add_new_stream_source(metadata)
         } else {
-            Err(HostProvisioningError::FileNotFound)
+            Err(HostProvisioningError::FileNotFound(file_name.to_string()))
         }
     }
 
@@ -437,7 +482,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         if file_name.starts_with("output") {
             Ok(self.get_result().map(|v| v.to_vec()))
         } else {
-            Err(HostProvisioningError::FileNotFound)
+            Err(HostProvisioningError::FileNotFound(file_name.to_string()))
         }
     }
 
