@@ -59,6 +59,4 @@ sgx_types = { branch="veracruz", git = 'https://github.com/veracruz-project/incu
 [patch.crates-io]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 
-#[patch.'https://github.com/veracruz-project/webpki.git']
-#webpki = { path = "../webpki" }
 
