@@ -144,9 +144,9 @@ pub fn nitro_main() -> Result<(), String> {
     }
 }
 
-fn initialize(policy_json: &String) -> Result<MCMessage, String> {
+fn initialize(policy_json: &str) -> Result<MCMessage, String> {
     println!("mc_nitro::initialize started");
-    managers::baja_manager::init_baja(&policy_json)
+    managers::baja_manager::init_baja(policy_json)
         .map_err(|err| format!("mc_nitro::main init_baja failed:{:?}", err))?;
     println!("mc_nitro::main init_baja completed");
     return Ok(MCMessage::Status(NitroStatus::Success));
