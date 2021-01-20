@@ -107,7 +107,7 @@ pub mod sinaloa_nitro {
                 )?;
                 Ok(Some(serialized_pat))
             } else {
-                unreachable!("Unimplemented");
+                return Err(SinaloaError::InvalidProtoBufMessage);
             }
         }
 
