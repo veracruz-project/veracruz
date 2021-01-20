@@ -285,10 +285,8 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerErro
             .perform()
             .map_err(|err| NitroServerError::Curl(err))?;
     }
-    let header_lines: Vec<&str> = {
-        let lines = received_header.split("\n");
-        lines.collect()
-    };
+    let header_lines: Vec<&str> = received_header.split("\n").collect();
+
     println!(
         "nitro-root-enclave-server::send_tabasco_start received header:{:?}",
         received_header
