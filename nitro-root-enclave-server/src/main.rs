@@ -23,7 +23,7 @@ use std::io::Read;
 use stringreader;
 use veracruz_utils::nitro_enclave::NitroError;
 use veracruz_utils::{
-    receive_buffer, send_buffer, NitroEnclave, NitroRootEnclaveMessage, NitroStatus,
+    receive_buffer, send_buffer, NitroEnclave, NitroRootEnclaveMessage,
 };
 
 // Maximum number of outstanding connections in the socket's
@@ -253,8 +253,8 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerErro
         .post_field_size(buffer.len() as u64)
         .map_err(|err| NitroServerError::Curl(err))?;
 
-    let mut received_body = std::string::String::new();
-    let mut received_header = std::string::String::new();
+    let mut received_body = String::new();
+    let mut received_header = String::new();
     {
         let mut transfer = curl_request.transfer();
 
