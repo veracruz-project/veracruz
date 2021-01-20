@@ -26,7 +26,6 @@ use veracruz_utils::{receive_buffer, send_buffer};
 use nsm_io;
 use nsm_lib;
 
-//const CID: u32 = 17;
 const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
 const PORT: u32 = 5005;
 // Maximum number of outstanding connections in the socket's

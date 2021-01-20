@@ -125,8 +125,6 @@ impl EC2Instance {
         let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
         let sockaddr = SockAddr::new_inet(inet_addr); 
 
-        // let socket_fd = socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None)
-        //     .expect("Failed to create socket");
         let socket_fd = {
             loop {
                 match socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None) {
@@ -146,8 +144,6 @@ impl EC2Instance {
         };
         while let Err(_err) = connect(socket_fd, &sockaddr) {
         }
-        //connect(socket_fd, &sockaddr).expect("Failed to connect to socket");
-
 
         self.socket_fd = Some(socket_fd);
 

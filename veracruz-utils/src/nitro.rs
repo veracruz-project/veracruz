@@ -74,10 +74,6 @@ pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), VeracruzSocketErro
         while sent_bytes < buf.len() {
             sent_bytes += match send(fd, &buf[sent_bytes..buf.len()], MsgFlags::empty()) {
                 Ok(size) => size,
-                //Err(nix::Error::Sys(EINTR)) =>{
-                    //println!("veracruz-utils::nitro::send_buffer as encountered EINTR error");
-                    //0
-                //},
                 Err(err) => {
                     return Err(VeracruzSocketError::NixError(err));
                 }

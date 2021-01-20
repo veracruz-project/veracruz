@@ -208,13 +208,6 @@ impl From<std::boxed::Box<bincode::ErrorKind>> for SinaloaError {
         }
 }
 
-//#[cfg(feature = "nitro")]
-//impl From<nix::Error> for SinaloaError {
-    //fn from(error: nix::Error) -> Self {
-        //SinaloaError::NixError(error)
-    //}
-//}
-
 pub trait Sinaloa {
     fn new(policy: &str) -> Result<Self, SinaloaError>
     where

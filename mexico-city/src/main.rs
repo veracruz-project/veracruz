@@ -9,7 +9,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-//#![no_main]
 #![cfg_attr(feature = "tz", no_main)]
 #![crate_name = "mexico_city_enclave"]
 #![feature(rustc_private)]

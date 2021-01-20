@@ -49,7 +49,6 @@ pub enum NitroError {
 
 pub struct NitroEnclave {
     enclave_id: String,
-    //enclave_cid: u32,
     vsocksocket: crate::vsocket::VsockSocket,
     ocall_thread: Option<JoinHandle<()>>,
     ocall_terminate_sender: Option<std::sync::Mutex<std::sync::mpsc::Sender<bool>>>,
@@ -129,7 +128,6 @@ impl NitroEnclave {
 
         let enclave: Self = NitroEnclave {
             enclave_id: enclave_data["EnclaveID"].to_string().trim_matches('"').to_string(),
-            //enclave_cid: cid,
             vsocksocket: crate::vsocket::vsock_connect(cid, VERACRUZ_PORT)?,
             ocall_thread: ocall_thread_opt,
             ocall_terminate_sender: sender,
