@@ -219,7 +219,7 @@ fn proxy_attestation(
     // load the PSA key into PSA Crypto
     let device_private_key = {
         let dkp_guard = DEVICE_KEY_PAIR.lock()
-            .map_err(|err| format!("ntiro-root-enclave:proxy_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
+            .map_err(|err| format!("nitro-root-enclave:proxy_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
         match &*dkp_guard {
             Some((_key, bytes)) => bytes.clone(),
             None => {
