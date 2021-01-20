@@ -197,8 +197,8 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
 }
 
 fn proxy_attestation(
-    challenge: &Vec<u8>,
-    native_token: &Vec<u8>,
+    challenge: &[u8],
+    native_token: &[u8],
     enclave_name: String,
 ) -> Result<Vec<u8>, String> {
     // first authenticate the native token
