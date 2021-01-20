@@ -1,4 +1,4 @@
-//! PSA Attestation-specific material
+//! AWS Nitro specific material for Tabasco
 //!
 //! ## Authors
 //!

@@ -1,8 +1,9 @@
 [package]
 name = "nitro-root-enclave"
 version = "0.1.0"
-authors = ["Derek Miller <derek.miller@arm.com>"]
+authors = ["The Veracruz Development Team"]
 edition = "2018"
+description = "The Veracruz root enclave for AWS Nitro Enclaves"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

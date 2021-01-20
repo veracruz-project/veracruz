@@ -1,3 +1,15 @@
+//! Structs needed for AWS Nitro Enclaves
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+
+
 use serde::{Deserialize, Serialize};
 
 use nix::sys::socket::{recv, send, MsgFlags};

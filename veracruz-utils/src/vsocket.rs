@@ -1,3 +1,14 @@
+//! Virtual socket handler for Veracruz
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+
 use nix::sys::socket::{connect, shutdown, socket};
 use nix::sys::socket::{AddressFamily, Shutdown, SockAddr, SockFlag, SockType};
 use nix::unistd::close;
