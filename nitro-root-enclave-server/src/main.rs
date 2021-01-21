@@ -219,16 +219,13 @@ fn send_start(
     firmware_version: &str,
 ) -> Result<(Vec<u8>, i32), NitroServerError> {
     let tabasco_response = send_tabasco_start(url_base, protocol, firmware_version)?;
-    match tabasco_response.has_psa_attestation_init() {
-        false => {
-            return Err(NitroServerError::InvalidProtoBufMessage);
-        }
-        true => {
-            let (challenge, device_id) =
-                colima::parse_psa_attestation_init(tabasco_response.get_psa_attestation_init())
-                    .map_err(|err| NitroServerError::Colima(err))?;
-            return Ok((challenge, device_id));
-        }
+    if tabasco_response.has_psa_attestation_init() {
+        let (challenge, device_id) =
+        colima::parse_psa_attestation_init(tabasco_response.get_psa_attestation_init())
+            .map_err(|err| NitroServerError::Colima(err))?;
+        return Ok((challenge, device_id));
+    } else{
+        return Err(NitroServerError::InvalidProtoBufMessage);
     }
 }
 
