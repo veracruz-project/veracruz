@@ -11,9 +11,9 @@
 
 use base64;
 use bincode;
+use clap::{App, Arg};
 use colima;
 use curl::easy::{Easy, List};
-use clap::{Arg, App};
 use err_derive::Error;
 use hex;
 use nix::sys::socket::{
@@ -22,9 +22,7 @@ use nix::sys::socket::{
 use std::io::Read;
 use stringreader;
 use veracruz_utils::nitro_enclave::NitroError;
-use veracruz_utils::{
-    receive_buffer, send_buffer, NitroEnclave, NitroRootEnclaveMessage,
-};
+use veracruz_utils::{receive_buffer, send_buffer, NitroEnclave, NitroRootEnclaveMessage};
 
 // Maximum number of outstanding connections in the socket's
 // listen queue
@@ -62,15 +60,17 @@ pub enum NitroServerError {
 fn main() {
     println!("Hello, world!");
     let matches = App::new("nitro-root-enclave-server")
-        .arg(Arg::with_name("tabasco")
-            .takes_value(true)
-            .required(true)
-            .help("URL for Tabasco server"))
+        .arg(
+            Arg::with_name("tabasco")
+                .takes_value(true)
+                .required(true)
+                .help("URL for Tabasco server"),
+        )
         .arg(
             Arg::with_name("debug")
                 .long("debug")
                 .takes_value(false)
-                .help("Enables debug mode in the enclave")
+                .help("Enables debug mode in the enclave"),
         )
         .get_matches();
     let tabasco_url = matches.value_of("tabasco").unwrap(); // Since the tabasco argument is required, this should never actually panic
@@ -83,7 +83,7 @@ fn main() {
                 println!("nitro-root-enclave-server::main native_attestation failed({:?}). Sleeping and trying again.", err);
                 std::thread::sleep(std::time::Duration::from_secs(2));
                 continue;
-            },
+            }
             Ok(enc) => break enc,
         }
     };
@@ -96,11 +96,15 @@ fn main() {
     )
     .expect("Failed to create socket_td");
 
-    let ip_string = local_ipaddress::get()
-        .expect("Failed to get local ip address");
-    let ip_addr: Vec<u8> = ip_string.split(".")
-        .map(|s| s.parse().expect("Parse error")).collect();
-    let my_ip_address = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), INBOUND_PORT);
+    let ip_string = local_ipaddress::get().expect("Failed to get local ip address");
+    let ip_addr: Vec<u8> = ip_string
+        .split(".")
+        .map(|s| s.parse().expect("Parse error"))
+        .collect();
+    let my_ip_address = InetAddr::new(
+        IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]),
+        INBOUND_PORT,
+    );
     let sockaddr = SockAddr::new_inet(my_ip_address);
 
     bind(socket_fd, &sockaddr).expect("Failed to bind socket");
@@ -222,10 +226,10 @@ fn send_start(
     let tabasco_response = send_tabasco_start(url_base, protocol, firmware_version)?;
     if tabasco_response.has_psa_attestation_init() {
         let (challenge, device_id) =
-        colima::parse_psa_attestation_init(tabasco_response.get_psa_attestation_init())
-            .map_err(|err| NitroServerError::Colima(err))?;
+            colima::parse_psa_attestation_init(tabasco_response.get_psa_attestation_init())
+                .map_err(|err| NitroServerError::Colima(err))?;
         return Ok((challenge, device_id));
-    } else{
+    } else {
         return Err(NitroServerError::InvalidProtoBufMessage);
     }
 }
@@ -311,7 +315,10 @@ pub fn send_tabasco_start(
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
 
-    println!("nitro-root-enclave-server::send_tabasco_start sending to url:{:?}", url);
+    println!(
+        "nitro-root-enclave-server::send_tabasco_start sending to url:{:?}",
+        url
+    );
     let received_body: String = post_buffer(&url, &encoded_start_msg)?;
     println!("nitro-root-enclave-server::send_tabasco_start completed post command");
 
