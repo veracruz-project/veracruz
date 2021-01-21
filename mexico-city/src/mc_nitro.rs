@@ -22,20 +22,28 @@ use veracruz_utils::{
     receive_buffer, send_buffer, vsocket, MCMessage, NitroRootEnclaveMessage, NitroStatus,
 };
 
-const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
-const HOST_CID: u32 = 3; // This may not be right
-const PORT: u32 = 5005;
-// max number of outstanding connectiosn in the socket listen queue
-const BACKLOG: usize = 128;
-const OCALL_PORT: u32 = 5006;
 use crate::managers;
 use crate::managers::MexicoCityError;
 
-// the following value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
-// I've no idea where it came from (I've seen no documentation on this), but
-// I guess I have to trust Amazon on this one
+/// The CID for the VSOCK to listen on
+/// Currently set to all 1's so it will listen on all of them
+const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
+/// The CID to send ocalls to that the non-secure host is listening on
+const HOST_CID: u32 = 3;
+/// The incoming port to listen on
+const PORT: u32 = 5005;
+/// max number of outstanding connectiosn in the socket listen queue
+const BACKLOG: usize = 128;
+/// The port to use when performing ocalls to the non-secure host
+const OCALL_PORT: u32 = 5006;
+
+/// The maximum attestation document size
+/// the value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
+/// I've no idea where it came from (I've seen no documentation on this), but
+/// I guess I have to trust Amazon on this one
 const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
+/// The main function for the Nitro mexico city enclave
 pub fn nitro_main() -> Result<(), MexicoCityError> {
     let socket_fd = socket(
         AddressFamily::Vsock,
@@ -129,6 +137,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
                 get_psa_attestation_token(&challenge)?
             }
             MCMessage::ResetEnclave => {
+                // Do nothing here for now
                 println!("mc_nitro::main ResetEnclave");
                 MCMessage::Status(NitroStatus::Success)
             }
@@ -148,6 +157,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
     }
 }
 
+/// Handler for the MCMessage::Initialize message
 fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
     println!("mc_nitro::initialize started");
     managers::baja_manager::init_baja(policy_json)?;
@@ -155,6 +165,7 @@ fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
     return Ok(MCMessage::Status(NitroStatus::Success));
 }
 
+/// Handler for the MCMessage::GetPSAAttestationToken message
 fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityError> {
     println!("mc_nitro::get_psa_attestation_token started");
     println!(
