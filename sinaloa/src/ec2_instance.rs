@@ -28,6 +28,7 @@ use nix::sys::socket::{
 };
 use veracruz_utils;
 
+/// A struct containing specifics about an EC2 instance
 pub struct EC2Instance {
     pub instance_id: String,
     pub private_ip: String,
@@ -35,35 +36,49 @@ pub struct EC2Instance {
     pub socket_fd: Option<RawFd>,
 }
 
+/// Errors that may occur in the handling of EC2 instances
 #[derive(Debug, Error)]
 pub enum EC2Error {
+    /// A std::io::Error occurred
     #[error(display = "EC2: IO Error:{:?}", _0)]
     IOError(std::io::Error),
+    /// An error handling UTF8 strings occurred
     #[error(display = "EC2: UTF8 Error:{:?}", _0)]
     Utf8Error(std::str::Utf8Error),
+    /// Serde JSON returned an error
     #[error(display = "EC2: Serde JSON Error:{:?}", _0)]
     SerdeJsonError(serde_json::Error),
+    /// Incorrect JSON was encountered
     #[error(display = "EC2: Incorrect JSON")]
     IncorrectJson,
+    /// An SSH error occurred
     #[error(display = "EC2: SSH2 Error:{:?}", _0)]
     SSH2Error(ssh2::Error),
+    /// The contacted server (an EC2 instance we started) did not present a
+    /// host key when it was contacted
     #[error(display = "EC2: No Host Key")]
     NoHostKeyError,
-    #[error(display = "EC2: Not connected")]
-    NotConnectedError,
+    /// A Veracruz-specific socket error was enountered
     #[error(display = "EC2: Veracruz Socket Error:{:?}", _0)]
     VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    /// A call to a function was "successful" but it returned a non-zero status
+    /// value. This typically happens with calls to libraries following the 
+    /// Unix calling conventions.
     #[error(display = "EC2: Command non-zero status error:{:?}", _0)]
     CommandNonZeroStatus(i32),
-    #[error(display = "EC2: Nix error:{:?}", _0)]
-    NixError(nix::Error),
+    /// an error was returned by the AWS CLI
     #[error(display = "EC2: CLI error")]
     CLIError,
-    #[error(display = "EC2: Unimplemented")]
-    Unimplemented,
 }
 
 impl EC2Instance {
+    /// instantiate an EC2 instance, which involves calling the AWS CLI to start
+    /// the instance, and then collecting information about that instance
+    /// Note that standard practice on AWS CLI calls is to return immediatly,
+    /// even before the instance has completed booting. In order to alleviate
+    /// that problem, this function sleeps for a set amount of time to give the
+    /// instance time to boot before returning, so the caller of this function
+    /// can be confident that they can contact the instance
     pub fn new() -> Result<Self, EC2Error> {
         let aws_key_name =
             env::var("AWS_KEY_NAME").expect("Failed to read AWS_KEY_NAME environment variable.");
@@ -137,6 +152,7 @@ impl EC2Instance {
         })
     }
 
+    /// Connect to the `socket_fd` socker on the EC2 instance
     fn socket_connect(&mut self) -> Result<RawFd, EC2Error> {
         let sockaddr = self.get_private_sockaddr()?;
 
@@ -167,6 +183,8 @@ impl EC2Instance {
         return Ok(socket_fd);
     }
 
+    /// Get the private IP address of the EC2 instance, and return it as a 
+    /// SockAddr
     fn get_private_sockaddr(&self) -> Result<SockAddr, EC2Error> {
         let ip_addr: Vec<u8> = self
             .private_ip
@@ -180,6 +198,8 @@ impl EC2Instance {
         return Ok(SockAddr::new_inet(inet_addr));
     }
 
+    /// Close the `socket_fd` socket to the EC2 instance, and then shutdown the
+    /// instance (using the AWS CLI)
     pub fn close(&mut self) -> Result<(), EC2Error> {
         if let Some(socket_fd) = self.socket_fd.take() {
             match shutdown(socket_fd, Shutdown::Both) {
@@ -205,6 +225,8 @@ impl EC2Instance {
         return Ok(());
     }
 
+    /// Execute a specified command on the EC2 instance.
+    /// This is performed by creating an SSH tunnel to the instance.
     pub fn execute_command(&self, command: &str) -> Result<(), EC2Error> {
         let full_ip = format!("{:}:{:}", self.private_ip, 22);
         let tcp = TcpStream::connect(full_ip.clone()).map_err(|err| EC2Error::IOError(err))?;
@@ -259,6 +281,7 @@ impl EC2Instance {
         Ok(())
     }
 
+    /// Upload a file to the EC2 instance. This is done via scp_send
     pub fn upload_file(&self, filename: &str, dest: &str) -> Result<(), EC2Error> {
         let file_data: Vec<u8> = self.read_file(filename).map_err(|err| {
             println!(
@@ -315,6 +338,7 @@ impl EC2Instance {
         Ok(())
     }
 
+    /// Read the filename into a Vec<u8> (so it's binary)
     fn read_file(&self, filename: &str) -> Result<Vec<u8>, EC2Error> {
         let path = Path::new(filename);
 
@@ -326,6 +350,7 @@ impl EC2Instance {
         Ok(buffer)
     }
 
+    /// sned a buffer to the EC2 instance via sockets, using `socket_fd`
     pub fn send_buffer(&mut self, buffer: &Vec<u8>) -> Result<(), EC2Error> {
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
@@ -335,6 +360,7 @@ impl EC2Instance {
         return Ok(());
     }
 
+    /// receive a buffer from the EC2 instance via sockets, using `socket_fd`
     pub fn receive_buffer(&mut self) -> Result<Vec<u8>, EC2Error> {
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
@@ -350,6 +376,7 @@ impl EC2Instance {
 }
 
 impl Drop for EC2Instance {
+    /// Drop the EC2 instance, which calls `close` and terminates the instance
     fn drop(&mut self) {
         match self.close() {
             Err(err) => println!("EC2Instance::drop failed on call to close:{:?}", err),
