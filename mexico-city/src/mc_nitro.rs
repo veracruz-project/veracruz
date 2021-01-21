@@ -61,14 +61,13 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
     bind(socket_fd, &sockaddr).map_err(|err| MexicoCityError::SocketError(err))?;
     println!("mc_nitro::nitro_main calling accept");
 
-    listen_vsock(socket_fd, BACKLOG)
-        .map_err(|err| MexicoCityError::SocketError(err))?;
+    listen_vsock(socket_fd, BACKLOG).map_err(|err| MexicoCityError::SocketError(err))?;
 
     let fd = accept(socket_fd).map_err(|err| MexicoCityError::SocketError(err))?;
     println!("mc_nitro::nitro_main accept succeeded. looping");
     loop {
-        let received_buffer = receive_buffer(fd)
-            .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+        let received_buffer =
+            receive_buffer(fd).map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
         let received_message: MCMessage = bincode::deserialize(&received_buffer)
             .map_err(|err| MexicoCityError::BincodeError(err))?;
         let return_message = match received_message {
@@ -152,8 +151,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             "mc_nitro::main calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
-        send_buffer(fd, &return_buffer)
-            .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+        send_buffer(fd, &return_buffer).map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
     }
 }
 
@@ -209,7 +207,8 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
     let enclave_name: String = managers::baja_manager::get_enclave_name()?;
     let nre_message =
         NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_name);
-    let nre_message_buffer = bincode::serialize(&nre_message).map_err(|err|MexicoCityError::BincodeError(err))?;
+    let nre_message_buffer =
+        bincode::serialize(&nre_message).map_err(|err| MexicoCityError::BincodeError(err))?;
 
     // send the buffer back to Sinaloa via an ocall
     let vsocksocket = vsocket::vsock_connect(HOST_CID, OCALL_PORT)
@@ -218,14 +217,12 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
         .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
     let received_buffer = receive_buffer(vsocksocket.as_raw_fd())
         .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
-    let received_message: NitroRootEnclaveMessage = bincode::deserialize(&received_buffer)
-        .map_err(|err| MexicoCityError::BincodeError(err))?;
+    let received_message: NitroRootEnclaveMessage =
+        bincode::deserialize(&received_buffer).map_err(|err| MexicoCityError::BincodeError(err))?;
 
     let (psa_token, pubkey, device_id) = match received_message {
         NitroRootEnclaveMessage::PSAToken(token, pubkey, d_id) => (token, pubkey, d_id),
-        _ => {
-            return Err(MexicoCityError::WrongMessageTypeError(received_message))
-        }
+        _ => return Err(MexicoCityError::WrongMessageTypeError(received_message)),
     };
     let psa_token_message: MCMessage =
         MCMessage::PSAAttestationToken(psa_token, pubkey, device_id.try_into().unwrap());

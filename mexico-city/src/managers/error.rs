@@ -10,14 +10,14 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
+#[cfg(feature = "nitro")]
+use nix;
 #[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro::{NitroRootEnclaveMessage, VeracruzSocketError};
-#[cfg(feature = "nitro")]
-use nix;
 
 #[derive(Debug, Error)]
 pub enum MexicoCityError {
