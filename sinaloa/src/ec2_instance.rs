@@ -18,15 +18,15 @@ use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::process::Command;
 
-use serde_json::Value;
 use err_derive::Error;
-use ssh2::{ Session};
+use serde_json::Value;
+use ssh2::Session;
 
-use veracruz_utils;
-use nix::sys::socket::{connect,
-    socket, AddressFamily, InetAddr, IpAddr, SockAddr, SockFlag, SockType,
-    shutdown, Shutdown
+use nix::sys::socket::{
+    connect, shutdown, socket, AddressFamily, InetAddr, IpAddr, Shutdown, SockAddr, SockFlag,
+    SockType,
 };
+use veracruz_utils;
 
 pub struct EC2Instance {
     pub instance_id: String,
@@ -65,36 +65,54 @@ pub enum EC2Error {
 
 impl EC2Instance {
     pub fn new() -> Result<Self, EC2Error> {
-        let aws_key_name = env::var("AWS_KEY_NAME").expect("Failed to read AWS_KEY_NAME environment variable.");
-        let aws_subnet = env::var("AWS_SUBNET").expect("Failed to read AWS_SUBNET environment variable.");
-        let aws_region = env::var("AWS_REGION").expect("Failed to read AWS_REGION environment variable.");
-        let aws_security_group_id = env::var("AWS_SECURITY_GROUP_ID").expect("Failed to read AWS_SECURITY_GROUP_ID environment variable.");
+        let aws_key_name =
+            env::var("AWS_KEY_NAME").expect("Failed to read AWS_KEY_NAME environment variable.");
+        let aws_subnet =
+            env::var("AWS_SUBNET").expect("Failed to read AWS_SUBNET environment variable.");
+        let aws_region =
+            env::var("AWS_REGION").expect("Failed to read AWS_REGION environment variable.");
+        let aws_security_group_id = env::var("AWS_SECURITY_GROUP_ID")
+            .expect("Failed to read AWS_SECURITY_GROUP_ID environment variable.");
 
         let subnet_option = format!("--subnet-id={:}", aws_subnet);
 
         let ec2_result = Command::new("/usr/local/bin/aws")
-            .args(&["ec2", "run-instances", "--image-id", "ami-037dd1d3f98da4d50",
-                    "--instance-type", "m5.xlarge", "--enclave-options", "Enabled=true",
-                    "--region",  &aws_region, "--key-name", &aws_key_name,
-                    &subnet_option, "--security-group-ids", &aws_security_group_id,
-                    "--associate-public-ip-address",
-                    "--tag-specifications",  "ResourceType=instance,Tags=[{Key=Veracruz,Value=RootEnclave}]"])
-                        .output()
+            .args(&[
+                "ec2",
+                "run-instances",
+                "--image-id",
+                "ami-037dd1d3f98da4d50",
+                "--instance-type",
+                "m5.xlarge",
+                "--enclave-options",
+                "Enabled=true",
+                "--region",
+                &aws_region,
+                "--key-name",
+                &aws_key_name,
+                &subnet_option,
+                "--security-group-ids",
+                &aws_security_group_id,
+                "--associate-public-ip-address",
+                "--tag-specifications",
+                "ResourceType=instance,Tags=[{Key=Veracruz,Value=RootEnclave}]",
+            ])
+            .output()
             .map_err(|err| {
                 println!("EC2Instance::new failed to start ec2 instance:{:?}", err);
                 EC2Error::IOError(err)
             })?;
         if !ec2_result.status.success() {
-            let ec2_result_text = std::str::from_utf8(&ec2_result.stderr)
-                .map_err(|err| EC2Error::Utf8Error(err))?;
+            let ec2_result_text =
+                std::str::from_utf8(&ec2_result.stderr).map_err(|err| EC2Error::Utf8Error(err))?;
             println!("ec2 result Stdout:{:}", ec2_result_text);
             return Err(EC2Error::CLIError);
         }
 
-        let ec2_result_text = std::str::from_utf8(&ec2_result.stdout)
-            .map_err(|err| EC2Error::Utf8Error(err))?;
-        let ec2_data: Value = serde_json::from_str(ec2_result_text)
-            .map_err(|err| EC2Error::SerdeJsonError(err))?;
+        let ec2_result_text =
+            std::str::from_utf8(&ec2_result.stdout).map_err(|err| EC2Error::Utf8Error(err))?;
+        let ec2_data: Value =
+            serde_json::from_str(ec2_result_text).map_err(|err| EC2Error::SerdeJsonError(err))?;
 
         let instance_id: &str = match &ec2_data["Instances"][0]["InstanceId"] {
             Value::String(value) => value,
@@ -124,51 +142,64 @@ impl EC2Instance {
 
         let socket_fd = {
             loop {
-                match socket(AddressFamily::Inet, SockType::Stream, SockFlag::empty(), None) {
+                match socket(
+                    AddressFamily::Inet,
+                    SockType::Stream,
+                    SockFlag::empty(),
+                    None,
+                ) {
                     Ok(fd) => break fd,
-                    Err(nix::Error::Sys(err)) => {
-                        match err {
-                            nix::errno::Errno::ECONNREFUSED => {
-                                println!("EC2Instance::socket failed, ECONNREFUSED, trying again");
-                                continue
-                            },
-                            _ => panic!(format!("Failed to create socket:{:?}", err)),
+                    Err(nix::Error::Sys(err)) => match err {
+                        nix::errno::Errno::ECONNREFUSED => {
+                            println!("EC2Instance::socket failed, ECONNREFUSED, trying again");
+                            continue;
                         }
+                        _ => panic!(format!("Failed to create socket:{:?}", err)),
                     },
                     Err(err) => panic!(format!("Failed to create socket:{:?}", err)),
                 }
             }
         };
-        while let Err(_err) = connect(socket_fd, &sockaddr) {
-        }
+        while let Err(_err) = connect(socket_fd, &sockaddr) {}
 
         self.socket_fd = Some(socket_fd);
 
         return Ok(socket_fd);
     }
 
-    
     fn get_private_sockaddr(&self) -> Result<SockAddr, EC2Error> {
-        let ip_addr: Vec<u8> = self.private_ip.split(".")
-            .map(|s| s.parse().expect("Parse error")).collect();
-        let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
+        let ip_addr: Vec<u8> = self
+            .private_ip
+            .split(".")
+            .map(|s| s.parse().expect("Parse error"))
+            .collect();
+        let inet_addr: InetAddr = InetAddr::new(
+            IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]),
+            self.socket_port,
+        );
         return Ok(SockAddr::new_inet(inet_addr));
     }
 
-    pub fn close(&mut self)-> Result<(), EC2Error> {
-        
+    pub fn close(&mut self) -> Result<(), EC2Error> {
         if let Some(socket_fd) = self.socket_fd.take() {
             match shutdown(socket_fd, Shutdown::Both) {
                 Ok(_) => (), // shutdown was successful, continue on your merry way
-                Err(err) => { // shutdown was not successful, still attmept to finish the close operation
+                Err(err) => {
+                    // shutdown was not successful, still attmept to finish the close operation
                     println!("EC2Instance::close failed to shutdown socket({:?}). We're gonna keep going, though", err);
-                },
+                }
             }
         }
         println!("EC2InstanFce::close attempting to shutdown instance");
         let _ec2_result = Command::new("/usr/local/bin/aws")
-            .args(&["ec2", "terminate-instances", "--instance-ids", &self.instance_id]).output()
-                .map_err(|err| EC2Error::IOError(err))?;
+            .args(&[
+                "ec2",
+                "terminate-instances",
+                "--instance-ids",
+                &self.instance_id,
+            ])
+            .output()
+            .map_err(|err| EC2Error::IOError(err))?;
 
         println!("EC2Instance::close completed");
         return Ok(());
@@ -176,12 +207,12 @@ impl EC2Instance {
 
     pub fn execute_command(&self, command: &str) -> Result<(), EC2Error> {
         let full_ip = format!("{:}:{:}", self.private_ip, 22);
-        let tcp = TcpStream::connect(full_ip.clone())
-            .map_err(|err| EC2Error::IOError(err))?;
+        let tcp = TcpStream::connect(full_ip.clone()).map_err(|err| EC2Error::IOError(err))?;
 
         let mut session: Session = Session::new().unwrap();
         session.set_tcp_stream(tcp);
-        session.handshake()
+        session
+            .handshake()
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
         let (key, key_type) = match session.host_key() {
@@ -189,93 +220,105 @@ impl EC2Instance {
             None => return Err(EC2Error::NoHostKeyError),
         };
 
-        let mut known_hosts = session.known_hosts()
+        let mut known_hosts = session
+            .known_hosts()
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        known_hosts.add(&full_ip, key, &full_ip, key_type.into())
+        known_hosts
+            .add(&full_ip, key, &full_ip, key_type.into())
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
-        let aws_private_key_filename = env::var("AWS_PRIVATE_KEY_FILENAME").expect("Failed to read AWS_PRIVATE_KEY_FILENAME environment variable.");
+        let aws_private_key_filename = env::var("AWS_PRIVATE_KEY_FILENAME")
+            .expect("Failed to read AWS_PRIVATE_KEY_FILENAME environment variable.");
         let privkey_path: &Path = Path::new(&aws_private_key_filename);
-        session.userauth_pubkey_file("ec2-user",
-            None,
-            privkey_path,
-            None
-            )
+        session
+            .userauth_pubkey_file("ec2-user", None, privkey_path, None)
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        let mut channel = session.channel_session()
+        let mut channel = session
+            .channel_session()
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        channel.exec(command)
+        channel
+            .exec(command)
             .map_err(|err| EC2Error::SSH2Error(err))?;
         let mut s = String::new();
-        channel.read_to_string(&mut s)
+        channel
+            .read_to_string(&mut s)
             .map_err(|err| EC2Error::IOError(err))?;
-        channel.wait_close()
+        channel
+            .wait_close()
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        let exit_status = channel.exit_status()
+        let exit_status = channel
+            .exit_status()
             .map_err(|err| EC2Error::SSH2Error(err))?;
         if exit_status != 0 {
-            println!("EC2Instance::excute_command SSH2 Session returned with non-zero exit-status:{:?}", exit_status);
+            println!(
+                "EC2Instance::excute_command SSH2 Session returned with non-zero exit-status:{:?}",
+                exit_status
+            );
             return Err(EC2Error::CommandNonZeroStatus(exit_status));
         }
         Ok(())
     }
 
     pub fn upload_file(&self, filename: &str, dest: &str) -> Result<(), EC2Error> {
-
-        let file_data: Vec<u8> = self.read_file(filename)
-            .map_err(|err| {
-                println!("EC2Instance::upload_file failed to read file:{:?}, received error:{:?}", filename, err);
-                err
-            })?;
+        let file_data: Vec<u8> = self.read_file(filename).map_err(|err| {
+            println!(
+                "EC2Instance::upload_file failed to read file:{:?}, received error:{:?}",
+                filename, err
+            );
+            err
+        })?;
         let full_ip = format!("{:}:{:}", self.private_ip, 22);
-        let tcp = TcpStream::connect(full_ip.clone())
-            .map_err(|err| {
-                println!("EC2Instance::upload_file Failed to connect to EC2instance:{:?}", err);
-                EC2Error::IOError(err)
-            })?;
+        let tcp = TcpStream::connect(full_ip.clone()).map_err(|err| {
+            println!(
+                "EC2Instance::upload_file Failed to connect to EC2instance:{:?}",
+                err
+            );
+            EC2Error::IOError(err)
+        })?;
 
         let mut session: Session = Session::new().unwrap();
         session.set_tcp_stream(tcp);
-        session.handshake()
-            .map_err(|err| {
-                println!("EC2Instance::upload_file failed handshake:{:?}", err);
-                EC2Error::SSH2Error(err)
-            })?;
+        session.handshake().map_err(|err| {
+            println!("EC2Instance::upload_file failed handshake:{:?}", err);
+            EC2Error::SSH2Error(err)
+        })?;
 
         let (key, key_type) = match session.host_key() {
             Some((k, kt)) => (k, kt),
             None => return Err(EC2Error::NoHostKeyError),
         };
 
-        let mut known_hosts = session.known_hosts()
+        let mut known_hosts = session
+            .known_hosts()
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        known_hosts.add(&full_ip, key, &full_ip, key_type.into())
+        known_hosts
+            .add(&full_ip, key, &full_ip, key_type.into())
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
-        let aws_private_key_filename = env::var("AWS_PRIVATE_KEY_FILENAME").expect("Failed to read AWS_PRIVATE_KEY_FILENAME environment variable.");
+        let aws_private_key_filename = env::var("AWS_PRIVATE_KEY_FILENAME")
+            .expect("Failed to read AWS_PRIVATE_KEY_FILENAME environment variable.");
         let privkey_path: &Path = Path::new(&aws_private_key_filename);
-        session.userauth_pubkey_file("ec2-user",
-            None,
-            privkey_path,
-            None
-            )
+        session
+            .userauth_pubkey_file("ec2-user", None, privkey_path, None)
             .map_err(|err| EC2Error::SSH2Error(err))?;
 
-        let mut remote_file = session.scp_send(Path::new(dest), 0o777, file_data.len() as u64, None)
+        let mut remote_file = session
+            .scp_send(Path::new(dest), 0o777, file_data.len() as u64, None)
             .map_err(|err| EC2Error::SSH2Error(err))?;
-        let _num_written = remote_file.write_all(&file_data)
-            .map_err(|err| {
-                println!("EC2Instance::upload_file failed to write file data:{:?}", err);
-                EC2Error::IOError(err)
-            })?;
+        let _num_written = remote_file.write_all(&file_data).map_err(|err| {
+            println!(
+                "EC2Instance::upload_file failed to write file data:{:?}",
+                err
+            );
+            EC2Error::IOError(err)
+        })?;
         Ok(())
     }
 
     fn read_file(&self, filename: &str) -> Result<Vec<u8>, EC2Error> {
         let path = Path::new(filename);
 
-        let mut file = File::open(&path)
-            .map_err(|err| EC2Error::IOError(err))?;
+        let mut file = File::open(&path).map_err(|err| EC2Error::IOError(err))?;
         let mut buffer: Vec<u8> = Vec::new();
         file.read_to_end(&mut buffer)
             .map_err(|err| EC2Error::IOError(err))?;
@@ -286,24 +329,22 @@ impl EC2Instance {
     pub fn send_buffer(&mut self, buffer: &Vec<u8>) -> Result<(), EC2Error> {
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
-            None => {
-                self.socket_connect()?
-            }
+            None => self.socket_connect()?,
         };
         veracruz_utils::send_buffer(socket_fd, buffer).expect("send buffer failed");
         return Ok(());
     }
 
     pub fn receive_buffer(&mut self) -> Result<Vec<u8>, EC2Error> {
-
         let socket_fd = match self.socket_fd {
             Some(socket_fd) => socket_fd,
             None => {
                 println!("EC2Instance::receive_buffer connecting socket. I don't think this should happen");
                 self.socket_connect()?
-            },
+            }
         };
-        let received_buffer = veracruz_utils::receive_buffer(socket_fd).expect("Failed to receive buffer");
+        let received_buffer =
+            veracruz_utils::receive_buffer(socket_fd).expect("Failed to receive buffer");
         return Ok(received_buffer);
     }
 }

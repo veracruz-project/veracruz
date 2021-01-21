@@ -10,12 +10,12 @@
 //! information on licensing and copyright.
 
 use crate::sinaloa::*;
+#[cfg(feature = "nitro")]
+use crate::sinaloa_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
 #[cfg(feature = "sgx")]
 use crate::sinaloa_sgx::sinaloa_sgx::SinaloaSGX as SinaloaEnclave;
 #[cfg(feature = "tz")]
 use crate::sinaloa_tz::sinaloa_tz::SinaloaTZ as SinaloaEnclave;
-#[cfg(feature = "nitro")]
-use crate::sinaloa_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
 
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;

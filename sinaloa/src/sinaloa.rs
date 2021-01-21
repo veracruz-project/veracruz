@@ -9,6 +9,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#[cfg(feature = "nitro")]
+use crate::ec2_instance::EC2Error;
 use actix_http::ResponseBuilder;
 use actix_web::{error, http::StatusCode, HttpResponse};
 use curl::easy::{Easy, List};
@@ -17,8 +19,6 @@ use log::debug;
 use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
-#[cfg(feature = "nitro")]
-use crate::ec2_instance::EC2Error;
 
 pub type SinaloaResponder = Result<String, SinaloaError>;
 
@@ -88,7 +88,10 @@ pub enum SinaloaError {
     #[error(display = "Sinaloa: Received Invalid MC Message: {:?}", _0)]
     InvalidMCMessage(veracruz_utils::MCMessage),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Received Invalid Nitro Root Enclave Message: {:?}", _0)]
+    #[error(
+        display = "Sinaloa: Received Invalid Nitro Root Enclave Message: {:?}",
+        _0
+    )]
     InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "Sinaloa: Received Invalid Protocol Buffer Message")]
@@ -203,9 +206,9 @@ impl error::ResponseError for SinaloaError {
 
 #[cfg(feature = "nitro")]
 impl From<std::boxed::Box<bincode::ErrorKind>> for SinaloaError {
-        fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
-            SinaloaError::BincodeError(*error)
-        }
+    fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
+        SinaloaError::BincodeError(*error)
+    }
 }
 
 pub trait Sinaloa {
@@ -295,7 +298,10 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, SinaloaError> {
         let lines = received_header.split("\n");
         lines.collect()
     };
-    println!("sinaloa::send_tabasco_start received header:{:?}", received_header);
+    println!(
+        "sinaloa::send_tabasco_start received header:{:?}",
+        received_header
+    );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
         return Err(SinaloaError::ReceivedNonSuccessPostStatusError);
     }
