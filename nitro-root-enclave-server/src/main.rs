@@ -64,6 +64,7 @@ fn main() {
     let matches = App::new("nitro-root-enclave-server")
         .arg(Arg::with_name("tabasco")
             .takes_value(true)
+            .required(true)
             .help("URL for Tabasco server"))
         .arg(
             Arg::with_name("debug")
@@ -72,7 +73,7 @@ fn main() {
                 .help("Enables debug mode in the enclave")
         )
         .get_matches();
-    let tabasco_url = matches.value_of("tabasco").unwrap();
+    let tabasco_url = matches.value_of("tabasco").unwrap(); // Since the tabasco argument is required, this should never actually panic
     let enclave_debug = matches.is_present("debug");
 
     // first, start the nitro-root-enclave
