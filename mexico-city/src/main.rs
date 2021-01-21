@@ -25,4 +25,5 @@ pub mod mc_nitro;
 #[cfg(feature = "nitro")]
 fn main() -> Result<(), String> {
     mc_nitro::nitro_main()
+        .map_err(|err| format!("Mexico City::main nitro_main returned error:{:?}", err))
 }
