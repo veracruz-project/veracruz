@@ -24,39 +24,50 @@ use stringreader;
 use veracruz_utils::nitro_enclave::NitroError;
 use veracruz_utils::{receive_buffer, send_buffer, NitroEnclave, NitroRootEnclaveMessage};
 
-// Maximum number of outstanding connections in the socket's
-// listen queue
+/// Maximum number of outstanding connections in the socket's
+/// listen queue
 const BACKLOG: usize = 128;
 
+/// The path to the enclave file that will be started
 const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "/home/ec2-user/nitro_root_enclave.eif";
+
+/// The inbound port number
 const INBOUND_PORT: u16 = 9090;
 
+/// Nitro root enclave-specific errors
 #[derive(Debug, Error)]
 pub enum NitroServerError {
-    #[error(display = "NitroServer: Non Success Status")]
-    NonSuccessStatus,
+    /// The root enclave returned an invalid message
     #[error(display = "NitroServer: InvalidRootEnclaveMessage")]
     InvalidRootEnclaveMessage,
+    /// A Bincode error was received
     #[error(display = "NitroServer: Bincode Error:{:?}", _0)]
     Bincode(#[error(source)] bincode::ErrorKind),
+    /// The enclave framework returned an error (this did not necessarily come
+        /// from the enclave itself
     #[error(display = "NitroServer: Enclave error:{:?}", _0)]
     EnclaveError(#[error(source)] NitroError),
+    /// An error was received from hex encoding or decoding
     #[error(display = "NitroServer: Hex error:{:?}", _0)]
     HexError(#[error(source)] hex::FromHexError),
+    /// A base64 decode error occurred
     #[error(display = "NitroServer: Base64 Decode error:{:?}", _0)]
     Base64Decode(#[error(source)] base64::DecodeError),
+    /// An invalid protocol buffer message was received
     #[error(display = "NitroServer: Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
+    /// A remote http server returned a non-success (200) status
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
     NonSuccessHttp,
+    /// Colima protocol buffer handling returned an error
     #[error(display = "NitroServer: Colima error:{:?}", _0)]
     Colima(colima::custom::ColimaError),
+    /// Curl returned an error
     #[error(display = "NitroServer: Curl error:{:?}", _0)]
     Curl(curl::Error),
-    #[error(display = "NitroServer: Unimplemented")]
-    UnimplementedError,
 }
 
+/// The main routine for the Nitro Root Enclave server
 fn main() {
     println!("Hello, world!");
     let matches = App::new("nitro-root-enclave-server")
@@ -129,6 +140,7 @@ fn main() {
     }
 }
 
+/// Start the nitro-root-enclave Nitro Enclave and handle it's native attestation
 fn native_attestation(
     tabasco_url: &str,
     enclave_debug: bool,
@@ -169,6 +181,7 @@ fn native_attestation(
     return Ok(nre_enclave);
 }
 
+/// Send the native (AWS Nitro) attestation token to the Tabasco server
 fn post_native_attestation_token(
     tabasco_url: &str,
     token: &Vec<u8>,
@@ -193,6 +206,7 @@ fn post_native_attestation_token(
     return Ok(());
 }
 
+/// Fetch the firmware version from the nitro-root-enclave
 fn fetch_firmware_version(nre_enclave: &NitroEnclave) -> Result<String, NitroServerError> {
     println!("nitro-root-enclave-server::fetch_firmware_version started");
 
@@ -218,6 +232,8 @@ fn fetch_firmware_version(nre_enclave: &NitroEnclave) -> Result<String, NitroSer
     return Ok(firmware_version);
 }
 
+/// Send the start message to the Tabasco server (this triggers the server to
+/// send the challenge) and then handle the response
 fn send_start(
     url_base: &str,
     protocol: &str,
@@ -234,6 +250,7 @@ fn send_start(
     }
 }
 
+/// Post a buffer to a remote HTTP server
 pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerError> {
     let mut buffer_reader = stringreader::StringReader::new(buffer);
 
@@ -290,7 +307,7 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerErro
     let header_lines: Vec<&str> = received_header.split("\n").collect();
 
     println!(
-        "nitro-root-enclave-server::send_tabasco_start received header:{:?}",
+        "nitro-root-enclave-server::post_buffer received header:{:?}",
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
@@ -305,6 +322,7 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerErro
     return Ok(received_body);
 }
 
+/// Send start to the tabasco server
 pub fn send_tabasco_start(
     url_base: &str,
     protocol: &str,
