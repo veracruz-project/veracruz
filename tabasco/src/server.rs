@@ -18,7 +18,6 @@ use crate::attestation::sgx;
 use crate::attestation::nitro;
 
 use lazy_static::lazy_static;
-use std::sync::Mutex;
 use std::sync::atomic::{ AtomicBool, Ordering};
 
 lazy_static! {
