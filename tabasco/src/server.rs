@@ -19,9 +19,10 @@ use crate::attestation::nitro;
 
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+use std::sync::atomic::{ AtomicBool, Ordering};
 
 lazy_static! {
-    pub static ref DEBUG_MODE: Mutex<bool> = Mutex::new(false);
+    pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
 }
 
 use crate::error::*;
@@ -197,9 +198,7 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> T
 
 pub fn server(url: String, debug: bool) -> Result<Server, String> {
     if debug {
-        let mut debug_mode_wrapper = DEBUG_MODE.lock()
-            .map_err(|err| format!("tabasco::server failed to obtain lock on DEBUG_MODE:{:?}", err))?;
-        *debug_mode_wrapper = true;
+        DEBUG_MODE.store(true, Ordering::Relaxed);
     }
     let server = HttpServer::new(move || {
         App::new()

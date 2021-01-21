@@ -14,6 +14,7 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use std::{collections::HashMap, sync::Mutex};
 use std::io::Write;
+use std::sync::atomic::Ordering;
 
 use nitro_enclave_token::NitroToken;
 
@@ -178,14 +179,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
     };
     let received_enclave_hash = &attestation_document.pcrs[0];
     if expected_enclave_hash != *received_enclave_hash {
-        let debug_mode_wrapper = crate::server::DEBUG_MODE.lock()
-            .map_err(|err| {
-                println!("tabasco::attestation::nitro_attestation_token failed to obtain lock on DEBUG_MODE mutex");
-                let _ignore = std::io::stdout().flush();
-                TabascoError::MutexError(format!("tabasco::attestation::nitro::attestation_token failed to objtain lock on DEBUG_MODE:{:?}", err))
-            }
-            )?;
-        if *debug_mode_wrapper {
+        if crate::server::DEBUG_MODE.load(Ordering::Relaxed) {
             println!("Comparison between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
             println!("This is debug mode, so this is expected, so we're not going to fail you, but you should feel bad.");
             let _ignore = std::io::stdout().flush();
