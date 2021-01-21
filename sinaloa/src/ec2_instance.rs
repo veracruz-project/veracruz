@@ -120,10 +120,7 @@ impl EC2Instance {
     }
 
     fn socket_connect(&mut self) -> Result<RawFd, EC2Error> {
-        let ip_addr: Vec<u8> = self.private_ip.split(".")
-            .map(|s| s.parse().expect("Parse error")).collect();
-        let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
-        let sockaddr = SockAddr::new_inet(inet_addr); 
+        let sockaddr = self.get_private_sockaddr()?;
 
         let socket_fd = {
             loop {
@@ -148,6 +145,14 @@ impl EC2Instance {
         self.socket_fd = Some(socket_fd);
 
         return Ok(socket_fd);
+    }
+
+    
+    fn get_private_sockaddr(&self) -> Result<SockAddr, EC2Error> {
+        let ip_addr: Vec<u8> = self.private_ip.split(".")
+            .map(|s| s.parse().expect("Parse error")).collect();
+        let inet_addr: InetAddr = InetAddr::new(IpAddr::new_v4(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]), self.socket_port);
+        return Ok(SockAddr::new_inet(inet_addr));
     }
 
     pub fn close(&mut self)-> Result<(), EC2Error> {
