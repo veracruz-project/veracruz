@@ -26,12 +26,19 @@ use veracruz_utils::{receive_buffer, send_buffer};
 use nsm_io;
 use nsm_lib;
 
-const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
+/// The CID to be listened to for messages from the non-secure world
+const CID: u32 = 0xFFFFFFFF; /// VMADDR_CID_ANY
+/// The Port to listen to for messages from the non-secure world
 const PORT: u32 = 5005;
-// Maximum number of outstanding connections in the socket's
-// listen queue
+/// Maximum number of outstanding connections in the socket's
+/// listen queue
 const BACKLOG: usize = 128;
 
+/// The DER-encoded root certificate used to authenticate the certificate chain
+/// (which is used to authenticate the Nitro Enclave tokens).
+/// AWS claims that this certificate should never change (read: only change if
+/// they have an extremely serious security issue), and it's expiry is set to
+/// some time in 2049.
 static AWS_NITRO_ROOT_CERTIFICATE: [u8; 533] = [
     0x30, 0x82, 0x02, 0x11, 0x30, 0x82, 0x01, 0x96, 0xa0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x11, 0x00,
     0xf9, 0x31, 0x75, 0x68, 0x1b, 0x90, 0xaf, 0xe1, 0x1d, 0x46, 0xcc, 0xb4, 0xe4, 0xe7, 0xf8, 0x56,
@@ -69,23 +76,30 @@ static AWS_NITRO_ROOT_CERTIFICATE: [u8; 533] = [
     0x23, 0x02, 0xf3, 0xdf, 0xf6,
 ];
 
-// the following value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
-// I've no idea where it came from (I've seen no documentation on this), but
-// I guess I have to trust Amazon on this one
+/// the following value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
+/// I've no idea where it came from (I've seen no documentation on this), but
+/// I guess I have to trust Amazon on this one
 const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
 lazy_static! {
+    /// The (randomly) self-generated device key pair
     static ref DEVICE_KEY_PAIR: Mutex<Option<(EcdsaKeyPair, Vec<u8>)>> = Mutex::new(None);
+    /// The hash value of the Mexico City enclave
     static ref MEXICO_CITY_HASH: Mutex<Option<Vec<u8>>> = Mutex::new(None);
+    /// The Device ID assigned to us by the Proxy Attestation Service
     static ref DEVICE_ID: Mutex<Option<i32>> = std::sync::Mutex::new(None);
 }
 
+/// Query the enclave for its firmware version
 fn get_firmware_version() -> Result<String, String> {
     println!("nitro-root-enclave::get_firmware_version");
     let version = env!("CARGO_PKG_VERSION");
     return Ok(version.to_string());
 }
 
+/// Set the hash value of mexico city to be included in the proxy attestation
+/// token.
+/// I DO NOT THINK THIS IS NECESSARY ANYMORE
 fn set_mexico_city_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
     let mut mch_guard = MEXICO_CITY_HASH.lock().map_err(|err| {
         format!(
@@ -97,6 +111,7 @@ fn set_mexico_city_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
     Ok(NitroStatus::Success)
 }
 
+/// Perform the native attestation flow
 fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, Vec<u8>), String> {
     let mut att_doc: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
 
@@ -196,6 +211,8 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
     return Ok((att_doc, device_public_key.to_vec()));
 }
 
+/// Perform the proxy attestation service on behalf of a Mexico City enclave
+/// running on another AWS Nitro Enclave
 fn proxy_attestation(
     challenge: &[u8],
     native_token: &[u8],
@@ -278,6 +295,7 @@ fn proxy_attestation(
     Ok(token.clone())
 }
 
+/// The main entry point for the Nitro Root enclave
 fn main() -> Result<(), String> {
     // generate the device private key
     // Let's try it as an EC key, because RSA is like, old, man.
