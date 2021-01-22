@@ -140,6 +140,15 @@ impl EC2Instance {
         println!("EC2Instance instance_id:{:?}", instance_id);
         println!("EC2Instance private_ip:{:?}", private_ip);
 
+        // When you start an EC2 instance, the CLI returns to you immediately,
+        // with the details of the instance. However, that instance has not yet
+        // completed booting. The networking is not up, yet, and the OS on the
+        // instance hasn't completed it's boot sequence. I have found that 30s
+        // is a sufficient amount of time to let this happen (in most cases).
+        // Could it be less? In most cases, probably yes, but AWS gives you no
+        // promises about the amount of time this will take (as they really
+        // can't, because they can't really make promises about how long an
+        // arbitrary OS takes to boot).
         std::thread::sleep(std::time::Duration::from_millis(30000));
 
         let socket_port: u16 = 9090;
