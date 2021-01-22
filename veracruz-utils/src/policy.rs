@@ -375,11 +375,13 @@ pub struct VeracruzPolicy {
     streaming_order: Vec<u64>,
 }
 
+/// an enumerated type representing the platform the enclave is running on
 pub enum EnclavePlatform {
     SGX,
     TrustZone,
     Nitro,
-    Mock, // The Mock platform is for unit testing (durango unit tests, at the moment)
+    /// The Mock platform is for unit testing (durango unit tests, at the moment)
+    Mock, 
 }
 
 impl VeracruzPolicy {
