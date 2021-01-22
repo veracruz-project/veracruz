@@ -33,8 +33,7 @@ impl Drop for VsockSocket {
     /// Drop a socket by closing it. If it fails, report a message, but don't
     /// do anything else (it could fail because it's not connected)
     fn drop(&mut self) {
-        shutdown(self.socket_fd, Shutdown::Both)
-            .unwrap_or_else(|_| ()); // Do nothing on failure. It's non fatal and a warning message is just confusing
+        shutdown(self.socket_fd, Shutdown::Both).unwrap_or_else(|_| ()); // Do nothing on failure. It's non fatal and a warning message is just confusing
         close(self.socket_fd).unwrap_or_else(|e| eprintln!("Failed to close socket: {:?}", e));
     }
 }
@@ -52,14 +51,12 @@ pub fn vsock_connect(cid: u32, port: u32) -> Result<VsockSocket, nix::Error> {
     let mut err: nix::Error = nix::Error::UnsupportedOperation; // just a placeholder
 
     for i in 0..MAX_CONNECTION_ATTEMPTS {
-        let vsocket = VsockSocket::new(
-            socket(
-                AddressFamily::Vsock,
-                SockType::Stream,
-                SockFlag::empty(),
-                None,
-            )?,
-        );
+        let vsocket = VsockSocket::new(socket(
+            AddressFamily::Vsock,
+            SockType::Stream,
+            SockFlag::empty(),
+            None,
+        )?);
         match connect(vsocket.as_raw_fd(), &sockaddr) {
             Ok(_) => return Ok(vsocket),
             Err(e) => err = e,

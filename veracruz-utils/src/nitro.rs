@@ -9,14 +9,13 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-
 use serde::{Deserialize, Serialize};
 
-use nix::sys::socket::{recv, send, MsgFlags};
-use nix::errno::Errno::EINTR;
 use byteorder::{ByteOrder, LittleEndian};
-use std::os::unix::io::RawFd;
 use err_derive::Error;
+use nix::errno::Errno::EINTR;
+use nix::sys::socket::{recv, send, MsgFlags};
+use std::os::unix::io::RawFd;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NitroStatus {
@@ -30,31 +29,31 @@ pub enum NitroRootEnclaveMessage {
     Status(NitroStatus),
     FetchFirmwareVersion,
     FirmwareVersion(String),
-    SetMexicoCityHashHack(Vec<u8>), // hash
-    NativeAttestation(Vec<u8>, i32), // challenge, device_id
-    TokenData(Vec<u8>, Vec<u8>), // token, public_key
+    SetMexicoCityHashHack(Vec<u8>),             // hash
+    NativeAttestation(Vec<u8>, i32),            // challenge, device_id
+    TokenData(Vec<u8>, Vec<u8>),                // token, public_key
     ProxyAttestation(Vec<u8>, Vec<u8>, String), // challenge, native_token, enclave_name
-    PSAToken(Vec<u8>, Vec<u8>, u32), // token, public_key, device_id
+    PSAToken(Vec<u8>, Vec<u8>, u32),            // token, public_key, device_id
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum MCMessage {
     Status(NitroStatus), // status
-    Initialize(String), // policy_json
+    Initialize(String),  // policy_json
     GetEnclaveCert,
     EnclaveCert(Vec<u8>), // cert
     GetEnclaveName,
-    EnclaveName(String), // enclave_name
-    GetPSAAttestationToken(Vec<u8>), //challenge
+    EnclaveName(String),                        // enclave_name
+    GetPSAAttestationToken(Vec<u8>),            //challenge
     PSAAttestationToken(Vec<u8>, Vec<u8>, i32), // token, public_key, device_id
     NewTLSSession,
-    TLSSession(u32), // session_id
-    CloseTLSSession(u32), // session_id
-    GetTLSDataNeeded(u32), // session_id
-    TLSDataNeeded(bool), // data_neeeded
+    TLSSession(u32),           // session_id
+    CloseTLSSession(u32),      // session_id
+    GetTLSDataNeeded(u32),     // session_id
+    TLSDataNeeded(bool),       // data_neeeded
     SendTLSData(u32, Vec<u8>), // session_id, tls_data,
-    GetTLSData(u32), // session_id
-    TLSData(Vec<u8>, bool), // TLS Data, alive_flag
+    GetTLSData(u32),           // session_id
+    TLSData(Vec<u8>, bool),    // TLS Data, alive_flag
     ResetEnclave,
 }
 
@@ -105,9 +104,7 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, VeracruzSocketError> {
         let mut received_bytes = 0;
         while received_bytes < len {
             received_bytes += match recv(fd, &mut buf[received_bytes..len], MsgFlags::empty()) {
-                Ok(size) => {
-                    size
-                },
+                Ok(size) => size,
                 Err(nix::Error::Sys(EINTR)) => 0,
                 Err(err) => {
                     println!("I have experienced an error:{:?}", err);
