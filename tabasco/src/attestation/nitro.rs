@@ -18,6 +18,11 @@ use std::sync::atomic::Ordering;
 
 use nitro_enclave_token::NitroToken;
 
+/// The DER-encoded root certificate used to authenticate the certificate chain
+/// (which is used to authenticate the Nitro Enclave tokens).
+/// AWS claims that this certificate should never change (read: only change if
+/// they have an extremely serious security issue), and it's expiry is set to
+/// some time in 2049.
 static AWS_NITRO_ROOT_CERTIFICATE: [u8; 533] = [
     0x30, 0x82, 0x02, 0x11, 0x30, 0x82, 0x01, 0x96, 0xa0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x11, 0x00,
     0xf9, 0x31, 0x75, 0x68, 0x1b, 0x90, 0xaf, 0xe1, 0x1d, 0x46, 0xcc, 0xb4, 0xe4, 0xe7, 0xf8, 0x56,
@@ -55,17 +60,27 @@ static AWS_NITRO_ROOT_CERTIFICATE: [u8; 533] = [
     0x23, 0x02, 0xf3, 0xdf, 0xf6,
 ];
 
+/// A struct containing information needed for attestation of a specific
+/// Nitro Root enclave
 #[derive(Clone)]
 struct NitroAttestationContext {
+    /// The firmware version of the Nitro Root Enclave
     firmware_version: String,
+    /// The challenge that we sent to the Nitro Root Enclave (used
+    /// when authenticating it's token)
     challenge: [u8; 32],
 }
 
 lazy_static! {
+    /// A hash map containing a `NitroAttestationContext` for each of the 
+    /// Nitro Root enclaves that we have started native attestation for
     static ref ATTESTATION_CONTEXT: Mutex<HashMap<i32, NitroAttestationContext>> =
         Mutex::new(HashMap::new());
 }
 
+/// Start the Nitro enclave attestation process for an enclave with the
+/// provided firmware version and the provided `device_id`.
+/// Note that this is the `device_id` we sent with the challenge.
 pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
     let mut challenge: [u8; 32] = [0; 32];
     let mut rng = rand::thread_rng();
@@ -85,8 +100,8 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
     Ok(base64::encode(&serialized_attestation_init))
 }
 
+/// Handle an attestation token passed to us in the `body_string` parameter
 pub fn attestation_token(body_string: String) -> TabascoResponder {
-    let _ignore = std::io::stdout().flush();
 
     let received_bytes = base64::decode(&body_string)
         .map_err(|err| {
