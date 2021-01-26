@@ -197,7 +197,7 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> T
 
 pub fn server(url: String, debug: bool) -> Result<Server, String> {
     if debug {
-        DEBUG_MODE.store(true, Ordering::Relaxed);
+        DEBUG_MODE.store(true, Ordering::SeqCst);
     }
     let server = HttpServer::new(move || {
         App::new()
