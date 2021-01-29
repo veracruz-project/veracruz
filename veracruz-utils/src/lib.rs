@@ -28,3 +28,17 @@ pub use crate::mexico_city_opcode::*;
 pub mod jalisco_opcode;
 #[cfg(feature = "tz")]
 pub use crate::jalisco_opcode::*;
+
+#[cfg(feature = "nitro")]
+pub mod nitro;
+#[cfg(feature = "nitro")]
+pub use crate::nitro::*;
+
+#[cfg(feature = "nitro")]
+pub mod vsocket;
+#[cfg(feature = "nitro")]
+pub use self::vsocket::*;
+#[cfg(feature = "nitro")]
+pub mod nitro_enclave;
+#[cfg(feature = "nitro")]
+pub use self::nitro_enclave::*;

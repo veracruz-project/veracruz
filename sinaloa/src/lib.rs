@@ -24,3 +24,11 @@ pub use self::sinaloa_tz::sinaloa_tz::*;
 pub mod sinaloa_sgx;
 #[cfg(feature = "sgx")]
 pub use self::sinaloa_sgx::sinaloa_sgx::*;
+
+#[cfg(feature = "nitro")]
+pub mod sinaloa_nitro;
+#[cfg(feature = "nitro")]
+pub use self::sinaloa_nitro::sinaloa_nitro::*;
+
+#[cfg(feature = "nitro")]
+mod ec2_instance;

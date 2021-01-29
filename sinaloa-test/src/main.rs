@@ -29,6 +29,14 @@ mod tests {
     use sinaloa::SinaloaSGX as SinaloaEnclave;
     #[cfg(feature = "tz")]
     use sinaloa::SinaloaTZ as SinaloaEnclave;
+    #[cfg(feature = "nitro")]
+    use sinaloa::SinaloaNitro as SinaloaEnclave;
+
+    use veracruz_utils::policy::EnclavePlatform;
+
+    #[cfg(feature = "nitro")]
+    use regex::Regex;
+
     use std::{
         collections::HashMap,
         collections::HashSet,
@@ -134,7 +142,10 @@ mod tests {
             std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Tabasco Server");
-                let server = tabasco::server::server(tabasco_url).unwrap();
+                #[cfg(feature="debug")]
+                let server = tabasco::server::server(tabasco_url, true).unwrap();
+                #[cfg(not(feature="debug"))]
+                let server = tabasco::server::server(tabasco_url, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -235,8 +246,16 @@ mod tests {
 
         let sinaloa = ret.unwrap();
 
+        #[cfg(feature = "nitro")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
+        #[cfg(feature = "sgx")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::SGX;
+        #[cfg(feature = "tz")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
+
+        let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
-            attestation_flow(&policy.tabasco_url(), &policy.mexico_city_hash(), &sinaloa);
+            attestation_flow(&policy.tabasco_url(), &mexico_city_hash, &sinaloa);
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -757,8 +776,16 @@ mod tests {
                 Ok(id)
             }
         })?;
+        #[cfg(feature = "nitro")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
+        #[cfg(feature = "sgx")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::SGX;
+        #[cfg(feature = "tz")]
+        let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
+
+        let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.tabasco_url(), &policy.mexico_city_hash(), &sinaloa)?
+            attestation_flow(&policy.tabasco_url(), &mexico_city_hash, &sinaloa)?
         } else {
             let enclave_cert = enclave_self_signed_cert(&sinaloa)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
@@ -1252,10 +1279,30 @@ mod tests {
     ) -> Result<(veracruz_utils::VeracruzPolicy, String, String), SinaloaError> {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
-        let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
-        let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
-        let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json.as_str())?;
-        Ok((policy, policy_json, policy_hash_str))
+
+        // Since we need to run the root enclave on another system for nitro enclaves
+        // we can't use localhost for the URL of tabasco (like we do in the policy
+        // files. so we need to replace it with the private IP of the current instance
+        #[cfg(feature = "nitro")]
+        {
+            let ip_string = local_ipaddress::get()
+            .expect("Failed to get local ip address");
+            let ip_address = format!("\"tabasco_url\": \"{:}:3010\"", ip_string);
+            let re = Regex::new(r#""tabasco_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
+
+            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
+            let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
+            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json_cow.as_ref())?;
+            Ok((policy, policy_json_cow.as_ref().to_string(), policy_hash_str))
+        }
+        #[cfg(not(feature = "nitro"))]
+        {
+            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
+            let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
+            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json.as_ref())?;
+            Ok((policy, policy_json.to_string(), policy_hash_str))
+        }
     }
 
     /// Auxiliary function: initialise sinaloa from policy and open a tls session
@@ -1553,7 +1600,7 @@ mod tests {
             }
         }
         Err(SinaloaError::DirectStrError(
-            "Terminate due to server crush",
+            "Terminate due to server crash",
         ))
     }
 
@@ -1664,12 +1711,23 @@ mod tests {
             });
         }
         let hash_bin = hex::decode(expected_enclave_hash)?;
-        if hash_bin != received_payload[47..79].to_vec() {
-            return Err(SinaloaError::MismatchError {
-                variable: "attestation_flow challenge",
-                received: received_payload[47..79].to_vec(),
-                expected: hash_bin.to_vec(),
-            });
+        // specifying 0..32 because some platforms give us measurements in
+        // SHA384 (Nitro Enclaves, I'm talking about you)
+        // but the PSA attestation token only contains 32 bytes of it in order
+        // to keep the offsets the same
+        if hash_bin[0..32] != received_payload[47..79] {
+            #[cfg(all(feature = "debug", feature = "nitro"))]
+            {
+                println!("sinaloa-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
+            }
+            #[cfg(not(feature = "debug"))]
+            {
+                return Err(SinaloaError::MismatchError {
+                    variable: "attestation_flow hash_bin",
+                    received: received_payload[47..79].to_vec(),
+                    expected: hash_bin.to_vec(),
+                });
+            }
         }
         let enclave_cert_hash = received_payload[86..118].to_vec();
         Ok(enclave_cert_hash)

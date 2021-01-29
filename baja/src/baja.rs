@@ -345,26 +345,27 @@ impl Baja {
             )
         };
 
-        // NOTE: this should be randomly generated as below. But this is causing
-        // temporary problems on TrustZone, so instead of randomly generating
-        // it, we're using a fixed value for now.  This **does not** compromise
-        // the security of the system in any way.
-        //
-        // let mut temp = vec![0; 3];
-        // let rng = SystemRandom::new();
-        // rng.fill(&mut temp).map_err(|_| "Error generating random bytes")?;
-        // It must be a valid DNS name, which must not be all numeric
-        // so we add an a at the beginning to be sure
-        // let full_string =
-        //   format!("a{:02x}{:02x}{:02x}", temp[0], temp[1], temp[2]);
-        // full_string[..7].to_string()
+        let name = {
+            // This should be randomly generated as below. But this is causing
+            // temporary problems on Trustzone, so instead of randomly generating
+            // it, we're using a static value for now.
+            // This does not compromise the security of the system
+            // TODO
+            //let mut temp = vec![0; 3];
 
-        let name = FIXED_SERVER_NAME.to_string();
-
+            //let rng = ring::rand::SystemRandom::new();
+            //rng.fill(&mut temp)
+            //.map_err(|_| "Error generating random bytes")?;
+            // It must be a valid DNS name, which must not be all numeric
+            // so we add an a at the beginning to be sure
+            //let full_string = format!("a{:02x}{:02x}{:02x}", temp[0], temp[1], temp[2]);
+            //full_string[..7].to_string()
+            FIXED_SERVER_NAME.to_string()
+        };
         let server_certificate_buffer = generate_certificate(
-            name.clone().into_bytes(),
+            name.as_bytes().to_vec(),
             server_private_key.clone(),
-            server_public_key.clone(),
+            server_public_key,
             &policy,
         )?;
 

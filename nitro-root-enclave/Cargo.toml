@@ -1,0 +1,21 @@
+[package]
+name = "nitro-root-enclave"
+version = "0.1.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "The Veracruz root enclave for AWS Nitro Enclaves"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nix = "0.15"
+byteorder = { version = "1.3" }
+veracruz-utils = { path = "../veracruz-utils", features = ["nitro"] }
+bincode = { git= "https://github.com/veracruz-project/bincode.git", branch= "veracruz", default-features=false }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"]}
+nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib" }
+nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io" }
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["nitro"]}
+nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main" }
+psa-attestation = { path = "../psa-attestation/", features =["nitro"]}
+

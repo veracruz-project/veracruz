@@ -10,10 +10,13 @@
 //! information on licensing and copyright.
 
 use crate::sinaloa::*;
+#[cfg(feature = "nitro")]
+use crate::sinaloa_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
 #[cfg(feature = "sgx")]
-use crate::sinaloa_sgx::sinaloa_sgx::SinaloaSGX as Sinaloa_encalve;
+use crate::sinaloa_sgx::sinaloa_sgx::SinaloaSGX as SinaloaEnclave;
 #[cfg(feature = "tz")]
-use crate::sinaloa_tz::sinaloa_tz::SinaloaTZ as Sinaloa_encalve;
+use crate::sinaloa_tz::sinaloa_tz::SinaloaTZ as SinaloaEnclave;
+
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;
 use futures::executor;
@@ -103,7 +106,7 @@ pub fn server(policy_filename: &str) -> Result<Server, SinaloaError> {
     let policy_json = std::fs::read_to_string(policy_filename)?;
     let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]
-    let SINALOA: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(Sinaloa_encalve::new(
+    let SINALOA: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(SinaloaEnclave::new(
         &policy_json,
     )?))));
 

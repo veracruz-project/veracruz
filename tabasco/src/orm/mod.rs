@@ -91,8 +91,17 @@ pub fn get_firmware_version_hash<'a>(
         .filter(firmware_versions::protocol.eq(protocol))
         .filter(firmware_versions::version_num.eq(version))
         .select(firmware_versions::hash)
-        .load(conn)?;
+        .load(conn)
+            .map_err(|err| {
+                println!("tabasco::orm::get_firmware_version_hash failed to query table:{:?}", err);
+                err
+            })?;
 
-    let hash_vec = hex::decode(hashes[0].to_owned())?;
+    let hash_vec = hex::decode(hashes[0].to_owned())
+        .map_err(|err| {
+            println!("tabasco::orm::get_firmware_version_hash failed to decode contents:{:?}", err);
+            err
+        })?;
+
     Ok(Some(hash_vec))
 }

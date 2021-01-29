@@ -9,6 +9,7 @@ description = "TLS endpoint and session management for the trusted Veracruz runt
 sgx = ["veracruz-utils/sgx", "sgx_tstd", "sgx_types", "rustls/mesalock_sgx", "webpki/mesalock_sgx", "ring/mesalock_sgx", "webpki-roots/mesalock_sgx"] 
 # NOTE: turn on the `std` on ring for Error trait
 tz = ["veracruz-utils/tz", "webpki/default", "webpki-roots/default", "ring/std", "ring/non_sgx", "optee-utee", "rustls/default"]
+nitro = ["ring/std", "ring/non_sgx"]
 
 [dependencies]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }

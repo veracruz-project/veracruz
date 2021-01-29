@@ -21,6 +21,11 @@ fn main() {
     let cc = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc";
     #[cfg(feature = "sgx")]
     let cc = "gcc";
+    #[cfg(feature = "nitro")]
+    let cc = "musl-gcc";
+    #[cfg(not(any(feature = "tz", feature = "sgx", feature = "nitro")))]
+    let cc = "gcc";
+
     let project_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let target_dir = env::var("OUT_DIR").unwrap();
 

@@ -13,7 +13,7 @@
 use optee_utee::trace_println;
 #[cfg(feature = "sgx")]
 use sgx_types::sgx_status_t;
-#[cfg(feature = "tz")]
+#[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::Mutex;
 use std::{
     collections::HashMap,

@@ -10,10 +10,14 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
-#[cfg(feature = "tz")]
+#[cfg(feature = "nitro")]
+use nix;
+#[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
+#[cfg(feature = "nitro")]
+use veracruz_utils::nitro::{NitroRootEnclaveMessage, VeracruzSocketError};
 
 #[derive(Debug, Error)]
 pub enum MexicoCityError {
@@ -50,6 +54,24 @@ pub enum MexicoCityError {
     UninitializedProtocolState,
     #[error(display = "MexicoCity: Unavailable income buffer with ID {}.", _0)]
     UnavailableIncomeBufferError(u64),
+    #[cfg(feature = "nitro")]
+    #[error(display = "MexicoCity: Socket Error: {:?}", _0)]
+    SocketError(nix::Error),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Mexico City: Veracruz Socket error:{:?}", _0)]
+    VeracruzSocketError(VeracruzSocketError),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Mexico City: Bincode error:{:?}", _0)]
+    BincodeError(bincode::Error),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Mexico City: NSM Lib error:{:?}", _0)]
+    NsmLibError(i32),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Mexico City: NSM Error code:{:?}", _0)]
+    NsmErrorCode(nsm_io::ErrorCode),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Mexico City: wrong message type received:{:?}", _0)]
+    WrongMessageTypeError(NitroRootEnclaveMessage),
 }
 
 impl<T> From<PoisonError<T>> for MexicoCityError {

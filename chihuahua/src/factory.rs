@@ -31,7 +31,7 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-#[cfg(any(feature = "std", feature = "tz"))]
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
@@ -93,7 +93,7 @@ pub fn single_threaded_chihuahua(
             }
         }
     }
-    #[cfg(any(feature = "tz", feature = "sgx"))]
+    #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
@@ -149,7 +149,7 @@ pub fn multi_threaded_chihuahua(
             }
         }
     }
-    #[cfg(any(feature = "tz", feature = "sgx"))]
+    #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
     {
         match strategy {
             ExecutionStrategy::Interpretation => {

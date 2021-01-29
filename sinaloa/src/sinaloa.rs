@@ -9,12 +9,16 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#[cfg(feature = "nitro")]
+use crate::ec2_instance::EC2Error;
 use actix_http::ResponseBuilder;
 use actix_web::{error, http::StatusCode, HttpResponse};
 use curl::easy::{Easy, List};
 use err_derive::Error;
 use log::debug;
 use std::io::Read;
+#[cfg(feature = "nitro")]
+use veracruz_utils::nitro_enclave::NitroError;
 
 pub type SinaloaResponder = Result<String, SinaloaError>;
 
@@ -71,6 +75,42 @@ pub enum SinaloaError {
     #[cfg(feature = "sgx")]
     #[error(display = "Sinaloa: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: BincodeError: {:?}", _0)]
+    BincodeError(bincode::ErrorKind),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: MCMessage::Status: {:?}", _0)]
+    MCMessageStatus(veracruz_utils::MCMessage),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: NitroStatus: {:?}", _0)]
+    NitroStatus(veracruz_utils::NitroStatus),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Received Invalid MC Message: {:?}", _0)]
+    InvalidMCMessage(veracruz_utils::MCMessage),
+    #[cfg(feature = "nitro")]
+    #[error(
+        display = "Sinaloa: Received Invalid Nitro Root Enclave Message: {:?}",
+        _0
+    )]
+    InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Received Invalid Protocol Buffer Message")]
+    InvalidProtoBufMessage,
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Nix Error: {:?}", _0)]
+    NixError(#[error(source)] nix::Error),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Serde Error")]
+    SerdeError,
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Veracruz Socket Error:{:?}", _0)]
+    VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: Nitro Error:{:?}", _0)]
+    NitroError(#[error(source)] NitroError),
+    #[cfg(feature = "nitro")]
+    #[error(display = "Sinaloa: EC2 Error:{:?}", _0)]
+    EC2Error(#[error(source)] EC2Error),
     #[cfg(feature = "tz")]
     #[error(display = "Sinaloa: UUIDError: {:?}.", _0)]
     UUIDError(#[error(source)] uuid::parser::ParseError),
@@ -127,6 +167,8 @@ pub enum SinaloaError {
     DirectMessageError(String, StatusCode),
     #[error(display = "Sinaloa: Error message {}.", _0)]
     DirectStrError(&'static str),
+    #[error(display = "Sinaloa: Unimplemented")]
+    UnimplementedError,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for SinaloaError {
@@ -159,6 +201,13 @@ impl error::ResponseError for SinaloaError {
             SinaloaError::UnsupportedRequestError => StatusCode::NOT_FOUND,
             _otherwise => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+}
+
+#[cfg(feature = "nitro")]
+impl From<std::boxed::Box<bincode::ErrorKind>> for SinaloaError {
+    fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
+        SinaloaError::BincodeError(*error)
     }
 }
 
@@ -249,6 +298,10 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, SinaloaError> {
         let lines = received_header.split("\n");
         lines.collect()
     };
+    println!(
+        "sinaloa::send_tabasco_start received header:{:?}",
+        received_header
+    );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
         return Err(SinaloaError::ReceivedNonSuccessPostStatusError);
     }

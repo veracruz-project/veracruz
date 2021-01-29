@@ -14,6 +14,16 @@ use crate::attestation;
 use crate::attestation::psa;
 #[cfg(feature = "sgx")]
 use crate::attestation::sgx;
+#[cfg(feature = "nitro")]
+use crate::attestation::nitro;
+
+use lazy_static::lazy_static;
+use std::sync::atomic::{ AtomicBool, Ordering};
+
+lazy_static! {
+    pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
+}
+
 use crate::error::*;
 use actix_web::{dev::Server, middleware, web, App, HttpServer};
 use psa_attestation::{
@@ -26,28 +36,46 @@ use std::{ffi::c_void, ptr::null};
 
 async fn verify_iat(input_data: String) -> TabascoResponder {
     if input_data.is_empty() {
+        println!("tabasco::verify_iat input_data is empty");
         return Err(TabascoError::MissingFieldError("tabasco::verify_iat data"));
     }
 
-    let proto_bytes = base64::decode(&input_data)?;
+    let proto_bytes = base64::decode(&input_data)
+        .map_err(|err| {
+            println!("tabasco::verify_iat decode of input data failed:{:?}", err);
+            err
+        })?;
 
-    let proto = colima::parse_tabasco_request(&proto_bytes)?;
+    let proto = colima::parse_tabasco_request(&proto_bytes)
+        .map_err(|err| {
+            println!("tabasco::verify_iat parse_tabasco_request failed:{:?}", err);
+            err
+        })?;
     if !proto.has_proxy_psa_attestation_token() {
+        println!("tabasco::verify_iat proto does not have proxy psa attestation token");
         return Err(TabascoError::NoProxyPSAAttestationTokenError);
     }
 
     let (token, pubkey, device_id) =
         colima::parse_proxy_psa_attestation_token(proto.get_proxy_psa_attestation_token());
-
     let pubkey_hash = {
-        let conn = crate::orm::establish_connection()?;
-        crate::orm::query_device(&conn, device_id)?
+        let conn = crate::orm::establish_connection()
+            .map_err(|err| {
+                println!("tabasco::verify_iat orm::establish_connection failed:{:?}", err);
+                err
+            })?;
+        crate::orm::query_device(&conn, device_id)
+            .map_err(|err| {
+                println!("tabasco::verify_iat orm::query_device failed:{:?}", err);
+                err
+            })?
     };
 
     // verify that the pubkey we received matches the hash we received
     // during native attestation
     let calculated_pubkey_hash = ring::digest::digest(&ring::digest::SHA256, pubkey.as_ref());
     if calculated_pubkey_hash.as_ref().to_vec() != pubkey_hash {
+        println!("tabasco::verify_iat hashes didn't match");
         return Err(TabascoError::MismatchError {
             variable: "Tabasco::server public key",
             received: calculated_pubkey_hash.as_ref().to_vec(),
@@ -67,6 +95,7 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
         )
     };
     if lpk_ret != 0 {
+        println!("tabasco::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}", lpk_ret);
         return Err(TabascoError::UnsafeCallError(
             "tabasco::server::verify_iat t_cose_sign1_verify_load_public_key",
             lpk_ret,
@@ -101,6 +130,7 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
         )
     };
     if sv_ret != 0 {
+        println!("tabasco::verify_iat sv_ret != 0");
         return Err(TabascoError::UnsafeCallError(
             "tabasco::server::verify_iat t_cose_sign1_verify",
             sv_ret,
@@ -115,6 +145,7 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
     }
 
     if payload.ptr == null() {
+        println!("tabasco::verify_iat payload.ptr is null");
         return Err(TabascoError::MissingFieldError("payload.ptr"));
     }
 
@@ -148,7 +179,26 @@ async fn psa_router(psa_request: web::Path<String>, input_data: String) -> Tabas
     Err(TabascoError::UnimplementedRequestError)
 }
 
-pub fn server(url: String) -> Result<Server, String> {
+#[allow(unused)]
+async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> TabascoResponder {
+    #[cfg(feature = "nitro")]
+    {
+        let inner = nitro_request.into_inner();
+        if inner.as_str() == "AttestationToken" {
+            nitro::attestation_token(input_data)
+        } else {
+            println!("Tabasco::nitro_router returning unsupported with into_inner:{:?}", inner.as_str());
+            Err(TabascoError::UnsupportedRequestError)
+        }
+    }
+    #[cfg(not(feature = "nitro"))]
+    Err(TabascoError::UnimplementedRequestError)
+}
+
+pub fn server(url: String, debug: bool) -> Result<Server, String> {
+    if debug {
+        DEBUG_MODE.store(true, Ordering::SeqCst);
+    }
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
@@ -156,6 +206,7 @@ pub fn server(url: String) -> Result<Server, String> {
             .route("/Start", web::post().to(attestation::start))
             .route("/SGX/{sgx_request}", web::post().to(sgx_router))
             .route("/PSA/{psa_request}", web::post().to(psa_router))
+            .route("/Nitro/{nitro_request}", web::post().to(nitro_router))
     })
     .bind(&url)
     .map_err(|err| format!("binding error: {:?}", err))?

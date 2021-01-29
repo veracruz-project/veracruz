@@ -19,7 +19,8 @@ use colima::colima::{
     MexicoCityRequest as REQUEST, MexicoCityRequest_oneof_message_oneof as MESSAGE,
 };
 use lazy_static::lazy_static;
-#[cfg(feature = "tz")]
+#[cfg(any(feature = "tz", feature = "nitro"))]
+
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;

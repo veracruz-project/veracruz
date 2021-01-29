@@ -82,6 +82,8 @@ pub enum VeracruzUtilError {
     DataProviderError,
     #[error(display = "VeracruzUtil: Policy has no result retriever.")]
     NoResultRetrieverError,
+    #[error(display = "VeracruzUtil: Policy is missing a field: {:?}", _0)]
+    MissingPolicyFieldError(String),
 }
 
 #[cfg(feature = "std")]
@@ -340,8 +342,12 @@ pub struct VeracruzPolicy {
     /// The ciphersuite that will be used with the TLS connections between the
     /// principals of the computation and the enclave.
     ciphersuite: String,
-    /// The hash of the Veracruz trusted runtime.
-    mexico_city_hash: String,
+    /// The hash of the Veracruz trusted runtime for SGX enclaves.
+    mexico_city_hash_sgx: Option<String>,
+    /// The hash of the Veracruz trusted runtime for TrustZone TAs.
+    mexico_city_hash_tz: Option<String>,
+    /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
+    mexico_city_hash_nitro: Option<String>,
     /// The declared ordering of data inputs, provided by the various data
     /// providers, as specified in the policy.  Note that data providers can
     /// provision their inputs asynchronously, and in an arbitrary order.  Once
@@ -369,6 +375,15 @@ pub struct VeracruzPolicy {
     streaming_order: Vec<u64>,
 }
 
+/// an enumerated type representing the platform the enclave is running on
+pub enum EnclavePlatform {
+    SGX,
+    TrustZone,
+    Nitro,
+    /// The Mock platform is for unit testing (durango unit tests, at the moment)
+    Mock, 
+}
+
 impl VeracruzPolicy {
     /// Constructs a new Veracruz policy type, validating the well-formedness of
     /// the resulting policy in the process.  Returns `Ok(policy)` iff these
@@ -378,7 +393,9 @@ impl VeracruzPolicy {
         sinaloa_url: String,
         enclave_cert_expiry: VeracruzExpiry,
         ciphersuite: String,
-        mexico_city_hash: String,
+        mexico_city_hash_sgx: Option<String>,
+        mexico_city_hash_tz: Option<String>,
+        mexico_city_hash_nitro: Option<String>,
         data_provision_order: Vec<u64>,
         streaming_order: Vec<u64>,
         tabasco_url: String,
@@ -391,7 +408,9 @@ impl VeracruzPolicy {
             sinaloa_url,
             enclave_cert_expiry,
             ciphersuite,
-            mexico_city_hash,
+            mexico_city_hash_sgx,
+            mexico_city_hash_tz,
+            mexico_city_hash_nitro,
             data_provision_order,
             tabasco_url,
             pi_hash,
@@ -443,8 +462,26 @@ impl VeracruzPolicy {
     /// Returns the hash of the trusted Veracruz runtime, associated with this
     /// policy.
     #[inline]
-    pub fn mexico_city_hash(&self) -> &String {
-        &self.mexico_city_hash
+    pub fn mexico_city_hash(&self, platform: &EnclavePlatform) -> Result<&String, VeracruzUtilError>  {
+        let hash = match platform {
+            EnclavePlatform::SGX => match &self.mexico_city_hash_sgx {
+                Some(hash) => hash,
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_sgx".to_string())),
+            },
+            EnclavePlatform::TrustZone => match &self.mexico_city_hash_tz {
+                Some(hash) => hash,
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_tz".to_string())),
+            },
+            EnclavePlatform::Nitro => match &self.mexico_city_hash_nitro {
+                Some(hash) => hash,
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_nitro".to_string())),
+            },
+            EnclavePlatform::Mock => match &self.mexico_city_hash_sgx {
+                Some(hash) => hash,
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_sgx".to_string())),
+            },
+        };
+        return Ok(&hash);
     }
 
     /// Returns the fixed data provisioning order, associated with this policy.

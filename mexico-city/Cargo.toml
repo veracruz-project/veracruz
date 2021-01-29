@@ -18,6 +18,7 @@ path = "src/main.rs"
 [features]
 sgx = ["colima/sgx", "baja/sgx", "veracruz-utils/sgx", "wasmi/mesalock_sgx", "chihuahua/sgx", "rustls/mesalock_sgx", "protobuf/mesalock_sgx", "ring/mesalock_sgx", "sgx_types" , "sgx_tstd", "sgx_tcrypto", "sgx_tdh"]
 tz = ["wasmi/std", "baja/tz", "chihuahua/tz", "veracruz-utils/tz", "libc", "optee-utee-sys", "optee-utee", "serde_json/alloc"]
+nitro = [ "chihuahua/nitro", "wasmi/non_sgx", "baja/nitro", "veracruz-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode" ]
 
 [dependencies]
 baja = { path = "../baja"}
@@ -32,7 +33,12 @@ wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "verac
 hex = { version = "0.4.1", default-features = false }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 err-derive = "0.2"
+nix = { version = "0.15", optional = true}
+byteorder = { version = "1.3", optional = true }
+bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
 
+nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib", optional = true }
+nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
 
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }

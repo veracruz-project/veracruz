@@ -9,6 +9,7 @@ description = "Veracruz integration test.  This is a full system test that shoul
 [features]
 sgx = ["durango/sgx","sinaloa/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation"]
 tz = ["durango/tz","sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz"]
+nitro = ["durango/nitro", "sinaloa/nitro", "veracruz-utils/nitro", "tabasco/nitro"]
 
 [dependencies]
 durango = {path = "../durango"}

@@ -19,6 +19,7 @@ OPTEE_DIR_SDK ?= /work/rust-optee-trustzone-sdk/
 AARCH64_OPENSSL_DIR ?= /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/build/openssl-1.0.2s/
 AARCH64_GCC ?= $(OPTEE_DIR)/toolchains/aarch64/bin/aarch64-linux-gnu-gcc
 SGX_RUST_FLAG ?= "-L/work/sgxsdk/lib64 -L/work/sgxsdk/sdk_libs"
+NITRO_RUST_FLAG ?= ""
  
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
@@ -45,6 +46,12 @@ sgx: sdk sgx-env
 	cd mexico-city-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd sonora-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd durango && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
+
+nitro: sdk
+	pwd
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C mexico-city nitro
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
 
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
@@ -98,6 +105,42 @@ trustzone-veracruz-test: trustzone test_cases trustzone-test-env
 trustzone-test-env: tz_test.sh run_tz_test.sh
 	chmod u+x $^
 
+nitro-sinaloa-test: nitro test_cases
+	cd sinaloa-test \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
+	cd sinaloa-test \
+		&& ./nitro_terminate.sh
+	cd ./sinaloa-test \
+		&& ./nitro_ec2_terminate_root.sh
+
+nitro-sinaloa-test-dry-run: nitro test_cases
+	cd sinaloa-test \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features sgx --no-run
+
+nitro-sinaloa-performance: nitro test_cases
+	cd sinaloa-test \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_performance_ --features nitro -- --ignored
+	cd sinaloa-test \
+		&& ./nitro_terminate.sh
+	cd ./sinaloa-test \
+		&& ./nitro_ec2_terminate_root.sh
+
+nitro-veracruz-test-dry-run: nitro test_cases
+	cd veracruz-test \
+		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro --no-run
+
+nitro-veracruz-test: nitro test_cases
+	cd veracruz-test \
+		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro
+	cd sinaloa-test \
+		&& ./nitro_terminate.sh
+	cd ./sinaloa-test \
+		&& ./nitro_ec2_terminate_root.sh
+
+nitro-psa-attestation:
+	cd psa-attestation && cargo build --features nitro
+
 trustzone-env:
 	unset CC
 	rustup target add aarch64-unknown-linux-gnu arm-unknown-linux-gnueabihf
@@ -116,12 +159,14 @@ clean:
 	cd veracruz-utils && cargo clean
 	cd sinaloa-test && cargo clean
 	cd veracruz-test && cargo clean
+	cd nitro-root-enclave-server && cargo clean
 	$(MAKE) clean -C mexico-city
 	$(MAKE) clean -C jalisco
 	$(MAKE) clean -C sinaloa
 	$(MAKE) clean -C test-collateral 
 	$(MAKE) clean -C sonora
 	$(MAKE) clean -C sdk
+	$(MAKE) clean -C nitro-root-enclave
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:

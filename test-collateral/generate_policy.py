@@ -15,14 +15,25 @@
 import argparse
 import subprocess
 import datetime
+import os.path
+from os import path
 
 identity_template = '\n\t\t{"certificate": "<CERT>",\n\t\t"id": <ID_NUM>,\n\t\t"roles": [<ROLES>]}'
 
-def get_enclave_hash(template):
-    subprocess.call(['dd', 'skip=960', 'count=32', 'if=css.bin', 'of=hash.bin', 'bs=1']);
-    hash_hex = subprocess.check_output(['xxd', '-ps', '-cols', '32', 'hash.bin']);
-    hash_hex = hash_hex.replace('\n', '');
-    return template.replace('<HASH_VALUE>', hash_hex);
+def get_enclave_hashes(template):
+    field_string = ''
+    if path.exists('css.bin'):
+        subprocess.call(['dd', 'skip=960', 'count=32', 'if=css.bin', 'of=hash.bin', 'bs=1'])
+        hash_hex = subprocess.check_output(['xxd', '-ps', '-cols', '32', 'hash.bin'])
+        hash_hex = hash_hex.replace('\n', '')
+        field_string = field_string + '    "mexico_city_hash_sgx": "' + hash_hex + '",'
+        # right now, we are totally faking TrustZone Hashes, so we're making it match SGX
+        field_string = field_string + '\n    "mexico_city_hash_tz": "' + hash_hex + '",'
+    if path.exists('../mexico-city/PCR0'):
+        pcr0 = open('../mexico-city/PCR0').read().replace("\n", "")
+        field_string = field_string + '\n    "mexico_city_hash_nitro": "' + pcr0 + '",'
+
+    return template.replace('<MEXICO_CITY_HASHES>', field_string)
 
 def get_pi_hash(pi_file, template):
     hash_result = subprocess.check_output(['sha256sum', pi_file])
@@ -122,7 +133,7 @@ policy = policy.replace('<TABASCO_URL>', args.tabasco_url)
 # debug info
 policy = policy.replace('<DEBUG_FLAG>', str(args.debug_flag).lower())
 
-policy = get_enclave_hash(policy)
+policy = get_enclave_hashes(policy)
 policy = get_pi_hash(args.pi_binary, policy)
 
 # execution strategy

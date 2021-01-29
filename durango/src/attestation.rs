@@ -9,6 +9,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use veracruz_utils::EnclavePlatform;
+
 #[cfg(feature = "mock")]
 use mockall::{automock, predicate::*};
 
@@ -16,6 +18,7 @@ use mockall::{automock, predicate::*};
 pub trait Attestation {
     fn attestation(
         policy: &veracruz_utils::VeracruzPolicy,
+        target_platform: &EnclavePlatform,
     ) -> Result<(Vec<u8>, String), DurangoError>;
 }
 
@@ -33,8 +36,14 @@ impl Attestation for AttestationPSA {
     /// Attestation against the global policy
     fn attestation(
         policy: &veracruz_utils::VeracruzPolicy,
+        target_platform: &EnclavePlatform,
     ) -> Result<(Vec<u8>, String), DurangoError> {
-        let expected_enclave_hash = hex::decode(policy.mexico_city_hash().as_str())?;
+        let mexico_city_hash = policy.mexico_city_hash(target_platform)
+            .map_err(|err| {
+                println!("Did not find mexico city hash for platform in policy:{:?}", err);
+                err
+            })?;
+        let expected_enclave_hash = hex::decode(mexico_city_hash.as_str())?;
         Self::attestation_flow(
             &policy.tabasco_url().as_str(),
             &policy.sinaloa_url().as_str(),
