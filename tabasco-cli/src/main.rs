@@ -97,8 +97,10 @@ fn main() {
     let mut sys = actix_rt::System::new("Tabasco Server");
 
     // create Tabasco instance
-    let tabasco = match tabasco::server::server(policy.tabasco_url().clone()) {
-        Ok(tabasco) => tabasco,
+    let tabasco_server = match tabasco_server::server::server(
+        policy.tabasco_url().clone()
+    ) {
+        Ok(tabasco_server) => tabasco_server,
         Err(err) => {
             error!("{}", err);
             process::exit(1);
@@ -106,7 +108,7 @@ fn main() {
     };
 
     info!("Tabasco running on {}", policy.tabasco_url());
-    match sys.block_on(tabasco) {
+    match sys.block_on(tabasco_server) {
         Ok(_) => {}
         Err(err) => {
             error!("{}", err);

@@ -87,11 +87,6 @@ struct Opt {
     /// policy file.
     #[structopt(short, long)]
     shutdown: bool,
-
-    // TODO remove this from here and Sinaloa
-    /// Skip attestation flow, use at your own risk
-    #[structopt(long)]
-    no_attestation: bool,
 }
 
 
@@ -130,14 +125,14 @@ fn main() {
     // TODO allow Durango to accept Paths?
     let client_cert_path = match opt.client_cert_path.to_str() {
         Some(client_cert_path) => client_cert_path,
-        _ => {
+        None => {
             error!("Invalid client_cert_path (not utf8?)");
             process::exit(1);
         }
     };
     let client_key_path = match opt.client_key_path.to_str() {
         Some(client_key_path) => client_key_path,
-        _ => {
+        None => {
             error!("Invalid client_key_path (not utf8?)");
             process::exit(1);
         }
@@ -155,7 +150,7 @@ fn main() {
             process::exit(1);
         }
     };
-    info!("Connected and attested {}", policy.sinaloa_url());
+    info!("Connected to {}", policy.sinaloa_url());
 
     let mut did_something = false;
 
@@ -247,5 +242,6 @@ fn main() {
 
     if !did_something {
         warn!("Nothing to do");
+        process::exit(2);
     }
 }
