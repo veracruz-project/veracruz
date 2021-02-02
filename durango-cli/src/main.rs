@@ -16,36 +16,14 @@ use log::{info, warn, error};
 use ring;
 use hex;
 use std::process;
-use rand;
-use rand::Rng;
-use base64;
-use curl::easy::{Easy, List};
-use stringreader;
-use std::io::Read;
-use tokio;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::sync;
 use durango::Durango;
 use std::fs;
 
-use sinaloa::sinaloa::*;
-#[cfg(feature = "sgx")]
-use sinaloa::SinaloaSGX as SinaloaEnclave;
-#[cfg(feature = "tz")]
-use sinaloa::SinaloaTZ as SinaloaEnclave;
 
-
-// TODO version info?
-// TODO what is name used for here?
 // TODO do we need to understand identity?
 
 #[derive(Debug, StructOpt)]
-#[structopt(
-    name="durango",
-    about="Command-line interface for Durango, \
-        the Rust client for Veracruz.",
-    rename_all="kebab"
-)]
+#[structopt(rename_all="kebab")]
 struct Opt {
     /// Path to client certificate file
     #[structopt(parse(from_os_str))]
@@ -81,6 +59,7 @@ struct Opt {
     #[structopt(short, long, parse(from_os_str))]
     output: Option<path::PathBuf>,
 
+    // TODO does it make more sense to invert this, and have --no-shutdown?
     /// Request a shutdown of the enclave
     ///
     /// Note: This requires "ResultReader" permissions in the
@@ -96,8 +75,9 @@ fn main() {
     let opt = Opt::from_args();
 
     // setup logger
-    env_logger::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
+    env_logger::from_env(
+        env_logger::Env::default().default_filter_or("info")
+    ).init();
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
@@ -112,7 +92,8 @@ fn main() {
         &ring::digest::SHA256, policy_json.as_bytes());
     let policy_hash = hex::encode(&policy_hash_bytes.as_ref().to_vec());
     let policy = match veracruz_utils::VeracruzPolicy::from_json(
-            policy_json.as_str()) {
+            policy_json.as_str()
+    ) {
         Ok(policy) => policy,
         Err(err) => {
             error!("{}", err);
@@ -235,9 +216,7 @@ fn main() {
             }
         }
 
-        // TODO do we get ack?
-        //info!("Shutdown successfully");
-        info!("Shutdown");
+        info!("Shutdown server");
     }
 
     if !did_something {

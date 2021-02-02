@@ -12,43 +12,21 @@
 use structopt::StructOpt;
 use std::path;
 use env_logger;
-use log::{info, warn, error, debug};
+use log::{info, error};
 use ring;
 use hex;
 use std::process;
-use rand;
-use rand::Rng;
-use base64;
-use curl::easy::{Easy, List};
-use stringreader;
-use std::io::Read;
-use tokio;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::sync;
 use actix_rt;
-
-use sinaloa::sinaloa::*;
-#[cfg(feature = "sgx")]
-use sinaloa::SinaloaSGX as SinaloaEnclave;
-#[cfg(feature = "tz")]
-use sinaloa::SinaloaTZ as SinaloaEnclave;
+use sinaloa;
+use veracruz_utils;
 
 
 #[derive(Debug, StructOpt)]
-#[structopt(
-    name="sinaloa",
-    about="Command-line interface for Sinaloa, \
-        the REST-server frontend for Veracruz.",
-    rename_all="kebab"
-)]
+#[structopt(rename_all="kebab")]
 struct Opt {
     /// Path to policy file
     #[structopt(parse(from_os_str))]
     policy_path: path::PathBuf,
-
-    /// Buffer size for network connections
-    #[structopt(long, default_value="1024")]
-    buffer_size: usize,
 }
 
 
@@ -58,8 +36,9 @@ fn main() {
     let opt = Opt::from_args();
 
     // setup logger
-    env_logger::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
+    env_logger::from_env(
+        env_logger::Env::default().default_filter_or("info")
+    ).init();
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
@@ -74,7 +53,8 @@ fn main() {
         &ring::digest::SHA256, policy_json.as_bytes());
     let policy_hash = hex::encode(&policy_hash_bytes.as_ref().to_vec());
     let policy = match veracruz_utils::VeracruzPolicy::from_json(
-            policy_json.as_str()) {
+            policy_json.as_str()
+    ) {
         Ok(policy) => policy,
         Err(err) => {
             error!("{}", err);
@@ -107,6 +87,7 @@ fn main() {
 
     // TODO support restarting in a loop?
     // TODO should we be getting FAILED_NO_READY on extra program?
+    // TODO there's an unwrap panic that happens if we ctrl-C, need to fix
     info!("Sinaloa running on {}", policy.sinaloa_url());
     match sys.block_on(sinaloa_server) {
         Ok(_) => {},

@@ -3,40 +3,22 @@ name = "durango-cli"
 version = "0.1.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
-description = "Command-line interface for Durango, the Rust client for Veracruz."
+description = """\
+    Command-line interface for Durango, \
+    the Rust client for Veracruz."""
+autobins = false
 
-# TODO These are copied from sinaloa-tests, are they all needed?
-[features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
-tz = ["sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz", "psa-attestation/tz"]
+# this is the only way to change the default binary name
+[[bin]]
+name = "durango"
+path = "src/main.rs"
 
 [dependencies]
 durango = {path = "../durango"}
-sinaloa = { path = "../sinaloa" }
 veracruz-utils = {path = "../veracruz-utils", features=["std"] }
-tabasco = { path = "../tabasco" }
-colima = { path = "../colima" }
-psa-attestation = { path = "../psa-attestation" }
 structopt = { version="0.2", features=["wrap_help"] }
 log = "0.4"
 env_logger = "0.7"
-# log = { version="0.4", features=["max_level_info", "release_max_level_info"] }
 ring = "0.16"
 hex = "0.4"
-rand = "0.7.0"
-base64 = "0.10.1"
-curl = "0.4.22"
-stringreader = "0.1.1"
-tokio = { version="1.1.0", features=["full"] }
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-
-[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_ucrypto = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
-sgx_types = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
-
-#[patch.crates-io]
-#rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
