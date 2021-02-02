@@ -15,26 +15,15 @@ use env_logger;
 use log::{info, error};
 use ring;
 use hex;
-//use std::io::Write;
 use std::process;
-use futures::executor;
 use actix_rt;
 use std::env;
-
-//use sinaloa::sinaloa::*;
-//#[cfg(feature = "sgx")]
-//use sinaloa::SinaloaSGX as SinaloaEnclave;
-//#[cfg(feature = "tz")]
-//use sinaloa::SinaloaTZ as SinaloaEnclave;
+use tabasco;
+use veracruz_utils;
 
 
 #[derive(Debug, StructOpt)]
-#[structopt(
-    name="tabasco",
-    about="Command-line interface for Tabasco, the REST-server \
-        frontend for Veracruz's proxy attestation service.",
-    rename_all="kebab"
-)]
+#[structopt(rename_all="kebab")]
 struct Opt {
     /// Path to policy file
     #[structopt(parse(from_os_str))]
@@ -53,8 +42,9 @@ fn main() {
     let opt = Opt::from_args();
 
     // setup logger
-    env_logger::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
+    env_logger::from_env(
+        env_logger::Env::default().default_filter_or("info")
+    ).init();
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
@@ -65,18 +55,19 @@ fn main() {
             process::exit(1);
         }
     };
+    // TODO move this functionality into VeracruzPolicy?
     let policy_hash_bytes = ring::digest::digest(
         &ring::digest::SHA256, policy_json.as_bytes());
     let policy_hash = hex::encode(&policy_hash_bytes.as_ref().to_vec());
     let policy = match veracruz_utils::VeracruzPolicy::from_json(
-            policy_json.as_str()) {
+            policy_json.as_str()
+    ) {
         Ok(policy) => policy,
         Err(err) => {
             error!("{}", err);
             process::exit(1);
         }
     };
-    // TODO do we need this hash?
     info!("Loaded policy {}", policy_hash);
 
     // needs a database URL
@@ -93,11 +84,11 @@ fn main() {
         }
     }
 
-    // create Actix runtime to run Tabasco
+    // create Actix runtime
     let mut sys = actix_rt::System::new("Tabasco Server");
 
     // create Tabasco instance
-    let tabasco_server = match tabasco_server::server::server(
+    let tabasco_server = match tabasco::server::server(
         policy.tabasco_url().clone()
     ) {
         Ok(tabasco_server) => tabasco_server,
@@ -109,7 +100,7 @@ fn main() {
 
     info!("Tabasco running on {}", policy.tabasco_url());
     match sys.block_on(tabasco_server) {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(err) => {
             error!("{}", err);
             process::exit(1);
