@@ -25,17 +25,17 @@ use std::fs;
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all="kebab")]
 struct Opt {
-    /// Path to client certificate file
-    #[structopt(parse(from_os_str))]
-    client_cert_path: path::PathBuf,
-
-    /// Path to client key file
-    #[structopt(parse(from_os_str))]
-    client_key_path: path::PathBuf,
-
     /// Path to policy file
     #[structopt(parse(from_os_str))]
     policy_path: path::PathBuf,
+
+    /// Path to client certificate file
+    #[structopt(short = "c", long = "client-cert", parse(from_os_str))]
+    client_cert_path: path::PathBuf,
+
+    /// Path to client key file
+    #[structopt(short = "k", long = "client-key", parse(from_os_str))]
+    client_key_path: path::PathBuf,
 
     /// Specify optional program file to upload
     ///
@@ -60,6 +60,7 @@ struct Opt {
     output: Option<path::PathBuf>,
 
     // TODO does it make more sense to invert this, and have --no-shutdown?
+    // TODO how should repeated client runs against a long-running server look?
     /// Request a shutdown of the enclave
     ///
     /// Note: This requires "ResultReader" permissions in the
@@ -75,6 +76,7 @@ fn main() {
     let opt = Opt::from_args();
 
     // setup logger
+    // TODO, unlike sinaloa/tabasco, this is a client, do we really
     env_logger::from_env(
         env_logger::Env::default().default_filter_or("info")
     ).init();

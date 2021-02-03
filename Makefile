@@ -193,6 +193,10 @@ clean:
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
+	cd tabasco-cli && cargo clean
+	cd sinaloa-cli && cargo clean
+	cd durango-cli && cargo clean
+	rm -rf bin
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
@@ -214,3 +218,6 @@ fmt:
 	cd trustzone-root-enclave && cargo fmt
 	cd proxy-attestation-server && cargo fmt
 	$(MAKE) -C sdk fmt
+	cd tabasco-cli && cargo fmt
+	cd sinaloa-cli && cargo fmt
+	cd durango-cli && cargo fmt
