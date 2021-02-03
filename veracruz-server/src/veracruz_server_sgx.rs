@@ -33,14 +33,20 @@ pub mod veracruz_server_sgx {
         sgx_root_enclave_sgx_ra_proc_msg2_trusted, sgx_root_enclave_start_local_attest_enc,
     };
     use std::{ffi::CStr, mem};
+    use std::io::Write;
+    use tempfile;
     use veracruz_utils;
 
     lazy_static! {
         static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
     }
 
-    static RUNTIME_MANAGER_FILE: &'static str = "./target/debug/runtime_manager.signed.so";
-    static SGX_ROOT_ENCLAVE_ENCLAVE_FILE: &'static str = "./target/debug/sgx_root_enclave.signed.so";
+    static RUNTIME_MANAGER_BINARY: &'static [u8] = include_bytes!(
+        "../../runtime-manager-bind/target/debug/runtime_manager.signed.so"
+    );
+    static SGX_ROOT_ENCLAVE_BINARY: &'static [u8] = include_bytes!(
+        "../../sgx-root-enclave-bind/target/debug/sgx_root_enclave.signed.so"
+    );
 
     pub struct VeracruzServerSGX {
         runtime_manager_enclave: SgxEnclave,
@@ -67,7 +73,12 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    fn start_enclave(library_fn: &str) -> Result<SgxEnclave, VeracruzServerError> {
+    fn start_enclave(library_binary: &[u8]) -> Result<SgxEnclave, VeracruzServerError> {
+        // need enclave binary as a file, so store in temporary file
+        let mut library_file = tempfile::NamedTempFile::new()?;
+        library_file.write_all(library_binary)?;
+        let library_path = library_file.path();
+
         let mut launch_token: sgx_launch_token_t = [0; 1024];
         let mut launch_token_updated: i32 = 0;
 
@@ -77,7 +88,7 @@ pub mod veracruz_server_sgx {
             misc_select: 0,
         };
         let enclave = SgxEnclave::create(
-            library_fn,
+            library_path,
             debug,
             &mut launch_token,
             &mut launch_token_updated,
@@ -465,7 +476,7 @@ pub mod veracruz_server_sgx {
 
     impl VeracruzServer for VeracruzServerSGX {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
-            let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
+            let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_BINARY)?;
 
             let mut new_veracruz_server = VeracruzServerSGX {
                 runtime_manager_enclave: runtime_manager_enclave,
@@ -488,7 +499,7 @@ pub mod veracruz_server_sgx {
                 match *sgx_root_enclave {
                     Some(_) => (), // do nothing, we're good
                     None => {
-                        let enclave = start_enclave(SGX_ROOT_ENCLAVE_ENCLAVE_FILE)?;
+                        let enclave = start_enclave(SGX_ROOT_ENCLAVE_BINARY)?;
                         new_veracruz_server.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
                         *sgx_root_enclave = Some(enclave)
                     }
