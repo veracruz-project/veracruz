@@ -86,7 +86,6 @@ fn main() {
     };
 
     // TODO support restarting in a loop?
-    // TODO should we be getting FAILED_NO_READY on extra program?
     // TODO there's an unwrap panic that happens if we ctrl-C, need to fix
     info!("Sinaloa running on {}", policy.sinaloa_url());
     match sys.block_on(sinaloa_server) {

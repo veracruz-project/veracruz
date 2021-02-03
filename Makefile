@@ -57,6 +57,17 @@ sgx: sdk sgx-env
 	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
+sgx-bin: sgx-enclaves sgx-env
+	mkdir -p bin
+	# TODO do we really need SGX flag for tabasco?
+	cd tabasco-cli && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx
+	cd sinaloa-cli && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx
+	cd durango-cli && cargo build
+	cp tabasco-cli/target/debug/tabasco bin/tabasco
+	# TODO remove relative path to enclave .so in Sinaloa?
+	cp sinaloa-cli/target/debug/sinaloa bin/sinaloa
+	cp durango-cli/target/debug/durango bin/durango
+
 nitro: sdk
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
