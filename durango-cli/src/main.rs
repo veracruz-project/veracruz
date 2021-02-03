@@ -18,9 +18,10 @@ use hex;
 use std::process;
 use durango::Durango;
 use std::fs;
+use std::io;
+use std::io::Read;
+use std::io::Write;
 
-
-// TODO do we need to understand identity?
 
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all="kebab")]
@@ -30,14 +31,16 @@ struct Opt {
     policy_path: path::PathBuf,
 
     /// Path to client certificate file
-    #[structopt(short = "c", long = "client-cert", parse(from_os_str))]
-    client_cert_path: path::PathBuf,
+    #[structopt(short, long, parse(from_os_str))]
+    identity: path::PathBuf,
 
     /// Path to client key file
-    #[structopt(short = "k", long = "client-key", parse(from_os_str))]
-    client_key_path: path::PathBuf,
+    #[structopt(short, long, parse(from_os_str))]
+    key: path::PathBuf,
 
     /// Specify optional program file to upload
+    ///
+    /// Accepts "-" to read from stdin
     ///
     /// Note: This requires "PiProvider" permissions in the
     /// policy file.
@@ -45,6 +48,8 @@ struct Opt {
     program: Option<path::PathBuf>,
 
     /// Specify optional data file to upload
+    ///
+    /// Accepts "-" to read from stdin
     ///
     /// Note: This requires "DataProvider" permissions in the
     /// policy file.
@@ -54,19 +59,20 @@ struct Opt {
     /// Specify optional output file to store results. If not provided
     /// the results will not be fetched.
     ///
+    /// If --no-shutdown is not provided, Durango will request a shutdown
+    /// from the Sinaloa server after recieving the results.
+    ///
+    /// Accepts "-" to write to stdout
+    ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
     #[structopt(short, long, parse(from_os_str))]
     output: Option<path::PathBuf>,
 
-    // TODO does it make more sense to invert this, and have --no-shutdown?
-    // TODO how should repeated client runs against a long-running server look?
-    /// Request a shutdown of the enclave
-    ///
-    /// Note: This requires "ResultReader" permissions in the
-    /// policy file.
+    /// Do not request a shutdown of the Sinaloa server after recieving the
+    /// results. This can be useful if you have multiple result readers.
     #[structopt(short, long)]
-    shutdown: bool,
+    no_shutdown: bool,
 }
 
 
@@ -77,6 +83,7 @@ fn main() {
 
     // setup logger
     // TODO, unlike sinaloa/tabasco, this is a client, do we really
+    // need timestamps/context?
     env_logger::from_env(
         env_logger::Env::default().default_filter_or("info")
     ).init();
@@ -106,14 +113,14 @@ fn main() {
 
     // need to convert to str for Durango
     // TODO allow Durango to accept Paths?
-    let client_cert_path = match opt.client_cert_path.to_str() {
+    let client_cert_path = match opt.identity.to_str() {
         Some(client_cert_path) => client_cert_path,
         None => {
             error!("Invalid client_cert_path (not utf8?)");
             process::exit(1);
         }
     };
-    let client_key_path = match opt.client_key_path.to_str() {
+    let client_key_path = match opt.key.to_str() {
         Some(client_key_path) => client_key_path,
         None => {
             error!("Invalid client_key_path (not utf8?)");
@@ -141,11 +148,22 @@ fn main() {
     if let Some(ref program_path) = opt.program {
         did_something = true;
 
-        let program = match fs::read(program_path) {
-            Ok(program) => program,
-            Err(err) => {
-                error!("{}", err);
-                process::exit(1);
+        let program = if program_path == &path::PathBuf::from("-") {
+            let mut program = Vec::new();
+            match io::stdin().read_to_end(&mut program) {
+                Ok(_) => program,
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
+            }
+        } else {
+            match fs::read(program_path) {
+                Ok(program) => program,
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
             }
         };
 
@@ -164,11 +182,22 @@ fn main() {
     if let Some(ref data_path) = opt.data {
         did_something = true;
 
-        let data = match fs::read(data_path) {
-            Ok(data) => data,
-            Err(err) => {
-                error!("{}", err);
-                process::exit(1);
+        let data = if data_path == &path::PathBuf::from("-") {
+            let mut data = Vec::new();
+            match io::stdin().read_to_end(&mut data) {
+                Ok(_) => data,
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
+            }
+        } else {
+            match fs::read(data_path) {
+                Ok(data) => data,
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
             }
         };
 
@@ -194,31 +223,39 @@ fn main() {
             }
         };
 
-        // TODO support "-"?
-        match fs::write(output_path, results) {
-            Ok(()) => {},
-            Err(err) => {
-                error!("{}", err);
-                process::exit(1);
+        // TODO "post_mexico_city started" causes problems with this
+        if output_path == &path::PathBuf::from("-") {
+            match io::stdout().write_all(&results) {
+                Ok(()) => {},
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
+            }
+        } else {
+            match fs::write(output_path, results) {
+                Ok(()) => {},
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
             }
         }
 
         info!("Read results into \"{:?}\"", output_path);
-    }
 
-    // shutdown?
-    if opt.shutdown {
-        did_something = true;
-
-        match durango.request_shutdown() {
-            Ok(()) => {}
-            Err(err) => {
-                error!("{}", err);
-                process::exit(1);
+        // shutdown?
+        if !opt.no_shutdown {
+            match durango.request_shutdown() {
+                Ok(()) => {}
+                Err(err) => {
+                    error!("{}", err);
+                    process::exit(1);
+                }
             }
-        }
 
-        info!("Shutdown server");
+            info!("Shutdown server");
+        }
     }
 
     if !did_something {
