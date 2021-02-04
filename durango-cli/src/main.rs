@@ -53,8 +53,8 @@ struct Opt {
     ///
     /// Note: This requires "DataProvider" permissions in the
     /// policy file.
-    #[structopt(short, long, parse(from_os_str))]
-    data: Option<path::PathBuf>,
+    #[structopt(short, long, multiple=true, number_of_values=1, parse(from_os_str))]
+    data: Vec<path::PathBuf>,
 
     /// Specify optional output file to store results. If not provided
     /// the results will not be fetched.
@@ -66,7 +66,7 @@ struct Opt {
     ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
-    #[structopt(short, long, parse(from_os_str))]
+    #[structopt(short, long, visible_alias="result", parse(from_os_str))]
     output: Option<path::PathBuf>,
 
     /// Do not request a shutdown of the Sinaloa server after recieving the
@@ -185,8 +185,9 @@ fn main() {
         info!("Submitted program {:?}", program_path);
     }
 
-    // send data?
-    if let Some(ref data_path) = opt.data {
+    // send data(s)?
+    // TODO can we specify these in any order?
+    for data_path in opt.data.iter() {
         did_something = true;
 
         let data = if data_path == &path::PathBuf::from("-") {
@@ -230,7 +231,7 @@ fn main() {
             }
         };
 
-        // TODO "post_mexico_city started" causes problems with this
+        // TODO "post_mexico_city started prints" causes problems with stdout
         if output_path == &path::PathBuf::from("-") {
             match io::stdout().write_all(&results) {
                 Ok(()) => {},
