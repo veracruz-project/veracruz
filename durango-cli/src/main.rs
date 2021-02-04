@@ -73,6 +73,13 @@ struct Opt {
     /// results. This can be useful if you have multiple result readers.
     #[structopt(short, long)]
     no_shutdown: bool,
+
+    /// Request shutdown without requesting data.
+    ///
+    /// Note: This requires "ResultReader" permissions in the
+    /// policy file.
+    #[structopt(short, long)]
+    shutdown: bool,
 }
 
 
@@ -175,7 +182,7 @@ fn main() {
             }
         }
 
-        info!("Submitted program \"{:?}\"", program_path);
+        info!("Submitted program {:?}", program_path);
     }
 
     // send data?
@@ -209,7 +216,7 @@ fn main() {
             }
         }
 
-        info!("Submitted data \"{:?}\"", data_path);
+        info!("Submitted data {:?}", data_path);
     }
 
     if let Some(ref output_path) = opt.output {
@@ -242,20 +249,22 @@ fn main() {
             }
         }
 
-        info!("Read results into \"{:?}\"", output_path);
+        info!("Read results into {:?}", output_path);
+    }
 
-        // shutdown?
-        if !opt.no_shutdown {
-            match durango.request_shutdown() {
-                Ok(()) => {}
-                Err(err) => {
-                    error!("{}", err);
-                    process::exit(1);
-                }
+    // shutdown?
+    if (opt.output.is_some() && !opt.no_shutdown) || opt.shutdown {
+        did_something = true;
+
+        match durango.request_shutdown() {
+            Ok(()) => {}
+            Err(err) => {
+                error!("{}", err);
+                process::exit(1);
             }
-
-            info!("Shutdown server");
         }
+
+        info!("Shutdown server");
     }
 
     if !did_something {
