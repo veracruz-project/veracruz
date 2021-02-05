@@ -21,6 +21,7 @@ use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer
 use base64;
 use futures::executor;
 use std::{
+    path,
     sync::mpsc,
     sync::{Arc, Mutex},
     thread,
@@ -102,7 +103,10 @@ async fn runtime_manager_request(
 }
 
 /// Return an actix server. The caller should call .await for starting the service.
-pub fn server(policy_filename: &str) -> Result<Server, VeracruzServerError> {
+pub fn server<P>(policy_filename: P) -> Result<Server, VeracruzServerError>
+where
+    P: AsRef<path::Path>
+{
     let policy_json = std::fs::read_to_string(policy_filename)?;
     let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]
