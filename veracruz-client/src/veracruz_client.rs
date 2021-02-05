@@ -212,7 +212,7 @@ impl VeracruzClient {
             tls_session: session,
             remote_session_id: None,
             policy: policy,
-            policy_hash: policy_hash.to_string(),
+            policy_hash: policy_hash,
             package_id: 0,
             client_cert: client_cert_string,
         })
