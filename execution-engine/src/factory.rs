@@ -39,11 +39,15 @@ use std::sync::SgxMutex as Mutex;
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
 use crate::hcall::{common::ExecutionEngine, wasmi};
+use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
 
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
     sync::Arc,
+    vec::Vec,
+    collections::HashMap,
+    string::String,
 };
 
 #[derive(Debug)]
@@ -123,16 +127,20 @@ pub fn multi_threaded_execution_engine(
     expected_data_sources: &[u64],
     expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
+    file_permissions: &VeracruzCapabilityTable,
+    program_digests: &HashMap<String, Vec<u8>>, 
 ) -> Option<Arc<Mutex<dyn ExecutionEngine + 'static>>> {
     #[cfg(feature = "std")]
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
+                let state = new_wasmi_instance(
+                    expected_data_sources,
+                    expected_stream_sources,
+                    expected_shutdown_sources,
+                    file_permissions,
+                    program_digests,
+                );
 
                 Some(Arc::new(Mutex::new(state)))
             }
@@ -153,17 +161,38 @@ pub fn multi_threaded_execution_engine(
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
+                let state = new_wasmi_instance(
+                    expected_data_sources,
+                    expected_stream_sources,
+                    expected_shutdown_sources,
+                    file_permissions,
+                    program_digests,
+                );
 
                 Some(Arc::new(Mutex::new(state)))
             }
             ExecutionStrategy::JIT => None,
         }
     }
+}
+
+//TODO remove old parameters.
+fn new_wasmi_instance (
+    expected_data_sources: &[u64],
+    expected_stream_sources: &[u64],
+    expected_shutdown_sources: &[u64],
+    capability_table: &VeracruzCapabilityTable,
+    program_digests: &HashMap<String, Vec<u8>>, 
+) -> impl Chihuahua + 'static {
+    let mut state = wasmi::WasmiHostProvisioningState::valid_new(
+        expected_shutdown_sources,
+        capability_table,
+        program_digests,
+    );
+    state
+        .set_expected_data_sources(expected_data_sources)
+        .set_expected_stream_sources(expected_stream_sources);
+    state
 }
 
 ////////////////////////////////////////////////////////////////////////////////

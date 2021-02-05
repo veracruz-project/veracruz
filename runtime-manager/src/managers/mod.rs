@@ -118,6 +118,9 @@ impl ProtocolState {
             }
             ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
+        let capability_table = global_policy.get_capability_table();
+        let program_digests = global_policy.get_program_digests();
+        println!("{:?}",capability_table);
 
         let host_state = multi_threaded_execution_engine(
             &execution_strategy,
@@ -128,6 +131,8 @@ impl ProtocolState {
                 .map(|e| *e as u64)
                 .collect::<Vec<u64>>()
                 .as_slice(),
+            &capability_table,
+            &program_digests,
         )
         .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?;
 

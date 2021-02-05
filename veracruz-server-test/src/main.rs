@@ -489,7 +489,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
-            &[("input-0", STRING_1_DATA), ("input-1", STRING_2_DATA)],
+            &[("input-2", STRING_1_DATA), ("input-1", STRING_2_DATA)],
             &[],
             false,
         );

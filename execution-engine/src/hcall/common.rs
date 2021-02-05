@@ -62,12 +62,13 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
     cmp::Ord,
-    collections::HashMap,
+    collections::{HashMap,HashSet},
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
     string::{String, ToString},
     vec::Vec,
 };
+use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Utility functions that don't fit elsewhere.
@@ -274,21 +275,14 @@ pub enum HostProvisioningError {
     #[error(
         display = "HostProvisioningError: Principal or program {:?} cannot be found.",_0
     )]
-    IndexNotFound(PermissionIndex),
+    IndexNotFound(VeracruzCapabilityIndex),
     #[error(
-        display = "HostProvisioningError: Client {} is disallowed to {:?}.",client_id,operation
+        display = "HostProvisioningError: Client {:?} is disallowed to {:?}.",client_id,operation
     )]
-    PermissionDenial {
-        client_id: u64,
-        operation : FileOperation,
+    CapabilityDenial {
+        client_id: VeracruzCapabilityIndex,
+        operation : VeracruzCapability,
     },
-}
-
-#[derive(Debug, Clone)]
-pub enum FileOperation {
-    Read,
-    Write,
-    Execute,
 }
 
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
@@ -296,37 +290,6 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         HostProvisioningError::FailedToObtainLock(format!("{:?}", error))
     }
-}
-
-//NOTE: This type is very similar to the one use in VeracruzUtil.
-//      However, for the purpose of self-contain, we define a seperate type.
-#[derive(Clone)]
-pub struct PermissionFlags {
-    read : bool,
-    write : bool,
-    execute : bool,
-}
-
-impl PermissionFlags {
-    pub fn read(&self) -> bool {
-        self.read
-    }
-
-    pub fn write(&self) -> bool {
-        self.write
-    }
-
-    pub fn execute(&self) -> bool {
-        self.execute
-    }
-}
-
-#[derive(Clone,Hash,PartialEq,Eq,Debug)]
-pub enum PermissionIndex {
-    // Client ID
-    Principal(u64),
-    // Program
-    Program(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -339,6 +302,7 @@ pub enum PermissionIndex {
 #[derive(Clone)]
 // TODO: remove MOST, except:
 // - memory
+// - program_module ? possibly can do on-demand allocation
 // in the favour of FS.
 pub struct HostProvisioningState<Module, Memory> {
     /// The data sources that have been provisioned into the machine.
@@ -369,8 +333,8 @@ pub struct HostProvisioningState<Module, Memory> {
     expected_shutdown_sources: Vec<u64>,
     //NOTE: the following will move to an external component.
     //TODO: integrate into FS
-    //      Index -> FilePath -> Permission
-    file_permissions: HashMap<PermissionIndex, HashMap<String,PermissionFlags>>,
+    //      Index -> FilePath -> Capability
+    capabilities: VeracruzCapabilityTable,
     //      Program_file_name -> Digest
     program_digests: HashMap<String, Vec<u8>>, 
 }
@@ -399,16 +363,17 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             previous_result: None,
             result: None,
             expected_shutdown_sources: Vec::new(),
-            file_permissions: HashMap::new(),
+            capabilities: HashMap::new(),
             program_digests: HashMap::new(),
         }
     }
 
     //TODO: THIS will replace the use of `new` in the future commits.
-    pub fn valid_new(expected_shutdown_sources: Vec<u64>, 
-        file_permissions: HashMap<PermissionIndex,HashMap<String,PermissionFlags>>,
-        program_digests: HashMap<String, Vec<u8>>, 
+    pub fn valid_new(expected_shutdown_sources: &[u64], 
+        capabilities: &VeracruzCapabilityTable,
+        program_digests: &HashMap<String, Vec<u8>>, 
     ) -> Self {
+        let mut capabilities = capabilities.clone();
         HostProvisioningState {
             data_sources: Vec::new(),
             expected_data_sources: Vec::new(),
@@ -420,38 +385,38 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             memory: None,
             previous_result: None,
             result: None,
-            expected_shutdown_sources,
-            file_permissions,
-            program_digests,
+            expected_shutdown_sources : expected_shutdown_sources.to_vec(),
+            //capabilities: capabilities.clone(),
+            capabilities,
+            program_digests: program_digests.clone(),
         }
     }
 
     // NOTE: the following will move to an external component.
-    /// Return Some(PermissionFlags) if `id` has the permission 
+    /// Return Some(CapabilityFlags) if `id` has the permission 
     /// to read, write and execute on the `file_name`.
     /// Return None if `id` or `file_name` do not exist.
-    pub(crate) fn get_permission(&self, id: &PermissionIndex, file_name: &str) -> Result<PermissionFlags, HostProvisioningError> {
-        self.file_permissions
-            .get(id)
+    pub(crate) fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), HostProvisioningError> {
+        self.capabilities
+            .get(&VeracruzCapabilityIndex::Principal(0))
             .ok_or(HostProvisioningError::IndexNotFound(id.clone()))?
             .get(file_name)
             .ok_or(HostProvisioningError::FileNotFound(file_name.to_string()))
-            .map(|permission| permission.clone())
+            .and_then(|p| {
+                if p.contains(cap) {
+                    Ok(())
+                } else {
+                    Err(HostProvisioningError::CapabilityDenial{
+                        client_id: id.clone(),
+                        operation: cap.clone(),
+                    })
+                }
+            })
     }
 
     /// Append to a file.
     pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.get_permission(&PermissionIndex::Principal(client_id),file_name)
-            .and_then(|p| {
-                if p.read() {
-                    Ok(())
-                } else {
-                    Err(HostProvisioningError::PermissionDenial{
-                        client_id,
-                        operation: FileOperation::Read,
-                    })
-                }
-            })?;
+        self.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         if file_name.starts_with("input-") {
