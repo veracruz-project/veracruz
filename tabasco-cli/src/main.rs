@@ -13,8 +13,6 @@ use structopt::StructOpt;
 use std::path;
 use env_logger;
 use log::{info, error};
-use ring;
-use hex;
 use std::process;
 use actix_rt;
 use std::env;
@@ -48,21 +46,10 @@ fn main() {
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
-    let policy_json = match std::fs::read_to_string(&opt.policy_path) {
-        Ok(policy_json) => policy_json,
-        Err(_) => {
-            error!("Cannot open file {:?}", opt.policy_path);
-            process::exit(1);
-        }
-    };
-    // TODO move this functionality into VeracruzPolicy?
-    let policy_hash_bytes = ring::digest::digest(
-        &ring::digest::SHA256, policy_json.as_bytes());
-    let policy_hash = hex::encode(&policy_hash_bytes.as_ref().to_vec());
-    let policy = match veracruz_utils::VeracruzPolicy::from_json(
-            policy_json.as_str()
+    let (policy, policy_hash) = match veracruz_utils::policy_and_hash_from_file(
+        &opt.policy_path
     ) {
-        Ok(policy) => policy,
+        Ok((policy, policy_hash)) => (policy, policy_hash),
         Err(err) => {
             error!("{}", err);
             process::exit(1);

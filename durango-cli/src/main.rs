@@ -13,8 +13,6 @@ use structopt::StructOpt;
 use std::path;
 use env_logger;
 use log::{info, warn, error};
-use ring;
-use hex;
 use std::process;
 use durango::Durango;
 use std::fs;
@@ -104,13 +102,11 @@ fn main() {
             process::exit(1);
         }
     };
-    let policy_hash_bytes = ring::digest::digest(
-        &ring::digest::SHA256, policy_json.as_bytes());
-    let policy_hash = hex::encode(&policy_hash_bytes.as_ref().to_vec());
-    let policy = match veracruz_utils::VeracruzPolicy::from_json(
-            policy_json.as_str()
+
+    let (policy, policy_hash) = match veracruz_utils::policy_and_hash_from_json(
+        &policy_json
     ) {
-        Ok(policy) => policy,
+        Ok((policy, policy_hash)) => (policy, policy_hash),
         Err(err) => {
             error!("{}", err);
             process::exit(1);
@@ -136,6 +132,7 @@ fn main() {
     };
 
     // create Durango instance
+    // TODO allow AsRef<VeracruzPolicy>?
     let mut durango = match Durango::new(
         client_cert_path,
         client_key_path,

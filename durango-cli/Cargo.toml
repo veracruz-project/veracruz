@@ -19,6 +19,4 @@ veracruz-utils = {path = "../veracruz-utils", features=["std"] }
 structopt = { version="0.3", features=["wrap_help"] }
 log = "0.4"
 env_logger = "0.7"
-ring = "0.16"
-hex = "0.4"
 

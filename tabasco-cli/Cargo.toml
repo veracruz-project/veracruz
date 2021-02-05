@@ -23,8 +23,6 @@ tabasco = { path = "../tabasco" }
 structopt = { version="0.3", features=["wrap_help"] }
 log = "0.4"
 env_logger = "0.7"
-ring = "0.16"
-hex = "0.4"
 actix-rt = "1.0.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
