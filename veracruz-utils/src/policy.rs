@@ -30,17 +30,22 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
-use ring;
-use hex;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
-    fs,
-    path,
     slice::Iter,
     string::{String, ToString},
     vec::Vec,
     collections::{HashMap, HashSet},
+};
+#[cfg(feature = "std")]
+use ring;
+#[cfg(feature = "std")]
+use hex;
+#[cfg(feature = "std")]
+use std::{
+    fs,
+    path,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -765,6 +770,7 @@ impl VeracruzPolicy {
 /// Parses and hashes a Veracruz policy from the given file, validating
 /// the well-formedness of the resulting policy in the process.
 /// Returns `Ok((policy, policy_hash))` iff these well-formedness checks pass.
+#[cfg(feature = "std")]
 pub fn policy_and_hash_from_file<P>(
     path: P
 ) -> Result<(VeracruzPolicy, String), VeracruzUtilError>
@@ -778,6 +784,7 @@ where
 /// Parses and hashes a Veracruz policy from a JSON-encoded string, `json`,
 /// validating the well-formedness of the resulting policy in the process.
 /// Returns `Ok((policy, policy_hash))` iff these well-formedness checks pass.
+#[cfg(feature = "std")]
 pub fn policy_and_hash_from_json(
     json: &str
 ) -> Result<(VeracruzPolicy, String), VeracruzUtilError> {
