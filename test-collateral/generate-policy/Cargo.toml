@@ -8,6 +8,7 @@ description = "Generates Veracruz policy files from a set of command line parame
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.19"
 clap = "2.33.3"
 env_logger = "0.8.2"
 log = "0.4.14"

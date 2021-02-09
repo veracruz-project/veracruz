@@ -11,6 +11,7 @@
 
 use std::{fs::File, io::Write, process::exit, str::FromStr};
 
+use chrono::{Datelike, Duration, Timelike, Utc};
 use clap::{App, Arg};
 use log::info;
 use serde_json::{json, to_string_pretty, Value};
@@ -40,7 +41,7 @@ const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
 const DEFAULT_OUTPUT_FILENAME: &'static str = "output.json";
 /// The default expiry of the server certificate (measured in hours, from its
 /// creation) if no alternative is provided on the command line.
-const DEFAULT_CERTIFICATE_EXPIRY: usize = 8;
+const DEFAULT_CERTIFICATE_EXPIRY: i64 = 8;
 /// The default debug status of the Veracruz enclave, if no alternative is
 /// provided on the command line.
 const DEFAULT_DEBUG_STATUS: bool = false;
@@ -70,8 +71,10 @@ struct Arguments {
     /// The filename of the output policy file.
     output_policy_file: String,
     /// The expiry timepoint of the server certificate.  This is measured in
-    /// hours.
-    certificate_lifetime: usize,
+    /// hours.  Represented as an `i64` as this is what the `chrono` library
+    /// expects.  We check that any value passed as an argument is positive,
+    /// however.
+    certificate_lifetime: i64,
     /// The data provisioning order.
     data_provisioning_order: Vec<i32>,
     /// The streaming provisioning order.
@@ -302,7 +305,11 @@ binary.",
     }
 
     if let Some(lifetime) = matches.value_of("certificate-lifetime-in-hours") {
-        if let Ok(lifetime) = usize::from_str(lifetime) {
+        if let Ok(lifetime) = i64::from_str(lifetime) {
+            if lifetime < 0 {
+                eprintln!("The certificate expiry point cannot be in the past.");
+                exit(1);
+            }
             arguments.certificate_lifetime = lifetime;
         } else {
             eprintln!("The certificate lifetime argument could not be parsed.");
@@ -379,14 +386,19 @@ binary.",
 // JSON serialization.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Serializes the enclave server certificate expiry timepoint to a JSON value.
+/// Serializes the enclave server certificate expiry timepoint to a JSON value,
+/// computing the time when the certificate will expire as a point relative to
+/// the current time.
 fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
+    let duration = Duration::hours(arguments.certificate_lifetime);
+    let expiry = Utc::now() + duration;
+
     json!({
-        "year": "",
-        "month": "",
-        "day": "",
-        "hour": "",
-        "minute": ""
+        "year": expiry.year(),
+        "month": expiry.month(),
+        "day": expiry.day(),
+        "hour": expiry.hour(),
+        "minute": expiry.minute()
     })
 }
 
