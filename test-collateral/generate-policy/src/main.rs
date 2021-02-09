@@ -13,8 +13,11 @@ use std::{fs::File, io::Write, process::exit, str::FromStr};
 
 use chrono::{Datelike, Duration, Timelike, Utc};
 use clap::{App, Arg};
+use data_encoding::HEXLOWER;
 use log::info;
+use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
+use std::io::Read;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,6 +140,9 @@ fn check_roles(roles: &[Vec<String>]) {
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Arguments {
+    let default_expiry = DEFAULT_CERTIFICATE_EXPIRY.to_string();
+    let default_debug = DEFAULT_DEBUG_STATUS.to_string();
+
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -181,7 +187,7 @@ fn parse_command_line() -> Arguments {
                 .long("output-policy-file")
                 .value_name("FILE")
                 .help("Filename of the generated policy file.")
-                .default_value("output.json")
+                .default_value(DEFAULT_OUTPUT_FILENAME)
                 .required(true),
         )
         .arg(
@@ -193,7 +199,7 @@ fn parse_command_line() -> Arguments {
                     "Describes the expiry lifetime of the server certificate, measured in \
 hours.",
                 )
-                .default_value("8")
+                .default_value(&default_expiry)
                 .required(true),
         )
         .arg(
@@ -229,7 +235,7 @@ hours.",
 information to be produced by the executing WASM binary.",
                 )
                 .required(true)
-                .default_value("false"),
+                .default_value(&default_debug),
         )
         .arg(
             Arg::with_name("execution-strategy")
@@ -240,7 +246,7 @@ information to be produced by the executing WASM binary.",
 binary.",
                 )
                 .required(true)
-                .default_value("interpretation"),
+                .default_value(DEFAULT_EXECUTION_STRATEGY),
         )
         .get_matches();
 
@@ -386,6 +392,23 @@ binary.",
 // JSON serialization.
 ////////////////////////////////////////////////////////////////////////////////
 
+/// Executes the hashing program on the WASM binary, returning the computed
+/// SHA256 hash as a string.
+fn compute_program_hash(arguments: &Arguments) -> String {
+    if let Ok(mut file) = File::open(&arguments.program_binary) {
+        let mut buffer = vec![];
+
+        file.read_to_end(&mut buffer).expect("Failed to read file.");
+
+        let d = digest(&SHA256, &mut buffer);
+
+        HEXLOWER.encode(d.as_ref())
+    } else {
+        eprintln!("Failed to open WASM program binary.");
+        exit(1);
+    }
+}
+
 /// Serializes the enclave server certificate expiry timepoint to a JSON value,
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
@@ -417,7 +440,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
     let data_provision_order = "";
     let streaming_order = "";
 
-    let pi_hash = "";
+    let pi_hash = compute_program_hash(arguments);
     let debug = &arguments.debug;
     let execution_strategy = &arguments.execution_strategy;
 
@@ -448,7 +471,7 @@ fn main() {
 
     if let Ok(mut file) = File::create(&arguments.output_policy_file) {
         if let Ok(json) = to_string_pretty(&serialize_json(&arguments)) {
-            write!(file, "{}", json);
+            write!(file, "{}", json).expect("Failed to write file.");
             info!("JSON file written successfully.");
             exit(0);
         } else {
