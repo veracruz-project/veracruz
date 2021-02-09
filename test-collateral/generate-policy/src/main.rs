@@ -9,7 +9,13 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{fs::File, io::Write, process::exit, str::FromStr};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+    process::{exit, Command},
+    str::FromStr,
+};
 
 use chrono::{Datelike, Duration, Timelike, Utc};
 use clap::{App, Arg};
@@ -17,7 +23,6 @@ use data_encoding::HEXLOWER;
 use log::info;
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
-use std::io::Read;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +43,13 @@ const VERSION: &'static str = "0.1.0";
 
 /// The single supported ciphersuite embedded in the policy file.
 const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256";
+
+/// The name of the 'dd' executable to call when computing the hash of the
+/// Mexico City enclave for SGX.
+const DD_EXECUTABLE_NAME: &'static str = "dd";
+/// The name of the 'xxd' executable to call when computing the hash of the
+/// Mexico City enclave for SGX.
+const XXD_EXECUTABLE_NAME: &'static str = "xxd";
 
 /// The default filename of the output JSON policy file, if no alternative is
 /// provided on the command line.
@@ -71,6 +83,11 @@ struct Arguments {
     sinaloa_url: Option<Url>,
     /// The URL of the Tabasco instance.
     tabasco_url: Option<Url>,
+    /// The filename of the Mexico City CSS file for SGX measurement.
+    css_file: String,
+    /// The filename of the Mexico City PRCR0 file for Nitro Enclave
+    /// measurement.
+    pcr0_file: String,
     /// The filename of the output policy file.
     output_policy_file: String,
     /// The expiry timepoint of the server certificate.  This is measured in
@@ -102,6 +119,8 @@ impl Arguments {
             roles: Vec::new(),
             sinaloa_url: None,
             tabasco_url: None,
+            css_file: String::new(),
+            pcr0_file: String::new(),
             output_policy_file: String::new(),
             certificate_lifetime: 0,
             data_provisioning_order: Vec::new(),
@@ -179,6 +198,22 @@ fn parse_command_line() -> Arguments {
                 .long("tabasco-url")
                 .value_name("URL")
                 .help("URL of the Tabasco server.")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("css-file")
+                .short("j")
+                .long("css-file")
+                .value_name("FILE")
+                .help("Filename of the CSS file for the Mexico City enclave for SGX measurement.")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("pcr-file")
+                .short("p")
+                .long("pcr-file")
+                .value_name("FILE")
+                .help("Filename of the PCR0 file for the Mexico City enclave for AWS Nitro Enclave measurement.")
                 .required(true),
         )
         .arg(
@@ -310,6 +345,20 @@ binary.",
         arguments.output_policy_file = String::from(DEFAULT_OUTPUT_FILENAME);
     }
 
+    if let Some(fname) = matches.value_of("css-file") {
+        arguments.css_file = String::from(fname);
+    } else {
+        eprintln!("No CSS file was passed as a command line parameter.");
+        exit(1);
+    }
+
+    if let Some(fname) = matches.value_of("pcr-file") {
+        arguments.pcr0_file = String::from(fname);
+    } else {
+        eprintln!("No PCR0 file was passed as a command line parameter.");
+        exit(1);
+    }
+
     if let Some(lifetime) = matches.value_of("certificate-lifetime-in-hours") {
         if let Ok(lifetime) = i64::from_str(lifetime) {
             if lifetime < 0 {
@@ -409,9 +458,79 @@ fn compute_program_hash(arguments: &Arguments) -> String {
     }
 }
 
+/// Computes the SGX hash of the Mexico City enclave making use of the external
+/// 'dd' and 'xxd' utilities, which are called as external processes.
+fn compute_sgx_enclave_hash(arguments: &Arguments) -> String {
+    if Path::new(&arguments.css_file).exists() {
+        if let Ok(output) = Command::new(DD_EXECUTABLE_NAME)
+            .arg("skip=960")
+            .arg("count=32")
+            .arg(format!("if={}", &arguments.css_file))
+            .arg(format!("of={}", "hash.bin"))
+            .output()
+        {
+            if !output.status.success() {
+                eprintln!("Invocation of 'dd' command failed.");
+                exit(1);
+            }
+
+            if let Ok(hash_hex) = Command::new(XXD_EXECUTABLE_NAME)
+                .arg("-ps")
+                .arg("-cols")
+                .arg("32")
+                .arg("hash.bin")
+                .output()
+            {
+                if !hash_hex.status.success() {
+                    eprintln!("Invocation of 'xxd' command failed.");
+                    exit(1);
+                }
+
+                if let Ok(mut hash_hex) = String::from_utf8(hash_hex.stdout) {
+                    hash_hex = hash_hex.replace("\n", "");
+
+                    return hash_hex;
+                } else {
+                    eprintln!("Failed to parse output of 'xxd'.");
+                    exit(1);
+                }
+            } else {
+                eprintln!("Incovation of 'xxd' command failed.");
+                exit(1);
+            }
+        } else {
+            eprintln!("Invocation of 'dd' command failed.");
+            exit(1);
+        }
+    } else {
+        eprintln!("CSS.bin file cannot be opened.");
+        exit(1);
+    }
+}
+
+/// Reads the Mexico City PCR0 file content, munging it a little, for the Nitro
+/// Enclave hash.
+fn compute_nitro_enclave_hash(arguments: &Arguments) -> String {
+    if let Ok(mut file) = File::open(&arguments.pcr0_file) {
+        let mut content = String::new();
+
+        file.read_to_string(&mut content)
+            .expect("Failed to read file.");
+
+        content = content.replace("\n", "");
+
+        return content;
+    } else {
+        eprintln!("Mexico City PCR0 file cannot be opened.");
+        exit(1);
+    }
+}
+
 /// Serializes the identities of all principals in the Veracruz computation into
 /// a JSON value.
 fn serialize_identities(arguments: &Arguments) -> Value {
+    assert_eq!(&arguments.certificates.len(), &arguments.roles.len());
+
     let mut values = vec![];
 
     for (id, (cert, roles)) in arguments
@@ -433,7 +552,7 @@ fn serialize_identities(arguments: &Arguments) -> Value {
             content = content.replace("-----END CERTIFICATE", "\\n-----END CERTIFICATE");
 
             let json = json!({
-                "cert": content,
+                "certificate": content,
                 "id": id,
                 "roles": roles,
             });
@@ -452,6 +571,8 @@ fn serialize_identities(arguments: &Arguments) -> Value {
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
 fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
+    assert!(arguments.certificate_lifetime >= 0);
+
     let duration = Duration::hours(arguments.certificate_lifetime);
     let expiry = Utc::now() + duration;
 
@@ -465,6 +586,10 @@ fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
 }
 
 /// Serializes the Veracruz policy file as a JSON value.
+///
+/// NOTE: we are glossing over TrustZone attestation for the moment, so we use
+/// the measurement of the SGX enclave as the measurement of the TrustZone
+/// trusted application, too.
 fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
@@ -476,10 +601,13 @@ fn serialize_json(arguments: &Arguments) -> Value {
     let enclave_cert_expiry = serialize_enclave_certificate_expiry(arguments);
     let ciphersuite = POLICY_CIPHERSUITE;
 
-    let data_provision_order = "";
-    let streaming_order = "";
+    let data_provision_order = json!(&arguments.data_provisioning_order);
+    let streaming_order = json!(&arguments.streaming_provisioning_order);
 
     let pi_hash = compute_program_hash(arguments);
+    let nitro_hash = compute_nitro_enclave_hash(arguments);
+    let sgx_hash = compute_sgx_enclave_hash(arguments);
+
     let debug = &arguments.debug;
     let execution_strategy = &arguments.execution_strategy;
 
@@ -494,6 +622,9 @@ fn serialize_json(arguments: &Arguments) -> Value {
         "pi_hash": pi_hash,
         "debug": debug,
         "execution_strategy": execution_strategy,
+        "mexico_city_hash_nitro": nitro_hash,
+        "mexico_city_hash_sgx": sgx_hash,
+        "mexico_city_hash_tz": sgx_hash,
     })
 }
 
