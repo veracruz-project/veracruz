@@ -409,6 +409,45 @@ fn compute_program_hash(arguments: &Arguments) -> String {
     }
 }
 
+/// Serializes the identities of all principals in the Veracruz computation into
+/// a JSON value.
+fn serialize_identities(arguments: &Arguments) -> Value {
+    let mut values = vec![];
+
+    for (id, (cert, roles)) in arguments
+        .certificates
+        .iter()
+        .zip(&arguments.roles)
+        .enumerate()
+    {
+        if let Ok(mut file) = File::open(cert) {
+            let mut content = String::new();
+
+            file.read_to_string(&mut content)
+                .expect("Failed to read file.");
+
+            content = content.replace(
+                "-----BEGIN CERTIFICATE-----",
+                "-----BEGIN CERTIFICATE-----\\n",
+            );
+            content = content.replace("-----END CERTIFICATE", "\\n-----END CERTIFICATE");
+
+            let json = json!({
+                "cert": content,
+                "id": id,
+                "roles": roles,
+            });
+
+            values.push(json);
+        } else {
+            eprintln!("Could not open certificate file.");
+            exit(1);
+        }
+    }
+
+    json!(values)
+}
+
 /// Serializes the enclave server certificate expiry timepoint to a JSON value,
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
@@ -429,7 +468,7 @@ fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
 fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
-    let identities = "";
+    let identities = serialize_identities(arguments);
 
     let sinaloa_url = format!("{}", &arguments.sinaloa_url.as_ref().unwrap());
     let tabasco_url = format!("{}", &arguments.tabasco_url.as_ref().unwrap());
