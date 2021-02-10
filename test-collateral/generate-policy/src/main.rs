@@ -125,8 +125,10 @@ struct Arguments {
     streaming_provisioning_order: Vec<i32>,
     /// The filename of the WASM program.
     program_binary: PathBuf,
-    /// The debug flag.
-    debug: bool,
+    /// Whether the enclave will be started in debug mode, with reduced
+    /// protections against snooping and interference, and with the ability to
+    /// write to the host's `stdout`.
+    enclave_debug_mode: bool,
     /// Describes the execution strategy (interpretation or JIT) that will be
     /// used for the computation.
     execution_strategy: String,
@@ -134,8 +136,8 @@ struct Arguments {
 
 impl Arguments {
     /// Creates a new `Arguments` structure with all fields set to empty (with
-    /// the `debug` flag set to `false`, and the `certificate_lifetime` field
-    /// set to `0`).
+    /// the `enclave_debug_mode` flag set to `false`, and the
+    /// `certificate_lifetime` field set to `0`).
     #[inline]
     pub fn new() -> Self {
         Arguments {
@@ -150,7 +152,7 @@ impl Arguments {
             data_provisioning_order: Vec::new(),
             streaming_provisioning_order: Vec::new(),
             program_binary: PathBuf::new(),
-            debug: false,
+            enclave_debug_mode: false,
             execution_strategy: String::new(),
         }
     }
@@ -171,7 +173,7 @@ fn check_execution_strategy(strategy: &str) {
 fn check_roles(roles: &[Vec<String>]) {
     if !roles.iter().all(|v| {
         v.iter()
-            .all(|s| s == "ResultReceiver" || s == "DataProvider" || s == "ProgramProvider")
+            .all(|s| s == "ResultReader" || s == "DataProvider" || s == "ProgramProvider")
     }) {
         abort_with("Could not parse the role command line arguments.");
     }
@@ -199,11 +201,12 @@ fn parse_command_line() -> Arguments {
         .arg(
             Arg::with_name("role")
                 .short("r")
-                .long("role")
+                .long("roles")
                 .value_name("ROLES")
                 .help("The set of roles of a computation participant, comma separated.")
                 .required(true)
-                .multiple(true),
+                .multiple(true)
+                .use_delimiter(true),
         )
         .arg(
             Arg::with_name("sinaloa-url")
@@ -284,12 +287,13 @@ as an RFC-2822 formatted timepoint.",
         .arg(
             Arg::with_name("debug")
                 .short("d")
-                .long("debug")
+                .long("enclave-debug-mode")
                 .help(
                     "Specifies whether the Veracruz trusted runtime should allow debugging \
 information to be produced by the executing WASM binary.",
                 )
                 .required(true)
+                .value_name("BOOLEAN")
                 .default_value(&default_debug),
         )
         .arg(
@@ -416,13 +420,13 @@ binary.",
 
     if let Some(debug) = matches.value_of("debug") {
         if let Ok(debug) = bool::from_str(debug) {
-            arguments.debug = debug;
+            arguments.enclave_debug_mode = debug;
         } else {
             abort_with("The debug flag could not be parsed.");
         }
     } else {
         info!("No debug flag passed as an argument.  Using a default.");
-        arguments.debug = DEFAULT_DEBUG_STATUS;
+        arguments.enclave_debug_mode = DEFAULT_DEBUG_STATUS;
     }
 
     if let Some(strategy) = matches.value_of("execution-strategy") {
@@ -591,7 +595,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         "data_provision_order": json!(&arguments.data_provisioning_order),
         "streaming_order": json!(&arguments.streaming_provisioning_order),
         "pi_hash": compute_program_hash(arguments),
-        "debug": &arguments.debug,
+        "debug": &arguments.enclave_debug_mode,
         "execution_strategy": &arguments.execution_strategy,
         "mexico_city_hash_nitro": compute_nitro_enclave_hash(arguments),
         "mexico_city_hash_sgx": compute_sgx_enclave_hash(arguments),
