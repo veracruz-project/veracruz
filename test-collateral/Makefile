@@ -22,7 +22,7 @@ MEXICO_CITY_CSS_BIN := ../mexico-city/css.bin
 MEXICO_CITY_PCR0 := ../mexico-city/PCR0
 
 ifeq ($(PLATFORM), Darwin)
-        CERTIFICATE_EXPIRY := $(date -Rf +100d)
+	CERTIFICATE_EXPIRY := $(date -Rf +100d)
 endif
 
 ifeq($(PLATFORM), Linux)
