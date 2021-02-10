@@ -25,6 +25,10 @@ use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use url::Url;
 
+////////////////////////////////////////////////////////////////////////////////
+// Miscellaneous useful functions.
+////////////////////////////////////////////////////////////////////////////////
+
 /// Aborts the program with a message on `stderr`.
 fn abort_with<T>(msg: T) -> !
 where
@@ -41,6 +45,14 @@ fn pretty_pathbuf(buf: PathBuf) -> String {
     } else {
         abort_with("Failed to pretty-print path.");
     }
+}
+
+/// Pretty-prints the SHA256 digest of the input `buf` into a lowercase
+/// hex-formatted string.
+fn pretty_digest(mut buf: &[u8]) -> String {
+    let digest = digest(&SHA256, &mut buf);
+
+    HEXLOWER.encode(digest.as_ref())
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -438,9 +450,7 @@ fn compute_program_hash(arguments: &Arguments) -> String {
 
         file.read_to_end(&mut buffer).expect("Failed to read file.");
 
-        let d = digest(&SHA256, &mut buffer);
-
-        HEXLOWER.encode(d.as_ref())
+        return pretty_digest(&mut buffer);
     } else {
         abort_with("Failed to open WASM program binary.");
     }
@@ -605,6 +615,10 @@ fn main() {
 
     if let Ok(mut file) = File::create(&arguments.output_policy_file) {
         if let Ok(json) = to_string_pretty(&serialize_json(&arguments)) {
+            println!(
+                "Writing JSON policy file with SHA256 hash {}.",
+                pretty_digest(&mut json.as_bytes())
+            );
             write!(file, "{}", json).expect("Failed to write file.");
             info!("JSON file written successfully.");
             exit(0);
