@@ -25,7 +25,7 @@ ifeq ($(PLATFORM), Darwin)
 	CERTIFICATE_EXPIRY := $(date -Rf +100d)
 endif
 
-ifeq($(PLATFORM), Linux)
+ifeq ($(PLATFORM), Linux)
 	CERTIFICATE_EXPIRY := $(date -d 'now + 100 days')
 endif
 
