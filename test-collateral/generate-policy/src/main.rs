@@ -17,7 +17,7 @@ use std::{
     str::FromStr,
 };
 
-use chrono::{Datelike, Duration, Timelike, Utc};
+use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use clap::{App, Arg};
 use data_encoding::HEXLOWER;
 use log::info;
@@ -72,9 +72,6 @@ const XXD_EXECUTABLE_NAME: &'static str = "xxd";
 /// The default filename of the output JSON policy file, if no alternative is
 /// provided on the command line.
 const DEFAULT_OUTPUT_FILENAME: &'static str = "output.json";
-/// The default expiry of the server certificate (measured in hours, from its
-/// creation) if no alternative is provided on the command line.
-const DEFAULT_CERTIFICATE_EXPIRY: i64 = 8;
 /// The default debug status of the Veracruz enclave, if no alternative is
 /// provided on the command line.
 const DEFAULT_DEBUG_STATUS: bool = false;
@@ -108,11 +105,8 @@ struct Arguments {
     pcr0_file: PathBuf,
     /// The filename of the output policy file.
     output_policy_file: PathBuf,
-    /// The expiry timepoint of the server certificate.  This is measured in
-    /// hours.  Represented as an `i64` as this is what the `chrono` library
-    /// expects.  We check that any value passed as an argument is positive,
-    /// however.
-    certificate_lifetime: i64,
+    /// The expiry timepoint of the server certificate.
+    certificate_expiry: Option<DateTime<FixedOffset>>,
     /// The data provisioning order.
     data_provisioning_order: Vec<i32>,
     /// The streaming provisioning order.
@@ -140,7 +134,7 @@ impl Arguments {
             css_file: PathBuf::new(),
             pcr0_file: PathBuf::new(),
             output_policy_file: PathBuf::new(),
-            certificate_lifetime: 0,
+            certificate_expiry: None,
             data_provisioning_order: Vec::new(),
             streaming_provisioning_order: Vec::new(),
             program_binary: PathBuf::new(),
@@ -175,7 +169,6 @@ fn check_roles(roles: &[Vec<String>]) {
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Arguments {
-    let default_expiry = DEFAULT_CERTIFICATE_EXPIRY.to_string();
     let default_debug = DEFAULT_DEBUG_STATUS.to_string();
 
     let matches = App::new(APPLICATION_NAME)
@@ -218,7 +211,7 @@ fn parse_command_line() -> Arguments {
         )
         .arg(
             Arg::with_name("css-file")
-                .short("j")
+                .short("b")
                 .long("css-file")
                 .value_name("FILE")
                 .help("Filename of the CSS file for the Mexico City enclave for SGX measurement.")
@@ -226,7 +219,7 @@ fn parse_command_line() -> Arguments {
         )
         .arg(
             Arg::with_name("pcr-file")
-                .short("p")
+                .short("l")
                 .long("pcr-file")
                 .value_name("FILE")
                 .help("Filename of the PCR0 file for the Mexico City enclave for AWS Nitro Enclave measurement.")
@@ -242,20 +235,19 @@ fn parse_command_line() -> Arguments {
                 .required(true),
         )
         .arg(
-            Arg::with_name("certificate-lifetime-in-hours")
-                .short("l")
-                .long("certificate-lifetime-in-hours")
-                .value_name("LIFETIME")
+            Arg::with_name("certificate-expiry")
+                .short("x")
+                .long("certificate-expiry")
+                .value_name("RFC2822 TIMEPOINT")
                 .help(
-                    "Describes the expiry lifetime of the server certificate, measured in \
-hours.",
+                    "The expiry point of the server certificate, expressed \
+as an RFC-2822 formatted timepoint.",
                 )
-                .default_value(&default_expiry)
                 .required(true),
         )
         .arg(
             Arg::with_name("data-provision-order")
-                .short("f")
+                .short("p")
                 .long("data-provision-order")
                 .value_name("ORDER")
                 .help("Specifies the data provisioning order.")
@@ -271,7 +263,7 @@ hours.",
         )
         .arg(
             Arg::with_name("binary")
-                .short("b")
+                .short("w")
                 .long("binary")
                 .value_name("FILE")
                 .help("Specifies the filename of the WASM binary to use for the computation.")
@@ -290,7 +282,7 @@ information to be produced by the executing WASM binary.",
         )
         .arg(
             Arg::with_name("execution-strategy")
-                .short("x")
+                .short("e")
                 .long("execution-strategy")
                 .help(
                     "Specifies whether to use interpretation or JIT execution for the WASM \
@@ -366,18 +358,14 @@ binary.",
         abort_with("No PCR0 file was passed as a command line parameter.");
     }
 
-    if let Some(lifetime) = matches.value_of("certificate-lifetime-in-hours") {
-        if let Ok(lifetime) = i64::from_str(lifetime) {
-            if lifetime < 0 {
-                abort_with("The certificate expiry point cannot be in the past.");
-            }
-            arguments.certificate_lifetime = lifetime;
+    if let Some(expiry) = matches.value_of("certificate-expiry") {
+        if let Ok(expiry) = DateTime::parse_from_rfc2822(expiry) {
+            arguments.certificate_expiry = Some(expiry);
         } else {
-            abort_with("The certificate lifetime argument could not be parsed.");
+            abort_with("The certificate expiry timepoint argument could not be parsed.");
         }
     } else {
-        info!("No certificate lifetime passed as an argument.  Using a default.");
-        arguments.certificate_lifetime = DEFAULT_CERTIFICATE_EXPIRY;
+        abort_with("No certificate lifetime passed as an argument.");
     }
 
     if let Some(data_provisioning_order) = matches.values_of("data-provision-order") {
@@ -563,9 +551,9 @@ fn serialize_identities(arguments: &Arguments) -> Value {
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
 fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
-    assert!(arguments.certificate_lifetime >= 0);
-
-    let expiry = Utc::now() + Duration::hours(arguments.certificate_lifetime);
+    let expiry = arguments
+        .certificate_expiry
+        .expect("Internal invariant failed: certificate lifetime is missing.");
 
     json!({
         "year": expiry.year(),
