@@ -12,7 +12,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{exit, Command},
     str::FromStr,
 };
@@ -24,6 +24,24 @@ use log::info;
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use url::Url;
+
+/// Aborts the program with a message on `stderr`.
+fn abort_with<T>(msg: T) -> !
+where
+    T: Into<String>,
+{
+    eprintln!("{}", msg.into());
+    exit(1);
+}
+
+/// Pretty-prints a `PathBuf`, aborting if this cannot be done.
+fn pretty_pathbuf(buf: PathBuf) -> String {
+    if let Ok(s) = buf.into_os_string().into_string() {
+        return s.clone();
+    } else {
+        abort_with("Failed to pretty-print path.");
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -73,7 +91,7 @@ const DEFAULT_EXECUTION_STRATEGY: &'static str = "Interpretation";
 struct Arguments {
     /// The filenames of cryptographic certificates associated to each principal
     /// in the computation.
-    certificates: Vec<String>,
+    certificates: Vec<PathBuf>,
     /// The roles associated to each principal in the computation.  Note that
     /// length of the two vectors, `certificates` and `roles`, must match as
     /// each certificate has an accompanying set of roles to form a compound
@@ -84,12 +102,12 @@ struct Arguments {
     /// The URL of the Tabasco instance.
     tabasco_url: Option<Url>,
     /// The filename of the Mexico City CSS file for SGX measurement.
-    css_file: String,
+    css_file: PathBuf,
     /// The filename of the Mexico City PRCR0 file for Nitro Enclave
     /// measurement.
-    pcr0_file: String,
+    pcr0_file: PathBuf,
     /// The filename of the output policy file.
-    output_policy_file: String,
+    output_policy_file: PathBuf,
     /// The expiry timepoint of the server certificate.  This is measured in
     /// hours.  Represented as an `i64` as this is what the `chrono` library
     /// expects.  We check that any value passed as an argument is positive,
@@ -100,7 +118,7 @@ struct Arguments {
     /// The streaming provisioning order.
     streaming_provisioning_order: Vec<i32>,
     /// The filename of the WASM program.
-    program_binary: String,
+    program_binary: PathBuf,
     /// The debug flag.
     debug: bool,
     /// Describes the execution strategy (interpretation or JIT) that will be
@@ -119,13 +137,13 @@ impl Arguments {
             roles: Vec::new(),
             sinaloa_url: None,
             tabasco_url: None,
-            css_file: String::new(),
-            pcr0_file: String::new(),
-            output_policy_file: String::new(),
+            css_file: PathBuf::new(),
+            pcr0_file: PathBuf::new(),
+            output_policy_file: PathBuf::new(),
             certificate_lifetime: 0,
             data_provisioning_order: Vec::new(),
             streaming_provisioning_order: Vec::new(),
-            program_binary: String::new(),
+            program_binary: PathBuf::new(),
             debug: false,
             execution_strategy: String::new(),
         }
@@ -138,8 +156,7 @@ fn check_execution_strategy(strategy: &str) {
     if strategy == "Interpretation" || strategy == "JIT" {
         return;
     } else {
-        eprintln!("Could not parse execution strategy argument.");
-        exit(1);
+        abort_with("Could not parse execution strategy argument.");
     }
 }
 
@@ -150,8 +167,7 @@ fn check_roles(roles: &[Vec<String>]) {
         v.iter()
             .all(|s| s == "ResultReceiver" || s == "DataProvider" || s == "ProgramProvider")
     }) {
-        eprintln!("Could not parse the role command line arguments.");
-        exit(1);
+        abort_with("Could not parse the role command line arguments.");
     }
 }
 
@@ -290,10 +306,9 @@ binary.",
     let mut arguments = Arguments::new();
 
     if let Some(certificates) = matches.values_of("certificate") {
-        arguments.certificates = certificates.map(|s| String::from(s)).collect();
+        arguments.certificates = certificates.map(|c| PathBuf::from(c)).collect();
     } else {
-        eprintln!("No certificates were passed as command line parameters.");
-        exit(-1);
+        abort_with("No certificates were passed as command line parameters.");
     }
 
     if let Some(roles) = matches.values_of("role") {
@@ -305,70 +320,60 @@ binary.",
 
         arguments.roles = roles;
     } else {
-        eprintln!("No roles were passed as command line parameters.");
-        exit(-1);
+        abort_with("No roles were passed as command line parameters.");
     }
 
     if arguments.certificates.len() != arguments.roles.len() {
-        eprintln!("The number of certificates and role attributes differ.");
-        exit(1)
+        abort_with("The number of certificates and role attributes differ.");
     }
 
     if let Some(url) = matches.value_of("sinaloa-url") {
         if let Ok(url) = Url::parse(url) {
             arguments.sinaloa_url = Some(url);
         } else {
-            eprintln!("Could not parse Sinaloa URL argument.");
-            exit(1);
+            abort_with("Could not parse Sinaloa URL argument.");
         }
     } else {
-        eprintln!("No Sinaloa URL was passed as a command line parameter.");
-        exit(1);
+        abort_with("No Sinaloa URL was passed as a command line parameter.");
     }
 
     if let Some(url) = matches.value_of("tabasco-url") {
         if let Ok(url) = Url::parse(url) {
             arguments.tabasco_url = Some(url);
         } else {
-            eprintln!("Could not parse Tabasco URL argument.");
-            exit(1);
+            abort_with("Could not parse Tabasco URL argument.");
         }
     } else {
-        eprintln!("No Tabasco URL was passed as a command line parameter.");
-        exit(1);
+        abort_with("No Tabasco URL was passed as a command line parameter.");
     }
 
     if let Some(fname) = matches.value_of("output-policy-file") {
-        arguments.output_policy_file = String::from(fname);
+        arguments.output_policy_file = PathBuf::from(fname);
     } else {
         info!("No output filename passed as an argument.  Using a default.");
-        arguments.output_policy_file = String::from(DEFAULT_OUTPUT_FILENAME);
+        arguments.output_policy_file = PathBuf::from(DEFAULT_OUTPUT_FILENAME);
     }
 
     if let Some(fname) = matches.value_of("css-file") {
-        arguments.css_file = String::from(fname);
+        arguments.css_file = PathBuf::from(fname);
     } else {
-        eprintln!("No CSS file was passed as a command line parameter.");
-        exit(1);
+        abort_with("No CSS file was passed as a command line parameter.");
     }
 
     if let Some(fname) = matches.value_of("pcr-file") {
-        arguments.pcr0_file = String::from(fname);
+        arguments.pcr0_file = PathBuf::from(fname);
     } else {
-        eprintln!("No PCR0 file was passed as a command line parameter.");
-        exit(1);
+        abort_with("No PCR0 file was passed as a command line parameter.");
     }
 
     if let Some(lifetime) = matches.value_of("certificate-lifetime-in-hours") {
         if let Ok(lifetime) = i64::from_str(lifetime) {
             if lifetime < 0 {
-                eprintln!("The certificate expiry point cannot be in the past.");
-                exit(1);
+                abort_with("The certificate expiry point cannot be in the past.");
             }
             arguments.certificate_lifetime = lifetime;
         } else {
-            eprintln!("The certificate lifetime argument could not be parsed.");
-            exit(1);
+            abort_with("The certificate lifetime argument could not be parsed.");
         }
     } else {
         info!("No certificate lifetime passed as an argument.  Using a default.");
@@ -382,8 +387,7 @@ binary.",
             if let Ok(i) = i32::from_str(value) {
                 parsed.push(i);
             } else {
-                eprintln!("Could not parse data provisioning order argument.");
-                exit(1);
+                abort_with("Could not parse data provisioning order argument.");
             }
         }
 
@@ -397,8 +401,7 @@ binary.",
             if let Ok(i) = i32::from_str(value) {
                 parsed.push(i);
             } else {
-                eprintln!("Could not parse streaming provisioning order argument.");
-                exit(1);
+                abort_with("Could not parse streaming provisioning order argument.");
             }
         }
 
@@ -406,18 +409,16 @@ binary.",
     }
 
     if let Some(binary) = matches.value_of("binary") {
-        arguments.program_binary = String::from(binary);
+        arguments.program_binary = PathBuf::from(binary);
     } else {
-        eprintln!("No program binary filename passed as an argument.");
-        exit(1);
+        abort_with("No program binary filename passed as an argument.");
     }
 
     if let Some(debug) = matches.value_of("debug") {
         if let Ok(debug) = bool::from_str(debug) {
             arguments.debug = debug;
         } else {
-            eprintln!("The debug flag could not be parsed.");
-            exit(1);
+            abort_with("The debug flag could not be parsed.");
         }
     } else {
         info!("No debug flag passed as an argument.  Using a default.");
@@ -453,8 +454,7 @@ fn compute_program_hash(arguments: &Arguments) -> String {
 
         HEXLOWER.encode(d.as_ref())
     } else {
-        eprintln!("Failed to open WASM program binary.");
-        exit(1);
+        abort_with("Failed to open WASM program binary.");
     }
 }
 
@@ -465,13 +465,12 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> String {
         if let Ok(output) = Command::new(DD_EXECUTABLE_NAME)
             .arg("skip=960")
             .arg("count=32")
-            .arg(format!("if={}", &arguments.css_file))
+            .arg(format!("if={}", pretty_pathbuf(arguments.css_file.clone())))
             .arg(format!("of={}", "hash.bin"))
             .output()
         {
             if !output.status.success() {
-                eprintln!("Invocation of 'dd' command failed.");
-                exit(1);
+                abort_with("Invocation of 'dd' command failed.");
             }
 
             if let Ok(hash_hex) = Command::new(XXD_EXECUTABLE_NAME)
@@ -482,8 +481,7 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> String {
                 .output()
             {
                 if !hash_hex.status.success() {
-                    eprintln!("Invocation of 'xxd' command failed.");
-                    exit(1);
+                    abort_with("Invocation of 'xxd' command failed.");
                 }
 
                 if let Ok(mut hash_hex) = String::from_utf8(hash_hex.stdout) {
@@ -491,20 +489,16 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> String {
 
                     return hash_hex;
                 } else {
-                    eprintln!("Failed to parse output of 'xxd'.");
-                    exit(1);
+                    abort_with("Failed to parse output of 'xxd'.");
                 }
             } else {
-                eprintln!("Incovation of 'xxd' command failed.");
-                exit(1);
+                abort_with("Invocation of 'xxd' command failed.");
             }
         } else {
-            eprintln!("Invocation of 'dd' command failed.");
-            exit(1);
+            abort_with("Invocation of 'dd' command failed.");
         }
     } else {
-        eprintln!("CSS.bin file cannot be opened.");
-        exit(1);
+        abort_with("CSS.bin file cannot be opened.");
     }
 }
 
@@ -521,8 +515,7 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> String {
 
         return content;
     } else {
-        eprintln!("Mexico City PCR0 file cannot be opened.");
-        exit(1);
+        abort_with("Mexico City PCR0 file cannot be opened.");
     }
 }
 
@@ -559,8 +552,7 @@ fn serialize_identities(arguments: &Arguments) -> Value {
 
             values.push(json);
         } else {
-            eprintln!("Could not open certificate file.");
-            exit(1);
+            abort_with("Could not open certificate file.");
         }
     }
 
@@ -573,8 +565,7 @@ fn serialize_identities(arguments: &Arguments) -> Value {
 fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
     assert!(arguments.certificate_lifetime >= 0);
 
-    let duration = Duration::hours(arguments.certificate_lifetime);
-    let expiry = Utc::now() + duration;
+    let expiry = Utc::now() + Duration::hours(arguments.certificate_lifetime);
 
     json!({
         "year": expiry.year(),
@@ -593,38 +584,20 @@ fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
 fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
-    let identities = serialize_identities(arguments);
-
-    let sinaloa_url = format!("{}", &arguments.sinaloa_url.as_ref().unwrap());
-    let tabasco_url = format!("{}", &arguments.tabasco_url.as_ref().unwrap());
-
-    let enclave_cert_expiry = serialize_enclave_certificate_expiry(arguments);
-    let ciphersuite = POLICY_CIPHERSUITE;
-
-    let data_provision_order = json!(&arguments.data_provisioning_order);
-    let streaming_order = json!(&arguments.streaming_provisioning_order);
-
-    let pi_hash = compute_program_hash(arguments);
-    let nitro_hash = compute_nitro_enclave_hash(arguments);
-    let sgx_hash = compute_sgx_enclave_hash(arguments);
-
-    let debug = &arguments.debug;
-    let execution_strategy = &arguments.execution_strategy;
-
     json!({
-        "identities": identities,
-        "sinaloa_url": sinaloa_url,
-        "enclave_cert_expiry": enclave_cert_expiry,
-        "ciphersuite": ciphersuite,
-        "tabasco_url": tabasco_url,
-        "data_provision_order": data_provision_order,
-        "streaming_order": streaming_order,
-        "pi_hash": pi_hash,
-        "debug": debug,
-        "execution_strategy": execution_strategy,
-        "mexico_city_hash_nitro": nitro_hash,
-        "mexico_city_hash_sgx": sgx_hash,
-        "mexico_city_hash_tz": sgx_hash,
+        "identities": serialize_identities(arguments),
+        "sinaloa_url": format!("{}", &arguments.sinaloa_url.as_ref().unwrap()),
+        "enclave_cert_expiry": serialize_enclave_certificate_expiry(arguments),
+        "ciphersuite": POLICY_CIPHERSUITE,
+        "tabasco_url": format!("{}", &arguments.tabasco_url.as_ref().unwrap()),
+        "data_provision_order": json!(&arguments.data_provisioning_order),
+        "streaming_order": json!(&arguments.streaming_provisioning_order),
+        "pi_hash": compute_program_hash(arguments),
+        "debug": &arguments.debug,
+        "execution_strategy": &arguments.execution_strategy,
+        "mexico_city_hash_nitro": compute_nitro_enclave_hash(arguments),
+        "mexico_city_hash_sgx": compute_sgx_enclave_hash(arguments),
+        "mexico_city_hash_tz": compute_sgx_enclave_hash(arguments),
     })
 }
 
@@ -637,7 +610,10 @@ fn serialize_json(arguments: &Arguments) -> Value {
 fn main() {
     let arguments = parse_command_line();
 
-    info!("Writing JSON file, {}.", arguments.output_policy_file);
+    info!(
+        "Writing JSON file, {}.",
+        pretty_pathbuf(arguments.output_policy_file.clone())
+    );
 
     if let Ok(mut file) = File::create(&arguments.output_policy_file) {
         if let Ok(json) = to_string_pretty(&serialize_json(&arguments)) {
@@ -645,11 +621,12 @@ fn main() {
             info!("JSON file written successfully.");
             exit(0);
         } else {
-            eprintln!("Failed to prettify serialized JSON.");
-            exit(1);
+            abort_with("Failed to prettify serialized JSON.");
         }
     } else {
-        eprintln!("Could not open file {}.", arguments.output_policy_file);
-        exit(1);
+        abort_with(format!(
+            "Could not open file {}.",
+            pretty_pathbuf(arguments.output_policy_file.clone())
+        ));
     }
 }
