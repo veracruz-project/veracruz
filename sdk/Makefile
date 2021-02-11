@@ -42,6 +42,9 @@ DATA = hello-world-1.dat \
  	   number-stream-1.dat \
 	   number-stream-2.dat \
 	   number-stream-init.dat \
+	   share-1.dat \
+	   share-2.dat \
+	   share-3.dat \
 	   idash2017/ \
 	   macd/ \
 	   private-set-inter-sum/ \
@@ -56,8 +59,8 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 	              private-set-intersection-sum-generator \
 	              string-generator \
 	              linear-regression-generator \
-	   	          number-stream-generator \
-	   	          image-processing-generator
+	   			  number-stream-generator \
+				  shamir-secret-sharing
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
@@ -81,6 +84,7 @@ $(addprefix $(DATASET_PATH),hello-world-1.dat hello-world-2.dat): %.dat : $$(add
 $(addprefix $(DATASET_PATH),intersection-advertisement-viewer.dat intersection-advertisement-customer.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/intersection-set-sum-generator/,Makefile src/main.rs)
 $(DATASET_PATH)linear-regression.dat: $$(addprefix $(DATA_GENERATORS_PATH)/linear-regression-generator/,Makefile src/main.rs)
 $(addprefix $(DATASET_PATH),private-set-1.dat private-set-2.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/private-set-intersection-generator/,Makefile src/main.rs $$(notdir %.csv))
+$(addprefix $(DATASET_PATH),share-1.dat share-2.dat share-3.dat): $(addprefix $(DATA_GENERATORS_PATH)/shamir-secret-sharing/,Makefile src/main.rs)
 $(DATASET_PATH)idash2017/: $$(addprefix $(DATA_GENERATORS_PATH)/idash2017-logistic-regression-generator/,Makefile src/main.rs)
 $(DATASET_PATH)macd/: $$(addprefix $(DATA_GENERATORS_PATH)/moving-average-convergence-divergence-generator/,Makefile src/main.rs)
 $(DATASET_PATH)private-set-inter-sum/: $$(addprefix $(DATA_GENERATORS_PATH)/private-set-intersection-sum-generator/,Makefile src/main.rs)

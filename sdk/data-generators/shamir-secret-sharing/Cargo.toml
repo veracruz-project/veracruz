@@ -1,0 +1,11 @@
+[package]
+name = "shamir-secret-sharing"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "A utility for generating secrets for Veracruz's Shamir secret sharing example."
+
+[dependencies]
+structopt = { version="0.3", features=["wrap_help"] }
+rand = "0.8.3"
+hex = "0.4"
