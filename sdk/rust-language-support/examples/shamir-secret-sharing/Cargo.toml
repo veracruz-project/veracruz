@@ -1,0 +1,18 @@
+[package]
+name = "shamir-secret-sharing"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Reconstruct a secret using Shamir's secret sharing scheme"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libveracruz = {path = "../../libveracruz"}
+hex = "0.4"
+
+[profile.release]
+opt-level = 3
+#lto = true
+codegen-units = 1
+
