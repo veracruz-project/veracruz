@@ -86,48 +86,48 @@ $(MEXICO_CITY_CSS_BIN):
 css.bin: $(MEXICO_CITY_CSS_BIN)
 	cp $< $@
 
-get_random_policy.json: css.bin client_rsa_cert.pem random-source.wasm
+get_random_policy.json: css.bin client_rsa_cert.pem random-source.wasm generate-policy
 	./pgen --certificate client_rsa_cert.pem --roles ProgramProvider,ResultReader \
                 --sinaloa-url 127.0.0.1:3011 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary random-source.wasm --debug-flag true --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-one_data_source_policy.json: css.bin client_rsa_cert.pem linear-regression.wasm
+one_data_source_policy.json: css.bin client_rsa_cert.pem linear-regression.wasm generate-policy
 	./pgen --data-provision-order 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3012 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary linear-regression.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-test_multiple_key_policy.json: css.bin client_rsa_cert.pem moving-average-convergence-divergence.wasm
+test_multiple_key_policy.json: css.bin client_rsa_cert.pem moving-average-convergence-divergence.wasm generate-policy
 	./pgen --data-provision-order 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3012 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary moving-average-convergence-divergence.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-two_data_source_string_edit_distance_policy.json: css.bin client_rsa_cert.pem string-edit-distance.wasm
+two_data_source_string_edit_distance_policy.json: css.bin client_rsa_cert.pem string-edit-distance.wasm generate-policy
 	./pgen --data-provision-order 0 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3013 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary string-edit-distance.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-two_data_source_intersection_set_policy.json: css.bin client_rsa_cert.pem intersection-set-sum.wasm
+two_data_source_intersection_set_policy.json: css.bin client_rsa_cert.pem intersection-set-sum.wasm generate-policy
 	./pgen --data-provision-order 0 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3022 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary intersection-set-sum.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-two_data_source_private_set_intersection_policy.json: css.bin client_rsa_cert.pem private-set-intersection.wasm
+two_data_source_private_set_intersection_policy.json: css.bin client_rsa_cert.pem private-set-intersection.wasm generate-policy
 	./pgen --data-provision-order 0 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3026 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary private-set-intersection.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-dual_policy.json: css.bin program_client_cert.pem data_client_cert.pem linear-regression.wasm
+dual_policy.json: css.bin program_client_cert.pem data_client_cert.pem linear-regression.wasm generate-policy
 	./pgen --data-provision-order 1 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider,ResultReader \
@@ -135,7 +135,7 @@ dual_policy.json: css.bin program_client_cert.pem data_client_cert.pem linear-re
 		--binary linear-regression.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-dual_parallel_policy.json: css.bin program_client_cert.pem data_client_cert.pem linear-regression.wasm
+dual_parallel_policy.json: css.bin program_client_cert.pem data_client_cert.pem linear-regression.wasm generate-policy
 	./pgen --data-provision-order 1 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider,ResultReader \
@@ -143,7 +143,7 @@ dual_parallel_policy.json: css.bin program_client_cert.pem data_client_cert.pem 
 		--binary linear-regression.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-triple_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem linear-regression.wasm
+triple_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem linear-regression.wasm generate-policy
 	./pgen --data-provision-order 1 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider,ResultReader \
@@ -152,7 +152,7 @@ triple_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_
 		--binary linear-regression.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-triple_parties_two_data_sources_sum_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm
+triple_parties_two_data_sources_sum_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm generate-policy
 	./pgen --data-provision-order 1 2 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider \
@@ -161,7 +161,7 @@ triple_parties_two_data_sources_sum_policy.json: css.bin program_client_cert.pem
 		--binary intersection-set-sum.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-permuted_triple_parties_two_data_sources_sum_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm
+permuted_triple_parties_two_data_sources_sum_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm generate-policy
 	./pgen --data-provision-order 1 2 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider \
@@ -170,7 +170,7 @@ permuted_triple_parties_two_data_sources_sum_policy.json: css.bin program_client
 		--binary intersection-set-sum.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-triple_parties_two_data_sources_string_edit_distance_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm
+triple_parties_two_data_sources_string_edit_distance_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm generate-policy
 	./pgen --data-provision-order 1 2 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider \
@@ -179,7 +179,7 @@ triple_parties_two_data_sources_string_edit_distance_policy.json: css.bin progra
 		--binary string-edit-distance.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-quadruple_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm
+quadruple_policy.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm generate-policy
 	./pgen --data-provision-order 1 2 \
 		--certificate program_client_cert.pem --roles ProgramProvider \
 		--certificate data_client_cert.pem --roles DataProvider \
@@ -189,35 +189,35 @@ quadruple_policy.json: css.bin program_client_cert.pem data_client_cert.pem resu
 		--binary string-edit-distance.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-invalid_policy/one_expired_data_source_policy.json: css.bin expired_cert.pem linear-regression.wasm
+invalid_policy/one_expired_data_source_policy.json: css.bin expired_cert.pem linear-regression.wasm generate-policy
 	./pgen --data-provision-order 0 \
 		--certificate expired_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3021 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary linear-regression.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-idash2017_logistic_regression_policy.json: css.bin client_rsa_cert.pem idash2017-logistic-regression.wasm
+idash2017_logistic_regression_policy.json: css.bin client_rsa_cert.pem idash2017-logistic-regression.wasm generate-policy
 	./pgen --data-provision-order 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3023 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary idash2017-logistic-regression.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-moving_average_convergence_divergence.json: css.bin client_rsa_cert.pem moving-average-convergence-divergence.wasm
+moving_average_convergence_divergence.json: css.bin client_rsa_cert.pem moving-average-convergence-divergence.wasm generate-policy
 	./pgen --data-provision-order 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3024 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary moving-average-convergence-divergence.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-private_set_intersection_sum.json: css.bin client_rsa_cert.pem private-set-intersection-sum.wasm
+private_set_intersection_sum.json: css.bin client_rsa_cert.pem private-set-intersection-sum.wasm generate-policy
 	./pgen --data-provision-order 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3025 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--binary private-set-intersection-sum.wasm --execution-strategy Interpretation \
 		--css-file $(MEXICO_CITY_CSS_BIN) --pcr-file $(MEXICO_CITY_PCR0)
 
-number-stream-accumulation.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem number-stream-accumulation.wasm
+number-stream-accumulation.json: css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem number-stream-accumulation.wasm generate-policy
 	./pgen --data-provision-order 0  --streaming-order 0 0 \
 		--certificate client_rsa_cert.pem --roles ProgramProvider,DataProvider,ResultReader \
 		--sinaloa-url 127.0.0.1:3026 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
