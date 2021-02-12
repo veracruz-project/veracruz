@@ -377,7 +377,7 @@ binary.",
     if let Some(fname) = matches.value_of("pcr-file") {
         arguments.pcr0_file = Some(PathBuf::from(fname));
     } else {
-        info!("No PCR0 file was passed as a command line parameter, Nitro hashes will not be computed.");
+        info!("No PCR0 file was passed as a command line parameter.  Nitro hashes will not be computed.");
     }
 
     if let Some(expiry) = matches.value_of("certificate-expiry") {
