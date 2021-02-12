@@ -443,6 +443,13 @@ binary.",
         arguments.execution_strategy = String::from(DEFAULT_EXECUTION_STRATEGY);
     }
 
+    if arguments.pcr0_file.is_none() && arguments.css_file.is_none() {
+        abort_with(
+            "Either the CSS.bin or the PCR0 file must be provided as a \
+command-line parameter.",
+        );
+    }
+
     info!("Successfully extracted command line arguments.");
 
     arguments
