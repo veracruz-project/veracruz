@@ -69,6 +69,7 @@ use std::{
     vec::Vec,
 };
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
+use crate::hcall::buffer::{VFS, VFSError};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Utility functions that don't fit elsewhere.
@@ -267,22 +268,15 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: Failed to sort the incoming data or incoming stream (this is a potential bug)."
     )]
     CannotSortDataOrStream,
+    #[error(
+        display = "HostProvisioningError: VFS Error {}.", _0
+    )]
+    VFSError(#[error(source)]VFSError),
     //TODO: potential remove this 
     #[error(
         display = "HostProvisioningError: File {} cannot be found.", _0
     )]
     FileNotFound(String),
-    #[error(
-        display = "HostProvisioningError: Principal or program {:?} cannot be found.",_0
-    )]
-    IndexNotFound(VeracruzCapabilityIndex),
-    #[error(
-        display = "HostProvisioningError: Client {:?} is disallowed to {:?}.",client_id,operation
-    )]
-    CapabilityDenial {
-        client_id: VeracruzCapabilityIndex,
-        operation : VeracruzCapability,
-    },
 }
 
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
@@ -334,9 +328,11 @@ pub struct HostProvisioningState<Module, Memory> {
     //NOTE: the following will move to an external component.
     //TODO: integrate into FS
     //      Index -> FilePath -> Capability
+    // REMOVE THIS
     capabilities: VeracruzCapabilityTable,
     //      Program_file_name -> Digest
     program_digests: HashMap<String, Vec<u8>>, 
+    vfs : VFS,
 }
 
 impl<Module, Memory> HostProvisioningState<Module, Memory> {
@@ -365,6 +361,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             expected_shutdown_sources: Vec::new(),
             capabilities: HashMap::new(),
             program_digests: HashMap::new(),
+            vfs: VFS::new(HashMap::new()),
         }
     }
 
@@ -373,7 +370,8 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         capabilities: &VeracruzCapabilityTable,
         program_digests: &HashMap<String, Vec<u8>>, 
     ) -> Self {
-        let mut capabilities = capabilities.clone();
+        let capabilities = capabilities.clone();
+        let capabilities_t = capabilities.clone();
         HostProvisioningState {
             data_sources: Vec::new(),
             expected_data_sources: Vec::new(),
@@ -389,34 +387,36 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             //capabilities: capabilities.clone(),
             capabilities,
             program_digests: program_digests.clone(),
+            vfs: VFS::new(capabilities_t),
         }
     }
 
-    // NOTE: the following will move to an external component.
-    /// Return Some(CapabilityFlags) if `id` has the permission 
-    /// to read, write and execute on the `file_name`.
-    /// Return None if `id` or `file_name` do not exist.
-    pub(crate) fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), HostProvisioningError> {
-        self.capabilities
-            .get(&VeracruzCapabilityIndex::Principal(0))
-            .ok_or(HostProvisioningError::IndexNotFound(id.clone()))?
-            .get(file_name)
-            .ok_or(HostProvisioningError::FileNotFound(file_name.to_string()))
-            .and_then(|p| {
-                if p.contains(cap) {
-                    Ok(())
-                } else {
-                    Err(HostProvisioningError::CapabilityDenial{
-                        client_id: id.clone(),
-                        operation: cap.clone(),
-                    })
-                }
-            })
-    }
+    //// NOTE: the following will move to an external component.
+    ///// Return Some(CapabilityFlags) if `id` has the permission 
+    ///// to read, write and execute on the `file_name`.
+    ///// Return None if `id` or `file_name` do not exist.
+    //pub(crate) fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), HostProvisioningError> {
+        //self.capabilities
+            //.get(id)
+            //.ok_or(HostProvisioningError::IndexNotFound(id.clone()))?
+            //.get(file_name)
+            //.ok_or(HostProvisioningError::FileNotFound(file_name.to_string()))
+            //.and_then(|p| {
+                //if p.contains(cap) {
+                    //Ok(())
+                //} else {
+                    //Err(HostProvisioningError::CapabilityDenial{
+                        //client_id: id.clone(),
+                        //operation: cap.clone(),
+                    //})
+                //}
+            //})
+    //}
 
     /// Append to a file.
     pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        self.vfs.write(file_name,data)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         if file_name.starts_with("input-") {
@@ -442,6 +442,8 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
 
     /// Read from a file
     pub(crate) fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Read)?;
+        self.vfs.read(file_name)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         if file_name.starts_with("output") {
@@ -452,7 +454,9 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     }
 
     /// Register program
-    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+    pub(crate) fn register_program_base(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        self.vfs.write(file_name,prog)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         Ok(())

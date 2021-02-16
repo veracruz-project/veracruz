@@ -170,8 +170,9 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> transport_protocol::Sg
 }
 
 /// Serialize a program binary.
-pub fn serialize_program(program_buffer: &[u8]) -> TransportProtocolResult {
+pub fn serialize_program(program_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
     let mut program = transport_protocol::Program::new();
+    program.set_file_name(file_name.to_string());
     program.set_code(program_buffer.to_vec());
     let mut abs = transport_protocol::RuntimeManagerRequest::new();
     abs.set_program(program);

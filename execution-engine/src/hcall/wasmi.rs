@@ -892,7 +892,7 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        //self.register_program(client_id, file_name, prog)?;
+        self.register_program_base(client_id,file_name,prog)?;
         self.load_program(prog)
     }
 

@@ -489,7 +489,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
-            &[("input-2", STRING_1_DATA), ("input-1", STRING_2_DATA)],
+            &[("input-1", STRING_1_DATA), ("input-0", STRING_2_DATA)],
             &[],
             false,
         );
@@ -1373,7 +1373,7 @@ mod tests {
 
         program_file.read_to_end(&mut program_text)?;
 
-        let serialized_program_text = transport_protocol::serialize_program(&program_text)?;
+        let serialized_program_text = transport_protocol::serialize_program(&program_text, Path::new(filename).file_name().unwrap().to_str().unwrap() )?;
         client_tls_send(
             client_tls_tx,
             client_tls_rx,
