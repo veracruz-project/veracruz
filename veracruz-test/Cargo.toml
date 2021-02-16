@@ -27,7 +27,7 @@ futures = "0.3"
 async-std = "1"
 pinecone = "0.2"
 env_logger = "0.7"
-log = "0.4"
+log = "=0.4.13"
 lazy_static = "1.4"
 err-derive = "0.2"
 
