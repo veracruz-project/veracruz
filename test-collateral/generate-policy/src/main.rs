@@ -12,6 +12,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
+    net::SocketAddr,
     path::{Path, PathBuf},
     process::{exit, Command},
     str::FromStr,
@@ -23,7 +24,6 @@ use data_encoding::HEXLOWER;
 use log::info;
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value, Value::String as JsonString};
-use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
@@ -96,7 +96,6 @@ const DEFAULT_EXECUTION_STRATEGY: &'static str = "Interpretation";
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A structure collating all of the arguments passed to the executable.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Arguments {
     /// The filenames of cryptographic certificates associated to each principal
     /// in the computation.
@@ -106,10 +105,10 @@ struct Arguments {
     /// each certificate has an accompanying set of roles to form a compound
     /// "identity".
     roles: Vec<Vec<String>>,
-    /// The URL of the Sinaloa instance.
-    sinaloa_url: Option<Url>,
-    /// The URL of the Tabasco instance.
-    tabasco_url: Option<Url>,
+    /// The socket address (IP and port) of the Sinaloa instance.
+    sinaloa_ip: Option<SocketAddr>,
+    /// The socket address (IP and port) of the Tabasco instance.
+    tabasco_ip: Option<SocketAddr>,
     /// The filename of the Mexico City CSS file for SGX measurement.  This is
     /// optional.
     css_file: Option<PathBuf>,
@@ -148,8 +147,8 @@ impl Arguments {
         Arguments {
             certificates: Vec::new(),
             roles: Vec::new(),
-            sinaloa_url: None,
-            tabasco_url: None,
+            sinaloa_ip: None,
+            tabasco_ip: None,
             css_file: None,
             pcr0_file: None,
             output_policy_file: PathBuf::new(),
@@ -213,19 +212,19 @@ fn parse_command_line() -> Arguments {
                 .multiple(true)
         )
         .arg(
-            Arg::with_name("sinaloa-url")
+            Arg::with_name("sinaloa-ip")
                 .short("s")
-                .long("sinaloa-url")
-                .value_name("URL")
-                .help("URL of the Sinaloa server.")
+                .long("sinaloa-ip")
+                .value_name("IP ADDRESS")
+                .help("IP address of the Sinaloa server.")
                 .required(true),
         )
         .arg(
-            Arg::with_name("tabasco-url")
+            Arg::with_name("tabasco-ip")
                 .short("t")
-                .long("tabasco-url")
-                .value_name("URL")
-                .help("URL of the Tabasco server.")
+                .long("tabasco-ip")
+                .value_name("IP ADDRESS")
+                .help("IP address of the Tabasco server.")
                 .required(true),
         )
         .arg(
@@ -339,24 +338,24 @@ binary.",
         abort_with("The number of certificates and role attributes differ.");
     }
 
-    if let Some(url) = matches.value_of("sinaloa-url") {
-        if let Ok(url) = Url::parse(url) {
-            arguments.sinaloa_url = Some(url);
+    if let Some(url) = matches.value_of("sinaloa-ip") {
+        if let Ok(url) = SocketAddr::from_str(url) {
+            arguments.sinaloa_ip = Some(url);
         } else {
-            abort_with("Could not parse Sinaloa URL argument.");
+            abort_with("Could not parse Sinaloa IP address argument.");
         }
     } else {
-        abort_with("No Sinaloa URL was passed as a command line parameter.");
+        abort_with("No Sinaloa IP address was passed as a command line parameter.");
     }
 
-    if let Some(url) = matches.value_of("tabasco-url") {
-        if let Ok(url) = Url::parse(url) {
-            arguments.tabasco_url = Some(url);
+    if let Some(url) = matches.value_of("tabasco-ip") {
+        if let Ok(url) = SocketAddr::from_str(url) {
+            arguments.tabasco_ip = Some(url);
         } else {
-            abort_with("Could not parse Tabasco URL argument.");
+            abort_with("Could not parse Tabasco IP address argument.");
         }
     } else {
-        abort_with("No Tabasco URL was passed as a command line parameter.");
+        abort_with("No Tabasco IP address was passed as a command line parameter.");
     }
 
     if let Some(fname) = matches.value_of("output-policy-file") {
@@ -613,10 +612,10 @@ fn serialize_json(arguments: &Arguments) -> Value {
 
     let mut base_json = json!({
         "identities": serialize_identities(arguments),
-        "sinaloa_url": format!("{}", &arguments.sinaloa_url.as_ref().unwrap()),
+        "sinaloa_url": format!("{}", &arguments.sinaloa_ip.as_ref().unwrap()),
         "enclave_cert_expiry": serialize_enclave_certificate_expiry(arguments),
         "ciphersuite": POLICY_CIPHERSUITE,
-        "tabasco_url": format!("{}", &arguments.tabasco_url.as_ref().unwrap()),
+        "tabasco_url": format!("{}", &arguments.tabasco_ip.as_ref().unwrap()),
         "data_provision_order": json!(&arguments.data_provisioning_order),
         "streaming_order": json!(&arguments.streaming_provisioning_order),
         "pi_hash": compute_program_hash(arguments),
