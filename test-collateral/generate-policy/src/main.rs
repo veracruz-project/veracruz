@@ -270,7 +270,6 @@ as an RFC-2822 formatted timepoint.",
                 .value_name("ORDER")
                 .help("Specifies the data provisioning order.")
                 .required(false)
-                .multiple(true)
         )
         .arg(
             Arg::with_name("stream-provision-order")
@@ -279,7 +278,6 @@ as an RFC-2822 formatted timepoint.",
                 .value_name("ORDER")
                 .help("Specifies the streaming provisioning order.")
                 .required(false)
-                .multiple(true)
         )
         .arg(
             Arg::with_name("binary")
@@ -391,32 +389,32 @@ binary.",
         abort_with("No certificate lifetime passed as an argument.");
     }
 
-    if let Some(data_provisioning_order) = matches.values_of("data-provision-order") {
-        let mut parsed = Vec::new();
+    if let Some(data_provisioning_order) = matches.value_of("data-provision-order") {
+        let mut items = Vec::new();
 
-        for value in data_provisioning_order {
-            if let Ok(i) = i32::from_str(value) {
-                parsed.push(i);
+        for item in data_provisioning_order.split(",") {
+            if let Ok(i) = i32::from_str(item) {
+                items.push(i);
             } else {
                 abort_with("Could not parse data provisioning order argument.");
             }
         }
 
-        arguments.data_provisioning_order = parsed;
+        arguments.data_provisioning_order = items;
     }
 
-    if let Some(streaming_provisioning_order) = matches.values_of("stream-provision-order") {
-        let mut parsed = Vec::new();
+    if let Some(streaming_provisioning_order) = matches.value_of("stream-provision-order") {
+        let mut items = Vec::new();
 
-        for value in streaming_provisioning_order {
-            if let Ok(i) = i32::from_str(value) {
-                parsed.push(i);
+        for item in streaming_provisioning_order.split(",") {
+            if let Ok(i) = i32::from_str(item) {
+                items.push(i);
             } else {
                 abort_with("Could not parse streaming provisioning order argument.");
             }
         }
 
-        arguments.streaming_provisioning_order = parsed;
+        arguments.streaming_provisioning_order = items;
     }
 
     if let Some(binary) = matches.value_of("binary") {
