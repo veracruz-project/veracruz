@@ -21,7 +21,7 @@ use std::{
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use clap::{App, Arg};
 use data_encoding::HEXLOWER;
-use log::info;
+use log::{error, info};
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value, Value::String as JsonString};
 
@@ -518,7 +518,9 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
             abort_with("Invocation of 'dd' command failed.");
         }
     } else {
-        abort_with("CSS.bin file cannot be opened.");
+        error!("Mexico City CSS.bin file cannot be opened.");
+        error!("Continuing on without computing an SGX hash.");
+        None
     }
 }
 
@@ -539,9 +541,11 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 
         content = content.replace("\n", "");
 
-        return Some(content);
+        Some(content)
     } else {
-        abort_with("Mexico City PCR0 file cannot be opened.");
+        error!("Mexico City PCR0 file cannot be opened.");
+        error!("Continuing on without computing a Nitro hash.");
+        None
     }
 }
 
