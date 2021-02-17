@@ -271,7 +271,6 @@ as an RFC-2822 formatted timepoint.",
                 .help("Specifies the data provisioning order.")
                 .required(false)
                 .multiple(true)
-                .use_delimiter(true)
         )
         .arg(
             Arg::with_name("stream-provision-order")
@@ -281,7 +280,6 @@ as an RFC-2822 formatted timepoint.",
                 .help("Specifies the streaming provisioning order.")
                 .required(false)
                 .multiple(true)
-                .use_delimiter(true)
         )
         .arg(
             Arg::with_name("binary")
