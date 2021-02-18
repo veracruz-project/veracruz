@@ -422,7 +422,7 @@ impl WasmiHostProvisioningState {
 
                         self.set_program_module(module_ref);
                         self.set_memory(linear_memory);
-                        self.set_program_digest(&sha_256_digest(buffer));
+                        //self.set_program_digest(&sha_256_digest(buffer));
 
                         if self.get_expected_data_source_count() == 0 {
                             if self.get_expected_stream_source_count() == 0 {

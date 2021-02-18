@@ -72,22 +72,10 @@ use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabi
 use crate::hcall::buffer::{VFS, VFSError};
 
 ////////////////////////////////////////////////////////////////////////////////
-// Utility functions that don't fit elsewhere.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Computes a SHA-256 digest of the bytes passed to it in `buffer`.
-///
-/// TODO: complete this.
-pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
-    ring::digest::digest(&ring::digest::SHA256, buffer)
-        .as_ref()
-        .to_vec()
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Metadata for data sources.
 ////////////////////////////////////////////////////////////////////////////////
 
+#[deprecated]
 /// A data source "frame" containing the data provisioned into the enclave, as
 /// well as some identifying metadata explaining where it came from.
 #[derive(Clone, Debug)]
@@ -100,6 +88,7 @@ pub struct DataSourceMetadata {
     package_id: u64,
 }
 
+#[deprecated]
 impl DataSourceMetadata {
     /// Creates a new `DataSourceMetadata` frame from a source of raw bytes, and
     /// client and package IDs.
@@ -131,6 +120,7 @@ impl DataSourceMetadata {
     }
 }
 
+#[deprecated]
 /// Pretty-printing for `DataSourceMetadata`.
 impl Display for DataSourceMetadata {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
@@ -299,13 +289,17 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
 // - program_module ? possibly can do on-demand allocation
 // in the favour of FS.
 pub struct HostProvisioningState<Module, Memory> {
+    //TODO REMOVE
     /// The data sources that have been provisioned into the machine.
     data_sources: Vec<DataSourceMetadata>,
+    //TODO REMOVE
     /// The stream sources that have been provisioned into the machine.
     stream_sources: Vec<DataSourceMetadata>,
+    //TODO REMOVE
     /// The expected list of data sources, derived from the global policy
     /// parameterising the computation.
     expected_data_sources: Vec<u64>,
+    //TODO REMOVE
     /// The expected list of stream sources, derived from the global policy
     /// parameterising the computation.
     expected_stream_sources: Vec<u64>,
@@ -314,24 +308,20 @@ pub struct HostProvisioningState<Module, Memory> {
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
     program_module: Option<Module>,
+    //TODO REMOVE
     /// The SHA-256 digest of the bytes of the loaded program, if any.
     program_digest: Option<Vec<u8>>,
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<Memory>,
+    //TODO REMOVE
     /// The result of the previous execution.
     previous_result: Option<Vec<u8>>,
+    //TODO REMOVE
     /// The result of the WASM program's computation on the input sources above.
     result: Option<Vec<u8>>,
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    //NOTE: the following will move to an external component.
-    //TODO: integrate into FS
-    //      Index -> FilePath -> Capability
-    // REMOVE THIS
-    capabilities: VeracruzCapabilityTable,
-    //      Program_file_name -> Digest
-    program_digests: HashMap<String, Vec<u8>>, 
     vfs : VFS,
 }
 
@@ -359,19 +349,15 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             previous_result: None,
             result: None,
             expected_shutdown_sources: Vec::new(),
-            capabilities: HashMap::new(),
-            program_digests: HashMap::new(),
-            vfs: VFS::new(HashMap::new()),
+            vfs: VFS::new(&HashMap::new(),&HashMap::new()),
         }
     }
 
     //TODO: THIS will replace the use of `new` in the future commits.
     pub fn valid_new(expected_shutdown_sources: &[u64], 
         capabilities: &VeracruzCapabilityTable,
-        program_digests: &HashMap<String, Vec<u8>>, 
+        digests: &HashMap<String, Vec<u8>>, 
     ) -> Self {
-        let capabilities = capabilities.clone();
-        let capabilities_t = capabilities.clone();
         HostProvisioningState {
             data_sources: Vec::new(),
             expected_data_sources: Vec::new(),
@@ -384,34 +370,9 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             previous_result: None,
             result: None,
             expected_shutdown_sources : expected_shutdown_sources.to_vec(),
-            //capabilities: capabilities.clone(),
-            capabilities,
-            program_digests: program_digests.clone(),
-            vfs: VFS::new(capabilities_t),
+            vfs: VFS::new(capabilities,digests),
         }
     }
-
-    //// NOTE: the following will move to an external component.
-    ///// Return Some(CapabilityFlags) if `id` has the permission 
-    ///// to read, write and execute on the `file_name`.
-    ///// Return None if `id` or `file_name` do not exist.
-    //pub(crate) fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), HostProvisioningError> {
-        //self.capabilities
-            //.get(id)
-            //.ok_or(HostProvisioningError::IndexNotFound(id.clone()))?
-            //.get(file_name)
-            //.ok_or(HostProvisioningError::FileNotFound(file_name.to_string()))
-            //.and_then(|p| {
-                //if p.contains(cap) {
-                    //Ok(())
-                //} else {
-                    //Err(HostProvisioningError::CapabilityDenial{
-                        //client_id: id.clone(),
-                        //operation: cap.clone(),
-                    //})
-                //}
-            //})
-    //}
 
     /// Append to a file.
     pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
