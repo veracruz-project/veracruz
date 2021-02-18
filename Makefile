@@ -42,9 +42,13 @@ docker: Dockerfile
 update:
 	west update
 
+# TODO move these into west?
+policy.h policy.c: policy.json
+	./policy_to_header.py $< policy.h policy.c
+
 .DEFAULT_GOAL :=
 .PHONY: build
-build:
+build: policy.h policy.c
 	west build -p auto -b qemu_cortex_m3
 
 .PHONY: clean
