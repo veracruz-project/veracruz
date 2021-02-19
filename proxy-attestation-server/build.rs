@@ -1,4 +1,4 @@
-//! Tabasco build script
+//! Veracruz proxy attestation server build script
 //!
 //! ## Authors
 //!
@@ -21,7 +21,7 @@ fn main() {
 
         // Destroy, and then re-create and repopulate, the database
         Command::new("bash")
-            .args(&["./populate_test_database.sh"])
+            .args(&["./populate-test-database.sh"])
             .output()
             .unwrap();
     }

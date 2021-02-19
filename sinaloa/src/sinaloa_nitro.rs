@@ -48,7 +48,7 @@ pub mod sinaloa_nitro {
                         .mexico_city_hash(&EnclavePlatform::Nitro)
                         .map_err(|err| SinaloaError::VeracruzUtilError(err))?;
                     let nre_context =
-                        SinaloaNitro::native_attestation(&policy.tabasco_url(), &mexico_city_hash)?;
+                        SinaloaNitro::native_attestation(&policy.proxy_attestation_server_url(), &mexico_city_hash)?;
                     *nre_guard = Some(nre_context);
                 }
             }
@@ -329,7 +329,7 @@ pub mod sinaloa_nitro {
         }
 
         fn native_attestation(
-            tabasco_url: &str,
+            proxy_attestation_server_url: &str,
             _mexico_city_hash: &str,
             //) -> Result<NitroEnclave, SinaloaError> {
         ) -> Result<EC2Instance, SinaloaError> {
@@ -357,12 +357,12 @@ pub mod sinaloa_nitro {
             #[cfg(feature = "debug")]
             let server_command: String = format!(
                 "nohup /home/ec2-user/nitro-root-enclave-server --debug {:} &> nitro_server.log &",
-                tabasco_url
+                proxy_attestation_server_url
             );
             #[cfg(not(feature = "debug"))]
             let server_command: String = format!(
                 "nohup /home/ec2-user/nitro-root-enclave-server {:} &> nitro_server.log &",
-                tabasco_url
+                proxy_attestation_server_url
             );
             nre_instance
                 .execute_command(&server_command)

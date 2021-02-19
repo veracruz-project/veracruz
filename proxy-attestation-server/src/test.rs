@@ -1,4 +1,4 @@
-//! Tabasco-specific tests
+//! Tests specified to the Veracruz proxy attestation service
 //!
 //! ## Authors
 //!
@@ -231,7 +231,7 @@ fn test_psa_attestation() {
 
     let url = "127.0.0.1:3016/VerifyPAT";
     let received_buffer =
-        post_buffer(&url, &encoded_token).expect("Failed to send buffer to Tabasco server");
+        post_buffer(&url, &encoded_token).expect("Failed to send buffer to proxy attestation server");
 }
 
 static SETUP: Once = Once::new();
@@ -245,7 +245,7 @@ fn send_sgx_start(url_base: &str, protocol: &str, firmware_version: &str) -> (Ve
     let serialized_start_msg = colima::serialize_start_msg(protocol, firmware_version);
     let encoded_start_msg = base64::encode(&serialized_start_msg);
     println!(
-        "tabasco::test::send_sgx_start encoded_start_msg:{:?}",
+        "proxy-attestation-server::test::send_sgx_start encoded_start_msg:{:?}",
         encoded_start_msg
     );
 

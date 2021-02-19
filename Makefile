@@ -154,7 +154,7 @@ clean:
 	cd mexico-city-bind && cargo clean 
 	cd sonora-bind && cargo clean
 	cd psa-attestation && cargo clean
-	cd tabasco && cargo clean
+	cd proxy-attestation-server && cargo clean
 	cd baja && cargo clean
 	cd veracruz-utils && cargo clean
 	cd sinaloa-test && cargo clean
@@ -171,7 +171,7 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,baja execution-engine colima durango jalisco mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora tabasco veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,baja execution-engine colima durango jalisco mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd baja && cargo fmt
@@ -186,5 +186,5 @@ fmt:
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
 	cd sonora && cargo fmt
-	cd tabasco && cargo fmt
+	cd proxy-attestation-server && cargo fmt
 	$(MAKE) -C sdk fmt

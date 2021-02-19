@@ -1,4 +1,4 @@
-//! AWS Nitro specific material for Tabasco
+//! AWS Nitro specific material for the Veracruz proxy attestation server
 //!
 //! ## Authors
 //!
@@ -81,7 +81,7 @@ lazy_static! {
 /// Start the Nitro enclave attestation process for an enclave with the
 /// provided firmware version and the provided `device_id`.
 /// Note that this is the `device_id` we sent with the challenge.
-pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
+pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerResponder {
     let mut challenge: [u8; 32] = [0; 32];
     let mut rng = rand::thread_rng();
 
@@ -101,25 +101,25 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
 }
 
 /// Handle an attestation token passed to us in the `body_string` parameter
-pub fn attestation_token(body_string: String) -> TabascoResponder {
+pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder {
 
     let received_bytes = base64::decode(&body_string)
         .map_err(|err| {
-            println!("tabasco::attestation::nitro::attestation_token failed to decode base64:{:?}", err);
+            println!("proxy-attestation-server::attestation::nitro::attestation_token failed to decode base64:{:?}", err);
             let _ignore = std::io::stdout().flush();
             err
         })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)
+    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
-            println!("tabasco::attestation::nitro::attestation_token failed to parse tabasco request:{:?}", err);
+            println!("proxy-attestation-server::attestation::nitro::attestation_token failed to parse proxy attestation server request:{:?}", err);
             let _ignore = std::io::stdout().flush();
             err
         })?;
     if !parsed.has_native_psa_attestation_token() {
-        println!("tabasco::attestation::psa::attestation_token received data is incorrect.");
+        println!("proxy-attestation-server::attestation::psa::attestation_token received data is incorrect.");
         let _ignore = std::io::stdout().flush();
-        return Err(TabascoError::MissingFieldError(
+        return Err(ProxyAttestationServerError::MissingFieldError(
             "native_psa_attestation_token",
         ));
     }
@@ -127,15 +127,15 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
         colima::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
 
     let attestation_document = NitroToken::authenticate_token(&token, &AWS_NITRO_ROOT_CERTIFICATE).map_err(|err| {
-        println!("Tabasco::nitro::attestation_token authenticate_token failed:{:?}", err);
+        println!("proxy-attestation-server::nitro::attestation_token authenticate_token failed:{:?}", err);
         let _ignore = std::io::stdout().flush();
-        TabascoError::CborError(format!("parse_nitro_token failed to parse token data:{:?}", err))
+        ProxyAttestationServerError::CborError(format!("parse_nitro_token failed to parse token data:{:?}", err))
     })?;
 
     let attestation_context = {
         let ac_hash = ATTESTATION_CONTEXT.lock()
             .map_err(|err| {
-                println!("Tabasco::nitro::attestation_token failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                println!("proxy-attestation-server::nitro::attestation_token failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                 let _ignore = std::io::stdout().flush();
                 err
             })?;
@@ -144,24 +144,24 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
             let context = &ac_hash[&device_id];
             context.clone()
         } else {
-            println!("Tabasco::nitro::attestation_token device not found. device_id:{:?}", device_id);
+            println!("proxy-attestation-server::nitro::attestation_token device not found. device_id:{:?}", device_id);
             let _ignore = std::io::stdout().flush();
-            return Err(TabascoError::NoDeviceError(device_id));
+            return Err(ProxyAttestationServerError::NoDeviceError(device_id));
         }
     };
 
     // check the nonce of the attestation document
     match attestation_document.nonce {
         None => {
-            println!("tabasco::attestation::nitro::attestation_token attestation document did not contain a nonce. We require it.");
+            println!("proxy-attestation-server::attestation::nitro::attestation_token attestation document did not contain a nonce. We require it.");
             let _ignore = std::io::stdout().flush();
-            return Err(TabascoError::MissingFieldError("nonce"));
+            return Err(ProxyAttestationServerError::MissingFieldError("nonce"));
         },
         Some(nonce) => {
             if nonce != attestation_context.challenge {
                 println!("Challenge failed to match. Wanted:{:02x?}, got:{:02x?}", nonce, attestation_context.challenge);
                 let _ignore = std::io::stdout().flush();
-                return Err(TabascoError::MismatchError {
+                return Err(ProxyAttestationServerError::MismatchError {
                     variable: "nonce/challenge",
                     expected: attestation_context.challenge.to_vec(),
                     received: nonce,
@@ -179,15 +179,15 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
             &attestation_context.firmware_version,
         )
             .map_err(|err| {
-                println!("tabasco::attestation::nitro::attestation_token get_firmware_version_hash failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::nitro::attestation_token get_firmware_version_hash failed:{:?}", err);
                 let _ignore = std::io::stdout().flush();
                 err
             })?;
         match hash_option {
             None => {
-                println!("tabasco::attestation::nitro_attestation_token firmware version hash not found in database");
+                println!("proxy-attestation-server::attestation::nitro_attestation_token firmware version hash not found in database");
                 let _ignore = std::io::stdout().flush();
-                return Err(TabascoError::MissingFieldError("firmware version"));
+                return Err(ProxyAttestationServerError::MissingFieldError("firmware version"));
             },
             Some(hash) => hash,
         }
@@ -199,10 +199,10 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
             println!("This is debug mode, so this is expected, so we're not going to fail you, but you should feel bad.");
             let _ignore = std::io::stdout().flush();
         } else {
-            println!("tabasco::attestation::nitro_attestation_token debug mode is off, so we're gonna return an error for this mismatch");
+            println!("proxy-attestation-server::attestation::nitro_attestation_token debug mode is off, so we're gonna return an error for this mismatch");
             let _ignore = std::io::stdout().flush();
 
-            return Err(TabascoError::MismatchError {
+            return Err(ProxyAttestationServerError::MismatchError {
                 variable: "received_enclave_hash",
                 expected: expected_enclave_hash,
                 received: received_enclave_hash.to_vec(),
@@ -213,7 +213,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
     let digest = match attestation_document.public_key {
         Some(public_key) => ring::digest::digest(&ring::digest::SHA256, &public_key),
         None => {
-            return Err(TabascoError::MissingFieldError("public_key"));
+            return Err(ProxyAttestationServerError::MissingFieldError("public_key"));
         },
     };
     let pubkey_hash = digest.as_ref();

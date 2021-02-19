@@ -1,4 +1,4 @@
-//! The ORM library
+//! The ORM library for the Veracruz proxy attestation server database
 //!
 //! ## Authors
 //!
@@ -12,7 +12,7 @@
 pub mod models;
 pub mod schema;
 
-use crate::error::TabascoError;
+use crate::error::ProxyAttestationServerError;
 use diesel::{
     prelude::SqliteConnection, update, Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
@@ -23,7 +23,7 @@ use schema::devices;
 use schema::firmware_versions;
 use std::env;
 
-pub fn establish_connection() -> Result<SqliteConnection, TabascoError> {
+pub fn establish_connection() -> Result<SqliteConnection, ProxyAttestationServerError> {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -35,7 +35,7 @@ pub fn update_or_create_device<'a>(
     device_id: i32,
     pubkey_hash: &Vec<u8>,
     enclave_name: String,
-) -> Result<(), TabascoError> {
+) -> Result<(), ProxyAttestationServerError> {
     let encoded_hash = hex::encode(pubkey_hash);
     // first see if it already exists
     //let existing_device_id = devices::table.find(devices::addr.eq(addr)).select(devices::id).first(&conn).unwrap();
@@ -73,7 +73,7 @@ pub fn update_or_create_device<'a>(
     }
 }
 
-pub fn query_device<'a>(conn: &SqliteConnection, device_id: i32) -> Result<Vec<u8>, TabascoError> {
+pub fn query_device<'a>(conn: &SqliteConnection, device_id: i32) -> Result<Vec<u8>, ProxyAttestationServerError> {
     let hashes: Vec<String> = devices::table
         .filter(devices::device_id.eq(device_id))
         .select(devices::pubkey_hash)
@@ -86,20 +86,20 @@ pub fn get_firmware_version_hash<'a>(
     conn: &SqliteConnection,
     protocol: &String,
     version: &String,
-) -> Result<Option<Vec<u8>>, TabascoError> {
+) -> Result<Option<Vec<u8>>, ProxyAttestationServerError> {
     let hashes: Vec<String> = firmware_versions::table
         .filter(firmware_versions::protocol.eq(protocol))
         .filter(firmware_versions::version_num.eq(version))
         .select(firmware_versions::hash)
         .load(conn)
             .map_err(|err| {
-                println!("tabasco::orm::get_firmware_version_hash failed to query table:{:?}", err);
+                println!("proxy-attestation-server::orm::get_firmware_version_hash failed to query table:{:?}", err);
                 err
             })?;
 
     let hash_vec = hex::decode(hashes[0].to_owned())
         .map_err(|err| {
-            println!("tabasco::orm::get_firmware_version_hash failed to decode contents:{:?}", err);
+            println!("proxy-attestation-server::orm::get_firmware_version_hash failed to decode contents:{:?}", err);
             err
         })?;
 

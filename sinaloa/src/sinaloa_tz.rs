@@ -51,7 +51,7 @@ pub mod sinaloa_tz {
                 if !*ji_guard {
                     debug!("Jalisco is uninitialized.");
                     SinaloaTZ::native_attestation(
-                        &policy.tabasco_url(),
+                        &policy.proxy_attestation_server_url(),
                         jalisco_uuid,
                         &mexico_city_hash,
                     )?;
@@ -320,7 +320,7 @@ pub mod sinaloa_tz {
         }
 
         fn native_attestation(
-            tabasco_url: &String,
+            proxy_attestation_server_url: &String,
             jalisco_uuid: Uuid,
             mexico_city_hash: &String,
         ) -> Result<(), SinaloaError> {
@@ -340,7 +340,7 @@ pub mod sinaloa_tz {
                     .invoke_command(JaliscoOpcode::SetMexicoCityHashHack as u32, &mut operation)?;
             }
             let (challenge, device_id) =
-                SinaloaTZ::send_start(tabasco_url, "psa", &firmware_version)?;
+                SinaloaTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
 
             let p0 = ParamValue::new(device_id.try_into()?, 0, ParamType::ValueInout);
             let p1 = ParamTmpRef::new_input(&challenge);
@@ -356,21 +356,21 @@ pub mod sinaloa_tz {
             let token_vec: Vec<u8> = token[0..token_size as usize].to_vec();
             unsafe { public_key.set_len(public_key_size as usize) };
 
-            SinaloaTZ::post_native_psa_attestation_token(tabasco_url, &token_vec, device_id)?;
+            SinaloaTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token_vec, device_id)?;
             debug!("sinaloa_tz::native_attestation returning Ok");
             return Ok(());
         }
 
         fn post_native_psa_attestation_token(
-            tabasco_url: &String,
+            proxy_attestation_server_url: &String,
             token: &Vec<u8>,
             device_id: i32,
         ) -> Result<(), SinaloaError> {
             debug!("sinaloa_tz::post_psa_attestation_token started");
-            let serialized_tabasco_request =
+            let proxy_attestation_server_request =
                 colima::serialize_native_psa_attestation_token(token, device_id)?;
-            let encoded_str = base64::encode(&serialized_tabasco_request);
-            let url = format!("{:}/PSA/AttestationToken", tabasco_url);
+            let encoded_str = base64::encode(&proxy_attestation_server_request);
+            let url = format!("{:}/PSA/AttestationToken", proxy_attestation_server_url);
             let response = crate::post_buffer(&url, &encoded_str)?;
 
             debug!(
@@ -404,15 +404,15 @@ pub mod sinaloa_tz {
             protocol: &str,
             firmware_version: &str,
         ) -> Result<(Vec<u8>, i32), SinaloaError> {
-            let tabasco_response = crate::send_tabasco_start(url_base, protocol, firmware_version)?;
-            if tabasco_response.has_psa_attestation_init() {
+            let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version?;
+            if proxy_attestation_server_response.has_psa_attestation_init() {
                 let (challenge, device_id) = colima::parse_psa_attestation_init(
-                    tabasco_response.get_psa_attestation_init(),
+                    proxy_attestation_server_response.get_psa_attestation_init(),
                 )?;
                 Ok((challenge, device_id))
             } else {
                 Err(SinaloaError::MissingFieldError(
-                    "tabasco_response psa_attestation_init",
+                    "proxy_attestation_server_response psa_attestation_init",
                 ))
             }
         }

@@ -1,4 +1,4 @@
-//! Intel SGX Attestation (EPID)-specific material
+//! Intel SGX Attestation (EPID)-specific material for the Veracruz proxy attestation server
 //!
 //! ## Authors
 //!
@@ -51,21 +51,21 @@ lazy_static! {
 static QUOTE_TYPE: u16 = 1; //SAMPLE_QUOTE_LINKABLE_SIGNATURE
                             //static QUOTE_TYPE = 0;      //SAMPLE_QUOTE_UNLINKABLE_SIGNATURE
 
-pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
+pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerResponder {
     let sgx_ecc_handle = SgxEccHandle::new();
     sgx_ecc_handle.open()
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::start failed to open sgx_ecc_handle:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::start failed to open sgx_ecc_handle:{:?}", err);
             err
         })?;
     let (private_key, public_key) = sgx_ecc_handle.create_key_pair()
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::start failed to create key pair:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::start failed to create key pair:{:?}", err);
             err
         })?;
     sgx_ecc_handle.close()
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::start failed to close sgx_ecc_Handle:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::start failed to close sgx_ecc_Handle:{:?}", err);
             err
         })?;
 
@@ -86,7 +86,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
         };
         let mut ac_hash = ATTESTATION_CONTEXT.lock()
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::start failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::start failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                 err
             })?;
         ac_hash.insert(device_id, attestation_context);
@@ -94,26 +94,26 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
     let serialized_attestation_init =
         colima::serialize_sgx_attestation_init(&serialized_pubkey, device_id)
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::start serialize_sgx_attestation_init failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::start serialize_sgx_attestation_init failed:{:?}", err);
                 err
             })?;
     Ok(base64::encode(&serialized_attestation_init))
 }
 
-pub fn msg1(body_string: String) -> TabascoResponder {
+pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::msg1 failed to decode body_string as base64:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg1 failed to decode body_string as base64:{:?}", err);
             err
         })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)
+    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::msg1 failed to parse_tabasco_request:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg1 failed to parse_proxy_attestation_server_request:{:?}", err);
             err
         })?;
     if !parsed.has_msg1() {
-        return Err(TabascoError::MissingFieldError("msg1"));
+        return Err(ProxyAttestationServerError::MissingFieldError("msg1"));
     }
     let (context, msg1, device_id) = colima::parse_msg1(&parsed);
     let (msg2, pubkey_challenge) = {
@@ -124,21 +124,21 @@ pub fn msg1(body_string: String) -> TabascoResponder {
         let sgx_ecc_handle = SgxEccHandle::new();
         sgx_ecc_handle.open()
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg1 failed to open sgx_ecc_handle:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg1 failed to open sgx_ecc_handle:{:?}", err);
                 err
             })?;
         let (private_key, public_key) = {
             let mut ac_hash = ATTESTATION_CONTEXT.lock()
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg1 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg1 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                     err
                 })?;
 
             let attestation_context = ac_hash
                 .get_mut(&device_id)
-                .ok_or(TabascoError::NoDeviceError(device_id)) 
+                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id)) 
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg1 NoDeviceError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg1 NoDeviceError:{:?}", err);
                     err
                 })?;
             (
@@ -149,30 +149,30 @@ pub fn msg1(body_string: String) -> TabascoResponder {
         let dh_key = sgx_ecc_handle.compute_shared_dhkey(&private_key, &msg1.g_a)?;
         sgx_ecc_handle.close()
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg1 failed to close sgx_ecc_handle:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg1 failed to close sgx_ecc_handle:{:?}", err);
                 err
             })?;
         let (smk, vk) = generate_sgx_symmetric_keys(&dh_key)
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg1 generate_sgx_symmetric_keys failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg1 generate_sgx_symmetric_keys failed:{:?}", err);
                 err
             })?;
         let msg2 = proc_msg1(&msg1, &smk, &private_key, &public_key)
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg1 proc_msg1 failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg1 proc_msg1 failed:{:?}", err);
                 err
             })?;
         {
             let mut ac_hash = ATTESTATION_CONTEXT.lock()
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg1 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg1 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                     err
                 })?;
             let mut attestation_context = ac_hash
                 .get_mut(&device_id)
-                .ok_or(TabascoError::NoDeviceError(device_id))
+                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg1 NoDeviceError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg1 NoDeviceError:{:?}", err);
                     err
                 })?;
 
@@ -188,47 +188,47 @@ pub fn msg1(body_string: String) -> TabascoResponder {
     let serialized_challenge =
         colima::serialize_sgx_attestation_challenge(context, &msg2, &pubkey_challenge)
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::msg1 serialize_sgx_attestation_challenge failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg1 serialize_sgx_attestation_challenge failed:{:?}", err);
             err
         })?;
 
     Ok(base64::encode(&serialized_challenge))
 }
 
-pub fn msg3(body_string: String) -> TabascoResponder {
+pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::msg3 base64 decode ov body_string failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg3 base64 decode ov body_string failed:{:?}", err);
             err
         })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)
+    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::msg3 parse_tabasco_request failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg3 parse_proxy_attestation_server_request failed:{:?}", err);
             err
         })?;
     if !parsed.has_sgx_attestation_tokens() {
         println!("received data is incorrect. TODO: Handle this");
-        return Err(TabascoError::NoSGXAttestationTokenError);
+        return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
     }
     let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_sig, device_id) =
         colima::parse_attestation_tokens(&parsed)
         .map_err(|err| {
-            println!("tabasco::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
             err
         })?;
     {
         let attestation_context = {
             let ac_hash = ATTESTATION_CONTEXT.lock()
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                     err
                 })?;
             let context = ac_hash
                 .get(&device_id)
-                .ok_or(TabascoError::NoDeviceError(device_id))
+                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 NoDeviceError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
                     err
                 })?;
             (*context).clone()
@@ -237,7 +237,7 @@ pub fn msg3(body_string: String) -> TabascoResponder {
         let expected_enclave_hash = {
             let connection = crate::orm::establish_connection()
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 establish_connection failed:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
                     err
                 })?;
             crate::orm::get_firmware_version_hash(
@@ -246,12 +246,12 @@ pub fn msg3(body_string: String) -> TabascoResponder {
                 &attestation_context.firmware_version,
             )
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg3 get_firmware_version_hash failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg3 get_firmware_version_hash failed:{:?}", err);
                 err
             })?
-            .ok_or(TabascoError::MissingFieldError("firmware version"))
+            .ok_or(ProxyAttestationServerError::MissingFieldError("firmware version"))
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                 err
             })?
         };
@@ -259,16 +259,16 @@ pub fn msg3(body_string: String) -> TabascoResponder {
         let msg3_epid_pseudonym = authenticate_msg3(
             &attestation_context
                 .msg1
-                .ok_or(TabascoError::MissingFieldError("attestation_context.msg1"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg1"))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                     err
                 })?,
             &attestation_context
                 .msg2
-                .ok_or(TabascoError::MissingFieldError("attestation_context.msg2"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg2"))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                     err
                 })?,
             &msg3,
@@ -276,16 +276,16 @@ pub fn msg3(body_string: String) -> TabascoResponder {
             &msg3_sig,
             &attestation_context
                 .smk
-                .ok_or(TabascoError::MissingFieldError("attestation_context.smk"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.smk"))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                     err
                 })?,
             &attestation_context
                 .vk
-                .ok_or(TabascoError::MissingFieldError("attestation_context.vk"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.vk"))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                     err
                 })?,
             &expected_enclave_hash,
@@ -294,9 +294,9 @@ pub fn msg3(body_string: String) -> TabascoResponder {
         let (pubkey_epid_pseudonym, pubkey_hash, enclave_name) = authenticate_pubkey_quote(
             &attestation_context
                 .pubkey_challenge
-                .ok_or(TabascoError::MissingFieldError("pubkey_challenge"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
                 .map_err(|err| {
-                    println!("tabasco::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                     err
                 })?,
             &pubkey_quote,
@@ -305,7 +305,7 @@ pub fn msg3(body_string: String) -> TabascoResponder {
 
         if pubkey_epid_pseudonym != msg3_epid_pseudonym {
             // We cannot verify that msg3 and pubkey_quote came from the same SGX system
-            return Err(TabascoError::MismatchError {
+            return Err(ProxyAttestationServerError::MismatchError {
                 variable: "msg3 and pubkey_quote",
                 expected: pubkey_epid_pseudonym.into_bytes(),
                 received: msg3_epid_pseudonym.into_bytes(),
@@ -319,7 +319,7 @@ pub fn msg3(body_string: String) -> TabascoResponder {
             // Or could they be different enclaves running the same firmware?
             // What is the consequence if they are?
             println!("msg3 and pubkey_quote came from different enclaves");
-            return Err(TabascoError::MismatchError {
+            return Err(ProxyAttestationServerError::MismatchError {
                 variable: "function msg3 msg3_quote.report_body.mr_enclave.m",
                 expected: pubkey_quote.report_body.mr_enclave.m.to_vec(),
                 received: msg3_quote.report_body.mr_enclave.m.to_vec(),
@@ -328,12 +328,12 @@ pub fn msg3(body_string: String) -> TabascoResponder {
 
         let connection = crate::orm::establish_connection()
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg3 establish_connection failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
                 err
             })?;
         crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)
             .map_err(|err| {
-                println!("tabasco::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
+                println!("proxy-attestation-server::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
                 err
             })?
     }
@@ -348,7 +348,7 @@ pub fn msg3(body_string: String) -> TabascoResponder {
 
 fn generate_sgx_symmetric_keys(
     ecdh: &sgx_ec256_dh_shared_t,
-) -> Result<(sgx_cmac_128bit_tag_t, sgx_cmac_128bit_tag_t), TabascoError> {
+) -> Result<(sgx_cmac_128bit_tag_t, sgx_cmac_128bit_tag_t), ProxyAttestationServerError> {
     let zero_key = [0; 16];
     let kdk = sgx_ucrypto::rsgx_rijndael128_cmac_msg(&zero_key, &ecdh.s)?;
     let smk_input: [u8; 7] = [0x01, 'S' as u8, 'M' as u8, 'K' as u8, 0x00, 0x80, 0x00];
@@ -365,14 +365,14 @@ fn proc_msg1(
     smk: &sgx_cmac_128bit_tag_t,
     private_key: &sgx_ec256_private_t,
     public_key: &sgx_ec256_public_t,
-) -> Result<sgx_ra_msg2_t, TabascoError> {
+) -> Result<sgx_ra_msg2_t, ProxyAttestationServerError> {
     let gid_little_endian = &msg1.gid;
     let gid = reverse(&gid_little_endian.to_vec());
 
     let sig_rl = get_sigrl(&gid)?;
     if sig_rl != "" {
         //TODO
-        return Err(TabascoError::MissingFieldError(
+        return Err(ProxyAttestationServerError::MissingFieldError(
             "Signature Revocation List (unimplemented)",
         ));
     }
@@ -461,7 +461,7 @@ fn reverse(input: &Vec<u8>) -> Vec<u8> {
     output
 }
 
-fn get_sigrl(gid: &Vec<u8>) -> Result<String, TabascoError> {
+fn get_sigrl(gid: &Vec<u8>) -> Result<String, ProxyAttestationServerError> {
     let mut gid_string = String::new();
     for i in 0..gid.len() {
         gid_string = format!("{:}{:02x}", gid_string, gid[i]);
@@ -511,7 +511,7 @@ fn authenticate_msg3(
     smk: &sgx_cmac_128bit_tag_t,
     vk: &sgx_cmac_128bit_tag_t,
     expected_enclave_hash: &Vec<u8>,
-) -> Result<String, TabascoError> {
+) -> Result<String, ProxyAttestationServerError> {
     // now we've got the msg3 and pubkey quote, verify msg3
     // compare g_a in msg3 with local g_a
     if msg3.g_a.gx != msg1.g_a.gx || (msg3.g_a.gy != msg1.g_a.gy) {
@@ -571,7 +571,7 @@ fn authenticate_msg3(
 
     let expected_hash = sha_handle.get_hash()?;
     if expected_hash != msg3_quote.report_body.report_data.d[0..32] {
-        return Err(TabascoError::MismatchError {
+        return Err(ProxyAttestationServerError::MismatchError {
             variable: "msg3_quote.report_body.report_data.d[0..32]",
             expected: expected_hash.to_vec(),
             received: msg3_quote.report_body.report_data.d[0..32].to_vec(),
@@ -579,7 +579,7 @@ fn authenticate_msg3(
     }
 
     if msg3_quote.report_body.mr_enclave.m != expected_enclave_hash[0..32] {
-        return Err(TabascoError::MismatchError {
+        return Err(ProxyAttestationServerError::MismatchError {
             variable: "function authenticate_msg3 msg3_quote.report_body.mr_enclave.m",
             expected: expected_enclave_hash[0..32].to_vec(),
             received: msg3_quote.report_body.mr_enclave.m.to_vec(),
@@ -594,7 +594,7 @@ fn authenticate_msg3(
 fn ias_verify_attestation_evidence(
     quote: &sgx_types::sgx_quote_t,
     sig: &Vec<u8>,
-) -> Result<String, TabascoError> {
+) -> Result<String, ProxyAttestationServerError> {
     let mut json_string = "{\"isvEnclaveQuote\":\"".to_string();
 
     let mut quote_slice = unsafe { any_as_u8_slice(quote) }.to_vec();
@@ -662,7 +662,7 @@ fn ias_verify_attestation_evidence(
         let cert1_index =
             certs
                 .rfind("-----BEGIN CERTIFICATE-----")
-                .ok_or(TabascoError::MissingFieldError(
+                .ok_or(ProxyAttestationServerError::MissingFieldError(
                     "-----BEGIN CERTIFICATE-----",
                 ))?;
         let cert1 = certs[1..cert1_index].to_string();
@@ -675,7 +675,7 @@ fn ias_verify_attestation_evidence(
         verifier.update(received_body.as_bytes())?;
         let result = verifier.verify(&decoded_signature)?;
         if !result {
-            return Err(TabascoError::FailedToVerifyError("decoded_signature"));
+            return Err(ProxyAttestationServerError::FailedToVerifyError("decoded_signature"));
         }
         // TODO: Authenticate the certificate chain. Right now, all we are doing is authenticating
         // the received signature with a key provided in a certificate. We are not authenticating that
@@ -688,7 +688,7 @@ fn ias_verify_attestation_evidence(
     Ok(v["epidPseudonym"]
         .as_str()
         //TODO
-        .ok_or(TabascoError::MissingFieldError("epidPseudonym"))?
+        .ok_or(ProxyAttestationServerError::MissingFieldError("epidPseudonym"))?
         .to_string())
 }
 
@@ -700,10 +700,10 @@ fn authenticate_pubkey_quote(
     pubkey_challenge: &[u8; 16],
     pubkey_quote: &sgx_quote_t,
     pubkey_sig: &Vec<u8>,
-) -> Result<(String, Vec<u8>, String), TabascoError> {
+) -> Result<(String, Vec<u8>, String), ProxyAttestationServerError> {
     // verify the challge value value that is internal to the pubkey quote
     if *pubkey_challenge != pubkey_quote.report_body.report_data.d[0..16] {
-        return Err(TabascoError::MismatchError {
+        return Err(ProxyAttestationServerError::MismatchError {
             variable: "pubkey_challenge",
             expected: pubkey_challenge.to_vec(),
             received: pubkey_quote.report_body.report_data.d[0..16].to_vec(),

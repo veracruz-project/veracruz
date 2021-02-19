@@ -52,7 +52,7 @@ mod tests {
     };
     #[cfg(feature = "sgx")]
     use stringreader;
-    use tabasco;
+    use proxy_attestation_server;
 
     // Constants corresponding to the `execution_engine::hcall::MachineState` enum which is
     // encoded as a `u8` value when servicing an enclave state request.  Included here
@@ -129,7 +129,7 @@ mod tests {
         static ref NEXT_TICKET: Mutex<u32> = Mutex::new(0);
     }
 
-    pub fn setup(tabasco_url: String) -> u32 {
+    pub fn setup(proxy_attestation_server_url: String) -> u32 {
         #[allow(unused_assignments)]
         let mut rst = 0;
         {
@@ -141,11 +141,11 @@ mod tests {
             info!("SETUP.call_once called");
             std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
             let _main_loop_handle = std::thread::spawn(|| {
-                let mut sys = System::new("Tabasco Server");
+                let mut sys = System::new("Veracruz Proxy Attestation Server");
                 #[cfg(feature="debug")]
-                let server = tabasco::server::server(tabasco_url, true).unwrap();
+                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, true).unwrap();
                 #[cfg(not(feature="debug"))]
-                let server = tabasco::server::server(tabasco_url, false).unwrap();
+                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -180,7 +180,7 @@ mod tests {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json);
             assert!(policy.is_ok());
             if let Ok(policy) = policy {
-                setup(policy.tabasco_url().clone());
+                setup(policy.proxy_attestation_server_url().clone());
                 let result = SinaloaEnclave::new(&policy_json);
                 assert!(result.is_ok(), "error:{:?}", result.err());
             }
@@ -191,7 +191,7 @@ mod tests {
         iterate_over_policy("../test-collateral/invalid_policy/", |policy_json| {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json);
             if let Ok(policy) = policy {
-                setup(policy.tabasco_url().clone());
+                setup(policy.proxy_attestation_server_url().clone());
                 let result = SinaloaEnclave::new(&policy_json);
                 assert!(
                     result.is_ok(),
@@ -208,8 +208,8 @@ mod tests {
     fn test_phase1_new_session() {
         iterate_over_policy("../test-collateral/", |policy_json| {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
-            // start the tabasco server
-            setup(policy.tabasco_url().clone());
+            // start the proxy attestation server
+            setup(policy.proxy_attestation_server_url().clone());
             let result = init_sinaloa_and_tls_session(policy_json);
             assert!(result.is_ok(), "error:{:?}", result.err());
         });
@@ -226,10 +226,10 @@ mod tests {
     #[test]
     /// Load sinaloa and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
-        // start the tabasco server
+        // start the proxy attestation server
         iterate_over_policy("../test-collateral/", |policy_json| {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
-            setup(policy.tabasco_url().clone());
+            setup(policy.proxy_attestation_server_url().clone());
             let result = SinaloaEnclave::new(&policy_json)
                 .and_then(|sinaloa| enclave_self_signed_cert(&sinaloa));
             assert!(result.is_ok(), "error:{:?}", result);
@@ -240,7 +240,7 @@ mod tests {
     /// Test the attestation flow without sending any program or data into Sinaloa
     fn test_phase1_attestation_only() {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
-        setup(policy.tabasco_url().clone());
+        setup(policy.proxy_attestation_server_url().clone());
 
         let ret = SinaloaEnclave::new(&policy_json);
 
@@ -255,7 +255,7 @@ mod tests {
 
         let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
-            attestation_flow(&policy.tabasco_url(), &mexico_city_hash, &sinaloa);
+            attestation_flow(&policy.proxy_attestation_server_url(), &mexico_city_hash, &sinaloa);
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -283,8 +283,8 @@ mod tests {
     /// Attempt to establish a client session with the Sinaloa server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
-        // start the tabasco server
-        setup(policy.tabasco_url().clone());
+        // start the proxy attestation server
+        setup(policy.proxy_attestation_server_url().clone());
         let (sinaloa, _) = init_sinaloa_and_tls_session(&policy_json).unwrap();
         let enclave_cert = enclave_self_signed_cert(&sinaloa).unwrap();
 
@@ -675,9 +675,10 @@ mod tests {
 
     /// This test was written to test an issue.
     /// The issue was that the key storage in Mbed Crypto was being exhausted
-    /// in tabasco.
+    /// in the proxy attestation server.
     /// The fix was to delete keys after they are used.
-    /// This test creates 32 enclaves, each of which attests against tabasco.
+    /// This test creates 32 enclaves, each of which attests against the proxy
+    /// attestation server.
     /// To generate the dataset for this test:
     /// - Go to directory: sdk/utility/macd2bincode
     /// - execute run.sh . It generates more than 32 datasets of the form *.dat .
@@ -756,12 +757,12 @@ mod tests {
             std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ) = std::sync::mpsc::channel();
 
-        info!("### Step 1.  Read policy and set up tabasco.");
+        info!("### Step 1.  Read policy and set up the proxy attestation server.");
         // load the policy, initialise enclave and start tls
         let time_setup = Instant::now();
         let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
         //let debug_flag = policy.debug;
-        let ticket = setup(policy.tabasco_url().clone());
+        let ticket = setup(policy.proxy_attestation_server_url().clone());
         info!(
             "             Setup time (μs): {}.",
             time_setup.elapsed().as_micros()
@@ -785,7 +786,7 @@ mod tests {
 
         let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.tabasco_url(), &mexico_city_hash, &sinaloa)?
+            attestation_flow(&policy.proxy_attestation_server_url(), &mexico_city_hash, &sinaloa)?
         } else {
             let enclave_cert = enclave_self_signed_cert(&sinaloa)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
@@ -1281,14 +1282,14 @@ mod tests {
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
         // Since we need to run the root enclave on another system for nitro enclaves
-        // we can't use localhost for the URL of tabasco (like we do in the policy
-        // files. so we need to replace it with the private IP of the current instance
+        // we can't use localhost for the URL of the proxy attestation server (like we do in
+	// the policy files. so we need to replace it with the private IP of the current instance
         #[cfg(feature = "nitro")]
         {
             let ip_string = local_ipaddress::get()
             .expect("Failed to get local ip address");
-            let ip_address = format!("\"tabasco_url\": \"{:}:3010\"", ip_string);
-            let re = Regex::new(r#""tabasco_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let ip_address = format!("\"proxy_attestation_server_url\": \"{:}:3010\"", ip_string);
+            let re = Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
             let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
             let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
@@ -1686,7 +1687,7 @@ mod tests {
     }
 
     fn attestation_flow(
-        tabasco_url: &String,
+        proxy_attestation_server_url: &String,
         expected_enclave_hash: &String,
         sinaloa: &dyn sinaloa::Sinaloa,
     ) -> Result<Vec<u8>, SinaloaError> {
@@ -1698,8 +1699,8 @@ mod tests {
             pagt_ret.ok_or(SinaloaError::MissingFieldError("attestation_flow pagt_ret"))?;
 
         let encoded_token = base64::encode(&received_bytes);
-        let complete_tabasco_url = format!("{:}/VerifyPAT", tabasco_url);
-        let received_buffer = post_buffer(&complete_tabasco_url, &encoded_token)?;
+        let complete_proxy_attestation_server_url = format!("{:}/VerifyPAT", proxy_attestation_server_url);
+        let received_buffer = post_buffer(&complete_proxy_attestation_server_url, &encoded_token)?;
 
         let received_payload = base64::decode(&received_buffer)?;
 

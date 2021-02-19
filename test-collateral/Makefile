@@ -72,51 +72,51 @@ css.bin: ../mexico-city/css.bin
 get_random_policy.json: policy.template css.bin client_rsa_cert.pem random-source.wasm generate_policy.py
 	python ./generate_policy.py --template-file policy.template \
                 --identity client_rsa_cert.pem "\"PiProvider\", \"ResultReader\"" \
-                --sinaloa-url 127.0.0.1:3011 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+                --sinaloa-url 127.0.0.1:3011 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 				--pi-binary random-source.wasm --debug-flag True --execution-strategy "\"Interpretation\""
 
 one_data_source_policy.json: policy.template css.bin client_rsa_cert.pem linear-regression.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3012 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3012 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary linear-regression.wasm --execution-strategy "\"Interpretation\""
 
 test_multiple_key_policy.json: policy.template css.bin client_rsa_cert.pem moving-average-convergence-divergence.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3012 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3012 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary moving-average-convergence-divergence.wasm --execution-strategy "\"Interpretation\""
 
 two_data_source_string_edit_distance_policy.json: policy.template css.bin client_rsa_cert.pem string-edit-distance.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 0  --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3013 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3013 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary string-edit-distance.wasm --execution-strategy "\"Interpretation\""
 
 two_data_source_intersection_set_policy.json: policy.template css.bin client_rsa_cert.pem intersection-set-sum.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 0  --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3022 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3022 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary intersection-set-sum.wasm --execution-strategy "\"Interpretation\""
 
 two_data_source_private_set_intersection_policy.json: policy.template css.bin client_rsa_cert.pem private-set-intersection.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 0  --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3026 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3026 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary private-set-intersection.wasm --execution-strategy "\"Interpretation\""
 
 dual_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem linear-regression.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 1 --template-file policy.template \
 		--identity program_client_cert.pem "\"PiProvider\"" \
 		--identity data_client_cert.pem "\"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3014 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3014 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary linear-regression.wasm --execution-strategy "\"Interpretation\""
 
 dual_parallel_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem linear-regression.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 1  --template-file policy.template \
 		--identity program_client_cert.pem "\"PiProvider\"" \
 		--identity data_client_cert.pem "\"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3015 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3015 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary linear-regression.wasm --execution-strategy "\"Interpretation\""
 
 triple_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem linear-regression.wasm generate_policy.py
@@ -124,7 +124,7 @@ triple_policy.json: policy.template css.bin program_client_cert.pem data_client_
 		--identity program_client_cert.pem "\"PiProvider\"" \
 		--identity data_client_cert.pem "\"DataProvider\", \"ResultReader\"" \
 		--identity result_client_cert.pem "\"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3016 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3016 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary linear-regression.wasm --execution-strategy "\"Interpretation\""
 
 triple_parties_two_data_sources_sum_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm generate_policy.py
@@ -132,7 +132,7 @@ triple_parties_two_data_sources_sum_policy.json: policy.template css.bin program
 		--identity program_client_cert.pem "\"PiProvider\"" \
 		--identity data_client_cert.pem "\"DataProvider\"" \
 		--identity result_client_cert.pem "\"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3017 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3017 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary intersection-set-sum.wasm --execution-strategy "\"Interpretation\""
 
 permuted_triple_parties_two_data_sources_sum_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm generate_policy.py
@@ -140,7 +140,7 @@ permuted_triple_parties_two_data_sources_sum_policy.json: policy.template css.bi
 		--identity program_client_cert.pem "\"PiProvider\"" \
 		--identity data_client_cert.pem "\"DataProvider\"" \
 		--identity result_client_cert.pem "\"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3018 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3018 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary intersection-set-sum.wasm --execution-strategy "\"Interpretation\""
 
 triple_parties_two_data_sources_string_edit_distance_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm generate_policy.py
@@ -148,7 +148,7 @@ triple_parties_two_data_sources_string_edit_distance_policy.json: policy.templat
 		--identity program_client_cert.pem "\"PiProvider\"" \
 		--identity data_client_cert.pem "\"DataProvider\"" \
 		--identity result_client_cert.pem "\"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3019 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3019 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary string-edit-distance.wasm --execution-strategy "\"Interpretation\""
 
 quadruple_policy.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm generate_policy.py
@@ -157,37 +157,37 @@ quadruple_policy.json: policy.template css.bin program_client_cert.pem data_clie
 		--identity data_client_cert.pem "\"DataProvider\"" \
 		--identity never_used_cert.pem "\"DataProvider\"" \
 		--identity result_client_cert.pem "\"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3020 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3020 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary string-edit-distance.wasm --execution-strategy "\"Interpretation\""
 
 invalid_policy/one_expired_data_source_policy.json: policy.template css.bin expired_cert.pem linear-regression.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 --template-file policy.template \
 		--identity expired_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3021 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3021 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary linear-regression.wasm --execution-strategy "\"Interpretation\""
 
 idash2017_logistic_regression_policy.json: policy.template css.bin client_rsa_cert.pem idash2017-logistic-regression.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3023 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3023 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary idash2017-logistic-regression.wasm --execution-strategy "\"Interpretation\""
 
 moving_average_convergence_divergence.json: policy.template css.bin client_rsa_cert.pem moving-average-convergence-divergence.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3024 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3024 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary moving-average-convergence-divergence.wasm --execution-strategy "\"Interpretation\""
 
 private_set_intersection_sum.json: policy.template css.bin client_rsa_cert.pem private-set-intersection-sum.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0 --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3025 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3025 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary private-set-intersection-sum.wasm --execution-strategy "\"Interpretation\""
 
 number-stream-accumulation.json: policy.template css.bin program_client_cert.pem data_client_cert.pem result_client_cert.pem number-stream-accumulation.wasm generate_policy.py
 	python ./generate_policy.py --data-provision-order 0  --streaming-order 0 0 --template-file policy.template \
 		--identity client_rsa_cert.pem "\"PiProvider\", \"DataProvider\", \"ResultReader\"" \
-		--sinaloa-url 127.0.0.1:3026 --tabasco-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
+		--sinaloa-url 127.0.0.1:3026 --proxy-attestation-server-url 127.0.0.1:3010 --output-policy-file $@ --certificate-lifetime-in-hours 8760 \
 		--pi-binary number-stream-accumulation.wasm --debug-flag True --execution-strategy "\"Interpretation\""
 
 .SECONDEXPANSION:

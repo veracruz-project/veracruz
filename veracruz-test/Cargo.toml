@@ -7,9 +7,9 @@ description = "Veracruz integration test.  This is a full system test that shoul
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["durango/sgx","sinaloa/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation"]
-tz = ["durango/tz","sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz"]
-nitro = ["durango/nitro", "sinaloa/nitro", "veracruz-utils/nitro", "tabasco/nitro"]
+sgx = ["durango/sgx","sinaloa/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "proxy-attestation-server/sgx", "colima/sgx_attestation"]
+tz = ["durango/tz","sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "colima/tz"]
+nitro = ["durango/nitro", "sinaloa/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
 
 [dependencies]
 durango = {path = "../durango"}
@@ -17,7 +17,7 @@ sinaloa = { path = "../sinaloa"}
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 serde_json = "1.0"
 serde = { version = "1.0.97", features = ["derive"] }
-tabasco = { path = "../tabasco"}
+proxy-attestation-server = { path = "../proxy-attestation-server"}
 colima = { path = "../colima"}
 hex = "0.3.1"
 ring = "0.16.5"

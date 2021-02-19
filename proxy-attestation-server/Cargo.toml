@@ -1,5 +1,5 @@
 [package]
-name = "tabasco"
+name = "proxy-attestation-server"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
@@ -7,7 +7,7 @@ build = "build.rs"
 description = "The Veracruz attestation web-service.  Maintains a database of enrolled isolates.  Can be used to authenticate or reject attestation tokens purporting to originate from these isolates."
 
 [[bin]]
-name = "tabasco_bin"
+name = "proxy-attestation-server-bin"
 path = "src/main.rs"
 
 [lib]
