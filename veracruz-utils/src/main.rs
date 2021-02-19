@@ -2,7 +2,7 @@ use veracruz_utils::policy::{VeracruzPolicy, VeracruzCapabilityIndex, VeracruzCa
 use std::fs;
 
 fn main() {
-    let contents = fs::read_to_string("../test-collateral/one_data_source_policy.json")
+    let contents = fs::read_to_string("../test-collateral/two_data_source_string_edit_distance_policy.json")
                                     .expect("Something went wrong reading the file");
     let policy = VeracruzPolicy::from_json(contents.as_str()).unwrap();
     println!("raw: {:?}", policy);
@@ -16,4 +16,10 @@ fn main() {
             .unwrap()
             .contains(&VeracruzCapability::Write);
     println!("{:?}",rst);
+    let digests = policy.get_program_digests();
+    println!("{:?}",digests);
+    //let rst = hex::decode(digests
+            //.get("string-edit-distance.wasm")
+            //.unwrap()).unwrap();
+    //println!("{:?}",rst);
 }

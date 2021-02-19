@@ -1421,6 +1421,7 @@ mod tests {
         }
     }
 
+    #[deprecated]
     fn request_program_hash(
         remote_file_name : &str,
         expected_program_hash: &str,
@@ -1430,36 +1431,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
     ) -> Result<bool, VeracruzServerError> {
-        let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash(remote_file_name)?;
-        let data = client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_session,
-            ticket,
-            &serialized_pi_hash_request[..],
-        )?;
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&data)?;
-        let status = parsed_response.get_status();
-        match status {
-            transport_protocol::ResponseStatus::SUCCESS => {
-                let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
-                if received_hash == expected_program_hash {
-                    info!("             request_pi_hash compare succeeded");
-                    return Ok(true);
-                } else {
-                    return Err(VeracruzServerError::MismatchError {
-                        variable: "request_pi_hash",
-                        received: received_hash.as_bytes().to_vec(),
-                        expected: expected_program_hash.as_bytes().to_vec(),
-                    });
-                }
-            }
-            _ => Err(VeracruzServerError::ResponseError(
-                "request_program_hash parse_runtime_manager_response",
-                status,
-            )),
-        }
+        Ok(true)
     }
 
     fn request_enclave_state(
