@@ -58,17 +58,17 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean doc fmt freestanding-chihuahua rust-libveracruz rust-veracruz-rt tlaxcala env
+.PHONY: all clean doc fmt freestanding-chihuahua rust-libveracruz rust-veracruz-rt wasm-checker env
 
-all: tlaxcala $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-chihuahua rust-libveracruz rust-veracruz-rt
+all: wasm-checker $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-chihuahua rust-libveracruz rust-veracruz-rt
 
-tlaxcala:
-	$(MAKE) -C tlaxcala
+wasm-checker:
+	$(MAKE) -C wasm-checker
 
 .SECONDEXPANSION:
-$(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUST_EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env tlaxcala
+$(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUST_EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env wasm-checker
 	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@)))
-	./tlaxcala/bin/tlaxcala -c ./tlaxcala/tlaxcala_config.json $@
+	./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
 
 freestanding-chihuahua: env
 	$(MAKE) -C freestanding-chihuahua/
@@ -126,4 +126,4 @@ clean:
 	$(MAKE) -C freestanding-chihuahua/ clean
 	$(MAKE) -C rust-language-support/libveracruz/ clean
 	$(MAKE) -C rust-language-support/veracruz-rt/ clean
-	$(MAKE) -C tlaxcala/ clean
+	$(MAKE) -C wasm-checker/ clean
