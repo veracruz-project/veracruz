@@ -1,5 +1,5 @@
-//! Chihuahua management code, decoding protocol messages and turning them into
-//! actions on the Chihuahua host provisioning state.
+//! Execution engine management code, decoding protocol messages and turning them into
+//! actions on the Veracruz host provisioning state.
 //!
 //! ## Authors
 //!
@@ -14,7 +14,7 @@ use super::{
     buffer::MexicoCityBuffer, MexicoCityError, ProtocolState, ProvisioningResponse,
     ProvisioningResult,
 };
-use chihuahua::hcall::common::{DataSourceMetadata, LifecycleState};
+use execution_engine::hcall::common::{DataSourceMetadata, LifecycleState};
 use colima::colima::{
     MexicoCityRequest as REQUEST, MexicoCityRequest_oneof_message_oneof as MESSAGE,
 };
@@ -106,7 +106,7 @@ fn response_invalid_request() -> super::ProvisioningResult {
 /// Returns the SHA-256 digest of the provisioned program.  Fails if no hash has
 /// yet been computed.
 fn dispatch_on_pi_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
-    // The digest is computed by Chihuahua when the program is provisioned.  If
+    // The digest is computed by Veracruz when the program is provisioned.  If
     // there's no digest, then we must not have been given a program yet.
     match protocol_state.get_program_digest()? {
         None => response_not_ready(),

@@ -13,7 +13,7 @@ use std::{collections::HashMap, result::Result, vec::Vec};
 
 type ClientID = u64;
 type PackageID = u64;
-type DataPackage = chihuahua::hcall::common::DataSourceMetadata;
+type DataPackage = execution_engine::hcall::common::DataSourceMetadata;
 
 /// Error type for mexico-city buffer.
 #[derive(Clone, Debug, Error)]

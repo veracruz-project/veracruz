@@ -80,7 +80,7 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), MexicoCityErr
 
     let proc_ret: super::ProvisioningResponse = match plaintext_option {
         Some((client_id, roles, plaintext_data)) => {
-            super::chihuahua_manager::dispatch_on_incoming_data(
+            super::execution_engine_manager::dispatch_on_incoming_data(
                 session_id,
                 client_id as u64,
                 &roles,
