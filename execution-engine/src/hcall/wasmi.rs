@@ -25,7 +25,7 @@ use crate::{
         wasmi::{mk_error_code, mk_host_trap},
     },
     hcall::common::{
-        sha_256_digest, Chihuahua, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
+        sha_256_digest, ExecutionEngine, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
         HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
         HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
         HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
@@ -875,15 +875,15 @@ impl WasmiHostProvisioningState {
 }
 
 /// The `WasmiHostProvisioningState` implements everything needed to create a
-/// compliant instance of `Chihuahua`.
-impl Chihuahua for WasmiHostProvisioningState {
-    /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.
+/// compliant instance of `ExecutionEngine`.
+impl ExecutionEngine for WasmiHostProvisioningState {
+    /// ExecutionEngine wrapper of load_program implementation in WasmiHostProvisioningState.
     #[inline]
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
         self.load_program(buffer)
     }
 
-    /// Chihuahua wrapper of add_new_data_source implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of add_new_data_source implementation in WasmiHostProvisioningState.
     #[inline]
     fn add_new_data_source(
         &mut self,
@@ -892,7 +892,7 @@ impl Chihuahua for WasmiHostProvisioningState {
         self.add_new_data_source(metadata)
     }
 
-    /// Chihuahua wrapper of add_new_stream_source implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of add_new_stream_source implementation in WasmiHostProvisioningState.
     #[inline]
     fn add_new_stream_source(
         &mut self,
@@ -901,107 +901,107 @@ impl Chihuahua for WasmiHostProvisioningState {
         self.add_new_stream_source(metadata)
     }
 
-    /// Chihuahua wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
     #[inline]
     fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
         self.invoke_entry_point()
     }
 
-    /// Chihuahua wrapper of is_program_registered implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of is_program_registered implementation in WasmiHostProvisioningState.
     #[inline]
     fn is_program_registered(&self) -> bool {
         self.is_program_registered()
     }
 
-    /// Chihuahua wrapper of is_result_registered implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of is_result_registered implementation in WasmiHostProvisioningState.
     #[inline]
     fn is_result_registered(&self) -> bool {
         self.is_result_registered()
     }
 
-    /// Chihuahua wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
     #[inline]
     fn is_memory_registered(&self) -> bool {
         self.is_memory_registered()
     }
 
-    /// Chihuahua wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
     #[inline]
     fn is_able_to_shutdown(&self) -> bool {
         self.is_able_to_shutdown()
     }
 
-    /// Chihuahua wrapper of get_lifecycle_state implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_lifecycle_state implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_lifecycle_state(&self) -> LifecycleState {
         self.get_lifecycle_state().clone()
     }
 
-    /// Chihuahua wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_current_data_source_count(&self) -> usize {
         self.get_current_data_source_count().clone()
     }
 
-    /// Chihuahua wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_expected_data_sources(&self) -> Vec<u64> {
         self.get_expected_data_sources().clone()
     }
 
-    /// Chihuahua wrapper of get_expected_shutdown_sources implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_expected_shutdown_sources(&self) -> Vec<u64> {
         self.get_expected_shutdown_sources().clone()
     }
 
-    /// Chihuahua wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_current_stream_source_count(&self) -> usize {
         self.get_current_stream_source_count().clone()
     }
 
-    /// Chihuahua wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_expected_stream_sources(&self) -> Vec<u64> {
         self.get_expected_stream_sources().clone()
     }
 
-    /// Chihuahua wrapper of set_previous_result implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of set_previous_result implementation in WasmiHostProvisioningState.
     #[inline]
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
         self.set_previous_result(result);
     }
 
-    /// Chihuahua wrapper of get_result implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_result implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_result(&self) -> Option<Vec<u8>> {
         self.get_result().map(|r| r.clone())
     }
 
-    /// Chihuahua wrapper of get_program_digest implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of get_program_digest implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_program_digest(&self) -> Option<Vec<u8>> {
         self.get_program_digest().map(|d| d.clone())
     }
 
-    /// Chihuahua wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
     #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
         self.set_expected_data_sources(sources);
         self
     }
 
-    /// Chihuahua wrapper of set_expected_stream_sources implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmiHostProvisioningState.
     #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
         self.set_expected_stream_sources(sources);
         self
     }
 
-    /// Chihuahua wrapper of set_expected_shutdown_sources implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmiHostProvisioningState.
     #[inline]
-    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
         self.set_expected_stream_sources(sources);
         self
     }
@@ -1012,7 +1012,7 @@ impl Chihuahua for WasmiHostProvisioningState {
         self.set_error();
     }
 
-    /// Chihuahua wrapper of request_shutdown implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of request_shutdown implementation in WasmiHostProvisioningState.
     #[inline]
     fn request_shutdown(&mut self, client_id: u64) {
         self.request_shutdown(client_id);

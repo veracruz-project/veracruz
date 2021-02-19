@@ -2,23 +2,23 @@
 //!
 //! ## About
 //!
-//! The `chihuahua` function defined in this file is one of the few functions
-//! exported from the Chihuahua library, and takes an enumeration value
+//! The factory functions defined in this file is one of the few functions
+//! exported from the ExecutionEngine library, and takes an enumeration value
 //! detailing which execution strategy should be used.  In the case of
-//! `Interpretation` being chosen, an implementation of the `Chihuahua` trait
+//! `Interpretation` being chosen, an implementation of the `ExecutionEngine` trait
 //! is returned which uses an interpretation execution strategy.  Similarly, in
 //! the case of `JIT` an implementation using a JITting execution strategy is
-//! returned.  Note that the `Chihuahua` trait is essentially this library's
+//! returned.  Note that the `ExecutionEngine` trait is essentially this library's
 //! interface to the outside world, and details exactly what external clients
-//! such as `freestanding-chihuahua` and `mexico-city` can rely on.
+//! such as `freestanding-executuon-engine` and `mexico-city` can rely on.
 //!
 //! ## Todo
 //!
-//! Try to merge `single_threaded_chihuahua` and `multi_threaded_chihuahua`
-//! into a single function.  Problem: if you return `boxed::Box<..>` then
-//! `mexico-city/src/managers/mod.rs` is seemingly impossible to implement as
-//! you run into issues with no compile-time size for the trait object when
-//! converting the `Box<..>` into `Arc<Mutex<..>>`.
+//! Try to merge `single_threaded_execution_engine` and
+//! `multi_threaded_execution_engine` into a single function.  Problem: if you
+//! return `boxed::Box<..>` then `mexico-city/src/managers/mod.rs` is seemingly
+//! impossible to implement as you run into issues with no compile-time size for
+//! the trait object when converting the `Box<..>` into `Arc<Mutex<..>>`.
 //!
 //! Also: remove the panic and include a proper error report that is propagated.
 //!
@@ -38,7 +38,7 @@ use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
-use crate::hcall::{common::Chihuahua, wasmi};
+use crate::hcall::{common::ExecutionEngine, wasmi};
 
 use std::{
     boxed::Box,
@@ -56,7 +56,7 @@ pub enum ExecutionStrategy {
     JIT,
 }
 
-/// Selects a Chihuahua implementation based on a stated preference for
+/// Selects an ExecutionEngine implementation based on a stated preference for
 /// execution strategy, passing the lists of client IDs of clients that can
 /// provision data and request platform shutdown straight to the relevant
 /// execution engine.
@@ -64,17 +64,17 @@ pub enum ExecutionStrategy {
 /// NB: wasmtime is only supported when feature=std is set at the moment,
 /// hence the branching around the body of this function.  When we get
 /// it compiled for SGX and TZ, then this will disappear.
-pub fn single_threaded_chihuahua(
+pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     expected_data_sources: &[u64],
     expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
-) -> Option<Box<dyn Chihuahua + 'static>> {
+) -> Option<Box<dyn ExecutionEngine + 'static>> {
     #[cfg(feature = "std")]
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
+                let mut state = wasmi::WasmiHostProvisioningState::new(;
                 state
                     .set_expected_data_sources(expected_data_sources)
                     .set_expected_stream_sources(expected_stream_sources)
@@ -110,7 +110,7 @@ pub fn single_threaded_chihuahua(
     }
 }
 
-/// Selects a Chihuahua implementation based on a stated preference for
+/// Selects an ExecutionEngine implementation based on a stated preference for
 /// execution strategy, passing the lists of client IDs of clients that can
 /// provision data and request platform shutdown straight to the relevant
 /// execution engine.
@@ -118,12 +118,12 @@ pub fn single_threaded_chihuahua(
 /// NB: wasmtime is only supported when feature=std is set at the moment,
 /// hence the branching around the body of this function.  When we get
 /// it compiled for SGX and TZ, then this will disappear.
-pub fn multi_threaded_chihuahua(
+pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     expected_data_sources: &[u64],
     expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
-) -> Option<Arc<Mutex<dyn Chihuahua + 'static>>> {
+) -> Option<Arc<Mutex<dyn ExecutionEngine + 'static>>> {
     #[cfg(feature = "std")]
     {
         match strategy {

@@ -24,7 +24,7 @@ use platform_services::{getrandom, result};
 use crate::{
     error::common::VeracruzError,
     hcall::common::{
-        sha_256_digest, Chihuahua, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
+        sha_256_digest, ExecutionEngine, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
         HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
         HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_READ_INPUT_NAME,
         HCALL_WRITE_OUTPUT_NAME,
@@ -537,13 +537,13 @@ impl DummyWasmtimeHostProvisioningState {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Chihuahua trait implementation.
+// ExecutionEngine trait implementation.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a
-/// compliant instance of `Chihuahua`.
-impl Chihuahua for DummyWasmtimeHostProvisioningState {
-    /// Chihuahua wrapper of load_program implementation in WasmtimeHostProvisioningState.
+/// compliant instance of `ExecutionEngine`.
+impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
+    /// ExecutionEngine wrapper of load_program implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
@@ -553,7 +553,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .load_program(buffer)
     }
 
-    /// Chihuahua wrapper of add_new_data_source implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of add_new_data_source implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn add_new_data_source(
@@ -566,7 +566,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .add_new_data_source(metadata)
     }
 
-    /// Chihuahua wrapper of add_new_stream_source implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of add_new_stream_source implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn add_new_stream_source(
@@ -579,7 +579,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .add_new_stream_source(metadata)
     }
 
-    /// Chihuahua wrapper of invoke_entry_point.
+    /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
@@ -593,7 +593,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .map(|r| r.clone())
     }
 
-    /// Chihuahua wrapper of is_program_registered implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of is_program_registered implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn is_program_registered(&self) -> bool {
@@ -604,7 +604,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of is_result_registered implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of is_result_registered implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn is_result_registered(&self) -> bool {
@@ -615,7 +615,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of is_memory_registered implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn is_memory_registered(&self) -> bool {
@@ -626,7 +626,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of is_able_to_shutdown implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of is_able_to_shutdown implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn is_able_to_shutdown(&self) -> bool {
@@ -637,7 +637,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_lifecycle_state implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_lifecycle_state implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_lifecycle_state(&self) -> LifecycleState {
@@ -648,7 +648,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_current_data_source_count implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_current_data_source_count(&self) -> usize {
@@ -659,7 +659,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_expected_data_sources implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_expected_data_sources(&self) -> Vec<u64> {
@@ -670,7 +670,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_current_stream_source_count implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_current_stream_source_count(&self) -> usize {
@@ -681,7 +681,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_expected_stream_sources implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_expected_stream_sources implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_expected_stream_sources(&self) -> Vec<u64> {
@@ -692,7 +692,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_expected_shutdown_sources implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_expected_shutdown_sources(&self) -> Vec<u64> {
@@ -703,7 +703,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .clone()
     }
 
-    /// Chihuahua wrapper of get_result implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_result implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_result(&self) -> Option<Vec<u8>> {
@@ -714,7 +714,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .map(|d| d.clone())
     }
 
-    /// Chihuahua wrapper of set_previous_result implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of set_previous_result implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn set_previous_result(&mut self, sources: &Option<Vec<u8>>) {
@@ -724,7 +724,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .set_previous_result(sources);
     }
 
-    /// Chihuahua wrapper of get_program_digest implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of get_program_digest implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn get_program_digest(&self) -> Option<Vec<u8>> {
@@ -735,10 +735,10 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .map(|d| d.clone())
     }
 
-    /// Chihuahua wrapper of set_expected_data_sources implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
         HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
@@ -746,10 +746,10 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
         self
     }
 
-    /// Chihuahua wrapper of set_expected_stream_sources implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
         HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
@@ -757,10 +757,10 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
         self
     }
 
-    /// Chihuahua wrapper of set_expected_shutdown_sources implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua {
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
         HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.")
@@ -778,7 +778,7 @@ impl Chihuahua for DummyWasmtimeHostProvisioningState {
             .set_error();
     }
 
-    /// Chihuahua wrapper of request_shutdown implementation in WasmtimeHostProvisioningState.
+    /// ExecutionEngine wrapper of request_shutdown implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn request_shutdown(&mut self, client_id: u64) {
