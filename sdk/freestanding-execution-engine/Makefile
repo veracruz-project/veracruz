@@ -1,4 +1,4 @@
-# Makefile to build freestanding-chihuahua
+# Makefile to build freestanding-execution-engine
 #
 # AUTHORS
 #
