@@ -1,4 +1,6 @@
-//! Tlaxcala wasm binary analysis tool
+//! WasmChecker
+//!
+//! Certifies that a WASM binary satisfies the Veracruz ABI.
 //!
 //! ## Authors
 //!
@@ -22,7 +24,7 @@
 #include <fstream>
 
 static std::string s_infile;
-static std::string s_configfile = "tlaxcala_config.json";
+static std::string s_configfile = "wasm-checker-config.json";
 static wabt::Features s_features;
 static std::unique_ptr<wabt::FileStream> s_log_stream;
 static bool s_read_debug_names = false;
@@ -40,7 +42,7 @@ examples:
 nlohmann::json config;
 
 static void ParseOptions(int argc, char **argv) {
-    wabt::OptionParser parser("tlaxcala", s_description);
+    wabt::OptionParser parser("wasm-checker", s_description);
 
     //s_log_stream = wabt::FileStream::CreateStdout();
     s_log_stream = NULL;
@@ -73,7 +75,7 @@ int main(int argc, char **argv) {
 
     std::vector<uint8_t> file_data;
 
-    std::cout << "tlaxcala reading file:" << s_infile << "\n";
+    std::cout << "wasm-checker reading file:" << s_infile << "\n";
     result = wabt::ReadFile(s_infile.c_str(), &file_data);
     if (wabt::Succeeded(result)) {
         wabt::Errors errors;

@@ -2,9 +2,9 @@
 
 # This makefile is used to generate the Tlaxcala wasm binary analyzer
 
-bin/tlaxcala: src/main.cc wabt json
+bin/wasm-checker: src/main.cc wabt json
 	mkdir -p bin/
-	g++ src/main.cc -o bin/tlaxcala -I./wabt/ -I./wabt/build -L ./wabt/build -I./json/include -lwabt
+	g++ src/main.cc -o bin/wasm-checker -I./wabt/ -I./wabt/build -L ./wabt/build -I./json/include -lwabt
 
 wabt:
 	git clone --recursive --depth 1 --branch 1.0.19 https://github.com/WebAssembly/wabt.git; \
@@ -15,6 +15,6 @@ json:
 
 .PHONY: clean
 clean:
-	rm -f bin/tlaxcala
+	rm -f bin/wasm-checker
 	rm -rf wabt/
 	rm -rf json/
