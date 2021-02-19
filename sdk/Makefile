@@ -58,7 +58,7 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean doc fmt freestanding-execution-engine rust-libveracruz rust-veracruz-rt tlaxcala env
+.PHONY: all clean doc fmt freestanding-execution-engine rust-libveracruz rust-veracruz-rt wasm-checker env
 
 all: wasm-checker $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-execution-engine rust-libveracruz rust-veracruz-rt
 

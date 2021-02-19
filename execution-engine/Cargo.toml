@@ -26,7 +26,7 @@ err-derive = "0.2"
 pinecone = "0.2"
 
 [lib]
-name = "execution-engine"
+name = "execution_engine"
 path = "./src/lib.rs"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

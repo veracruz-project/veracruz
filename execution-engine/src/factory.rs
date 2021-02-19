@@ -74,7 +74,7 @@ pub fn single_threaded_execution_engine(
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new(;
+                let mut state = wasmi::WasmiHostProvisioningState::new();
                 state
                     .set_expected_data_sources(expected_data_sources)
                     .set_expected_stream_sources(expected_stream_sources)
