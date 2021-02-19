@@ -15,11 +15,11 @@ anybody aiming to use Veracruz.  Its major components are:
 - Baja: acts as the TLS endpoint inside the isolate, managing encrypted and
 intrgrity-protected communication sessions between the trusted Veracruz runtime
 and the outside world (see also: Jalisco). 
-- Chihuahua: is the WASM execution engine for Veracruz, and which actually
-executes a program to completion (or failure!).  Chihuahua exposes a custom
+- Execution Engine: is the WASM execution engine for Veracruz, and which actually
+executes a program to completion (or failure!).  The Execution Engine exposes a custom
 ABI to the WASM binary, and abstracts over the different execution strategies
 available for executing a program: at the moment the JIT strategy is only
-available when using seL4 (or `freestanding-chihuahua`---see below) with
+available when using seL4 (or `freestanding-execution-engine`---see below) with
 interpretation as the only selectable execution strategy for TrustZone and SGX
 (we are currently working on changing this).
 - Colima: is a support library that manages the parsing and serialization of
@@ -82,10 +82,10 @@ include those that do not build against the Rust standard library (i.e. are
 `no_std`) and those which use both the standard library and off-the-shelf Rust
 libraries for e.g. machine learning.  Examples use Xargo to build a custom set
 of core Rust libraries before building the examples.
-- Freestanding Chihuahua: this is a version of the Chihuahua WASM execution
+- Freestanding Execution Engine: this is a version of the WASM execution
 engine (see above) that has been wrapped in a command line interface, and is
 intended to allow offline testing of Veracruz programs outside of an enclave.
-See `./freestanding-chihuahua --help` for more information on invoking the
+See `./freestanding-execution-engine --help` for more information on invoking the
 offline execution engine, and the different configuration options available.
 - The Veracruz support library (`libveracruz`): this is a Rust support library
 for writing Veracruz programs.  It abstracts the Veracruz ABI, exposing a
