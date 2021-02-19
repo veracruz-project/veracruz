@@ -19,7 +19,7 @@ use getrandom;
 /// Fills a buffer, `buffer`, with random bytes sampled from the random number
 /// source provided by the host operating system, as provided by `getrandom`.
 ///
-/// This is for use with "offline-chihuahua".
+/// This is for use with "freestanding-execution-engine".
 pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result {
     if let Ok(_) = getrandom::getrandom(buffer) {
         return result::Result::Success;
