@@ -4,6 +4,7 @@ version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
 description = "Veracruz protocol message wire-format parsing and serialization code for the trusted Veracruz runtime"
+build = "build.rs"
 
 [features]
 sgx = ["protobuf/mesalock_sgx", "sgx_types", "sgx_tstd"]

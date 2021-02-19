@@ -12,6 +12,8 @@
 extern crate protoc_rust;
 
 fn main() {
+    println!("cargo:rerun-if-changed=protos/colima.proto");
+
     protoc_rust::run(protoc_rust::Args {
         out_dir: "src/",
         input: &["protos/colima.proto"],

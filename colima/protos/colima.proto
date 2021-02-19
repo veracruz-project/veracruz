@@ -199,6 +199,7 @@ message ProxyAttestationServerResponse {
   }
   uint32 context = 1;
 }
+
 message MexicoCityRequest {
   oneof message_oneof {
     Data data = 2;

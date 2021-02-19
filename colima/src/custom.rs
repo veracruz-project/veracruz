@@ -46,14 +46,14 @@ pub fn parse_mexico_city_response(
     )?)
 }
 
-pub fn parse_tabasco_request(buffer: &[u8]) -> Result<colima::TabascoRequest, ColimaError> {
-    Ok(protobuf::parse_from_bytes::<colima::TabascoRequest>(
+pub fn parse_proxy_attestation_server_request(buffer: &[u8]) -> Result<colima::ProxyAttestationServerRequest, ColimaError> {
+    Ok(protobuf::parse_from_bytes::<colima::ProxyAttestationServerRequest>(
         buffer,
     )?)
 }
 
-pub fn parse_tabasco_response(buffer: &[u8]) -> Result<colima::TabascoResponse, ColimaError> {
-    Ok(protobuf::parse_from_bytes::<colima::TabascoResponse>(
+pub fn parse_proxy_attestation_server_response(buffer: &[u8]) -> Result<colima::ProxyAttestationServerResponse, ColimaError> {
+    Ok(protobuf::parse_from_bytes::<colima::ProxyAttestationServerResponse>(
         buffer,
     )?)
 }
@@ -261,10 +261,10 @@ pub fn serialize_proxy_psa_attestation_token(
     pat_proto.set_token(token.to_vec());
     pat_proto.set_pubkey(pubkey.to_vec());
     pat_proto.set_device_id(device_id);
-    let mut tabasco_request = colima::TabascoRequest::new();
-    tabasco_request.set_proxy_psa_attestation_token(pat_proto);
+    let mut proxy_attestation_server_request = colima::ProxyAttestationServerRequest::new();
+    proxy_attestation_server_request.set_proxy_psa_attestation_token(pat_proto);
 
-    Ok(tabasco_request.write_to_bytes()?)
+    Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
 pub fn parse_proxy_psa_attestation_token(
@@ -281,10 +281,10 @@ pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> C
     let mut pat_proto = colima::NativePsaAttestationToken::new();
     pat_proto.set_token(token.to_vec());
     pat_proto.set_device_id(device_id);
-    let mut tabasco_request = colima::TabascoRequest::new();
-    tabasco_request.set_native_psa_attestation_token(pat_proto);
+    let mut proxy_attestation_server_request = colima::ProxyAttestationServerRequest::new();
+    proxy_attestation_server_request.set_native_psa_attestation_token(pat_proto);
 
-    Ok(tabasco_request.write_to_bytes()?)
+    Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
 pub fn parse_native_psa_attestation_token(
@@ -301,7 +301,7 @@ pub fn serialize_sgx_attestation_init(pubkey: &[u8], device_id: i32) -> ColimaRe
     let mut attest_init_proto = colima::SgxAttestationInit::new();
     attest_init_proto.set_public_key(pubkey.to_vec());
     attest_init_proto.set_device_id(device_id);
-    let mut colima = colima::TabascoResponse::new();
+    let mut colima = colima::ProxyAttestationServerResponse::new();
     colima.set_sgx_attestation_init(attest_init_proto);
 
     Ok(colima.write_to_bytes()?)
@@ -309,7 +309,7 @@ pub fn serialize_sgx_attestation_init(pubkey: &[u8], device_id: i32) -> ColimaRe
 
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_sgx_attestation_challenge(
-    parsed: &colima::TabascoResponse,
+    parsed: &colima::ProxyAttestationServerResponse,
 ) -> Result<
     (
         sgx_types::sgx_ra_context_t,
@@ -353,7 +353,7 @@ pub fn serialize_sgx_attestation_challenge(
             attestation_challenge
         };
 
-        let mut proto = colima::TabascoResponse::new();
+        let mut proto = colima::ProxyAttestationServerResponse::new();
         proto.set_sgx_attestation_challenge(attestation_challenge);
         proto.set_context(context);
         proto
@@ -363,7 +363,7 @@ pub fn serialize_sgx_attestation_challenge(
 }
 
 pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> ColimaResult {
-    let mut request = colima::TabascoResponse::new();
+    let mut request = colima::ProxyAttestationServerResponse::new();
     let mut pai = colima::PsaAttestationInit::new();
     pai.set_challenge(challenge.to_vec());
     pai.set_device_id(device_id);
@@ -509,7 +509,7 @@ fn parse_msg3(abs: &colima::SgxAttestationTokens) -> (sgx_types::sgx_ra_msg3_t, 
 
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_attestation_tokens(
-    parsed: &colima::TabascoRequest,
+    parsed: &colima::ProxyAttestationServerRequest,
 ) -> Result<
     (
         sgx_types::sgx_ra_msg3_t,
@@ -590,7 +590,7 @@ pub fn serialize_sgx_attestation_tokens(
 
     attestation_tokens.set_pubkey_sig(pubkey_sig.to_vec());
 
-    let mut colima = colima::TabascoRequest::new();
+    let mut colima = colima::ProxyAttestationServerRequest::new();
     colima.set_sgx_attestation_tokens(attestation_tokens);
     colima.set_context(context);
 
@@ -598,7 +598,7 @@ pub fn serialize_sgx_attestation_tokens(
 }
 
 pub fn parse_start_msg(
-    parsed: &colima::TabascoRequest,
+    parsed: &colima::ProxyAttestationServerRequest,
 ) -> (std::string::String, std::string::String) {
     let start_msg = parsed.get_start_msg();
     (
@@ -608,7 +608,7 @@ pub fn parse_start_msg(
 }
 
 pub fn serialize_start_msg(protocol: &str, firmware_version: &str) -> ColimaResult {
-    let mut colima = colima::TabascoRequest::new();
+    let mut colima = colima::ProxyAttestationServerRequest::new();
     let mut start_msg = colima::StartMsg::new();
     start_msg.set_protocol(protocol.to_string());
     start_msg.set_firmware_version(firmware_version.to_string());
@@ -618,7 +618,7 @@ pub fn serialize_start_msg(protocol: &str, firmware_version: &str) -> ColimaResu
 
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_msg1(
-    parsed: &colima::TabascoRequest,
+    parsed: &colima::ProxyAttestationServerRequest,
 ) -> (sgx_types::sgx_ra_context_t, sgx_types::sgx_ra_msg1_t, i32) {
     let context = parsed.get_context();
     let msg1_proto = parsed.get_msg1();
@@ -645,7 +645,7 @@ pub fn serialize_msg1(
     msg1_proto.set_gid(msg1.gid.to_vec());
     msg1_proto.set_device_id(device_id);
 
-    let mut colima = colima::TabascoRequest::new();
+    let mut colima = colima::ProxyAttestationServerRequest::new();
     colima.set_msg1(msg1_proto);
     colima.set_context(context);
 
