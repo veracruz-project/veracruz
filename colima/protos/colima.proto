@@ -180,7 +180,7 @@ message PolicyHash {
 }
 
 
-message TabascoRequest {
+message ProxyAttestationServerRequest {
   oneof message_oneof {
     StartMsg start_msg = 2;
     NativePsaAttestationToken native_psa_attestation_token = 3;
@@ -191,7 +191,7 @@ message TabascoRequest {
   uint32 context = 1;
 }
 
-message TabascoResponse {
+message ProxyAttestationServerResponse {
   oneof message_oneof {
     PsaAttestationInit psa_attestation_init = 2;
     SgxAttestationInit sgx_attestation_init = 3;

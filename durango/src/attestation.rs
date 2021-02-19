@@ -45,7 +45,7 @@ impl Attestation for AttestationPSA {
             })?;
         let expected_enclave_hash = hex::decode(mexico_city_hash.as_str())?;
         Self::attestation_flow(
-            &policy.tabasco_url().as_str(),
+            &policy.proxy_attestation_server_url().as_str(),
             &policy.sinaloa_url().as_str(),
             &expected_enclave_hash,
         )
@@ -54,7 +54,7 @@ impl Attestation for AttestationPSA {
 
 impl AttestationPSA {
     fn attestation_flow(
-        tabasco_url: &str,
+        proxy_attestation_server_url: &str,
         remote_url: &str,
         expected_enclave_hash: &Vec<u8>,
     ) -> Result<(Vec<u8>, String), DurangoError> {
@@ -62,8 +62,8 @@ impl AttestationPSA {
         let serialized_rpat = colima::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let received_string = AttestationPSA::post_sinaloa(remote_url, &serialized_rpat)?;
 
-        let complete_tabasco_url = format!("http://{:}/VerifyPAT", tabasco_url);
-        let received_buffer = AttestationPSA::post_string(&complete_tabasco_url, received_string)?;
+        let complete_proxy_attestation_server_url = format!("http://{:}/VerifyPAT", proxy_attestation_server_url);
+        let received_buffer = AttestationPSA::post_string(&complete_proxy_attestation_server_url, received_string)?;
 
         let received_payload = base64::decode(&received_buffer)?;
 
