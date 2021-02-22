@@ -142,10 +142,22 @@ mod tests {
             std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
+                #[cfg(feature = "nitro")]
+                let ip_addr = 
+                {
+                    let ip_string = local_ipaddress::get()
+                        .expect("Failed to get local ip address");
+                    let ip_port_string = format!("{:}:3010", ip_string);
+                    ip_port_string
+                };
+                #[cfg(not(feature = "nitro"))]
+                let ip_addr = {
+                    proxy_attestation_server_url
+                };
                 #[cfg(feature="debug")]
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, true).unwrap();
+                let server = tabasco::server::server(ip_addr, true).unwrap();
                 #[cfg(not(feature="debug"))]
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+                let server = tabasco::server::server(ip_addr, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -1286,8 +1298,7 @@ mod tests {
 	// the policy files. so we need to replace it with the private IP of the current instance
         #[cfg(feature = "nitro")]
         {
-            let ip_string = local_ipaddress::get()
-            .expect("Failed to get local ip address");
+            let ip_string = std::env::var("TABASCO_IP_ADDRESS").expect("TABASCO_IP_ADDRESS environment variable not set");
             let ip_address = format!("\"proxy_attestation_server_url\": \"{:}:3010\"", ip_string);
             let re = Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
             let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
