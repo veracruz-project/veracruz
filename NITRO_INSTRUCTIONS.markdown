@@ -20,12 +20,8 @@ sudo yum install openssl11-devel
 sudo yum install openssl11
 ```
 
-Install the AWS CLI tools (source: https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html):
-```bash
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-```
+Configure nitro enclaves (source: From <https://docs.aws.amazon.com/enclaves/latest/user/enclaves-user.pdf> )
+Edit `/etc/nitro_enclaves/allocator.yaml` and set cpus = 2, memory to 256MB
 
 Following the directions here(https://www.crybit.com/change-default-data-image-directory-docker/), change the location where docker stores images (we do this because the default partition
 is too small for the docker images, so we want them stored on the EBS volume):
@@ -35,60 +31,24 @@ sudo mv /var/lib/docker /ebs_volume
 sudo ln -s /ebs_volume/docker /var/lib/docker
 sudo systemctl start docker
 ```
+Now, either build or download the docker image from our repo (https://github.com/veracruz-project/veracruz-docker-image)
 
+Set the environment variable `VERACRUZ_ROOT` to the absolute path to the veracruz source code.
 
-Now, get your docker image from wherever (these instructions show it being pulled from AWS ECR - https://docs.aws.amazon.com/AmazonECR/latest/userguide/getting-started-cli.html):
+Set the environment variable `LOCALIP` to the private AWS IP address of the EC2 instance you are running on.
+Start the docker image:
 ```bash
-sudo usermod -a -G docker ec2-user
+docker run --privileged -d -v $(abspath $(VERACRUZ_ROOT)):/work/veracruz -v $(HOME)/.cargo/registry/:/usr/local/cargo/registry/ -v /usr/bin:/host/bin -v /usr/share/nitro_enclaves:/usr/share/nitro_enclaves -v /run/nitro_enclaves:/run/nitro_enclaves -v /etc/nitro_enclaves:/etc/nitro_enclaves --device=/dev/vsock:/dev/vsock -v /var/run/docker.sock:/var/run/docker.sock --device=/dev/nitro_enclaves:/dev/nitro_enclaves --env TABASCO_IP_ADDRESS=$(LOCALIP) -p $(LOCALIP):3010:3010/tcp --name veracruz_nitro veracruz_image_nitro
 ```
-logout
-log back in
 
+Start a shell on the newly launch container:
+```bash
+docker exec -u root -it veracruz_nitro bash
+```
 
-configure your AWS credentials:
+Now, configure your AWS credentials inside the container shell:
 ```bash
 aws configure
-```
-
-authenticate to your registry:
-```bash
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 768728991925.dkr.ecr.us-east-1.amazonaws.com
-```
-pull the image:
-```bash
-docker pull <IMAGE URI>
-```
-
-
-Clone veracruz source:
-```bash
-git clone https://github.com/veracruz-project/veracruz.git --recursive
-```
-Now, run the docker container:
-```bash
-export VERACRUZ_ROOT=<PATH TO VERACRUZ>
-docker run -d -v $VERACRUZ_ROOT:/work/veracruz -v $HOME/.cargo/registry:/home/<USERNAME>/.cargo/registry --name veracruz <IMAGE NAME>
-```
-
-Now, start a shell in the container:
-```bash
-docker exec -u dermil01 -it veracruz bash
-```
-
-Install the AWS Nitro Enclaves CLI (source: https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave-cli-install.html) (TODO: This should be done by the docker build process):
-```bash
-sudo amazon-linux-extras install aws-nitro-enclaves-cli
-sudo yum install aws-nitro-enclaves-cli-devel -y
-sudo usermod -aG ne ec2-user
-```
-
-Configure nitro enclaves (source: From <https://docs.aws.amazon.com/enclaves/latest/user/enclaves-user.pdf> ) (TODO: Find out if this will work from inside a docker container).
-Edit `/etc/nitro_enclaves/allocator.yaml` and set cpus = 2, memory to 256MB
-
-preparing the build environment inside the container (TODO: This should be done in the container build process):
-install the target x86_64-unknown-linux-musl
-```bash
-rustup target add x86_64-unknown-linux-musl
 ```
 
 Veracruz needs the ability to start another EC2 instance from your initial EC2 instance. The following instructions set up this ability.
@@ -117,3 +77,10 @@ export AWS_SUBNET="<VALUE>"
 export AWS_REGION="<VALUE>"
 export AWS_SECURITY_GROUP_ID="<VALUE>"
 ```
+
+Now, inside the shell running on the container, execute the following:
+```bash
+cd /work/veracruz
+make nitro-sinaloa-test
+```
+You should see 22 tests pass.
