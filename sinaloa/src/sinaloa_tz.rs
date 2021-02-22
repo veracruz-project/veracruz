@@ -404,7 +404,7 @@ pub mod sinaloa_tz {
             protocol: &str,
             firmware_version: &str,
         ) -> Result<(Vec<u8>, i32), SinaloaError> {
-            let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version?;
+            let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_psa_attestation_init() {
                 let (challenge, device_id) = colima::parse_psa_attestation_init(
                     proxy_attestation_server_response.get_psa_attestation_init(),

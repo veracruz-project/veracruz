@@ -255,7 +255,7 @@ pub fn send_proxy_attestation_server_start(
     let received_body: String = post_buffer(&url, &encoded_start_msg)?;
 
     let body_vec = base64::decode(&received_body)?;
-    let response = colima::parse_proxy_attestation_server_response(&body_vec?;
+    let response = colima::parse_proxy_attestation_server_response(&body_vec)?;
     return Ok(response);
 }
 
