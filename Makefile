@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env nitro-env trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -47,7 +47,7 @@ sgx: sdk sgx-env
 	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
-nitro: sdk
+nitro: sdk nitro-env
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
@@ -107,7 +107,7 @@ trustzone-test-env: tz_test.sh run_tz_test.sh
 
 nitro-veracruz-server-test: nitro test_cases
 	cd veracruz-server-test \
-		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro -- --test-threads=1 \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
 	cd veracruz-server-test \
 		&& ./nitro-terminate.sh
@@ -149,6 +149,9 @@ trustzone-env:
 
 sgx-env:
 	unset CC
+
+nitro-env:
+	rustup target add x86_64-unknown-linux-musl
 
 clean:
 	cd runtime-manager-bind && cargo clean 
