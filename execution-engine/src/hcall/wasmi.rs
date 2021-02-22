@@ -403,7 +403,7 @@ impl WasmiHostProvisioningState {
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        if self.get_lifecycle_state() == &LifecycleState::Initial {
+        //if self.get_lifecycle_state() == &LifecycleState::Initial {
             if let Ok(module) = Module::from_buffer(buffer) {
                 let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
 
@@ -424,6 +424,7 @@ impl WasmiHostProvisioningState {
                         self.set_memory(linear_memory);
                         //self.set_program_digest(&sha_256_digest(buffer));
 
+                        // TODO: Remove state machine
                         if self.get_expected_data_source_count() == 0 {
                             if self.get_expected_stream_source_count() == 0 {
                                 self.set_ready_to_execute();
@@ -433,6 +434,9 @@ impl WasmiHostProvisioningState {
                         } else {
                             self.set_data_sources_loading();
                         }
+                        //TODO: GLUE CODE
+                        
+                        //TODO: END OF GLUE CODE
                         return Ok(());
                     }
 
@@ -446,13 +450,14 @@ impl WasmiHostProvisioningState {
                 self.set_error();
                 Err(HostProvisioningError::InvalidWASMModule)
             }
-        } else {
-            self.set_error();
-            Err(HostProvisioningError::InvalidLifeCycleState {
-                expected: vec![LifecycleState::Initial],
-                found: self.get_lifecycle_state().clone(),
-            })
-        }
+
+        //} else {
+            //self.set_error();
+            //Err(HostProvisioningError::InvalidLifeCycleState {
+                //expected: vec![LifecycleState::Initial],
+                //found: self.get_lifecycle_state().clone(),
+            //})
+        //}
     }
 
     /// The WASMI implementation of `__veracruz_hcall_write_output()`.
@@ -849,7 +854,37 @@ impl WasmiHostProvisioningState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
-        if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
+        // TODO: GLUE CODE HERE
+        let input_table = self.get_program_input_table(file_name)?;
+        let mut input_vec = Vec::new();
+        let mut stream_vec = Vec::new();
+        for input_file in input_table {
+            if input_file.starts_with("input-") {
+                let package_id = input_file.strip_prefix("input-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
+                let metadata = DataSourceMetadata::new(
+                    self.vfs.read(&input_file).map_err(|e| format!("{:?}",e))?.as_slice(),
+                    0,
+                    package_id,
+                );
+                input_vec.push(metadata);
+            }
+            if input_file.starts_with("stream-") {
+                let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
+                let metadata = DataSourceMetadata::new(
+                    self.vfs.read(&input_file).map_err(|e| format!("{:?}",e))?.as_slice(),
+                    0,
+                    package_id,
+                );
+                stream_vec.push(metadata);
+            }
+        }
+
+        self.data_sources = input_vec;
+        self.stream_sources = stream_vec;
+        //
+        // TODO: END GLUE CODE HERE
+        // TODO Drop state machine
+        //if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
             match self.invoke_export(ENTRY_POINT_NAME) {
                 Ok(Some(RuntimeValue::I32(return_code))) => {
                     self.set_finished_executing();
@@ -868,9 +903,9 @@ impl WasmiHostProvisioningState {
                     Err(FatalHostError::WASMIError(err))
                 }
             }
-        } else {
-            Err(FatalHostError::EngineIsNotReady)
-        }
+        //} else {
+            //Err(FatalHostError::EngineIsNotReady)
+        //}
     }
 }
 
@@ -879,13 +914,13 @@ impl WasmiHostProvisioningState {
 impl ExecutionEngine for WasmiHostProvisioningState {
     /// ExecutionEngine wrapper of load_program implementation in WasmiHostProvisioningState.
     fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.append_file(client_id,file_name,data)
+        self.append_file_base(client_id,file_name,data)
     }
 
     /// Chihuahua wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.read_file(client_id,file_name)
+        self.read_file_base(client_id,file_name)
     }
 
     /// Chihuahua wrapper of register_program implementation in WasmiHostProvisioningState.

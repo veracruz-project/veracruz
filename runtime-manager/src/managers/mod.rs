@@ -120,6 +120,7 @@ impl ProtocolState {
         };
         let capability_table = global_policy.get_capability_table();
         let program_digests = global_policy.get_program_digests()?;
+        let input_table = global_policy.get_input_table()?;
         println!("{:?}",capability_table);
 
         let host_state = multi_threaded_execution_engine(
@@ -133,6 +134,7 @@ impl ProtocolState {
                 .as_slice(),
             &capability_table,
             &program_digests,
+            &input_table,
         )
         .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?;
 

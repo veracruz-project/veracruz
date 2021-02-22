@@ -129,6 +129,7 @@ pub fn multi_threaded_execution_engine(
     expected_shutdown_sources: &[u64],
     file_permissions: &VeracruzCapabilityTable,
     program_digests: &HashMap<String, Vec<u8>>, 
+    input_table: &HashMap<String, Vec<String>>,
 ) -> Option<Arc<Mutex<dyn ExecutionEngine + 'static>>> {
     #[cfg(feature = "std")]
     {
@@ -140,6 +141,7 @@ pub fn multi_threaded_execution_engine(
                     expected_shutdown_sources,
                     file_permissions,
                     program_digests,
+                    input_table,
                 );
 
                 Some(Arc::new(Mutex::new(state)))
@@ -167,6 +169,7 @@ pub fn multi_threaded_execution_engine(
                     expected_shutdown_sources,
                     file_permissions,
                     program_digests,
+                    input_table,
                 );
 
                 Some(Arc::new(Mutex::new(state)))
@@ -183,11 +186,13 @@ fn new_wasmi_instance (
     expected_shutdown_sources: &[u64],
     capability_table: &VeracruzCapabilityTable,
     program_digests: &HashMap<String, Vec<u8>>, 
+    input_table: &HashMap<String, Vec<String>>, 
 ) -> impl Chihuahua + 'static {
     let mut state = wasmi::WasmiHostProvisioningState::valid_new(
         expected_shutdown_sources,
         capability_table,
         program_digests,
+        input_table,
     );
     state
         .set_expected_data_sources(expected_data_sources)

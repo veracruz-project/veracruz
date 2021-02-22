@@ -291,10 +291,10 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
 pub struct HostProvisioningState<Module, Memory> {
     //TODO REMOVE
     /// The data sources that have been provisioned into the machine.
-    data_sources: Vec<DataSourceMetadata>,
+    pub(crate) data_sources: Vec<DataSourceMetadata>,
     //TODO REMOVE
     /// The stream sources that have been provisioned into the machine.
-    stream_sources: Vec<DataSourceMetadata>,
+    pub(crate) stream_sources: Vec<DataSourceMetadata>,
     //TODO REMOVE
     /// The expected list of data sources, derived from the global policy
     /// parameterising the computation.
@@ -308,9 +308,6 @@ pub struct HostProvisioningState<Module, Memory> {
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
     program_module: Option<Module>,
-    //TODO REMOVE
-    /// The SHA-256 digest of the bytes of the loaded program, if any.
-    program_digest: Option<Vec<u8>>,
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<Memory>,
     //TODO REMOVE
@@ -322,7 +319,10 @@ pub struct HostProvisioningState<Module, Memory> {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    vfs : VFS,
+    pub(crate) vfs : VFS,
+    // program name -> Vec of require input file
+    // TODO: for back capabilities, input file need to be in order.
+    input_table : HashMap<String, Vec<String>>,
 }
 
 impl<Module, Memory> HostProvisioningState<Module, Memory> {
@@ -335,6 +335,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     //      Pass:
     //      - file permission, which controls and replace, stream_sources, data_sources, program_digest, previous_result, result, expected_data_sources, expected_stream_sources
     //      - expected_shutdown_sources
+    #[deprecated]
     #[inline]
     pub fn new() -> Self {
         HostProvisioningState {
@@ -344,12 +345,13 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             expected_stream_sources: Vec::new(),
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
-            program_digest: None,
+            //program_digest: None,
             memory: None,
             previous_result: None,
             result: None,
             expected_shutdown_sources: Vec::new(),
             vfs: VFS::new(&HashMap::new(),&HashMap::new()),
+            input_table : HashMap::new(),
         }
     }
 
@@ -357,6 +359,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     pub fn valid_new(expected_shutdown_sources: &[u64], 
         capabilities: &VeracruzCapabilityTable,
         digests: &HashMap<String, Vec<u8>>, 
+        input_table : &HashMap<String, Vec<String>>,
     ) -> Self {
         HostProvisioningState {
             data_sources: Vec::new(),
@@ -365,44 +368,46 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             expected_stream_sources: Vec::new(),
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
-            program_digest: None,
+            //program_digest: None,
             memory: None,
             previous_result: None,
             result: None,
             expected_shutdown_sources : expected_shutdown_sources.to_vec(),
             vfs: VFS::new(capabilities,digests),
+            input_table : input_table.clone(),
         }
     }
 
     /// Append to a file.
-    pub(crate) fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    pub(crate) fn append_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
         self.vfs.write(file_name,data)?;
+        Ok(())
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        if file_name.starts_with("input-") {
-            let package_id = file_name.strip_prefix("input-").unwrap().parse::<u64>().unwrap();
-            let metadata = DataSourceMetadata::new(
-                data,
-                client_id,
-                package_id,
-            );
-            self.add_new_data_source(metadata)
-        } else if file_name.starts_with("stream-") {
-            let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
-            let metadata = DataSourceMetadata::new(
-                data,
-                client_id,
-                package_id,
-            );
-            self.add_new_stream_source(metadata)
-        } else {
-            Err(HostProvisioningError::FileNotFound(file_name.to_string()))
-        }
+        //if file_name.starts_with("input-") {
+            //let package_id = file_name.strip_prefix("input-").unwrap().parse::<u64>().unwrap();
+            //let metadata = DataSourceMetadata::new(
+                //data,
+                //client_id,
+                //package_id,
+            //);
+            //self.add_new_data_source(metadata)
+        //} else if file_name.starts_with("stream-") {
+            //let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
+            //let metadata = DataSourceMetadata::new(
+                //data,
+                //client_id,
+                //package_id,
+            //);
+            //self.add_new_stream_source(metadata)
+        //} else {
+            //Err(HostProvisioningError::FileNotFound(file_name.to_string()))
+        //}
     }
 
     /// Read from a file
-    pub(crate) fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+    pub(crate) fn read_file_base(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Read)?;
         self.vfs.read(file_name)?;
         //TODO: link to the actually fs API.
@@ -471,9 +476,10 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     }
 
     /// Registers the program digest.
+    #[deprecated]
     #[inline]
     pub(crate) fn set_program_digest(&mut self, digest: &[u8]) {
-        self.program_digest = Some(digest.to_vec());
+        //self.program_digest = Some(digest.to_vec());
     }
 
     /// Registers a linear memory/heap.
@@ -531,9 +537,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
 
     /// Returns the program digest, if it has been computed.  Returns `None` iff
     /// the digest has not yet been computed.
+    #[deprecated]
     #[inline]
     pub(crate) fn get_program_digest(&self) -> Option<&Vec<u8>> {
-        self.program_digest.as_ref()
+        None
+        //self.program_digest.as_ref()
     }
 
     /// Returns the data source frame (containing raw data, source and package
@@ -692,6 +700,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.lifecycle_state = LifecycleState::Error;
     }
 
+    #[deprecated]
     /// Sets the machine state to `LifecycleState::ReadyToExecute`.
     ///
     /// PANICS: will panic if the current machine state is neither
@@ -709,6 +718,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.lifecycle_state = LifecycleState::ReadyToExecute;
     }
 
+    #[deprecated]
     /// Sets the machine state to `LifecycleState::DataSourcesLoading`.
     ///
     /// PANICS: will panic if the current machine state is neither
@@ -725,6 +735,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.lifecycle_state = LifecycleState::DataSourcesLoading;
     }
 
+    #[deprecated]
     /// Sets the machine state to `LifecycleState::DataSourcesLoading`.
     ///
     /// PANICS: will panic if the current machine state is neither
@@ -742,6 +753,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.lifecycle_state = LifecycleState::StreamSourcesLoading;
     }
 
+    #[deprecated]
     /// Sets the machine state to `LifecycleState::FinishedExecuting`.
     ///
     /// PANICS: will panic if the current machine state is not
@@ -751,7 +763,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         // This should have been checked before now, to provide a more
         // meaningful error.  This is here just to ensure nothing slips through,
         // and if it does, terminate.
-        assert_eq!(self.lifecycle_state, LifecycleState::ReadyToExecute);
+        //assert_eq!(self.lifecycle_state, LifecycleState::ReadyToExecute);
         self.lifecycle_state = LifecycleState::FinishedExecuting;
     }
 
@@ -765,6 +777,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         Self::sorting_functor(&mut self.data_sources, &self.expected_data_sources)
     }
 
+    #[deprecated]
     /// Registers the data source `metadata`` in the host state.  Host state
     /// must be in the state `LifecycleState::DataSourcesLoading` otherwise an
     /// error is returned.  Progresses the provisioning process to either
@@ -936,6 +949,13 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     pub(crate) fn request_shutdown(&mut self, client_id: u64) {
         self.expected_shutdown_sources.retain(|v| v != &client_id);
     }
+
+    pub(crate) fn get_program_input_table(&mut self, file_name: &str) -> Result<Vec<String>, FatalHostError> {
+        let inputs = self.input_table.get(file_name).ok_or(FatalHostError::ProgramCannotFound{
+            file_name : file_name.to_string(),
+        })?;
+        Ok(inputs.clone())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1027,6 +1047,10 @@ pub enum FatalHostError {
     /// Wrapper for WASI Error other than Trap.
     #[error(display = "FatalVeracruzHostError: WASMIError {:?}.", _0)]
     WASMIError(#[source(error)] wasmi::Error),
+    #[error(display = "FatalVeracruzHostError: Program {} cannot be found.", file_name)]
+    ProgramCannotFound{
+        file_name : String,
+    },
     /// Wrapper for direct error message.
     #[error(display = "FatalVeracruzHostError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
@@ -1113,6 +1137,7 @@ pub trait ExecutionEngine: Send {
     /// and the hash of `prog` must match the requirement.
     fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError>; 
 
+    #[deprecated]
     //TODO: these API will be replaced by FS API -- strart
     /// Loads a raw WASM program from a buffer of received or parsed bytes.
     /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
@@ -1123,6 +1148,7 @@ pub trait ExecutionEngine: Send {
     /// data to be provisioned.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError>;
 
+    #[deprecated]
     /// Provisions a new data source, described using a `DataSourceMetadata`
     /// frame into the host state.  Will fail if the lifecycle state is not
     /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
@@ -1133,6 +1159,7 @@ pub trait ExecutionEngine: Send {
         metadata: DataSourceMetadata,
     ) -> Result<(), HostProvisioningError>;
 
+    #[deprecated]
     /// Provisions a new stream source, described using a `DataSourceMetadata`
     /// frame into the host state.  Will fail if the lifecycle state is not
     /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
@@ -1151,11 +1178,13 @@ pub trait ExecutionEngine: Send {
     /// returned by the WASM program entry point as an `i32` value.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError>;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns `true` iff a program module has been registered in the host
     /// provisioning state.
     fn is_program_registered(&self) -> bool;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns `true` iff a result has been registered with the host
     /// provisioning state by a WASM program.
@@ -1170,61 +1199,71 @@ pub trait ExecutionEngine: Send {
     /// so.
     fn is_able_to_shutdown(&self) -> bool;
 
+    #[deprecated]
     /// Returns the current lifecycle state that the host provisioning state is
     /// in.
     fn get_lifecycle_state(&self) -> LifecycleState;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns the current number of data sources provisioned into the host
     /// provisioning state.
     fn get_current_data_source_count(&self) -> usize;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns the expected data sources, as identified by their client IDs,
     /// that we expect to be provisioned into the host state.
     fn get_expected_data_sources(&self) -> Vec<u64>;
 
-    //TODO: do we need this 
     /// Returns the list of client IDs of clients who can request shutdown of
     /// the platform.
     fn get_expected_shutdown_sources(&self) -> Vec<u64>;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns the current number of stream sources provisioned into the host
     /// provisioning state.
     fn get_current_stream_source_count(&self) -> usize;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns the expected stream sources, as identified by their client IDs,
     /// that we expect to be provisioned into the host state.
     fn get_expected_stream_sources(&self) -> Vec<u64>;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns a result of a WASM computation that has executed on the host
     /// provisioning state.  Returns `None` iff no such result has been
     /// registered.
     fn get_result(&self) -> Option<Vec<u8>>;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Returns an SHA-256 digest of the bytes loaded into the host provisioning
     /// state.  Returns `None` iff no such program has yet been loaded.
     fn get_program_digest(&self) -> Option<Vec<u8>>;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Sets the expected data sources, through a list of their source IDs, that
     /// this computation is expecting.
     fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Sets the expected stream sources, through a list of their source IDs, that
     /// this computation is expecting.
     fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Sets the expected shutdown sources, through a list of their source IDs, that
     /// this computation is expecting.
     fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
+    #[deprecated]
     //TODO: do we need this 
     /// Registers the previous result.
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>);

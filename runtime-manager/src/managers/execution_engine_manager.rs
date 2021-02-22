@@ -137,17 +137,30 @@ fn dispatch_on_request_state(protocol_state: &ProtocolState) -> ProvisioningResu
 /// Returns the result of a computation, computing the result first.  Fails if
 /// we are not in the `LifecycleState::ReadyToExecute` state.
 fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &ProtocolState, client_id: u64,) -> ProvisioningResult {
-    //TODO: USE THE FILE_NAME 
+    // TODO check file exists
     if check_state(
         &protocol_state.get_lifecycle_state()?,
-        &[LifecycleState::ReadyToExecute],
+        &[LifecycleState::FinishedExecuting],
     ) {
+        //TODO: read the actually file.
+        let result = protocol_state.read_file(client_id,"output")?;
+        let response = response_success(result);
+        return Ok(ProvisioningResponse::Success { response });
+    }
+
+    //TODO: USE THE FILE_NAME 
+    //if check_state(
+        //&protocol_state.get_lifecycle_state()?,
+        //&[LifecycleState::ReadyToExecute],
+    //) {
+        // TODO: MOVE OUT OF THIS FUNCTION
         match protocol_state.invoke_entry_point(&file_name) {
             Ok(return_code) => {
-                assert!(check_state(
-                    &protocol_state.get_lifecycle_state()?,
-                    &[LifecycleState::FinishedExecuting]
-                ));
+                //TODO: TEMPERARY comment out
+                //assert!(check_state(
+                    //&protocol_state.get_lifecycle_state()?,
+                    //&[LifecycleState::FinishedExecuting]
+                //));
 
                 if return_code == 0 {
                     let result = protocol_state.get_result()?;
@@ -159,23 +172,17 @@ fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestRe
                 }
             }
             Err(error) => {
-                assert!(check_state(
-                    &protocol_state.get_lifecycle_state()?,
-                    &[LifecycleState::Error]
-                ));
+                //TODO: TEMPERARY comment out
+                //assert!(check_state(
+                    //&protocol_state.get_lifecycle_state()?,
+                    //&[LifecycleState::Error]
+                //));
                 Err(error)
             }
         }
-    } else if check_state(
-        &protocol_state.get_lifecycle_state()?,
-        &[LifecycleState::FinishedExecuting],
-    ) {
-        let result = protocol_state.read_file(client_id,&file_name)?;
-        let response = response_success(result);
-        Ok(ProvisioningResponse::Success { response })
-    } else {
-        response_not_ready()
-    }
+    //} else {
+        //response_not_ready()
+    //}
 }
 
 /// Processes a request from a client to perform a platform shutdown.  Returns

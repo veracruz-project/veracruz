@@ -18,8 +18,7 @@ fn main() {
     println!("{:?}",rst);
     let digests = policy.get_program_digests();
     println!("{:?}",digests);
-    //let rst = hex::decode(digests
-            //.get("string-edit-distance.wasm")
-            //.unwrap()).unwrap();
-    //println!("{:?}",rst);
+
+    let inputs = policy.get_input_table();
+    println!("{:?}",inputs);
 }
