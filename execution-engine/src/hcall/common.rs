@@ -996,13 +996,13 @@ pub(crate) enum EntrySignature {
 
 /// This is what an execution strategy exposes to clients outside of this
 /// library.  This functionality is sufficient to implement both
-/// `freestanding-chihuahua` and `mexico-city` and if any functionality is
+/// `freestanding-execution-engine` and `mexico-city` and if any functionality is
 /// missing that these components require then it should be added to this trait
 /// and implemented for all supported implementation strategies.
 ///
 /// Note that a factory method, in the file `hcall/factory.rs` will return an
 /// opaque instance of this trait depending on the
-pub trait Chihuahua: Send {
+pub trait ExecutionEngine: Send {
     /// Loads a raw WASM program from a buffer of received or parsed bytes.
     /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
     /// if the buffer cannot be parsed.  On success bumps the lifecycle state to
@@ -1090,15 +1090,15 @@ pub trait Chihuahua: Send {
 
     /// Sets the expected data sources, through a list of their source IDs, that
     /// this computation is expecting.
-    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
     /// Sets the expected stream sources, through a list of their source IDs, that
     /// this computation is expecting.
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
     /// Sets the expected shutdown sources, through a list of their source IDs, that
     /// this computation is expecting.
-    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn Chihuahua;
+    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
     /// Registers the previous result.
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>);

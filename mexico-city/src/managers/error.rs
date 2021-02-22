@@ -28,9 +28,9 @@ pub enum MexicoCityError {
     #[error(display = "MexicoCity: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
     #[error(display = "MexicoCity: FatalHostError: {:?}.", _0)]
-    FatalHostError(#[error(source)] chihuahua::hcall::common::FatalHostError),
+    FatalHostError(#[error(source)] execution_engine::hcall::common::FatalHostError),
     #[error(display = "MexicoCity: HostProvisioningError: {:?}.", _0)]
-    HostProvisioningError(#[error(source)] chihuahua::hcall::common::HostProvisioningError),
+    HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
     #[error(display = "MexicoCity: MexicoCityBufferError: {:?}.", _0)]
     MexicoCityBufferError(#[error(source)] crate::managers::buffer::MexicoCityBufferError),
     #[error(display = "MexicoCity: Failed to obtain lock {:?}.", _0)]

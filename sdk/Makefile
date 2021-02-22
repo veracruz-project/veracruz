@@ -1,7 +1,7 @@
 # Top-level build-all Makefile for the SDK
 #
 # Builds:
-#   - freestanding-chihuahua
+#   - freestanding-execution-engine
 #   - Rust support libraries libveracruz and veracruz-rt
 #   - all of the Rust examples in the rust-language-support/examples/ directory
 #   - all of the datasets in data-generators/ directory
@@ -58,9 +58,9 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean doc fmt freestanding-chihuahua rust-libveracruz rust-veracruz-rt wasm-checker env
+.PHONY: all clean doc fmt freestanding-execution-engine rust-libveracruz rust-veracruz-rt wasm-checker env
 
-all: wasm-checker $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-chihuahua rust-libveracruz rust-veracruz-rt
+all: wasm-checker $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-execution-engine rust-libveracruz rust-veracruz-rt
 
 wasm-checker:
 	$(MAKE) -C wasm-checker
@@ -70,8 +70,8 @@ $(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUS
 	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@)))
 	./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
 
-freestanding-chihuahua: env
-	$(MAKE) -C freestanding-chihuahua/
+freestanding-execution-engine: env
+	$(MAKE) -C freestanding-execution-engine/
 
 rust-libveracruz: env
 	$(MAKE) -C rust-language-support/libveracruz/
@@ -103,7 +103,7 @@ fmt:
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
         	$(MAKE) -C $$example fmt; \
     	done
-	$(MAKE) -C freestanding-chihuahua/ fmt
+	$(MAKE) -C freestanding-execution-engine/ fmt
 	$(MAKE) -C rust-language-support/libveracruz/ fmt
 	$(MAKE) -C rust-language-support/veracruz-rt/ fmt
 
@@ -111,7 +111,7 @@ doc:
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
                 $(MAKE) -C $$example doc; \
         done
-	$(MAKE) -C freestanding-chihuahua/ doc
+	$(MAKE) -C freestanding-execution-engine/ doc
 	$(MAKE) -C rust-language-support/libveracruz/ doc
 	$(MAKE) -C rust-language-support/veracruz-rt/ doc
 
@@ -123,7 +123,7 @@ clean:
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
 		$(MAKE) -C $$example clean; \
 	done
-	$(MAKE) -C freestanding-chihuahua/ clean
+	$(MAKE) -C freestanding-execution-engine/ clean
 	$(MAKE) -C rust-language-support/libveracruz/ clean
 	$(MAKE) -C rust-language-support/veracruz-rt/ clean
 	$(MAKE) -C wasm-checker/ clean

@@ -2,7 +2,7 @@
 //!
 //! A thin abstraction-layer over various platform services provided by individual
 //! trusted execution environments and the Rust standard library (for
-//! "freestanding-chihuahua").  These services are exposed by Chihuahua to the WASM
+//! "freestanding-execution-engine").  These services are exposed by Veracruz to the WASM
 //! program running in the TEE through a H-call.
 //!
 //! Services provided by this library:

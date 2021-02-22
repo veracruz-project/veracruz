@@ -1,4 +1,4 @@
-//! Common error handling code for all Chihuahua execution engines.
+//! Common error handling code for all execution engines.
 //!
 //! ## Authors
 //!

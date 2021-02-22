@@ -1,6 +1,6 @@
-//! The Chihuahua WASM execution engine
+//! The Veracruz WASM execution engine
 //!
-//! Chihuahua executes the WASM binary, and manages its execution, using two
+//! This module executes the WASM binary, and manages its execution, using two
 //! *execution strategies*.  These are:
 //!
 //! 1. Interpretation, using the WASMI interpreter,

@@ -54,9 +54,9 @@ mod tests {
     use stringreader;
     use tabasco;
 
-    // Constants corresponding to the `chihuahua::hcall::MachineState` enum which is
+    // Constants corresponding to the `execution_engine::hcall::MachineState` enum which is
     // encoded as a `u8` value when servicing an enclave state request.  Included here
-    // to avoid adding chihuahua as a direct dependency of this crate.
+    // to avoid adding `execution_engine` as a direct dependency of this crate.
     const ENCLAVE_STATE_INITIAL: u8 = 0;
     const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
     const ENCLAVE_STATE_STREAM_SOURCE_SLOADING: u8 = 2;

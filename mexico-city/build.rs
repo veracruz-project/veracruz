@@ -55,7 +55,7 @@ fn main() -> std::io::Result<()> {
         println!("cargo:rerun-if-changed=ta.lds");
 
         println!("cargo:rustc-link-search={}", search_path.display());
-        println!("cargo:rustc-link-search=../chihuahua/src/output");
+        println!("cargo:rustc-link-search=../execution-engine/src/output");
         println!("cargo:rustc-link-lib=static=utee");
         println!("cargo:rustc-link-lib=static=mbedtls");
         println!("cargo:rustc-link-lib=static=utils");

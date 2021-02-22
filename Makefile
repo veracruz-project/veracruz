@@ -171,11 +171,11 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,baja chihuahua colima durango jalisco mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora tabasco veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,baja execution-engine colima durango jalisco mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora tabasco veracruz-test veracruz-util)
 
 fmt:
 	cd baja && cargo fmt
-	cd chihuahua && cargo fmt
+	cd execution-engine && cargo fmt
 	cd colima && cargo fmt
 	cd durango && cargo fmt
 	cd jalisco && cargo fmt

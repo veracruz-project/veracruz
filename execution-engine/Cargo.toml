@@ -1,5 +1,5 @@
 [package]
-name = "chihuahua"
+name = "execution-engine"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
@@ -26,7 +26,7 @@ err-derive = "0.2"
 pinecone = "0.2"
 
 [lib]
-name = "chihuahua"
+name = "execution_engine"
 path = "./src/lib.rs"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

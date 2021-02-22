@@ -1,8 +1,8 @@
-//! A freestanding version of Chihuahua, for offline development.
+//! A freestanding version of the Veracruz execution engine, for offline development.
 //!
 //! ## About
 //!
-//! Reads a TOML configuration file at `./config/chihuahua.toml` to ascertain
+//! Reads a TOML configuration file at `./config/execution-engine.toml` to ascertain
 //! static configuration options for computation.
 //!
 //! The WASM binary to execute, and any data sources being passed to the binary,
@@ -28,9 +28,9 @@
 
 use std::{boxed::Box, convert::TryFrom, fmt, fs::File, io::Read, process::exit, time::Instant};
 
-use chihuahua::{
-    factory::{single_threaded_chihuahua, ExecutionStrategy},
-    hcall::common::{Chihuahua, DataSourceMetadata},
+use execution_engine::{
+    factory::{single_threaded_execution_engine, ExecutionStrategy},
+    hcall::common::{ExecutionEngine, DataSourceMetadata},
 };
 
 use clap::{App, Arg};
@@ -40,20 +40,20 @@ use log::*;
 // Constants.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// About Chihuahua/freestanding-chihuahua/Veracruz.
+/// About freestanding-execution-engine/Veracruz.
 const ABOUT: &'static str = "Veracruz: a platform for practical secure multi-party \
-                             computations.\nThis is freestanding-chihuahua, an offline \
-                             counterpart of the Chihuahua execution engine that is part of the \
+                             computations.\nThis is freestanding-execution-engine, an offline \
+                             counterpart of the Veracruz execution engine that is part of the \
                              Veracruz platform.  This can be used to test and develop WASM \
                              programs before deployment on the platform.";
 /// The name of the application.
-const APPLICATION_NAME: &'static str = "freestanding-chihuahua";
+const APPLICATION_NAME: &'static str = "freestanding-execution-engine";
 /// The authors list.
 const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in \
                                the Veracruz root directory for detailed authorship information.";
 /// The path to the static TOML configuration file that configures
-/// freestanding-chihuahua.
-const CONFIGURATION_FILE: &'static str = "config/chihuahua.toml";
+/// freestanding-execution-engine.
+const CONFIGURATION_FILE: &'static str = "config/execution-engine.toml";
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
 
@@ -149,12 +149,12 @@ impl fmt::Display for ErrorCode {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Chihuahua configuration files, and parsing.
+// Configuration files, and parsing.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The static configuration, which in this case fulfills a similar role to the
 /// Veracruz policy file.  This contains various important bits of static
-/// configuration for a Chihuahua computation, such as whether performance
+/// configuration for a Veracruz computation, such as whether performance
 /// statistics should be suppressed, the number of data sources expected, etc.
 struct Configuration {
     /// The maximum call stack size of the WASM engine.
@@ -415,7 +415,7 @@ fn read_configuration_file(fname: &str) -> Configuration {
 }
 
 /// Loads the specified data sources, as provided on the command line, for
-/// reading and massages them into Chihuahua metadata frames, ready for
+/// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
 fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
@@ -456,7 +456,7 @@ fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
 }
 
 /// Entry: reads the static configuration and the command line parameters,
-/// parsing both and then starts provisioning the Chihuahua host state, before
+/// parsing both and then starts provisioning the Veracruz host state, before
 /// invoking the entry point.
 fn main() {
     env_logger::init();
@@ -474,8 +474,8 @@ fn main() {
     info!("WASM module loaded.");
 
     let expected_data_sources: Vec<u64> = (0..config.data_source_count as u64).collect();
-    let mut provisioning_state: Box<dyn Chihuahua + 'static> =
-        single_threaded_chihuahua(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
+    let mut provisioning_state: Box<dyn ExecutionEngine + 'static> =
+        single_threaded_execution_engine(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
             .unwrap();
 
     provisioning_state.set_expected_data_sources(&expected_data_sources);

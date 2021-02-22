@@ -1,4 +1,4 @@
-//! Management module for the Chihuahua execution engine.
+//! Management module for the Veracruz execution engine.
 //!
 //! ## Authors
 //!
@@ -29,16 +29,16 @@ use std::{ffi::CString, sync::SgxMutex as Mutex};
 
 use lazy_static::lazy_static;
 
-use chihuahua::{
-    factory::multi_threaded_chihuahua,
-    hcall::common::{Chihuahua, DataSourceMetadata, LifecycleState},
+use execution_engine::{
+    factory::multi_threaded_execution_engine,
+    hcall::common::{ExecutionEngine, DataSourceMetadata, LifecycleState},
 };
 
 use veracruz_utils::VeracruzPolicy;
 
 pub mod baja_manager;
 pub mod buffer;
-pub mod chihuahua_manager;
+pub mod execution_engine_manager;
 pub mod error;
 pub use error::MexicoCityError;
 
@@ -89,10 +89,10 @@ pub type ProvisioningResult = Result<ProvisioningResponse, MexicoCityError>;
 /// Veracruz platform, containing information that must be persisted across the
 /// different rounds of the provisioning process and the fixed global policy.
 struct ProtocolState {
-    /// The Chihuahua host provisioning state, which captures "transient" state
+    /// The Veracruz host provisioning state, which captures "transient" state
     /// of the provisioning process and updates its internal lifecycle state
     /// appropriately as more and more clients provision their secrets.
-    host_state: Arc<Mutex<dyn Chihuahua>>,
+    host_state: Arc<Mutex<dyn ExecutionEngine>>,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
     global_policy: veracruz_utils::VeracruzPolicy,
@@ -103,12 +103,7 @@ struct ProtocolState {
 impl ProtocolState {
     /// Constructs a new `ProtocolState` from a global policy.  The selected
     /// execution strategy is extrated from the global policy and a suitable
-    /// Chihuahua execution strategy is selected based on that.
-    ///
-    /// NB: converts the `boxed::Box<Chihuaua + 'static>` returned from the
-    /// Chihuahua factory into `Arc<Mutex<Chihuahua + 'static>>` as the latter
-    /// satisfies the `Send` constraint imposed by statics in Rust whilst the
-    /// former does not.
+    /// Veracruz execution strategy is selected based on that.
     pub fn new(
         global_policy: VeracruzPolicy,
         global_policy_hash: String,
@@ -119,12 +114,12 @@ impl ProtocolState {
 
         let execution_strategy = match global_policy.execution_strategy() {
             veracruz_utils::ExecutionStrategy::Interpretation => {
-                chihuahua::factory::ExecutionStrategy::Interpretation
+                execution_engine::factory::ExecutionStrategy::Interpretation
             }
-            veracruz_utils::ExecutionStrategy::JIT => chihuahua::factory::ExecutionStrategy::JIT,
+            veracruz_utils::ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
 
-        let host_state = multi_threaded_chihuahua(
+        let host_state = multi_threaded_execution_engine(
             &execution_strategy,
             &expected_data_sources,
             &expected_stream_sources,
@@ -156,12 +151,12 @@ impl ProtocolState {
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // The Chihuahua facade.
+    // The ExecutionEngine facade.
     ////////////////////////////////////////////////////////////////////////////
 
-    /* The following re-implements a subset of the Chihuahua API for
+    /* The following re-implements a subset of the ExecutionEngine API for
      * `ProtocolState` by just calling through to the underlying
-     * `Arc<Mutex<dyn Chihuahua>>` object.  All lock-handling code is therefore
+     * `Arc<Mutex<dyn ExecutionEngine>>` object.  All lock-handling code is therefore
      * hidden from the user.
      */
 
