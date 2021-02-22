@@ -90,7 +90,7 @@ trustzone-sinaloa-test: trustzone test_cases trustzone-test-env
 	cd sinaloa-test \
 		&& export OPENSSL_DIR=$(AARCH64_OPENSSL_DIR) \
 		&& cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
-		&& ./cp_sinaloa_test_tz.sh
+		&& ./cp-sinaloa-test-tz.sh
 	chmod u+x run_sinaloa_test_tz.sh
 	./run_sinaloa_test_tz.sh
 
@@ -98,7 +98,7 @@ trustzone-veracruz-test: trustzone test_cases trustzone-test-env
 	cd veracruz-test \
 		&& export OPENSSL_DIR=$(AARCH64_OPENSSL_DIR) \
 		&& cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
-		&& ./cp_veracruz_tz.sh
+		&& ./cp-veracruz-tz.sh
 	chmod u+x run_veracruz_test_tz.sh
 	./run_veracruz_test_tz.sh
 
@@ -110,9 +110,9 @@ nitro-sinaloa-test: nitro test_cases
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
 	cd sinaloa-test \
-		&& ./nitro_terminate.sh
+		&& ./nitro-terminate.sh
 	cd ./sinaloa-test \
-		&& ./nitro_ec2_terminate_root.sh
+		&& ./nitro-ec2-terminate_root.sh
 
 nitro-sinaloa-test-dry-run: nitro test_cases
 	cd sinaloa-test \
@@ -122,9 +122,9 @@ nitro-sinaloa-performance: nitro test_cases
 	cd sinaloa-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_performance_ --features nitro -- --ignored
 	cd sinaloa-test \
-		&& ./nitro_terminate.sh
+		&& ./nitro-terminate.sh
 	cd ./sinaloa-test \
-		&& ./nitro_ec2_terminate_root.sh
+		&& ./nitro-ec2-terminate-root.sh
 
 nitro-veracruz-test-dry-run: nitro test_cases
 	cd veracruz-test \
@@ -134,9 +134,9 @@ nitro-veracruz-test: nitro test_cases
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro
 	cd sinaloa-test \
-		&& ./nitro_terminate.sh
+		&& ./nitro-terminate.sh
 	cd ./sinaloa-test \
-		&& ./nitro_ec2_terminate_root.sh
+		&& ./nitro-ec2-terminate_root.sh
 
 nitro-psa-attestation:
 	cd psa-attestation && cargo build --features nitro
