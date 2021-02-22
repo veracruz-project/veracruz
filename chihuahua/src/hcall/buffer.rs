@@ -58,18 +58,27 @@ impl VFS {
             digests: digests.clone(),
         }
     }
+    
+
+    #[deprecated]
+    pub(crate) fn over_write(&mut self, file_name : &str, new_data : &[u8]) -> Result<(),VFSError> {
+        self.fs.insert(file_name.to_string(),new_data.to_vec());
+        self.digest_check(file_name,new_data)
+    }
 
     pub(crate) fn write(&mut self, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
-        let new_data : &[u8] = match self.fs.get_mut(file_name) {
+        match self.fs.get_mut(file_name) {
             Some(b) => {
                 b.append(&mut buf.to_vec());
-                b
             },
             None => {
                 self.fs.insert(file_name.to_string(),buf.to_vec());
-                buf
             },
         };
+        self.digest_check(file_name,self.fs.get(file_name).unwrap())
+    }
+
+    fn digest_check(&self, file_name: &str, new_data: &[u8]) -> Result<(),VFSError> {
         if let Some(digest) = self.digests.get(file_name) {
             let new_digest = Self::sha_256_digest(new_data);
             if new_digest.len() != digest.len() {

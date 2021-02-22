@@ -138,15 +138,15 @@ fn dispatch_on_request_state(protocol_state: &ProtocolState) -> ProvisioningResu
 /// we are not in the `LifecycleState::ReadyToExecute` state.
 fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &ProtocolState, client_id: u64,) -> ProvisioningResult {
     // TODO check file exists
-    if check_state(
-        &protocol_state.get_lifecycle_state()?,
-        &[LifecycleState::FinishedExecuting],
-    ) {
-        //TODO: read the actually file.
-        let result = protocol_state.read_file(client_id,"output")?;
-        let response = response_success(result);
-        return Ok(ProvisioningResponse::Success { response });
-    }
+    //if check_state(
+        //&protocol_state.get_lifecycle_state()?,
+        //&[LifecycleState::FinishedExecuting],
+    //) {
+        ////TODO: read the actually file.
+        //let result = protocol_state.read_file(client_id,"output")?;
+        //let response = response_success(result);
+        //return Ok(ProvisioningResponse::Success { response });
+    //}
 
     //TODO: USE THE FILE_NAME 
     //if check_state(
@@ -215,7 +215,7 @@ fn dispatch_on_program(
 ) -> ProvisioningResult {
     // Buffer the program, it will be used in batch process
     PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice())?;
-    PROG_AND_DATA_BUFFER.lock()?.fs.insert(file_name.clone(),code.clone());
+    //PROG_AND_DATA_BUFFER.lock()?.fs.insert(file_name.clone(),code.clone());
 
     if check_state(
         &protocol_state.get_lifecycle_state()?,
@@ -225,22 +225,22 @@ fn dispatch_on_program(
         //if let Err(reason) = protocol_state.load_program(&code) {
             // If program loading fails we stay in the initial state as the
             // program provisioner can just try again.
-            assert!(check_state(
-                &protocol_state.get_lifecycle_state()?,
-                &[LifecycleState::Error, LifecycleState::Initial]
-            ));
+            //assert!(check_state(
+                //&protocol_state.get_lifecycle_state()?,
+                //&[LifecycleState::Error, LifecycleState::Initial]
+            //));
 
             Err(reason)
         } else {
             // After program load we're either waiting for data sources or not
             // expecting any data sources and therefore ready to execute.
-            assert!(check_state(
-                &protocol_state.get_lifecycle_state()?,
-                &[
-                    LifecycleState::DataSourcesLoading,
-                    LifecycleState::ReadyToExecute
-                ]
-            ));
+            //assert!(check_state(
+                //&protocol_state.get_lifecycle_state()?,
+                //&[
+                    //LifecycleState::DataSourcesLoading,
+                    //LifecycleState::ReadyToExecute
+                //]
+            //));
 
             let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
             Ok(ProvisioningResponse::Success { response })
@@ -266,43 +266,43 @@ fn dispatch_on_data(
 ) -> ProvisioningResult {
     //TODO: REPLACE BY FS API
     let package_id = file_name.strip_prefix("input-").unwrap().parse::<u64>().unwrap();
-    let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
-    PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame)?;
+    //let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
+    //PROG_AND_DATA_BUFFER.lock()?.buffer_data(&frame)?;
 
-    if check_state(
-        &protocol_state.get_lifecycle_state()?,
-        &[LifecycleState::DataSourcesLoading],
-    ) {
-        if let Err(error) = protocol_state.append_file(client_id,file_name.as_str(),data.as_slice()) {
+    //if check_state(
+        //&protocol_state.get_lifecycle_state()?,
+        //&[LifecycleState::DataSourcesLoading],
+    //) {
+        if let Err(error) = protocol_state.write_file(client_id,file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
             // then we should be in an error state, otherwise we remain in the
             // same state.
 
-            assert!(check_state(
-                &protocol_state.get_lifecycle_state()?,
-                &[LifecycleState::Error, LifecycleState::DataSourcesLoading]
-            ));
+            //assert!(check_state(
+                //&protocol_state.get_lifecycle_state()?,
+                //&[LifecycleState::Error, LifecycleState::DataSourcesLoading]
+            //));
 
             Err(error)
         } else {
             // We either stay in the same state, or progress to ready to execute
             // if all data is now available.
-            assert!(check_state(
-                &protocol_state.get_lifecycle_state()?,
-                &[
-                    LifecycleState::DataSourcesLoading,
-                    LifecycleState::StreamSourcesLoading,
-                    LifecycleState::ReadyToExecute,
-                ]
-            ));
+            //assert!(check_state(
+                //&protocol_state.get_lifecycle_state()?,
+                //&[
+                    //LifecycleState::DataSourcesLoading,
+                    //LifecycleState::StreamSourcesLoading,
+                    //LifecycleState::ReadyToExecute,
+                //]
+            //));
 
             let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
             Ok(ProvisioningResponse::Success { response })
         }
-    } else {
-        response_not_ready()
-    }
+    //} else {
+        //response_not_ready()
+    //}
 }
 
 /// Provisions a stream source into the host provisioning state.  Fails if we are
@@ -318,43 +318,43 @@ fn dispatch_on_stream(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    if check_state(
-        &protocol_state.get_lifecycle_state()?,
-        &[LifecycleState::StreamSourcesLoading],
-    ) {
+    //if check_state(
+        //&protocol_state.get_lifecycle_state()?,
+        //&[LifecycleState::StreamSourcesLoading],
+    //) {
         //TODO: REPLACE BY FS API
         let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
         let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
 
-        if let Err(error) = protocol_state.append_file(client_id,file_name.as_str(),data.as_slice()) {
+        if let Err(error) = protocol_state.write_file(client_id,file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
             // then we should be in an error state, otherwise we remain in the
             // same state.
 
-            assert!(check_state(
-                &protocol_state.get_lifecycle_state()?,
-                &[LifecycleState::Error, LifecycleState::StreamSourcesLoading]
-            ));
+            //assert!(check_state(
+                //&protocol_state.get_lifecycle_state()?,
+                //&[LifecycleState::Error, LifecycleState::StreamSourcesLoading]
+            //));
 
             Err(error)
         } else {
             // We either stay in the same state, or progress to ready to execute
             // if all data is now available.
-            assert!(check_state(
-                &protocol_state.get_lifecycle_state()?,
-                &[
-                    LifecycleState::StreamSourcesLoading,
-                    LifecycleState::ReadyToExecute
-                ]
-            ));
+            //assert!(check_state(
+                //&protocol_state.get_lifecycle_state()?,
+                //&[
+                    //LifecycleState::StreamSourcesLoading,
+                    //LifecycleState::ReadyToExecute
+                //]
+            //));
 
             let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
             Ok(ProvisioningResponse::Success { response })
         }
-    } else {
-        response_not_ready()
-    }
+    //} else {
+        //response_not_ready()
+    //}
 }
 
 /// Signals the next round of computation. It will reload the program and all (static) data,
@@ -363,11 +363,11 @@ fn dispatch_on_stream(
 fn dispatch_on_next_round(
     protocol_state: &mut ProtocolState,
 ) -> (Option<ProtocolState>, ProvisioningResult) {
-    let lifecycle_state = match protocol_state.get_lifecycle_state() {
-        Ok(o) => o,
-        Err(e) => return (None, Err(e)),
-    };
-    if check_state(&lifecycle_state, &[LifecycleState::FinishedExecuting]) {
+    //let lifecycle_state = match protocol_state.get_lifecycle_state() {
+        //Ok(o) => o,
+        //Err(e) => return (None, Err(e)),
+    //};
+    //if check_state(&lifecycle_state, &[LifecycleState::FinishedExecuting]) {
         match reload(protocol_state) {
             Ok(o) => (
                 Some(o),
@@ -377,12 +377,10 @@ fn dispatch_on_next_round(
             ),
             Err(e) => (None, Err(e)),
         }
-    } else {
-        (None, response_not_ready())
-    }
+    //} else {
+        //(None, response_not_ready())
+    //}
 }
-
-/// Allocates a new protocol state, reloads the program and all (static) data,
 /// and loads the current result as the `previous_result` for the new instance.
 fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeManagerError> {
     let mut new_protocol_state = ProtocolState::new(
@@ -392,10 +390,10 @@ fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeMa
     new_protocol_state.set_previous_result(&old_protocol_state.get_result()?)?;
     let buffer = PROG_AND_DATA_BUFFER.lock()?;
     new_protocol_state.load_program(buffer.get_program()?)?;
-    let all_data = buffer.all_data()?;
-    for data in all_data {
-        new_protocol_state.add_new_data_source(data)?;
-    }
+    //let all_data = buffer.all_data()?;
+    //for data in all_data {
+        //new_protocol_state.add_new_data_source(data)?;
+    //}
     Ok(new_protocol_state)
 }
 

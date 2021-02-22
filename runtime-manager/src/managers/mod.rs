@@ -179,6 +179,11 @@ impl ProtocolState {
     }
 
     //TODO: add description
+    pub(crate) fn write_file(&self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), MexicoCityError> {
+        Ok(self.host_state.lock()?.write_file(client_id,file_name,data)?)
+    }
+
+    //TODO: add description
     pub(crate) fn append_file(&self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), MexicoCityError> {
         Ok(self.host_state.lock()?.append_file(client_id,file_name,data)?)
     }

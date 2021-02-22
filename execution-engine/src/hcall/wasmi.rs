@@ -425,15 +425,15 @@ impl WasmiHostProvisioningState {
                         //self.set_program_digest(&sha_256_digest(buffer));
 
                         // TODO: Remove state machine
-                        if self.get_expected_data_source_count() == 0 {
-                            if self.get_expected_stream_source_count() == 0 {
-                                self.set_ready_to_execute();
-                            } else {
-                                self.set_stream_sources_loading();
-                            }
-                        } else {
-                            self.set_data_sources_loading();
-                        }
+                        //if self.get_expected_data_source_count() == 0 {
+                            //if self.get_expected_stream_source_count() == 0 {
+                        self.set_ready_to_execute();
+                            //} else {
+                                //self.set_stream_sources_loading();
+                            //}
+                        //} else {
+                            //self.set_data_sources_loading();
+                        //}
                         //TODO: GLUE CODE
                         
                         //TODO: END OF GLUE CODE
@@ -855,6 +855,8 @@ impl WasmiHostProvisioningState {
     /// execution.
     pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
         // TODO: GLUE CODE HERE
+        let program = self.vfs.read(file_name).unwrap();
+        self.load_program(program.as_slice());
         let input_table = self.get_program_input_table(file_name)?;
         let mut input_vec = Vec::new();
         let mut stream_vec = Vec::new();
@@ -917,6 +919,12 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.append_file_base(client_id,file_name,data)
     }
 
+    /// Chihuahua wrapper of write_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn write_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.write_file_base(client_id,file_name,data)
+    }
+
     /// Chihuahua wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
@@ -928,7 +936,8 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         self.register_program_base(client_id,file_name,prog)?;
-        self.load_program(prog)
+        Ok(())
+        //self.load_program(prog)
     }
 
     /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.

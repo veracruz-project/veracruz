@@ -379,31 +379,17 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     }
 
     /// Append to a file.
+    pub(crate) fn write_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        self.vfs.over_write(file_name,data)?;
+        Ok(())
+    }
+
+    /// Append to a file.
     pub(crate) fn append_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
         self.vfs.write(file_name,data)?;
         Ok(())
-        //TODO: link to the actually fs API.
-        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        //if file_name.starts_with("input-") {
-            //let package_id = file_name.strip_prefix("input-").unwrap().parse::<u64>().unwrap();
-            //let metadata = DataSourceMetadata::new(
-                //data,
-                //client_id,
-                //package_id,
-            //);
-            //self.add_new_data_source(metadata)
-        //} else if file_name.starts_with("stream-") {
-            //let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
-            //let metadata = DataSourceMetadata::new(
-                //data,
-                //client_id,
-                //package_id,
-            //);
-            //self.add_new_stream_source(metadata)
-        //} else {
-            //Err(HostProvisioningError::FileNotFound(file_name.to_string()))
-        //}
     }
 
     /// Read from a file
@@ -422,7 +408,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     /// Register program
     pub(crate) fn register_program_base(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
-        self.vfs.write(file_name,prog)?;
+        self.vfs.over_write(file_name,prog)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         Ok(())
@@ -710,11 +696,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         // This should have been checked before now, to provide a more
         // meaningful error.  This is here just to ensure nothing slips through,
         // and if it does, terminate.
-        assert!(
-            self.lifecycle_state == LifecycleState::Initial
-                || self.lifecycle_state == LifecycleState::DataSourcesLoading
-                || self.lifecycle_state == LifecycleState::StreamSourcesLoading
-        );
+        //assert!(
+            //self.lifecycle_state == LifecycleState::Initial
+                //|| self.lifecycle_state == LifecycleState::DataSourcesLoading
+                //|| self.lifecycle_state == LifecycleState::StreamSourcesLoading
+        //);
         self.lifecycle_state = LifecycleState::ReadyToExecute;
     }
 
@@ -728,10 +714,10 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         // This should have been checked before now, to provide a more
         // meaningful error.  This is here just to ensure nothing slips through,
         // and if it does, terminate.
-        assert!(
-            self.lifecycle_state == LifecycleState::DataSourcesLoading
-                || self.lifecycle_state == LifecycleState::Initial
-        );
+        //assert!(
+            //self.lifecycle_state == LifecycleState::DataSourcesLoading
+                //|| self.lifecycle_state == LifecycleState::Initial
+        //);
         self.lifecycle_state = LifecycleState::DataSourcesLoading;
     }
 
@@ -745,11 +731,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         // This should have been checked before now, to provide a more
         // meaningful error.  This is here just to ensure nothing slips through,
         // and if it does, terminate.
-        assert!(
-            self.lifecycle_state == LifecycleState::StreamSourcesLoading
-                || self.lifecycle_state == LifecycleState::DataSourcesLoading
-                || self.lifecycle_state == LifecycleState::Initial
-        );
+        //assert!(
+            //self.lifecycle_state == LifecycleState::StreamSourcesLoading
+                //|| self.lifecycle_state == LifecycleState::DataSourcesLoading
+                //|| self.lifecycle_state == LifecycleState::Initial
+        //);
         self.lifecycle_state = LifecycleState::StreamSourcesLoading;
     }
 
@@ -795,38 +781,39 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         &mut self,
         metadata: DataSourceMetadata,
     ) -> Result<(), HostProvisioningError> {
-        match self.get_lifecycle_state() {
-            LifecycleState::DataSourcesLoading => {
-                let expected_data_sources = self.get_expected_data_source_count();
+        Ok(())
+        //match self.get_lifecycle_state() {
+            //LifecycleState::DataSourcesLoading => {
+                //let expected_data_sources = self.get_expected_data_source_count();
                 /* This is an invariant checking guard: we should not be still
                  * in LifecycleState::DataSourcesLoading if we have all the data
                  * that we need --- we should have moved into
                  * LifecycleState::ReadyToExecute or LifecycleState::StreamSourcesLoading by now!
                  */
-                assert!(self.get_current_data_source_count() < expected_data_sources);
+                //assert!(self.get_current_data_source_count() < expected_data_sources);
 
-                self.data_sources.push(metadata);
+                //self.data_sources.push(metadata);
 
                 /* If we have loaded everything, bunp the state and sort the
                  * incoming data, otherwise remain in the data sources loading
                  * state and signal success.
                  */
-                if self.get_current_data_source_count() == expected_data_sources {
-                    if self.get_expected_stream_source_count() == 0 {
-                        self.set_ready_to_execute();
-                    } else {
-                        self.set_stream_sources_loading();
-                    }
-                    self.sort_incoming_data()
-                } else {
-                    Ok(())
-                }
-            }
-            otherwise => Err(HostProvisioningError::InvalidLifeCycleState {
-                expected: vec![LifecycleState::DataSourcesLoading],
-                found: otherwise.clone(),
-            }),
-        }
+                //if self.get_current_data_source_count() == expected_data_sources {
+                    //if self.get_expected_stream_source_count() == 0 {
+                        //self.set_ready_to_execute();
+                    //} else {
+                        //self.set_stream_sources_loading();
+                    //}
+                    //self.sort_incoming_data()
+                //} else {
+                    //Ok(())
+                //}
+            //}
+            //otherwise => Err(HostProvisioningError::InvalidLifeCycleState {
+                //expected: vec![LifecycleState::DataSourcesLoading],
+                //found: otherwise.clone(),
+            //}),
+        //}
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -860,34 +847,35 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         &mut self,
         metadata: DataSourceMetadata,
     ) -> Result<(), HostProvisioningError> {
-        match self.get_lifecycle_state() {
-            LifecycleState::StreamSourcesLoading => {
-                let expected_stream_sources = self.get_expected_stream_source_count();
+        Ok(())
+        //match self.get_lifecycle_state() {
+            //LifecycleState::StreamSourcesLoading => {
+                //let expected_stream_sources = self.get_expected_stream_source_count();
                 /* This is an invariant checking guard: we should not be still
                  * in LifecycleState::StreamSourcesLoading if we have all the data
                  * that we need --- we should have moved into
                  * LifecycleState::ReadyToExecute by now!
                  */
-                assert!(self.get_current_stream_source_count() < expected_stream_sources);
+                //assert!(self.get_current_stream_source_count() < expected_stream_sources);
 
-                self.stream_sources.push(metadata);
+                //self.stream_sources.push(metadata);
 
                 /* If we have loaded everything, bunp the state and sort the
                  * incoming data, otherwise remain in the data sources loading
                  * state and signal success.
                  */
-                if self.get_current_stream_source_count() == expected_stream_sources {
-                    self.set_ready_to_execute();
-                    self.sort_incoming_stream()
-                } else {
-                    Ok(())
-                }
-            }
-            otherwise => Err(HostProvisioningError::InvalidLifeCycleState {
-                expected: vec![LifecycleState::StreamSourcesLoading],
-                found: otherwise.clone(),
-            }),
-        }
+                //if self.get_current_stream_source_count() == expected_stream_sources {
+                    //self.set_ready_to_execute();
+                    //self.sort_incoming_stream()
+                //} else {
+                    //Ok(())
+                //}
+            //}
+            //otherwise => Err(HostProvisioningError::InvalidLifeCycleState {
+                //expected: vec![LifecycleState::StreamSourcesLoading],
+                //found: otherwise.clone(),
+            //}),
+        //}
     }
 
     /// Sort the incoming data against pattern, against the expected_data_sources provided in the policy file
@@ -1121,6 +1109,12 @@ pub trait ExecutionEngine: Send {
     /// The client must has the write permission to the file.
     /// It createa a new file, if the file does not exists.
     fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
+
+    /// Write `buf` to `file_name` in the file system
+    /// on behalf of the client identified by `client_id`.
+    /// The client must has the write permission to the file.
+    /// It createa a new file, if the file does not exists.
+    fn write_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
 
     /// Read `file_name` in the file system
     /// on behalf of the client identified by `client_id`.
