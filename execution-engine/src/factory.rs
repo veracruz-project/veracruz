@@ -80,8 +80,8 @@ pub fn single_threaded_execution_engine(
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
                 state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
+                    //.set_expected_data_sources(expected_data_sources)
+                    //.set_expected_stream_sources(expected_stream_sources)
                     .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
@@ -103,8 +103,8 @@ pub fn single_threaded_execution_engine(
             ExecutionStrategy::Interpretation => {
                 let mut state = wasmi::WasmiHostProvisioningState::new();
                 state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
+                    //.set_expected_data_sources(expected_data_sources)
+                    //.set_expected_stream_sources(expected_stream_sources)
                     .set_expected_shutdown_sources(expected_shutdown_sources);
 
                 Some(Box::new(state))
@@ -124,8 +124,8 @@ pub fn single_threaded_execution_engine(
 /// it compiled for SGX and TZ, then this will disappear.
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    expected_data_sources: &[u64],
-    expected_stream_sources: &[u64],
+    //expected_data_sources: &[u64],
+    //expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
     file_permissions: &VeracruzCapabilityTable,
     program_digests: &HashMap<String, Vec<u8>>, 
@@ -136,8 +136,8 @@ pub fn multi_threaded_execution_engine(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let state = new_wasmi_instance(
-                    expected_data_sources,
-                    expected_stream_sources,
+                    //expected_data_sources,
+                    //expected_stream_sources,
                     expected_shutdown_sources,
                     file_permissions,
                     program_digests,
@@ -147,9 +147,10 @@ pub fn multi_threaded_execution_engine(
                 Some(Arc::new(Mutex::new(state)))
             }
             ExecutionStrategy::JIT => {
+                //TODO change
                 wasmtime::initialize(
-                    expected_data_sources,
-                    expected_stream_sources,
+                    &vec!([]),
+                    &vec!([]),
                     expected_shutdown_sources,
                 );
 
@@ -164,8 +165,8 @@ pub fn multi_threaded_execution_engine(
         match strategy {
             ExecutionStrategy::Interpretation => {
                 let state = new_wasmi_instance(
-                    expected_data_sources,
-                    expected_stream_sources,
+                    //expected_data_sources,
+                    //expected_stream_sources,
                     expected_shutdown_sources,
                     file_permissions,
                     program_digests,
@@ -181,8 +182,8 @@ pub fn multi_threaded_execution_engine(
 
 //TODO remove old parameters.
 fn new_wasmi_instance (
-    expected_data_sources: &[u64],
-    expected_stream_sources: &[u64],
+    //expected_data_sources: &[u64],
+    //expected_stream_sources: &[u64],
     expected_shutdown_sources: &[u64],
     capability_table: &VeracruzCapabilityTable,
     program_digests: &HashMap<String, Vec<u8>>, 
@@ -194,9 +195,9 @@ fn new_wasmi_instance (
         program_digests,
         input_table,
     );
-    state
-        .set_expected_data_sources(expected_data_sources)
-        .set_expected_stream_sources(expected_stream_sources);
+    //state
+        //.set_expected_data_sources(expected_data_sources)
+        //.set_expected_stream_sources(expected_stream_sources);
     state
 }
 

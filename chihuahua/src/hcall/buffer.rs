@@ -36,7 +36,7 @@ pub enum VFSError {
 
 /// Buffer for storing program, (static) data, and stream data.
 #[derive(Clone, Debug)]
-pub(crate) struct VFS {
+pub struct VFS {
     fs: HashMap<String, Vec<u8>>,
     capabilities: VeracruzCapabilityTable,
     digests: HashMap<String, Vec<u8>>,

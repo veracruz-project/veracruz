@@ -32,6 +32,7 @@ use lazy_static::lazy_static;
 use execution_engine::{
     factory::multi_threaded_execution_engine,
     hcall::common::{ExecutionEngine, DataSourceMetadata, LifecycleState},
+    hcall::buffer::VFS,
 };
 
 use veracruz_utils::{policy::{policy::Policy, principal::ExecutionStrategy}};
@@ -108,8 +109,6 @@ impl ProtocolState {
         global_policy: Policy,
         global_policy_hash: String,
     ) -> Result<Self, RuntimeManagerError> {
-        let expected_data_sources = global_policy.data_provision_order();
-        let expected_stream_sources = global_policy.stream_provision_order();
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let execution_strategy = match global_policy.execution_strategy() {
@@ -125,8 +124,8 @@ impl ProtocolState {
 
         let host_state = multi_threaded_execution_engine(
             &execution_strategy,
-            &expected_data_sources,
-            &expected_stream_sources,
+            //&expected_data_sources,
+            //&expected_stream_sources,
             expected_shutdown_sources
                 .iter()
                 .map(|e| *e as u64)
@@ -199,31 +198,6 @@ impl ProtocolState {
         //Ok(self.host_state.lock()?.load_program(prog)?)
     }
 
-    /// Provisions a new data source, described using a `DataSourceMetadata`
-    /// frame into the host state.  Will fail if the lifecycle state is not
-    /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
-    /// `LifecycleState::StreamSourcesLoading` when the call represents the last
-    /// data source to be loaded,
-    /// `LifecycleState::ReadyToExecute` if no stream data is required,
-    /// or maintains the current lifecycle state.
-    pub(crate) fn add_new_data_source(
-        &self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.add_new_data_source(metadata)?)
-    }
-
-    /// Provisions a new stream source, described using a `DataSourceMetadata`
-    /// frame into the host state.  Will fail if the lifecycle state is not
-    /// `LifecycleState::StreamSourcesLoading`.  Will bump the lifecycle state to
-    /// `LifecycleState::ReadyToExecute` when the call represents the last
-    /// data source to be loaded, or maintains the current lifecycle state.
-    pub(crate) fn add_new_stream_source(
-        &self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.add_new_stream_source(metadata)?)
-    }
 
     /// Invokes the entry point of the provisioned WASM program.  Will fail if
     /// the current lifecycle state is not `LifecycleState::ReadyToExecute` or
@@ -245,6 +219,21 @@ impl ProtocolState {
     /// registered.
     pub(crate) fn get_result(&self) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
         Ok(self.host_state.lock()?.get_result().map(|o| o.clone()))
+    }
+
+    /// Returns a result of a WASM computation that has executed on the host
+    /// provisioning state.  Returns `None` iff no such result has been
+    /// registered.
+    pub(crate) fn get_vfs(&self) -> Result<VFS, MexicoCityError> {
+        Ok(self.host_state.lock()?.get_vfs().clone())
+    }
+
+    /// Returns a result of a WASM computation that has executed on the host
+    /// provisioning state.  Returns `None` iff no such result has been
+    /// registered.
+    pub(crate) fn set_vfs(&self, vfs : VFS) -> Result<(), MexicoCityError> {
+        self.host_state.lock()?.set_vfs(&vfs);
+        Ok(())
     }
 
     /// Sets the `previous_result` field.

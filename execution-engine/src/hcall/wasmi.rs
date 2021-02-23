@@ -32,6 +32,7 @@ use crate::{
         HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
         HCALL_WRITE_OUTPUT_NAME,
     },
+    hcall::buffer::VFS,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -854,9 +855,23 @@ impl WasmiHostProvisioningState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
+        //assert!(self.program_module.is_none());
+        //assert!(self.memory.is_none());
+        //let program = self.vfs.read(file_name).map_err(|e| format!("NO PROGRAM ERROR - 1"))?;
+        //self.load_program(program.as_slice()).map_err(|e| format!("LOAD ERROR - 1"))?;
+        //assert!(self.program_module.is_some());
+        //assert!(self.memory.is_some());
+        ////TODO: REMOVE ENGINE
+        //self.program_module = None;
+        //self.memory = None;
+        //assert!(self.program_module.is_none());
+        //assert!(self.memory.is_none());
+        let program = self.vfs.read(file_name).map_err(|e| format!("NO PROGRAM ERROR - 2"))?;
+        self.load_program(program.as_slice()).map_err(|e| format!("load error - 2"))?;
+        assert!(self.program_module.is_some());
+        assert!(self.memory.is_some());
+
         // TODO: GLUE CODE HERE
-        let program = self.vfs.read(file_name).unwrap();
-        self.load_program(program.as_slice());
         let input_table = self.get_program_input_table(file_name)?;
         let mut input_vec = Vec::new();
         let mut stream_vec = Vec::new();
@@ -868,46 +883,63 @@ impl WasmiHostProvisioningState {
                     0,
                     package_id,
                 );
-                input_vec.push(metadata);
+                input_vec.push(metadata.clone());
+                stream_vec.push(metadata.clone());
+                stream_vec.push(metadata.clone());
             }
-            if input_file.starts_with("stream-") {
-                let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
-                let metadata = DataSourceMetadata::new(
-                    self.vfs.read(&input_file).map_err(|e| format!("{:?}",e))?.as_slice(),
-                    0,
-                    package_id,
-                );
-                stream_vec.push(metadata);
-            }
+            //if input_file.starts_with("stream-") {
+                //let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
+                //let metadata = DataSourceMetadata::new(
+                    //self.vfs.read(&input_file).map_err(|e| format!("{:?}",e))?.as_slice(),
+                    //0,
+                    //package_id,
+                //);
+                //stream_vec.push(metadata);
+            //}
         }
 
         self.data_sources = input_vec;
         self.stream_sources = stream_vec;
         //
         // TODO: END GLUE CODE HERE
+        //
+        //
+        //
+        //
+        //
+        //
+        //
         // TODO Drop state machine
         //if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
-            match self.invoke_export(ENTRY_POINT_NAME) {
+            let rst = match self.invoke_export(ENTRY_POINT_NAME) {
                 Ok(Some(RuntimeValue::I32(return_code))) => {
                     self.set_finished_executing();
                     Ok(return_code)
                 }
                 Ok(_) => {
                     self.set_error();
+                    assert!(false);
                     Err(FatalHostError::ReturnedCodeError)
                 }
                 Err(Error::Trap(trap)) => {
                     self.set_error();
+                    assert!(false);
                     Err(FatalHostError::WASMITrapError(trap))
                 }
                 Err(err) => {
                     self.set_error();
+                    assert!(false);
                     Err(FatalHostError::WASMIError(err))
                 }
-            }
+            };
         //} else {
             //Err(FatalHostError::EngineIsNotReady)
         //}
+        //
+        //TODO: REMOVE ENGINE
+        self.program_module = None;
+        self.memory = None;
+        rst
     }
 }
 
@@ -946,23 +978,23 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.load_program(buffer)
     }
 
-    /// ExecutionEngine wrapper of add_new_data_source implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn add_new_data_source(
-        &mut self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), HostProvisioningError> {
-        self.add_new_data_source(metadata)
-    }
+    ///// ExecutionEngine wrapper of add_new_data_source implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn add_new_data_source(
+        //&mut self,
+        //metadata: DataSourceMetadata,
+    //) -> Result<(), HostProvisioningError> {
+        //self.add_new_data_source(metadata)
+    //}
 
-    /// ExecutionEngine wrapper of add_new_stream_source implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn add_new_stream_source(
-        &mut self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), HostProvisioningError> {
-        self.add_new_stream_source(metadata)
-    }
+    ///// ExecutionEngine wrapper of add_new_stream_source implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn add_new_stream_source(
+        //&mut self,
+        //metadata: DataSourceMetadata,
+    //) -> Result<(), HostProvisioningError> {
+        //self.add_new_stream_source(metadata)
+    //}
 
     /// ExecutionEngine wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
     #[inline]
@@ -1000,17 +1032,17 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.get_lifecycle_state().clone()
     }
 
-    /// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_current_data_source_count(&self) -> usize {
-        self.get_current_data_source_count().clone()
-    }
+    ///// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn get_current_data_source_count(&self) -> usize {
+        //self.get_current_data_source_count().clone()
+    //}
 
-    /// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_expected_data_sources(&self) -> Vec<u64> {
-        self.get_expected_data_sources().clone()
-    }
+    ///// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn get_expected_data_sources(&self) -> Vec<u64> {
+        //self.get_expected_data_sources().clone()
+    //}
 
     /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmiHostProvisioningState.
     #[inline]
@@ -1018,22 +1050,32 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.get_expected_shutdown_sources().clone()
     }
 
-    /// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_current_stream_source_count(&self) -> usize {
-        self.get_current_stream_source_count().clone()
-    }
+    ///// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn get_current_stream_source_count(&self) -> usize {
+        //self.get_current_stream_source_count().clone()
+    //}
 
-    /// ExecutionEngine wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_expected_stream_sources(&self) -> Vec<u64> {
-        self.get_expected_stream_sources().clone()
-    }
+    ///// Chihuahua wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn get_expected_stream_sources(&self) -> Vec<u64> {
+        //self.get_expected_stream_sources().clone()
+    //}
 
-    /// ExecutionEngine wrapper of set_previous_result implementation in WasmiHostProvisioningState.
+    /// Chihuahua wrapper of set_previous_result implementation in WasmiHostProvisioningState.
     #[inline]
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
         self.set_previous_result(result);
+    }
+
+    #[inline]
+    fn set_vfs(&mut self, vfs: &VFS) {
+        self.set_vfs(vfs);
+    }
+
+    #[inline]
+    fn get_vfs(&self) -> &VFS  {
+        self.get_vfs()
     }
 
     /// ExecutionEngine wrapper of get_result implementation in WasmiHostProvisioningState.
@@ -1048,26 +1090,26 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.get_program_digest().map(|d| d.clone())
     }
 
-    /// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        self.set_expected_data_sources(sources);
-        self
-    }
+    ///// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
+        //self.set_expected_data_sources(sources);
+        //self
+    //}
 
-    /// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        self.set_expected_stream_sources(sources);
-        self
-    }
+    ///// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
+        //self.set_expected_stream_sources(sources);
+        //self
+    //}
 
-    /// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        self.set_expected_stream_sources(sources);
-        self
-    }
+    ///// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
+        //self.set_expected_stream_sources(sources);
+        //self
+    //}
 
     /// Invaildate this wasmi instanace.
     #[inline]
