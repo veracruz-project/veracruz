@@ -38,7 +38,7 @@ pub enum MexicoCityError {
     #[error(display = "MexicoCity: Uninitialized baja session in function {}.", _0)]
     UninitializedBajaSessionError(&'static str),
     #[cfg(feature = "sgx")]
-    #[error(display = "Tabasco: SGXError: {:?}.", _0)]
+    #[error(display = "MexicoCity: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
     #[error(display = "MexicoCity: {} failed with error code {:?}.", _0, _1)]
     UnsafeCallError(&'static str, u32),
@@ -58,19 +58,19 @@ pub enum MexicoCityError {
     #[error(display = "MexicoCity: Socket Error: {:?}", _0)]
     SocketError(nix::Error),
     #[cfg(feature = "nitro")]
-    #[error(display = "Mexico City: Veracruz Socket error:{:?}", _0)]
+    #[error(display = "MexicoCity: Veracruz Socket error:{:?}", _0)]
     VeracruzSocketError(VeracruzSocketError),
     #[cfg(feature = "nitro")]
-    #[error(display = "Mexico City: Bincode error:{:?}", _0)]
+    #[error(display = "MexicoCity: Bincode error:{:?}", _0)]
     BincodeError(bincode::Error),
     #[cfg(feature = "nitro")]
-    #[error(display = "Mexico City: NSM Lib error:{:?}", _0)]
+    #[error(display = "MexicoCity: NSM Lib error:{:?}", _0)]
     NsmLibError(i32),
     #[cfg(feature = "nitro")]
-    #[error(display = "Mexico City: NSM Error code:{:?}", _0)]
+    #[error(display = "MexicoCity: NSM Error code:{:?}", _0)]
     NsmErrorCode(nsm_io::ErrorCode),
     #[cfg(feature = "nitro")]
-    #[error(display = "Mexico City: wrong message type received:{:?}", _0)]
+    #[error(display = "MexicoCity: wrong message type received:{:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
 }
 
