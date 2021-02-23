@@ -1,6 +1,4 @@
-//! Manager for Baja
-//!
-//! Interfaces with Baja.
+//! Mexico City's interface with the session manager.
 //!
 //! ## Authors
 //!
@@ -12,10 +10,10 @@
 //! information on licensing and copyright.
 
 use crate::managers::*;
-use session_manager::Baja;
+use session_manager::SessionManager;
 use std::{sync::atomic::Ordering, vec::Vec};
 
-pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
+pub fn init_session_manager(policy_json: &str) -> Result<(), MexicoCityError> {
     let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
     let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 
@@ -30,11 +28,11 @@ pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
     }
 
     //TODO: change the error type
-    let new_baja = Baja::new(policy)?;
+    let new_session_manager = SessionManager::new(policy)?;
 
     {
-        let mut baja_state = super::MY_BAJA.lock()?;
-        *baja_state = Some(new_baja);
+        let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
+        *session_manager_state = Some(new_session_manager);
     }
 
     Ok(())
@@ -47,10 +45,10 @@ pub fn new_session() -> Result<u32, MexicoCityError> {
         session_counter.clone()
     };
 
-    let session = match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => my_baja.create_session(),
+    let session = match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => my_session_manager.create_session(),
         None => {
-            return Err(MexicoCityError::UninitializedBajaSessionError(
+            return Err(MexicoCityError::UninitializedSessionError(
                 "new_session",
             ))
         }
@@ -70,7 +68,7 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), MexicoCityErr
     let this_session =
         sessions
             .get_mut(&session_id)
-            .ok_or(MexicoCityError::UnavailableBajaSessionError(
+            .ok_or(MexicoCityError::UnavailableSessionError(
                 session_id as u64,
             ))?;
     let _result = this_session.send_tls_data(&mut input_data.to_vec())?;
@@ -110,7 +108,7 @@ pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), MexicoCityError> {
             //TODO: change the error type
             Ok((result, needed))
         }
-        None => Err(MexicoCityError::UnavailableBajaSessionError(
+        None => Err(MexicoCityError::UnavailableSessionError(
             session_id as u64,
         )),
     }?;
@@ -127,34 +125,34 @@ pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), MexicoCityError> {
 pub fn get_data_needed(session_id: u32) -> Result<bool, MexicoCityError> {
     match super::SESSIONS.lock()?.get_mut(&session_id) {
         Some(this_session) => Ok(this_session.read_tls_needed()),
-        None => Err(MexicoCityError::UnavailableBajaSessionError(
+        None => Err(MexicoCityError::UnavailableSessionError(
             session_id as u64,
         )),
     }
 }
 
 pub fn get_enclave_cert_pem() -> Result<Vec<u8>, MexicoCityError> {
-    match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.server_certificate_buffer().clone()),
-        None => Err(MexicoCityError::UninitializedBajaSessionError(
+    match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => Ok(my_session_manager.server_certificate_buffer().clone()),
+        None => Err(MexicoCityError::UninitializedSessionError(
             "get_enclave_cert_pem",
         )),
     }
 }
 
 pub fn get_enclave_cert() -> Result<rustls::Certificate, MexicoCityError> {
-    match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.server_certificate().clone()),
-        None => Err(MexicoCityError::UninitializedBajaSessionError(
+    match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => Ok(my_session_manager.server_certificate().clone()),
+        None => Err(MexicoCityError::UninitializedSessionError(
             "get_enclave_cert",
         )),
     }
 }
 
 pub fn get_enclave_name() -> Result<std::string::String, MexicoCityError> {
-    match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.name().clone()),
-        None => Err(MexicoCityError::UninitializedBajaSessionError(
+    match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => Ok(my_session_manager.name().clone()),
+        None => Err(MexicoCityError::UninitializedSessionError(
             "get_enclave_name",
         )),
     }
