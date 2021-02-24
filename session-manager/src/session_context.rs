@@ -19,7 +19,7 @@ use std::{
 };
 
 use crate::{
-    baja_session::{BajaSession, Principal},
+    session::{BajaSession, Principal},
     error::BajaError,
 };
 use veracruz_utils::VeracruzPolicy;
