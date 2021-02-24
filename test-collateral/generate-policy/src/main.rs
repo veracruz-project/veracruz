@@ -476,29 +476,41 @@ fn compute_program_hash(arguments: &Arguments) -> String {
 /// 'dd' and 'xxd' utilities, which are called as external processes.  Returns
 /// `None` iff no `css.bin` file was provided as a command-line argument.
 fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
+    info!("Computing Intel SGX Enclave hash.");
+
     let css_file = match &arguments.css_file {
         None => return None,
         Some(css_file) => css_file,
     };
 
     if Path::new(css_file).exists() {
-        if let Ok(output) = Command::new(DD_EXECUTABLE_NAME)
+        let mut dd_command = Command::new(DD_EXECUTABLE_NAME);
+        
+        dd_command
             .arg("skip=960")
             .arg("count=32")
             .arg(format!("if={}", pretty_pathbuf(css_file.clone())))
             .arg(format!("of={}", "hash.bin"))
-            .output()
-        {
+            .arg("bs=1");
+
+        info!("Invoking 'dd' executable: {:?}.", dd_command);
+
+        if let Ok(output) = dd_command.output() {
             if !output.status.success() {
                 abort_with("Invocation of 'dd' command failed.");
             }
 
-            if let Ok(hash_hex) = Command::new(XXD_EXECUTABLE_NAME)
+            let mut xxd_command = Command::new(XXD_EXECUTABLE_NAME);
+
+            xxd_command
                 .arg("-ps")
                 .arg("-cols")
                 .arg("32")
-                .arg("hash.bin")
-                .output()
+                .arg("hash.bin");
+
+            info!("Invoking 'xxd' executable: {:?}.", xxd_command);
+
+            if let Ok(hash_hex) = xxd_command.output()
             {
                 if !hash_hex.status.success() {
                     abort_with("Invocation of 'xxd' command failed.");
@@ -506,6 +518,8 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 
                 if let Ok(mut hash_hex) = String::from_utf8(hash_hex.stdout) {
                     hash_hex = hash_hex.replace("\n", "");
+
+                    info!("Hash successfully computed, {}.", hash_hex);
 
                     return Some(hash_hex);
                 } else {
@@ -528,6 +542,8 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 /// Enclave hash.  Returns `None` iff no `pcr0` file was provided as a command
 /// line argument.
 fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
+    info!("Computing AWS Nitro Enclave hash.");
+    
     let pcr0_file = match &arguments.pcr0_file {
         None => return None,
         Some(pcr0_file) => pcr0_file,
@@ -541,10 +557,12 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 
         content = content.replace("\n", "");
 
+        info!("Hash successfully computed, {}.", content);
+
         Some(content)
     } else {
-        error!("Mexico City PCR0 file cannot be opened.");
-        error!("Continuing on without computing a Nitro hash.");
+        info!("Mexico City PCR0 file cannot be opened.");
+        info!("Continuing on without computing a Nitro hash.");
         None
     }
 }
@@ -552,6 +570,8 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 /// Serializes the identities of all principals in the Veracruz computation into
 /// a JSON value.
 fn serialize_identities(arguments: &Arguments) -> Value {
+    info!("Serializing identities of computation Principals.");
+    
     assert_eq!(&arguments.certificates.len(), &arguments.roles.len());
 
     let mut values = vec![];
@@ -589,6 +609,8 @@ fn serialize_identities(arguments: &Arguments) -> Value {
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
 fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
+    info!("Serializing enclave certificate expiry timepoint.");
+    
     let expiry = arguments
         .certificate_expiry
         .expect("Internal invariant failed: certificate lifetime is missing.");
@@ -641,6 +663,8 @@ fn serialize_json(arguments: &Arguments) -> Value {
 /// Entry point: reads the command line, serializes the policy file to JSON, and
 /// then writes the serialized JSON to the specified output file.
 fn main() {
+    env_logger::init();
+
     let arguments = parse_command_line();
 
     info!(
