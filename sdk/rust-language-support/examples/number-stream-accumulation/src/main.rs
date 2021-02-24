@@ -22,7 +22,7 @@ fn main() -> return_code::Veracruz {
 }
 
 fn read_init_value() -> Result<f64, i32> {
-    if host::input_count() != 1 {
+    if host::input_count() < 1 {
         return return_code::fail_data_source_count();
     } else {
         let input = host::read_input(0).unwrap();

@@ -80,70 +80,70 @@ use std::sync::SgxMutex as Mutex;
 // Metadata for data sources.
 ////////////////////////////////////////////////////////////////////////////////
 
-#[deprecated]
-/// A data source "frame" containing the data provisioned into the enclave, as
-/// well as some identifying metadata explaining where it came from.
-#[derive(Clone, Debug)]
-pub struct DataSourceMetadata {
-    /// The raw data (encoded in bytes) provisioned into the enclave.
-    data: Vec<u8>,
-    /// Who provisioned this data.
-    client_id: u64,
-    /// The "serial number" for data issued by a single provisioner of data.
-    package_id: u64,
-}
+//#[deprecated]
+///// A data source "frame" containing the data provisioned into the enclave, as
+///// well as some identifying metadata explaining where it came from.
+//#[derive(Clone, Debug)]
+//pub struct DataSourceMetadata {
+    ///// The raw data (encoded in bytes) provisioned into the enclave.
+    //data: Vec<u8>,
+    ///// Who provisioned this data.
+    //client_id: u64,
+    ///// The "serial number" for data issued by a single provisioner of data.
+    //package_id: u64,
+//}
 
-#[deprecated]
-impl DataSourceMetadata {
-    /// Creates a new `DataSourceMetadata` frame from a source of raw bytes, and
-    /// client and package IDs.
-    #[inline]
-    pub fn new(data: &[u8], client_id: u64, package_id: u64) -> Self {
-        DataSourceMetadata {
-            data: data.to_vec(),
-            client_id: client_id,
-            package_id: package_id,
-        }
-    }
+//#[deprecated]
+//impl DataSourceMetadata {
+    ///// Creates a new `DataSourceMetadata` frame from a source of raw bytes, and
+    ///// client and package IDs.
+    //#[inline]
+    //pub fn new(data: &[u8], client_id: u64, package_id: u64) -> Self {
+        //DataSourceMetadata {
+            //data: data.to_vec(),
+            //client_id: client_id,
+            //package_id: package_id,
+        //}
+    //}
 
-    /// Gets the raw bytes associated with this metadata frame.
-    #[inline]
-    pub fn get_data(&self) -> &Vec<u8> {
-        &self.data
-    }
+    ///// Gets the raw bytes associated with this metadata frame.
+    //#[inline]
+    //pub fn get_data(&self) -> &Vec<u8> {
+        //&self.data
+    //}
 
-    /// Gets the client ID associated with this metadata frame.
-    #[inline]
-    pub fn get_client_id(&self) -> u64 {
-        self.client_id
-    }
+    ///// Gets the client ID associated with this metadata frame.
+    //#[inline]
+    //pub fn get_client_id(&self) -> u64 {
+        //self.client_id
+    //}
 
-    /// Gets the package ID associated with this metadata frame.
-    #[inline]
-    pub fn get_package_id(&self) -> u64 {
-        self.package_id
-    }
-}
+    ///// Gets the package ID associated with this metadata frame.
+    //#[inline]
+    //pub fn get_package_id(&self) -> u64 {
+        //self.package_id
+    //}
+//}
 
-#[deprecated]
-/// Pretty-printing for `DataSourceMetadata`.
-impl Display for DataSourceMetadata {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(
-            f,
-            "Data source (client ID: {}, package ID: {}) bytes:\n",
-            self.client_id, self.package_id
-        )?;
-        write!(f, "  {:?}", self.data)
-    }
-}
+//#[deprecated]
+///// Pretty-printing for `DataSourceMetadata`.
+//impl Display for DataSourceMetadata {
+    //fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        //write!(
+            //f,
+            //"Data source (client ID: {}, package ID: {}) bytes:\n",
+            //self.client_id, self.package_id
+        //)?;
+        //write!(f, "  {:?}", self.data)
+    //}
+//}
 
 ////////////////////////////////////////////////////////////////////////////////
 // The machine lifecycle state.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The lifecycle state of the Veracruz host.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum LifecycleState {
     /// The initial state: nothing yet has been provisioned into the Veracruz
     /// machine.  The state is essentially "pristine", having just been created.
@@ -216,7 +216,7 @@ pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
 /// wire protocols, for example if somebody tries to provision data when that is
 /// not expected, or similar.  Some may be recoverable errors, some may be fatal
 /// errors due to programming bugs.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Serialize, Deserialize)]
 pub enum HostProvisioningError {
     /// The provisioning process failed because it could not correctly sort the
     /// incoming data.  This should never happen, and is a bug.
@@ -300,12 +300,12 @@ lazy_static!{
 // - program_module ? possibly can do on-demand allocation
 // in the favour of FS.
 pub struct HostProvisioningState<Module, Memory> {
-    //TODO REMOVE
-    /// The data sources that have been provisioned into the machine.
-    pub(crate) data_sources: Vec<DataSourceMetadata>,
-    //TODO REMOVE
-    /// The stream sources that have been provisioned into the machine.
-    pub(crate) stream_sources: Vec<DataSourceMetadata>,
+    ////TODO REMOVE
+    ///// The data sources that have been provisioned into the machine.
+    //pub(crate) data_sources: Vec<DataSourceMetadata>,
+    ////TODO REMOVE
+    ///// The stream sources that have been provisioned into the machine.
+    //pub(crate) stream_sources: Vec<DataSourceMetadata>,
     ////TODO REMOVE
     ///// The expected list of data sources, derived from the global policy
     ///// parameterising the computation.
@@ -351,10 +351,10 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     #[inline]
     pub fn new() -> Self {
         HostProvisioningState {
-            data_sources: Vec::new(),
-            //expected_data_sources: Vec::new(),
-            stream_sources: Vec::new(),
-            //expected_stream_sources: Vec::new(),
+            //data_sources: Vec::new(),
+            ////expected_data_sources: Vec::new(),
+            //stream_sources: Vec::new(),
+            ////expected_stream_sources: Vec::new(),
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
             memory: None,
@@ -377,10 +377,10 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             *lock_vfs = Some(VFS::new(capabilities,digests));
         }
         HostProvisioningState {
-            data_sources: Vec::new(),
-            //expected_data_sources: Vec::new(),
-            stream_sources: Vec::new(),
-            //expected_stream_sources: Vec::new(),
+            //data_sources: Vec::new(),
+            ////expected_data_sources: Vec::new(),
+            //stream_sources: Vec::new(),
+            ////expected_stream_sources: Vec::new(),
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
             memory: None,
@@ -392,24 +392,22 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     }
 
     /// Append to a file.
-    pub(crate) fn write_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+    pub(crate) fn write_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
         VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,data)?;
         Ok(())
     }
 
     /// Append to a file.
-    pub(crate) fn append_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+    pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
         VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.append_write(file_name,data)?;
         Ok(())
     }
 
     /// Read from a file
-    pub(crate) fn read_file_base(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        if client_id != 42 {
-            VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Read)?;
-        }
+    pub(crate) fn read_file_base(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         if file_name.starts_with("output") {
@@ -420,14 +418,14 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         }
     }
 
-    /// Register program
-    pub(crate) fn register_program_base(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,prog)?;
-        //TODO: link to the actually fs API.
-        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        Ok(())
-    }
+    ///// Register program
+    //pub(crate) fn register_program_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        //VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        //VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,prog)?;
+        ////TODO: link to the actually fs API.
+        ////TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        //Ok(())
+    //}
 
     /// Registers the program result.
     #[inline]
@@ -512,11 +510,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         //self.expected_data_sources.len()
     //}
 
-    /// Returns the number of data sources that have been provisioned so far.
-    #[inline]
-    pub(crate) fn get_current_data_source_count(&self) -> usize {
-        self.data_sources.len()
-    }
+    ///// Returns the number of data sources that have been provisioned so far.
+    //#[inline]
+    //pub(crate) fn get_current_data_source_count(&self) -> usize {
+        //self.data_sources.len()
+    //}
 
     ///// Returns the stream sources that the provisioning process is expecting.
     //#[inline]
@@ -530,11 +528,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         //self.expected_stream_sources.len()
     //}
 
-    /// Returns that number of stream sources that have been provisioned so far.
-    #[inline]
-    pub(crate) fn get_current_stream_source_count(&self) -> usize {
-        self.stream_sources.len()
-    }
+    ///// Returns that number of stream sources that have been provisioned so far.
+    //#[inline]
+    //pub(crate) fn get_current_stream_source_count(&self) -> usize {
+        //self.stream_sources.len()
+    //}
 
     ///// Returns the program digest, if it has been computed.  Returns `None` iff
     ///// the digest has not yet been computed.
@@ -545,27 +543,27 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         ////self.program_digest.as_ref()
     //}
 
-    /// Returns the data source frame (containing raw data, source and package
-    /// IDs) associated with the Nth registered data source as stored in the
-    /// host provisioning state, expressed by `index`.  Returns `None` iff
-    /// `index` is not the index of any registered data source.
-    pub(crate) fn get_current_data_source(&self, index: usize) -> Option<&DataSourceMetadata> {
-        if index > self.get_current_data_source_count() {
-            return None;
-        }
-        Some(&self.data_sources[index])
-    }
+    ///// Returns the data source frame (containing raw data, source and package
+    ///// IDs) associated with the Nth registered data source as stored in the
+    ///// host provisioning state, expressed by `index`.  Returns `None` iff
+    ///// `index` is not the index of any registered data source.
+    //pub(crate) fn get_current_data_source(&self, index: usize) -> Option<&DataSourceMetadata> {
+        //if index > self.get_current_data_source_count() {
+            //return None;
+        //}
+        //Some(&self.data_sources[index])
+    //}
 
-    /// Returns the data source frame (containing raw data, source and package
-    /// IDs) associated with the Nth registered data source as stored in the
-    /// host provisioning state, expressed by `index`.  Returns `None` iff
-    /// `index` is not the index of any registered data source.
-    pub(crate) fn get_current_stream_source(&self, index: usize) -> Option<&DataSourceMetadata> {
-        if index > self.get_current_stream_source_count() {
-            return None;
-        }
-        Some(&self.stream_sources[index])
-    }
+    ///// Returns the data source frame (containing raw data, source and package
+    ///// IDs) associated with the Nth registered data source as stored in the
+    ///// host provisioning state, expressed by `index`.  Returns `None` iff
+    ///// `index` is not the index of any registered data source.
+    //pub(crate) fn get_current_stream_source(&self, index: usize) -> Option<&DataSourceMetadata> {
+        //if index > self.get_current_stream_source_count() {
+            //return None;
+        //}
+        //Some(&self.stream_sources[index])
+    //}
 
     /// Returns the data source frame (containing raw data, source and package
     /// IDs) associated with the Nth registered data source as stored in the
@@ -1067,6 +1065,9 @@ pub enum FatalHostError {
     /// Wrapper for direct error message.
     #[error(display = "FatalVeracruzHostError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
+    //TODO REMOVE
+    #[error(display = "FatalVeracruzHostError: provisioning error {:?}.", _0)]
+    ProvisionError(#[error(source)] HostProvisioningError),
     /// Something unknown or unexpected went wrong, and there's no more detailed
     /// information.
     #[error(display = "FatalVeracruzHostError: Unknown error.")]
@@ -1133,13 +1134,13 @@ pub trait ExecutionEngine: Send {
     /// on behalf of the client identified by `client_id`.
     /// The client must has the write permission to the file.
     /// It createa a new file, if the file does not exists.
-    fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
+    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
 
     /// Write `buf` to `file_name` in the file system
     /// on behalf of the client identified by `client_id`.
     /// The client must has the write permission to the file.
     /// It createa a new file, if the file does not exists.
-    fn write_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
+    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
 
     /// Read `file_name` in the file system
     /// on behalf of the client identified by `client_id`.
@@ -1147,16 +1148,15 @@ pub trait ExecutionEngine: Send {
     /// It createa a new file, if the file does not exists.
     ///
     /// TODO: Add the range selector
-    fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError>;
+    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError>;
 
-    /// Register a program `file_name` 
-    /// on behalf of the client identified by `client_id`.
-    /// The client must has the read permission to `file_name`.
-    /// This program must be specified in the permission system
-    /// and the hash of `prog` must match the requirement.
-    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError>; 
+    ///// Register a program `file_name` 
+    ///// on behalf of the client identified by `client_id`.
+    ///// The client must has the read permission to `file_name`.
+    ///// This program must be specified in the permission system
+    ///// and the hash of `prog` must match the requirement.
+    //fn register_program(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError>; 
 
-    #[deprecated]
     //TODO: these API will be replaced by FS API -- strart
     /// Loads a raw WASM program from a buffer of received or parsed bytes.
     /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
@@ -1223,11 +1223,11 @@ pub trait ExecutionEngine: Send {
     /// in.
     fn get_lifecycle_state(&self) -> LifecycleState;
 
-    #[deprecated]
-    //TODO: do we need this 
-    /// Returns the current number of data sources provisioned into the host
-    /// provisioning state.
-    fn get_current_data_source_count(&self) -> usize;
+    //#[deprecated]
+    ////TODO: do we need this 
+    ///// Returns the current number of data sources provisioned into the host
+    ///// provisioning state.
+    //fn get_current_data_source_count(&self) -> usize;
 
     //#[deprecated]
     ////TODO: do we need this 
@@ -1239,11 +1239,11 @@ pub trait ExecutionEngine: Send {
     /// the platform.
     fn get_expected_shutdown_sources(&self) -> Vec<u64>;
 
-    #[deprecated]
-    //TODO: do we need this 
-    /// Returns the current number of stream sources provisioned into the host
-    /// provisioning state.
-    fn get_current_stream_source_count(&self) -> usize;
+    //#[deprecated]
+    ////TODO: do we need this 
+    ///// Returns the current number of stream sources provisioned into the host
+    ///// provisioning state.
+    //fn get_current_stream_source_count(&self) -> usize;
 
     //#[deprecated]
     ////TODO: do we need this 

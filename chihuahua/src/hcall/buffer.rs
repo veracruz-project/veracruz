@@ -4,9 +4,10 @@
 use err_derive::Error;
 use std::{collections::HashMap, result::Result, vec::Vec, string::{ToString, String}};
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
+use serde::{Deserialize, Serialize};
 
 /// Error type for mexico-city buffer.
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, Serialize, Deserialize)]
 pub enum VFSError {
     //TODO: potential remove this 
     #[error(
@@ -102,6 +103,9 @@ impl VFS {
     /// to read, write and execute on the `file_name`.
     /// Return None if `id` or `file_name` do not exist.
     pub fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), VFSError> {
+        if *id == VeracruzCapabilityIndex::InternalSuperUser {
+            return Ok(());
+        }
         self.capabilities
             .get(id)
             .ok_or(VFSError::IndexNotFound(id.clone()))?

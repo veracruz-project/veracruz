@@ -34,6 +34,7 @@ use crate::{
     },
     hcall::buffer::VFS,
 };
+use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -506,7 +507,7 @@ impl WasmiHostProvisioningState {
         }
 
         let address: u32 = args.nth(0);
-        let result = self.get_current_data_source_count() as u32;
+        let result = 99 as u32;
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
@@ -536,22 +537,36 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_data_source(index as usize) {
-                None => return Ok(VeracruzError::BadInput),
-                Some(frame) => {
-                    let result = frame.get_data().len() as u32;
-                    let result: Vec<u8> = result.to_le_bytes().to_vec();
+            Some(memory) => 
+            {
+                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("XXXYYY"))?.len();
+                let result: Vec<u8> = result.to_le_bytes().to_vec();
 
-                    if let Err(_) = memory.set(address, &result) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: result.len() as usize,
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+                if let Err(_) = memory.set(address, &result) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: result.len() as usize,
+                    });
                 }
+
+                Ok(VeracruzError::Success)
             },
+                //match self.get_current_data_source(index as usize) {
+                //None => return Ok(VeracruzError::BadInput),
+                //Some(frame) => {
+                    //let result = frame.get_data().len() as u32;
+                    //let result: Vec<u8> = result.to_le_bytes().to_vec();
+
+                    //if let Err(_) = memory.set(address, &result) {
+                        //return Err(FatalHostError::MemoryWriteFailed {
+                            //memory_address: address as usize,
+                            //bytes_to_be_written: result.len() as usize,
+                        //});
+                    //}
+
+                    //Ok(VeracruzError::Success)
+                //}
+            //},
         }
     }
 
@@ -569,25 +584,41 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_data_source(index as usize) {
-                None => return Ok(VeracruzError::BadInput),
-                Some(frame) => {
-                    let data = frame.get_data();
-
-                    if data.len() > size as usize {
-                        return Ok(VeracruzError::DataSourceSize);
-                    }
-
-                    if let Err(_) = memory.set(address, data) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: data.len(),
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+            Some(memory) => 
+            {
+                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("XXXYYY"))?;
+                if data.len() > size as usize {
+                    return Ok(VeracruzError::DataSourceSize);
                 }
+                if let Err(_) = memory.set(address, &data) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: data.len(),
+                    });
+                }
+
+                Ok(VeracruzError::Success)
+
             },
+                /*match self.get_current_data_source(index as usize) {*/
+                //None => return Ok(VeracruzError::BadInput),
+                //Some(frame) => {
+                    //let data = frame.get_data();
+
+                    //if data.len() > size as usize {
+                        //return Ok(VeracruzError::DataSourceSize);
+                    //}
+
+                    //if let Err(_) = memory.set(address, data) {
+                        //return Err(FatalHostError::MemoryWriteFailed {
+                            //memory_address: address as usize,
+                            //bytes_to_be_written: data.len(),
+                        //});
+                    //}
+
+                    //Ok(VeracruzError::Success)
+                //}
+            //},
         }
     }
 
@@ -600,7 +631,8 @@ impl WasmiHostProvisioningState {
         }
 
         let address: u32 = args.nth(0);
-        let result = self.get_current_stream_source_count() as u32;
+        //TODO TEMPERARY HARD CODE A BIG NUMBET
+        let result = 99 as u32;
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
@@ -630,22 +662,36 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_stream_source(index as usize) {
-                None => return Ok(VeracruzError::BadStream),
-                Some(frame) => {
-                    let result = frame.get_data().len() as u32;
-                    let result: Vec<u8> = result.to_le_bytes().to_vec();
+            Some(memory) => 
+            {
+                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("XXXYYY"))?.len();
+                let result: Vec<u8> = result.to_le_bytes().to_vec();
 
-                    if let Err(_) = memory.set(address, &result) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: result.len() as usize,
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+                if let Err(_) = memory.set(address, &result) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: result.len() as usize,
+                    });
                 }
+
+                Ok(VeracruzError::Success)
             },
+                //match self.get_current_stream_source(index as usize) {
+                //None => return Ok(VeracruzError::BadStream),
+                //Some(frame) => {
+                    //let result = frame.get_data().len() as u32;
+                    //let result: Vec<u8> = result.to_le_bytes().to_vec();
+
+                    //if let Err(_) = memory.set(address, &result) {
+                        //return Err(FatalHostError::MemoryWriteFailed {
+                            //memory_address: address as usize,
+                            //bytes_to_be_written: result.len() as usize,
+                        //});
+                    //}
+
+                    //Ok(VeracruzError::Success)
+                //}
+            //},
         }
     }
 
@@ -661,29 +707,46 @@ impl WasmiHostProvisioningState {
         let address: u32 = args.nth(1);
         let size: u32 = args.nth(2);
 
+
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_stream_source(index as usize) {
-                None => return Ok(VeracruzError::BadStream),
-                Some(frame) => {
-                    let data = frame.get_data();
-
-                    if data.len() > size as usize {
-                        assert!(false);
-                        return Ok(VeracruzError::StreamSourceSize);
-                    }
-
-                    if let Err(_) = memory.set(address, data) {
-                        assert!(false);
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: data.len(),
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+            Some(memory) =>
+            {
+                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("XXXYYY"))?;
+                if data.len() > size as usize {
+                    return Ok(VeracruzError::DataSourceSize);
                 }
+                if let Err(_) = memory.set(address, &data) {
+                    return Err(FatalHostError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: data.len(),
+                    });
+                }
+
+                Ok(VeracruzError::Success)
             },
+            //{
+                //match self.get_current_stream_source(index as usize) {
+                //None => return Ok(VeracruzError::BadStream),
+                //Some(frame) => {
+                    //let data = frame.get_data();
+
+                    //if data.len() > size as usize {
+                        //assert!(false);
+                        //return Ok(VeracruzError::StreamSourceSize);
+                    //}
+
+                    //if let Err(_) = memory.set(address, data) {
+                        //assert!(false);
+                        //return Err(FatalHostError::MemoryWriteFailed {
+                            //memory_address: address as usize,
+                            //bytes_to_be_written: data.len(),
+                        //});
+                    //}
+
+                    //Ok(VeracruzError::Success)
+                //}
+            //},
         }
     }
 
@@ -868,38 +931,38 @@ impl WasmiHostProvisioningState {
         //self.memory = None;
         //assert!(self.program_module.is_none());
         //assert!(self.memory.is_none());
-        let program = self.read_file(42,file_name).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-1: {}",file_name))?;
+        let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-1: {}",file_name))?;
         self.load_program(program.as_slice()).map_err(|e| format!("load error - 2"))?;
         assert!(self.program_module.is_some());
         assert!(self.memory.is_some());
 
         // TODO: GLUE CODE HERE
-        let input_table = self.get_program_input_table(file_name)?;
-        let mut input_vec = Vec::new();
-        let mut stream_vec = Vec::new();
-        for input_file in input_table {
-            if input_file.starts_with("input-") {
-                let package_id = input_file.strip_prefix("input-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
-                let metadata = DataSourceMetadata::new(
-                    self.read_file(42,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-2"))?.as_slice(),
-                    0,
-                    package_id,
-                );
-                input_vec.push(metadata.clone());
-            }
-            if input_file.starts_with("stream-") {
-                let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
-                let metadata = DataSourceMetadata::new(
-                    self.read_file(42,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-3"))?.as_slice(),
-                    0,
-                    package_id,
-                );
-                stream_vec.push(metadata);
-            }
-        }
+        //let input_table = self.get_program_input_table(file_name)?;
+        //let mut input_vec = Vec::new();
+        //let mut stream_vec = Vec::new();
+        //for input_file in input_table {
+            //if input_file.starts_with("input-") {
+                //let package_id = input_file.strip_prefix("input-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
+                //let metadata = DataSourceMetadata::new(
+                    //self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-2"))?.as_slice(),
+                    //0,
+                    //package_id,
+                //);
+                //input_vec.push(metadata.clone());
+            //}
+            //if input_file.starts_with("stream-") {
+                //let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
+                //let metadata = DataSourceMetadata::new(
+                    //self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-3"))?.as_slice(),
+                    //0,
+                    //package_id,
+                //);
+                //stream_vec.push(metadata);
+            //}
+        //}
 
-        self.data_sources = input_vec;
-        self.stream_sources = stream_vec;
+        //self.data_sources = input_vec;
+        //self.stream_sources = stream_vec;
         //
         // TODO: END GLUE CODE HERE
         //
@@ -939,8 +1002,8 @@ impl WasmiHostProvisioningState {
         //TODO: REMOVE ENGINE
         self.program_module = None;
         self.memory = None;
-        self.data_sources = Vec::new();
-        self.stream_sources = Vec::new();
+        //self.data_sources = Vec::new();
+        //self.stream_sources = Vec::new();
         //self.set_ready_to_execute();
         rst
     }
@@ -950,30 +1013,30 @@ impl WasmiHostProvisioningState {
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmiHostProvisioningState {
     /// ExecutionEngine wrapper of load_program implementation in WasmiHostProvisioningState.
-    fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.append_file_base(client_id,file_name,data)
     }
 
     /// Chihuahua wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn write_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.write_file_base(client_id,file_name,data)
     }
 
     /// Chihuahua wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         self.read_file_base(client_id,file_name)
     }
 
-    /// Chihuahua wrapper of register_program implementation in WasmiHostProvisioningState.
-    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
-        //TODO: link to the actually fs API.
-        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        self.register_program_base(client_id,file_name,prog)?;
-        Ok(())
-        //self.load_program(prog)
-    }
+    ///// Chihuahua wrapper of register_program implementation in WasmiHostProvisioningState.
+    //fn register_program(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        ////TODO: link to the actually fs API.
+        ////TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        //self.register_program_base(client_id,file_name,prog)?;
+        //Ok(())
+        ////self.load_program(prog)
+    //}
 
     /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.
     #[inline]
@@ -1036,10 +1099,10 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     }
 
     ///// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_current_data_source_count(&self) -> usize {
-        self.get_current_data_source_count().clone()
-    }
+    //#[inline]
+    //fn get_current_data_source_count(&self) -> usize {
+        //self.get_current_data_source_count().clone()
+    //}
 
     ///// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
     //#[inline]
@@ -1054,10 +1117,10 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     }
 
     ///// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_current_stream_source_count(&self) -> usize {
-        self.get_current_stream_source_count().clone()
-    }
+    //#[inline]
+    //fn get_current_stream_source_count(&self) -> usize {
+        //self.get_current_stream_source_count().clone()
+    //}
 
     ///// Chihuahua wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
     //#[inline]

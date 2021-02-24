@@ -561,15 +561,15 @@ impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
             .read_file(client_id,file_name)
     }
 
-    /// Chihuahua wrapper of register_program implementation in WasmtimeHostProvisioningState.
-    fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
-        //TODO: link to the actually fs API.
-        //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .load_program(prog)
-    }
+    ///// Chihuahua wrapper of register_program implementation in WasmtimeHostProvisioningState.
+    //fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
+        ////TODO: link to the actually fs API.
+        ////TODO: THIS ONLY IS GLUE CODE FOR NOW!
+        //HOST_PROVISIONING_STATE
+            //.lock()
+            //.expect("Failed to obtain lock on host provisioning state.")
+            //.load_program(prog)
+    //}
 
     /// Chihuahua wrapper of load_program implementation in WasmtimeHostProvisioningState.
     /// Raises a panic if the global wasmtime host is unavailable.
@@ -581,31 +581,31 @@ impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
             .load_program(buffer)
     }
 
-    /// ExecutionEngine wrapper of add_new_data_source implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn add_new_data_source(
-        &mut self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), HostProvisioningError> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .add_new_data_source(metadata)
-    }
+    ///// ExecutionEngine wrapper of add_new_data_source implementation in WasmtimeHostProvisioningState.
+    ///// Raises a panic if the global wasmtime host is unavailable.
+    //#[inline]
+    //fn add_new_data_source(
+        //&mut self,
+        //metadata: DataSourceMetadata,
+    //) -> Result<(), HostProvisioningError> {
+        //HOST_PROVISIONING_STATE
+            //.lock()
+            //.expect("Failed to obtain lock on host provisioning state.")
+            //.add_new_data_source(metadata)
+    //}
 
-    /// ExecutionEngine wrapper of add_new_stream_source implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn add_new_stream_source(
-        &mut self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), HostProvisioningError> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .add_new_stream_source(metadata)
-    }
+    ///// ExecutionEngine wrapper of add_new_stream_source implementation in WasmtimeHostProvisioningState.
+    ///// Raises a panic if the global wasmtime host is unavailable.
+    //#[inline]
+    //fn add_new_stream_source(
+        //&mut self,
+        //metadata: DataSourceMetadata,
+    //) -> Result<(), HostProvisioningError> {
+        //HOST_PROVISIONING_STATE
+            //.lock()
+            //.expect("Failed to obtain lock on host provisioning state.")
+            //.add_new_stream_source(metadata)
+    //}
 
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.

@@ -31,9 +31,6 @@ pub enum RuntimeManagerError {
     FatalHostError(#[error(source)] execution_engine::hcall::common::FatalHostError),
     #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
     HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
-    #[error(display = "RuntimeManager: RuntimeManagerBufferError: {:?}.", _0)]
-    RuntimeManagerBufferError(#[error(source)] crate::managers::buffer::RuntimeManagerBufferError),
-    #[error(display = "RuntimeManager: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
     #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]
     UninitializedSessionError(&'static str),

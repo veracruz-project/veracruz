@@ -11,10 +11,10 @@
 //! information on licensing and copyright.
 
 use super::{
-    buffer::RuntimeManagerBuffer, RuntimeManagerError, ProtocolState, ProvisioningResponse,
+    RuntimeManagerError, ProtocolState, ProvisioningResponse,
     ProvisioningResult,
 };
-use execution_engine::hcall::common::{DataSourceMetadata, LifecycleState};
+use execution_engine::hcall::common::{LifecycleState};
 use transport_protocol::transport_protocol::{
     RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
 };
@@ -26,6 +26,7 @@ use std::sync::Mutex;
 use std::sync::SgxMutex as Mutex;
 use std::{collections::HashMap, result::Result, vec::Vec};
 use veracruz_utils::policy::principal::Role;
+use veracruz_utils::{VeracruzCapabilityIndex, VeracruzRole};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The buffer of incoming data.
@@ -33,8 +34,6 @@ use veracruz_utils::policy::principal::Role;
 
 lazy_static! {
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
-    //TODO: replace by dedicated FS with meta-data, e.g. permission.
-    static ref PROG_AND_DATA_BUFFER: Mutex<RuntimeManagerBuffer> = Mutex::new(RuntimeManagerBuffer::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,13 +136,13 @@ fn dispatch_on_request_state(protocol_state: &ProtocolState) -> ProvisioningResu
 /// Returns the result of a computation, computing the result first.  Fails if
 /// we are not in the `LifecycleState::ReadyToExecute` state.
 fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &ProtocolState, client_id: u64,) -> ProvisioningResult {
-    // TODO check file exists
+    // TODO check if file  has been modified exists
     if check_state(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::FinishedExecuting],
     ) {
         //TODO: read the actually file.
-        let result = protocol_state.read_file(client_id,"output")?;
+        let result = protocol_state.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
         let response = response_success(result);
         return Ok(ProvisioningResponse::Success { response });
     }
@@ -214,14 +213,14 @@ fn dispatch_on_program(
     client_id: u64,
 ) -> ProvisioningResult {
     // Buffer the program, it will be used in batch process
-    PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice())?;
+    //PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice())?;
     //PROG_AND_DATA_BUFFER.lock()?.fs.insert(file_name.clone(),code.clone());
 
     if check_state(
         &protocol_state.get_lifecycle_state()?,
         &[LifecycleState::Initial],
     ) {
-        if let Err(reason) = protocol_state.register_program(client_id,&file_name,&code) {
+        if let Err(reason) = protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),&file_name,&code) {
         //if let Err(reason) = protocol_state.load_program(&code) {
             // If program loading fails we stay in the initial state as the
             // program provisioner can just try again.
@@ -273,7 +272,7 @@ fn dispatch_on_data(
         //&protocol_state.get_lifecycle_state()?,
         //&[LifecycleState::DataSourcesLoading],
     //) {
-        if let Err(error) = protocol_state.write_file(client_id,file_name.as_str(),data.as_slice()) {
+        if let Err(error) = protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
             // then we should be in an error state, otherwise we remain in the
@@ -326,7 +325,7 @@ fn dispatch_on_stream(
         let package_id = file_name.strip_prefix("stream-").unwrap().parse::<u64>().unwrap();
         //let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
 
-        if let Err(error) = protocol_state.write_file(client_id,file_name.as_str(),data.as_slice()) {
+        if let Err(error) = protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),file_name.as_str(),data.as_slice()) {
             // If something critical went wrong (e.g. all data was provisioned,
             // but the platform couldn't sort the incoming data for some reason
             // then we should be in an error state, otherwise we remain in the
