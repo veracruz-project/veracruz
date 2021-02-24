@@ -986,6 +986,7 @@ mod tests {
                     info!("------------ Streaming Round # {} ------------", count);
                     count += 1;
                     for (remote_file_name, data) in next_round_data.iter() {
+                        println!("{:?}",data);
                         let time_stream_hash = Instant::now();
                         //check_enclave_state(
                             //client_session_id,
@@ -1407,100 +1408,6 @@ mod tests {
         }
     }
 
-<<<<<<< HEAD
-    #[deprecated]
-    fn request_program_hash(
-        remote_file_name : &str,
-        expected_program_hash: &str,
-        client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<bool, VeracruzServerError> {
-        Ok(true)
-    }
-
-    fn request_enclave_state(
-        client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
-
-        client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_session,
-            ticket,
-            serialized_enclave_state_request.as_slice(),
-        )
-    }
-=======
-    //#[deprecated]
-    //fn request_program_hash(
-        //remote_file_name : &str,
-        //expected_program_hash: &str,
-        //client_session_id: u32,
-        //client_session: &mut dyn rustls::Session,
-        //ticket: u32,
-        //client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        //client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    //) -> Result<bool, SinaloaError> {
-        ////let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash(remote_file_name)?;
-        ////let data = client_tls_send(
-            //client_tls_tx,
-            //client_tls_rx,
-            //client_session_id,
-            //client_session,
-            //ticket,
-            ////&serialized_pi_hash_request[..],
-        ////)?;
-        ////let parsed_response = transport_protocol::parse_mexico_city_response(&data)?;
-        ////let status = parsed_response.get_status();
-        ////match status {
-            ////transport_protocol::ResponseStatus::SUCCESS => {
-                ////let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
-                ////if received_hash == expected_program_hash {
-                    ////info!("             request_pi_hash compare succeeded");
-                    ////return Ok(true);
-                ////} else {
-                    ////return Err(SinaloaError::MismatchError {
-                        ////variable: "request_pi_hash",
-                        ////received: received_hash.as_bytes().to_vec(),
-                        ////expected: expected_program_hash.as_bytes().to_vec(),
-                    ////});
-                ////}
-            ////}
-            ////_ => Err(SinaloaError::ResponseError(
-                ////"request_program_hash parse_mexico_city_response",
-                ////status,
-            ////)),
-        ////}
-    //}
-
-    //fn request_enclave_state(
-        //client_session_id: u32,
-        //client_session: &mut dyn rustls::Session,
-        //ticket: u32,
-        //client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        //client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    //) -> Result<Vec<u8>, SinaloaError> {
-        //let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
-
-        //client_tls_send(
-            //client_tls_tx,
-            //client_tls_rx,
-            //client_session_id,
-            //client_session,
-            //ticket,
-            //serialized_enclave_state_request.as_slice(),
-        //)
-    //}
->>>>>>> Push the program loading to the very last minute.
 
     fn provision_data(
         filename: &str,
@@ -1552,100 +1459,6 @@ mod tests {
         )
     }
 
-<<<<<<< HEAD
-    fn check_enclave_state(
-        client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        expecting: u8,
-    ) -> Result<(), VeracruzServerError> {
-        let encoded_state = request_enclave_state(
-            client_session_id,
-            client_session,
-            ticket,
-            client_tls_tx,
-            client_tls_rx,
-        )?;
-        let parsed = transport_protocol::parse_runtime_manager_response(&encoded_state)?;
-
-        if parsed.has_state() {
-            let state = parsed.get_state().get_state().to_vec();
-            if state == vec![expecting] {
-                Ok(())
-            } else {
-                Err(VeracruzServerError::MismatchError {
-                    variable: "parsed.get_state().get_state().to_vec()",
-                    received: state,
-                    expected: vec![expecting],
-                })
-            }
-        } else {
-            Err(VeracruzServerError::MissingFieldError("enclave state in response"))
-        }
-=======
-        Ok(())
-        //let encoded_state = request_enclave_state(
-            //client_session_id,
-            //client_session,
-            //ticket,
-            //client_tls_tx,
-            //client_tls_rx,
-        //)?;
-        //let parsed = transport_protocol::parse_mexico_city_response(&encoded_state)?;
-
-        //if parsed.has_state() {
-            //let state = parsed.get_state().get_state().to_vec();
-            //if state == vec![expecting] {
-                //Ok(())
-            //} else {
-                //Err(SinaloaError::MismatchError {
-                    //variable: "parsed.get_state().get_state().to_vec()",
-                    //received: state,
-                    //expected: vec![expecting],
-                //})
-            //}
-        //} else {
-            //Err(SinaloaError::MissingFieldError("enclave state in response"))
-        //}
->>>>>>> Store the static (initial) data into VFS, and load them just before execution.
-    }
-=======
-    //fn check_enclave_state(
-        //client_session_id: u32,
-        //client_session: &mut dyn rustls::Session,
-        //ticket: u32,
-        //client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        //client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        //expecting: u8,
-    //) -> Result<(), SinaloaError> {
-        //Ok(())
-        ////let encoded_state = request_enclave_state(
-            ////client_session_id,
-            ////client_session,
-            ////ticket,
-            ////client_tls_tx,
-            ////client_tls_rx,
-        ////)?;
-        ////let parsed = transport_protocol::parse_mexico_city_response(&encoded_state)?;
-
-        ////if parsed.has_state() {
-            ////let state = parsed.get_state().get_state().to_vec();
-            ////if state == vec![expecting] {
-                ////Ok(())
-            ////} else {
-                ////Err(SinaloaError::MismatchError {
-                    ////variable: "parsed.get_state().get_state().to_vec()",
-                    ////received: state,
-                    ////expected: vec![expecting],
-                ////})
-            ////}
-        ////} else {
-            ////Err(SinaloaError::MissingFieldError("enclave state in response"))
-        ////}
-    //}
->>>>>>> Push the program loading to the very last minute.
 
     fn server_tls_loop(
         veracruz_server: &mut dyn veracruz_server::VeracruzServer,

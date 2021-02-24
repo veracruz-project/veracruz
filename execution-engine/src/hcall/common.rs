@@ -61,8 +61,7 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
-    cmp::Ord,
-    collections::{HashMap,HashSet},
+    collections::HashMap,
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
     string::{String, ToString},
@@ -70,6 +69,12 @@ use std::{
 };
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
 use crate::hcall::buffer::{VFS, VFSError};
+use lazy_static::lazy_static;
+
+#[cfg(any(feature = "tz", feature = "nitro"))]
+use std::sync::Mutex;
+#[cfg(feature = "sgx")]
+use std::sync::SgxMutex as Mutex;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Metadata for data sources.
@@ -262,6 +267,8 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: VFS Error {}.", _0
     )]
     VFSError(#[error(source)]VFSError),
+    #[error(display = "HostProvisioningError: No File System.")]
+    NoVFS,
     //TODO: potential remove this 
     #[error(
         display = "HostProvisioningError: File {} cannot be found.", _0
@@ -279,6 +286,10 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
 ////////////////////////////////////////////////////////////////////////////////
 // The Veracruz provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
+
+lazy_static!{
+    static ref VFS_INSTANCE: Mutex<Option<VFS>> = Mutex::new(None);
+}
 
 /// The state of the Veracruz machine, which captures metadata as the Veracruz
 /// state is gradually "provisioned" by the data and program providers.  Also
@@ -320,7 +331,7 @@ pub struct HostProvisioningState<Module, Memory> {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    pub(crate) vfs : VFS,
+    //vfs : VFS,
     // program name -> Vec of require input file
     // TODO: for back capabilities, input file need to be in order.
     input_table : HashMap<String, Vec<String>>,
@@ -350,7 +361,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             previous_result: None,
             result: None,
             expected_shutdown_sources: Vec::new(),
-            vfs: VFS::new(&HashMap::new(),&HashMap::new()),
+            //vfs: VFS::new(&HashMap::new(),&HashMap::new()),
             input_table : HashMap::new(),
         }
     }
@@ -361,6 +372,10 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         digests: &HashMap<String, Vec<u8>>, 
         input_table : &HashMap<String, Vec<String>>,
     ) -> Self {
+        let mut lock_vfs = VFS_INSTANCE.lock().unwrap();
+        if let None = *lock_vfs {
+            *lock_vfs = Some(VFS::new(capabilities,digests));
+        }
         HostProvisioningState {
             data_sources: Vec::new(),
             //expected_data_sources: Vec::new(),
@@ -372,42 +387,43 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             previous_result: None,
             result: None,
             expected_shutdown_sources : expected_shutdown_sources.to_vec(),
-            vfs: VFS::new(capabilities,digests),
             input_table : input_table.clone(),
         }
     }
 
     /// Append to a file.
     pub(crate) fn write_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
-        self.vfs.over_write(file_name,data)?;
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,data)?;
         Ok(())
     }
 
     /// Append to a file.
     pub(crate) fn append_file_base(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
-        self.vfs.write(file_name,data)?;
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.append_write(file_name,data)?;
         Ok(())
     }
 
     /// Read from a file
     pub(crate) fn read_file_base(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Read)?;
-        self.vfs.read(file_name)?;
+        if client_id != 42 {
+            VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Read)?;
+        }
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         if file_name.starts_with("output") {
             Ok(self.get_result().map(|v| v.to_vec()))
         } else {
-            Err(HostProvisioningError::FileNotFound(file_name.to_string()))
+            Ok(
+            VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.read(file_name)?)
         }
     }
 
     /// Register program
     pub(crate) fn register_program_base(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
-        self.vfs.over_write(file_name,prog)?;
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(&VeracruzCapabilityIndex::Principal(client_id),file_name, &VeracruzCapability::Write)?;
+        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,prog)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
         Ok(())
@@ -460,12 +476,12 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.program_module = Some(module);
     }
 
-    /// Registers the program digest.
-    #[deprecated]
-    #[inline]
-    pub(crate) fn set_program_digest(&mut self, digest: &[u8]) {
-        //self.program_digest = Some(digest.to_vec());
-    }
+    ///// Registers the program digest.
+    //#[deprecated]
+    //#[inline]
+    //pub(crate) fn set_program_digest(&mut self, digest: &[u8]) {
+        ////self.program_digest = Some(digest.to_vec());
+    //}
 
     /// Registers a linear memory/heap.
     #[inline]
@@ -520,14 +536,14 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.stream_sources.len()
     }
 
-    /// Returns the program digest, if it has been computed.  Returns `None` iff
-    /// the digest has not yet been computed.
-    #[deprecated]
-    #[inline]
-    pub(crate) fn get_program_digest(&self) -> Option<&Vec<u8>> {
-        None
-        //self.program_digest.as_ref()
-    }
+    ///// Returns the program digest, if it has been computed.  Returns `None` iff
+    ///// the digest has not yet been computed.
+    //#[deprecated]
+    //#[inline]
+    //pub(crate) fn get_program_digest(&self) -> Option<&Vec<u8>> {
+        //None
+        ////self.program_digest.as_ref()
+    //}
 
     /// Returns the data source frame (containing raw data, source and package
     /// IDs) associated with the Nth registered data source as stored in the
@@ -703,50 +719,50 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.lifecycle_state = LifecycleState::ReadyToExecute;
     }
 
-    #[deprecated]
-    /// Sets the machine state to `LifecycleState::DataSourcesLoading`.
-    ///
-    /// PANICS: will panic if the current machine state is neither
-    /// `LifecycleState::Initial` nor `LifecycleState::DataSourcesLoading`.
-    #[inline]
-    pub(crate) fn set_data_sources_loading(&mut self) {
-        // This should have been checked before now, to provide a more
-        // meaningful error.  This is here just to ensure nothing slips through,
-        // and if it does, terminate.
-        //assert!(
-            //self.lifecycle_state == LifecycleState::DataSourcesLoading
-                //|| self.lifecycle_state == LifecycleState::Initial
-        //);
-        self.lifecycle_state = LifecycleState::DataSourcesLoading;
-    }
+    //#[deprecated]
+    ///// Sets the machine state to `LifecycleState::DataSourcesLoading`.
+    /////
+    ///// PANICS: will panic if the current machine state is neither
+    ///// `LifecycleState::Initial` nor `LifecycleState::DataSourcesLoading`.
+    //#[inline]
+    //pub(crate) fn set_data_sources_loading(&mut self) {
+        //// This should have been checked before now, to provide a more
+        //// meaningful error.  This is here just to ensure nothing slips through,
+        //// and if it does, terminate.
+        ////assert!(
+            ////self.lifecycle_state == LifecycleState::DataSourcesLoading
+                ////|| self.lifecycle_state == LifecycleState::Initial
+        ////);
+        //self.lifecycle_state = LifecycleState::DataSourcesLoading;
+    //}
 
-    #[deprecated]
-    fn set_vfs(&mut self, vfs: &VFS){
-        self.vfs = vfs.clone()
-    }
+    //#[deprecated]
+    //fn set_vfs(&mut self, vfs: &VFS){
+        //self.vfs = vfs.clone()
+    //}
 
-    #[deprecated]
-    fn get_vfs(&self) -> &VFS {
-        &self.vfs
-    }
+    //#[deprecated]
+    //fn get_vfs(&self) -> &VFS {
+        //&self.vfs
+    //}
 
-    #[deprecated]
-    /// Sets the machine state to `LifecycleState::DataSourcesLoading`.
-    ///
-    /// PANICS: will panic if the current machine state is neither
-    /// `LifecycleState::Initial` nor `LifecycleState::DataSourcesLoading`.
-    #[inline]
-    pub(crate) fn set_stream_sources_loading(&mut self) {
-        // This should have been checked before now, to provide a more
-        // meaningful error.  This is here just to ensure nothing slips through,
-        // and if it does, terminate.
-        //assert!(
-            //self.lifecycle_state == LifecycleState::StreamSourcesLoading
-                //|| self.lifecycle_state == LifecycleState::DataSourcesLoading
-                //|| self.lifecycle_state == LifecycleState::Initial
-        //);
-        self.lifecycle_state = LifecycleState::StreamSourcesLoading;
-    }
+    //#[deprecated]
+    ///// Sets the machine state to `LifecycleState::DataSourcesLoading`.
+    /////
+    ///// PANICS: will panic if the current machine state is neither
+    ///// `LifecycleState::Initial` nor `LifecycleState::DataSourcesLoading`.
+    //#[inline]
+    //pub(crate) fn set_stream_sources_loading(&mut self) {
+        //// This should have been checked before now, to provide a more
+        //// meaningful error.  This is here just to ensure nothing slips through,
+        //// and if it does, terminate.
+        ////assert!(
+            ////self.lifecycle_state == LifecycleState::StreamSourcesLoading
+                ////|| self.lifecycle_state == LifecycleState::DataSourcesLoading
+                ////|| self.lifecycle_state == LifecycleState::Initial
+        ////);
+        //self.lifecycle_state = LifecycleState::StreamSourcesLoading;
+    //}
 
     #[deprecated]
     /// Sets the machine state to `LifecycleState::FinishedExecuting`.
@@ -1207,11 +1223,11 @@ pub trait ExecutionEngine: Send {
     /// in.
     fn get_lifecycle_state(&self) -> LifecycleState;
 
-    //#[deprecated]
-    ////TODO: do we need this 
-    ///// Returns the current number of data sources provisioned into the host
-    ///// provisioning state.
-    //fn get_current_data_source_count(&self) -> usize;
+    #[deprecated]
+    //TODO: do we need this 
+    /// Returns the current number of data sources provisioned into the host
+    /// provisioning state.
+    fn get_current_data_source_count(&self) -> usize;
 
     //#[deprecated]
     ////TODO: do we need this 
@@ -1223,11 +1239,11 @@ pub trait ExecutionEngine: Send {
     /// the platform.
     fn get_expected_shutdown_sources(&self) -> Vec<u64>;
 
-    //#[deprecated]
-    ////TODO: do we need this 
-    ///// Returns the current number of stream sources provisioned into the host
-    ///// provisioning state.
-    //fn get_current_stream_source_count(&self) -> usize;
+    #[deprecated]
+    //TODO: do we need this 
+    /// Returns the current number of stream sources provisioned into the host
+    /// provisioning state.
+    fn get_current_stream_source_count(&self) -> usize;
 
     //#[deprecated]
     ////TODO: do we need this 
@@ -1242,11 +1258,11 @@ pub trait ExecutionEngine: Send {
     /// registered.
     fn get_result(&self) -> Option<Vec<u8>>;
 
-    #[deprecated]
-    //TODO: do we need this 
-    /// Returns an SHA-256 digest of the bytes loaded into the host provisioning
-    /// state.  Returns `None` iff no such program has yet been loaded.
-    fn get_program_digest(&self) -> Option<Vec<u8>>;
+    //#[deprecated]
+    ////TODO: do we need this 
+    ///// Returns an SHA-256 digest of the bytes loaded into the host provisioning
+    ///// state.  Returns `None` iff no such program has yet been loaded.
+    //fn get_program_digest(&self) -> Option<Vec<u8>>;
 
     //#[deprecated]
     ////TODO: do we need this 
@@ -1271,11 +1287,11 @@ pub trait ExecutionEngine: Send {
     /// Registers the previous result.
     fn set_previous_result(&mut self, result: &Option<Vec<u8>>);
 
-    #[deprecated]
-    fn set_vfs(&mut self, vfs: &VFS);
+    //#[deprecated]
+    //fn set_vfs(&mut self, vfs: &VFS);
 
-    #[deprecated]
-    fn get_vfs(&self) -> &VFS;
+    //#[deprecated]
+    //fn get_vfs(&self) -> &VFS;
 
     /// Moves the host provisioning state's lifecycle state into
     /// `LifecycleState::Error`, a state which it cannot ever escape,

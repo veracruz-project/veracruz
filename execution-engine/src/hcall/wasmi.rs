@@ -669,10 +669,12 @@ impl WasmiHostProvisioningState {
                     let data = frame.get_data();
 
                     if data.len() > size as usize {
+                        assert!(false);
                         return Ok(VeracruzError::StreamSourceSize);
                     }
 
                     if let Err(_) = memory.set(address, data) {
+                        assert!(false);
                         return Err(FatalHostError::MemoryWriteFailed {
                             memory_address: address as usize,
                             bytes_to_be_written: data.len(),
@@ -866,7 +868,7 @@ impl WasmiHostProvisioningState {
         //self.memory = None;
         //assert!(self.program_module.is_none());
         //assert!(self.memory.is_none());
-        let program = self.vfs.read(file_name).map_err(|e| format!("NO PROGRAM ERROR - 2"))?;
+        let program = self.read_file(42,file_name).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-1: {}",file_name))?;
         self.load_program(program.as_slice()).map_err(|e| format!("load error - 2"))?;
         assert!(self.program_module.is_some());
         assert!(self.memory.is_some());
@@ -879,23 +881,21 @@ impl WasmiHostProvisioningState {
             if input_file.starts_with("input-") {
                 let package_id = input_file.strip_prefix("input-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
                 let metadata = DataSourceMetadata::new(
-                    self.vfs.read(&input_file).map_err(|e| format!("{:?}",e))?.as_slice(),
+                    self.read_file(42,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-2"))?.as_slice(),
                     0,
                     package_id,
                 );
                 input_vec.push(metadata.clone());
-                stream_vec.push(metadata.clone());
-                stream_vec.push(metadata.clone());
             }
-            //if input_file.starts_with("stream-") {
-                //let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
-                //let metadata = DataSourceMetadata::new(
-                    //self.vfs.read(&input_file).map_err(|e| format!("{:?}",e))?.as_slice(),
-                    //0,
-                    //package_id,
-                //);
-                //stream_vec.push(metadata);
-            //}
+            if input_file.starts_with("stream-") {
+                let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
+                let metadata = DataSourceMetadata::new(
+                    self.read_file(42,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-3"))?.as_slice(),
+                    0,
+                    package_id,
+                );
+                stream_vec.push(metadata);
+            }
         }
 
         self.data_sources = input_vec;
@@ -939,6 +939,9 @@ impl WasmiHostProvisioningState {
         //TODO: REMOVE ENGINE
         self.program_module = None;
         self.memory = None;
+        self.data_sources = Vec::new();
+        self.stream_sources = Vec::new();
+        //self.set_ready_to_execute();
         rst
     }
 }
@@ -1033,10 +1036,10 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     }
 
     ///// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_current_data_source_count(&self) -> usize {
-        //self.get_current_data_source_count().clone()
-    //}
+    #[inline]
+    fn get_current_data_source_count(&self) -> usize {
+        self.get_current_data_source_count().clone()
+    }
 
     ///// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
     //#[inline]
@@ -1051,10 +1054,10 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     }
 
     ///// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_current_stream_source_count(&self) -> usize {
-        //self.get_current_stream_source_count().clone()
-    //}
+    #[inline]
+    fn get_current_stream_source_count(&self) -> usize {
+        self.get_current_stream_source_count().clone()
+    }
 
     ///// Chihuahua wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
     //#[inline]
@@ -1068,15 +1071,15 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.set_previous_result(result);
     }
 
-    #[inline]
-    fn set_vfs(&mut self, vfs: &VFS) {
-        self.set_vfs(vfs);
-    }
+    //#[inline]
+    //fn set_vfs(&mut self, vfs: &VFS) {
+        //self.set_vfs(vfs);
+    //}
 
-    #[inline]
-    fn get_vfs(&self) -> &VFS  {
-        self.get_vfs()
-    }
+    //#[inline]
+    //fn get_vfs(&self) -> &VFS  {
+        //self.get_vfs()
+    //}
 
     /// ExecutionEngine wrapper of get_result implementation in WasmiHostProvisioningState.
     #[inline]
@@ -1084,11 +1087,11 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.get_result().map(|r| r.clone())
     }
 
-    /// ExecutionEngine wrapper of get_program_digest implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_program_digest(&self) -> Option<Vec<u8>> {
-        self.get_program_digest().map(|d| d.clone())
-    }
+    ///// ExecutionEngine wrapper of get_program_digest implementation in WasmiHostProvisioningState.
+    //#[inline]
+    //fn get_program_digest(&self) -> Option<Vec<u8>> {
+        //self.get_program_digest().map(|d| d.clone())
+    //}
 
     ///// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
     //#[inline]

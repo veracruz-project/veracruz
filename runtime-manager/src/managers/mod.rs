@@ -221,20 +221,20 @@ impl ProtocolState {
         Ok(self.host_state.lock()?.get_result().map(|o| o.clone()))
     }
 
-    /// Returns a result of a WASM computation that has executed on the host
-    /// provisioning state.  Returns `None` iff no such result has been
-    /// registered.
-    pub(crate) fn get_vfs(&self) -> Result<VFS, MexicoCityError> {
-        Ok(self.host_state.lock()?.get_vfs().clone())
-    }
+    ///// Returns a result of a WASM computation that has executed on the host
+    ///// provisioning state.  Returns `None` iff no such result has been
+    ///// registered.
+    //pub(crate) fn get_vfs(&self) -> Result<VFS, MexicoCityError> {
+        //Ok(self.host_state.lock()?.get_vfs().clone())
+    //}
 
-    /// Returns a result of a WASM computation that has executed on the host
-    /// provisioning state.  Returns `None` iff no such result has been
-    /// registered.
-    pub(crate) fn set_vfs(&self, vfs : VFS) -> Result<(), MexicoCityError> {
-        self.host_state.lock()?.set_vfs(&vfs);
-        Ok(())
-    }
+    ///// Returns a result of a WASM computation that has executed on the host
+    ///// provisioning state.  Returns `None` iff no such result has been
+    ///// registered.
+    //pub(crate) fn set_vfs(&self, vfs : VFS) -> Result<(), MexicoCityError> {
+        //self.host_state.lock()?.set_vfs(&vfs);
+        //Ok(())
+    //}
 
     /// Sets the `previous_result` field.
     pub(crate) fn set_previous_result(
@@ -245,15 +245,6 @@ impl ProtocolState {
         Ok(())
     }
 
-    /// Returns an SHA-256 digest of the bytes loaded into the host provisioning
-    /// state.  Returns `None` iff no such program has yet been loaded.
-    pub(crate) fn get_program_digest(&self) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        Ok(self
-            .host_state
-            .lock()?
-            .get_program_digest()
-            .map(|o| o.clone()))
-    }
 
     /// Moves the host provisioning state's lifecycle state into
     /// `LifecycleState::Error`, a state which it cannot ever escape,

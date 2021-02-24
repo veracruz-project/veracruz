@@ -44,14 +44,14 @@ pub struct VFS {
 
 impl VFS {
     /// Computes a SHA-256 digest of the bytes passed to it in `buffer`.
-    pub(crate) fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
+    pub fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
         ring::digest::digest(&ring::digest::SHA256, buffer)
             .as_ref()
             .to_vec()
     }
 
     /// Initialize a new empty buffer.
-    pub(crate) fn new(capabilities: &VeracruzCapabilityTable, digests: &HashMap<String, Vec<u8>>) -> Self {
+    pub fn new(capabilities: &VeracruzCapabilityTable, digests: &HashMap<String, Vec<u8>>) -> Self {
         VFS {
             fs: HashMap::new(),
             capabilities: capabilities.clone(),
@@ -59,14 +59,14 @@ impl VFS {
         }
     }
     
-
-    #[deprecated]
-    pub(crate) fn over_write(&mut self, file_name : &str, new_data : &[u8]) -> Result<(),VFSError> {
+    pub fn write(&mut self, file_name : &str, new_data : &[u8]) -> Result<(),VFSError> {
+        self.fs.remove(file_name);
+        assert!(!self.fs.contains_key(file_name));
         self.fs.insert(file_name.to_string(),new_data.to_vec());
         self.digest_check(file_name,new_data)
     }
 
-    pub(crate) fn write(&mut self, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
+    pub fn append_write(&mut self, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
         match self.fs.get_mut(file_name) {
             Some(b) => {
                 b.append(&mut buf.to_vec());
@@ -93,15 +93,15 @@ impl VFS {
         Ok(())
     }
 
-    pub(crate) fn read(&self, file_name : &str) -> Result<Vec<u8>,VFSError> {
-        Ok(self.fs.get(file_name).map(|v|v.clone()).unwrap_or(Vec::new()))
+    pub fn read(&self, file_name : &str) -> Result<Option<Vec<u8>>,VFSError> {
+        Ok(self.fs.get(file_name).map(|v|v.clone()))
     }
 
     // NOTE: the following function should match wasi api.
     /// Return Some(CapabilityFlags) if `id` has the permission 
     /// to read, write and execute on the `file_name`.
     /// Return None if `id` or `file_name` do not exist.
-    pub(crate) fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), VFSError> {
+    pub fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), VFSError> {
         self.capabilities
             .get(id)
             .ok_or(VFSError::IndexNotFound(id.clone()))?

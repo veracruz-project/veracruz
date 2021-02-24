@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let encode = pinecone::to_vec(&dataset2)?;
 
     let mut file = File::create(format!("{}-2.txt", file_prefix))?;
-    file.write_all(format!("{:?}\n{:?}", dataset2_txt, encode).as_bytes())?;
+    file.write_all(format!("{:?}\n{:?}", dataset2_txt, dataset2).as_bytes())?;
     let mut file = File::create(format!("{}-2.dat", file_prefix))?;
     file.write_all(&encode)?;
 
