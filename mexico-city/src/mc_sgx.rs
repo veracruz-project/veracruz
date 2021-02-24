@@ -68,11 +68,11 @@ pub extern "C" fn init_baja_enc(policy_buf: *const u8, policy_buf_size: usize) -
         Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
     };
 
-    let ret = crate::managers::baja_manager::init_baja(&policy_str);
+    let ret = crate::managers::session_manager::init_baja(&policy_str);
     if ret.is_ok() {
         sgx_status_t::SGX_SUCCESS
     } else {
-        println!("mc_sgx::init_baja_enc failed baja_manager:{:?}", ret);
+        println!("mc_sgx::init_baja_enc failed session_manager:{:?}", ret);
         sgx_status_t::SGX_ERROR_UNEXPECTED
     }
 }
@@ -80,7 +80,7 @@ pub extern "C" fn init_baja_enc(policy_buf: *const u8, policy_buf_size: usize) -
 #[no_mangle]
 #[cfg(feature = "sgx")]
 pub extern "C" fn new_session_enc(session_id: *mut u32) -> sgx_status_t {
-    match managers::baja_manager::new_session() {
+    match managers::session_manager::new_session() {
         Ok(local_session_id) => {
             unsafe {
                 *session_id = local_session_id;
@@ -94,7 +94,7 @@ pub extern "C" fn new_session_enc(session_id: *mut u32) -> sgx_status_t {
 #[no_mangle]
 #[cfg(feature = "sgx")]
 pub extern "C" fn close_session_enc(session_id: u32) -> sgx_status_t {
-    match managers::baja_manager::close_session(session_id) {
+    match managers::session_manager::close_session(session_id) {
         Ok(_) => sgx_status_t::SGX_SUCCESS,
         Err(_) => sgx_status_t::SGX_ERROR_UNEXPECTED,
     }
@@ -161,13 +161,13 @@ pub extern "C" fn psa_attestation_get_token_enc(
             )
         };
 
-        let enclave_cert = managers::baja_manager::get_enclave_cert()?;
+        let enclave_cert = managers::session_manager::get_enclave_cert()?;
 
         let enclave_cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
 
         let mut ocall_ret = sgx_status_t::SGX_SUCCESS;
 
-        let enclave_name: std::string::String = managers::baja_manager::get_enclave_name()?;
+        let enclave_name: std::string::String = managers::session_manager::get_enclave_name()?;
 
         let ocall_status = unsafe {
             finish_local_attest_ocall(
@@ -218,11 +218,11 @@ pub extern "C" fn tls_send_data_enc(
 ) -> sgx_status_t {
     let input_vec = unsafe { std::slice::from_raw_parts(input_buf, input_size) };
 
-    match managers::baja_manager::send_data(session_id, &input_vec) {
+    match managers::session_manager::send_data(session_id, &input_vec) {
         Ok(_) => sgx_status_t::SGX_SUCCESS,
         Err(err) => {
             println!(
-                "mc::tls_send_data_enc baja_manager::send_data failed with err:{:?}",
+                "mc::tls_send_data_enc session_manager::send_data failed with err:{:?}",
                 err
             );
             sgx_status_t::SGX_ERROR_UNEXPECTED
@@ -239,7 +239,7 @@ pub extern "C" fn tls_get_data_enc(
     output_data_size: &mut usize,
     active_flag: &mut u8,
 ) -> sgx_status_t {
-    match managers::baja_manager::get_data(session_id) {
+    match managers::session_manager::get_data(session_id) {
         Ok((active_bool, output_data)) => {
             let output_buf_slice =
                 unsafe { std::slice::from_raw_parts_mut(output_buf, output_buf_size) };
@@ -259,7 +259,7 @@ pub extern "C" fn tls_get_data_enc(
 #[no_mangle]
 #[cfg(feature = "sgx")]
 pub extern "C" fn tls_get_data_needed_enc(session_id: u32, needed: *mut u8) -> sgx_status_t {
-    match managers::baja_manager::get_data_needed(session_id) {
+    match managers::session_manager::get_data_needed(session_id) {
         Ok(local_needed) => {
             if local_needed {
                 unsafe { *needed = 1 };
@@ -275,7 +275,7 @@ pub extern "C" fn tls_get_data_needed_enc(session_id: u32, needed: *mut u8) -> s
 #[no_mangle]
 #[cfg(feature = "sgx")]
 pub extern "C" fn get_enclave_cert_len_enc(cert_buf_len: &mut usize) -> sgx_status_t {
-    match managers::baja_manager::get_enclave_cert_pem() {
+    match managers::session_manager::get_enclave_cert_pem() {
         Ok(cert) => {
             *cert_buf_len = cert.len();
             sgx_status_t::SGX_SUCCESS
@@ -291,7 +291,7 @@ pub extern "C" fn get_enclave_cert_enc(
     cert_buf_size: usize,
     cert_buf_len: &mut usize,
 ) -> sgx_status_t {
-    match managers::baja_manager::get_enclave_cert_pem() {
+    match managers::session_manager::get_enclave_cert_pem() {
         Ok(cert) => {
             if cert.len() <= cert_buf_size {
                 let cert_buf_slice =
@@ -310,7 +310,7 @@ pub extern "C" fn get_enclave_cert_enc(
 #[no_mangle]
 #[cfg(feature = "sgx")]
 pub extern "C" fn get_enclave_name_len_enc(name_len: &mut usize) -> sgx_status_t {
-    match managers::baja_manager::get_enclave_name() {
+    match managers::session_manager::get_enclave_name() {
         Ok(name) => {
             *name_len = name.len();
             sgx_status_t::SGX_SUCCESS
@@ -322,7 +322,7 @@ pub extern "C" fn get_enclave_name_len_enc(name_len: &mut usize) -> sgx_status_t
 #[no_mangle]
 #[cfg(feature = "sgx")]
 pub extern "C" fn get_enclave_name_enc(name_buf: *mut u8, name_buf_size: usize) -> sgx_status_t {
-    match managers::baja_manager::get_enclave_name() {
+    match managers::session_manager::get_enclave_name() {
         Ok(name) => {
             if name.len() <= name_buf_size {
                 let name_buf_slice =
