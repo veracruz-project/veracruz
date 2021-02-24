@@ -322,12 +322,12 @@ pub struct HostProvisioningState<Module, Memory> {
     pub(crate) program_module: Option<Module>,
     /// A reference to the WASM program's linear memory (or "heap").
     pub(crate) memory: Option<Memory>,
-    //TODO REMOVE
-    /// The result of the previous execution.
-    previous_result: Option<Vec<u8>>,
-    //TODO REMOVE
-    /// The result of the WASM program's computation on the input sources above.
-    result: Option<Vec<u8>>,
+    ////TODO REMOVE
+    ///// The result of the previous execution.
+    //previous_result: Option<Vec<u8>>,
+    ////TODO REMOVE
+    ///// The result of the WASM program's computation on the input sources above.
+    //result: Option<Vec<u8>>,
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
@@ -358,8 +358,8 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
             memory: None,
-            previous_result: None,
-            result: None,
+            //previous_result: None,
+            //result: None,
             expected_shutdown_sources: Vec::new(),
             //vfs: VFS::new(&HashMap::new(),&HashMap::new()),
             input_table : HashMap::new(),
@@ -384,8 +384,8 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             lifecycle_state: LifecycleState::Initial,
             program_module: None,
             memory: None,
-            previous_result: None,
-            result: None,
+            //previous_result: None,
+            //result: None,
             expected_shutdown_sources : expected_shutdown_sources.to_vec(),
             input_table : input_table.clone(),
         }
@@ -410,12 +410,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
         //TODO: link to the actually fs API.
         //TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        if file_name.starts_with("output") {
-            Ok(self.get_result().map(|v| v.to_vec()))
-        } else {
-            Ok(
-            VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.read(file_name)?)
-        }
+        //if file_name.starts_with("output") {
+            //Ok(self.get_result().map(|v| v.to_vec()))
+        //} else {
+            Ok(VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.read(file_name)?)
+        //}
     }
 
     ///// Register program
@@ -427,25 +426,25 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         //Ok(())
     //}
 
-    /// Registers the program result.
-    #[inline]
-    pub(crate) fn set_result(&mut self, result: &[u8]) {
-        self.result = Some(result.to_vec());
-    }
+    ///// Registers the program result.
+    //#[inline]
+    //pub(crate) fn set_result(&mut self, result: &[u8]) {
+        //self.result = Some(result.to_vec());
+    //}
 
-    /// Registers the previous result.
-    /// If the previous computation does not produce any result, ie returning none,
-    /// it is converted to an empty vector.
-    /// This distinguishes from `None`, which indicates that it is the first round of computation.
-    #[inline]
-    pub(crate) fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
-        self.previous_result = Some(
-            result
-                .as_ref()
-                .unwrap_or(&vec![])
-                .to_vec(),
-        );
-    }
+    ///// Registers the previous result.
+    ///// If the previous computation does not produce any result, ie returning none,
+    ///// it is converted to an empty vector.
+    ///// This distinguishes from `None`, which indicates that it is the first round of computation.
+    //#[inline]
+    //pub(crate) fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
+        //self.previous_result = Some(
+            //result
+                //.as_ref()
+                //.unwrap_or(&vec![])
+                //.to_vec(),
+        //);
+    //}
 
     ///// Registers the number of expected data sources, `number`.
     //#[inline]
@@ -565,13 +564,13 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         //Some(&self.stream_sources[index])
     //}
 
-    /// Returns the data source frame (containing raw data, source and package
-    /// IDs) associated with the Nth registered data source as stored in the
-    /// host provisioning state, expressed by `index`.  Returns `None` iff
-    /// `index` is not the index of any registered data source.
-    pub(crate) fn get_previous_result(&self) -> Option<&Vec<u8>> {
-        self.previous_result.as_ref()
-    }
+    ///// Returns the data source frame (containing raw data, source and package
+    ///// IDs) associated with the Nth registered data source as stored in the
+    ///// host provisioning state, expressed by `index`.  Returns `None` iff
+    ///// `index` is not the index of any registered data source.
+    //pub(crate) fn get_previous_result(&self) -> Option<&Vec<u8>> {
+        //self.previous_result.as_ref()
+    //}
 
     /// Returns the client IDs of clients who are able to request platform
     /// shutdown, per the global policy.
@@ -611,12 +610,12 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.expected_shutdown_sources.is_empty()
     }
 
-    /// Returns an optional result computed by the WASM program when it has
-    /// finished executing.
-    #[inline]
-    pub(crate) fn get_result(&self) -> Option<&Vec<u8>> {
-        self.result.as_ref()
-    }
+    ///// Returns an optional result computed by the WASM program when it has
+    ///// finished executing.
+    //#[inline]
+    //pub(crate) fn get_result(&self) -> Option<&Vec<u8>> {
+        //self.result.as_ref()
+    //}
 
     /// Returns an optional reference to the WASM program module.
     #[inline]
@@ -1251,12 +1250,12 @@ pub trait ExecutionEngine: Send {
     ///// that we expect to be provisioned into the host state.
     //fn get_expected_stream_sources(&self) -> Vec<u64>;
 
-    #[deprecated]
-    //TODO: do we need this 
-    /// Returns a result of a WASM computation that has executed on the host
-    /// provisioning state.  Returns `None` iff no such result has been
-    /// registered.
-    fn get_result(&self) -> Option<Vec<u8>>;
+    //#[deprecated]
+    ////TODO: do we need this 
+    ///// Returns a result of a WASM computation that has executed on the host
+    ///// provisioning state.  Returns `None` iff no such result has been
+    ///// registered.
+    //fn get_result(&self) -> Option<Vec<u8>>;
 
     //#[deprecated]
     ////TODO: do we need this 
@@ -1282,10 +1281,10 @@ pub trait ExecutionEngine: Send {
     ///// this computation is expecting.
     //fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine;
 
-    #[deprecated]
-    //TODO: do we need this 
-    /// Registers the previous result.
-    fn set_previous_result(&mut self, result: &Option<Vec<u8>>);
+    //#[deprecated]
+    ////TODO: do we need this 
+    ///// Registers the previous result.
+    //fn set_previous_result(&mut self, result: &Option<Vec<u8>>);
 
     //#[deprecated]
     //fn set_vfs(&mut self, vfs: &VFS);

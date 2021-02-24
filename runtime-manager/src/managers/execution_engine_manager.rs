@@ -162,7 +162,7 @@ fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestRe
                 //));
 
                 if return_code == 0 {
-                    let result = protocol_state.get_result()?;
+                    let result = protocol_state.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
                     let response = response_success(result);
                     Ok(ProvisioningResponse::Success { response })
                 } else {
@@ -393,7 +393,7 @@ fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeMa
         old_protocol_state.get_policy().clone(),
         format!("{}", old_protocol_state.get_policy_hash()),
     )?;
-    new_protocol_state.set_previous_result(&old_protocol_state.get_result()?)?;
+    //new_protocol_state.set_previous_result(&old_protocol_state.get_result()?)?;
     //new_protocol_state.set_vfs(old_protocol_state.get_vfs()?)?;
     //let buffer = PROG_AND_DATA_BUFFER.lock()?;
     //new_protocol_state.load_program(buffer.get_program()?)?;
