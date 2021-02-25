@@ -588,7 +588,9 @@ fn serialize_identities(arguments: &Arguments) -> Value {
             file.read_to_string(&mut content)
                 .expect("Failed to read file.");
 
-            content = content.replace("-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----");
+            content = content.replace("\n", "");
+            content = content.replace("-----BEGIN CERTIFICATE-----", "-----BEGIN CERTIFICATE-----\n");
+            content = content.replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
 
             let json = json!({
                 "certificate": content,
