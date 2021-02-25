@@ -43,19 +43,19 @@ trustzone-veracruz-client-test: trustzone test_cases
 # Compile for sgx
 # offset the CC OPENSSL_DIR, which might be used in compiling trustzone
 sgx: sdk sgx-env
-	cd mexico-city-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
+	cd runtime-manager-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd trustzone-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
 nitro: sdk
 	pwd
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C mexico-city nitro
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
 
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
-	$(MAKE) -C mexico-city trustzone CC=$(AARCH64_GCC)
+	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC)
 	$(MAKE) -C sgx-root-enclave trustzone
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
 
@@ -151,7 +151,7 @@ sgx-env:
 	unset CC
 
 clean:
-	cd mexico-city-bind && cargo clean 
+	cd runtime-manager-bind && cargo clean 
 	cd trustzone-root-enclave-bind && cargo clean
 	cd psa-attestation && cargo clean
 	cd proxy-attestation-server && cargo clean
@@ -160,7 +160,7 @@ clean:
 	cd sinaloa-test && cargo clean
 	cd veracruz-test && cargo clean
 	cd nitro-root-enclave-server && cargo clean
-	$(MAKE) clean -C mexico-city
+	$(MAKE) clean -C runtime-manager
 	$(MAKE) clean -C sgx-root-enclave
 	$(MAKE) clean -C sinaloa
 	$(MAKE) clean -C test-collateral 
@@ -171,7 +171,7 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave runtime-manager-bind runtime-manager psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd session-manager && cargo fmt
@@ -179,7 +179,7 @@ fmt:
 	cd transport-protocol && cargo fmt
 	cd veracruz-client && cargo fmt
 	cd sgx-root-enclave && cargo fmt
-	cd mexico-city && cargo fmt
+	cd runtime-manager && cargo fmt
 	cd psa-attestation && cargo fmt
 	cd sinaloa-test && cargo fmt
 	cd sinaloa && cargo fmt

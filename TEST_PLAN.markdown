@@ -37,7 +37,7 @@ one go.
 
 In the `veracruz-test` directory in the main Veracruz repository.  These tests are
 integration tests intended to exercise the entire stack, including the Veracuz
-client, Sinaloa, and Mexico City.  The Veracruz client interfaces with Sinaloa
+client, Sinaloa, and the Runtime Manager.  The Veracruz client interfaces with Sinaloa
 using a (local) network connection.
 
 The tests are organized again into phases, numbered 1--3, for the same reason that

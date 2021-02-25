@@ -84,8 +84,8 @@ const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 lazy_static! {
     /// The (randomly) self-generated device key pair
     static ref DEVICE_KEY_PAIR: Mutex<Option<(EcdsaKeyPair, Vec<u8>)>> = Mutex::new(None);
-    /// The hash value of the Mexico City enclave
-    static ref MEXICO_CITY_HASH: Mutex<Option<Vec<u8>>> = Mutex::new(None);
+    /// The hash value of the Runtime Manager enclave
+    static ref RUNTIME_MANAGER_HASH: Mutex<Option<Vec<u8>>> = Mutex::new(None);
     /// The Device ID assigned to us by the Proxy Attestation Service
     static ref DEVICE_ID: Mutex<Option<i32>> = std::sync::Mutex::new(None);
 }
@@ -97,13 +97,13 @@ fn get_firmware_version() -> Result<String, String> {
     return Ok(version.to_string());
 }
 
-/// Set the hash value of mexico city to be included in the proxy attestation
+/// Set the hash value of the Runtime Manager to be included in the proxy attestation
 /// token.
 /// I DO NOT THINK THIS IS NECESSARY ANYMORE
-fn set_mexico_city_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
-    let mut mch_guard = MEXICO_CITY_HASH.lock().map_err(|err| {
+fn set_runtime_manager_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
+    let mut mch_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
         format!(
-            "set_mexico_city_hash failed to obtain lock on MEXICO_CITY_HASH:{:?}",
+            "set_runtime_manager_hash failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}",
             err
         )
     })?;
@@ -211,7 +211,7 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
     return Ok((att_doc, device_public_key.to_vec()));
 }
 
-/// Perform the proxy attestation service on behalf of a Mexico City enclave
+/// Perform the proxy attestation service on behalf of a Runtime Manager enclave
 /// running on another AWS Nitro Enclave
 fn proxy_attestation(
     challenge: &[u8],
@@ -352,8 +352,8 @@ fn main() -> Result<(), String> {
                 })?;
                 NitroRootEnclaveMessage::FirmwareVersion(version)
             }
-            NitroRootEnclaveMessage::SetMexicoCityHashHack(hash) => {
-                let status = set_mexico_city_hash_hack(hash)?;
+            NitroRootEnclaveMessage::SetRuntimeManagerHashHack(hash) => {
+                let status = set_runtime_manager_hash_hack(hash)?;
                 NitroRootEnclaveMessage::Status(status)
             }
             NitroRootEnclaveMessage::NativeAttestation(challenge, device_id) => {

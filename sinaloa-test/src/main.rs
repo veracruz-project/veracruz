@@ -253,9 +253,9 @@ mod tests {
         #[cfg(feature = "tz")]
         let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
 
-        let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
+        let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
-            attestation_flow(&policy.proxy_attestation_server_url(), &mexico_city_hash, &sinaloa);
+            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &sinaloa);
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -784,9 +784,9 @@ mod tests {
         #[cfg(feature = "tz")]
         let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
 
-        let mexico_city_hash = policy.mexico_city_hash(&test_target_platform).unwrap();
+        let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.proxy_attestation_server_url(), &mexico_city_hash, &sinaloa)?
+            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &sinaloa)?
         } else {
             let enclave_cert = enclave_self_signed_cert(&sinaloa)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
@@ -875,7 +875,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received acknowledgement after sending program: {:?}",
-                    transport_protocol::parse_mexico_city_response(&response)
+                    transport_protocol::parse_runtime_manager_response(&response)
                 );
                 info!(
                     "             Provisioning program time (μs): {}.",
@@ -893,7 +893,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received installed program hash data: {:?}",
-                    transport_protocol::parse_mexico_city_response(&response)
+                    transport_protocol::parse_runtime_manager_response(&response)
                 );
                 info!(
                     "             Program provider hash response time (μs): {}.",
@@ -948,7 +948,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received acknowledgement after sending data: {:?},",
-                    transport_protocol::parse_mexico_city_response(&response)
+                    transport_protocol::parse_runtime_manager_response(&response)
                 );
                 info!(
                     "             Provisioning data time (μs): {}.",
@@ -1042,7 +1042,7 @@ mod tests {
                         )?;
                         info!(
                             "             Stream provider received acknowledgement after sending stream data: {:?},",
-                            transport_protocol::parse_mexico_city_response(&response)
+                            transport_protocol::parse_runtime_manager_response(&response)
                         );
                         info!(
                             "             Provisioning stream time (μs): {}.",
@@ -1091,7 +1091,7 @@ mod tests {
                     )
                     .and_then(|response| {
                         // decode the result
-                        let response = transport_protocol::parse_mexico_city_response(&response)?;
+                        let response = transport_protocol::parse_runtime_manager_response(&response)?;
                         let response = transport_protocol::parse_result(&response)?;
                         response.ok_or(SinaloaError::MissingFieldError(
                             "Result retrievers response",
@@ -1162,7 +1162,7 @@ mod tests {
                 )
                 .and_then(|response| {
                     // decode the result
-                    let response = transport_protocol::parse_mexico_city_response(&response)?;
+                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
                     let response = transport_protocol::parse_result(&response)?;
                     response.ok_or(SinaloaError::MissingFieldError(
                         "Result retrievers response",
@@ -1198,7 +1198,7 @@ mod tests {
             )?;
             info!(
                 "             Client received acknowledgment after shutdown request: {:?}",
-                transport_protocol::parse_mexico_city_response(&response)
+                transport_protocol::parse_runtime_manager_response(&response)
             );
             info!(
                 "             Shutdown time (μs): {}.",
@@ -1365,11 +1365,11 @@ mod tests {
             ticket,
             &serialized_request_policy_hash[..],
         )?;
-        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(SinaloaError::ResponseError(
-                "check_policy_hash parse_mexico_city_response",
+                "check_policy_hash parse_runtime_manager_response",
                 status,
             ));
         }
@@ -1402,8 +1402,8 @@ mod tests {
             ticket,
             &serialized_pi_hash_request[..],
         )?;
-        let parsed_response = transport_protocol::parse_mexico_city_response(&data)?;
-        let status = parsed_response.get_status();
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&data)?;
+        et status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
@@ -1419,7 +1419,7 @@ mod tests {
                 }
             }
             _ => Err(SinaloaError::ResponseError(
-                "request_program_hash parse_mexico_city_response",
+                "request_program_hash parse_runtime_manager_response",
                 status,
             )),
         }
@@ -1509,7 +1509,7 @@ mod tests {
             client_tls_tx,
             client_tls_rx,
         )?;
-        let parsed = transport_protocol::parse_mexico_city_response(&encoded_state)?;
+        let parsed = transport_protocol::parse_runtime_manager_response(&encoded_state)?;
 
         if parsed.has_state() {
             let state = parsed.get_state().get_state().to_vec();

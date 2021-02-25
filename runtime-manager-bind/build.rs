@@ -1,4 +1,4 @@
-//! Bindings to the Mexico City enclave
+//! Bindings to the Runtime Manager enclave
 //!
 //! ## Authors
 //!
@@ -27,21 +27,21 @@ fn main() {
     };
 
     let out_dir_link_search = format!("cargo:rustc-link-search={:}", out_dir);
-    // link against the mexico city non-secure library
-    println!("cargo:rustc-link-search=../mexico-city/bin");
+    // link against the runtime manager non-secure library
+    println!("cargo:rustc-link-search=../runtime-manager/bin");
     println!("{:}", out_dir_link_search);
-    println!("cargo:rustc-link-lib=static=mexico_city_u");
+    println!("cargo:rustc-link-lib=static=runtime_manager_u");
     println!("cargo:rerun-if-changed=.");
-    println!("cargo:rerun-if-changed=../mexico_city/");
+    println!("cargo:rerun-if-changed=../runtime-manager/");
 
     let make_result = Command::new("make")
         .arg("sgx")
-        .current_dir("../mexico-city")
+        .current_dir("../runtime-manager")
         .args(&[out_dir_arg, final_dir_arg])
         .status()
         .unwrap();
     if !make_result.success() {
-        panic!("mexico-city-bind: build.rs failed to run make ../mexico-city");
+        panic!("runtime-manager-bind: build.rs failed to run make ../runtime-manager");
     }
 
     let bindings = bindgen::Builder::default()

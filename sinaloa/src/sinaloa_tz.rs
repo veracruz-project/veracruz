@@ -21,7 +21,7 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
-    use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, MCOpcode, SGX_ROOT_ENCLAVE_UUID, MC_UUID};
+    use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, RuntimeManagerOpcode, SGX_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
@@ -29,7 +29,7 @@ pub mod sinaloa_tz {
     }
 
     pub struct SinaloaTZ {
-        mexico_city_uuid: String,
+        runtime_manager_uuid: String,
     }
 
     impl Sinaloa for SinaloaTZ {
@@ -41,10 +41,10 @@ pub mod sinaloa_tz {
 
             let sgx_root_enclave_uuid = Uuid::parse_str(&SGX_ROOT_ENCLAVE_UUID.to_string())?;
             {
-                let mexico_city_hash = {
-                    match policy.mexico_city_hash(&EnclavePlatform::TrustZone) {
+                let runtime_manager_hash = {
+                    match policy.runtime_manager_hash(&EnclavePlatform::TrustZone) {
                         Ok(hash) => hash,
-                        Err(_) => return Err(SinaloaError::MissingFieldError("mexico_city_hash_tz")),
+                        Err(_) => return Err(SinaloaError::MissingFieldError("runtime_manager_hash_tz")),
                     }
                 };
                 let mut ji_guard = SGX_ROOT_ENCLAVE_INITIALIZED.lock()?;
@@ -53,13 +53,13 @@ pub mod sinaloa_tz {
                     SinaloaTZ::native_attestation(
                         &policy.proxy_attestation_server_url(),
                         sgx_root_enclave_uuid,
-                        &mexico_city_hash,
+                        &runtime_manager_hash,
                     )?;
                     *ji_guard = true;
                 }
             }
 
-            let mc_uuid = Uuid::parse_str(&MC_UUID.to_string())?;
+            let mc_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
 
             let p0 = ParamTmpRef::new_input(&policy_json.as_bytes());
 
@@ -71,16 +71,16 @@ pub mod sinaloa_tz {
                     .as_mut()
                     .ok_or(SinaloaError::UninitializedEnclaveError)?;
                 let mut mc_session = context.open_session(mc_uuid)?;
-                mc_session.invoke_command(MCOpcode::Initialize as u32, &mut operation)?;
+                mc_session.invoke_command(RuntimeManagerOpcode::Initialize as u32, &mut operation)?;
             }
 
             Ok(Self {
-                mexico_city_uuid: MC_UUID.to_string(),
+                runtime_manager_uuid: RUNTIME_MANAGER_UUID.to_string(),
             })
         }
 
         fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
-            let parsed = transport_protocol::parse_mexico_city_request(&data)?;
+            let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
                 let rpat = parsed.get_request_proxy_psa_attestation_token();
@@ -106,7 +106,7 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(mc_uuid)?;
 
             // get the certificate size
@@ -114,7 +114,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
 
-                session.invoke_command(MCOpcode::GetEnclaveCertSize as u32, &mut operation)?;
+                session.invoke_command(RuntimeManagerOpcode::GetEnclaveCertSize as u32, &mut operation)?;
                 operation.parameters().0.a()
             };
 
@@ -122,7 +122,7 @@ pub mod sinaloa_tz {
                 let mut cert_vec = vec![0; certificate_len as usize];
                 let p0 = ParamTmpRef::new_output(&mut cert_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                session.invoke_command(MCOpcode::GetEnclaveCert as u32, &mut operation)?;
+                session.invoke_command(RuntimeManagerOpcode::GetEnclaveCert as u32, &mut operation)?;
                 cert_vec
             };
             Ok(certificate)
@@ -134,7 +134,7 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(mc_uuid)?;
 
             // get the enclave name size
@@ -142,7 +142,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
 
-                session.invoke_command(MCOpcode::GetEnclaveNameSize as u32, &mut operation)?;
+                session.invoke_command(RuntimeManagerOpcode::GetEnclaveNameSize as u32, &mut operation)?;
                 operation.parameters().0.a()
             };
             let name: String = {
@@ -150,7 +150,7 @@ pub mod sinaloa_tz {
                 //let mut name_vec = Vec::with_capacity(name_len as usize);
                 let p0 = ParamTmpRef::new_output(&mut name_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                session.invoke_command(MCOpcode::GetEnclaveName as u32, &mut operation)?;
+                session.invoke_command(RuntimeManagerOpcode::GetEnclaveName as u32, &mut operation)?;
                 String::from_utf8(name_vec)?
             };
             Ok(name)
@@ -167,7 +167,7 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(mc_uuid)?;
 
             // Get the token, public key and device_id
@@ -184,7 +184,7 @@ pub mod sinaloa_tz {
             let p3 = ParamTmpRef::new_output(&mut pubkey);
 
             let mut operation = Operation::new(0, p0, p1, p2, p3);
-            session.invoke_command(MCOpcode::GetPSAAttestationToken as u32, &mut operation)?;
+            session.invoke_command(RuntimeManagerOpcode::GetPSAAttestationToken as u32, &mut operation)?;
 
             let (_, p1_output, p2_output, p3_output) = operation.parameters();
             let device_id: i32 = p1_output.a().try_into()?;
@@ -205,13 +205,13 @@ pub mod sinaloa_tz {
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
 
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(mc_uuid)?;
 
             let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
 
-            session.invoke_command(MCOpcode::NewTLSSession as u32, &mut operation)?;
+            session.invoke_command(RuntimeManagerOpcode::NewTLSSession as u32, &mut operation)?;
 
             let session_id = operation.parameters().0.a();
 
@@ -223,11 +223,11 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(mc_uuid)?;
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-            session.invoke_command(MCOpcode::CloseTLSSession as u32, &mut operation)?;
+            session.invoke_command(RuntimeManagerOpcode::CloseTLSSession as u32, &mut operation)?;
             Ok(())
         }
 
@@ -240,14 +240,14 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(mc_uuid)?;
 
             {
                 let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
                 let p1 = ParamTmpRef::new_input(&input);
                 let mut operation = Operation::new(0, p0, p1, ParamNone, ParamNone);
-                session.invoke_command(MCOpcode::SendTLSData as u32, &mut operation)?;
+                session.invoke_command(RuntimeManagerOpcode::SendTLSData as u32, &mut operation)?;
             }
 
             let mut active_flag = true;
@@ -262,7 +262,7 @@ pub mod sinaloa_tz {
                 let active = ParamValue::new(1, 0, ParamType::ValueInout);
                 let mut operation = Operation::new(0, p0, p1, p2, active);
 
-                session.invoke_command(MCOpcode::GetTLSData as u32, &mut operation)?;
+                session.invoke_command(RuntimeManagerOpcode::GetTLSData as u32, &mut operation)?;
                 let output_len = operation.parameters().2.a() as usize;
                 active_flag = operation.parameters().3.a() != 0;
                 ret_array.push(output[0..output_len].to_vec());
@@ -280,7 +280,7 @@ pub mod sinaloa_tz {
 
         fn close(&mut self) -> Result<bool, SinaloaError> {
             let mut context_guard = CONTEXT.lock()?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             match &mut *context_guard {
                 None => {
                     return Err(SinaloaError::UninitializedEnclaveError);
@@ -289,7 +289,7 @@ pub mod sinaloa_tz {
                     let mut session = context.open_session(mc_uuid)?;
                     let mut null_operation =
                         Operation::new(0, ParamNone, ParamNone, ParamNone, ParamNone);
-                    session.invoke_command(MCOpcode::ResetEnclave as u32, &mut null_operation)?;
+                    session.invoke_command(RuntimeManagerOpcode::ResetEnclave as u32, &mut null_operation)?;
                 }
             }
 
@@ -315,14 +315,14 @@ pub mod sinaloa_tz {
         ) -> Result<bool, SinaloaError> {
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInout);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-            session.invoke_command(MCOpcode::GetTLSDataNeeded as u32, &mut operation)?;
+            session.invoke_command(RuntimeManagerOpcode::GetTLSDataNeeded as u32, &mut operation)?;
             Ok(operation.parameters().0.b() == 1)
         }
 
         fn native_attestation(
             proxy_attestation_server_url: &String,
             sgx_root_enclave_uuid: Uuid,
-            mexico_city_hash: &String,
+            runtime_manager_hash: &String,
         ) -> Result<(), SinaloaError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
@@ -333,12 +333,12 @@ pub mod sinaloa_tz {
             let firmware_version = SinaloaTZ::fetch_firmware_version(&mut sgx_root_enclave_session)?;
 
             {
-                let mexico_city_hash_vec = hex::decode(mexico_city_hash.as_str())?;
-                let p0 = ParamTmpRef::new_input(&mexico_city_hash_vec);
+                let runtime_manager_hash_vec = hex::decode(runtime_manager_hash.as_str())?;
+                let p0 = ParamTmpRef::new_input(&runtime_manager_hash_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 sgx_root_enclave_session
-                    .invoke_command(SgxRootEnclaveOpcode::SetMexicoCityHashHack as u32, &mut operation)?;
-            }
+                    .invoke_command(SgxRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
+	    }
             let (challenge, device_id) =
                 SinaloaTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
 

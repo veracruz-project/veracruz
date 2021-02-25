@@ -1,9 +1,9 @@
 [package]
-name = "mexico-city-bind"
+name = "runtime-manager-bind"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
-description = "Automatically-generated C bindings for the Mexico-City enclave image."
+description = "Automatically-generated C bindings for the Runtime Manager enclave image."
 
 [dependencies]
 

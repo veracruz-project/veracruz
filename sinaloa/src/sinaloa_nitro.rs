@@ -20,7 +20,7 @@ pub mod sinaloa_nitro {
         policy::EnclavePlatform, MCMessage, NitroEnclave, NitroError, NitroStatus,
     };
 
-    const MEXICO_CITY_EIF_PATH: &str = "../mexico-city/mexico_city.eif";
+    const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
     const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "../nitro-root-enclave/nitro_root_enclave.eif";
     const NITRO_ROOT_ENCLAVE_SERVER_PATH: &str =
         "../nitro-root-enclave-server/target/debug/nitro-root-enclave-server";
@@ -44,33 +44,33 @@ pub mod sinaloa_nitro {
                 let mut nre_guard = NRE_CONTEXT.lock()?;
                 if nre_guard.is_none() {
                     println!("NITRO ROOT ENCLAVE IS UNINITIALIZED.");
-                    let mexico_city_hash = policy
-                        .mexico_city_hash(&EnclavePlatform::Nitro)
+                    let runtime_manager_hash = policy
+                        .runtime_manager_hash(&EnclavePlatform::Nitro)
                         .map_err(|err| SinaloaError::VeracruzUtilError(err))?;
                     let nre_context =
-                        SinaloaNitro::native_attestation(&policy.proxy_attestation_server_url(), &mexico_city_hash)?;
+                        SinaloaNitro::native_attestation(&policy.proxy_attestation_server_url(), &runtime_manager_hash)?;
                     *nre_guard = Some(nre_context);
                 }
             }
 
-            println!("SinaloaNitro::new native_attestation complete. instantiating Mexico City");
+            println!("SinaloaNitro::new native_attestation complete. instantiating Runtime Manager");
             #[cfg(feature = "debug")]
-            let mexico_city_enclave = {
-                println!("Starting mexico city enclave in debug mode");
+            let runtime_manager_enclave = {
+                println!("Starting Runtime Manager enclave in debug mode");
                 NitroEnclave::new(
                     false,
-                    MEXICO_CITY_EIF_PATH,
+                    RUNTIME_MANAGER_EIF_PATH,
                     true,
                     Some(SinaloaNitro::sinaloa_ocall_handler),
                 )
                 .map_err(|err| SinaloaError::NitroError(err))?
             };
             #[cfg(not(feature = "debug"))]
-            let mexico_city_enclave = {
-                println!("Starting mexico city enclave in release mode");
+            let runtime_manager_enclave = {
+                println!("Starting Runtime Manager enclave in release mode");
                 NitroEnclave::new(
                     false,
-                    MEXICO_CITY_EIF_PATH,
+                    RUNTIME_MANAGER_EIF_PATH,
                     false,
                     Some(SinaloaNitro::sinaloa_ocall_handler),
                 )
@@ -78,9 +78,9 @@ pub mod sinaloa_nitro {
             };
             println!("SinaloaNitro::new NitroEnclave::new returned");
             let meta = Self {
-                enclave: mexico_city_enclave,
+                enclave: runtime_manager_enclave,
             };
-            println!("SinaloaNitro::new Mexico City instantiated. Calling initialize");
+            println!("SinaloaNitro::new Runtime Manager instantiated. Calling initialize");
             std::thread::sleep(std::time::Duration::from_millis(10000));
 
             let initialize: MCMessage = MCMessage::Initialize(policy_json.to_string());
@@ -105,7 +105,7 @@ pub mod sinaloa_nitro {
         }
 
         fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
-            let parsed = transport_protocol::parse_mexico_city_request(&data)?;
+            let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
                 let rpat = parsed.get_request_proxy_psa_attestation_token();
@@ -330,7 +330,7 @@ pub mod sinaloa_nitro {
 
         fn native_attestation(
             proxy_attestation_server_url: &str,
-            _mexico_city_hash: &str,
+            _runtime_manager_hash: &str,
             //) -> Result<NitroEnclave, SinaloaError> {
         ) -> Result<EC2Instance, SinaloaError> {
             println!("SinaloaNitro::native_attestation started");

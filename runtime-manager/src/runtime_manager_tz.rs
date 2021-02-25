@@ -1,4 +1,4 @@
-//! Arm TrustZone-specific material for the Mexico City enclave
+//! Arm TrustZone-specific material for the Runtime Manager enclave
 //!
 //! ## Authors
 //!
@@ -392,8 +392,8 @@ const TA_FLAGS: u32 = optee_utee_sys::TA_FLAG_SINGLE_INSTANCE
 const TA_DATA_SIZE: u32 = 18 * 1024 * 1024;
 const TA_STACK_SIZE: u32 = 1 * 1024 * 1024;
 const TA_VERSION: &[u8] = b"0.1\0";
-const TA_DESCRIPTION: &[u8] = b"Mexico City TA for Veracruz\0";
-const EXT_PROP_VALUE_1: &[u8] = b"Mexico City TA\0";
+const TA_DESCRIPTION: &[u8] = b"Runtime Manager TA for Veracruz\0";
+const EXT_PROP_VALUE_1: &[u8] = b"Runtime Manager TA\0";
 const EXT_PROP_VALUE_2: u32 = 0x0010;
 const TRACE_LEVEL: i32 = 4;
 const TRACE_EXT_PREFIX: &[u8] = b"MC\0";
@@ -401,8 +401,8 @@ const TA_FRAMEWORK_STACK_SIZE: u32 = 2048;
 
 include!(concat!(env!("OUT_DIR"), "/user_ta_header.rs"));
 
-// NOTE: fix a mystery where a bcmp function implementation is required for compiling mexico_city
-// which optee does not provide.
+// NOTE: fix a mystery where a bcmp function implementation is required for compiling the
+// Runtime Manager which optee does not provide.
 // Have tried to patch in the rust/libc but it will introduce double implementation.
 // TODO: Why does it happen in the first place???
 #[allow(non_camel_case_types)]

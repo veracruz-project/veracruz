@@ -1,4 +1,4 @@
-//! Mexico-city build script
+//! Runtime manager build script
 //!
 //! ## Authors
 //!
@@ -20,7 +20,7 @@ fn main() -> std::io::Result<()> {
     let target = target_build_utils::TargetInfo::new().expect("could not get target info");
     if target.target_arch() == "aarch64" {
         let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-        let mc_uuid: &str = &std::fs::read_to_string("../mexico_city_uuid.txt").unwrap();
+        let mc_uuid: &str = &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
 
         let mut buffer = File::create(out.join("user_ta_header.rs"))?;
         buffer.write_all(include_bytes!("ta_static.rs"))?;

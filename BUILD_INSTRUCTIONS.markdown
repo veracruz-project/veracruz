@@ -53,7 +53,7 @@ You can manual build by running:
 ```
 source /work/veracruz/sgx_env.sh
 
-cd /work/veracruz/mexico-city/
+cd /work/veracruz/runtime-manager/
 make
 
 cd /work/veracruz/sinaloa/
