@@ -449,6 +449,9 @@ pub enum FatalHostError {
     ProgramCannotFound{
         file_name : String,
     },
+    /// Wrapper for Virtual FS Error.
+    #[error(display = "FatalVeracruzHostError: VFS Error: {:?}.", _0)]
+    VFSError(#[error(source)] VFSError),
     /// Wrapper for direct error message.
     #[error(display = "FatalVeracruzHostError: Error message {:?}.", _0)]
     DirectErrorMessage(String),

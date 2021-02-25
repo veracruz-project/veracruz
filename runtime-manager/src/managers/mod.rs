@@ -84,6 +84,7 @@ pub enum ProvisioningResponse {
     },
 }
 
+//TODO MOVE THIS TO A SEPARATE FILE?
 /// Result type of provisioning functions.
 pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 
@@ -91,10 +92,16 @@ pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 /// Veracruz platform, containing information that must be persisted across the
 /// different rounds of the provisioning process and the fixed global policy.
 struct ProtocolState {
+    #[deprecated]
     /// The Veracruz host provisioning state, which captures "transient" state
     /// of the provisioning process and updates its internal lifecycle state
     /// appropriately as more and more clients provision their secrets.
     host_state: Arc<Mutex<dyn ExecutionEngine>>,
+    /// This flag indicates if new data or program is arrived since last execution.
+    /// It decides if it is necessary to run a program when result retriever requests reading
+    /// result.
+    /// TODO: more defined tracking, e.g. flag per available program in the policy?
+    is_modified : bool,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
     global_policy: Policy,
@@ -138,9 +145,11 @@ impl ProtocolState {
             global_policy_hash,
             expected_shutdown_sources,
             vfs,
+            is_modified : false
         })
     }
 
+    #[deprecated]
     pub fn reload(&mut self) -> Result<(), MexicoCityError> {
         let execution_strategy = match self.global_policy.execution_strategy() {
             veracruz_utils::ExecutionStrategy::Interpretation => {
@@ -153,6 +162,7 @@ impl ProtocolState {
             self.vfs.clone()
         )
         .ok_or(MexicoCityError::InvalidExecutionStrategyError)?;
+        self.is_modified = true;
         Ok(())
     }
 

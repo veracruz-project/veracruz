@@ -515,7 +515,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL IN principal
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("XXXYYY"))?.len();
+                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len();
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
@@ -547,7 +547,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL in appropriate principal
-                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("XXXYYY"))?;
+                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
                 if data.len() > size as usize {
                     return Ok(VeracruzError::DataSourceSize);
                 }
@@ -607,7 +607,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL in appropriate principal
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("XXXYYY"))?.len();
+                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len();
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
@@ -640,7 +640,7 @@ impl WasmiHostProvisioningState {
             Some(memory) =>
             {
                 //TODO FILL in appropriate principal
-                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("XXXYYY"))?;
+                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
                 if data.len() > size as usize {
                     return Ok(VeracruzError::DataSourceSize);
                 }
@@ -822,8 +822,8 @@ impl WasmiHostProvisioningState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
-        let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-1: {}",file_name))?;
-        self.load_program(program.as_slice()).map_err(|e| format!("load error - 2"))?;
+        let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+        self.load_program(program.as_slice())?;
         assert!(self.program_module.is_some());
         assert!(self.memory.is_some());
 

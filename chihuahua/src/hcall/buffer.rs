@@ -45,7 +45,7 @@ pub struct VFS {
 
 impl VFS {
     /// Computes a SHA-256 digest of the bytes passed to it in `buffer`.
-    pub fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
+    fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
         ring::digest::digest(&ring::digest::SHA256, buffer)
             .as_ref()
             .to_vec()
