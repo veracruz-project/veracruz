@@ -123,9 +123,9 @@ pub mod sinaloa_sgx {
             protocol: &str,
             firmware_version: &str,
         ) -> Result<(Vec<u8>, i32), SinaloaError> {
-            let tabasco_response = crate::send_tabasco_start(url_base, protocol, firmware_version)?;
-            if tabasco_response.has_sgx_attestation_init() {
-                let attestation_init = tabasco_response.get_sgx_attestation_init();
+            let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
+            if proxy_attestation_server_response.has_sgx_attestation_init() {
+                let attestation_init = proxy_attestation_server_response.get_sgx_attestation_init();
                 let (public_key, device_id) = colima::parse_sgx_attestation_init(attestation_init);
                 Ok((public_key, device_id))
             } else {
@@ -150,7 +150,7 @@ pub mod sinaloa_sgx {
             let received_body = crate::post_buffer(&url, &encoded_msg1)?;
 
             let body_vec = base64::decode(&received_body)?;
-            let parsed = colima::parse_tabasco_response(&body_vec)?;
+            let parsed = colima::parse_proxy_attestation_server_response(&body_vec)?;
             if parsed.has_sgx_attestation_challenge() {
                 let (_context, msg2, challenge) = colima::parse_sgx_attestation_challenge(&parsed)?;
                 Ok((challenge.to_vec(), msg2))
@@ -381,10 +381,10 @@ pub mod sinaloa_sgx {
         fn native_attestation(
             &mut self,
             sonora_enclave: &SgxEnclave,
-            tabasco_url: &String,
+            proxy_attestation_server_url: &String,
         ) -> Result<(), SinaloaError> {
             let firmware_version = fetch_firmware_version(sonora_enclave)?;
-            let (public_key, device_id) = self.send_start(tabasco_url, "sgx", &firmware_version)?;
+            let (public_key, device_id) = self.send_start(proxy_attestation_server_url, "sgx", &firmware_version)?;
 
             let mut ra_context = sgx_ra_context_t::default();
 
@@ -443,13 +443,13 @@ pub mod sinaloa_sgx {
             }
 
             let (challenge, msg2) =
-                self.send_sgx_msg1(&tabasco_url, &ra_context, &msg1, device_id)?;
+                self.send_sgx_msg1(&proxy_attestation_server_url, &ra_context, &msg1, device_id)?;
 
             let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_quote_sig) =
                 attestation_challenge(&sonora_enclave, &challenge, &ra_context, &msg2)
                     .expect("Attestation challenge failed");
             self.send_msg3(
-                tabasco_url,
+                proxy_attestation_server_url,
                 &ra_context,
                 &msg3,
                 &msg3_quote,
@@ -489,7 +489,7 @@ pub mod sinaloa_sgx {
                     Some(_) => (), // do nothing, we're good
                     None => {
                         let sonora_enclave = start_enclave(SONORA_ENCLAVE_FILE)?;
-                        new_sinaloa.native_attestation(&sonora_enclave, &policy.tabasco_url())?;
+                        new_sinaloa.native_attestation(&sonora_enclave, &policy.proxy_attestation_server_url())?;
                         *sonora_option = Some(sonora_enclave)
                     }
                 }

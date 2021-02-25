@@ -20,7 +20,7 @@ fn main() {
         panic!("veracruz_test: make ../test-collateral failed.");
     }
     Command::new("bash")
-        .args(&["./populate_test_database.sh"])
+        .args(&["./populate-test-database.sh"])
         .output()
         .unwrap();
 }

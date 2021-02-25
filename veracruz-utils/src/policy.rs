@@ -6,7 +6,7 @@
 //!
 //! - The identities and roles of every principals in the computation,
 //! - Important URLs, both for the Sinaloa bridge server on the untrusted host's
-//!   machine and the Tabasco proxy attestation service,
+//!   machine and the Veracruz proxy attestation service,
 //! - Permissible ciphersuites for TLS connections between clients and the
 //!   trusted Veracruz runtime, as well as the hashes of the expected program
 //!   and of the trusted Veracruz runtime itself,
@@ -355,8 +355,8 @@ pub struct VeracruzPolicy {
     /// declared order so that the Veracruz host ABI, which allows access to
     /// inputs via an index, remains well-defined.
     data_provision_order: Vec<u64>,
-    /// The URL of the Tabasco attestation service.
-    tabasco_url: String,
+    /// The URL of the proxy attestation service.
+    proxy_attestation_server_url: String,
     /// The hash of the program which will be provisioned into Veracruz by the
     /// program provider.
     pi_hash: String,
@@ -398,7 +398,7 @@ impl VeracruzPolicy {
         mexico_city_hash_nitro: Option<String>,
         data_provision_order: Vec<u64>,
         streaming_order: Vec<u64>,
-        tabasco_url: String,
+        proxy_attestation_server_url: String,
         pi_hash: String,
         debug: bool,
         execution_strategy: ExecutionStrategy,
@@ -412,7 +412,7 @@ impl VeracruzPolicy {
             mexico_city_hash_tz,
             mexico_city_hash_nitro,
             data_provision_order,
-            tabasco_url,
+            proxy_attestation_server_url,
             pi_hash,
             debug,
             execution_strategy,
@@ -496,11 +496,11 @@ impl VeracruzPolicy {
         &self.streaming_order
     }
 
-    /// Returns the URL of the Tabasco attestation service, associated with this
+    /// Returns the URL of the proxy attestation service, associated with this
     /// policy.
     #[inline]
-    pub fn tabasco_url(&self) -> &String {
-        &self.tabasco_url
+    pub fn proxy_attestation_server_url(&self) -> &String {
+        &self.proxy_attestation_server_url
     }
 
     /// Returns the hash of the WASM binary, associated with this policy.

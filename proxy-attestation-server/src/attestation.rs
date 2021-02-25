@@ -24,29 +24,29 @@ lazy_static! {
     static ref DEVICE_ID: Mutex<i32> = Mutex::new(0);
 }
 
-pub async fn start(body_string: String) -> TabascoResponder {
+pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)
         .map_err(|err| {
-            println!("tabasco::attestation::start failed to decode body_string as base64:{:?}", err);
+            println!("proxy-attestation-server::attestation::start failed to decode body_string as base64:{:?}", err);
             err
         })?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)
+    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
-            println!("tabasco::attestation::start failed to parse_tabasco_request:{:?}", err);
+            println!("proxy-attestation-server::attestation::start failed to parse_proxy_attestation_server_request:{:?}", err);
             err
         })?;
 
     if !parsed.has_start_msg() {
-        println!("Tabasco::attestation::start it don't have start_msg");
-        return Err(TabascoError::MissingFieldError("start msg"));
+        println!("proxy-attestation-server::attestation::start doesn't have start_msg");
+        return Err(ProxyAttestationServerError::MissingFieldError("start msg"));
     }
     let (protocol, firmware_version) = colima::parse_start_msg(&parsed);
 
     let device_id = {
         let mut device_id_wrapper = DEVICE_ID.lock()
             .map_err(|err| {
-                println!("tabasco::attestation::start failed to obtain lock on DEVICE_ID:{:?}", err);
+                println!("proxy-attestation-server::attestation::start failed to obtain lock on DEVICE_ID:{:?}", err);
                 err
             })?;
         *device_id_wrapper = *device_id_wrapper + 1;
@@ -60,6 +60,6 @@ pub async fn start(body_string: String) -> TabascoResponder {
         "psa" => psa::start(&firmware_version, device_id),
         #[cfg(feature = "nitro")]
         "nitro" => nitro::start(&firmware_version, device_id),
-        _ => Err(TabascoError::UnknownAttestationTokenError),
+        _ => Err(ProxyAttestationServerError::UnknownAttestationTokenError),
     }
 }

@@ -69,7 +69,7 @@ def streaming_order(args):
 parser = argparse.ArgumentParser('Generate a Veracruz Policy file from a template')
 parser.add_argument('--identity', '-i', help='Information for an identity', required=True, nargs=2, metavar=('cert', 'roles'), action='append')
 parser.add_argument('--sinaloa-url', help='URL where the Sinaloa instance will be started', required=True)
-parser.add_argument('--tabasco-url', help='URL where the Tabasco instance will be started', required=True)
+parser.add_argument('--proxy-attestation-server-url', help='URL where the proxy attestation server instance will be started', required=True)
 parser.add_argument('--output-policy-file', '-o', help='Location of the output policy file', required=True)
 parser.add_argument('--template-file', '-t', help='Location of the input template file', required=True)
 parser.add_argument('--certificate-lifetime-in-hours', help='The expiry for the server certificate will be set to this number of hours in the future', required=True)
@@ -127,8 +127,8 @@ policy = policy.replace('<HOUR>', str(expiry.hour))
 policy = policy.replace('<MINUTE>', str(expiry.minute))
 policy = policy.replace('<SECOND>', str(expiry.second))
 
-# set the tabasco URL
-policy = policy.replace('<TABASCO_URL>', args.tabasco_url)
+# set the proxy attestation server URL
+policy = policy.replace('<PROXY_ATTESTATION_SERVER_URL>', args.proxy_attestation_server_url)
 
 # debug info
 policy = policy.replace('<DEBUG_FLAG>', str(args.debug_flag).lower())

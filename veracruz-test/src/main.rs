@@ -68,7 +68,7 @@ mod tests {
     use serde::Deserialize;
     use sinaloa;
     use std::{io::Read, sync::Once};
-    use tabasco;
+    use proxy_attestation_server;
     use veracruz_utils::{EnclavePlatform, policy, VeracruzPolicy};
 
     #[derive(Debug, Error)]
@@ -91,14 +91,14 @@ mod tests {
 
     static SETUP: Once = Once::new();
 
-    pub fn setup(tabasco_url: String) {
+    pub fn setup(proxy_attestation_server_url: String) {
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
             std::env::set_var("RUST_LOG", "debug,actix_server=info,actix_web=info,tokio_reactor=info,hyper=info,reqwest=info,rustls=info");
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
-                let mut sys = System::new("Tabasco Server");
-                let server = tabasco::server::server(tabasco_url, false).unwrap();
+                let mut sys = System::new("Veracruz Proxy Attestation Server");
+                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -289,7 +289,7 @@ mod tests {
         let policy_json = std::fs::read_to_string(LINEAR_REGRESSION_PARALLEL_POLICY).unwrap();
         let policy = VeracruzPolicy::from_json(&policy_json).unwrap();
 
-        setup(policy.tabasco_url().clone());
+        setup(policy.proxy_attestation_server_url().clone());
 
         task::sleep(std::time::Duration::from_millis(5000)).await;
         let server_handle = server_tls_loop(LINEAR_REGRESSION_PARALLEL_POLICY);
@@ -350,7 +350,7 @@ mod tests {
     ) -> Result<(), VeracruzTestError> {
         let policy_json = std::fs::read_to_string(policy_path)?;
         let policy = VeracruzPolicy::from_json(&policy_json)?;
-        setup(policy.tabasco_url().clone());
+        setup(policy.proxy_attestation_server_url().clone());
         info!("### Step 0. Read the policy file {}.", policy_path);
 
         // Wait the setup

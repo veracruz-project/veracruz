@@ -1,4 +1,4 @@
-//! The Tabasco server
+//! The Veracruz proxy attestation server
 //!
 //! ## Authors
 //!
@@ -18,7 +18,7 @@ use crate::attestation::sgx;
 use crate::attestation::nitro;
 
 use lazy_static::lazy_static;
-use std::sync::atomic::{ AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 lazy_static! {
     pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
@@ -34,26 +34,26 @@ use psa_attestation::{
 };
 use std::{ffi::c_void, ptr::null};
 
-async fn verify_iat(input_data: String) -> TabascoResponder {
+async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
     if input_data.is_empty() {
-        println!("tabasco::verify_iat input_data is empty");
-        return Err(TabascoError::MissingFieldError("tabasco::verify_iat data"));
+        println!("proxy-attestation-server::verify_iat input_data is empty");
+        return Err(ProxyAttestationServerError::MissingFieldError("proxy-attestation-server::verify_iat data"));
     }
 
     let proto_bytes = base64::decode(&input_data)
         .map_err(|err| {
-            println!("tabasco::verify_iat decode of input data failed:{:?}", err);
+            println!("proxy-attestation-server::verify_iat decode of input data failed:{:?}", err);
             err
         })?;
 
-    let proto = colima::parse_tabasco_request(&proto_bytes)
+    let proto = colima::parse_proxy_attestation_server_request(&proto_bytes)
         .map_err(|err| {
-            println!("tabasco::verify_iat parse_tabasco_request failed:{:?}", err);
+            println!("proxy-attestation-server::verify_iat parse_proxy_attestation_server_request failed:{:?}", err);
             err
         })?;
     if !proto.has_proxy_psa_attestation_token() {
-        println!("tabasco::verify_iat proto does not have proxy psa attestation token");
-        return Err(TabascoError::NoProxyPSAAttestationTokenError);
+        println!("proxy-attestation-server::verify_iat proto does not have proxy psa attestation token");
+        return Err(ProxyAttestationServerError::NoProxyPSAAttestationTokenError);
     }
 
     let (token, pubkey, device_id) =
@@ -61,12 +61,12 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
     let pubkey_hash = {
         let conn = crate::orm::establish_connection()
             .map_err(|err| {
-                println!("tabasco::verify_iat orm::establish_connection failed:{:?}", err);
+                println!("proxy-attestation-server::verify_iat orm::establish_connection failed:{:?}", err);
                 err
             })?;
         crate::orm::query_device(&conn, device_id)
             .map_err(|err| {
-                println!("tabasco::verify_iat orm::query_device failed:{:?}", err);
+                println!("proxy-attestation-server::verify_iat orm::query_device failed:{:?}", err);
                 err
             })?
     };
@@ -75,9 +75,9 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
     // during native attestation
     let calculated_pubkey_hash = ring::digest::digest(&ring::digest::SHA256, pubkey.as_ref());
     if calculated_pubkey_hash.as_ref().to_vec() != pubkey_hash {
-        println!("tabasco::verify_iat hashes didn't match");
-        return Err(TabascoError::MismatchError {
-            variable: "Tabasco::server public key",
+        println!("proxy-attestation-server::verify_iat hashes didn't match");
+        return Err(ProxyAttestationServerError::MismatchError {
+            variable: "proxy-attestation-server::server public key",
             received: calculated_pubkey_hash.as_ref().to_vec(),
             expected: pubkey_hash,
         });
@@ -95,9 +95,9 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
         )
     };
     if lpk_ret != 0 {
-        println!("tabasco::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}", lpk_ret);
-        return Err(TabascoError::UnsafeCallError(
-            "tabasco::server::verify_iat t_cose_sign1_verify_load_public_key",
+        println!("proxy-attestation-server::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}", lpk_ret);
+        return Err(ProxyAttestationServerError::UnsafeCallError(
+            "proxy-attestation-server::server::verify_iat t_cose_sign1_verify_load_public_key",
             lpk_ret,
         ));
     }
@@ -130,9 +130,9 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
         )
     };
     if sv_ret != 0 {
-        println!("tabasco::verify_iat sv_ret != 0");
-        return Err(TabascoError::UnsafeCallError(
-            "tabasco::server::verify_iat t_cose_sign1_verify",
+        println!("proxy-attestation-server::verify_iat sv_ret != 0");
+        return Err(ProxyAttestationServerError::UnsafeCallError(
+            "proxy-attestation-server::server::verify_iat t_cose_sign1_verify",
             sv_ret,
         ));
     }
@@ -140,13 +140,13 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
     // remove the key from storage
     let dpk_ret = unsafe { t_cose_sign1_verify_delete_public_key(&mut key_handle) };
     if dpk_ret != 0 {
-        println!("tabasco::attestation::psa_attestation_token Was unable to delete public key, and received the error code:{:?}.
+        println!("proxy-attestation-server::attestation::psa_attestation_token Was unable to delete public key, and received the error code:{:?}.
                    I can't do anything about it, and it may not cause a problem right now, but this will probably end badly for you.", dpk_ret);
     }
 
     if payload.ptr == null() {
-        println!("tabasco::verify_iat payload.ptr is null");
-        return Err(TabascoError::MissingFieldError("payload.ptr"));
+        println!("proxy-attestation-server::verify_iat payload.ptr is null");
+        return Err(ProxyAttestationServerError::MissingFieldError("payload.ptr"));
     }
 
     let payload_vec =
@@ -156,43 +156,43 @@ async fn verify_iat(input_data: String) -> TabascoResponder {
 }
 
 #[allow(unused)]
-async fn sgx_router(psa_request: web::Path<String>, input_data: String) -> TabascoResponder {
+async fn sgx_router(psa_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
     #[cfg(feature = "sgx")]
     match psa_request.into_inner().as_str() {
         "Msg1" => sgx::msg1(input_data),
         "Msg3" => sgx::msg3(input_data),
-        _ => Err(TabascoError::UnsupportedRequestError),
+        _ => Err(ProxyAttestationServerError::UnsupportedRequestError),
     }
     #[cfg(not(feature = "sgx"))]
-    Err(TabascoError::UnimplementedRequestError)
+    Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
 #[allow(unused)]
-async fn psa_router(psa_request: web::Path<String>, input_data: String) -> TabascoResponder {
+async fn psa_router(psa_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
     #[cfg(feature = "psa")]
     if psa_request.into_inner().as_str() == "AttestationToken" {
         psa::attestation_token(input_data)
     } else {
-        Err(TabascoError::UnsupportedRequestError)
+        Err(ProxyAttestationServerError::UnsupportedRequestError)
     }
     #[cfg(not(feature = "psa"))]
-    Err(TabascoError::UnimplementedRequestError)
+    Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
 #[allow(unused)]
-async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> TabascoResponder {
+async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
     #[cfg(feature = "nitro")]
     {
         let inner = nitro_request.into_inner();
         if inner.as_str() == "AttestationToken" {
             nitro::attestation_token(input_data)
         } else {
-            println!("Tabasco::nitro_router returning unsupported with into_inner:{:?}", inner.as_str());
-            Err(TabascoError::UnsupportedRequestError)
+            println!("proxy-attestation-server::nitro_router returning unsupported with into_inner:{:?}", inner.as_str());
+            Err(ProxyAttestationServerError::UnsupportedRequestError)
         }
     }
     #[cfg(not(feature = "nitro"))]
-    Err(TabascoError::UnimplementedRequestError)
+    Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
 pub fn server(url: String, debug: bool) -> Result<Server, String> {

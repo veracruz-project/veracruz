@@ -341,7 +341,7 @@ fn test_durango_new_invalid_enclave_name() {
 async fn durango_policy_violations() {
     // set up the attestation result as a mock object
     // This fakes the Attestation interface so we don't have to bring up a
-    // tabasco server or communicate with IAS. This means that we are NOT
+    // proxy attestation server or communicate with IAS. This means that we are NOT
     // testing the attestation flow
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_policy, _target_platform| {

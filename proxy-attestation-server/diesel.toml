@@ -2,4 +2,4 @@
 # see diesel.rs/guides/configuring-diesel-cli
 
 [print_schema]
-file = "/work/veracruz/tabasco/src/orm/schema.rs"
+file = "/work/veracruz/proxy-attestation-server/src/orm/schema.rs"

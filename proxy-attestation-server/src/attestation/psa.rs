@@ -1,4 +1,4 @@
-//! PSA Attestation-specific material
+//! PSA Attestation-specific material for the Veracruz proxy attestation server
 //!
 //! ## Authors
 //!
@@ -45,7 +45,7 @@ lazy_static! {
         Mutex::new(HashMap::new());
 }
 
-pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
+pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerResponder {
     let mut challenge: [u8; 32] = [0; 32];
     let mut rng = rand::thread_rng();
 
@@ -64,13 +64,13 @@ pub fn start(firmware_version: &str, device_id: i32) -> TabascoResponder {
     Ok(base64::encode(&serialized_attestation_init))
 }
 
-pub fn attestation_token(body_string: String) -> TabascoResponder {
+pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)?;
 
-    let parsed = colima::parse_tabasco_request(&received_bytes)?;
+    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)?;
     if !parsed.has_native_psa_attestation_token() {
-        println!("tabasco::attestation::psa::attestation_token received data is incorrect.");
-        return Err(TabascoError::MissingFieldError(
+        println!("proxy-attestation-server::attestation::psa::attestation_token received data is incorrect.");
+        return Err(ProxyAttestationServerError::MissingFieldError(
             "native_psa_attestation_token",
         ));
     }
@@ -81,7 +81,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
         let ac_hash = ATTESTATION_CONTEXT.lock()?;
         let context = ac_hash
             .get(&device_id)
-            .ok_or(TabascoError::NoDeviceError(device_id))?;
+            .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))?;
         (*context).clone()
     };
 
@@ -97,7 +97,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
         )
     };
     if lpk_ret != 0 {
-        return Err(TabascoError::UnsafeCallError(
+        return Err(ProxyAttestationServerError::UnsafeCallError(
             "attestation_token t_cose_sign1_verify_load_public_key",
             lpk_ret,
         ));
@@ -133,13 +133,13 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
     // remove the key from storage
     let dpk_ret = unsafe { t_cose_sign1_verify_delete_public_key(&mut key_handle) };
     if dpk_ret != 0 {
-        println!("tabasco::attestation::psa_attestation_token Was unable to delete public key, and received the error code:{:?}.
+        println!("proxy-attestation-server::attestation::psa_attestation_token Was unable to delete public key, and received the error code:{:?}.
                   I can't do anything about it, and it may not cause a problem right now, but this will probably end badly for you.", dpk_ret);
     }
 
     if sv_ret != 0 {
         println!("sv_ret:{:}", sv_ret);
-        return Err(TabascoError::UnsafeCallError(
+        return Err(ProxyAttestationServerError::UnsafeCallError(
             "attestation_token t_cose_sign1_verify",
             sv_ret,
         ));
@@ -147,7 +147,7 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
     let payload_vec =
         unsafe { std::slice::from_raw_parts(payload.ptr as *const u8, payload.len as usize) };
     if attestation_context.challenge != payload_vec[8..40] {
-        return Err(TabascoError::MismatchError {
+        return Err(ProxyAttestationServerError::MismatchError {
             variable: "payload_vec[8..40]",
             expected: attestation_context.challenge.to_vec(),
             received: payload_vec[8..40].to_vec(),
@@ -172,10 +172,10 @@ pub fn attestation_token(body_string: String) -> TabascoResponder {
             &"psa".to_string(),
             &attestation_context.firmware_version,
         )?
-        .ok_or(TabascoError::MissingFieldError("firmware version"))?
+        .ok_or(ProxyAttestationServerError::MissingFieldError("firmware version"))?
     };
     if expected_enclave_hash != received_enclave_hash {
-        return Err(TabascoError::MismatchError {
+        return Err(ProxyAttestationServerError::MismatchError {
             variable: "received_enclave_hash",
             expected: expected_enclave_hash,
             received: received_enclave_hash.to_vec(),

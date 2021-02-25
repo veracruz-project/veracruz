@@ -72,10 +72,10 @@ fn main() {
     println!("Hello, world!");
     let matches = App::new("nitro-root-enclave-server")
         .arg(
-            Arg::with_name("tabasco")
+            Arg::with_name("proxy-attestation-server")
                 .takes_value(true)
                 .required(true)
-                .help("URL for Tabasco server"),
+                .help("URL for proxy attestation server"),
         )
         .arg(
             Arg::with_name("debug")
@@ -84,12 +84,12 @@ fn main() {
                 .help("Enables debug mode in the enclave"),
         )
         .get_matches();
-    let tabasco_url = matches.value_of("tabasco").unwrap(); // Since the tabasco argument is required, this should never actually panic
+    let proxy_attestation_server_url = matches.value_of("proxy-attestation-server").unwrap(); // Since the proxy attestation server argument is required, this should never actually panic
     let enclave_debug = matches.is_present("debug");
 
     // first, start the nitro-root-enclave
     let enclave = loop {
-        match native_attestation(tabasco_url, enclave_debug) {
+        match native_attestation(proxy_attestation_server_url, enclave_debug) {
             Err(err) => {
                 println!("nitro-root-enclave-server::main native_attestation failed({:?}). Sleeping and trying again.", err);
                 std::thread::sleep(std::time::Duration::from_secs(2));
@@ -142,7 +142,7 @@ fn main() {
 
 /// Start the nitro-root-enclave Nitro Enclave and handle it's native attestation
 fn native_attestation(
-    tabasco_url: &str,
+    proxy_attestation_server_url: &str,
     enclave_debug: bool,
 ) -> Result<NitroEnclave, NitroServerError> {
     println!("nitro-root-enclave-server::native_attestation started");
@@ -155,10 +155,10 @@ fn native_attestation(
     let firmware_version = fetch_firmware_version(&nre_enclave)?;
     println!("nitro-root-enclave-server::native_attestation fetch_firmware_version complete. Now setting mexico city hash");
 
-    println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to tabasco");
-    let (challenge, device_id) = send_start(tabasco_url, "nitro", &firmware_version)?;
+    println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to proxy attestation server.");
+    let (challenge, device_id) = send_start(proxy_attestation_server_url, "nitro", &firmware_version)?;
 
-    println!("SinaloaNitro::native_attestation completed send to tabasco. Now sending NativeAttestation message to Nitro Root Enclave");
+    println!("SinaloaNitro::native_attestation completed send to the proxy attestation server. Now sending NativeAttestation message to Nitro Root Enclave");
     let message = NitroRootEnclaveMessage::NativeAttestation(challenge, device_id);
     let message_buffer =
         bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
@@ -174,25 +174,25 @@ fn native_attestation(
     };
 
     println!(
-        "nitro-root-enclave-server::native_attestation posting native_attestation_token to tabasco"
+        "nitro-root-enclave-server::native_attestation posting native_attestation_token to the proxy attestation server."
     );
-    post_native_attestation_token(tabasco_url, &token, device_id)?;
+    post_native_attestation_token(proxy_attestation_server_url, &token, device_id)?;
     println!("nitro-root-enclave-server::native_attestation returning Ok");
     return Ok(nre_enclave);
 }
 
-/// Send the native (AWS Nitro) attestation token to the Tabasco server
+/// Send the native (AWS Nitro) attestation token to the proxy attestation server
 fn post_native_attestation_token(
-    tabasco_url: &str,
+    proxy_attestation_server_url: &str,
     token: &Vec<u8>,
     device_id: i32,
 ) -> Result<(), NitroServerError> {
     println!("nitro-root-enclave-server::post_native_attestation_token started");
-    let serialized_tabasco_request =
+    let serialized_proxy_attestation_server_request =
         colima::serialize_native_psa_attestation_token(token, device_id)
             .map_err(|err| NitroServerError::Colima(err))?;
-    let encoded_str = base64::encode(&serialized_tabasco_request);
-    let url = format!("{:}/Nitro/AttestationToken", tabasco_url);
+    let encoded_str = base64::encode(&serialized_proxy_attestation_server_request);
+    let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
     println!(
         "nitro-root-enclave-server::post_native_attestation_token posting to URL{:?}",
         url
@@ -232,17 +232,17 @@ fn fetch_firmware_version(nre_enclave: &NitroEnclave) -> Result<String, NitroSer
     return Ok(firmware_version);
 }
 
-/// Send the start message to the Tabasco server (this triggers the server to
+/// Send the start message to the proxy attestation server (this triggers the server to
 /// send the challenge) and then handle the response
 fn send_start(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
 ) -> Result<(Vec<u8>, i32), NitroServerError> {
-    let tabasco_response = send_tabasco_start(url_base, protocol, firmware_version)?;
-    if tabasco_response.has_psa_attestation_init() {
+    let proxy_attestation_server_response = send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
+    if proxy_attestation_server_response.has_psa_attestation_init() {
         let (challenge, device_id) =
-            colima::parse_psa_attestation_init(tabasco_response.get_psa_attestation_init())
+            colima::parse_psa_attestation_init(proxy_attestation_server_response.get_psa_attestation_init())
                 .map_err(|err| NitroServerError::Colima(err))?;
         return Ok((challenge, device_id));
     } else {
@@ -322,28 +322,28 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, NitroServerErro
     return Ok(received_body);
 }
 
-/// Send start to the tabasco server
-pub fn send_tabasco_start(
+/// Send start to the proxy attestation server.
+pub fn send_proxy_attestation_server_start(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
-) -> Result<colima::TabascoResponse, NitroServerError> {
+) -> Result<colima::ProxyAttestationServerResponse, NitroServerError> {
     let serialized_start_msg = colima::serialize_start_msg(protocol, firmware_version)
         .map_err(|err| NitroServerError::Colima(err))?;
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
 
     println!(
-        "nitro-root-enclave-server::send_tabasco_start sending to url:{:?}",
+        "nitro-root-enclave-server::send_proxy_attestation_server_start sending to url:{:?}",
         url
     );
     let received_body: String = post_buffer(&url, &encoded_start_msg)?;
-    println!("nitro-root-enclave-server::send_tabasco_start completed post command");
+    println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed post command");
 
     let body_vec =
         base64::decode(&received_body).map_err(|err| NitroServerError::Base64Decode(err))?;
     let response =
-        colima::parse_tabasco_response(&body_vec).map_err(|err| NitroServerError::Colima(err))?;
-    println!("nitro-root-enclave-server::send_tabasco_start completed. Returning.");
+        colima::parse_proxy_attestation_server_response(&body_vec).map_err(|err| NitroServerError::Colima(err))?;
+    println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed. Returning.");
     return Ok(response);
 }

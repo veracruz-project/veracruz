@@ -1,3 +1,2 @@
-target/
-tmp.sql
 proxy-attestation-server.db
+tmp.sql

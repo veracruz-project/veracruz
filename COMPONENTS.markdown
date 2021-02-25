@@ -66,9 +66,9 @@ isolates initialized on the machine using local attestation.  This isolate must
 be authenticated using remote attestation, making use of the native attestation
 service for the isolation technology in use to protect Sonora (SGX only, for
 the time being).
-- Tabasco: this is the attestation service proper, which maintains a database
-of registered keys and identities, and which can be contacted by clients to
-authenticate an isolate enrolled in the service.
+- Proxy Attestation Server: this is the attestation service proper, which
+  maintains a database of registered keys and identities, and which can be contacted
+  by clients to authenticate an isolate enrolled in the service.
 
 ## The Software Development Kit
 

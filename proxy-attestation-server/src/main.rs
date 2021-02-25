@@ -1,4 +1,4 @@
-//! Tabasco
+//! Binary for the Veracruz proxy attestation server
 //!
 //! ## Authors
 //!

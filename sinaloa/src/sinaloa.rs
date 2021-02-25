@@ -243,11 +243,11 @@ pub trait Sinaloa {
     fn close(&mut self) -> Result<bool, SinaloaError>;
 }
 
-pub fn send_tabasco_start(
+pub fn send_proxy_attestation_server_start(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
-) -> Result<colima::TabascoResponse, SinaloaError> {
+) -> Result<colima::ProxyAttestationServerResponse, SinaloaError> {
     let serialized_start_msg = colima::serialize_start_msg(protocol, firmware_version)?;
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
@@ -255,7 +255,7 @@ pub fn send_tabasco_start(
     let received_body: String = post_buffer(&url, &encoded_start_msg)?;
 
     let body_vec = base64::decode(&received_body)?;
-    let response = colima::parse_tabasco_response(&body_vec)?;
+    let response = colima::parse_proxy_attestation_server_response(&body_vec)?;
     return Ok(response);
 }
 
@@ -299,7 +299,7 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, SinaloaError> {
         lines.collect()
     };
     println!(
-        "sinaloa::send_tabasco_start received header:{:?}",
+        "sinaloa::send_proxy_attestation_server_start received header:{:?}",
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {

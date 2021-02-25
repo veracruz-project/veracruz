@@ -25,9 +25,10 @@ fn main() {
         panic!("sinaloa-test:build.rs: failed to make test-collateral");
     }
 
-    // Destroy, and then re-create and repopulate, the Tabasco database
+    // Destroy, and then re-create and repopulate, the proxy attestation servers'
+    // database
     Command::new("bash")
-        .args(&["./populate_test_database.sh"])
+        .args(&["./populate-test-database.sh"])
         .output()
         .unwrap();
 }

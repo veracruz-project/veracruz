@@ -8,9 +8,9 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "tabasco/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
-tz = ["sinaloa/tz", "veracruz-utils/tz", "tabasco/psa", "colima/tz", "psa-attestation/tz"]
-nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "tabasco/nitro"]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
+tz = ["sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "colima/tz", "psa-attestation/tz"]
+nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
@@ -35,7 +35,7 @@ serde = { version = "1.0.97", features = ["derive"] }
 percent-encoding = "2.1.0"
 openssl = "0.10.24"
 rand = "0.7.0"
-tabasco = { path = "../tabasco" }
+proxy-attestation-server = { path = "../proxy-attestation-server" }
 psa-attestation = { path = "../psa-attestation"}
 hex = "0.4"
 pinecone = "0.2"
