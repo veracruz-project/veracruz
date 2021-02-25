@@ -503,6 +503,8 @@ pub mod sinaloa_sgx {
                     result, ret
                 );
                 Err(SinaloaError::EnclaveCallError("runtime_manager_init_session_manager_enc"))
+                    result, ret
+                );
             }
         }
 

@@ -1,4 +1,4 @@
-//! AWS Nitro-Enclaves-specific material for the Runtime Manager enclave
+//! AWS Nitro-Enclaves-specific material for the Mexico City enclave
 //!
 //! ## Authors
 //!
@@ -19,11 +19,11 @@ use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use veracruz_utils::{
-    receive_buffer, send_buffer, vsocket, RuntimeManagerMessage, NitroRootEnclaveMessage, NitroStatus,
+    receive_buffer, send_buffer, vsocket, MCMessage, NitroRootEnclaveMessage, NitroStatus,
 };
 
 use crate::managers;
-use crate::managers::RuntimeManagerError;
+use crate::managers::MexicoCityError;
 
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
@@ -43,129 +43,129 @@ const OCALL_PORT: u32 = 5006;
 /// I guess I have to trust Amazon on this one
 const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
-/// The main function for the Nitro Runtime Manager enclave
-pub fn nitro_main() -> Result<(), RuntimeManagerError> {
+/// The main function for the Nitro mexico city enclave
+pub fn nitro_main() -> Result<(), MexicoCityError> {
     let socket_fd = socket(
         AddressFamily::Vsock,
         SockType::Stream,
         SockFlag::empty(),
         None,
     )
-    .map_err(|err| RuntimeManagerError::SocketError(err))?;
+    .map_err(|err| MexicoCityError::SocketError(err))?;
     println!(
-        "runtime_manager_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
+        "mc_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
         CID, PORT
     );
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
-    bind(socket_fd, &sockaddr).map_err(|err| RuntimeManagerError::SocketError(err))?;
-    println!("runtime_manager_nitro::nitro_main calling accept");
+    bind(socket_fd, &sockaddr).map_err(|err| MexicoCityError::SocketError(err))?;
+    println!("mc_nitro::nitro_main calling accept");
 
-    listen_vsock(socket_fd, BACKLOG).map_err(|err| RuntimeManagerError::SocketError(err))?;
+    listen_vsock(socket_fd, BACKLOG).map_err(|err| MexicoCityError::SocketError(err))?;
 
-    let fd = accept(socket_fd).map_err(|err| RuntimeManagerError::SocketError(err))?;
-    println!("runtime_manager_nitro::nitro_main accept succeeded. looping");
+    let fd = accept(socket_fd).map_err(|err| MexicoCityError::SocketError(err))?;
+    println!("mc_nitro::nitro_main accept succeeded. looping");
     loop {
         let received_buffer =
-            receive_buffer(fd).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-        let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)
-            .map_err(|err| RuntimeManagerError::BincodeError(err))?;
+            receive_buffer(fd).map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+        let received_message: MCMessage = bincode::deserialize(&received_buffer)
+            .map_err(|err| MexicoCityError::BincodeError(err))?;
         let return_message = match received_message {
-            RuntimeManagerMessage::Initialize(policy_json) => initialize(&policy_json)?,
-            RuntimeManagerMessage::GetEnclaveCert => {
-                println!("runtime_manager_nitro::main GetEnclaveCert");
+            MCMessage::Initialize(policy_json) => initialize(&policy_json)?,
+            MCMessage::GetEnclaveCert => {
+                println!("mc_nitro::main GetEnclaveCert");
                 let return_message = match managers::session_manager::get_enclave_cert_pem() {
-                    Ok(cert) => RuntimeManagerMessage::EnclaveCert(cert),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Ok(cert) => MCMessage::EnclaveCert(cert),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::GetEnclaveName => {
-                println!("runtime_manager_nitro::main GetEnclaveName");
+            MCMessage::GetEnclaveName => {
+                println!("mc_nitro::main GetEnclaveName");
                 let return_message = match managers::session_manager::get_enclave_name() {
-                    Ok(name) => RuntimeManagerMessage::EnclaveName(name),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Ok(name) => MCMessage::EnclaveName(name),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::NewTLSSession => {
-                println!("runtime_manager_nitro::main NewTLSSession");
+            MCMessage::NewTLSSession => {
+                println!("mc_nitro::main NewTLSSession");
                 let ns_result = managers::session_manager::new_session();
-                let return_message: RuntimeManagerMessage = match ns_result {
-                    Ok(session_id) => RuntimeManagerMessage::TLSSession(session_id),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                let return_message: MCMessage = match ns_result {
+                    Ok(session_id) => MCMessage::TLSSession(session_id),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::CloseTLSSession(session_id) => {
-                println!("runtime_manager_nitro::main CloseTLSSession");
+            MCMessage::CloseTLSSession(session_id) => {
+                println!("mc_nitro::main CloseTLSSession");
                 let cs_result = managers::session_manager::close_session(session_id);
-                let return_message: RuntimeManagerMessage = match cs_result {
-                    Ok(_) => RuntimeManagerMessage::Status(NitroStatus::Success),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                let return_message: MCMessage = match cs_result {
+                    Ok(_) => MCMessage::Status(NitroStatus::Success),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::GetTLSDataNeeded(session_id) => {
-                println!("runtime_manager_nitro::main GetTLSDataNeeded");
+            MCMessage::GetTLSDataNeeded(session_id) => {
+                println!("mc_nitro::main GetTLSDataNeeded");
                 let return_message = match managers::session_manager::get_data_needed(session_id) {
-                    Ok(needed) => RuntimeManagerMessage::TLSDataNeeded(needed),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Ok(needed) => MCMessage::TLSDataNeeded(needed),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::SendTLSData(session_id, tls_data) => {
-                println!("runtime_manager_nitro::main SendTLSData");
+            MCMessage::SendTLSData(session_id, tls_data) => {
+                println!("mc_nitro::main SendTLSData");
                 let return_message = match managers::session_manager::send_data(session_id, &tls_data)
                 {
-                    Ok(_) => RuntimeManagerMessage::Status(NitroStatus::Success),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Ok(_) => MCMessage::Status(NitroStatus::Success),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::GetTLSData(session_id) => {
-                println!("runtime_manager_nitro::main GetTLSData");
+            MCMessage::GetTLSData(session_id) => {
+                println!("mc_nitro::main GetTLSData");
                 let return_message = match managers::session_manager::get_data(session_id) {
-                    Ok((active, output_data)) => RuntimeManagerMessage::TLSData(output_data, active),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Ok((active, output_data)) => MCMessage::TLSData(output_data, active),
+                    Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::GetPSAAttestationToken(challenge) => {
-                println!("runtime_manager_nitro::main GetPSAAttestationToken");
+            MCMessage::GetPSAAttestationToken(challenge) => {
+                println!("mc_nitro::main GetPSAAttestationToken");
                 get_psa_attestation_token(&challenge)?
             }
-            RuntimeManagerMessage::ResetEnclave => {
+            MCMessage::ResetEnclave => {
                 // Do nothing here for now
-                println!("runtime_manager_nitro::main ResetEnclave");
-                RuntimeManagerMessage::Status(NitroStatus::Success)
+                println!("mc_nitro::main ResetEnclave");
+                MCMessage::Status(NitroStatus::Success)
             }
             _ => {
-                println!("runtime_manager_nitro::main Unknown Opcode");
-                RuntimeManagerMessage::Status(NitroStatus::Unimplemented)
+                println!("mc_nitro::main Unknown Opcode");
+                MCMessage::Status(NitroStatus::Unimplemented)
             }
         };
         let return_buffer = bincode::serialize(&return_message)
-            .map_err(|err| RuntimeManagerError::BincodeError(err))?;
+            .map_err(|err| MexicoCityError::BincodeError(err))?;
         println!(
-            "runtime_manager_nitro::main calling send buffer with buffer_len:{:?}",
+            "mc_nitro::main calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
-        send_buffer(fd, &return_buffer).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
+        send_buffer(fd, &return_buffer).map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
     }
 }
 
-/// Handler for the RuntimeManagerMessage::Initialize message
-fn initialize(policy_json: &str) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
-    println!("runtime_manager_nitro::initialize started");
+/// Handler for the MCMessage::Initialize message
+fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
+    println!("mc_nitro::initialize started");
     managers::session_manager::init_session_manager(policy_json)?;
-    println!("runtime_manager_nitro::main init_session_manager completed");
-    return Ok(RuntimeManagerMessage::Status(NitroStatus::Success));
+    println!("mc_nitro::main init_session_manager completed");
+    return Ok(MCMessage::Status(NitroStatus::Success));
 }
 
-/// Handler for the RuntimeManagerMessage::GetPSAAttestationToken message
-fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
-    println!("runtime_manager_nitro::get_psa_attestation_token started");
+/// Handler for the MCMessage::GetPSAAttestationToken message
+fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityError> {
+    println!("mc_nitro::get_psa_attestation_token started");
     println!(
         "nc_nitro::get_psa_attestation_token received challenge:{:?}",
         challenge
@@ -180,7 +180,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, 
 
         let nsm_fd = nsm_lib::nsm_lib_init();
         if nsm_fd < 0 {
-            return Err(RuntimeManagerError::NsmLibError(nsm_fd));
+            return Err(MexicoCityError::NsmLibError(nsm_fd));
         }
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
@@ -197,7 +197,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, 
         };
         match status {
             nsm_io::ErrorCode::Success => (),
-            _ => return Err(RuntimeManagerError::NsmErrorCode(status)),
+            _ => return Err(MexicoCityError::NsmErrorCode(status)),
         }
         unsafe {
             att_doc.set_len(att_doc_len as usize);
@@ -208,24 +208,24 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, 
     let nre_message =
         NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_name);
     let nre_message_buffer =
-        bincode::serialize(&nre_message).map_err(|err| RuntimeManagerError::BincodeError(err))?;
+        bincode::serialize(&nre_message).map_err(|err| MexicoCityError::BincodeError(err))?;
 
     // send the buffer back to Sinaloa via an ocall
     let vsocksocket = vsocket::vsock_connect(HOST_CID, OCALL_PORT)
-        .map_err(|err| RuntimeManagerError::SocketError(err))?;
+        .map_err(|err| MexicoCityError::SocketError(err))?;
     send_buffer(vsocksocket.as_raw_fd(), &nre_message_buffer)
-        .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
+        .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
     let received_buffer = receive_buffer(vsocksocket.as_raw_fd())
-        .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
+        .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
     let received_message: NitroRootEnclaveMessage =
-        bincode::deserialize(&received_buffer).map_err(|err| RuntimeManagerError::BincodeError(err))?;
+        bincode::deserialize(&received_buffer).map_err(|err| MexicoCityError::BincodeError(err))?;
 
     let (psa_token, pubkey, device_id) = match received_message {
         NitroRootEnclaveMessage::PSAToken(token, pubkey, d_id) => (token, pubkey, d_id),
-        _ => return Err(RuntimeManagerError::WrongMessageTypeError(received_message)),
+        _ => return Err(MexicoCityError::WrongMessageTypeError(received_message)),
     };
-    let psa_token_message: RuntimeManagerMessage =
-        RuntimeManagerMessage::PSAAttestationToken(psa_token, pubkey, device_id.try_into().unwrap());
+    let psa_token_message: MCMessage =
+        MCMessage::PSAAttestationToken(psa_token, pubkey, device_id.try_into().unwrap());
 
     return Ok(psa_token_message);
 }
