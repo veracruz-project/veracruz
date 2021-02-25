@@ -39,7 +39,7 @@ use std::sync::SgxMutex as Mutex;
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
 use crate::hcall::{common::ExecutionEngine, wasmi};
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
+use veracruz_utils::VeracruzCapabilityTable;
 
 use std::{
     boxed::Box,
@@ -189,16 +189,16 @@ fn new_wasmi_instance (
     program_digests: &HashMap<String, Vec<u8>>, 
     input_table: &HashMap<String, Vec<String>>, 
 ) -> impl Chihuahua + 'static {
-    let mut state = wasmi::WasmiHostProvisioningState::valid_new(
+    wasmi::WasmiHostProvisioningState::valid_new(
         expected_shutdown_sources,
         capability_table,
         program_digests,
         input_table,
-    );
+    )
     //state
         //.set_expected_data_sources(expected_data_sources)
         //.set_expected_stream_sources(expected_stream_sources);
-    state
+    //state
 }
 
 ////////////////////////////////////////////////////////////////////////////////

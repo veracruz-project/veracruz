@@ -166,17 +166,6 @@ impl ProtocolState {
      * hidden from the user.
      */
 
-    /// Loads a raw WASM program from a buffer of received or parsed bytes.
-    /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
-    /// if the buffer cannot be parsed.  On success bumps the lifecycle state to
-    /// `LifecycleState::ReadyToExecute` in cases where no data sources are
-    /// expected (i.e. we are a pure delegate) or
-    /// `LifecycleState::DataSourcesLoading` in cases where we are expecting
-    /// data to be provisioned.
-    pub(crate) fn load_program(&self, buffer: &[u8]) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.load_program(buffer)?)
-    }
-
     //TODO: add description
     pub(crate) fn write_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), MexicoCityError> {
         Ok(self.host_state.lock()?.write_file(client_id,file_name,data)?)
@@ -192,13 +181,6 @@ impl ProtocolState {
         Ok(self.host_state.lock()?.read_file(client_id,file_name)?)
     }
 
-    //TODO: add description
-    //pub(crate) fn register_program(&self, client_id: &VeracruzCapabilityIndex, file_name: &str, prog: &[u8]) -> Result<(), MexicoCityError> {
-        //Ok(self.host_state.lock()?.register_program(client_id,file_name,prog)?)
-        ////Ok(self.host_state.lock()?.load_program(prog)?)
-    //}
-
-
     /// Invokes the entry point of the provisioned WASM program.  Will fail if
     /// the current lifecycle state is not `LifecycleState::ReadyToExecute` or
     /// if the WASM program fails at runtime.  On success, bumps the lifecycle
@@ -213,24 +195,6 @@ impl ProtocolState {
     pub(crate) fn get_lifecycle_state(&self) -> Result<LifecycleState, RuntimeManagerError> {
         Ok(self.host_state.lock()?.get_lifecycle_state().clone())
     }
-
-
-    ///// Returns a result of a WASM computation that has executed on the host
-    ///// provisioning state.  Returns `None` iff no such result has been
-    ///// registered.
-    //pub(crate) fn get_vfs(&self) -> Result<VFS, MexicoCityError> {
-        //Ok(self.host_state.lock()?.get_vfs().clone())
-    //}
-
-    ///// Returns a result of a WASM computation that has executed on the host
-    ///// provisioning state.  Returns `None` iff no such result has been
-    ///// registered.
-    //pub(crate) fn set_vfs(&self, vfs : VFS) -> Result<(), MexicoCityError> {
-        //self.host_state.lock()?.set_vfs(&vfs);
-        //Ok(())
-    //}
-
-
 
     /// Moves the host provisioning state's lifecycle state into
     /// `LifecycleState::Error`, a state which it cannot ever escape,

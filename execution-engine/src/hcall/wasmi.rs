@@ -32,9 +32,8 @@ use crate::{
         HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
         HCALL_WRITE_OUTPUT_NAME,
     },
-    hcall::buffer::VFS,
 };
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
+use veracruz_utils::VeracruzCapabilityIndex;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -405,61 +404,39 @@ impl WasmiHostProvisioningState {
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        //if self.get_lifecycle_state() == &LifecycleState::Initial {
-            if let Ok(module) = Module::from_buffer(buffer) {
-                let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
+        if let Ok(module) = Module::from_buffer(buffer) {
+            let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
 
-                if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
-                    if not_started_module_ref.has_start() {
-                        self.set_error();
-                        return Err(HostProvisioningError::InvalidWASMModule);
-                    }
-
-                    let module_ref = not_started_module_ref.assert_no_start();
-
-                    if let Ok(linear_memory) = get_module_memory(&module_ref) {
-                        // Everything has now gone well, so register the module,
-                        // linear memory, and the program digest, then work out
-                        // which state we should be in.
-
-                        self.set_program_module(module_ref);
-                        self.set_memory(linear_memory);
-                        //self.set_program_digest(&sha_256_digest(buffer));
-
-                        // TODO: Remove state machine
-                        //if self.get_expected_data_source_count() == 0 {
-                            //if self.get_expected_stream_source_count() == 0 {
-                        self.set_ready_to_execute();
-                            //} else {
-                                //self.set_stream_sources_loading();
-                            //}
-                        //} else {
-                            //self.set_data_sources_loading();
-                        //}
-                        //TODO: GLUE CODE
-                        
-                        //TODO: END OF GLUE CODE
-                        return Ok(());
-                    }
-
+            if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
+                if not_started_module_ref.has_start() {
                     self.set_error();
-                    return Err(HostProvisioningError::NoLinearMemoryFound);
+                    return Err(HostProvisioningError::InvalidWASMModule);
+                }
+
+                let module_ref = not_started_module_ref.assert_no_start();
+
+                if let Ok(linear_memory) = get_module_memory(&module_ref) {
+                    // Everything has now gone well, so register the module,
+                    // linear memory, and the program digest, then work out
+                    // which state we should be in.
+
+                    self.set_program_module(module_ref);
+                    self.set_memory(linear_memory);
+                    //TODO REMOVE ?
+                    self.set_ready_to_execute();
+                    return Ok(());
                 }
 
                 self.set_error();
-                Err(HostProvisioningError::ModuleInstantiationFailure)
-            } else {
-                self.set_error();
-                Err(HostProvisioningError::InvalidWASMModule)
+                return Err(HostProvisioningError::NoLinearMemoryFound);
             }
 
-        //} else {
-            //self.set_error();
-            //Err(HostProvisioningError::InvalidLifeCycleState {
-                //expected: vec![LifecycleState::Initial],
-                //found: self.get_lifecycle_state().clone(),
-            //})
-        //}
+            self.set_error();
+            Err(HostProvisioningError::ModuleInstantiationFailure)
+        } else {
+            self.set_error();
+            Err(HostProvisioningError::InvalidWASMModule)
+        }
     }
 
     /// The WASMI implementation of `__veracruz_hcall_write_output()`.
@@ -482,17 +459,8 @@ impl WasmiHostProvisioningState {
                         bytes_to_be_read: size as usize,
                     }),
                     Ok(bytes) => {
-                        /* If a result is already written, signal this to the WASM
-                         * program and do not register a new result.  Otherwise,
-                         * register the result and signal success.
-                         */
-                        //if self.is_result_registered() {
-                            //Ok(VeracruzError::ResultAlreadyWritten)
-                        //} else {
-                            //self.set_result(&bytes);
-                            self.write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes)?;
-                            Ok(VeracruzError::Success)
-                        //}
+                        self.write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes)?;
+                        Ok(VeracruzError::Success)
                     }
                 }
             }
@@ -554,22 +522,6 @@ impl WasmiHostProvisioningState {
 
                 Ok(VeracruzError::Success)
             },
-                //match self.get_current_data_source(index as usize) {
-                //None => return Ok(VeracruzError::BadInput),
-                //Some(frame) => {
-                    //let result = frame.get_data().len() as u32;
-                    //let result: Vec<u8> = result.to_le_bytes().to_vec();
-
-                    //if let Err(_) = memory.set(address, &result) {
-                        //return Err(FatalHostError::MemoryWriteFailed {
-                            //memory_address: address as usize,
-                            //bytes_to_be_written: result.len() as usize,
-                        //});
-                    //}
-
-                    //Ok(VeracruzError::Success)
-                //}
-            //},
         }
     }
 
@@ -604,25 +556,6 @@ impl WasmiHostProvisioningState {
                 Ok(VeracruzError::Success)
 
             },
-                /*match self.get_current_data_source(index as usize) {*/
-                //None => return Ok(VeracruzError::BadInput),
-                //Some(frame) => {
-                    //let data = frame.get_data();
-
-                    //if data.len() > size as usize {
-                        //return Ok(VeracruzError::DataSourceSize);
-                    //}
-
-                    //if let Err(_) = memory.set(address, data) {
-                        //return Err(FatalHostError::MemoryWriteFailed {
-                            //memory_address: address as usize,
-                            //bytes_to_be_written: data.len(),
-                        //});
-                    //}
-
-                    //Ok(VeracruzError::Success)
-                //}
-            //},
         }
     }
 
@@ -681,22 +614,6 @@ impl WasmiHostProvisioningState {
 
                 Ok(VeracruzError::Success)
             },
-                //match self.get_current_stream_source(index as usize) {
-                //None => return Ok(VeracruzError::BadStream),
-                //Some(frame) => {
-                    //let result = frame.get_data().len() as u32;
-                    //let result: Vec<u8> = result.to_le_bytes().to_vec();
-
-                    //if let Err(_) = memory.set(address, &result) {
-                        //return Err(FatalHostError::MemoryWriteFailed {
-                            //memory_address: address as usize,
-                            //bytes_to_be_written: result.len() as usize,
-                        //});
-                    //}
-
-                    //Ok(VeracruzError::Success)
-                //}
-            //},
         }
     }
 
@@ -731,28 +648,6 @@ impl WasmiHostProvisioningState {
 
                 Ok(VeracruzError::Success)
             },
-            //{
-                //match self.get_current_stream_source(index as usize) {
-                //None => return Ok(VeracruzError::BadStream),
-                //Some(frame) => {
-                    //let data = frame.get_data();
-
-                    //if data.len() > size as usize {
-                        //assert!(false);
-                        //return Ok(VeracruzError::StreamSourceSize);
-                    //}
-
-                    //if let Err(_) = memory.set(address, data) {
-                        //assert!(false);
-                        //return Err(FatalHostError::MemoryWriteFailed {
-                            //memory_address: address as usize,
-                            //bytes_to_be_written: data.len(),
-                        //});
-                    //}
-
-                    //Ok(VeracruzError::Success)
-                //}
-            //},
         }
     }
 
@@ -780,21 +675,6 @@ impl WasmiHostProvisioningState {
                 }
                 Ok(VeracruzError::Success)
             }
-            //{
-                //let previous_result = self
-                    //.get_previous_result()
-                    //.map(|e| e.clone())
-                    //.unwrap_or(vec![]);
-                //let result: Vec<u8> = previous_result.len().to_le_bytes().to_vec();
-
-                //if let Err(_) = memory.set(address, &result) {
-                    //return Err(FatalHostError::MemoryWriteFailed {
-                        //memory_address: address as usize,
-                        //bytes_to_be_written: result.len() as usize,
-                    //});
-                //}
-                //Ok(VeracruzError::Success)
-            //}
         }
     }
 
@@ -827,24 +707,6 @@ impl WasmiHostProvisioningState {
                 }
                 Ok(VeracruzError::Success)
             }
-            //{
-                //let previous_result = self
-                    //.get_previous_result()
-                    //.map(|e| e.clone())
-                    //.unwrap_or(vec![]);
-
-                //if previous_result.len() > size as usize {
-                    //return Ok(VeracruzError::PreviousResultSize);
-                //}
-
-                //if let Err(_) = memory.set(address, &previous_result) {
-                    //return Err(FatalHostError::MemoryWriteFailed {
-                        //memory_address: address as usize,
-                        //bytes_to_be_written: previous_result.len(),
-                    //});
-                //}
-                //Ok(VeracruzError::Success)
-            //}
         }
     }
 
@@ -877,22 +739,6 @@ impl WasmiHostProvisioningState {
                 }
                 Ok(VeracruzError::Success)
             }
-            //{
-                //let previous_result = self.get_previous_result();
-                //let flag: u32 = match previous_result {
-                    //Some(_) => 1,
-                    //None => 0,
-                //};
-                //let result: Vec<u8> = flag.to_le_bytes().to_vec();
-
-                //if let Err(_) = memory.set(address, &result) {
-                    //return Err(FatalHostError::MemoryWriteFailed {
-                        //memory_address: address as usize,
-                        //bytes_to_be_written: result.len() as usize,
-                    //});
-                //}
-                //Ok(VeracruzError::Success)
-            //}
         }
     }
 
@@ -971,91 +817,35 @@ impl WasmiHostProvisioningState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
-        //assert!(self.program_module.is_none());
-        //assert!(self.memory.is_none());
-        //let program = self.vfs.read(file_name).map_err(|e| format!("NO PROGRAM ERROR - 1"))?;
-        //self.load_program(program.as_slice()).map_err(|e| format!("LOAD ERROR - 1"))?;
-        //assert!(self.program_module.is_some());
-        //assert!(self.memory.is_some());
-        ////TODO: REMOVE ENGINE
-        //self.program_module = None;
-        //self.memory = None;
-        //assert!(self.program_module.is_none());
-        //assert!(self.memory.is_none());
         let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-1: {}",file_name))?;
         self.load_program(program.as_slice()).map_err(|e| format!("load error - 2"))?;
         assert!(self.program_module.is_some());
         assert!(self.memory.is_some());
 
-        // TODO: GLUE CODE HERE
-        //let input_table = self.get_program_input_table(file_name)?;
-        //let mut input_vec = Vec::new();
-        //let mut stream_vec = Vec::new();
-        //for input_file in input_table {
-            //if input_file.starts_with("input-") {
-                //let package_id = input_file.strip_prefix("input-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
-                //let metadata = DataSourceMetadata::new(
-                    //self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-2"))?.as_slice(),
-                    //0,
-                    //package_id,
-                //);
-                //input_vec.push(metadata.clone());
-            //}
-            //if input_file.starts_with("stream-") {
-                //let package_id = input_file.strip_prefix("stream-").ok_or(format!("XXX"))?.parse::<u64>().map_err(|e| format!("{:?}",e))?;
-                //let metadata = DataSourceMetadata::new(
-                    //self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&input_file).map_err(|e| format!("{:?}",e))?.ok_or(format!("XXXYYY-3"))?.as_slice(),
-                    //0,
-                    //package_id,
-                //);
-                //stream_vec.push(metadata);
-            //}
-        //}
-
-        //self.data_sources = input_vec;
-        //self.stream_sources = stream_vec;
-        //
-        // TODO: END GLUE CODE HERE
-        //
-        //
-        //
-        //
-        //
-        //
-        //
-        // TODO Drop state machine
-        //if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
-            let rst = match self.invoke_export(ENTRY_POINT_NAME) {
-                Ok(Some(RuntimeValue::I32(return_code))) => {
-                    self.set_finished_executing();
-                    Ok(return_code)
-                }
-                Ok(_) => {
-                    self.set_error();
-                    assert!(false);
-                    Err(FatalHostError::ReturnedCodeError)
-                }
-                Err(Error::Trap(trap)) => {
-                    self.set_error();
-                    assert!(false);
-                    Err(FatalHostError::WASMITrapError(trap))
-                }
-                Err(err) => {
-                    self.set_error();
-                    assert!(false);
-                    Err(FatalHostError::WASMIError(err))
-                }
-            };
-        //} else {
-            //Err(FatalHostError::EngineIsNotReady)
-        //}
-        //
+        let rst = match self.invoke_export(ENTRY_POINT_NAME) {
+            Ok(Some(RuntimeValue::I32(return_code))) => {
+                self.set_finished_executing();
+                Ok(return_code)
+            }
+            Ok(_) => {
+                self.set_error();
+                assert!(false);
+                Err(FatalHostError::ReturnedCodeError)
+            }
+            Err(Error::Trap(trap)) => {
+                self.set_error();
+                assert!(false);
+                Err(FatalHostError::WASMITrapError(trap))
+            }
+            Err(err) => {
+                self.set_error();
+                assert!(false);
+                Err(FatalHostError::WASMIError(err))
+            }
+        };
         //TODO: REMOVE ENGINE
         self.program_module = None;
         self.memory = None;
-        //self.data_sources = Vec::new();
-        //self.stream_sources = Vec::new();
-        //self.set_ready_to_execute();
         rst
     }
 }
@@ -1080,39 +870,6 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.read_file_base(client_id,file_name)
     }
 
-    ///// Chihuahua wrapper of register_program implementation in WasmiHostProvisioningState.
-    //fn register_program(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
-        ////TODO: link to the actually fs API.
-        ////TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        //self.register_program_base(client_id,file_name,prog)?;
-        //Ok(())
-        ////self.load_program(prog)
-    //}
-
-    /// Chihuahua wrapper of load_program implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        self.load_program(buffer)
-    }
-
-    ///// ExecutionEngine wrapper of add_new_data_source implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn add_new_data_source(
-        //&mut self,
-        //metadata: DataSourceMetadata,
-    //) -> Result<(), HostProvisioningError> {
-        //self.add_new_data_source(metadata)
-    //}
-
-    ///// ExecutionEngine wrapper of add_new_stream_source implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn add_new_stream_source(
-        //&mut self,
-        //metadata: DataSourceMetadata,
-    //) -> Result<(), HostProvisioningError> {
-        //self.add_new_stream_source(metadata)
-    //}
-
     /// ExecutionEngine wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
     #[inline]
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
@@ -1123,12 +880,6 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     #[inline]
     fn is_program_registered(&self) -> bool {
         self.is_program_registered()
-    }
-
-    /// ExecutionEngine wrapper of is_result_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_result_registered(&self) -> bool {
-        self.is_result_registered()
     }
 
     /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
@@ -1149,84 +900,11 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.get_lifecycle_state().clone()
     }
 
-    ///// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_current_data_source_count(&self) -> usize {
-        //self.get_current_data_source_count().clone()
-    //}
-
-    ///// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_expected_data_sources(&self) -> Vec<u64> {
-        //self.get_expected_data_sources().clone()
-    //}
-
     /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_expected_shutdown_sources(&self) -> Vec<u64> {
         self.get_expected_shutdown_sources().clone()
     }
-
-    ///// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_current_stream_source_count(&self) -> usize {
-        //self.get_current_stream_source_count().clone()
-    //}
-
-    ///// Chihuahua wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_expected_stream_sources(&self) -> Vec<u64> {
-        //self.get_expected_stream_sources().clone()
-    //}
-
-    ///// Chihuahua wrapper of set_previous_result implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
-        //self.set_previous_result(result);
-    //}
-
-    //#[inline]
-    //fn set_vfs(&mut self, vfs: &VFS) {
-        //self.set_vfs(vfs);
-    //}
-
-    //#[inline]
-    //fn get_vfs(&self) -> &VFS  {
-        //self.get_vfs()
-    //}
-
-    ///// ExecutionEngine wrapper of get_result implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_result(&self) -> Option<Vec<u8>> {
-        //self.get_result().map(|r| r.clone())
-    //}
-
-    ///// ExecutionEngine wrapper of get_program_digest implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn get_program_digest(&self) -> Option<Vec<u8>> {
-        //self.get_program_digest().map(|d| d.clone())
-    //}
-
-    ///// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        //self.set_expected_data_sources(sources);
-        //self
-    //}
-
-    ///// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        //self.set_expected_stream_sources(sources);
-        //self
-    //}
-
-    ///// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmiHostProvisioningState.
-    //#[inline]
-    //fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        //self.set_expected_stream_sources(sources);
-        //self
-    //}
 
     /// Invaildate this wasmi instanace.
     #[inline]

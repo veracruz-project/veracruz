@@ -17,8 +17,8 @@
 
 #![cfg_attr(feature = "sgx", no_std)]
 
-//TODO REMOVE. Use this feature for temporary glue code in fs.
-#![feature(str_strip)]
+////TODO REMOVE. Use this feature for temporary glue code in fs.
+//#![feature(str_strip)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
