@@ -12,6 +12,10 @@
 use std::{boxed::Box, string::ToString, vec::Vec};
 
 use platform_services::{getrandom, result};
+#[cfg(any(feature = "tz", feature = "nitro"))]
+use std::sync::{Mutex, Arc};
+#[cfg(feature = "sgx")]
+use std::sync::{SgxMutex as Mutex, Arc};
 
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
@@ -32,6 +36,7 @@ use crate::{
         HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
         HCALL_WRITE_OUTPUT_NAME,
     },
+    hcall::buffer::VFS,
 };
 use veracruz_utils::VeracruzCapabilityIndex;
 
@@ -853,7 +858,14 @@ impl WasmiHostProvisioningState {
 /// The `WasmiHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmiHostProvisioningState {
-    /// ExecutionEngine wrapper of load_program implementation in WasmiHostProvisioningState.
+    fn from_vfs(
+        vfs : Arc<Mutex<VFS>>,
+    ) -> Self {
+        Self::from_vfs_base(vfs)
+    }
+
+    /// Chihuahua wrapper of append_file implementation in WasmiHostProvisioningState.
+    #[inline]
     fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.append_file_base(client_id,file_name,data)
     }
@@ -876,45 +888,15 @@ impl ExecutionEngine for WasmiHostProvisioningState {
         self.invoke_entry_point(file_name)
     }
 
-    /// ExecutionEngine wrapper of is_program_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_program_registered(&self) -> bool {
-        self.is_program_registered()
-    }
-
-    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_memory_registered(&self) -> bool {
-        self.is_memory_registered()
-    }
-
-    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_able_to_shutdown(&self) -> bool {
-        self.is_able_to_shutdown()
-    }
-
     /// ExecutionEngine wrapper of get_lifecycle_state implementation in WasmiHostProvisioningState.
     #[inline]
     fn get_lifecycle_state(&self) -> LifecycleState {
         self.get_lifecycle_state().clone()
     }
 
-    /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_expected_shutdown_sources(&self) -> Vec<u64> {
-        self.get_expected_shutdown_sources().clone()
-    }
-
     /// Invaildate this wasmi instanace.
     #[inline]
     fn invalidate(&mut self) {
         self.set_error();
-    }
-
-    /// ExecutionEngine wrapper of request_shutdown implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn request_shutdown(&mut self, client_id: u64) {
-        self.request_shutdown(client_id);
     }
 }

@@ -67,14 +67,14 @@ use std::{
     string::{String, ToString},
     vec::Vec,
 };
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
+use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability};
 use crate::hcall::buffer::{VFS, VFSError};
 use lazy_static::lazy_static;
 
 #[cfg(any(feature = "tz", feature = "nitro"))]
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
+use std::sync::{SgxMutex as Mutex, Arc};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The machine lifecycle state.
@@ -230,11 +230,7 @@ pub struct HostProvisioningState<Module, Memory> {
     pub(crate) program_module: Option<Module>,
     /// A reference to the WASM program's linear memory (or "heap").
     pub(crate) memory: Option<Memory>,
-    /// The list of clients (their IDs) that can request shutdown of the
-    /// Veracruz platform.
-    expected_shutdown_sources: Vec<u64>,
-    // TODO: for back capabilities, input file need to be in order.
-    input_table : HashMap<String, Vec<String>>,
+    vfs : Arc<Mutex<VFS>>,
 }
 
 impl<Module, Memory> HostProvisioningState<Module, Memory> {
@@ -254,55 +250,42 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
             lifecycle_state: LifecycleState::ReadyToExecute,
             program_module: None,
             memory: None,
-            expected_shutdown_sources: Vec::new(),
-            input_table : HashMap::new(),
+            vfs : Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new()))),
         }
     }
 
     //TODO: THIS will replace the use of `new` in the future commits.
-    pub fn valid_new(expected_shutdown_sources: &[u64], 
-        capabilities: &VeracruzCapabilityTable,
-        digests: &HashMap<String, Vec<u8>>, 
-        input_table : &HashMap<String, Vec<String>>,
+    pub fn from_vfs_base(
+        vfs : Arc<Mutex<VFS>>,
     ) -> Self {
-        let mut lock_vfs = VFS_INSTANCE.lock().unwrap();
-        if let None = *lock_vfs {
-            *lock_vfs = Some(VFS::new(capabilities,digests));
-        }
         HostProvisioningState {
             lifecycle_state: LifecycleState::ReadyToExecute,
             program_module: None,
             memory: None,
-            expected_shutdown_sources : expected_shutdown_sources.to_vec(),
-            input_table : input_table.clone(),
+            vfs,
         }
     }
 
     /// Append to a file.
     pub(crate) fn write_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,data)?;
+        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        self.vfs.lock()?.write(file_name,data)?;
+        //VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        //VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,data)?;
         Ok(())
     }
 
     /// Append to a file.
     pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.append_write(file_name,data)?;
+        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        self.vfs.lock()?.append_write(file_name,data)?;
         Ok(())
     }
 
     /// Read from a file
     pub(crate) fn read_file_base(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
-        Ok(VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.read(file_name)?)
-    }
-
-    /// Registers the number of expected data sources, `number`.
-    #[inline]
-    pub(crate) fn set_expected_shutdown_sources(&mut self, client_ids: &[u64]) -> &mut Self {
-        self.expected_shutdown_sources = client_ids.to_vec();
-        self
+        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
+        Ok(self.vfs.lock()?.read(file_name)?)
     }
 
     /// Registers the program module.
@@ -325,38 +308,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     #[inline]
     pub(crate) fn get_lifecycle_state(&self) -> &LifecycleState {
         self.lifecycle_state.borrow()
-    }
-
-    /// Returns the client IDs of clients who are able to request platform
-    /// shutdown, per the global policy.
-    #[inline]
-    pub(crate) fn get_expected_shutdown_sources(&self) -> &Vec<u64> {
-        self.expected_shutdown_sources.borrow()
-    }
-
-    /// Returns `true` iff a program module has been registered by the
-    /// provisioning process.
-    #[inline]
-    pub(crate) fn is_program_registered(&self) -> bool {
-        match &self.program_module {
-            None => false,
-            Some(_module) => true,
-        }
-    }
-
-    /// Returns `true` iff a program's memory is registered by the provisioning
-    /// process.
-    #[inline]
-    pub(crate) fn is_memory_registered(&self) -> bool {
-        match &self.memory {
-            None => false,
-            Some(_memory) => true,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn is_able_to_shutdown(&self) -> bool {
-        self.expected_shutdown_sources.is_empty()
     }
 
     /// Returns an optional reference to the WASM program module.
@@ -402,23 +353,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     #[inline]
     pub(crate) fn set_finished_executing(&mut self) {
         self.lifecycle_state = LifecycleState::FinishedExecuting;
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Requesting shutdown.
-    ////////////////////////////////////////////////////////////////////////////
-
-    /// Signals to the provisioning host that a client has requested shutdown.
-    #[inline]
-    pub(crate) fn request_shutdown(&mut self, client_id: u64) {
-        self.expected_shutdown_sources.retain(|v| v != &client_id);
-    }
-
-    pub(crate) fn get_program_input_table(&mut self, file_name: &str) -> Result<Vec<String>, FatalHostError> {
-        let inputs = self.input_table.get(file_name).ok_or(FatalHostError::ProgramCannotFound{
-            file_name : file_name.to_string(),
-        })?;
-        Ok(inputs.clone())
     }
 }
 
@@ -609,47 +543,21 @@ pub trait ExecutionEngine: Send {
     /// returned by the WASM program entry point as an `i32` value.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError>;
 
-    #[deprecated]
-    //TODO: do we need this 
-    /// Returns `true` iff a program module has been registered in the host
-    /// provisioning state.
-    fn is_program_registered(&self) -> bool;
-
-    //TODO: do we need this 
-    /// Returns `true` iff a memory is registered with the host provisioning
-    /// state from the program module.
-    fn is_memory_registered(&self) -> bool;
-
-    /// Returns `true` iff all clients who must request shutdown have now done
-    /// so.
-    fn is_able_to_shutdown(&self) -> bool;
+    ///// Returns `true` iff all clients who must request shutdown have now done
+    ///// so.
+    //fn is_able_to_shutdown(&self) -> bool;
 
     #[deprecated]
     /// Returns the current lifecycle state that the host provisioning state is
     /// in.
     fn get_lifecycle_state(&self) -> LifecycleState;
 
-    /// Returns the list of client IDs of clients who can request shutdown of
-    /// the platform.
-    fn get_expected_shutdown_sources(&self) -> Vec<u64>;
-
     /// Moves the host provisioning state's lifecycle state into
     /// `LifecycleState::Error`, a state which it cannot ever escape,
     /// effectively invalidating it.
     fn invalidate(&mut self);
 
-    /// Signals that a client would like to shutdown the platform.  Has no
-    /// effect is `client_id` does not correspond to a client with the shutdown
-    /// role.
-    fn request_shutdown(&mut self, client_id: u64);
-
-    /// Requests shutdown on behalf of a client, as identified by their client
-    /// ID, and then checks if this request was sufficient to reach a threshold
-    /// of requests wherein the platform can finally shutdown.
-    fn request_and_check_shutdown(&mut self, client_id: u64) -> bool {
-        self.request_shutdown(client_id);
-        self.is_able_to_shutdown()
-    }
+    fn from_vfs(vfs : Arc<Mutex<VFS>>) -> Self where Self: Sized;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

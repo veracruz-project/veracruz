@@ -100,6 +100,10 @@ struct ProtocolState {
     global_policy: Policy,
     /// A hex-encoding of the raw JSON global policy.
     global_policy_hash: String,
+    /// The list of clients (their IDs) that can request shutdown of the
+    /// Veracruz platform.
+    expected_shutdown_sources: Vec<u64>,
+    vfs : Arc<Mutex<VFS>>,
 }
 
 impl ProtocolState {
@@ -120,20 +124,11 @@ impl ProtocolState {
         };
         let capability_table = global_policy.get_capability_table();
         let program_digests = global_policy.get_program_digests()?;
-        let input_table = global_policy.get_input_table()?;
+        let vfs = Arc::new(Mutex::new(VFS::new(&capability_table,&program_digests)));
 
         let host_state = multi_threaded_execution_engine(
             &execution_strategy,
-            //&expected_data_sources,
-            //&expected_stream_sources,
-            expected_shutdown_sources
-                .iter()
-                .map(|e| *e as u64)
-                .collect::<Vec<u64>>()
-                .as_slice(),
-            &capability_table,
-            &program_digests,
-            &input_table,
+            vfs.clone()
         )
         .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?;
 
@@ -141,7 +136,24 @@ impl ProtocolState {
             host_state,
             global_policy,
             global_policy_hash,
+            expected_shutdown_sources,
+            vfs,
         })
+    }
+
+    pub fn reload(&mut self) -> Result<(), MexicoCityError> {
+        let execution_strategy = match self.global_policy.execution_strategy() {
+            veracruz_utils::ExecutionStrategy::Interpretation => {
+                chihuahua::factory::ExecutionStrategy::Interpretation
+            }
+            veracruz_utils::ExecutionStrategy::JIT => chihuahua::factory::ExecutionStrategy::JIT,
+        };
+        self.host_state = multi_threaded_chihuahua(
+            &execution_strategy,
+            self.vfs.clone()
+        )
+        .ok_or(MexicoCityError::InvalidExecutionStrategyError)?;
+        Ok(())
     }
 
     /// Returns the global policy associated with the protocol state.
@@ -207,13 +219,11 @@ impl ProtocolState {
     /// ID, and then checks if this request was sufficient to reach a threshold
     /// of requests wherein the platform can finally shutdown.
     pub(crate) fn request_and_check_shutdown(
-        &self,
+        &mut self,
         client_id: u64,
     ) -> Result<bool, RuntimeManagerError> {
-        Ok(self
-            .host_state
-            .lock()?
-            .request_and_check_shutdown(client_id))
+        self.expected_shutdown_sources.retain(|v| v != &client_id);
+        Ok(self.expected_shutdown_sources.is_empty())
     }
 }
 

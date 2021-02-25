@@ -38,16 +38,15 @@ use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
-use crate::hcall::{common::ExecutionEngine, wasmi};
+use crate::hcall::{common::ExecutionEngine, wasmi, buffer::VFS};
 use veracruz_utils::VeracruzCapabilityTable;
-
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
     sync::Arc,
-    vec::Vec,
-    collections::HashMap,
-    string::String,
+    //vec::Vec,
+    //collections::HashMap,
+    //string::String,
 };
 
 #[derive(Debug)]
@@ -70,19 +69,13 @@ pub enum ExecutionStrategy {
 /// it compiled for SGX and TZ, then this will disappear.
 pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    expected_data_sources: &[u64],
-    expected_stream_sources: &[u64],
-    expected_shutdown_sources: &[u64],
+    vfs : Arc<Mutex<VFS>>,
 ) -> Option<Box<dyn ExecutionEngine + 'static>> {
     #[cfg(feature = "std")]
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    //.set_expected_data_sources(expected_data_sources)
-                    //.set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
+                let state = new_wasmi_instance(vfs);
 
                 Some(Box::new(state))
             }
@@ -101,11 +94,7 @@ pub fn single_threaded_execution_engine(
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    //.set_expected_data_sources(expected_data_sources)
-                    //.set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
+                let state = new_wasmi_instance(vfs);
 
                 Some(Box::new(state))
             }
@@ -124,25 +113,13 @@ pub fn single_threaded_execution_engine(
 /// it compiled for SGX and TZ, then this will disappear.
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    //expected_data_sources: &[u64],
-    //expected_stream_sources: &[u64],
-    expected_shutdown_sources: &[u64],
-    file_permissions: &VeracruzCapabilityTable,
-    program_digests: &HashMap<String, Vec<u8>>, 
-    input_table: &HashMap<String, Vec<String>>,
+    vfs : Arc<Mutex<VFS>>,
 ) -> Option<Arc<Mutex<dyn ExecutionEngine + 'static>>> {
     #[cfg(feature = "std")]
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let state = new_wasmi_instance(
-                    //expected_data_sources,
-                    //expected_stream_sources,
-                    expected_shutdown_sources,
-                    file_permissions,
-                    program_digests,
-                    input_table,
-                );
+                let state = new_wasmi_instance(vfs);
 
                 Some(Arc::new(Mutex::new(state)))
             }
@@ -164,14 +141,7 @@ pub fn multi_threaded_execution_engine(
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let state = new_wasmi_instance(
-                    //expected_data_sources,
-                    //expected_stream_sources,
-                    expected_shutdown_sources,
-                    file_permissions,
-                    program_digests,
-                    input_table,
-                );
+                let state = new_wasmi_instance(vfs);
 
                 Some(Arc::new(Mutex::new(state)))
             }
@@ -182,23 +152,9 @@ pub fn multi_threaded_execution_engine(
 
 //TODO remove old parameters.
 fn new_wasmi_instance (
-    //expected_data_sources: &[u64],
-    //expected_stream_sources: &[u64],
-    expected_shutdown_sources: &[u64],
-    capability_table: &VeracruzCapabilityTable,
-    program_digests: &HashMap<String, Vec<u8>>, 
-    input_table: &HashMap<String, Vec<String>>, 
+    vfs : Arc<Mutex<VFS>>
 ) -> impl Chihuahua + 'static {
-    wasmi::WasmiHostProvisioningState::valid_new(
-        expected_shutdown_sources,
-        capability_table,
-        program_digests,
-        input_table,
-    )
-    //state
-        //.set_expected_data_sources(expected_data_sources)
-        //.set_expected_stream_sources(expected_stream_sources);
-    //state
+    wasmi::WasmiHostProvisioningState::from_vfs(vfs)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

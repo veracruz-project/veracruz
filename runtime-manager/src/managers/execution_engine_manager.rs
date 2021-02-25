@@ -172,7 +172,7 @@ fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestRe
 /// request a shutdown can go ahead and do so.
 #[inline]
 fn dispatch_on_shutdown(
-    protocol_state: &ProtocolState,
+    protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> Result<(bool, ProvisioningResult), RuntimeManagerError> {
     Ok((
@@ -252,25 +252,24 @@ fn dispatch_on_stream(
 /// Fails if the enclave is not in `LifecycleState::FinishedExecuting`.
 fn dispatch_on_next_round(
     protocol_state: &mut ProtocolState,
-) -> (Option<ProtocolState>, ProvisioningResult) {
-    match reload(protocol_state) {
-        Ok(o) => (
-            Some(o),
+//) -> (Option<ProtocolState>, ProvisioningResult) {
+) -> ProvisioningResult {
+    match protocol_state.reload() {
+        Ok(o) => 
             Ok(ProvisioningResponse::Success {
                 response: response_success(None),
             }),
-        ),
-        Err(e) => (None, Err(e)),
+        Err(e) => Err(e),
     }
 }
-/// and loads the current result as the `previous_result` for the new instance.
-fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeManagerError> {
-    let mut new_protocol_state = ProtocolState::new(
-        old_protocol_state.get_policy().clone(),
-        format!("{}", old_protocol_state.get_policy_hash()),
-    )?;
-    Ok(new_protocol_state)
-}
+///// and loads the current result as the `previous_result` for the new instance.
+//fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeManagerError> {
+    //let new_protocol_state = ProtocolState::new(
+        //old_protocol_state.get_policy().clone(),
+        //format!("{}", old_protocol_state.get_policy_hash()),
+    //)?;
+    //Ok(new_protocol_state)
+//}
 
 /// Branches on a decoded protobuf message, `request`, and invokes appropriate
 /// behaviour from more specialised functions.
@@ -315,8 +314,9 @@ fn dispatch_on_request(
             dispatch_on_stream(protocol_state, stream, client_id)
         }
         MESSAGE::request_next_round(_) => {
-            let (new_protocol_state, response) = dispatch_on_next_round(protocol_state);
-            *protocol_state_guard = new_protocol_state;
+            //let (new_protocol_state, response) = dispatch_on_next_round(protocol_state);
+            let response = dispatch_on_next_round(protocol_state);
+            //*protocol_state_guard = new_protocol_state;
             response
         }
         _otherwise => response_invalid_request(),
