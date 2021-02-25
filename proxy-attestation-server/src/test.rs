@@ -32,16 +32,16 @@ use sgx_types::{
 };
 use sgx_urts::SgxEnclave;
 
-extern crate sonora_bind;
+extern crate trustzone_root_enclave_bind;
 
-use sonora_bind::{
+use trustzone_root_enclave_bind::{
     _quote_nonce, _ra_msg2_t, _ra_msg3_t, _report_t, _sgx_ec256_public_t, _target_info_t,
-    sonora_get_firmware_version, sonora_get_firmware_version_len,
-    sonora_init_remote_attestation_enc, sonora_sgx_get_pubkey_report, sonora_sgx_ra_get_ga,
-    sonora_sgx_ra_get_msg3_trusted, sonora_sgx_ra_proc_msg2_trusted,
+    trustzone_root_enclave_get_firmware_version, trustzone_root_enclave_get_firmware_version_len,
+    trustzone_root_enclave_init_remote_attestation_enc, trustzone_root_enclave_sgx_get_pubkey_report, trustzone_root_enclave_sgx_ra_get_ga,
+    trustzone_root_enclave_sgx_ra_get_msg3_trusted, trustzone_root_enclave_sgx_ra_proc_msg2_trusted,
 };
 
-static ENCLAVE_FILE: &'static str = "/work/veracruz/sonora/bin/sonora.signed.so";
+static ENCLAVE_FILE: &'static str = "/work/veracruz/trustzone-root-enclave/bin/trustzone_root_enclave.signed.so";
 
 #[test]
 fn test_sgx_attestation() {
@@ -71,7 +71,7 @@ fn test_sgx_attestation() {
         let mut gfvl_ret: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_result = unsafe {
-            sonora_get_firmware_version_len(enclave.geteid(), &mut gfvl_ret, &mut fv_length)
+            trustzone_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_ret, &mut fv_length)
         };
         assert!(gfvl_result == 0);
         assert!(gfvl_ret == 0);
@@ -81,7 +81,7 @@ fn test_sgx_attestation() {
 
         let mut gfv_ret = sgx_status_t::SGX_SUCCESS as u32;
         let gfv_result = unsafe {
-            sonora_get_firmware_version(enclave.geteid(), &mut gfv_ret, p_output, fv_length)
+            trustzone_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_ret, p_output, fv_length)
         };
         assert!(gfv_result == sgx_status_t::SGX_SUCCESS as u32);
         assert!(gfv_ret == sgx_status_t::SGX_SUCCESS as u32);
@@ -95,7 +95,7 @@ fn test_sgx_attestation() {
     let mut attestation_context: sgx_ra_context_t = 0;
     let mut ira_ret: u32 = 0;
     let ira_result = unsafe {
-        sonora_init_remote_attestation_enc(
+        trustzone_root_enclave_init_remote_attestation_enc(
             enclave.geteid(),
             &mut ira_ret,
             public_key.as_ptr() as *const u8,
@@ -108,7 +108,7 @@ fn test_sgx_attestation() {
     assert!(ira_ret == sgx_status_t::SGX_SUCCESS as u32);
 
     let mut msg1 = sgx_ra_msg1_t::default();
-    let bindgen_sonora_sgx_ra_get_ga = unsafe {
+    let bindgen_trustzone_root_enclave_sgx_ra_get_ga = unsafe {
         mem::transmute::<
             unsafe extern "C" fn(u64, *mut u32, u32, *mut _sgx_ec256_public_t) -> u32,
             unsafe extern "C" fn(
@@ -117,13 +117,13 @@ fn test_sgx_attestation() {
                 u32,
                 *mut sgx_ec256_public_t,
             ) -> sgx_status_t,
-        >(sonora_sgx_ra_get_ga)
+        >(trustzone_root_enclave_sgx_ra_get_ga)
     };
     let msg1_ret = unsafe {
         sgx_ra_get_msg1(
             attestation_context,
             enclave.geteid(),
-            bindgen_sonora_sgx_ra_get_ga,
+            bindgen_trustzone_root_enclave_sgx_ra_get_ga,
             &mut msg1,
         )
     };
@@ -321,7 +321,7 @@ fn attestation_challenge(
     let mut p_msg3 = std::ptr::null_mut();
     let mut msg3_size = 0;
     let msg2_size: u32 = std::mem::size_of::<sgx_ra_msg2_t>() as u32;
-    let bindgen_sonora_sgx_ra_proc_msg2_trusted = unsafe {
+    let bindgen_trustzone_root_enclave_sgx_ra_proc_msg2_trusted = unsafe {
         mem::transmute::<
             unsafe extern "C" fn(
                 u64,
@@ -341,9 +341,9 @@ fn attestation_challenge(
                 *mut sgx_report_t,
                 *mut sgx_quote_nonce_t,
             ) -> sgx_status_t,
-        >(sonora_sgx_ra_proc_msg2_trusted)
+        >(trustzone_root_enclave_sgx_ra_proc_msg2_trusted)
     };
-    let bindgen_sonora_sgx_ra_get_msg3_trusted = unsafe {
+    let bindgen_trustzone_root_enclave_sgx_ra_get_msg3_trusted = unsafe {
         mem::transmute::<
             unsafe extern "C" fn(
                 u64,
@@ -363,14 +363,14 @@ fn attestation_challenge(
                 *mut sgx_ra_msg3_t,
                 u32,
             ) -> sgx_status_t,
-        >(sonora_sgx_ra_get_msg3_trusted)
+        >(trustzone_root_enclave_sgx_ra_get_msg3_trusted)
     };
     let proc_msg2_ret = unsafe {
         sgx_ra_proc_msg2(
             *context,
             enclave.geteid(),
-            bindgen_sonora_sgx_ra_proc_msg2_trusted,
-            bindgen_sonora_sgx_ra_get_msg3_trusted,
+            bindgen_trustzone_root_enclave_sgx_ra_proc_msg2_trusted,
+            bindgen_trustzone_root_enclave_sgx_ra_get_msg3_trusted,
             msg2,
             msg2_size,
             &mut p_msg3,
@@ -413,7 +413,7 @@ fn attestation_challenge(
         };
         let mut gpr_ret: u32 = sgx_types::sgx_status_t::SGX_SUCCESS as u32;
         let gpr_result = unsafe {
-            sonora_sgx_get_pubkey_report(
+            trustzone_root_enclave_sgx_get_pubkey_report(
                 enclave.geteid(),
                 &mut gpr_ret,
                 pubkey_challenge.as_ptr(),

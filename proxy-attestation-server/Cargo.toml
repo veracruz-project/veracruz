@@ -61,7 +61,7 @@ sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.g
 
 [dev-dependencies]
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
-sonora-bind = { path = "../sonora-bind" }
+trustzone-root-enclave-bind = { path = "../trustzone-root-enclave-bind" }
 psa-attestation = { path = "../psa-attestation" }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
