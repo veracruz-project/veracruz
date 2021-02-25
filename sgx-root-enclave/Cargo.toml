@@ -1,5 +1,5 @@
 [package]
-name = "jalisco"
+name = "sgx-root-enclave"
 # NOTE: when you update this version, please also update the psa entry in populate-test-database.sh in sinaloa-test and veracruz-test 
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
@@ -8,7 +8,7 @@ build = "build.rs"
 description = "TLS endpoint code for clients interacting with a trusted Veracruz runtime"
 
 [[bin]]
-name = "jalisco"
+name = "sgx-root-enclave"
 path = "src/main.rs"
 
 [features]

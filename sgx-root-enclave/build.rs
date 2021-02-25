@@ -1,4 +1,4 @@
-//! Jalisco build script
+//! SGXRootEnclave build script
 //!
 //! ## Authors
 //!
@@ -19,11 +19,11 @@ use uuid::Uuid;
 
 fn main() -> std::io::Result<()> {
     let out_dir = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    let jal_uuid: &str = &std::fs::read_to_string("../jalisco_uuid.txt").unwrap();
+    let root_enclave_uuid: &str = &std::fs::read_to_string("../sgx-root-enclave-uuid.txt").unwrap();
 
     let mut buffer = File::create(out_dir.join("user_ta_header.rs"))?;
     buffer.write_all(include_bytes!("ta_static.rs"))?;
-    let tee_uuid_result = Uuid::parse_str(jal_uuid);
+    let tee_uuid_result = Uuid::parse_str(root_enclave_uuid);
     let tee_uuid = tee_uuid_result.unwrap();
     let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) = tee_uuid.as_fields();
 

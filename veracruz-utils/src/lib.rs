@@ -25,9 +25,9 @@ pub mod mexico_city_opcode;
 pub use crate::mexico_city_opcode::*;
 
 #[cfg(feature = "tz")]
-pub mod jalisco_opcode;
+pub mod sgx_root_enclave_opcode;
 #[cfg(feature = "tz")]
-pub use crate::jalisco_opcode::*;
+pub use crate::sgx_root_enclave_opcode::*;
 
 #[cfg(feature = "nitro")]
 pub mod nitro;

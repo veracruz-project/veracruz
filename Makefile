@@ -56,7 +56,7 @@ nitro: sdk
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
 	$(MAKE) -C mexico-city trustzone CC=$(AARCH64_GCC)
-	$(MAKE) -C jalisco trustzone
+	$(MAKE) -C sgx-root-enclave trustzone
 	cd durango && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
 
 sgx-sinaloa-test: sgx test_cases
@@ -161,7 +161,7 @@ clean:
 	cd veracruz-test && cargo clean
 	cd nitro-root-enclave-server && cargo clean
 	$(MAKE) clean -C mexico-city
-	$(MAKE) clean -C jalisco
+	$(MAKE) clean -C sgx-root-enclave
 	$(MAKE) clean -C sinaloa
 	$(MAKE) clean -C test-collateral 
 	$(MAKE) clean -C sonora
@@ -171,14 +171,14 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine colima durango jalisco mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora proxy-attestation-server veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine colima durango sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd session-manager && cargo fmt
 	cd execution-engine && cargo fmt
 	cd colima && cargo fmt
 	cd durango && cargo fmt
-	cd jalisco && cargo fmt
+	cd sgx-root-enclave && cargo fmt
 	cd mexico-city && cargo fmt
 	cd psa-attestation && cargo fmt
 	cd sinaloa-test && cargo fmt

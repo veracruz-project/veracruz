@@ -14,7 +14,7 @@ anybody aiming to use Veracruz.  Its major components are:
 
 - Session manager: acts as the TLS endpoint inside the isolate, managing
 encrypted and integrity-protected communication sessions between the trusted
-Veracruz runtime and the outside world (see also: Jalisco).
+Veracruz runtime and the outside world.
 - Execution Engine: is the WASM execution engine for Veracruz, and which actually
 executes a program to completion (or failure!).  The Execution Engine exposes a custom
 ABI to the WASM binary, and abstracts over the different execution strategies
@@ -43,9 +43,6 @@ Veracruz runtime.  Components related to this untrusted interfacing are:
 trusted runtime.  Principals provisioning secrets into the isolate/challenging
 the authenticity of the isolate with remote attestation use this for all
 communication between them and the trusted runtime.
-- Jalisco: is a TLS endpoint for use by clients, and is used to establish an
-encrypted and integrity-protected link between clients and the trusted runtime
-(see also: Session manager).
 - Sinaloa: is an untrusted "bridge"/server component executing on the
 delegate's machine, outside of the isolate, and which routes encrypted
 communication between the various principals and the isolate. 
@@ -60,11 +57,11 @@ components:
 - psa-attestation: support code for the Arm PSA Attestation Protocol and
 Token.  This is the attestation protocol that the Veracruz attestation
 service exposes to client code.
-- Sonora: this is the root attestation isolate that is assumed to be present
-on the delegate's machine, and which challenges the authenticity of other
+- SGXRootEnclave: this is the root attestation isolate that is assumed to be present
+on the delegate's machine, for SGX attestation, and which challenges the authenticity of other
 isolates initialized on the machine using local attestation.  This isolate must
 be authenticated using remote attestation, making use of the native attestation
-service for the isolation technology in use to protect Sonora (SGX only, for
+service for the isolation technology in use to protect the Veracruz runtime (SGX only, for
 the time being).
 - Proxy Attestation Server: this is the attestation service proper, which
   maintains a database of registered keys and identities, and which can be contacted

@@ -148,8 +148,8 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
             )
         };
         if status != 0 {
-            println!("jalisco::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
-            return Err(format!("jalisco::create psa_initial_attest_load_key failed to load device private key with code:{:}", status));
+            println!("sgx-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
+            return Err(format!("sgx-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status));
         }
         let mut public_key = std::vec::Vec::with_capacity(128); // TODO: Don't do this
         let mut public_key_size: u64 = 0;
@@ -163,11 +163,11 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
         };
         if status != 0 {
             println!(
-                "jalisco::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
+                "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
                 status
             );
             return Err(format!(
-                "jalisco::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
+                "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
                 status
             ));
         }
@@ -422,7 +422,7 @@ fn main() -> Result<(), String> {
                         )
                     };
                     if status != 0 {
-                        println!("jalisco::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
+                        println!("sgx-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
                         return Err(format!("nitro-root-enclave::proxy_attestation psa_initial_attest_load_key failed to load key with code:{:?}", status));
                     }
                     println!("nitro-root-enclave::proxy_attestation device_key_handle:{:?}", device_key_handle);
@@ -438,11 +438,11 @@ fn main() -> Result<(), String> {
                     };
                     if status != 0 {
                         println!(
-                            "jalisco::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
+                            "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
                             status
                         );
                         return Err(format!(
-                            "jalisco::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
+                            "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
                             status
                         ));
                     }
