@@ -79,7 +79,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     e
                 ))
             })?;
-            crate::managers::baja_manager::init_baja(&input_str).map_err(|e| {
+            crate::managers::session_manager::init_baja(&input_str).map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command Initialize {:?}", e))
             })?;
         }
@@ -88,7 +88,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             let mut values = unsafe {
                 params.0.as_value().map_err(|e| print_error_and_return(format!("mc_tz::invoke_command GetEnclaveCertSize failed to get param.0 as value {:?}",e)))?
             };
-            let cert = managers::baja_manager::get_enclave_cert_pem().map_err(|e| {
+            let cert = managers::session_manager::get_enclave_cert_pem().map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command GetEnclaveCertSize {:?}", e))
             })?;
             values.set_a(cert.len() as u32);
@@ -103,7 +103,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     ))
                 })?
             };
-            let cert = managers::baja_manager::get_enclave_cert_pem().map_err(|e| {
+            let cert = managers::session_manager::get_enclave_cert_pem().map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command GetEnclaveCert {:?}", e))
             })?;
             p0.buffer().write(&cert).map_err(|e| {
@@ -118,7 +118,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             let mut values = unsafe {
                 params.0.as_value().map_err(|e| print_error_and_return(format!("mc_tz::invoke_command GetEnclaveNameSize failed to get param.0 as value {:?}",e)))?
             };
-            let name = managers::baja_manager::get_enclave_name().map_err(|e| {
+            let name = managers::session_manager::get_enclave_name().map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command GetEnclaveNameSize {:?}", e))
             })?;
             values.set_a(name.len() as u32);
@@ -133,7 +133,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     ))
                 })?
             };
-            let name = managers::baja_manager::get_enclave_name().map_err(|e| {
+            let name = managers::session_manager::get_enclave_name().map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command GetEnclaveName {:?}", e))
             })?;
             p0.buffer().write(&name.as_bytes()).map_err(|e| {
@@ -153,7 +153,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     ))
                 })?
             };
-            let local_session_id = managers::baja_manager::new_session().map_err(|e| {
+            let local_session_id = managers::session_manager::new_session().map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command NewTLSSession {:?}", e))
             })?;
             values.set_a(local_session_id);
@@ -169,7 +169,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 })?
             };
             let session_id = values.a();
-            managers::baja_manager::close_session(session_id).map_err(|e| {
+            managers::session_manager::close_session(session_id).map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command CloseTLSSession {:?}", e))
             })?;
         }
@@ -179,7 +179,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 params.0.as_value().map_err(|e| print_error_and_return(format!("mc_tz::invoke_command GetTLSDataNeeded failed to get param.0 as value {:?}",e)))?
             };
             let local_needed =
-                managers::baja_manager::get_data_needed(values.a()).map_err(|e| {
+                managers::session_manager::get_data_needed(values.a()).map_err(|e| {
                     print_error_and_return(format!(
                         "mc_tz::invoke_command GetTLSDataNeeded {:?}",
                         e
@@ -213,9 +213,9 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             let input_buffer = input.buffer();
 
             debug_message(
-                "mc_tz::invoke_command SendTLSData calling baja_manager::send_data".to_string(),
+                "mc_tz::invoke_command SendTLSData calling session_manager::send_data".to_string(),
             );
-            managers::baja_manager::send_data(session_id, &input_buffer).map_err(|err| {
+            managers::session_manager::send_data(session_id, &input_buffer).map_err(|err| {
                 print_error_and_return(format!("mc_tz::invoke_command SendTLSData {:?}", err))
             })?;
         }
@@ -259,7 +259,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             };
 
             let (active_bool, output_data) =
-                managers::baja_manager::get_data(session_id).map_err(|e| {
+                managers::session_manager::get_data(session_id).map_err(|e| {
                     print_error_and_return(format!("mc_tz::invoke_command GetTLSData {:?}", e))
                 })?;
 
@@ -293,7 +293,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             };
 
             let mut enclave_cert =
-                managers::baja_manager::get_enclave_cert_pem().map_err(|err| {
+                managers::session_manager::get_enclave_cert_pem().map_err(|err| {
                     print_error_and_return(format!(
                         "mc_tz::invoke_command::GetPSAAttestationToken {:?}",
                         err
