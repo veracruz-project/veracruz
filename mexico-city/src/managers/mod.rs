@@ -47,7 +47,7 @@ pub use error::MexicoCityError;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    static ref MY_BAJA: Mutex<Option<::session_manager::Baja>> = Mutex::new(None);
+    static ref MY_BAJA: Mutex<Option<::session_manager::SessionContext>> = Mutex::new(None);
     static ref SESSION_COUNTER: Mutex<u32> = Mutex::new(0);
     static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> = Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);

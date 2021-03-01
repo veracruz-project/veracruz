@@ -296,7 +296,7 @@ where
 
 /// A Baja context contains various bits of meta-data, such as certificates and
 /// server configuration options, for managing a Baja server session.
-pub struct Baja {
+pub struct SessionContext {
     /// A buffer for storing an unparsed PEM certificate for the server.
     server_certificate_buffer: Vec<u8>,
     /// The parsed PEM certificate for the server.
@@ -313,7 +313,7 @@ pub struct Baja {
     principals: Vec<Principal>,
 }
 
-impl Baja {
+impl SessionContext {
     /// Creates a new Baja context using the global Veracruz policy, `policy`.
     pub fn new(policy: VeracruzPolicy) -> Result<Self, SessionManagerError> {
         // create the root_cert_store that contains all of the certs of the clients that can connect

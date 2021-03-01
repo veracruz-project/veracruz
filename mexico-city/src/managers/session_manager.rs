@@ -12,7 +12,7 @@
 //! information on licensing and copyright.
 
 use crate::managers::*;
-use ::session_manager::Baja;
+use ::session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 
 pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
@@ -30,7 +30,7 @@ pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
     }
 
     //TODO: change the error type
-    let new_baja = Baja::new(policy)?;
+    let new_baja = SessionContext::new(policy)?;
 
     {
         let mut baja_state = super::MY_BAJA.lock()?;
