@@ -14,7 +14,6 @@ use super::{
     RuntimeManagerError, ProtocolState, ProvisioningResponse,
     ProvisioningResult,
 };
-use execution_engine::hcall::common::{LifecycleState};
 use transport_protocol::transport_protocol::{
     RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
 };
@@ -36,18 +35,6 @@ lazy_static! {
     //TODO, wrap into a chihuahua management object.
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Utility functions.
-////////////////////////////////////////////////////////////////////////////////
-
-///// Checks that the host provisioning state is in one of a number of expected
-///// states, otherwise raises an error with an error message detailing the
-///// mismatch.
-//#[inline]
-//fn check_state(current: &LifecycleState, expected: &[LifecycleState]) -> bool {
-    //expected.contains(&current)
-//}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Protocol response messages.
@@ -115,6 +102,7 @@ fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult
 /// Returns the current lifecycle state of the host provisioning state.  This
 /// state can be queried unconditionally (though it may change between the query
 /// being serviced and being received back/being acted upon...)
+#[deprecated]
 fn dispatch_on_request_state(_ : &ProtocolState) -> ProvisioningResult {
     //TODO REMOVE???
     let response =
@@ -122,8 +110,7 @@ fn dispatch_on_request_state(_ : &ProtocolState) -> ProvisioningResult {
     Ok(ProvisioningResponse::Success { response })
 }
 
-/// Returns the result of a computation, computing the result first.  Fails if
-/// we are not in the `LifecycleState::ReadyToExecute` state.
+/// Returns the result of a computation, computing the result first.
 fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &mut ProtocolState, client_id: u64,) -> ProvisioningResult {
     if !protocol_state.is_modified() {
         let result = protocol_state.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
@@ -149,9 +136,7 @@ fn dispatch_on_shutdown(
     ))
 }
 
-/// Provisions a program into the host provisioning state.  Fails if we are not
-/// in `LifecycleState::Initial` or if the provisioned program is malformed in
-/// some way.
+/// Provisions a program into the VFS.  Fails if the client has no permission.
 ///
 /// Note: this doesn't invalidate the host state if something is wrong with the
 /// program, as the program provider can try again by uploading another program,
@@ -166,13 +151,7 @@ fn dispatch_on_program(
     Ok(ProvisioningResponse::Success { response })
 }
 
-/// Provisions a data source into the host provisioning state.  Fails if we are
-/// not in `LifecycleState::DataSourcesLoading`.  If we are still expecting more
-/// data then we stay in state `LifecycleState::DataSourcesLoading`, otherwise
-/// if this represents the last data provisioning step then the host
-/// provisioning state automatically switches to
-/// `LifecycleState::ReadyToExecute` or `LifecycleState::StreamSourcesLoading`
-/// if stream data is required.
+/// Provisions a data source into the VFS. Fails if the client has no permission.
 fn dispatch_on_data(
     protocol_state: &mut ProtocolState,
     transport_protocol::Data {
@@ -185,12 +164,7 @@ fn dispatch_on_data(
     Ok(ProvisioningResponse::Success { response })
 }
 
-/// Provisions a stream source into the host provisioning state.  Fails if we are
-/// not in `LifecycleState::StreamSourcesLoading`.  If we are still expecting more
-/// data then we stay in state `LifecycleState::StreamSourcesLoading`, otherwise
-/// if this represents the last data provisioning step then the host
-/// provisioning state automatically switches to
-/// `LifecycleState::ReadyToExecute`.
+/// Provisions a data source into the VFS. Fails if the client has no permission.
 fn dispatch_on_stream(
     protocol_state: &mut ProtocolState,
     transport_protocol::Data {
@@ -203,9 +177,9 @@ fn dispatch_on_stream(
     Ok(ProvisioningResponse::Success { response })
 }
 
-/// Signals the next round of computation. It will reload the program and all (static) data,
-/// and load the current result as the `previous_result` for the next round.
-/// Fails if the enclave is not in `LifecycleState::FinishedExecuting`.
+/// Signals the next round of computation.
+/// The next result request is guaranteed to execute the
+/// program before reading the result from the VFS.
 fn dispatch_on_next_round(
     protocol_state: &mut ProtocolState,
 ) -> ProvisioningResult {

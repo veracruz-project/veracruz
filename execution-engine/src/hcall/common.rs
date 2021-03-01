@@ -60,45 +60,16 @@ use crate::error::common::VeracruzError;
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::TryFrom,
-    fmt::{Display, Error, Formatter},
     string::{String, ToString},
     vec::Vec,
 };
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability};
 use crate::hcall::buffer::{VFS, VFSError};
-use lazy_static::lazy_static;
 
 #[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
 use std::sync::{SgxMutex as Mutex, Arc};
-
-////////////////////////////////////////////////////////////////////////////////
-// The machine lifecycle state.
-////////////////////////////////////////////////////////////////////////////////
-
-/// The lifecycle state of the Veracruz host.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum LifecycleState {
-    ReadyToExecute,
-    /// The machine has executed, and finished successfully.  The result of the
-    /// machine's execution can now be extracted.
-    FinishedExecuting,
-    /// An error occurred during the provisioning or machine execution process.
-    Error,
-}
-
-/// Pretty printing for `LifecycleState`.
-impl Display for LifecycleState {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match self {
-            LifecycleState::ReadyToExecute => write!(f, "ReadyToExecute"),
-            LifecycleState::FinishedExecuting => write!(f, "FinishedExecuting"),
-            LifecycleState::Error => write!(f, "Error"),
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // The H-Call API
@@ -131,6 +102,7 @@ pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
 // Provisioning errors
 ////////////////////////////////////////////////////////////////////////////////
 
+//TODO: REMOVE THIS ERROR
 /// Errors that can occur during host provisioning.  These are errors that may
 /// be reported back to principals in the Veracruz computation over the Veracruz
 /// wire protocols, for example if somebody tries to provision data when that is
@@ -138,24 +110,6 @@ pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
 /// errors due to programming bugs.
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum HostProvisioningError {
-    /// The provisioning process failed because it could not correctly sort the
-    /// incoming data.  This should never happen, and is a bug.
-    #[error(
-        display = "HostProvisioningError: Failed to sort incoming data (this is a potential bug)."
-    )]
-    FailedToSortIncomingData,
-    /// The host state was in an unexpected, or invalid, lifecycle state and
-    /// there is a mismatch between actual provisioning state and what was
-    /// expected.
-    #[error(
-        display = "HostProvisioningError: Invalid host state, found {:?}, expected {:?}.",
-        found,
-        expected
-    )]
-    InvalidLifeCycleState {
-        found: LifecycleState,
-        expected: Vec<LifecycleState>,
-    },
     /// The WASM module supplied by the program supplier was invalid and could
     /// not be parsed.
     #[error(display = "HostProvisioningError: Invalid WASM program (e.g. failed to parse it).")]
@@ -165,6 +119,8 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: No linear memory could be found in the supplied WASM module."
     )]
     NoLinearMemoryFound,
+    #[error(display = "HostProvisioningError: No WASM memory registered.")]
+    NoMemoryRegistered,
     /// The program module could not be properly instantiated by the WASM engine
     /// for some reason.
     #[error(display = "HostProvisioningError: Failed to instantiate the WASM module.")]
@@ -172,6 +128,8 @@ pub enum HostProvisioningError {
     /// A lock could not be obtained for some reason.
     #[error(display = "HostProvisioningError: Failed to obtain lock {:?}.", _0)]
     FailedToObtainLock(String),
+    #[error(display = "HostProvisioningError: Wasmi Error: {}.", _0)]
+    WasmiError(String),
     /// The host provisioning state has not been initialized.  This should never
     /// happen and is a bug.
     #[error(
@@ -187,8 +145,6 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: VFS Error {}.", _0
     )]
     VFSError(#[error(source)]VFSError),
-    #[error(display = "HostProvisioningError: No File System.")]
-    NoVFS,
     //TODO: potential remove this 
     #[error(
         display = "HostProvisioningError: File {} cannot be found.", _0
@@ -196,6 +152,7 @@ pub enum HostProvisioningError {
     FileNotFound(String),
 }
 
+//TODO: move to a separate fill error.rs
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
 impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
@@ -203,13 +160,15 @@ impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
     }
 }
 
+impl From<wasmi::Error> for HostProvisioningError {
+    fn from(error: wasmi::Error) -> Self {
+        HostProvisioningError::WasmiError(format!("{:?}", error))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // The Veracruz provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
-
-lazy_static!{
-    static ref VFS_INSTANCE: Mutex<Option<VFS>> = Mutex::new(None);
-}
 
 /// The state of the Veracruz machine, which captures metadata as the Veracruz
 /// state is gradually "provisioned" by the data and program providers.  Also
@@ -220,8 +179,6 @@ lazy_static!{
 // - program_module ? possibly can do on-demand allocation
 // in the favour of FS.
 pub struct HostProvisioningState<Module, Memory> {
-    /// The current lifecycle state of the machine.
-    lifecycle_state: LifecycleState,
     //TODO: SPAWN ON DEMAND
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
@@ -241,7 +198,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
         HostProvisioningState {
-            lifecycle_state: LifecycleState::ReadyToExecute,
             program_module: None,
             memory: None,
             vfs,
@@ -296,38 +252,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
         self.memory.as_ref()
     }
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Progressing through the state machine.
-    ////////////////////////////////////////////////////////////////////////////
-    
-    ///// Sets the machine state to `MachineState::Error`.
-    /////
-    ///// Does not panic: an error state can be reached from any Veracruz state
-    ///// and once in an error state you can never get back out.
-    //#[inline]
-    //pub(crate) fn set_error(&mut self) {
-        //self.lifecycle_state = LifecycleState::Error;
-    //}
-
-    //#[deprecated]
-    ///// Sets the machine state to `LifecycleState::ReadyToExecute`.
-    /////
-    ///// PANICS: will panic if the current machine state is neither
-    ///// `LifecycleState::Initial`, `LifecycleState::DataSourcesLoading` nor `LifecycleState::StreamSourcesLoading`.
-    //#[inline]
-    //pub(crate) fn set_ready_to_execute(&mut self) {
-        //self.lifecycle_state = LifecycleState::ReadyToExecute;
-    //}
-
-    //#[deprecated]
-    ///// Sets the machine state to `LifecycleState::FinishedExecuting`.
-    /////
-    ///// PANICS: will panic if the current machine state is not
-    ///// `LifecycleState::ReadyToExecute`.
-    //#[inline]
-    //pub(crate) fn set_finished_executing(&mut self) {
-        //self.lifecycle_state = LifecycleState::FinishedExecuting;
-    //}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -493,30 +417,8 @@ pub(crate) enum EntrySignature {
 /// Note that a factory method, in the file `hcall/factory.rs` will return an
 /// opaque instance of this trait depending on the
 pub trait ExecutionEngine: Send {
-    //TODO: these API will be replaced by FS API -- strart
-    /// Append `buf` to `file_name` in the file system
-    /// on behalf of the client identified by `client_id`.
-    /// The client must has the write permission to the file.
-    /// It createa a new file, if the file does not exists.
-    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
-
-    /// Write `buf` to `file_name` in the file system
-    /// on behalf of the client identified by `client_id`.
-    /// The client must has the write permission to the file.
-    /// It createa a new file, if the file does not exists.
-    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError>;
-
-    /// Read `file_name` in the file system
-    /// on behalf of the client identified by `client_id`.
-    /// The client must has the read permission to the file.
-    /// It createa a new file, if the file does not exists.
-    ///
-    /// TODO: Add the range selector
-    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError>;
-
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
-    /// the WASM program fails at runtime.  On success, bumps the lifecycle
-    /// state to `LifecycleState::FinishedExecuting` and returns the error code
+    /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError>;
 }
@@ -524,52 +426,3 @@ pub trait ExecutionEngine: Send {
 ////////////////////////////////////////////////////////////////////////////////
 // Trait implementations
 ////////////////////////////////////////////////////////////////////////////////
-
-/// Serialize a `LifecycleState` value to a `u8`.
-///
-/// This is needed for responding to the Veracruz protocol "query enclave state"
-/// request from a computation principal.  The current state is encoded as a
-/// `u8` and forwarded to the requestor.
-impl From<LifecycleState> for u8 {
-    fn from(state: LifecycleState) -> Self {
-        match state {
-            LifecycleState::ReadyToExecute => 3,
-            LifecycleState::FinishedExecuting => 4,
-            LifecycleState::Error => 5,
-        }
-    }
-}
-
-/// Serialize a `&LifecycleState` value to a `u8`.
-///
-/// This is needed for responding to the Veracruz protocol "query enclave state"
-/// request from a computation principal.  The current state is encoded as a
-/// `u8` and forwarded to the requestor.
-impl From<&LifecycleState> for u8 {
-    fn from(state: &LifecycleState) -> Self {
-        match state {
-            LifecycleState::ReadyToExecute => 3,
-            LifecycleState::FinishedExecuting => 4,
-            LifecycleState::Error => 5,
-        }
-    }
-}
-
-/// Converts a `u8` value to a `LifecycleState`, if possible.
-///
-/// This is needed for understanding the response to the Veracruz protocol
-/// "query enclave state" message made by a computation principal.  The current
-/// state is encoded as a `u8` and forwarded, which can then be decoded using
-/// this.
-impl TryFrom<u8> for LifecycleState {
-    type Error = ();
-
-    fn try_from(code: u8) -> Result<Self, ()> {
-        match code {
-            3 => Ok(LifecycleState::ReadyToExecute),
-            4 => Ok(LifecycleState::FinishedExecuting),
-            5 => Ok(LifecycleState::Error),
-            _otherwise => Err(()),
-        }
-    }
-}

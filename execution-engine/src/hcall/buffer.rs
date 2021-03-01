@@ -61,8 +61,6 @@ impl VFS {
     }
     
     pub fn write(&mut self, file_name : &str, new_data : &[u8]) -> Result<(),VFSError> {
-        self.fs.remove(file_name);
-        assert!(!self.fs.contains_key(file_name));
         self.fs.insert(file_name.to_string(),new_data.to_vec());
         self.digest_check(file_name,new_data)
     }

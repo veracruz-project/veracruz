@@ -115,9 +115,7 @@ pub fn multi_threaded_execution_engine(
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let state = new_wasmi_instance(vfs);
-
-                Some(Arc::new(Mutex::new(state)))
+                Some(new_wasmi_instance(vfs))
             }
             ExecutionStrategy::JIT => {
                 //TODO change
@@ -135,9 +133,7 @@ pub fn multi_threaded_execution_engine(
     {
         match strategy {
             ExecutionStrategy::Interpretation => {
-                let state = new_wasmi_instance(vfs);
-
-                Some(state)
+                Some(new_wasmi_instance(vfs))
             }
             ExecutionStrategy::JIT => None,
         }

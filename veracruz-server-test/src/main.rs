@@ -489,7 +489,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
-            &[("input-1", STRING_1_DATA), ("input-0", STRING_2_DATA)],
+            &[("input-0", STRING_1_DATA), ("input-1", STRING_2_DATA)],
             &[],
             false,
         );
@@ -854,14 +854,6 @@ mod tests {
             // if there is a program provided
             if let Some(path) = program_path.as_ref() {
                 let time_provosion_data = Instant::now();
-                //check_enclave_state(
-                    //client_session_id,
-                    //&mut client_session,
-                    //ticket,
-                    //&client_tls_tx,
-                    //&client_tls_rx,
-                    //ENCLAVE_STATE_INITIAL,
-                //)?;
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -886,7 +878,6 @@ mod tests {
                     "             Provisioning program time (μs): {}.",
                     time_provosion_data.elapsed().as_micros()
                 );
-                info!("### Step 5.  Program provider requests program hash.");
             }
 
             info!("### Step 6.  Data providers provision secret data.");
@@ -896,23 +887,6 @@ mod tests {
                     remote_file_name
                 );
                 let time_data_hash = Instant::now();
-                //check_enclave_state(
-                    //client_session_id,
-                    //&mut client_session,
-                    //ticket,
-                    //&client_tls_tx,
-                    //&client_tls_rx,
-                    //ENCLAVE_STATE_DATA_SOURCES_LOADING,
-                //)?;
-                //let _response = request_program_hash(
-                    //program_file_name,
-                    //policy.pi_hash(program_file_name)?,
-                    //client_session_id,
-                    //&mut client_session,
-                    //ticket,
-                    //&client_tls_tx,
-                    //&client_tls_rx,
-                //)?;
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -986,25 +960,7 @@ mod tests {
                     info!("------------ Streaming Round # {} ------------", count);
                     count += 1;
                     for (remote_file_name, data) in next_round_data.iter() {
-                        println!("{:?}",data);
                         let time_stream_hash = Instant::now();
-                        //check_enclave_state(
-                            //client_session_id,
-                            //&mut client_session,
-                            //ticket,
-                            //&client_tls_tx,
-                            //&client_tls_rx,
-                            //ENCLAVE_STATE_STREAM_SOURCE_SLOADING,
-                        //)?;
-                        //let _response = request_program_hash(
-                            //program_file_name,
-                            //policy.pi_hash(program_file_name)?,
-                            //client_session_id,
-                            //&mut client_session,
-                            //ticket,
-                            //&client_tls_tx,
-                            //&client_tls_rx,
-                        //)?;
                         check_policy_hash(
                             &policy_hash,
                             client_session_id,
@@ -1040,25 +996,8 @@ mod tests {
                             time_stream.elapsed().as_micros()
                         );
                     }
-                    info!("### Step 8.  Result retrievers request program.");
+                    info!("### Step 8.  Result retrievers request program {}.", program_file_name);
                     let time_result_hash = Instant::now();
-                    //check_enclave_state(
-                        //client_session_id,
-                        //&mut client_session,
-                        //ticket,
-                        //&client_tls_tx,
-                        //&client_tls_rx,
-                        //ENCLAVE_STATE_READY_TO_EXECUTE,
-                    //)?;
-                    //let _response = request_program_hash(
-                        //program_file_name,
-                        //policy.pi_hash(program_file_name)?,
-                        //client_session_id,
-                        //&mut client_session,
-                        //ticket,
-                        //&client_tls_tx,
-                        //&client_tls_rx,
-                    //)?;
                     check_policy_hash(
                         &policy_hash,
                         client_session_id,
@@ -1073,6 +1012,23 @@ mod tests {
                     );
                     let time_result = Instant::now();
                     info!("             Result retrievers request result.");
+                    let _response = client_tls_send(
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        //TODO: change to the output file specified in policy
+                        &colima::serialize_request_result(program_file_name)?.as_slice(),
+                    )
+                    .and_then(|response| {
+                        // decode the result
+                        let response = colima::parse_mexico_city_response(&response)?;
+                        let response = colima::parse_result(&response)?;
+                        response.ok_or(SinaloaError::MissingFieldError(
+                            "Result retrievers response",
+                        ))
+                    })?;
                     let response = client_tls_send(
                         &client_tls_tx,
                         &client_tls_rx,
@@ -1117,25 +1073,8 @@ mod tests {
                 info!("------------ Stream-Result-Next End  ------------");
             } else {
                 info!("### Step 7.  NOT in streaming mode.");
-                info!("### Step 8.  Result retrievers request program.");
+                info!("### Step 8.  Result retrievers request program {}.", program_file_name);
                 let time_result_hash = Instant::now();
-                //check_enclave_state(
-                    //client_session_id,
-                    //&mut client_session,
-                    //ticket,
-                    //&client_tls_tx,
-                    //&client_tls_rx,
-                    //ENCLAVE_STATE_READY_TO_EXECUTE,
-                //)?;
-                //let _response = request_program_hash(
-                    //program_file_name,
-                    //policy.pi_hash(program_file_name)?,
-                    //client_session_id,
-                    //&mut client_session,
-                    //ticket,
-                    //&client_tls_tx,
-                    //&client_tls_rx,
-                //)?;
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -1150,6 +1089,7 @@ mod tests {
                 );
                 let time_result = Instant::now();
                 info!("             Result retrievers request result.");
+                // Request the result twice on purpose
                 let _response = client_tls_send(
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1172,14 +1112,12 @@ mod tests {
                     time_result.elapsed().as_micros()
                 );
 
-                //TODO: TEMPERARY GLUE CODE
                 let response = client_tls_send(
                     &client_tls_tx,
                     &client_tls_rx,
                     client_session_id,
                     &mut client_session,
                     ticket,
-                    //TODO: change to the output file specified in policy
                     &colima::serialize_request_result(program_file_name)?.as_slice(),
                 )
                 .and_then(|response| {
@@ -1194,7 +1132,6 @@ mod tests {
                     "             Computation result time (μs): {}.",
                     time_result.elapsed().as_micros()
                 );
-                //TODO: TEMPERARY GLUE CODE END
 
                 info!("### Step 9.  Client decodes the result.");
                 let result: T = pinecone::from_bytes(&response.as_slice())?;
@@ -1203,14 +1140,6 @@ mod tests {
 
             info!("### Step 10. Client shuts down Veracruz.");
             let time_shutdown = Instant::now();
-            //check_enclave_state(
-                //client_session_id,
-                //&mut client_session,
-                //ticket,
-                //&client_tls_tx,
-                //&client_tls_rx,
-                //ENCLAVE_STATE_FINISHED_EXECUTING,
-            //)?;
             let response = client_tls_send(
                 &client_tls_tx,
                 &client_tls_rx,
@@ -1408,7 +1337,6 @@ mod tests {
         }
     }
 
-
     fn provision_data(
         filename: &str,
         client_session_id: u32,
@@ -1458,7 +1386,6 @@ mod tests {
             &serialized_stream[..],
         )
     }
-
 
     fn server_tls_loop(
         veracruz_server: &mut dyn veracruz_server::VeracruzServer,

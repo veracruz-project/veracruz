@@ -31,7 +31,7 @@ use lazy_static::lazy_static;
 
 use execution_engine::{
     factory::multi_threaded_execution_engine,
-    hcall::common::{ExecutionEngine, LifecycleState},
+    hcall::common::ExecutionEngine,
     hcall::buffer::VFS,
 };
 
@@ -134,7 +134,7 @@ impl ProtocolState {
             global_policy_hash,
             expected_shutdown_sources,
             vfs,
-            is_modified : false
+            is_modified : true
         })
     }
 

@@ -257,10 +257,10 @@ fn check_main(module: &ModuleInstance) -> EntrySignature {
 
 /// Finds the linear memory of the WASM module, `module`, and returns it,
 /// otherwise creating a fatal host error that will kill the Veracruz instance.
-fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, FatalHostError> {
+fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, HostProvisioningError> {
     match module.export_by_name(LINEAR_MEMORY_NAME) {
         Some(ExternVal::Memory(memoryref)) => Ok(memoryref),
-        _otherwise => Err(FatalHostError::NoMemoryRegistered),
+        _otherwise => Err(HostProvisioningError::NoMemoryRegistered),
     }
 }
 
@@ -404,33 +404,20 @@ impl WasmiHostProvisioningState {
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        if let Ok(module) = Module::from_buffer(buffer) {
-            let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
+        let module = Module::from_buffer(buffer)?;
+        let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
 
-            if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
-                if not_started_module_ref.has_start() {
-                    return Err(HostProvisioningError::InvalidWASMModule);
-                }
-
-                let module_ref = not_started_module_ref.assert_no_start();
-
-                if let Ok(linear_memory) = get_module_memory(&module_ref) {
-                    // Everything has now gone well, so register the module,
-                    // linear memory, and the program digest, then work out
-                    // which state we should be in.
-
-                    self.set_program_module(module_ref);
-                    self.set_memory(linear_memory);
-                    return Ok(());
-                }
-
-                return Err(HostProvisioningError::NoLinearMemoryFound);
-            }
-
-            Err(HostProvisioningError::ModuleInstantiationFailure)
-        } else {
-            Err(HostProvisioningError::InvalidWASMModule)
+        let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
+        if not_started_module_ref.has_start() {
+            return Err(HostProvisioningError::InvalidWASMModule);
         }
+
+        let module_ref = not_started_module_ref.assert_no_start();
+
+        let linear_memory = get_module_memory(&module_ref)?;
+        self.set_program_module(module_ref);
+        self.set_memory(linear_memory);
+        Ok(())
     }
 
     /// The WASMI implementation of `__veracruz_hcall_write_output()`.
@@ -795,6 +782,29 @@ impl WasmiHostProvisioningState {
         not_started.invoke_export(export_name, &program_arguments, self)
     }
 
+    /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.append_file_base(client_id,file_name,data)
+    }
+
+    /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.write_file_base(client_id,file_name,data)
+    }
+
+    /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        self.read_file_base(client_id,file_name)
+    }
+}
+
+/// The `WasmiHostProvisioningState` implements everything needed to create a
+/// compliant instance of `ExecutionEngine`.
+impl ExecutionEngine for WasmiHostProvisioningState {
+
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
@@ -810,7 +820,7 @@ impl WasmiHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
         let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
         self.load_program(program.as_slice())?;
         assert!(self.program_module.is_some());
@@ -830,33 +840,5 @@ impl WasmiHostProvisioningState {
                 Err(FatalHostError::WASMIError(err))
             }
         }
-    }
-}
-
-/// The `WasmiHostProvisioningState` implements everything needed to create a
-/// compliant instance of `ExecutionEngine`.
-impl ExecutionEngine for WasmiHostProvisioningState {
-    /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.append_file_base(client_id,file_name,data)
-    }
-
-    /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.write_file_base(client_id,file_name,data)
-    }
-
-    /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.read_file_base(client_id,file_name)
-    }
-
-    /// ExecutionEngine wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
-        self.invoke_entry_point(file_name)
     }
 }
