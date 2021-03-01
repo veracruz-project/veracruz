@@ -20,7 +20,7 @@ use std::{
 
 use crate::{
     session::{Session, Principal},
-    error::BajaError,
+    error::SessionManagerError,
 };
 use veracruz_utils::VeracruzPolicy;
 
@@ -116,7 +116,7 @@ fn generate_certificate(
     private_key: rustls::PrivateKey,
     public_key: Vec<u8>,
     policy: &veracruz_utils::VeracruzPolicy,
-) -> Result<Vec<u8>, BajaError> {
+) -> Result<Vec<u8>, SessionManagerError> {
     let ring_private_key = EcdsaKeyPair::from_pkcs8(
         &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
         &private_key.0[..],
@@ -125,7 +125,7 @@ fn generate_certificate(
     let mut constructed_cert = CERTIFICATE_TEMPLATE.to_vec();
 
     if common_name_bytes.len() != (ISSUER_COMMON_NAME_LOCATION.1 - ISSUER_COMMON_NAME_LOCATION.0) {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "common_name",
             ISSUER_COMMON_NAME_LOCATION.1 - ISSUER_COMMON_NAME_LOCATION.0,
         ));
@@ -151,7 +151,7 @@ fn generate_certificate(
         if valid_from_bytes.len()
             != (VALIDITY_VALID_FROM_LOCATION.1 - VALIDITY_VALID_FROM_LOCATION.0)
         {
-            return Err(BajaError::InvalidLengthError(
+            return Err(SessionManagerError::InvalidLengthError(
                 "valid_from_bytes",
                 VALIDITY_VALID_FROM_LOCATION.1 - VALIDITY_VALID_FROM_LOCATION.0,
             ));
@@ -173,7 +173,7 @@ fn generate_certificate(
         );
         let valid_to_bytes = valid_to.as_bytes().to_vec();
         if valid_to_bytes.len() != (VALIDITY_VALID_TO_LOCATION.1 - VALIDITY_VALID_TO_LOCATION.0) {
-            return Err(BajaError::InvalidLengthError(
+            return Err(SessionManagerError::InvalidLengthError(
                 "valid_to_bytes",
                 VALIDITY_VALID_TO_LOCATION.1 - VALIDITY_VALID_TO_LOCATION.0,
             ));
@@ -186,7 +186,7 @@ fn generate_certificate(
 
     if common_name_bytes.len() != (SUBJECT_COMMON_NAME_LOCATION.1 - SUBJECT_COMMON_NAME_LOCATION.0)
     {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "common_name_bytes",
             SUBJECT_COMMON_NAME_LOCATION.1 - SUBJECT_COMMON_NAME_LOCATION.0,
         ));
@@ -197,7 +197,7 @@ fn generate_certificate(
     );
 
     if public_key.len() != (PUBLIC_KEY_LOCATION.1 - PUBLIC_KEY_LOCATION.0) {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "public_key",
             PUBLIC_KEY_LOCATION.1 - PUBLIC_KEY_LOCATION.0,
         ));
@@ -210,7 +210,7 @@ fn generate_certificate(
     if common_name_bytes.len()
         != (SUBJECT_ALT_NAME_FIRST_LOCATION.1 - SUBJECT_ALT_NAME_FIRST_LOCATION.0)
     {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "common_name_bytes",
             SUBJECT_ALT_NAME_FIRST_LOCATION.1 - SUBJECT_ALT_NAME_FIRST_LOCATION.0,
         ));
@@ -222,7 +222,7 @@ fn generate_certificate(
     if common_name_bytes.len()
         != (SUBJECT_ALT_NAME_SECOND_LOCATION.1 - SUBJECT_ALT_NAME_SECOND_LOCATION.0)
     {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "common_name_bytes",
             SUBJECT_ALT_NAME_SECOND_LOCATION.1 - SUBJECT_ALT_NAME_SECOND_LOCATION.0,
         ));
@@ -240,7 +240,7 @@ fn generate_certificate(
     let mut signature_first_vec = vec![0; 32];
     signature_first_vec[..].clone_from_slice(&signature_vec[0..32]);
     if signature_first_vec.len() != (SIGNATURE_PART_1_LOCATION.1 - SIGNATURE_PART_1_LOCATION.0) {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "signature_first_vec",
             SIGNATURE_PART_1_LOCATION.1 - SIGNATURE_PART_1_LOCATION.0,
         ));
@@ -253,7 +253,7 @@ fn generate_certificate(
     let mut signature_second_vec = vec![0; 32];
     signature_second_vec[..].clone_from_slice(&signature_vec[32..64]);
     if signature_second_vec.len() != (SIGNATURE_PART_2_LOCATION.1 - SIGNATURE_PART_2_LOCATION.0) {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "signature_second_vec",
             SIGNATURE_PART_2_LOCATION.1 - SIGNATURE_PART_2_LOCATION.0,
         ));
@@ -264,7 +264,7 @@ fn generate_certificate(
     );
 
     if constructed_cert.len() != CERTIFICATE_TEMPLATE.len() {
-        return Err(BajaError::InvalidLengthError(
+        return Err(SessionManagerError::InvalidLengthError(
             "constructed_cert",
             CERTIFICATE_TEMPLATE.len(),
         ));
@@ -274,16 +274,16 @@ fn generate_certificate(
 }
 
 /// Converts a string into a parsed X509 cryptographic certificate.
-fn convert_cert_buffer<'a, U>(cert_string: U) -> Result<Certificate, BajaError>
+fn convert_cert_buffer<'a, U>(cert_string: U) -> Result<Certificate, SessionManagerError>
 where
     U: Into<&'a String>,
 {
     let mut cursor = Cursor::new(cert_string.into());
     rustls::internal::pemfile::certs(&mut cursor)
-        .map_err(|_| BajaError::TLSUnspecifiedError)
+        .map_err(|_| SessionManagerError::TLSUnspecifiedError)
         .and_then(|certs| {
             if certs.is_empty() {
-                Err(BajaError::NoCertificateError)
+                Err(SessionManagerError::NoCertificateError)
             } else {
                 Ok(certs[0].clone())
             }
@@ -315,7 +315,7 @@ pub struct Baja {
 
 impl Baja {
     /// Creates a new Baja context using the global Veracruz policy, `policy`.
-    pub fn new(policy: VeracruzPolicy) -> Result<Self, BajaError> {
+    pub fn new(policy: VeracruzPolicy) -> Result<Self, SessionManagerError> {
         // create the root_cert_store that contains all of the certs of the clients that can connect
         // Note: We are not using a CA here, so each client that needs to connect must have it's
         // cert directly in the RootCertStore
@@ -384,7 +384,7 @@ impl Baja {
         // long, anyway).
 
         let policy_ciphersuite = CipherSuite::lookup_value(policy.ciphersuite())
-            .map_err(|_| BajaError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string()))?;
+            .map_err(|_| SessionManagerError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string()))?;
         let mut supported_ciphersuite = None;
 
         for this_supported_cs in rustls::ALL_CIPHERSUITES.iter() {
@@ -394,7 +394,7 @@ impl Baja {
         }
 
         let supported_ciphersuite = supported_ciphersuite.ok_or(
-            BajaError::TLSUnsupportedCyphersuiteError(policy_ciphersuite),
+            SessionManagerError::TLSUnsupportedCyphersuiteError(policy_ciphersuite),
         )?;
 
         server_config.ciphersuites = vec![supported_ciphersuite];

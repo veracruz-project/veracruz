@@ -11,7 +11,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::error::BajaError;
+use crate::error::SessionManagerError;
 use veracruz_utils::{VeracruzIdentity, VeracruzRole};
 
 use std::{
@@ -53,7 +53,7 @@ impl Session {
     }
 
     /// Writes the contents of `input` over the Baja session's TLS server session.
-    pub fn send_tls_data(&mut self, input: &mut Vec<u8>) -> Result<(), BajaError> {
+    pub fn send_tls_data(&mut self, input: &mut Vec<u8>) -> Result<(), SessionManagerError> {
         let mut slice = input.as_slice();
         self.tls_session.read_tls(&mut slice)?;
         self.tls_session.process_new_packets()?;
@@ -62,7 +62,7 @@ impl Session {
 
     /// Writes the entirety of the `input` buffer over the TLS connection.
     #[inline]
-    pub fn return_data(&mut self, input: &[u8]) -> Result<(), BajaError> {
+    pub fn return_data(&mut self, input: &[u8]) -> Result<(), SessionManagerError> {
         self.tls_session.write_all(input)?;
         Ok(())
     }
@@ -71,7 +71,7 @@ impl Session {
     /// session has no data to read, returns `Ok(None)`.  If data is available
     /// for reading, returns `Ok(Some(buffer))` for some byte buffer, `buffer`.
     /// If reading fails, then an error is returned.
-    pub fn read_tls_data(&mut self) -> Result<Option<Vec<u8>>, BajaError> {
+    pub fn read_tls_data(&mut self) -> Result<Option<Vec<u8>>, SessionManagerError> {
         if self.tls_session.wants_write() {
             let mut output = Vec::new();
             self.tls_session.write_tls(&mut output)?;
@@ -86,7 +86,7 @@ impl Session {
     /// data.
     pub fn read_plaintext_data(
         &mut self,
-    ) -> Result<Option<(u32, Vec<VeracruzRole>, Vec<u8>)>, BajaError> {
+    ) -> Result<Option<(u32, Vec<VeracruzRole>, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
         let num_bytes = self.tls_session.read_to_end(&mut received_buffer)?;
 
@@ -94,10 +94,10 @@ impl Session {
             let peer_certs = self
                 .tls_session
                 .get_peer_certificates()
-                .ok_or(BajaError::PeerCertificateError)?;
+                .ok_or(SessionManagerError::PeerCertificateError)?;
 
             if peer_certs.len() != 1 {
-                return Err(BajaError::InvalidLengthError("peer_certs", 1));
+                return Err(SessionManagerError::InvalidLengthError("peer_certs", 1));
             }
 
             let mut roles = Vec::new();
@@ -111,7 +111,7 @@ impl Session {
             }
 
             if roles.is_empty() {
-                return Err(BajaError::EmptyRoleError(client_id.into()));
+                return Err(SessionManagerError::EmptyRoleError(client_id.into()));
             }
 
             Ok(Some((client_id, roles, received_buffer)))

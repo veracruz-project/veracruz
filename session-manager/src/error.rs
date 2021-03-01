@@ -19,7 +19,7 @@ use err_derive::Error;
 /// NOTE: `protobuf` does not implement `Clone`, so deriving `Clone` for this
 /// type is impossible.
 #[derive(Debug, Error)]
-pub enum BajaError {
+pub enum SessionManagerError {
     /// A TLS error originating in the `RusTLS` library occurred, with an
     /// accompanying error code.
     #[error(display = "Baja: a TLS error occurred: {:?}.", _0)]

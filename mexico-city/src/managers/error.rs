@@ -21,8 +21,8 @@ use veracruz_utils::nitro::{NitroRootEnclaveMessage, VeracruzSocketError};
 
 #[derive(Debug, Error)]
 pub enum MexicoCityError {
-    #[error(display = "MexicoCity: BajaError: {:?}.", _0)]
-    BajaError(#[error(source)] session_manager::BajaError),
+    #[error(display = "MexicoCity: SessionManagerError: {:?}.", _0)]
+    SessionManagerError(#[error(source)] session_manager::SessionManagerError),
     #[error(display = "MexicoCity: ColimaError: {:?}.", _0)]
     ColimaError(#[error(source)] colima::ColimaError),
     #[error(display = "MexicoCity: VeracruzUtilError: {:?}.", _0)]

@@ -24,4 +24,4 @@ pub use self::session_context::*;
 pub mod session;
 pub use self::session::*;
 pub mod error;
-pub use self::error::BajaError;
+pub use self::error::SessionManagerError;
