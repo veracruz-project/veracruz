@@ -24,8 +24,8 @@ enclave {
     trusted {
         /* define ECALLs here. */
 
-        public sgx_status_t init_baja_enc([in, size=policy_buf_size, readonly] const uint8_t *policy_buf,
-                                          size_t policy_buf_size);
+        public sgx_status_t init_session_manager_enc([in, size=policy_buf_size, readonly] const uint8_t *policy_buf,
+                                                     size_t policy_buf_size);
         public sgx_status_t new_session_enc([out] uint32_t *p_session_id);
         public sgx_status_t close_session_enc(uint32_t session_id);
         public sgx_status_t tls_send_data_enc(uint32_t session_id,

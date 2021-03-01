@@ -19,7 +19,7 @@ pub mod sinaloa_sgx {
     use mexico_city_bind::{
         mexico_city_close_session_enc, mexico_city_get_enclave_cert_enc,
         mexico_city_get_enclave_cert_len_enc, mexico_city_get_enclave_name_enc,
-        mexico_city_get_enclave_name_len_enc, mexico_city_init_baja_enc,
+        mexico_city_get_enclave_name_len_enc, mexico_city_init_session_manager_enc,
         mexico_city_new_session_enc, mexico_city_psa_attestation_get_token_enc,
         mexico_city_tls_get_data_enc, mexico_city_tls_get_data_needed_enc,
         mexico_city_tls_send_data_enc,
@@ -473,7 +473,7 @@ pub mod sinaloa_sgx {
 
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_init_baja_enc(
+                mexico_city_init_session_manager_enc(
                     new_sinaloa.mc_enclave.geteid(),
                     &mut result,
                     policy_json.as_bytes().as_ptr() as *const u8,
@@ -499,10 +499,10 @@ pub mod sinaloa_sgx {
                 Ok(new_sinaloa)
             } else {
                 debug!(
-                    "mexico_city_init_baja_enc result:{:?}, ret:{:?}",
+                    "mexico_city_init_session_manager_enc result:{:?}, ret:{:?}",
                     result, ret
                 );
-                Err(SinaloaError::EnclaveCallError("mexico_city_init_baja_enc"))
+                Err(SinaloaError::EnclaveCallError("mexico_city_init_session_manager_enc"))
             }
         }
 

@@ -15,7 +15,7 @@ use crate::managers::*;
 use ::session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 
-pub fn init_baja(policy_json: &str) -> Result<(), MexicoCityError> {
+pub fn init_session_manager(policy_json: &str) -> Result<(), MexicoCityError> {
     let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
     let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 

@@ -158,8 +158,8 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
 /// Handler for the MCMessage::Initialize message
 fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
     println!("mc_nitro::initialize started");
-    managers::session_manager::init_baja(policy_json)?;
-    println!("mc_nitro::main init_baja completed");
+    managers::session_manager::init_session_manager(policy_json)?;
+    println!("mc_nitro::main init_session_manager completed");
     return Ok(MCMessage::Status(NitroStatus::Success));
 }
 

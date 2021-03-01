@@ -79,7 +79,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     e
                 ))
             })?;
-            crate::managers::session_manager::init_baja(&input_str).map_err(|e| {
+            crate::managers::session_manager::init_session_manager(&input_str).map_err(|e| {
                 print_error_and_return(format!("mc_tz::invoke_command Initialize {:?}", e))
             })?;
         }
