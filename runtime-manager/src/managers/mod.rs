@@ -200,11 +200,11 @@ impl ProtocolState {
     pub(crate) fn launch(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = match self.global_policy.execution_strategy() {
             veracruz_utils::ExecutionStrategy::Interpretation => {
-                chihuahua::factory::ExecutionStrategy::Interpretation
+                execution_engine::factory::ExecutionStrategy::Interpretation
             }
-            veracruz_utils::ExecutionStrategy::JIT => chihuahua::factory::ExecutionStrategy::JIT,
+            veracruz_utils::ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
-        let return_code = multi_threaded_chihuahua(
+        let return_code = multi_threaded_execution_engine(
             &execution_strategy,
             self.vfs.clone()
         )

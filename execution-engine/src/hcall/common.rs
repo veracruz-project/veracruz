@@ -60,8 +60,6 @@ use crate::error::common::VeracruzError;
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::Borrow,
-    collections::HashMap,
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
     string::{String, ToString},
@@ -239,23 +237,7 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Creates a new initial `HostProvisioningState`.
-    //TODO: Deprecated semi-valid HostProvisioningState.
-    //      Pass:
-    //      - file permission, which controls and replace, stream_sources, data_sources, program_digest, previous_result, result, expected_data_sources, expected_stream_sources
-    //      - expected_shutdown_sources
-    #[deprecated]
-    #[inline]
-    pub fn new() -> Self {
-        HostProvisioningState {
-            lifecycle_state: LifecycleState::ReadyToExecute,
-            program_module: None,
-            memory: None,
-            vfs : Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new()))),
-        }
-    }
-
-    //TODO: THIS will replace the use of `new` in the future commits.
-    pub fn from_vfs_base(
+    pub fn new(
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
         HostProvisioningState {
@@ -302,12 +284,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     // Querying the host state.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Returns the current state of the provisioning process.
-    #[inline]
-    pub(crate) fn get_lifecycle_state(&self) -> &LifecycleState {
-        self.lifecycle_state.borrow()
-    }
-
     /// Returns an optional reference to the WASM program module.
     #[inline]
     pub(crate) fn get_program(&self) -> Option<&Module> {
@@ -324,34 +300,34 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     // Progressing through the state machine.
     ////////////////////////////////////////////////////////////////////////////
     
-    /// Sets the machine state to `MachineState::Error`.
-    ///
-    /// Does not panic: an error state can be reached from any Veracruz state
-    /// and once in an error state you can never get back out.
-    #[inline]
-    pub(crate) fn set_error(&mut self) {
-        self.lifecycle_state = LifecycleState::Error;
-    }
+    ///// Sets the machine state to `MachineState::Error`.
+    /////
+    ///// Does not panic: an error state can be reached from any Veracruz state
+    ///// and once in an error state you can never get back out.
+    //#[inline]
+    //pub(crate) fn set_error(&mut self) {
+        //self.lifecycle_state = LifecycleState::Error;
+    //}
 
-    #[deprecated]
-    /// Sets the machine state to `LifecycleState::ReadyToExecute`.
-    ///
-    /// PANICS: will panic if the current machine state is neither
-    /// `LifecycleState::Initial`, `LifecycleState::DataSourcesLoading` nor `LifecycleState::StreamSourcesLoading`.
-    #[inline]
-    pub(crate) fn set_ready_to_execute(&mut self) {
-        self.lifecycle_state = LifecycleState::ReadyToExecute;
-    }
+    //#[deprecated]
+    ///// Sets the machine state to `LifecycleState::ReadyToExecute`.
+    /////
+    ///// PANICS: will panic if the current machine state is neither
+    ///// `LifecycleState::Initial`, `LifecycleState::DataSourcesLoading` nor `LifecycleState::StreamSourcesLoading`.
+    //#[inline]
+    //pub(crate) fn set_ready_to_execute(&mut self) {
+        //self.lifecycle_state = LifecycleState::ReadyToExecute;
+    //}
 
-    #[deprecated]
-    /// Sets the machine state to `LifecycleState::FinishedExecuting`.
-    ///
-    /// PANICS: will panic if the current machine state is not
-    /// `LifecycleState::ReadyToExecute`.
-    #[inline]
-    pub(crate) fn set_finished_executing(&mut self) {
-        self.lifecycle_state = LifecycleState::FinishedExecuting;
-    }
+    //#[deprecated]
+    ///// Sets the machine state to `LifecycleState::FinishedExecuting`.
+    /////
+    ///// PANICS: will panic if the current machine state is not
+    ///// `LifecycleState::ReadyToExecute`.
+    //#[inline]
+    //pub(crate) fn set_finished_executing(&mut self) {
+        //self.lifecycle_state = LifecycleState::FinishedExecuting;
+    //}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -543,22 +519,6 @@ pub trait ExecutionEngine: Send {
     /// state to `LifecycleState::FinishedExecuting` and returns the error code
     /// returned by the WASM program entry point as an `i32` value.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError>;
-
-    ///// Returns `true` iff all clients who must request shutdown have now done
-    ///// so.
-    //fn is_able_to_shutdown(&self) -> bool;
-
-    #[deprecated]
-    /// Returns the current lifecycle state that the host provisioning state is
-    /// in.
-    fn get_lifecycle_state(&self) -> LifecycleState;
-
-    /// Moves the host provisioning state's lifecycle state into
-    /// `LifecycleState::Error`, a state which it cannot ever escape,
-    /// effectively invalidating it.
-    fn invalidate(&mut self);
-
-    fn from_vfs(vfs : Arc<Mutex<VFS>>) -> Self where Self: Sized;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

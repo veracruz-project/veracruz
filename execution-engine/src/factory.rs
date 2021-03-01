@@ -39,14 +39,10 @@ use std::sync::SgxMutex as Mutex;
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
 use crate::hcall::{common::ExecutionEngine, wasmi, buffer::VFS};
-use veracruz_utils::VeracruzCapabilityTable;
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
     sync::Arc,
-    //vec::Vec,
-    //collections::HashMap,
-    //string::String,
 };
 
 #[derive(Debug)]
@@ -151,8 +147,8 @@ pub fn multi_threaded_execution_engine(
 //TODO remove old parameters.
 fn new_wasmi_instance (
     vfs : Arc<Mutex<VFS>>
-) -> impl Chihuahua + 'static {
-    wasmi::WasmiHostProvisioningState::from_vfs(vfs)
+) -> impl ExecutionEngine {
+    wasmi::WasmiHostProvisioningState::new(vfs)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

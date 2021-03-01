@@ -12,10 +12,6 @@
 use std::{boxed::Box, string::ToString, vec::Vec};
 
 use platform_services::{getrandom, result};
-#[cfg(any(feature = "tz", feature = "nitro"))]
-use std::sync::{Mutex, Arc};
-#[cfg(feature = "sgx")]
-use std::sync::{SgxMutex as Mutex, Arc};
 
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
@@ -29,14 +25,13 @@ use crate::{
         wasmi::{mk_error_code, mk_host_trap},
     },
     hcall::common::{
-        sha_256_digest, ExecutionEngine, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
-        HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
+        ExecutionEngine, EntrySignature, FatalHostError, HCallError,
+        HostProvisioningError, HostProvisioningState, HCALL_GETRANDOM_NAME,
         HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
         HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
         HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
         HCALL_WRITE_OUTPUT_NAME,
     },
-    hcall::buffer::VFS,
 };
 use veracruz_utils::VeracruzCapabilityIndex;
 
@@ -414,7 +409,6 @@ impl WasmiHostProvisioningState {
 
             if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
                 if not_started_module_ref.has_start() {
-                    self.set_error();
                     return Err(HostProvisioningError::InvalidWASMModule);
                 }
 
@@ -427,19 +421,14 @@ impl WasmiHostProvisioningState {
 
                     self.set_program_module(module_ref);
                     self.set_memory(linear_memory);
-                    //TODO REMOVE ?
-                    self.set_ready_to_execute();
                     return Ok(());
                 }
 
-                self.set_error();
                 return Err(HostProvisioningError::NoLinearMemoryFound);
             }
 
-            self.set_error();
             Err(HostProvisioningError::ModuleInstantiationFailure)
         } else {
-            self.set_error();
             Err(HostProvisioningError::InvalidWASMModule)
         }
     }
@@ -827,56 +816,39 @@ impl WasmiHostProvisioningState {
         assert!(self.program_module.is_some());
         assert!(self.memory.is_some());
 
-        let rst = match self.invoke_export(ENTRY_POINT_NAME) {
+        match self.invoke_export(ENTRY_POINT_NAME) {
             Ok(Some(RuntimeValue::I32(return_code))) => {
-                self.set_finished_executing();
                 Ok(return_code)
             }
             Ok(_) => {
-                self.set_error();
-                assert!(false);
                 Err(FatalHostError::ReturnedCodeError)
             }
             Err(Error::Trap(trap)) => {
-                self.set_error();
-                assert!(false);
                 Err(FatalHostError::WASMITrapError(trap))
             }
             Err(err) => {
-                self.set_error();
-                assert!(false);
                 Err(FatalHostError::WASMIError(err))
             }
-        };
-        //TODO: REMOVE ENGINE
-        self.program_module = None;
-        self.memory = None;
-        rst
+        }
     }
 }
 
 /// The `WasmiHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmiHostProvisioningState {
-    fn from_vfs(
-        vfs : Arc<Mutex<VFS>>,
-    ) -> Self {
-        Self::from_vfs_base(vfs)
-    }
-
-    /// Chihuahua wrapper of append_file implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.append_file_base(client_id,file_name,data)
     }
 
-    /// Chihuahua wrapper of write_file implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.write_file_base(client_id,file_name,data)
     }
 
-    /// Chihuahua wrapper of read_file implementation in WasmiHostProvisioningState.
+    /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         self.read_file_base(client_id,file_name)
@@ -886,17 +858,5 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     #[inline]
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
         self.invoke_entry_point(file_name)
-    }
-
-    /// ExecutionEngine wrapper of get_lifecycle_state implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_lifecycle_state(&self) -> LifecycleState {
-        self.get_lifecycle_state().clone()
-    }
-
-    /// Invaildate this wasmi instanace.
-    #[inline]
-    fn invalidate(&mut self) {
-        self.set_error();
     }
 }
