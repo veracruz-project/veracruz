@@ -270,15 +270,13 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     pub(crate) fn write_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
         self.vfs.lock()?.write(file_name,data)?;
-        //VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
-        //VFS_INSTANCE.lock()?.as_mut().ok_or(HostProvisioningError::NoVFS)?.write(file_name,data)?;
         Ok(())
     }
 
     /// Append to a file.
     pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
-        self.vfs.lock()?.append_write(file_name,data)?;
+        self.vfs.lock()?.append(file_name,data)?;
         Ok(())
     }
 

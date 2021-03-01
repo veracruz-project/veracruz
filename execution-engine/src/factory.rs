@@ -114,7 +114,7 @@ pub fn single_threaded_execution_engine(
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
-) -> Option<Arc<Mutex<dyn ExecutionEngine + 'static>>> {
+) -> Option<impl ExecutionEngine> {
     #[cfg(feature = "std")]
     {
         match strategy {
@@ -131,9 +131,7 @@ pub fn multi_threaded_execution_engine(
                     expected_shutdown_sources,
                 );
 
-                Some(Arc::new(Mutex::new(
-                    wasmtime::DummyWasmtimeHostProvisioningState::new(),
-                )))
+                Some(wasmtime::DummyWasmtimeHostProvisioningState::new())
             }
         }
     }
@@ -143,7 +141,7 @@ pub fn multi_threaded_execution_engine(
             ExecutionStrategy::Interpretation => {
                 let state = new_wasmi_instance(vfs);
 
-                Some(Arc::new(Mutex::new(state)))
+                Some(state)
             }
             ExecutionStrategy::JIT => None,
         }

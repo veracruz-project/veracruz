@@ -67,7 +67,7 @@ impl VFS {
         self.digest_check(file_name,new_data)
     }
 
-    pub fn append_write(&mut self, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
+    pub fn append(&mut self, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
         match self.fs.get_mut(file_name) {
             Some(b) => {
                 b.append(&mut buf.to_vec());
