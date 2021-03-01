@@ -19,7 +19,7 @@ use std::{
     vec::Vec,
 };
 
-use rustls::{Certificate, ServerSession, Session};
+use rustls::{Certificate, ServerSession, Session as TLSSession};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Baja sessions.
@@ -32,7 +32,7 @@ pub type Principal = VeracruzIdentity<Certificate>;
 
 /// A Baja session consists of a TLS server session with a list of principals
 /// and their identifying information.
-pub struct BajaSession {
+pub struct Session {
     /// The TLS server session.
     tls_session: ServerSession,
     /// The list of principals, their identities, and roles in the Veracruz
@@ -40,13 +40,13 @@ pub struct BajaSession {
     principals: Vec<Principal>,
 }
 
-impl BajaSession {
+impl Session {
     /// Creates a new Baja session from a server configuration and a list of
     /// principals.
     pub fn new(config: rustls::ServerConfig, principals: Vec<Principal>) -> Self {
         let tls_session = ServerSession::new(&std::sync::Arc::new(config));
 
-        BajaSession {
+        Session {
             tls_session,
             principals,
         }

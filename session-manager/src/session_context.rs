@@ -19,7 +19,7 @@ use std::{
 };
 
 use crate::{
-    session::{BajaSession, Principal},
+    session::{Session, Principal},
     error::BajaError,
 };
 use veracruz_utils::VeracruzPolicy;
@@ -445,7 +445,7 @@ impl Baja {
     /// about the principals that are stored in this Baja context.  Fails iff
     /// the creation of the new Baja session fails.
     #[inline]
-    pub fn create_session(&self) -> BajaSession {
-        BajaSession::new(self.server_config().clone(), self.principals().clone())
+    pub fn create_session(&self) -> Session {
+        Session::new(self.server_config().clone(), self.principals().clone())
     }
 }

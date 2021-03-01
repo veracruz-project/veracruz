@@ -36,7 +36,7 @@ pub enum MexicoCityError {
     #[error(display = "MexicoCity: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
     #[error(display = "MexicoCity: Uninitialized baja session in function {}.", _0)]
-    UninitializedBajaSessionError(&'static str),
+    UninitializedSessionError(&'static str),
     #[cfg(feature = "sgx")]
     #[error(display = "MexicoCity: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
@@ -49,7 +49,7 @@ pub enum MexicoCityError {
     )]
     InvalidExecutionStrategyError,
     #[error(display = "MexicoCity: Unavailable baja session with ID {}.", _0)]
-    UnavailableBajaSessionError(u64),
+    UnavailableSessionError(u64),
     #[error(display = "MexicoCity: Unavailable protocol state.")]
     UninitializedProtocolState,
     #[error(display = "MexicoCity: Unavailable income buffer with ID {}.", _0)]
