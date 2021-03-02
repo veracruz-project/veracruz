@@ -35,7 +35,7 @@ const MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME: &'static str =
 const MOCK_ATTESTATION_ENCLAVE_NAME: &'static str = "localhost";
 
 use crate::attestation::*;
-use crate::durango::*;
+use crate::veracruz_client::*;
 use crate::error::*;
 use std::{fs::File, io::prelude::*, io::Read, path::Path};
 
@@ -468,7 +468,7 @@ fn durango_session() {
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
     let mut _durango =
-        crate::durango::Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock)
+        crate::veracruz_client::Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock)
             .unwrap();
 
     let client_cert = {
@@ -533,7 +533,7 @@ async fn policy_server_loop(
 fn client_loop(
     tx: std::sync::mpsc::Sender<Vec<u8>>,
     rx: std::sync::mpsc::Receiver<Vec<u8>>,
-    session: &mut crate::durango::Durango,
+    session: &mut crate::veracruz_client::Durango,
 ) {
     let one_tenth_sec = std::time::Duration::from_millis(100);
     // The client initiates the handshake

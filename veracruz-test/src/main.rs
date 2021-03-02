@@ -61,7 +61,7 @@ mod tests {
 
     use actix_rt::System;
     use async_std::task;
-    use durango;
+    use veracruz_client;
     use env_logger;
     use err_derive::Error;
     use log::info;
@@ -78,7 +78,7 @@ mod tests {
         #[error(display = "VeracruzTest: Pinecone Error: {:?}.", _0)]
         PineconeError(#[error(source)] pinecone::Error),
         #[error(display = "VeracruzTest: DurangoError: {:?}.", _0)]
-        DurangoError(#[error(source)] durango::DurangoError),
+        DurangoError(#[error(source)] veracruz_client::DurangoError),
         #[error(display = "VeracruzTest: VeracruzUtilError: {:?}.", _0)]
         VeracruzUtilError(#[error(source)] policy::VeracruzUtilError),
         #[error(display = "VeracruzTest: SinaloaError: {:?}.", _0)]
@@ -304,7 +304,7 @@ mod tests {
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
             let mut client =
-                durango::Durango::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
+                veracruz_client::Durango::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
                                       &policy_json,
                                       &target_platform)?;
             let program_filename = LINEAR_REGRESSION_WASM;
@@ -315,7 +315,7 @@ mod tests {
         let data_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(11000)).await;
             let mut client =
-                durango::Durango::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json, &target_platform)?;
+                veracruz_client::Durango::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json, &target_platform)?;
 
             let data_filename = LINEAR_REGRESSION_DATA;
             let data = read_binary_file(&data_filename)?;
@@ -372,7 +372,7 @@ mod tests {
                 #[cfg(feature = "nitro")]
                 let target_platform = EnclavePlatform::Nitro;
 
-                clients.push(durango::Durango::new(cert, key, &policy_json, &target_platform)?);
+                clients.push(veracruz_client::Durango::new(cert, key, &policy_json, &target_platform)?);
             }
 
             info!(
