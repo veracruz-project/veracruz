@@ -1,6 +1,4 @@
-//! Manager for Baja
-//!
-//! Interfaces with Baja.
+//! Interfaces with the session manager.
 //!
 //! ## Authors
 //!
@@ -30,11 +28,11 @@ pub fn init_session_manager(policy_json: &str) -> Result<(), MexicoCityError> {
     }
 
     //TODO: change the error type
-    let new_baja = SessionContext::new(policy)?;
+    let new_session_manager = SessionContext::new(policy)?;
 
     {
-        let mut baja_state = super::MY_BAJA.lock()?;
-        *baja_state = Some(new_baja);
+        let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
+        *session_manager_state = Some(new_session_manager);
     }
 
     Ok(())
@@ -47,8 +45,8 @@ pub fn new_session() -> Result<u32, MexicoCityError> {
         session_counter.clone()
     };
 
-    let session = match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => my_baja.create_session(),
+    let session = match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => my_session_manager.create_session(),
         None => {
             return Err(MexicoCityError::UninitializedSessionError(
                 "new_session",
@@ -134,8 +132,8 @@ pub fn get_data_needed(session_id: u32) -> Result<bool, MexicoCityError> {
 }
 
 pub fn get_enclave_cert_pem() -> Result<Vec<u8>, MexicoCityError> {
-    match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.server_certificate_buffer().clone()),
+    match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => Ok(my_session_manager.server_certificate_buffer().clone()),
         None => Err(MexicoCityError::UninitializedSessionError(
             "get_enclave_cert_pem",
         )),
@@ -143,8 +141,8 @@ pub fn get_enclave_cert_pem() -> Result<Vec<u8>, MexicoCityError> {
 }
 
 pub fn get_enclave_cert() -> Result<rustls::Certificate, MexicoCityError> {
-    match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.server_certificate().clone()),
+    match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => Ok(my_session_manager.server_certificate().clone()),
         None => Err(MexicoCityError::UninitializedSessionError(
             "get_enclave_cert",
         )),
@@ -152,8 +150,8 @@ pub fn get_enclave_cert() -> Result<rustls::Certificate, MexicoCityError> {
 }
 
 pub fn get_enclave_name() -> Result<std::string::String, MexicoCityError> {
-    match &*super::MY_BAJA.lock()? {
-        Some(my_baja) => Ok(my_baja.name().clone()),
+    match &*super::MY_SESSION_MANAGER.lock()? {
+        Some(my_session_manager) => Ok(my_session_manager.name().clone()),
         None => Err(MexicoCityError::UninitializedSessionError(
             "get_enclave_name",
         )),

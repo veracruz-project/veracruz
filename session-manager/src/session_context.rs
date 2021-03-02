@@ -1,7 +1,7 @@
-//! Baja contexts
+//! Session contexts
 //!
 //! Contexts contain meta-data, such as certificates and principals and their
-//! roles, necessary to establish and manage a Baja session.
+//! roles, necessary to establish and manage a session.
 //!
 //! ## Authors
 //!
@@ -291,11 +291,11 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// The Baja context.
+// The session context.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// A Baja context contains various bits of meta-data, such as certificates and
-/// server configuration options, for managing a Baja server session.
+/// A session context contains various bits of meta-data, such as certificates
+/// and server configuration options, for managing a server session.
 pub struct SessionContext {
     /// A buffer for storing an unparsed PEM certificate for the server.
     server_certificate_buffer: Vec<u8>,
@@ -314,7 +314,7 @@ pub struct SessionContext {
 }
 
 impl SessionContext {
-    /// Creates a new Baja context using the global Veracruz policy, `policy`.
+    /// Creates a new context using the global Veracruz policy, `policy`.
     pub fn new(policy: VeracruzPolicy) -> Result<Self, SessionManagerError> {
         // create the root_cert_store that contains all of the certs of the clients that can connect
         // Note: We are not using a CA here, so each client that needs to connect must have it's
@@ -410,7 +410,7 @@ impl SessionContext {
         })
     }
 
-    /// Returns the randomly-generated name associated with the Baja context.
+    /// Returns the randomly-generated name associated with the context.
     #[inline]
     pub fn name(&self) -> &String {
         &self.name
@@ -441,9 +441,9 @@ impl SessionContext {
         &self.principals
     }
 
-    /// Creates a new Baja session, using server configuration and information
-    /// about the principals that are stored in this Baja context.  Fails iff
-    /// the creation of the new Baja session fails.
+    /// Creates a new session, using server configuration and information about
+    /// the principals that are stored in this context.  Fails iff the creation
+    /// of the new session fails.
     #[inline]
     pub fn create_session(&self) -> Session {
         Session::new(self.server_config().clone(), self.principals().clone())

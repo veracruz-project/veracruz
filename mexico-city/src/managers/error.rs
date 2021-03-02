@@ -35,7 +35,7 @@ pub enum MexicoCityError {
     MexicoCityBufferError(#[error(source)] crate::managers::buffer::MexicoCityBufferError),
     #[error(display = "MexicoCity: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
-    #[error(display = "MexicoCity: Uninitialized baja session in function {}.", _0)]
+    #[error(display = "MexicoCity: Uninitialized session in function {}.", _0)]
     UninitializedSessionError(&'static str),
     #[cfg(feature = "sgx")]
     #[error(display = "MexicoCity: SGXError: {:?}.", _0)]
@@ -48,7 +48,7 @@ pub enum MexicoCityError {
         display = "MexicoCity: Global policy requested an execution strategy unavailable on this platform."
     )]
     InvalidExecutionStrategyError,
-    #[error(display = "MexicoCity: Unavailable baja session with ID {}.", _0)]
+    #[error(display = "MexicoCity: Unavailable session with ID {}.", _0)]
     UnavailableSessionError(u64),
     #[error(display = "MexicoCity: Unavailable protocol state.")]
     UninitializedProtocolState,

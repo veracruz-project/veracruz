@@ -1,4 +1,4 @@
-//! Baja sessions
+//! Sessions
 //!
 //! Management and abstraction of TLS server sessions.
 //!
@@ -22,7 +22,7 @@ use std::{
 use rustls::{Certificate, ServerSession, Session as TLSSession};
 
 ////////////////////////////////////////////////////////////////////////////////
-// Baja sessions.
+// Sessions.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A principal is an individual identified with a cryptographic certificate,
@@ -30,8 +30,8 @@ use rustls::{Certificate, ServerSession, Session as TLSSession};
 /// do in a Veracruz computation.
 pub type Principal = VeracruzIdentity<Certificate>;
 
-/// A Baja session consists of a TLS server session with a list of principals
-/// and their identifying information.
+/// A session consists of a TLS server session with a list of principals and
+/// their identifying information.
 pub struct Session {
     /// The TLS server session.
     tls_session: ServerSession,
@@ -41,7 +41,7 @@ pub struct Session {
 }
 
 impl Session {
-    /// Creates a new Baja session from a server configuration and a list of
+    /// Creates a new session from a server configuration and a list of
     /// principals.
     pub fn new(config: rustls::ServerConfig, principals: Vec<Principal>) -> Self {
         let tls_session = ServerSession::new(&std::sync::Arc::new(config));
@@ -52,7 +52,7 @@ impl Session {
         }
     }
 
-    /// Writes the contents of `input` over the Baja session's TLS server session.
+    /// Writes the contents of `input` over the session's TLS server session.
     pub fn send_tls_data(&mut self, input: &mut Vec<u8>) -> Result<(), SessionManagerError> {
         let mut slice = input.as_slice();
         self.tls_session.read_tls(&mut slice)?;
@@ -67,7 +67,7 @@ impl Session {
         Ok(())
     }
 
-    /// Reads TLS data from the Baja session's TLS server session.  If the TLS
+    /// Reads TLS data from the session's TLS server session.  If the TLS
     /// session has no data to read, returns `Ok(None)`.  If data is available
     /// for reading, returns `Ok(Some(buffer))` for some byte buffer, `buffer`.
     /// If reading fails, then an error is returned.
@@ -120,14 +120,13 @@ impl Session {
         }
     }
 
-    /// Returns `true` iff the Baja session's TLS server session has data to be
-    /// read.
+    /// Returns `true` iff the session's TLS server session has data to be read.
     #[inline]
     pub fn read_tls_needed(&self) -> bool {
         self.tls_session.wants_write()
     }
 
-    /// Returns `true` iff the Baja session's TLS server session has finished
+    /// Returns `true` iff the session's TLS server session has finished
     /// handshaking and therefore authentication has been completed.
     #[inline]
     pub fn is_authenticated(&self) -> bool {

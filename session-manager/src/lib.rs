@@ -1,4 +1,4 @@
-//! The Baja library
+//! The session manager's library
 //!
 //! Code for sending and receiving data over a TLS-encrypted link, inside the
 //! Veracruz runtime.
