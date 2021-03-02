@@ -52,7 +52,7 @@ fn test_internal_read_all_bytes_in_file_succ() {
     if let Err(_) = File::create(filename).and_then(|mut file| file.write_all(content)) {
         panic!(format!("cannot create test file: {}", filename));
     }
-    let rst = Durango::pub_read_all_bytes_in_file(filename);
+    let rst = VeracruzClient::pub_read_all_bytes_in_file(filename);
     assert!(rst.is_ok());
     let rst_content = rst.unwrap();
     assert_eq!(rst_content, content);
@@ -60,32 +60,32 @@ fn test_internal_read_all_bytes_in_file_succ() {
 
 #[test]
 fn test_internal_read_all_bytes_in_file_invalid_file() {
-    assert!(Durango::pub_read_all_bytes_in_file("../test-collateral/invalid_file").is_err());
+    assert!(VeracruzClient::pub_read_all_bytes_in_file("../test-collateral/invalid_file").is_err());
 }
 
 #[test]
 fn test_internal_read_all_bytes_in_file_invalid_path() {
-    assert!(Durango::pub_read_all_bytes_in_file("invalid_path").is_err());
+    assert!(VeracruzClient::pub_read_all_bytes_in_file("invalid_path").is_err());
 }
 
 #[test]
 fn test_internal_read_cert_succ() {
-    assert!(Durango::pub_read_cert(CLIENT_CERT_FILENAME).is_ok());
+    assert!(VeracruzClient::pub_read_cert(CLIENT_CERT_FILENAME).is_ok());
 }
 
 #[test]
 fn test_internal_read_cert_invalid_certificate() {
-    assert!(Durango::pub_read_cert(CLIENT_KEY_FILENAME).is_err());
+    assert!(VeracruzClient::pub_read_cert(CLIENT_KEY_FILENAME).is_err());
 }
 
 #[test]
 fn test_internal_read_private_key_succ() {
-    assert!(Durango::pub_read_private_key(CLIENT_KEY_FILENAME).is_ok());
+    assert!(VeracruzClient::pub_read_private_key(CLIENT_KEY_FILENAME).is_ok());
 }
 
 #[test]
 fn test_internal_read_cert_invalid_private_key() {
-    assert!(Durango::pub_read_private_key(CLIENT_CERT_FILENAME).is_err());
+    assert!(VeracruzClient::pub_read_private_key(CLIENT_CERT_FILENAME).is_err());
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_set_up_mock_object_for_attestation_handler() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -117,10 +117,10 @@ fn load_client_cert_and_private_key(
         rustls::PrivateKey,
         veracruz_utils::VeracruzPolicy,
     ),
-    DurangoError,
+    VeracruzClientError,
 > {
-    Durango::pub_read_cert(cert_file).and_then(|cert| {
-        Durango::pub_read_private_key(pkey_file).and_then(|pkey| {
+    VeracruzClient::pub_read_cert(cert_file).and_then(|cert| {
+        VeracruzClient::pub_read_private_key(pkey_file).and_then(|pkey| {
             let policy_json = std::fs::read_to_string(policy_file)?;
             let policy: veracruz_utils::VeracruzPolicy =
                 serde_json::from_str(policy_json.as_str())?;
@@ -135,7 +135,7 @@ fn test_internal_init_self_signed_cert_client_config_succ() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -153,7 +153,7 @@ fn test_internal_init_self_signed_cert_client_config_succ() {
             let (enclave_cert, enclave_name) =
                 crate::attestation::MockAttestation::attestation(&policy, &EnclavePlatform::Mock).unwrap();
             let policy_ciphersuite_string = policy.ciphersuite().as_str();
-            assert!(Durango::pub_init_self_signed_cert_client_config(
+            assert!(VeracruzClient::pub_init_self_signed_cert_client_config(
                 cert,
                 pkey,
                 enclave_cert,
@@ -171,7 +171,7 @@ fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -188,7 +188,7 @@ fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
             let (enclave_cert, enclave_name) =
                 crate::attestation::MockAttestation::attestation(&policy, &EnclavePlatform::Mock).unwrap();
             let policy_ciphersuite_string = "WRONG CIPHERSUITE";
-            assert!(Durango::pub_init_self_signed_cert_client_config(
+            assert!(VeracruzClient::pub_init_self_signed_cert_client_config(
                 cert,
                 pkey,
                 enclave_cert,
@@ -201,13 +201,13 @@ fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
 }
 
 /// Auxiliary function: read policy file
-fn read_policy(fname: &str) -> Result<String, DurangoError> {
+fn read_policy(fname: &str) -> Result<String, VeracruzClientError> {
     let policy_string = std::fs::read_to_string(fname)?;
     Ok(policy_string.clone())
 }
 
 /// Auxiliary function: apply functor to all the policy file (json file) in the path
-fn iterate_over_policy(path: &str, f: fn(Result<String, DurangoError>) -> ()) {
+fn iterate_over_policy(path: &str, f: fn(Result<String, VeracruzClientError>) -> ()) {
     let test_collateral_path = Path::new(path);
     for entry in test_collateral_path
         .read_dir()
@@ -238,7 +238,7 @@ fn test_durango_new_succ() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -249,7 +249,7 @@ fn test_durango_new_succ() {
 
         assert!(policy.is_ok());
         let policy = policy.unwrap();
-        assert!(Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &EnclavePlatform::Mock).is_ok());
+        assert!(VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &EnclavePlatform::Mock).is_ok());
     });
 }
 
@@ -261,7 +261,7 @@ fn test_durango_new_fail() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -271,7 +271,7 @@ fn test_durango_new_fail() {
     iterate_over_policy("../test-collateral/invalid_policy/", |policy| {
         if let Ok(policy) = policy {
             assert!(
-                Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &EnclavePlatform::Mock).is_err(),
+                VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &EnclavePlatform::Mock).is_err(),
                 format!("{:?}", policy)
             );
         }
@@ -284,7 +284,7 @@ fn test_durango_new_unmatched_client_certificate() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -293,7 +293,7 @@ fn test_durango_new_unmatched_client_certificate() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let rst = Durango::new(DATA_CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
+    let rst = VeracruzClient::new(DATA_CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
     assert!(rst.is_err());
 }
 
@@ -303,7 +303,7 @@ fn test_durango_new_unmatched_client_key() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -312,7 +312,7 @@ fn test_durango_new_unmatched_client_key() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let rst = Durango::new(CLIENT_CERT_FILENAME, DATA_CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
+    let rst = VeracruzClient::new(CLIENT_CERT_FILENAME, DATA_CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
     assert!(rst.is_err());
 }
 
@@ -322,7 +322,7 @@ fn test_durango_new_invalid_enclave_name() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             "this is an invalid host url".to_string(),
@@ -331,7 +331,7 @@ fn test_durango_new_invalid_enclave_name() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let rst = Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
+    let rst = VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock);
     assert!(rst.is_err());
 }
 
@@ -346,7 +346,7 @@ async fn durango_policy_violations() {
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_policy, _target_platform| {
         Ok((
-            Durango::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
+            VeracruzClient::pub_read_cert(MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME)
                 .unwrap()
                 .0,
             MOCK_ATTESTATION_ENCLAVE_NAME.to_string(),
@@ -357,9 +357,9 @@ async fn durango_policy_violations() {
     let server_key_filename = "../test-collateral/server_rsa_key.pem";
     let mut server_config = {
         let mut server_root_cert_store = rustls::RootCertStore::empty();
-        let program_client_cert = Durango::pub_read_cert(PROGRAM_CLIENT_CERT_FILENAME).unwrap();
-        let data_client_cert = Durango::pub_read_cert(DATA_CLIENT_CERT_FILENAME).unwrap();
-        let result_client_cert = Durango::pub_read_cert(RESULT_CLIENT_CERT_FILENAME).unwrap();
+        let program_client_cert = VeracruzClient::pub_read_cert(PROGRAM_CLIENT_CERT_FILENAME).unwrap();
+        let data_client_cert = VeracruzClient::pub_read_cert(DATA_CLIENT_CERT_FILENAME).unwrap();
+        let result_client_cert = VeracruzClient::pub_read_cert(RESULT_CLIENT_CERT_FILENAME).unwrap();
         server_root_cert_store.add(&program_client_cert).unwrap();
         server_root_cert_store.add(&data_client_cert).unwrap();
         server_root_cert_store.add(&result_client_cert).unwrap();
@@ -367,9 +367,9 @@ async fn durango_policy_violations() {
             server_root_cert_store,
         ))
     };
-    let server_cert = Durango::pub_read_cert(server_cert_filename).unwrap();
+    let server_cert = VeracruzClient::pub_read_cert(server_cert_filename).unwrap();
     let server_priv_key = {
-        let key_buffer = Durango::pub_read_all_bytes_in_file(server_key_filename).unwrap();
+        let key_buffer = VeracruzClient::pub_read_all_bytes_in_file(server_key_filename).unwrap();
         let mut cursor = std::io::Cursor::new(key_buffer);
         let rsa_keys = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
             .expect("file contains invalid rsa private key");
@@ -393,10 +393,10 @@ async fn durango_policy_violations() {
     let _tj_ret = futures::try_join!(server_loop_handle, client_loop_handle);
 }
 
-async fn policy_client_loop() -> Result<(), DurangoError> {
+async fn policy_client_loop() -> Result<(), VeracruzClientError> {
     let policy_json = std::fs::read_to_string(TRIPLE_POLICY_FILENAME).unwrap(); // TODO: Use a different policy file?
 
-    let mut data_client = Durango::new(
+    let mut data_client = VeracruzClient::new(
         DATA_CLIENT_CERT_FILENAME,
         DATA_CLIENT_KEY_FILENAME,
         &policy_json,
@@ -406,12 +406,12 @@ async fn policy_client_loop() -> Result<(), DurangoError> {
     let fake_data = vec![0xde, 0xad, 0xbe, 0xef];
     let sp_ret = data_client.send_program(&fake_data.to_vec());
     match sp_ret {
-        Err(DurangoError::InvalidRoleError(_, _))
-        | Err(DurangoError::InvalidClientCertificateError(_)) => (),
+        Err(VeracruzClientError::InvalidRoleError(_, _))
+        | Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
         _otherwise => panic!(),
     }
 
-    let mut program_client = Durango::new(
+    let mut program_client = VeracruzClient::new(
         PROGRAM_CLIENT_CERT_FILENAME,
         PROGRAM_CLIENT_KEY_FILENAME,
         &policy_json,
@@ -420,19 +420,19 @@ async fn policy_client_loop() -> Result<(), DurangoError> {
 
     let sd_ret = program_client.send_data(&fake_data.to_vec());
     match sd_ret {
-        Err(DurangoError::InvalidRoleError(_, _))
-        | Err(DurangoError::InvalidClientCertificateError(_)) => (),
+        Err(VeracruzClientError::InvalidRoleError(_, _))
+        | Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
         _otherwise => panic!(),
     }
 
     let gr_ret = program_client.get_results();
     match gr_ret {
-        Err(DurangoError::InvalidRoleError(_, _))
-        | Err(DurangoError::InvalidClientCertificateError(_)) => (),
+        Err(VeracruzClientError::InvalidRoleError(_, _))
+        | Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
         _otherwise => panic!(),
     }
 
-    Err(DurangoError::DirectMessage(format!(
+    Err(VeracruzClientError::DirectMessage(format!(
         "returning error so try_join will terminate the server loop"
     )))
 }
@@ -468,7 +468,7 @@ fn durango_session() {
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
     let mut _durango =
-        crate::veracruz_client::Durango::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock)
+        crate::veracruz_client::VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock)
             .unwrap();
 
     let client_cert = {
@@ -517,14 +517,14 @@ async fn mc(session: Session, req: HttpRequest) -> Result<HttpResponse, actix_we
 async fn policy_server_loop(
     _server_sess: &mut dyn rustls::Session,
     server_url: &str,
-) -> Result<(), DurangoError> {
+) -> Result<(), VeracruzClientError> {
     HttpServer::new(|| App::new().service(mc))
         .bind(server_url)
         .unwrap()
         .run()
         .await
         .map_err(|err| {
-            DurangoError::DirectMessage(format!("HttpServer failed to run:{:?}", err))
+            VeracruzClientError::DirectMessage(format!("HttpServer failed to run:{:?}", err))
         })?;
     Ok(())
 }
@@ -533,7 +533,7 @@ async fn policy_server_loop(
 fn client_loop(
     tx: std::sync::mpsc::Sender<Vec<u8>>,
     rx: std::sync::mpsc::Receiver<Vec<u8>>,
-    session: &mut crate::veracruz_client::Durango,
+    session: &mut crate::veracruz_client::VeracruzClient,
 ) {
     let one_tenth_sec = std::time::Duration::from_millis(100);
     // The client initiates the handshake

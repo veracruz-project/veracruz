@@ -12,7 +12,7 @@
 use err_derive::Error;
 
 #[derive(Debug, Error)]
-pub enum DurangoError {
+pub enum VeracruzClientError {
     // NOTE: Protobuf does not implement clone, hence derive(clone) is impossible.
     #[error(display = "Durango: HexError: {:?}.", _0)]
     HexError(#[error(source)] hex::FromHexError),
@@ -95,8 +95,8 @@ pub enum DurangoError {
     DirectMessage(String),
 }
 
-impl From<x509_parser::error::PEMError> for DurangoError {
+impl From<x509_parser::error::PEMError> for VeracruzClientError {
     fn from(error: x509_parser::error::PEMError) -> Self {
-        DurangoError::X509ParserPEMError(error)
+        VeracruzClientError::X509ParserPEMError(error)
     }
 }
