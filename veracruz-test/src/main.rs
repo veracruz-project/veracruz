@@ -380,11 +380,11 @@ mod tests {
                 program_provider_index, program_filename
             );
             // provision program
-            let program_provider_durango = clients
+            let program_provider_veracruz_client = clients
                 .get_mut(program_provider_index)
                 .ok_or(VeracruzTestError::ClientIndexError(program_provider_index))?;
             let program_data = read_binary_file(program_filename)?;
-            let _ = program_provider_durango.send_program(&program_data)?;
+            let _ = program_provider_veracruz_client.send_program(&program_data)?;
             info!("### Step 4. Provision data.");
             // provosion data
             for (data_provider_index, data_filename) in data_providers.iter() {
@@ -392,24 +392,24 @@ mod tests {
                     "            Client #{} provisions program {}.",
                     data_provider_index, data_filename
                 );
-                let data_provider_durango = clients
+                let data_provider_veracruz_client = clients
                     .get_mut(*data_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*data_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                let _ = data_provider_durango.send_data(&data)?;
+                let _ = data_provider_veracruz_client.send_data(&data)?;
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
             // fetch result
             for result_retriever_index in result_retrievers.iter() {
-                let result_retriever_durango = clients
+                let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
-                let result = result_retriever_durango.get_results()?;
+                let result = result_retriever_veracruz_client.get_results()?;
                 let result: T = pinecone::from_bytes(&result)?;
                 info!("            Result: {:?}", result);
 
-                let _result = result_retriever_durango.request_shutdown()?;
+                let _result = result_retriever_veracruz_client.request_shutdown()?;
             }
             Ok::<(), VeracruzTestError>(())
         };

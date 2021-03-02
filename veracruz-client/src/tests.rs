@@ -233,7 +233,7 @@ fn iterate_over_policy(path: &str, f: fn(Result<String, VeracruzClientError>) ->
 }
 
 #[test]
-fn test_durango_new_succ() {
+fn test_veracruz_client_new_succ() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
@@ -256,7 +256,7 @@ fn test_durango_new_succ() {
 #[test]
 /// This function tests loading invalid policy.
 /// Invalid or out-of-time certificate, and invalid or out-of-time enclave cert-time
-fn test_durango_new_fail() {
+fn test_veracruz_client_new_fail() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
@@ -279,7 +279,7 @@ fn test_durango_new_fail() {
 }
 
 #[test]
-fn test_durango_new_unmatched_client_certificate() {
+fn test_veracruz_client_new_unmatched_client_certificate() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
@@ -298,7 +298,7 @@ fn test_durango_new_unmatched_client_certificate() {
 }
 
 #[test]
-fn test_durango_new_unmatched_client_key() {
+fn test_veracruz_client_new_unmatched_client_key() {
     // set up the attestation result as a mock object
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
@@ -317,7 +317,7 @@ fn test_durango_new_unmatched_client_key() {
 }
 
 #[test]
-fn test_durango_new_invalid_enclave_name() {
+fn test_veracruz_client_new_invalid_enclave_name() {
     // set up the attestation result as a mock object with an invalid host url
     let handler = crate::attestation::MockAttestation::attestation_context();
     handler.expect().returning(|_, _| {
@@ -338,7 +338,7 @@ fn test_durango_new_invalid_enclave_name() {
 #[actix_rt::test]
 /// Test Durango's policy enforcement by setting up new Durango instances, and
 /// then calling them using invalid client credentials for the policy
-async fn durango_policy_violations() {
+async fn veracruz_client_policy_violations() {
     // set up the attestation result as a mock object
     // This fakes the Attestation interface so we don't have to bring up a
     // proxy attestation server or communicate with IAS. This means that we are NOT
@@ -439,7 +439,7 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
 
 #[test]
 #[ignore]
-fn durango_session() {
+fn veracruz_client_session() {
     let server_cert_filename = "../test-collateral/server_rsa_cert.pem";
     let server_key_filename = "../test-collateral/server_rsa_key.pem";
 
@@ -467,7 +467,7 @@ fn durango_session() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let mut _durango =
+    let mut _veracruz_client =
         crate::veracruz_client::VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &EnclavePlatform::Mock)
             .unwrap();
 
