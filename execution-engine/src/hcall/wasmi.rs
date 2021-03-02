@@ -457,13 +457,13 @@ impl WasmiHostProvisioningState {
         }
 
         let address: u32 = args.nth(0);
-        //TODO CRAZY BIG NUMBER
-        let result = 99 as u32;
+        let result : u32 = self.count_file("input")? as u32;
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
             Some(memory) => {
                 if let Err(_) = memory.set_value(address, result) {
+                    assert!(false);
                     return Err(FatalHostError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: std::mem::size_of::<u32>(),
@@ -491,10 +491,11 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL IN principal
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len();
+                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
+                    assert!(false);
                     return Err(FatalHostError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: result.len() as usize,
@@ -528,6 +529,7 @@ impl WasmiHostProvisioningState {
                     return Ok(VeracruzError::DataSourceSize);
                 }
                 if let Err(_) = memory.set(address, &data) {
+                    assert!(false);
                     return Err(FatalHostError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: data.len(),
@@ -549,8 +551,7 @@ impl WasmiHostProvisioningState {
         }
 
         let address: u32 = args.nth(0);
-        //TODO TEMPERARY HARD CODE A BIG NUMBET
-        let result = 99 as u32;
+        let result = self.count_file("stream")? as u32;
 
         match self.get_memory() {
             None => Err(FatalHostError::NoMemoryRegistered),
@@ -583,7 +584,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL in appropriate principal
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len();
+                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
@@ -798,6 +799,11 @@ impl WasmiHostProvisioningState {
     #[inline]
     fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         self.read_file_base(client_id,file_name)
+    }
+
+    #[inline]
+    fn count_file(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        self.count_file_base(prefix)
     }
 }
 

@@ -9,12 +9,12 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-#[cfg(any(feature = "std", feature = "tz"))]
-use std::sync::Mutex;
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
+use std::sync::{SgxMutex as Mutex, Arc};
 
-use std::{time::Instant, vec::Vec};
+use std::{time::Instant, vec::Vec, collections::HashMap};
 
 use byteorder::{ByteOrder, LittleEndian};
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Trap, ValType};
@@ -24,12 +24,14 @@ use platform_services::{getrandom, result};
 use crate::{
     error::common::VeracruzError,
     hcall::common::{
-        sha_256_digest, ExecutionEngine, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
-        HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
+        ExecutionEngine, EntrySignature, FatalHostError, HCallError,
+        HostProvisioningError, HostProvisioningState, HCALL_GETRANDOM_NAME,
         HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_READ_INPUT_NAME,
         HCALL_WRITE_OUTPUT_NAME,
     },
 };
+use veracruz_utils::VeracruzCapabilityIndex;
+use crate::hcall::buffer::VFS;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime host provisioning state.
@@ -42,7 +44,10 @@ type WasmtimeHostProvisioningState = HostProvisioningState<Vec<u8>, ()>;
 
 lazy_static! {
     static ref HOST_PROVISIONING_STATE: Mutex<WasmtimeHostProvisioningState> =
-        Mutex::new(WasmtimeHostProvisioningState::new());
+        //TODO: change
+        Mutex::new(WasmtimeHostProvisioningState::new(
+            Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))
+                ));
 }
 
 /// Initializes the global host provisioning state.
@@ -51,17 +56,13 @@ lazy_static! {
 /// `LifecycleState::Initial` immediately after creation or if the global lock
 /// cannot be obtained.
 pub(crate) fn initialize(
-    expected_data_sources: &[u64],
-    expected_stream_sources: &[u64],
-    expected_shutdown_sources: &[u64],
+        vfs : Arc<Mutex<VFS>>,
 ) {
     let mut guard = HOST_PROVISIONING_STATE
         .lock()
         .expect("Failed to obtain lock on host provisioning state.");
 
-    guard.set_expected_data_sources(expected_data_sources);
-    guard.set_expected_stream_sources(expected_stream_sources);
-    guard.set_expected_shutdown_sources(expected_shutdown_sources);
+    *guard = WasmtimeHostProvisioningState::new(vfs);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -101,6 +102,30 @@ fn check_main(tau: &ExternType) -> EntrySignature {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl WasmtimeHostProvisioningState {
+
+    /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.append_file_base(client_id,file_name,data)
+    }
+
+    /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.write_file_base(client_id,file_name,data)
+    }
+
+    /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        self.read_file_base(client_id,file_name)
+    }
+
+    #[inline]
+    fn count_file(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        self.count_file_base(prefix)
+    }
+
     /// Loads a compiled program into the host state.
     /// The provisioning process must be in the `LifecycleState::Initial` state
     /// otherwise an error is returned.  Progresses the provisioning process to
@@ -108,27 +133,8 @@ impl WasmtimeHostProvisioningState {
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        if self.get_lifecycle_state() == &LifecycleState::Initial {
-            self.set_program_module(buffer.to_vec());
-            self.set_program_digest(&sha_256_digest(buffer));
-
-            if self.get_expected_data_source_count() == 0 {
-                if self.get_expected_stream_source_count() == 0 {
-                    self.set_ready_to_execute();
-                } else {
-                    self.set_stream_sources_loading();
-                }
-            } else {
-                self.set_data_sources_loading();
-            }
-            return Ok(());
-        } else {
-            self.set_error();
-            Err(HostProvisioningError::InvalidLifeCycleState {
-                expected: vec![LifecycleState::Initial],
-                found: self.get_lifecycle_state().clone(),
-            })
-        }
+        self.set_program_module(buffer.to_vec());
+        Ok(())
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_write_output()`.
@@ -151,20 +157,8 @@ impl WasmtimeHostProvisioningState {
                     ))
                 };
 
-                /* If a result is already written, signal this to the WASM
-                 * program and do not register a new result.  Otherwise,
-                 * register the result and signal success.
-                 */
-                if self.is_result_registered() {
-                    Ok(VeracruzError::ResultAlreadyWritten)
-                } else {
-                    self.set_result(&bytes);
-                    println!(
-                        ">>> write_output successfully executed in {:?}.",
-                        start.elapsed()
-                    );
-                    Ok(VeracruzError::Success)
-                }
+                self.write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes)?;
+                Ok(VeracruzError::Success)
             }
         }
     }
@@ -178,7 +172,7 @@ impl WasmtimeHostProvisioningState {
         {
             Some(memory) => {
                 let address = address as usize;
-                let result = self.get_current_data_source_count() as u32;
+                let result : u32 = self.count_file("input")? as u32;
 
                 let mut buffer = [0u8; std::mem::size_of::<u32>()];
                 LittleEndian::write_u32(&mut buffer, result);
@@ -213,27 +207,24 @@ impl WasmtimeHostProvisioningState {
                 let index = index as usize;
                 let address = address as usize;
 
-                match self.get_current_data_source(index as usize) {
-                    None => return Ok(VeracruzError::BadInput),
-                    Some(frame) => {
-                        let mut buffer = vec![0u8; std::mem::size_of::<u32>()];
-                        LittleEndian::write_u32(&mut buffer, frame.get_data().len() as u32);
+                let size : u32 = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
 
-                        unsafe {
-                            std::slice::from_raw_parts_mut(
-                                memory.data_ptr().add(address),
-                                std::mem::size_of::<u32>(),
-                            )
-                            .copy_from_slice(&buffer)
-                        };
+                let mut buffer = vec![0u8; std::mem::size_of::<u32>()];
+                LittleEndian::write_u32(&mut buffer, size);
 
-                        println!(
-                            ">>> input_size successfully executed in {:?}.",
-                            start.elapsed()
-                        );
-                        Ok(VeracruzError::Success)
-                    }
-                }
+                unsafe {
+                    std::slice::from_raw_parts_mut(
+                        memory.data_ptr().add(address),
+                        std::mem::size_of::<u32>(),
+                    )
+                    .copy_from_slice(&buffer)
+                };
+
+                println!(
+                    ">>> input_size successfully executed in {:?}.",
+                    start.elapsed()
+                );
+                Ok(VeracruzError::Success)
             }
         }
     }
@@ -251,29 +242,22 @@ impl WasmtimeHostProvisioningState {
                 let index = index as usize;
                 let size = size as usize;
 
-                match self.get_current_data_source(index as usize) {
-                    None => {
-                        return Ok(VeracruzError::BadInput);
-                    }
-                    Some(frame) => {
-                        let data = frame.get_data();
+                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
 
-                        if data.len() > size {
-                            Ok(VeracruzError::DataSourceSize)
-                        } else {
-                            unsafe {
-                                std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
-                                    .copy_from_slice(data)
-                            };
+                if data.len() > size {
+                    Ok(VeracruzError::DataSourceSize)
+                } else {
+                    unsafe {
+                        std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
+                            .copy_from_slice(&data)
+                    };
 
-                            println!(
-                                ">>> read_input successfully executed in {:?}.",
-                                start.elapsed()
-                            );
+                    println!(
+                        ">>> read_input successfully executed in {:?}.",
+                        start.elapsed()
+                    );
 
-                            Ok(VeracruzError::Success)
-                        }
-                    }
+                    Ok(VeracruzError::Success)
                 }
             }
         }
@@ -330,7 +314,7 @@ impl WasmtimeHostProvisioningState {
 /// Otherwise, returns the return value of the entry point function of the
 /// program, along with a host state capturing the result of the program's
 /// execution.
-pub(crate) fn invoke_entry_point(file_name: &str) -> Result<i32, Trap> {
+pub(crate) fn invoke_entry_point() -> Result<i32, Trap> {
     let start = Instant::now();
 
     let binary;
@@ -339,13 +323,6 @@ pub(crate) fn invoke_entry_point(file_name: &str) -> Result<i32, Trap> {
         let sigma = HOST_PROVISIONING_STATE
             .lock()
             .expect("Failed to obtain lock on host provisioning state.");
-
-        if sigma.get_lifecycle_state() != &LifecycleState::ReadyToExecute {
-            return Err(Trap::new(format!(
-                "Machine is in state '{}', expecting 'ReadyToExecute'",
-                sigma.get_lifecycle_state()
-            )));
-        }
 
         binary =
             match sigma.get_program() {
@@ -543,276 +520,21 @@ impl DummyWasmtimeHostProvisioningState {
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
-    /// ExecutionEngine wrapper of load_program implementation in WasmtimeHostProvisioningState.
-    #[inline]
-    fn append_file(&mut self, client_id: u64, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .append_file(client_id,file_name,data)
-    }
-
-    /// Chihuahua wrapper of read_file implementation in WasmtimeHostProvisioningState.
-    #[inline]
-    fn read_file(&self, client_id: u64, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .read_file(client_id,file_name)
-    }
-
-    ///// Chihuahua wrapper of register_program implementation in WasmtimeHostProvisioningState.
-    //fn register_program(&mut self, client_id: u64, file_name: &str, prog: &[u8]) -> Result<(), HostProvisioningError> {
-        ////TODO: link to the actually fs API.
-        ////TODO: THIS ONLY IS GLUE CODE FOR NOW!
-        //HOST_PROVISIONING_STATE
-            //.lock()
-            //.expect("Failed to obtain lock on host provisioning state.")
-            //.load_program(prog)
-    //}
-
-    /// Chihuahua wrapper of load_program implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .load_program(buffer)
-    }
-
-    ///// ExecutionEngine wrapper of add_new_data_source implementation in WasmtimeHostProvisioningState.
-    ///// Raises a panic if the global wasmtime host is unavailable.
-    //#[inline]
-    //fn add_new_data_source(
-        //&mut self,
-        //metadata: DataSourceMetadata,
-    //) -> Result<(), HostProvisioningError> {
-        //HOST_PROVISIONING_STATE
-            //.lock()
-            //.expect("Failed to obtain lock on host provisioning state.")
-            //.add_new_data_source(metadata)
-    //}
-
-    ///// ExecutionEngine wrapper of add_new_stream_source implementation in WasmtimeHostProvisioningState.
-    ///// Raises a panic if the global wasmtime host is unavailable.
-    //#[inline]
-    //fn add_new_stream_source(
-        //&mut self,
-        //metadata: DataSourceMetadata,
-    //) -> Result<(), HostProvisioningError> {
-        //HOST_PROVISIONING_STATE
-            //.lock()
-            //.expect("Failed to obtain lock on host provisioning state.")
-            //.add_new_stream_source(metadata)
-    //}
 
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self,file_name:&str) -> Result<i32, FatalHostError> {
-        invoke_entry_point(file_name)
-            //TODO: Change the error of invoke_entry_point to FatalHostError.
-            //      Add better error type to FatalHostErorr.
-            .map_err(|e| format!("WASM program issued trap: {}.", e))
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
+
+        //TODO check the permission XXX TODO XXX
+        //let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+
+        //self.load_program(program.as_slice())?;
+
+        invoke_entry_point()
             .map_err(|e| {
                 FatalHostError::DirectErrorMessage(format!("WASM program issued trap: {}.", e))
             })
             .map(|r| r.clone())
-    }
-
-    /// ExecutionEngine wrapper of is_program_registered implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn is_program_registered(&self) -> bool {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .is_program_registered()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of is_result_registered implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn is_result_registered(&self) -> bool {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .is_result_registered()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn is_memory_registered(&self) -> bool {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .is_memory_registered()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of is_able_to_shutdown implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn is_able_to_shutdown(&self) -> bool {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .is_able_to_shutdown()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_lifecycle_state implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_lifecycle_state(&self) -> LifecycleState {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_lifecycle_state()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_current_data_source_count(&self) -> usize {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_current_data_source_count()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_expected_data_sources(&self) -> Vec<u64> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_expected_data_sources()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_current_stream_source_count(&self) -> usize {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_current_stream_source_count()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_expected_stream_sources implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_expected_stream_sources(&self) -> Vec<u64> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_expected_stream_sources()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_expected_shutdown_sources(&self) -> Vec<u64> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_expected_shutdown_sources()
-            .clone()
-    }
-
-    /// ExecutionEngine wrapper of get_result implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_result(&self) -> Option<Vec<u8>> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_result()
-            .map(|d| d.clone())
-    }
-
-    /// ExecutionEngine wrapper of set_previous_result implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn set_previous_result(&mut self, sources: &Option<Vec<u8>>) {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .set_previous_result(sources);
-    }
-
-    /// ExecutionEngine wrapper of get_program_digest implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn get_program_digest(&self) -> Option<Vec<u8>> {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .get_program_digest()
-            .map(|d| d.clone())
-    }
-
-    /// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .set_expected_data_sources(sources);
-        self
-    }
-
-    /// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .set_expected_stream_sources(sources);
-        self
-    }
-
-    /// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .set_expected_shutdown_sources(sources);
-        self
-    }
-
-    /// Invaildate this global wasmtime host instanace.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn invalidate(&mut self) {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .set_error();
-    }
-
-    /// ExecutionEngine wrapper of request_shutdown implementation in WasmtimeHostProvisioningState.
-    /// Raises a panic if the global wasmtime host is unavailable.
-    #[inline]
-    fn request_shutdown(&mut self, client_id: u64) {
-        HOST_PROVISIONING_STATE
-            .lock()
-            .expect("Failed to obtain lock on host provisioning state.")
-            .request_shutdown(client_id);
     }
 }

@@ -96,6 +96,10 @@ impl VFS {
         Ok(self.fs.get(file_name).map(|v|v.clone()))
     }
 
+    pub fn count(&self, prefix: &str)  -> Result<u64,VFSError> {
+        Ok(self.fs.keys().map(|k| if k.starts_with(prefix) {1} else {0}).sum())
+    }
+
     // NOTE: the following function should match wasi api.
     /// Return Some(CapabilityFlags) if `id` has the permission 
     /// to read, write and execute on the `file_name`.

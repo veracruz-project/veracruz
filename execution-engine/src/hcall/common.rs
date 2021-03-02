@@ -66,7 +66,7 @@ use std::{
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability};
 use crate::hcall::buffer::{VFS, VFSError};
 
-#[cfg(any(feature = "tz", feature = "nitro"))]
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
 use std::sync::{SgxMutex as Mutex, Arc};
@@ -185,7 +185,7 @@ pub struct HostProvisioningState<Module, Memory> {
     pub(crate) program_module: Option<Module>,
     /// A reference to the WASM program's linear memory (or "heap").
     pub(crate) memory: Option<Memory>,
-    vfs : Arc<Mutex<VFS>>,
+    pub(crate) vfs : Arc<Mutex<VFS>>,
 }
 
 impl<Module, Memory> HostProvisioningState<Module, Memory> {
@@ -222,6 +222,11 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     pub(crate) fn read_file_base(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
         Ok(self.vfs.lock()?.read(file_name)?)
+    }
+    
+    /// Read from a file
+    pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        Ok(self.vfs.lock()?.count(prefix)?)
     }
 
     /// Registers the program module.

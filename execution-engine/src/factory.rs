@@ -66,35 +66,20 @@ pub enum ExecutionStrategy {
 pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
-) -> Option<Box<dyn ExecutionEngine + 'static>> {
-    #[cfg(feature = "std")]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                let state = new_wasmi_instance(vfs);
-
-                Some(Box::new(state))
-            }
-            ExecutionStrategy::JIT => {
-                wasmtime::initialize(
-                    expected_data_sources,
-                    expected_stream_sources,
-                    expected_shutdown_sources,
-                );
-
+) -> Option<Box<dyn ExecutionEngine>> {
+    match strategy {
+        ExecutionStrategy::Interpretation => {
+            Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
+        }
+        ExecutionStrategy::JIT => 
+        {
+            #[cfg(feature = "std")]
+            {
+                wasmtime::initialize(vfs);
                 Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
             }
-        }
-    }
-    #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                let state = new_wasmi_instance(vfs);
-
-                Some(Box::new(state))
-            }
-            ExecutionStrategy::JIT => None,
+            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
+            None
         }
     }
 }
@@ -110,41 +95,22 @@ pub fn single_threaded_execution_engine(
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
-) -> Option<impl ExecutionEngine> {
-    #[cfg(feature = "std")]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                Some(new_wasmi_instance(vfs))
+) -> Option<Box<dyn ExecutionEngine>> {
+    match strategy {
+        ExecutionStrategy::Interpretation => {
+            Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
+        }
+        ExecutionStrategy::JIT => 
+        {
+            #[cfg(feature = "std")]
+            {
+                wasmtime::initialize(vfs);
+                Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
             }
-            ExecutionStrategy::JIT => {
-                //TODO change
-                wasmtime::initialize(
-                    &vec!([]),
-                    &vec!([]),
-                    expected_shutdown_sources,
-                );
-
-                Some(wasmtime::DummyWasmtimeHostProvisioningState::new())
-            }
+            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
+            None
         }
     }
-    #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                Some(new_wasmi_instance(vfs))
-            }
-            ExecutionStrategy::JIT => None,
-        }
-    }
-}
-
-//TODO remove old parameters.
-fn new_wasmi_instance (
-    vfs : Arc<Mutex<VFS>>
-) -> impl ExecutionEngine {
-    wasmi::WasmiHostProvisioningState::new(vfs)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -30,7 +30,7 @@ use std::{boxed::Box, convert::TryFrom, fmt, fs::File, io::Read, process::exit, 
 
 use execution_engine::{
     factory::{single_threaded_execution_engine, ExecutionStrategy},
-    hcall::common::{ExecutionEngine, DataSourceMetadata},
+    hcall::common::ExecutionEngine,
 };
 
 use clap::{App, Arg};
@@ -414,46 +414,46 @@ fn read_configuration_file(fname: &str) -> Configuration {
     }
 }
 
-/// Loads the specified data sources, as provided on the command line, for
-/// reading and massages them into metadata frames, ready for
-/// the computation.  May abort the program if something goes wrong when reading
-/// any data source.
-fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
-    let mut rets = Vec::new();
+///// Loads the specified data sources, as provided on the command line, for
+///// reading and massages them into metadata frames, ready for
+///// the computation.  May abort the program if something goes wrong when reading
+///// any data source.
+//fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
+    //let mut rets = Vec::new();
 
-    for (id, fname) in cmdline.data_sources.iter().enumerate() {
-        info!("Loading data source '{}' for reading.", fname);
+    //for (id, fname) in cmdline.data_sources.iter().enumerate() {
+        //info!("Loading data source '{}' for reading.", fname);
 
-        let mut file = File::open(fname).unwrap_or_else(|err| {
-            eprintln!(
-                "Could not open data source '{}'.  Error '{}' returned.",
-                fname, err
-            );
-            exit(-1)
-        });
+        //let mut file = File::open(fname).unwrap_or_else(|err| {
+            //eprintln!(
+                //"Could not open data source '{}'.  Error '{}' returned.",
+                //fname, err
+            //);
+            //exit(-1)
+        //});
 
-        let mut buffer = Vec::new();
+        //let mut buffer = Vec::new();
 
-        file.read_to_end(&mut buffer).unwrap_or_else(|err| {
-            error!(
-                "Could not read data source '{}'.  Error '{}' returned.",
-                fname, err
-            );
-            exit(-1)
-        });
+        //file.read_to_end(&mut buffer).unwrap_or_else(|err| {
+            //error!(
+                //"Could not read data source '{}'.  Error '{}' returned.",
+                //fname, err
+            //);
+            //exit(-1)
+        //});
 
-        // XXX: may panic! if u64 and usize have differing bitwidths...
-        let id = u64::try_from(id).unwrap();
+        //// XXX: may panic! if u64 and usize have differing bitwidths...
+        //let id = u64::try_from(id).unwrap();
 
-        let frame = DataSourceMetadata::new(&buffer, id, 0);
+        //let frame = DataSourceMetadata::new(&buffer, id, 0);
 
-        info!("Pushing '{}' as data source number '{}'.", fname, id);
+        //info!("Pushing '{}' as data source number '{}'.", fname, id);
 
-        rets.push(frame)
-    }
+        //rets.push(frame)
+    //}
 
-    rets
-}
+    //rets
+//}
 
 /// Entry: reads the static configuration and the command line parameters,
 /// parsing both and then starts provisioning the Veracruz host state, before
@@ -473,86 +473,86 @@ fn main() {
 
     info!("WASM module loaded.");
 
-    let expected_data_sources: Vec<u64> = (0..config.data_source_count as u64).collect();
-    let mut provisioning_state: Box<dyn ExecutionEngine + 'static> =
-        single_threaded_execution_engine(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
-            .unwrap();
+    //let expected_data_sources: Vec<u64> = (0..config.data_source_count as u64).collect();
+    //let mut provisioning_state: Box<dyn ExecutionEngine + 'static> =
+        //single_threaded_execution_engine(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
+            //.unwrap();
 
-    provisioning_state.set_expected_data_sources(&expected_data_sources);
+    //provisioning_state.set_expected_data_sources(&expected_data_sources);
 
-    info!(
-        "Machine state before loading program: {:?}",
-        provisioning_state.get_lifecycle_state()
-    );
+    //info!(
+        //"Machine state before loading program: {:?}",
+        //provisioning_state.get_lifecycle_state()
+    //);
 
-    if let Err(error) = provisioning_state.load_program(&module) {
-        eprintln!("Failed to register program.  Error '{}' returned.", error);
-        exit(-1);
-    }
+    //if let Err(error) = provisioning_state.load_program(&module) {
+        //eprintln!("Failed to register program.  Error '{}' returned.", error);
+        //exit(-1);
+    //}
 
-    info!("WASM program loaded.");
+    //info!("WASM program loaded.");
 
-    let sources = load_data_sources(&cmdline);
+    //let sources = load_data_sources(&cmdline);
 
-    info!(
-        "Machine state after loading program: {:?}",
-        provisioning_state.get_lifecycle_state()
-    );
+    //info!(
+        //"Machine state after loading program: {:?}",
+        //provisioning_state.get_lifecycle_state()
+    //);
 
-    for source in sources {
-        if let Err(err) = provisioning_state.add_new_data_source(source) {
-            eprintln!("Failed to register data source.  Error '{}' produced.", err);
-            exit(-1);
-        }
-    }
+    //for source in sources {
+        //if let Err(err) = provisioning_state.add_new_data_source(source) {
+            //eprintln!("Failed to register data source.  Error '{}' produced.", err);
+            //exit(-1);
+        //}
+    //}
 
-    info!("Data sources loaded.");
-    info!(
-        "Machine state after loading data sources: {:?}",
-        provisioning_state.get_lifecycle_state()
-    );
-    info!("Invoking main.");
+    //info!("Data sources loaded.");
+    //info!(
+        //"Machine state after loading data sources: {:?}",
+        //provisioning_state.get_lifecycle_state()
+    //);
+    //info!("Invoking main.");
 
-    let start = Instant::now();
+    //let start = Instant::now();
 
-    match provisioning_state.invoke_entry_point("program.wasm") {
-        Ok(err_code) => {
-            if cmdline.time_computation {
-                println!("WASM program finished execution in '{:?}.", start.elapsed());
-            }
+    //match provisioning_state.invoke_entry_point("program.wasm") {
+        //Ok(err_code) => {
+            //if cmdline.time_computation {
+                //println!("WASM program finished execution in '{:?}.", start.elapsed());
+            //}
 
-            if err_code == 0 {
-                println!("WASM program executed successfully.");
+            //if err_code == 0 {
+                //println!("WASM program executed successfully.");
 
-                match provisioning_state.get_result() {
-                    None => println!("Program produced no result data."),
-                    Some(result) => {
-                        println!(
-                            "Program produced '{}' bytes of result data: '{:?}'.",
-                            result.len(),
-                            result
-                        );
-                    }
-                }
-            } else {
-                let pretty = ErrorCode::try_from(err_code)
-                    .map(|e| format!("{}", e))
-                    .unwrap_or_else(|_| "<unknown error code>".to_string());
-                println!(
-                    "Veracruz program returned error code '{}' (return code = {}).",
-                    pretty, err_code
-                );
-                if cmdline.time_computation {
-                    println!("WASM program finished execution in '{:?}.", start.elapsed());
-                }
-            }
-        }
-        Err(error) => {
-            eprintln!("Veracruz program returned unexpected result '{:?}'.", error);
-            if cmdline.time_computation {
-                println!("WASM program finished execution in '{:?}.", start.elapsed());
-            }
-            exit(-1)
-        }
-    }
+                //match provisioning_state.get_result() {
+                    //None => println!("Program produced no result data."),
+                    //Some(result) => {
+                        //println!(
+                            //"Program produced '{}' bytes of result data: '{:?}'.",
+                            //result.len(),
+                            //result
+                        //);
+                    //}
+                //}
+            //} else {
+                //let pretty = ErrorCode::try_from(err_code)
+                    //.map(|e| format!("{}", e))
+                    //.unwrap_or_else(|_| "<unknown error code>".to_string());
+                //println!(
+                    //"Veracruz program returned error code '{}' (return code = {}).",
+                    //pretty, err_code
+                //);
+                //if cmdline.time_computation {
+                    //println!("WASM program finished execution in '{:?}.", start.elapsed());
+                //}
+            //}
+        //}
+        //Err(error) => {
+            //eprintln!("Veracruz program returned unexpected result '{:?}'.", error);
+            //if cmdline.time_computation {
+                //println!("WASM program finished execution in '{:?}.", start.elapsed());
+            //}
+            //exit(-1)
+        //}
+    //}
 }
