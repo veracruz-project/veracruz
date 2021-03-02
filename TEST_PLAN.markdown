@@ -36,9 +36,9 @@ one go.
 ## Veracruz-test
 
 In the `veracruz-test` directory in the main Veracruz repository.  These tests are
-integration tests intended to exercise the entire stack, including Durango,
-Sinaloa, and Mexico City.  The client uses Durango to interface with Sinaloa
-using a (local) network connection.
+integration tests intended to exercise the entire stack, including the Veracuz
+client, Sinaloa, and Mexico City.  The client interfaces with Sinaloa using a
+(local) network connection.
 
 The tests are organized again into phases, numbered 1--3, for the same reason that
 Sinaloa-tests are phased, as discussed above.
@@ -82,22 +82,22 @@ Sinaloa-tests are phased, as discussed above.
 | veracruz-test | veracruz_phase2_string_edit_distance_three_clients                             | A test of veracruz using network communication using three sessions (one for program, one for the first data, and one for the second data and retrieval.) | triple_parties_two_data_sources_string_edit_distance_policy.json | string-edit-distance.wasm |lorum-ipsum-25-paras.dat<cr>hello-world.dat | written |
 | veracruz-test | veracruz_phase3_string_edit_distance_four_clients                              | A test of veracruz using network communication using four sessions (one for program, one for the first data, one for the second data, and one for retrieval.) | quadruple_policy.json |string-edit-distance.wasm | lorum-ipsum-25-paras.dat<cr>hello-world.dat | written |
 | veracruz-test | veracruz_phase4_linear_regression_two_clients_parallel                         | a test of veracruz using network communication using two parallel sessions (one for program, one for data sending and retrieving) | dual_policy.json | linear-regression.wasm | king-county-sqftliving-price.dat | written |
-| durango        | test_internal_read_all_bytes_in_file_succ                                     | Test the Durango private function read_all_bytes_in_file with a valid file | n/a                         | n/a | n/a | written |
-| durango        |test_internal_read_all_bytes_in_file_invalid_file                              | Test the Durango private function read_all_bytes_in_file with an invalid file | n/a                         | n/a | n/a | written |
-| durango        | test_internal_read_all_bytes_in_file_invalid_path                             | Test the Durango private function read_all_bytes_in_file with an invalid path | n/a                         | n/a | n/a | written |
-| durango        | test_internal_read_cert_succ                                                  | Test the Durango private function read_cert with a valid certificate file | n/a                         | n/a | n/a | written |
-| durango        | test_internal_read_cert_invalid_certificate                                   | Test the Durango private function read_cert with an invalid certificate file (in this case, a key file) | n/a                         | n/a | n/a | written |
-| durango        | test_internal_read_private_key_succ                                           | Test the Durango private function read_private_key with a valid private key file | n/a                         | n/a | n/a | written |
-| durango        | test_internal_read_cert_invalid_private_key                                   | Test the Durango private function read_private_key with an invalid private key file (in this case, a certificate file) | n/a                         | n/a | n/a | written |
-| durango        | test_set_up_mock_object_for_attestation_handler                               | Test the Durango test infrastructure for setting un a mock attestation server (sort of a meta-test, I suppose?) | one_data_source_policy.json | n/a | n/a | written |
-| durango        | test_internal_init_self_signed_cert_client_config_succ                        | | one_data_source_policy.json | n/a | n/a | written |
-| durango        | test_internal_init_self_signed_cert_client_config_invalid_ciphersuite         | | one_data_source_policy.json | n/a | n/a | written |
-| durango        | test_durango_new_succ                                                         | Test the Durango new function with various valid policy files| ../test-collateral/\*.json   | n/a | n/a | written |
-| durango | test_durango_new_fail                                                                | This function tests loading invalid policy.<br>Invalid or out-of-time certificate, and invalid or out-of-time enclave cert-time. | ../test-collateral/invalid_policy/\*.json | n/a | n/a | written |
-| durango        | test_durango_new_unmatched_client_certificate                                 | Test Durango new function with mismatched client certificate and client key | one_data_source_policy.json | n/a | n/a | written |
-| durango        | test_durango_new_unmatched_client_key                                         | Test Durango new function with mismatched client certificate and client key | one_data_source_policy.json | n/a | n/a | written |
-| durango        | test_durango_new_invalid_enclave_name                                         | Test Durango new when provided with an invalid URL for the Sinaloa server | one_data_source_policy.json | n/a | n/a | written |
-| durango        | durango_policy_violations                                                     | Test Durango's policy enforcement by setting up new Durango instances, and then calling them using invalid client credentials for the policy | | n/a | n/a | not written |
-| durango        | durango_session                                                               | Test Durango's ability to send and receive data | one_data_source_policy.json | n/a | n/a | ignored - need to rewrite to the new interfaces |
+| veracruz-client        | test_internal_read_all_bytes_in_file_succ                                     | Test the VeracruzClient private function read_all_bytes_in_file with a valid file | n/a                         | n/a | n/a | written |
+| veracruz-client        |test_internal_read_all_bytes_in_file_invalid_file                              | Test the VeracruzClient private function read_all_bytes_in_file with an invalid file | n/a                         | n/a | n/a | written |
+| veracruz-client        | test_internal_read_all_bytes_in_file_invalid_path                             | Test the VeracruzClient private function read_all_bytes_in_file with an invalid path | n/a                         | n/a | n/a | written |
+| veracruz-client        | test_internal_read_cert_succ                                                  | Test the VeracruzClient private function read_cert with a valid certificate file | n/a                         | n/a | n/a | written |
+| veracruz-client        | test_internal_read_cert_invalid_certificate                                   | Test the VeracruzClient private function read_cert with an invalid certificate file (in this case, a key file) | n/a                         | n/a | n/a | written |
+| veracruz-client        | test_internal_read_private_key_succ                                           | Test the VeracruzClient private function read_private_key with a valid private key file | n/a                         | n/a | n/a | written |
+| veracruz-client        | test_internal_read_cert_invalid_private_key                                   | Test the VeracruzClient private function read_private_key with an invalid private key file (in this case, a certificate file) | n/a                         | n/a | n/a | written |
+| veracruz-client        | test_set_up_mock_object_for_attestation_handler                               | Test the VeracruzClient test infrastructure for setting un a mock attestation server (sort of a meta-test, I suppose?) | one_data_source_policy.json | n/a | n/a | written |
+| veracruz-client        | test_internal_init_self_signed_cert_client_config_succ                        | | one_data_source_policy.json | n/a | n/a | written |
+| veracruz-client        | test_internal_init_self_signed_cert_client_config_invalid_ciphersuite         | | one_data_source_policy.json | n/a | n/a | written |
+| veracruz-client        | test_veracruz_client_new_succ                                                         | Test the VeracruzClient new function with various valid policy files| ../test-collateral/\*.json   | n/a | n/a | written |
+| veracruz-client | test_veracruz_client_new_fail                                                                | This function tests loading invalid policy.<br>Invalid or out-of-time certificate, and invalid or out-of-time enclave cert-time. | ../test-collateral/invalid_policy/\*.json | n/a | n/a | written |
+| veracruz-client        | test_veracruz_client_new_unmatched_client_certificate                                 | Test VeracruzClient new function with mismatched client certificate and client key | one_data_source_policy.json | n/a | n/a | written |
+| veracruz-client        | test_veracruz_client_new_unmatched_client_key                                         | Test VeracruzClient new function with mismatched client certificate and client key | one_data_source_policy.json | n/a | n/a | written |
+| veracruz-client        | test_veracruz_client_new_invalid_enclave_name                                         | Test VeracruzClient new when provided with an invalid URL for the Sinaloa server | one_data_source_policy.json | n/a | n/a | written |
+| veracruz-client        | veracruz_client_policy_violations                                                     | Test VeracruzClient's policy enforcement by setting up new VeracruzClient instances, and then calling them using invalid client credentials for the policy | | n/a | n/a | not written |
+| veracruz-client        | veracruz_client_session                                                               | Test VeracruzClient's ability to send and receive data | one_data_source_policy.json | n/a | n/a | ignored - need to rewrite to the new interfaces |
 | proxy-attestation-server | test_sgx_attestation                                                | Test the proxy attestation server's SGX Attestation flow | n/a | n/a | n/a | written |
 | proxy-attestation-server | test_psa_attestation                                                | Test the proxy attestation server's PSA Atttestation flow | n/a | n/a | n/a | written |

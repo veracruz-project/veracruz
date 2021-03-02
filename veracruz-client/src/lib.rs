@@ -1,4 +1,4 @@
-//! The Durango library
+//! The Veracruz Client's library
 //!
 //! ## Authors
 //!

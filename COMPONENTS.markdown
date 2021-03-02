@@ -40,10 +40,10 @@ concept exposed by this library is the Global Policy, which describes the
 Untrusted code needs to be used to interface between clients and the trusted
 Veracruz runtime.  Components related to this untrusted interfacing are:
 
-- Durango: is client software that is designed to interact with the Veracruz
-trusted runtime.  Principals provisioning secrets into the isolate/challenging
-the authenticity of the isolate with remote attestation use this for all
-communication between them and the trusted runtime.
+- Veracruz client: is client software that is designed to interact with the
+Veracruz trusted runtime.  Principals provisioning secrets into the
+isolate/challenging the authenticity of the isolate with remote attestation use
+this for all communication between them and the trusted runtime.
 - Sinaloa: is an untrusted "bridge"/server component executing on the
 delegate's machine, outside of the isolate, and which routes encrypted
 communication between the various principals and the isolate. 

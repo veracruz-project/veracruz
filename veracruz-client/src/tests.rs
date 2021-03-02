@@ -1,4 +1,4 @@
-//! Durango-specific tests
+//! Client-specific tests
 //!
 //! Note the tests need to be run in single-threaded mode.  Use
 //!
@@ -336,8 +336,9 @@ fn test_veracruz_client_new_invalid_enclave_name() {
 }
 
 #[actix_rt::test]
-/// Test Durango's policy enforcement by setting up new Durango instances, and
-/// then calling them using invalid client credentials for the policy
+/// Test Veracruz client's policy enforcement by setting up new client
+/// instances, and then calling them using invalid client credentials for the
+/// policy
 async fn veracruz_client_policy_violations() {
     // set up the attestation result as a mock object
     // This fakes the Attestation interface so we don't have to bring up a

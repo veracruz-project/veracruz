@@ -1,4 +1,4 @@
-//! The Durango error
+//! Veracruz client error
 //!
 //! ## Authors
 //!

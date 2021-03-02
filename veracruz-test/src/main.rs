@@ -362,7 +362,7 @@ mod tests {
             // Wait for the enclave initialasation
             task::sleep(std::time::Duration::from_millis(10000)).await;
 
-            info!("### Step 2. Set up all durango sessions.");
+            info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
                 #[cfg(feature = "sgx")]

@@ -381,7 +381,7 @@ pub enum EnclavePlatform {
     SGX,
     TrustZone,
     Nitro,
-    /// The Mock platform is for unit testing (durango unit tests, at the moment)
+    /// The Mock platform is for unit testing (client unit tests, at the moment)
     Mock, 
 }
 
