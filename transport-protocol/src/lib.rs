@@ -1,4 +1,4 @@
-//! The Colima library
+//! The transport protocol library
 //!
 //! ## Authors
 //!

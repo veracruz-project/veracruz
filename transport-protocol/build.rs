@@ -1,4 +1,4 @@
-//! Colima build script
+//! Transport protocol build script
 //!
 //! ## Authors
 //!

@@ -1,4 +1,4 @@
-//! Custom and derived functionality relating to Colima.
+//! Custom and derived functionality relating to the transport protocol.
 //!
 //! ## Authors
 //!

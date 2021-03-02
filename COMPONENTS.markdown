@@ -22,8 +22,9 @@ available for executing a program: at the moment the JIT strategy is only
 available when using seL4 (or `freestanding-execution-engine`---see below) with
 interpretation as the only selectable execution strategy for TrustZone and SGX
 (we are currently working on changing this).
-- Colima: is a support library that manages the parsing and serialization of
-`protobuf` messages used in the various Veracruz wire protocols.
+- Transport protocol: is a support library that manages the parsing and
+serialization of `protobuf` messages used in the various Veracruz wire
+protocols.
 - Mexico City: is a "command and control" module for the trusted Veracruz
 runtime which drives the other components.
 - platform_services: provides an abstraction layer over important services that
