@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-durango-test trustzone-durango-test sgx trustzone sgx-sinaloa-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env tlaxcala trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-sinaloa-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env tlaxcala trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -32,12 +32,12 @@ sdk:
 test_cases: sdk
 	$(MAKE) -C test-collateral
 
-# Test durango for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
-sgx-durango-test: sgx test_cases 
+# Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
+sgx-veracruz-client-test: sgx test_cases 
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --lib --features "mock sgx" -- --test-threads=1
 
-# Test durango for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
-trustzone-durango-test: trustzone test_cases
+# Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
+trustzone-veracruz-client-test: trustzone test_cases
 	cd veracruz-client && cargo test --lib --features "mock tz" -- --test-threads=1
 
 # Compile for sgx
