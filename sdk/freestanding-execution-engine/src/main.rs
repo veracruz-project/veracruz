@@ -27,10 +27,18 @@
 //! and copyright information.
 
 use std::{boxed::Box, convert::TryFrom, fmt, fs::File, io::Read, process::exit, time::Instant};
+use std::sync::Mutex;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    vec::Vec,
+    path::Path,
+};
 
 use execution_engine::{
     factory::{single_threaded_execution_engine, ExecutionStrategy},
     hcall::common::ExecutionEngine,
+    hcall::buffer::VFS,
 };
 
 use clap::{App, Arg};
@@ -345,6 +353,35 @@ fn parse_command_line(config: &Configuration) -> CommandLineOptions {
 /// Reads a WASM file from disk (actually, will read any file, but we only need
 /// it for WASM here) and return a collection of bytes corresponding to that
 /// file.  Will abort the program if anything goes wrong.
+fn load_file(file_path: &str) -> (String, Vec<u8>) {
+    info!("Opening file '{}' for reading.", file_path);
+
+    let mut file = File::open(file_path).unwrap_or_else(|err| {
+        eprintln!(
+            "Cannot open WASM binary '{}'.  Error '{}' returned.",
+            file_path, err
+        );
+        exit(-1)
+    });
+
+    let mut contents = Vec::new();
+
+    file.read_to_end(&mut contents).unwrap_or_else(|err| {
+        eprintln!(
+            "Cannot read WASM binary '{}' to completion.  Error '{}' returned.",
+            file_path, err
+        );
+        exit(-1);
+    });
+
+    (Path::new(file_path).file_name().unwrap().to_str().unwrap().to_string(), contents)
+}
+
+
+
+/// Reads a WASM file from disk (actually, will read any file, but we only need
+/// it for WASM here) and return a collection of bytes corresponding to that
+/// file.  Will abort the program if anything goes wrong.
 fn read_program_file(fname: &str) -> Vec<u8> {
     info!("Opening file '{}' for reading.", fname);
 
@@ -368,6 +405,11 @@ fn read_program_file(fname: &str) -> Vec<u8> {
 
     contents
 }
+
+
+
+
+
 
 /// Reads a static TOML configuration file from a fixed location on disk,
 /// returning a `Configuration` struct.  Will abort the program if anything
@@ -414,46 +456,41 @@ fn read_configuration_file(fname: &str) -> Configuration {
     }
 }
 
-///// Loads the specified data sources, as provided on the command line, for
-///// reading and massages them into metadata frames, ready for
-///// the computation.  May abort the program if something goes wrong when reading
-///// any data source.
-//fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
-    //let mut rets = Vec::new();
 
-    //for (id, fname) in cmdline.data_sources.iter().enumerate() {
-        //info!("Loading data source '{}' for reading.", fname);
+/// Loads the specified data sources, as provided on the command line, for
+/// reading and massages them into metadata frames, ready for
+/// the computation.  May abort the program if something goes wrong when reading
+/// any data source.
+fn load_data_sources(cmdline: &CommandLineOptions, vfs : Arc<Mutex<VFS>>) {
+    for (id, file_path) in cmdline.data_sources.iter().enumerate() {
+        info!("Loading data source '{}' with id {} for reading.", file_path, id);
 
-        //let mut file = File::open(fname).unwrap_or_else(|err| {
-            //eprintln!(
-                //"Could not open data source '{}'.  Error '{}' returned.",
-                //fname, err
-            //);
-            //exit(-1)
-        //});
+        let mut file = File::open(file_path).unwrap_or_else(|err| {
+            eprintln!(
+                "Could not open data source '{}'.  Error '{}' returned.",
+                file_path, err
+            );
+            exit(-1)
+        });
 
-        //let mut buffer = Vec::new();
+        let mut buffer = Vec::new();
 
-        //file.read_to_end(&mut buffer).unwrap_or_else(|err| {
-            //error!(
-                //"Could not read data source '{}'.  Error '{}' returned.",
-                //fname, err
-            //);
-            //exit(-1)
-        //});
+        file.read_to_end(&mut buffer).unwrap_or_else(|err| {
+            error!(
+                "Could not read data source '{}'.  Error '{}' returned.",
+                file_path, err
+            );
+            exit(-1)
+        });
 
-        //// XXX: may panic! if u64 and usize have differing bitwidths...
-        //let id = u64::try_from(id).unwrap();
+        // XXX: may panic! if u64 and usize have differing bitwidths...
+        let id = u64::try_from(id).unwrap();
+        let file_name = format!("input-{}",id);
+        vfs.lock().unwrap().write(&file_name,&buffer).unwrap();
 
-        //let frame = DataSourceMetadata::new(&buffer, id, 0);
-
-        //info!("Pushing '{}' as data source number '{}'.", fname, id);
-
-        //rets.push(frame)
-    //}
-
-    //rets
-//}
+        info!("Loading '{}' as file_name '{}' into vfs.", file_path, file_name);
+    }
+}
 
 /// Entry: reads the static configuration and the command line parameters,
 /// parsing both and then starts provisioning the Veracruz host state, before
@@ -469,90 +506,51 @@ fn main() {
 
     info!("Command line read successfully.");
 
-    let module = read_program_file(&cmdline.binary);
+    let vfs = Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())));
+    let (prog_file_name, program) = load_file(&cmdline.binary);
+    vfs.lock().unwrap().write(&prog_file_name,&program).unwrap();
+    
+    info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    info!("WASM module loaded.");
+    load_data_sources(&cmdline,vfs.clone());
 
-    //let expected_data_sources: Vec<u64> = (0..config.data_source_count as u64).collect();
-    //let mut provisioning_state: Box<dyn ExecutionEngine + 'static> =
-        //single_threaded_execution_engine(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
-            //.unwrap();
+    info!("Data sources loaded.");
 
-    //provisioning_state.set_expected_data_sources(&expected_data_sources);
+    info!("Invoking main.");
 
-    //info!(
-        //"Machine state before loading program: {:?}",
-        //provisioning_state.get_lifecycle_state()
-    //);
+    let start = Instant::now();
 
-    //if let Err(error) = provisioning_state.load_program(&module) {
-        //eprintln!("Failed to register program.  Error '{}' returned.", error);
-        //exit(-1);
-    //}
+    match single_threaded_execution_engine(&cmdline.execution_strategy, vfs.clone())
+          .unwrap()
+          .invoke_entry_point(&prog_file_name) {
+        Ok(err_code) => {
+            if cmdline.time_computation {
+                info!("WASM program finished execution in '{:?}.", start.elapsed());
+            }
 
-    //info!("WASM program loaded.");
+            if err_code == 0 {
+                info!("WASM program executed successfully.");
 
-    //let sources = load_data_sources(&cmdline);
-
-    //info!(
-        //"Machine state after loading program: {:?}",
-        //provisioning_state.get_lifecycle_state()
-    //);
-
-    //for source in sources {
-        //if let Err(err) = provisioning_state.add_new_data_source(source) {
-            //eprintln!("Failed to register data source.  Error '{}' produced.", err);
-            //exit(-1);
-        //}
-    //}
-
-    //info!("Data sources loaded.");
-    //info!(
-        //"Machine state after loading data sources: {:?}",
-        //provisioning_state.get_lifecycle_state()
-    //);
-    //info!("Invoking main.");
-
-    //let start = Instant::now();
-
-    //match provisioning_state.invoke_entry_point("program.wasm") {
-        //Ok(err_code) => {
-            //if cmdline.time_computation {
-                //println!("WASM program finished execution in '{:?}.", start.elapsed());
-            //}
-
-            //if err_code == 0 {
-                //println!("WASM program executed successfully.");
-
-                //match provisioning_state.get_result() {
-                    //None => println!("Program produced no result data."),
-                    //Some(result) => {
-                        //println!(
-                            //"Program produced '{}' bytes of result data: '{:?}'.",
-                            //result.len(),
-                            //result
-                        //);
-                    //}
-                //}
-            //} else {
-                //let pretty = ErrorCode::try_from(err_code)
-                    //.map(|e| format!("{}", e))
-                    //.unwrap_or_else(|_| "<unknown error code>".to_string());
-                //println!(
-                    //"Veracruz program returned error code '{}' (return code = {}).",
-                    //pretty, err_code
-                //);
-                //if cmdline.time_computation {
-                    //println!("WASM program finished execution in '{:?}.", start.elapsed());
-                //}
-            //}
-        //}
-        //Err(error) => {
-            //eprintln!("Veracruz program returned unexpected result '{:?}'.", error);
-            //if cmdline.time_computation {
-                //println!("WASM program finished execution in '{:?}.", start.elapsed());
-            //}
-            //exit(-1)
-        //}
-    //}
+                info!("Result {:?}.",vfs.lock().unwrap().read("output").unwrap());
+            } else {
+                let pretty = ErrorCode::try_from(err_code)
+                    .map(|e| format!("{}", e))
+                    .unwrap_or_else(|_| "<unknown error code>".to_string());
+                println!(
+                    "Veracruz program returned error code '{}' (return code = {}).",
+                    pretty, err_code
+                );
+                if cmdline.time_computation {
+                    println!("WASM program finished execution in '{:?}.", start.elapsed());
+                }
+            }
+        }
+        Err(error) => {
+            eprintln!("Veracruz program returned unexpected result '{:?}'.", error);
+            if cmdline.time_computation {
+                println!("WASM program finished execution in '{:?}.", start.elapsed());
+            }
+            exit(-1)
+        }
+    }
 }

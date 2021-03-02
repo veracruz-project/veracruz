@@ -527,9 +527,9 @@ impl ExecutionEngine for DummyWasmtimeHostProvisioningState {
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
 
         //TODO check the permission XXX TODO XXX
-        //let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+        let program = HOST_PROVISIONING_STATE.lock().unwrap().read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
 
-        //self.load_program(program.as_slice())?;
+        HOST_PROVISIONING_STATE.lock().unwrap().load_program(program.as_slice())?;
 
         invoke_entry_point()
             .map_err(|e| {
