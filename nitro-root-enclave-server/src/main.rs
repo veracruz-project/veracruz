@@ -59,7 +59,7 @@ pub enum NitroServerError {
     /// A remote http server returned a non-success (200) status
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
     NonSuccessHttp,
-    /// TransportProtocol protocol buffer handling returned an error
+    /// Transport protocol buffer handling returned an error
     #[error(display = "NitroServer: TransportProtocol error:{:?}", _0)]
     TransportProtocol(transport_protocol::custom::TransportProtocolError),
     /// Curl returned an error
