@@ -24,7 +24,7 @@ pub enum RuntimeManagerError {
     #[error(display = "RuntimeManager: SessionManagerError: {:?}.", _0)]
     SessionManagerError(#[error(source)] session_manager::SessionManagerError),
     #[error(display = "RuntimeManager: TransportProtocolError: {:?}.", _0)]
-    TransportProtocolError(#[error(source)] colima::TransportProtocolError),
+    TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "RuntimeManager: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
     #[error(display = "RuntimeManager: FatalHostError: {:?}.", _0)]

@@ -1403,7 +1403,7 @@ mod tests {
             &serialized_pi_hash_request[..],
         )?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(&data)?;
-        et status = parsed_response.get_status();
+        let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
