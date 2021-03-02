@@ -50,8 +50,8 @@ pub enum DurangoError {
     TryIntoError(#[error(source)] std::num::TryFromIntError),
     #[error(display = "Durango: ParseIntError: {}.", _0)]
     ParseIntError(#[error(source)] std::num::ParseIntError),
-    #[error(display = "Durango: ColimaError: {:?}.", _0)]
-    ColimaError(#[error(source)] transport_protocol::ColimaError),
+    #[error(display = "Durango: TransportProtocolError: {:?}.", _0)]
+    TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "Durango: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
     #[error(display = "Durango: Certificate expired: {:?}.", _0)]

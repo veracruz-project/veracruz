@@ -135,8 +135,8 @@ pub enum SinaloaError {
         expected: std::vec::Vec<u8>,
         received: std::vec::Vec<u8>,
     },
-    #[error(display = "Sinaloa: ColimaError: {:?}.", _0)]
-    ColimaError(#[error(source)] transport_protocol::ColimaError),
+    #[error(display = "Sinaloa: TransportProtocolError: {:?}.", _0)]
+    TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "Sinaloa: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
     #[error(display = "Sinaloa: Pinecone Error: {:?}.", _0)]
