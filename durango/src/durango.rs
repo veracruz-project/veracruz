@@ -252,12 +252,12 @@ impl Durango {
 
         self.check_policy_hash()?;
 
-        let serialized_program = colima::serialize_program(&program)?;
+        let serialized_program = transport_protocol::serialize_program(&program)?;
         let response = self.send(&serialized_program)?;
-        let parsed_response = colima::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
         let status = parsed_response.get_status();
         match status {
-            colima::ResponseStatus::SUCCESS => return Ok(()),
+            transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
             _ => {
                 return Err(DurangoError::ResponseError("send_program", status));
             }
@@ -268,13 +268,13 @@ impl Durango {
         self.check_role_permission(&VeracruzRole::DataProvider)?;
         self.check_policy_hash()?;
         self.check_pi_hash()?;
-        let serialized_data = colima::serialize_program_data(&data, self.next_package_id())?;
+        let serialized_data = transport_protocol::serialize_program_data(&data, self.next_package_id())?;
         let response = self.send(&serialized_data)?;
 
-        let parsed_response = colima::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
         let status = parsed_response.get_status();
         match status {
-            colima::ResponseStatus::SUCCESS => return Ok(()),
+            transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
             _ => {
                 return Err(DurangoError::ResponseError("send_data", status));
             }
@@ -286,12 +286,12 @@ impl Durango {
         self.check_policy_hash()?;
         self.check_pi_hash()?;
 
-        let serialized_read_result = colima::serialize_request_result()?;
+        let serialized_read_result = transport_protocol::serialize_request_result()?;
         let response = self.send(&serialized_read_result)?;
 
-        let parsed_response = colima::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
         let status = parsed_response.get_status();
-        if status != colima::ResponseStatus::SUCCESS {
+        if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(DurangoError::ResponseError("get_result", status));
         }
         if !parsed_response.has_result() {
@@ -302,7 +302,7 @@ impl Durango {
     }
 
     pub fn request_shutdown(&mut self) -> Result<(), DurangoError> {
-        let serialized_request = colima::serialize_request_shutdown()?;
+        let serialized_request = transport_protocol::serialize_request_shutdown()?;
         let _response = self.send(&serialized_request)?;
         Ok(())
     }
@@ -314,11 +314,11 @@ impl Durango {
     }
 
     fn check_policy_hash(&mut self) -> Result<(), DurangoError> {
-        let serialized_rph = colima::serialize_request_policy_hash()?;
+        let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph)?;
-        let parsed_response = colima::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
         match parsed_response.status {
-            colima::ResponseStatus::SUCCESS => {
+            transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
                 if self.policy_hash != received_hash {
                     return Err(DurangoError::MismatchError {
@@ -340,15 +340,15 @@ impl Durango {
     }
 
     fn check_pi_hash(&mut self) -> Result<(), DurangoError> {
-        let serialized_request = colima::serialize_request_pi_hash()?;
+        let serialized_request = transport_protocol::serialize_request_pi_hash()?;
         let mut iterations = 0;
         let max_iterations = 10;
         while iterations < max_iterations {
             let response = self.send(&serialized_request)?;
-            let parsed_response = colima::parse_mexico_city_response(&response)?;
+            let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
             let status = parsed_response.get_status();
             match status {
-                colima::ResponseStatus::SUCCESS => {
+                transport_protocol::ResponseStatus::SUCCESS => {
                     let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
                     if received_hash == *self.policy.pi_hash() {
                         return Ok(());
@@ -360,7 +360,7 @@ impl Durango {
                         });
                     }
                 }
-                colima::ResponseStatus::FAILED_NOT_READY => {
+                transport_protocol::ResponseStatus::FAILED_NOT_READY => {
                     std::thread::sleep(std::time::Duration::from_millis(5000));
                     // go for another iteration
                 }

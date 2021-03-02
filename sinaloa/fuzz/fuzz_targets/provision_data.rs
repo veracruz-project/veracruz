@@ -10,7 +10,7 @@
 //! and copyright information.
 
 #![no_main]
-use colima;
+use transport_protocol;
 use libfuzzer_sys::fuzz_target;
 use std::io::prelude::*;
 use std::fs::File;
@@ -20,7 +20,7 @@ const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
 
 fuzz_target!(|buffer: &[u8]| {
     // Fuzz a  valid protocol
-    if let Ok(request) = colima::serialize_program(buffer) {
+    if let Ok(request) = transport_protocol::serialize_program(buffer) {
         println!("program: {:?}",request);
 
 	let mut f = File::open("../test-collateral/one_data_source_policy.json").unwrap();
@@ -61,10 +61,10 @@ fuzz_target!(|buffer: &[u8]| {
 
 
         let rst = client_tls_send(&client_tls_tx, &client_tls_rx, &mut client_session, &request).unwrap();
-        let rst = protobuf::parse_from_bytes::<colima::MexicoCityResponse>(&rst);
+        let rst = protobuf::parse_from_bytes::<transport_protocol::MexicoCityResponse>(&rst);
         assert!(rst.is_ok());
         //let response = rst.unwrap();
-        //assert!( response.get_status() == colima::ResponseStatus::SUCCESS );
+        //assert!( response.get_status() == transport_protocol::ResponseStatus::SUCCESS );
         //check_enclave_state(
             //&mut client_session,
             //&client_tls_tx,
@@ -278,7 +278,7 @@ fn check_enclave_state(
             error_msg
         ),
         Ok(encoded_state) => {
-            let parsed = colima::parse_response(&encoded_state);
+            let parsed = transport_protocol::parse_response(&encoded_state);
 
             if parsed.has_state() {
                 let state = parsed.get_state().get_state().to_vec();
@@ -303,7 +303,7 @@ fn request_enclave_state(
     client_tls_tx: &std::sync::mpsc::Sender<std::vec::Vec<u8>>,
     client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>
 ) -> Result<Vec<u8>, String> {
-    let serialized_enclave_state_request = colima::serialize_request_enclave_state()?;
+    let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
 
     client_tls_send(
 	client_tls_tx,

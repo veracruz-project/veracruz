@@ -60,14 +60,14 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
         ac_hash.insert(device_id, attestation_context);
     }
     let serialized_attestation_init =
-        colima::serialize_psa_attestation_init(&challenge, device_id)?;
+        transport_protocol::serialize_psa_attestation_init(&challenge, device_id)?;
     Ok(base64::encode(&serialized_attestation_init))
 }
 
 pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)?;
 
-    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)?;
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)?;
     if !parsed.has_native_psa_attestation_token() {
         println!("proxy-attestation-server::attestation::psa::attestation_token received data is incorrect.");
         return Err(ProxyAttestationServerError::MissingFieldError(
@@ -75,7 +75,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         ));
     }
     let (token, device_id) =
-        colima::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
+        transport_protocol::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
 
     let attestation_context = {
         let ac_hash = ATTESTATION_CONTEXT.lock()?;

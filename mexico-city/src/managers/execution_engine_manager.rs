@@ -15,7 +15,7 @@ use super::{
     ProvisioningResult,
 };
 use execution_engine::hcall::common::{DataSourceMetadata, LifecycleState};
-use colima::colima::{
+use transport_protocol::transport_protocol::{
     MexicoCityRequest as REQUEST, MexicoCityRequest_oneof_message_oneof as MESSAGE,
 };
 use lazy_static::lazy_static;
@@ -63,15 +63,15 @@ fn check_roles(current: &Vec<VeracruzRole>, expected: &[VeracruzRole]) -> bool {
 /// result.
 #[inline]
 fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
-    colima::serialize_result(colima::ResponseStatus::SUCCESS as i32, result)
+    transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
         .unwrap_or_else(|err| panic!(err))
 }
 
 /// Encodes an error code that the virtual machine program produced, ready for
 /// transmission back to swhoever requested a result.
 fn response_error_code_returned(error_code: &i32) -> std::vec::Vec<u8> {
-    colima::serialize_result(
-        colima::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
+    transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
         Some(error_code.to_le_bytes().to_vec()),
     )
     .unwrap_or_else(|err| panic!(err))
@@ -80,14 +80,14 @@ fn response_error_code_returned(error_code: &i32) -> std::vec::Vec<u8> {
 /// Encodes an error code indicating that the enclace is not ready to receive a
 /// particular type of message.
 fn response_not_ready() -> super::ProvisioningResult {
-    let rst = colima::serialize_result(colima::ResponseStatus::FAILED_NOT_READY as i32, None)?;
+    let rst = transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_NOT_READY as i32, None)?;
     Ok(super::ProvisioningResponse::ProtocolError { response: rst })
 }
 
 /// Encodes an error code indicating that a principal with an invalid role tried
 /// to perform an action.
 fn response_invalid_role() -> super::ProvisioningResult {
-    let rst = colima::serialize_result(colima::ResponseStatus::FAILED_INVALID_ROLE as i32, None)?;
+    let rst = transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_INVALID_ROLE as i32, None)?;
     Ok(super::ProvisioningResponse::ProtocolError { response: rst })
 }
 
@@ -95,7 +95,7 @@ fn response_invalid_role() -> super::ProvisioningResult {
 /// protocol request.
 fn response_invalid_request() -> super::ProvisioningResult {
     let rst =
-        colima::serialize_result(colima::ResponseStatus::FAILED_INVALID_REQUEST as i32, None)?;
+        transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST as i32, None)?;
     Ok(super::ProvisioningResponse::ProtocolError { response: rst })
 }
 
@@ -111,7 +111,7 @@ fn dispatch_on_pi_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
     match protocol_state.get_program_digest()? {
         None => response_not_ready(),
         Some(digest) => {
-            let response = colima::serialize_pi_hash(&digest)?;
+            let response = transport_protocol::serialize_pi_hash(&digest)?;
             Ok(ProvisioningResponse::Success { response })
         }
     }
@@ -120,7 +120,7 @@ fn dispatch_on_pi_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
 /// Returns the SHA-256 digest of the policy.
 fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
     let hash = protocol_state.get_policy_hash();
-    let response = colima::serialize_policy_hash(hash.as_bytes())?;
+    let response = transport_protocol::serialize_policy_hash(hash.as_bytes())?;
     Ok(ProvisioningResponse::Success { response })
 }
 
@@ -129,7 +129,7 @@ fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult
 /// being serviced and being received back/being acted upon...)
 fn dispatch_on_request_state(protocol_state: &ProtocolState) -> ProvisioningResult {
     let response =
-        colima::serialize_machine_state(u8::from(protocol_state.get_lifecycle_state()?))?;
+        transport_protocol::serialize_machine_state(u8::from(protocol_state.get_lifecycle_state()?))?;
     Ok(ProvisioningResponse::Success { response })
 }
 
@@ -201,7 +201,7 @@ fn dispatch_on_shutdown(
 /// which seems benign.  Should this change?
 fn dispatch_on_program(
     protocol_state: &ProtocolState,
-    colima::Program { code, .. }: colima::Program,
+    transport_protocol::Program { code, .. }: transport_protocol::Program,
 ) -> ProvisioningResult {
     // Buffer the program, it will be used in batch process
     PROG_AND_DATA_BUFFER.lock()?.buffer_program(code.as_slice());
@@ -230,7 +230,7 @@ fn dispatch_on_program(
                 ]
             ));
 
-            let response = colima::serialize_result(colima::ResponseStatus::SUCCESS as i32, None)?;
+            let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
             Ok(ProvisioningResponse::Success { response })
         }
     } else {
@@ -247,9 +247,9 @@ fn dispatch_on_program(
 /// if stream data is required.
 fn dispatch_on_data(
     protocol_state: &ProtocolState,
-    colima::Data {
+    transport_protocol::Data {
         data, package_id, ..
-    }: colima::Data,
+    }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
     let frame = DataSourceMetadata::new(&data, client_id, package_id as u64);
@@ -285,7 +285,7 @@ fn dispatch_on_data(
                 ]
             ));
 
-            let response = colima::serialize_result(colima::ResponseStatus::SUCCESS as i32, None)?;
+            let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
             Ok(ProvisioningResponse::Success { response })
         }
     } else {
@@ -301,9 +301,9 @@ fn dispatch_on_data(
 /// `LifecycleState::ReadyToExecute`.
 fn dispatch_on_stream(
     protocol_state: &ProtocolState,
-    colima::Data {
+    transport_protocol::Data {
         data, package_id, ..
-    }: colima::Data,
+    }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
     if check_state(
@@ -335,7 +335,7 @@ fn dispatch_on_stream(
                 ]
             ));
 
-            let response = colima::serialize_result(colima::ResponseStatus::SUCCESS as i32, None)?;
+            let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
             Ok(ProvisioningResponse::Success { response })
         }
     } else {
@@ -471,7 +471,7 @@ fn dispatch_on_request(
 fn parse_incoming_buffer(
     tls_session_id: u32,
     mut input: Vec<u8>,
-) -> Result<Option<colima::MexicoCityRequest>, MexicoCityError> {
+) -> Result<Option<transport_protocol::MexicoCityRequest>, MexicoCityError> {
     let mut incoming_buffer_hash = INCOMING_BUFFER_HASH.lock()?;
 
     // First, make sure there is an entry in the hash for the TLS session.
@@ -496,7 +496,7 @@ fn parse_incoming_buffer(
     //
     // TODO: It would be nice to check the error, and then determine if this might
     // be the case or if it is hopeless and we could just error out.
-    match protobuf::parse_from_bytes::<colima::MexicoCityRequest>(&incoming_buffer) {
+    match protobuf::parse_from_bytes::<transport_protocol::MexicoCityRequest>(&incoming_buffer) {
         Err(_) => Ok(None),
         Ok(parsed) => {
             incoming_buffer_hash.remove(&tls_session_id);

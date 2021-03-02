@@ -39,7 +39,7 @@ pub enum SinaloaError {
         _0,
         _1
     )]
-    ResponseError(&'static str, colima::ResponseStatus),
+    ResponseError(&'static str, transport_protocol::ResponseStatus),
     #[error(display = "Sinaloa: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
     #[error(display = "Sinaloa: Base64Error: {:?}.", _0)]
@@ -136,7 +136,7 @@ pub enum SinaloaError {
         received: std::vec::Vec<u8>,
     },
     #[error(display = "Sinaloa: ColimaError: {:?}.", _0)]
-    ColimaError(#[error(source)] colima::ColimaError),
+    ColimaError(#[error(source)] transport_protocol::ColimaError),
     #[error(display = "Sinaloa: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
     #[error(display = "Sinaloa: Pinecone Error: {:?}.", _0)]
@@ -247,15 +247,15 @@ pub fn send_proxy_attestation_server_start(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
-) -> Result<colima::ProxyAttestationServerResponse, SinaloaError> {
-    let serialized_start_msg = colima::serialize_start_msg(protocol, firmware_version)?;
+) -> Result<transport_protocol::ProxyAttestationServerResponse, SinaloaError> {
+    let serialized_start_msg = transport_protocol::serialize_start_msg(protocol, firmware_version)?;
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
 
     let received_body: String = post_buffer(&url, &encoded_start_msg)?;
 
     let body_vec = base64::decode(&received_body)?;
-    let response = colima::parse_proxy_attestation_server_response(&body_vec)?;
+    let response = transport_protocol::parse_proxy_attestation_server_response(&body_vec)?;
     return Ok(response);
 }
 

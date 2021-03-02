@@ -22,7 +22,7 @@ pub enum ProxyAttestationServerError {
     #[error(display = "ProxyAttestationServer: Base64Error: {:?}.", _0)]
     Base64Error(#[error(source)] base64::DecodeError),
     #[error(display = "ProxyAttestationServer: ColimaError: {:?}.", _0)]
-    ColimaError(#[error(source)] colima::ColimaError),
+    ColimaError(#[error(source)] transport_protocol::ColimaError),
     #[error(display = "ProxyAttestationServer: DieselError: {:?}.", _0)]
     DieselError(#[error(source)] diesel::result::Error),
     #[error(display = "ProxyAttestationServer: DieselError: {:?}.", _0)]

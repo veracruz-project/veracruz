@@ -24,7 +24,7 @@ pub enum MexicoCityError {
     #[error(display = "MexicoCity: SessionManagerError: {:?}.", _0)]
     SessionManagerError(#[error(source)] session_manager::SessionManagerError),
     #[error(display = "MexicoCity: ColimaError: {:?}.", _0)]
-    ColimaError(#[error(source)] colima::ColimaError),
+    ColimaError(#[error(source)] transport_protocol::ColimaError),
     #[error(display = "MexicoCity: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
     #[error(display = "MexicoCity: FatalHostError: {:?}.", _0)]

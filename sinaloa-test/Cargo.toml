@@ -8,8 +8,8 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "colima/sgx_attestation", "psa-attestation/sgx"]
-tz = ["sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "colima/tz", "psa-attestation/tz"]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx"]
+tz = ["sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz", "psa-attestation/tz"]
 nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
@@ -24,7 +24,7 @@ webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "ver
 webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
-colima = { path = "../colima" }
+transport-protocol = { path = "../transport-protocol" }
 protobuf = "2.6"
 curl = "0.4.22"
 untrusted = "0.6.2"

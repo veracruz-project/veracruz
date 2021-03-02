@@ -1,5 +1,5 @@
 [package]
-name = "colima"
+name = "transport-protocol"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"

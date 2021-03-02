@@ -14,7 +14,7 @@ hex = "=0.4.2"
 bincode = { git= "https://github.com/veracruz-project/bincode.git", branch= "veracruz", default-features=false }
 err-derive = "0.2"
 base64 = "0.10.1"
-colima = { path = "../colima"}
+transport-protocol = { path = "../transport-protocol"}
 stringreader = "0.1"
 curl = "0.4"
 clap = "2.33"

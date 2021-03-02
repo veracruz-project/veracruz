@@ -6,7 +6,7 @@ edition = "2018"
 description = "Client code for provisioning secrets into, and otherwise interacting with, the trusted Veracruz runtime"
 
 [features]
-sgx = ["sgx_types", "sgx_ucrypto", "colima/sgx_attestation"]
+sgx = ["sgx_types", "sgx_ucrypto", "transport-protocol/sgx_attestation"]
 tz = []
 nitro = []
 mock = ["mockall", "mockito"]
@@ -19,7 +19,7 @@ webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "ver
 webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz"}
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz"}
 reqwest = { version = "0.9", default-features=false }
-colima = { path = "../colima" }
+transport-protocol = { path = "../transport-protocol" }
 base64 = "0.10.1"
 rand = "0.7.0"
 x509-parser="0.6.0"

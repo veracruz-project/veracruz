@@ -18,7 +18,7 @@ path = "src/lib.rs"
 
 [features]
 # a feature to enable SGX native attestation. Only available on x64 platforms
-sgx = ["sgx_types", "sgx_ucrypto", "sgx_urts", "psa-attestation/sgx", "colima/sgx_attestation"]
+sgx = ["sgx_types", "sgx_ucrypto", "sgx_urts", "psa-attestation/sgx", "transport-protocol/sgx_attestation"]
 
 # a feature to enable PSA native attestation.
 # Note: Final attestation is always PSA. This is just to enable platforms
@@ -30,7 +30,7 @@ nitro = [ "serde_cbor", "nitro-enclave-token" ]
 rouille = "3.0"
 lazy_static = "1.3"
 base64 = "0.10"
-colima = { path = "../colima" }
+transport-protocol = { path = "../transport-protocol" }
 curl = "0.4"
 rand = "0.7"
 stringreader = "0.1"

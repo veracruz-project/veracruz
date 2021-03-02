@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 syntax = "proto3";
-package colima;
+package transport_protocol;
 
 message SgxEc256Public {
   bytes gx = 1;

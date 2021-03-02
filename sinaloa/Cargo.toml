@@ -6,8 +6,8 @@ edition = "2018"
 description = "An untrusted server/bridge that allows the outside world and the trusted Veracruz runtime to communicate with each other."
 
 [features]
-sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "colima/sgx_attestation", "mexico-city-bind", "trustzone-root-enclave-bind"]
-tz = ["veracruz-utils/std", "veracruz-utils/tz", "colima/tz", "optee-teec", "uuid"]
+sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "mexico-city-bind", "trustzone-root-enclave-bind"]
+tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid"]
 nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2" ]
 debug = []
 
@@ -15,7 +15,7 @@ debug = []
 dirs = "1.0.2"
 veracruz-utils = { path = "../veracruz-utils", features = ["std","tz"] }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
-colima = { path = "../colima"}
+transport-protocol = { path = "../transport-protocol"}
 rouille = "3.0"
 base64 = "0.10.1"
 untrusted = "0.6.2"

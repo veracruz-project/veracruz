@@ -15,7 +15,7 @@
 mod tests {
     use actix_rt::System;
     use base64;
-    use colima;
+    use transport_protocol;
     use curl::easy::{Easy, List};
     use env_logger;
     use lazy_static::lazy_static;
@@ -875,7 +875,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received acknowledgement after sending program: {:?}",
-                    colima::parse_mexico_city_response(&response)
+                    transport_protocol::parse_mexico_city_response(&response)
                 );
                 info!(
                     "             Provisioning program time (μs): {}.",
@@ -893,7 +893,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received installed program hash data: {:?}",
-                    colima::parse_mexico_city_response(&response)
+                    transport_protocol::parse_mexico_city_response(&response)
                 );
                 info!(
                     "             Program provider hash response time (μs): {}.",
@@ -948,7 +948,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received acknowledgement after sending data: {:?},",
-                    colima::parse_mexico_city_response(&response)
+                    transport_protocol::parse_mexico_city_response(&response)
                 );
                 info!(
                     "             Provisioning data time (μs): {}.",
@@ -1042,7 +1042,7 @@ mod tests {
                         )?;
                         info!(
                             "             Stream provider received acknowledgement after sending stream data: {:?},",
-                            colima::parse_mexico_city_response(&response)
+                            transport_protocol::parse_mexico_city_response(&response)
                         );
                         info!(
                             "             Provisioning stream time (μs): {}.",
@@ -1087,12 +1087,12 @@ mod tests {
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        &colima::serialize_request_result()?.as_slice(),
+                        &transport_protocol::serialize_request_result()?.as_slice(),
                     )
                     .and_then(|response| {
                         // decode the result
-                        let response = colima::parse_mexico_city_response(&response)?;
-                        let response = colima::parse_result(&response)?;
+                        let response = transport_protocol::parse_mexico_city_response(&response)?;
+                        let response = transport_protocol::parse_result(&response)?;
                         response.ok_or(SinaloaError::MissingFieldError(
                             "Result retrievers response",
                         ))
@@ -1113,7 +1113,7 @@ mod tests {
                             client_session_id,
                             &mut client_session,
                             ticket,
-                            &colima::serialize_request_next_round()?.as_slice(),
+                            &transport_protocol::serialize_request_next_round()?.as_slice(),
                         )?;
                     }
                 }
@@ -1158,12 +1158,12 @@ mod tests {
                     client_session_id,
                     &mut client_session,
                     ticket,
-                    &colima::serialize_request_result()?.as_slice(),
+                    &transport_protocol::serialize_request_result()?.as_slice(),
                 )
                 .and_then(|response| {
                     // decode the result
-                    let response = colima::parse_mexico_city_response(&response)?;
-                    let response = colima::parse_result(&response)?;
+                    let response = transport_protocol::parse_mexico_city_response(&response)?;
+                    let response = transport_protocol::parse_result(&response)?;
                     response.ok_or(SinaloaError::MissingFieldError(
                         "Result retrievers response",
                     ))
@@ -1194,11 +1194,11 @@ mod tests {
                 client_session_id,
                 &mut client_session,
                 ticket,
-                &colima::serialize_request_shutdown()?.as_slice(),
+                &transport_protocol::serialize_request_shutdown()?.as_slice(),
             )?;
             info!(
                 "             Client received acknowledgment after shutdown request: {:?}",
-                colima::parse_mexico_city_response(&response)
+                transport_protocol::parse_mexico_city_response(&response)
             );
             info!(
                 "             Shutdown time (μs): {}.",
@@ -1337,7 +1337,7 @@ mod tests {
 
         program_file.read_to_end(&mut program_text)?;
 
-        let serialized_program_text = colima::serialize_program(&program_text)?;
+        let serialized_program_text = transport_protocol::serialize_program(&program_text)?;
         client_tls_send(
             client_tls_tx,
             client_tls_rx,
@@ -1356,7 +1356,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
     ) -> Result<(), SinaloaError> {
-        let serialized_request_policy_hash = colima::serialize_request_policy_hash()?;
+        let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()?;
         let response = client_tls_send(
             client_tls_tx,
             client_tls_rx,
@@ -1365,9 +1365,9 @@ mod tests {
             ticket,
             &serialized_request_policy_hash[..],
         )?;
-        let parsed_response = colima::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
         let status = parsed_response.get_status();
-        if status != colima::ResponseStatus::SUCCESS {
+        if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(SinaloaError::ResponseError(
                 "check_policy_hash parse_mexico_city_response",
                 status,
@@ -1393,7 +1393,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
     ) -> Result<bool, SinaloaError> {
-        let serialized_pi_hash_request = colima::serialize_request_pi_hash()?;
+        let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash()?;
         let data = client_tls_send(
             client_tls_tx,
             client_tls_rx,
@@ -1402,10 +1402,10 @@ mod tests {
             ticket,
             &serialized_pi_hash_request[..],
         )?;
-        let parsed_response = colima::parse_mexico_city_response(&data)?;
+        let parsed_response = transport_protocol::parse_mexico_city_response(&data)?;
         let status = parsed_response.get_status();
         match status {
-            colima::ResponseStatus::SUCCESS => {
+            transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
                 if received_hash == expected_program_hash {
                     info!("             request_pi_hash compare succeeded");
@@ -1432,7 +1432,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
     ) -> Result<Vec<u8>, SinaloaError> {
-        let serialized_enclave_state_request = colima::serialize_request_enclave_state()?;
+        let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
 
         client_tls_send(
             client_tls_tx,
@@ -1460,7 +1460,7 @@ mod tests {
             data_file.read_to_end(&mut data_buffer)?;
             data_buffer
         };
-        let serialized_data = colima::serialize_program_data(&data, package_id as u32)?;
+        let serialized_data = transport_protocol::serialize_program_data(&data, package_id as u32)?;
 
         client_tls_send(
             client_tls_tx,
@@ -1482,7 +1482,7 @@ mod tests {
         package_id: u64,
     ) -> Result<Vec<u8>, SinaloaError> {
         // The client also sends the associated data
-        let serialized_stream = colima::serialize_stream(data, package_id as u32)?;
+        let serialized_stream = transport_protocol::serialize_stream(data, package_id as u32)?;
 
         client_tls_send(
             client_tls_tx,
@@ -1509,7 +1509,7 @@ mod tests {
             client_tls_tx,
             client_tls_rx,
         )?;
-        let parsed = colima::parse_mexico_city_response(&encoded_state)?;
+        let parsed = transport_protocol::parse_mexico_city_response(&encoded_state)?;
 
         if parsed.has_state() {
             let state = parsed.get_state().get_state().to_vec();
@@ -1693,7 +1693,7 @@ mod tests {
     ) -> Result<Vec<u8>, SinaloaError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         info!("sinaloa-test/attestation_flow: challenge:{:?}", challenge);
-        let serialized_pagt = colima::serialize_request_proxy_psa_attestation_token(&challenge)?;
+        let serialized_pagt = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let pagt_ret = sinaloa.plaintext_data(serialized_pagt)?;
         let received_bytes =
             pagt_ret.ok_or(SinaloaError::MissingFieldError("attestation_flow pagt_ret"))?;

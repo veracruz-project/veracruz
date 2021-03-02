@@ -96,7 +96,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
         ac_hash.insert(device_id, attestation_context);
     }
     let serialized_attestation_init =
-        colima::serialize_psa_attestation_init(&challenge, device_id)?;
+        transport_protocol::serialize_psa_attestation_init(&challenge, device_id)?;
     Ok(base64::encode(&serialized_attestation_init))
 }
 
@@ -110,7 +110,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             err
         })?;
 
-    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::nitro::attestation_token failed to parse proxy attestation server request:{:?}", err);
             let _ignore = std::io::stdout().flush();
@@ -124,7 +124,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         ));
     }
     let (token, device_id) =
-        colima::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
+        transport_protocol::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
 
     let attestation_document = NitroToken::authenticate_token(&token, &AWS_NITRO_ROOT_CERTIFICATE).map_err(|err| {
         println!("proxy-attestation-server::nitro::attestation_token authenticate_token failed:{:?}", err);

@@ -84,7 +84,7 @@ mod tests {
         #[error(display = "VeracruzTest: SinaloaError: {:?}.", _0)]
         SinaloaError(#[error(source)] sinaloa::SinaloaError),
         #[error(display = "VeracruzTest: ColimaError: {:?}.", _0)]
-        ColimaError(#[error(source)] colima::ColimaError),
+        ColimaError(#[error(source)] transport_protocol::ColimaError),
         #[error(display = "VeracruzTest: Failed to find client with index {}.", _0)]
         ClientIndexError(usize),
     }

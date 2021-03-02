@@ -16,7 +16,7 @@ name = "mexico_city_enclave"
 path = "src/main.rs"
 
 [features]
-sgx = ["colima/sgx", "session-manager/sgx", "veracruz-utils/sgx", "wasmi/mesalock_sgx", "execution-engine/sgx", "rustls/mesalock_sgx", "protobuf/mesalock_sgx", "ring/mesalock_sgx", "sgx_types" , "sgx_tstd", "sgx_tcrypto", "sgx_tdh"]
+sgx = ["transport-protocol/sgx", "session-manager/sgx", "veracruz-utils/sgx", "wasmi/mesalock_sgx", "execution-engine/sgx", "rustls/mesalock_sgx", "protobuf/mesalock_sgx", "ring/mesalock_sgx", "sgx_types" , "sgx_tstd", "sgx_tcrypto", "sgx_tdh"]
 tz = ["wasmi/std", "session-manager/tz", "execution-engine/tz", "veracruz-utils/tz", "libc", "optee-utee-sys", "optee-utee", "serde_json/alloc"]
 nitro = [ "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "veracruz-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode" ]
 
@@ -24,7 +24,7 @@ nitro = [ "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "v
 session-manager = { path = "../session-manager"}
 lazy_static = {version = "1.4.0", features=["spin_no_std"] }
 execution-engine = { path = "../execution-engine" }
-colima = { path = "../colima" }
+transport-protocol = { path = "../transport-protocol" }
 protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }

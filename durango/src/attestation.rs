@@ -24,7 +24,7 @@ pub trait Attestation {
 
 use crate::error::DurangoError;
 use base64;
-use colima;
+use transport_protocol;
 use hex;
 use rand::Rng;
 use reqwest;
@@ -59,7 +59,7 @@ impl AttestationPSA {
         expected_enclave_hash: &Vec<u8>,
     ) -> Result<(Vec<u8>, String), DurangoError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
-        let serialized_rpat = colima::serialize_request_proxy_psa_attestation_token(&challenge)?;
+        let serialized_rpat = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let received_string = AttestationPSA::post_sinaloa(remote_url, &serialized_rpat)?;
 
         let complete_proxy_attestation_server_url = format!("http://{:}/VerifyPAT", proxy_attestation_server_url);

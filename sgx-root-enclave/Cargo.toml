@@ -17,7 +17,7 @@ tz = []
 
 [dependencies]
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
-colima = { path = "../colima", features=["tz"] }
+transport-protocol = { path = "../transport-protocol", features=["tz"] }
 protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz"}
 psa-attestation = { path = "../psa-attestation", features=["tz"]}
 optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
