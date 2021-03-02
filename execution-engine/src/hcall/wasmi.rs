@@ -26,7 +26,7 @@ use crate::{
     },
     hcall::common::{
         ExecutionEngine, EntrySignature, FatalHostError, HCallError,
-        HostProvisioningError, HostProvisioningState, HCALL_GETRANDOM_NAME,
+        HostProvisioningError, VFSService, HCALL_GETRANDOM_NAME,
         HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
         HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
         HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
@@ -34,6 +34,11 @@ use crate::{
     },
 };
 use veracruz_utils::VeracruzCapabilityIndex;
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+use std::sync::{Mutex, Arc};
+#[cfg(feature = "sgx")]
+use std::sync::{SgxMutex as Mutex, Arc};
+use crate::hcall::buffer::VFS;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -42,7 +47,15 @@ use veracruz_utils::VeracruzCapabilityIndex;
 /// The WASMI host provisioning state: the `HostProvisioningState` with the
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
 /// `MemoryRef` type.
-pub(crate) type WasmiHostProvisioningState = HostProvisioningState<ModuleRef, MemoryRef>;
+//pub(crate) type WasmiHostProvisioningState = HostProvisioningState<ModuleRef, MemoryRef>;
+pub(crate) struct WasmiHostProvisioningState {
+    vfs : VFSService,
+    /// A reference to the WASM program module that will actually execute on
+    /// the input data sources.
+    pub(crate) program_module: Option<ModuleRef>,
+    /// A reference to the WASM program's linear memory (or "heap").
+    pub(crate) memory: Option<MemoryRef>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -394,6 +407,30 @@ impl Externals for WasmiHostProvisioningState {
 /// Functionality of the `WasmiHostProvisioningState` type that relies on it
 /// satisfying the `Externals` and `ModuleImportResolver` constraints.
 impl WasmiHostProvisioningState {
+
+    /// Creates a new initial `HostProvisioningState`.
+    pub fn new(
+        vfs : Arc<Mutex<VFS>>,
+    ) -> Self {
+        Self {
+            vfs : VFSService::new(vfs),
+            program_module: None,
+            memory: None,
+        }
+    }
+
+    /// Returns an optional reference to the WASM program module.
+    #[inline]
+    pub(crate) fn get_program(&self) -> Option<&ModuleRef> {
+        self.program_module.as_ref()
+    }
+
+    /// Returns an optional reference to the WASM program's heap.
+    #[inline]
+    pub(crate) fn get_memory(&self) -> Option<&MemoryRef> {
+        self.memory.as_ref()
+    }
+
     /// Loads a compiled program into the host state.  Tries to parse `buffer`
     /// to obtain a WASM `Module` struct.  Returns an appropriate error if this
     /// fails.
@@ -415,8 +452,8 @@ impl WasmiHostProvisioningState {
         let module_ref = not_started_module_ref.assert_no_start();
 
         let linear_memory = get_module_memory(&module_ref)?;
-        self.set_program_module(module_ref);
-        self.set_memory(linear_memory);
+        self.program_module = Some(module_ref);
+        self.memory = Some(linear_memory);
         Ok(())
     }
 
@@ -786,24 +823,24 @@ impl WasmiHostProvisioningState {
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.append_file_base(client_id,file_name,data)
+        self.vfs.append_file_base(client_id,file_name,data)
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.write_file_base(client_id,file_name,data)
+        self.vfs.write_file_base(client_id,file_name,data)
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.read_file_base(client_id,file_name)
+        self.vfs.read_file_base(client_id,file_name)
     }
 
     #[inline]
     fn count_file(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        self.count_file_base(prefix)
+        self.vfs.count_file_base(prefix)
     }
 }
 

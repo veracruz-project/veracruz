@@ -178,30 +178,20 @@ impl From<wasmi::Error> for HostProvisioningError {
 // - memory
 // - program_module ? possibly can do on-demand allocation
 // in the favour of FS.
-pub struct HostProvisioningState<Module, Memory> {
-    //TODO: SPAWN ON DEMAND
-    /// A reference to the WASM program module that will actually execute on
-    /// the input data sources.
-    pub(crate) program_module: Option<Module>,
-    /// A reference to the WASM program's linear memory (or "heap").
-    pub(crate) memory: Option<Memory>,
-    pub(crate) vfs : Arc<Mutex<VFS>>,
+pub struct VFSService {
+    vfs : Arc<Mutex<VFS>>,
 }
 
-impl<Module, Memory> HostProvisioningState<Module, Memory> {
+impl VFSService {
     ////////////////////////////////////////////////////////////////////////////
     // Creating and modifying host states.
     ////////////////////////////////////////////////////////////////////////////
-
+    
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
-        HostProvisioningState {
-            program_module: None,
-            memory: None,
-            vfs,
-        }
+        Self { vfs }
     }
 
     /// Append to a file.
@@ -228,35 +218,6 @@ impl<Module, Memory> HostProvisioningState<Module, Memory> {
     pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
         Ok(self.vfs.lock()?.count(prefix)?)
     }
-
-    /// Registers the program module.
-    #[inline]
-    pub(crate) fn set_program_module(&mut self, module: Module) {
-        self.program_module = Some(module);
-    }
-
-    /// Registers a linear memory/heap.
-    #[inline]
-    pub(crate) fn set_memory(&mut self, memory: Memory) {
-        self.memory = Some(memory);
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Querying the host state.
-    ////////////////////////////////////////////////////////////////////////////
-
-    /// Returns an optional reference to the WASM program module.
-    #[inline]
-    pub(crate) fn get_program(&self) -> Option<&Module> {
-        self.program_module.as_ref()
-    }
-
-    /// Returns an optional reference to the WASM program's heap.
-    #[inline]
-    pub(crate) fn get_memory(&self) -> Option<&Memory> {
-        self.memory.as_ref()
-    }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////

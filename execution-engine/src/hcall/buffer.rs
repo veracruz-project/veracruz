@@ -51,6 +51,14 @@ impl VFS {
             .to_vec()
     }
 
+    pub(crate) fn new_empty() -> Self {
+        VFS {
+            fs: HashMap::new(),
+            capabilities: HashMap::new(),
+            digests: HashMap::new(),
+        }
+    }
+
     /// Initialize a new empty buffer.
     pub fn new(capabilities: &VeracruzCapabilityTable, digests: &HashMap<String, Vec<u8>>) -> Self {
         VFS {

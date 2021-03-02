@@ -75,8 +75,7 @@ pub fn single_threaded_execution_engine(
         {
             #[cfg(feature = "std")]
             {
-                wasmtime::initialize(vfs);
-                Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
+                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)))
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
@@ -103,10 +102,7 @@ pub fn multi_threaded_execution_engine(
         ExecutionStrategy::JIT => 
         {
             #[cfg(feature = "std")]
-            {
-                wasmtime::initialize(vfs);
-                Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
-            }
+            { Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs))) }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
         }
