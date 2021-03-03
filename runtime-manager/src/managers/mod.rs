@@ -31,7 +31,7 @@ use lazy_static::lazy_static;
 
 use execution_engine::{
     factory::multi_threaded_execution_engine,
-    hcall::common::ExecutionEngine,
+    hcall::common::EngineReturnCode,
     hcall::buffer::VFS,
 };
 
@@ -160,12 +160,6 @@ impl ProtocolState {
     // The ExecutionEngine facade.
     ////////////////////////////////////////////////////////////////////////////
 
-    /* The following re-implements a subset of the ExecutionEngine API for
-     * `ProtocolState` by just calling through to the underlying
-     * `Arc<Mutex<dyn ExecutionEngine>>` object.  All lock-handling code is therefore
-     * hidden from the user.
-     */
-
     //TODO: add description
     pub(crate) fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
@@ -212,11 +206,11 @@ impl ProtocolState {
         .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?
         .invoke_entry_point(&file_name)?;
         
-        let response = if return_code == 0 {
+        let response = if return_code == EngineReturnCode::Success {
             let result = self.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
             Self::response_success(result)
         } else {
-            Self::response_error_code_returned(&return_code)
+            Self::response_error_code_returned(return_code)
         };
 
         self.is_modified = false;
@@ -228,10 +222,10 @@ impl ProtocolState {
             .unwrap_or_else(|err| panic!(err))
     }
 
-    fn response_error_code_returned(error_code: &i32) -> std::vec::Vec<u8> {
+    fn response_error_code_returned(error_code: EngineReturnCode) -> std::vec::Vec<u8> {
         colima::serialize_result(
             colima::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
-            Some(error_code.to_le_bytes().to_vec()),
+            Some(i32::from(error_code).to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!(err))
     }

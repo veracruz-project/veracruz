@@ -27,8 +27,8 @@ pub enum RuntimeManagerError {
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "RuntimeManager: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
-    #[error(display = "RuntimeManager: FatalHostError: {:?}.", _0)]
-    FatalHostError(#[error(source)] execution_engine::hcall::common::FatalHostError),
+    #[error(display = "RuntimeManager: FatalEngineError: {:?}.", _0)]
+    FatalHostError(#[error(source)] execution_engine::hcall::common::FatalEngineError),
     #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
     HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
     #[error(display = "RuntimeManager: VFS Error: {:?}.", _0)]

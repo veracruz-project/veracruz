@@ -1053,22 +1053,6 @@ mod tests {
                     info!("### Step 9.  Client decodes the result.");
                     let result: T = pinecone::from_bytes(&response.as_slice())?;
                     info!("             Client received result: {:?},", result);
-                    // there are more streaming data, requesting next round
-                    if stream_data_vec.iter().map(|d| !d.is_empty()).all(|d| d) {
-                        info!("             Client request next round");
-                        let response = client_tls_send(
-                            &client_tls_tx,
-                            &client_tls_rx,
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &transport_protocol::serialize_request_next_round()?.as_slice(),
-                        )?;
-                        info!(
-                            "             Request Next Run: {:?},",
-                            colima::parse_mexico_city_response(&response)
-                        );
-                    }
                 }
                 info!("------------ Stream-Result-Next End  ------------");
             } else {
