@@ -264,12 +264,12 @@ impl VeracruzClient {
         }
     }
 
-    pub fn send_program(&mut self, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
+    pub fn send_program(&mut self, file_name:&str, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_role_permission(&Role::ProgramProvider)?;
 
         self.check_policy_hash()?;
 
-        let serialized_program = transport_protocol::serialize_program(&program)?;
+        let serialized_program = transport_protocol::serialize_program(&program, file_name)?;
         let response = self.send(&serialized_program)?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
@@ -281,11 +281,11 @@ impl VeracruzClient {
         }
     }
 
-    pub fn send_data(&mut self, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
+    pub fn send_data(&mut self,file_name:&str, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_role_permission(&Role::DataProvider)?;
         self.check_policy_hash()?;
-        self.check_pi_hash()?;
-        let serialized_data = transport_protocol::serialize_program_data(&data, self.next_package_id())?;
+        //self.check_pi_hash(file_name)?;
+        let serialized_data = transport_protocol::serialize_program_data(&data, file_name)?;
         let response = self.send(&serialized_data)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
@@ -298,12 +298,12 @@ impl VeracruzClient {
         }
     }
 
-    pub fn get_results(&mut self) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn get_results(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_role_permission(&Role::ResultReader)?;
         self.check_policy_hash()?;
-        self.check_pi_hash()?;
+        self.check_pi_hash(file_name)?;
 
-        let serialized_read_result = transport_protocol::serialize_request_result()?;
+        let serialized_read_result = transport_protocol::serialize_request_result(file_name)?;
         let response = self.send(&serialized_read_result)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
@@ -324,12 +324,6 @@ impl VeracruzClient {
         Ok(())
     }
 
-    fn next_package_id(&mut self) -> u32 {
-        let rst = self.package_id;
-        self.package_id += 1;
-        rst
-    }
-
     fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph)?;
@@ -340,7 +334,7 @@ impl VeracruzClient {
                 if self.policy_hash != received_hash {
                     return Err(VeracruzClientError::MismatchError {
                         variable: "check_pi_hash",
-                        expected: self.policy.pi_hash().clone().into_bytes(),
+                        expected: b"check policy file".to_vec(),
                         received: received_hash.as_bytes().to_vec(),
                     });
                 } else {
@@ -356,8 +350,9 @@ impl VeracruzClient {
         }
     }
 
-    fn check_pi_hash(&mut self) -> Result<(), VeracruzClientError> {
-        let serialized_request = transport_protocol::serialize_request_pi_hash()?;
+    #[deprecated]
+    fn check_pi_hash(&mut self, file_name:&str) -> Result<(), VeracruzClientError> {
+        let serialized_request = transport_protocol::serialize_request_pi_hash(file_name)?;
         let mut iterations = 0;
         let max_iterations = 10;
         while iterations < max_iterations {
@@ -366,16 +361,7 @@ impl VeracruzClient {
             let status = parsed_response.get_status();
             match status {
                 transport_protocol::ResponseStatus::SUCCESS => {
-                    let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
-                    if received_hash == *self.policy.pi_hash() {
-                        return Ok(());
-                    } else {
-                        return Err(VeracruzClientError::MismatchError {
-                            variable: "check_pi_hash",
-                            expected: self.policy.pi_hash().clone().into_bytes(),
-                            received: received_hash.into_bytes(),
-                        });
-                    }
+                    return Ok(());
                 }
                 transport_protocol::ResponseStatus::FAILED_NOT_READY => {
                     std::thread::sleep(std::time::Duration::from_millis(5000));

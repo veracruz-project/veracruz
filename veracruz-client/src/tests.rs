@@ -405,7 +405,7 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
     )?;
 
     let fake_data = vec![0xde, 0xad, 0xbe, 0xef];
-    let sp_ret = data_client.send_program(&fake_data.to_vec());
+    let sp_ret = data_client.send_program("fake_program",&fake_data.to_vec());
     match sp_ret {
         Err(VeracruzClientError::InvalidRoleError(_, _))
         | Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
@@ -419,14 +419,14 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
         &Platform::Mock,
     )?;
 
-    let sd_ret = program_client.send_data(&fake_data.to_vec());
+    let sd_ret = program_client.send_data("fake_data",&fake_data.to_vec());
     match sd_ret {
         Err(VeracruzClientError::InvalidRoleError(_, _))
         | Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
         _otherwise => panic!(),
     }
 
-    let gr_ret = program_client.get_results();
+    let gr_ret = program_client.get_results("fake_result");
     match gr_ret {
         Err(VeracruzClientError::InvalidRoleError(_, _))
         | Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),

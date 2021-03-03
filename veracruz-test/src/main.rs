@@ -67,7 +67,7 @@ mod tests {
     use log::info;
     use serde::Deserialize;
     use veracruz_server;
-    use std::{io::Read, sync::Once};
+    use std::{io::Read, sync::Once, path::Path};
     use proxy_attestation_server;
     use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
@@ -150,7 +150,7 @@ mod tests {
                 (DATA_CLIENT_CERT, DATA_CLIENT_KEY),
             ],
             (0, LINEAR_REGRESSION_WASM),
-            &vec![(1, LINEAR_REGRESSION_DATA)],
+            &vec![(1, "input-0", LINEAR_REGRESSION_DATA)],
             &vec![1],
         )
         .await;
@@ -172,7 +172,7 @@ mod tests {
                 (RESULT_CLIENT_CERT, RESULT_CLIENT_KEY),
             ],
             (0, LINEAR_REGRESSION_WASM),
-            &vec![(1, LINEAR_REGRESSION_DATA)],
+            &vec![(1, "input-0", LINEAR_REGRESSION_DATA)],
             &vec![1, 2],
         )
         .await;
@@ -196,8 +196,8 @@ mod tests {
             ],
             (0, CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
             &vec![
-                (1, INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
-                (2, INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                (1, "input-0", INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                (2, "input-1", INTERSECTION_SET_SUM_CUSTOMER_DATA),
             ],
             &vec![2],
         )
@@ -222,8 +222,8 @@ mod tests {
             ],
             (0, CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
             &vec![
-                (2, INTERSECTION_SET_SUM_CUSTOMER_DATA),
-                (1, INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                (2, "input-1", INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                (1, "input-0", INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
             ],
             &vec![2],
         )
@@ -244,9 +244,8 @@ mod tests {
             ],
             (0, STRING_EDIT_DISTANCE_WASM),
             &vec![
-                // purposely use index start from 1
-                (1, STRING_1_DATA),
-                (2, STRING_2_DATA),
+                (1, "input-0", STRING_1_DATA),
+                (2, "input-1", STRING_2_DATA),
             ],
             &vec![2],
         )
@@ -271,7 +270,7 @@ mod tests {
                 (RESULT_CLIENT_CERT, RESULT_CLIENT_KEY),
             ],
             (0, STRING_EDIT_DISTANCE_WASM),
-            &vec![(1, STRING_1_DATA), (2, STRING_2_DATA)],
+            &vec![(1, "input-0", STRING_1_DATA), (2, "input-1", STRING_2_DATA)],
             &vec![3],
         )
         .await;
@@ -307,9 +306,10 @@ mod tests {
                 veracruz_client::VeracruzClient::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
                                       &policy_json,
                                       &target_platform)?;
-            let program_filename = LINEAR_REGRESSION_WASM;
-            let program_data = read_binary_file(&program_filename)?;
-            client.send_program(&program_data)?;
+            let program_path = LINEAR_REGRESSION_WASM;
+            let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
+            let program_data = read_binary_file(&program_path)?;
+            client.send_program(program_filename,&program_data)?;
             Ok::<(), VeracruzTestError>(())
         };
         let data_provider_handle = async {
@@ -319,8 +319,10 @@ mod tests {
 
             let data_filename = LINEAR_REGRESSION_DATA;
             let data = read_binary_file(&data_filename)?;
-            client.send_data(&data)?;
-            client.get_results()?;
+            client.send_data("input-0",&data)?;
+            let program_path = LINEAR_REGRESSION_WASM;
+            let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
+            client.get_results(program_filename)?;
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
         };
@@ -340,11 +342,12 @@ mod tests {
         // List of client's certificates and private keys
         client_configs: &[(&str, &str)],
         // Program provider, index refering to the `client_configs` parameter, and program path
-        (program_provider_index, program_filename): (usize, &str),
-        // Data providers, a list of indices refering to the `client_configs` parameter and data pathes.
+        (program_provider_index, program_path): (usize, &str),
+        // Data providers, a list of indices refering to the `client_configs` parameter,
+        // remote file name and data pathes.
         // The list determines the order of which data is sent out, from head to tail.
         // Note that a client might provision more than one packages
-        data_providers: &[(usize, &str)],
+        data_providers: &[(usize, &str, &str)],
         // Result retriever, a list of indices refering to the `client_configs` parameter.
         result_retrievers: &[usize],
     ) -> Result<(), VeracruzTestError> {
@@ -377,17 +380,18 @@ mod tests {
 
             info!(
                 "### Step 3. Client #{} provisions program {}.",
-                program_provider_index, program_filename
+                program_provider_index, program_path
             );
             // provision program
             let program_provider_veracruz_client = clients
                 .get_mut(program_provider_index)
                 .ok_or(VeracruzTestError::ClientIndexError(program_provider_index))?;
-            let program_data = read_binary_file(program_filename)?;
-            let _ = program_provider_veracruz_client.send_program(&program_data)?;
+            let program_data = read_binary_file(program_path)?;
+            let program_name = Path::new(program_path).file_name().unwrap().to_str().unwrap();
+            program_provider_veracruz_client.send_program(&program_name,&program_data)?;
             info!("### Step 4. Provision data.");
             // provosion data
-            for (data_provider_index, data_filename) in data_providers.iter() {
+            for (data_provider_index, remote_filename, data_filename) in data_providers.iter() {
                 info!(
                     "            Client #{} provisions program {}.",
                     data_provider_index, data_filename
@@ -396,7 +400,7 @@ mod tests {
                     .get_mut(*data_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*data_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                let _ = data_provider_veracruz_client.send_data(&data)?;
+                data_provider_veracruz_client.send_data(remote_filename,&data)?;
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
@@ -405,7 +409,7 @@ mod tests {
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
-                let result = result_retriever_veracruz_client.get_results()?;
+                let result = result_retriever_veracruz_client.get_results(program_name)?;
                 let result: T = pinecone::from_bytes(&result)?;
                 info!("            Result: {:?}", result);
 
