@@ -37,7 +37,7 @@ openssl = "0.10.24"
 rand = "0.7.0"
 proxy-attestation-server = { path = "../proxy-attestation-server" }
 psa-attestation = { path = "../psa-attestation"}
-hex = "0.4"
+hex = "=0.4.2"
 pinecone = "0.2"
 futures = "0.3"
 actix-rt = "1.0.0"

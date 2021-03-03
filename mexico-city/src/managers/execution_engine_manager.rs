@@ -411,7 +411,7 @@ fn dispatch_on_request(
             }
         }
         MESSAGE::program(prog) => {
-            if check_roles(roles, &[VeracruzRole::PiProvider]) {
+            if check_roles(roles, &[VeracruzRole::ProgramProvider]) {
                 dispatch_on_program(protocol_state, prog)
             } else {
                 response_invalid_role()

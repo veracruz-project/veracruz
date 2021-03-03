@@ -248,7 +248,7 @@ impl Durango {
     }
 
     pub fn send_program(&mut self, program: &Vec<u8>) -> Result<(), DurangoError> {
-        self.check_role_permission(&VeracruzRole::PiProvider)?;
+        self.check_role_permission(&VeracruzRole::ProgramProvider)?;
 
         self.check_policy_hash()?;
 

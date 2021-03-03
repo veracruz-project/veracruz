@@ -116,7 +116,7 @@ pub enum ExecutionStrategy {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VeracruzRole {
     /// The principal is responsible for supplying the program to execute.
-    PiProvider,
+    ProgramProvider,
     /// The principal is responsible for providing an input data set to the
     /// computation.
     DataProvider,
@@ -548,7 +548,7 @@ impl VeracruzPolicy {
             has_result_reader =
                 has_result_reader || identity.roles.contains(&VeracruzRole::ResultReader);
 
-            let new_pi_flag = identity.roles.contains(&VeracruzRole::PiProvider);
+            let new_pi_flag = identity.roles.contains(&VeracruzRole::ProgramProvider);
 
             if has_pi_provider && new_pi_flag {
                 return Err(VeracruzUtilError::NoProgramProviderError);
