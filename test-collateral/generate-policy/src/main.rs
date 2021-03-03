@@ -59,7 +59,7 @@ fn pretty_digest(mut buf: &[u8]) -> String {
 // Constants.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// About Chihuahua/freestanding-chihuahua/Veracruz.
+/// About the utility..
 const ABOUT: &'static str = "A utility for generating Veracruz JSON policy \
 files from a series of command line arguments.";
 /// The name of the application.
@@ -107,8 +107,8 @@ struct Arguments {
     roles: Vec<Vec<String>>,
     /// The socket address (IP and port) of the Sinaloa instance.
     sinaloa_ip: Option<SocketAddr>,
-    /// The socket address (IP and port) of the Tabasco instance.
-    tabasco_ip: Option<SocketAddr>,
+    /// The socket address (IP and port) of the Veracruz proxy attestation instance.
+    proxy_attestation_server_ip: Option<SocketAddr>,
     /// The filename of the Mexico City CSS file for SGX measurement.  This is
     /// optional.
     css_file: Option<PathBuf>,
@@ -148,7 +148,7 @@ impl Arguments {
             certificates: Vec::new(),
             roles: Vec::new(),
             sinaloa_ip: None,
-            tabasco_ip: None,
+            proxy_attestation_server_ip: None,
             css_file: None,
             pcr0_file: None,
             output_policy_file: PathBuf::new(),
@@ -220,11 +220,11 @@ fn parse_command_line() -> Arguments {
                 .required(true),
         )
         .arg(
-            Arg::with_name("tabasco-ip")
+            Arg::with_name("proxy-attestation-server-ip")
                 .short("t")
-                .long("tabasco-ip")
+                .long("proxy-attestation-server-ip")
                 .value_name("IP ADDRESS")
-                .help("IP address of the Tabasco server.")
+                .help("IP address of the Veracruz proxy attestation server.")
                 .required(true),
         )
         .arg(
@@ -348,14 +348,14 @@ binary.",
         abort_with("No Sinaloa IP address was passed as a command line parameter.");
     }
 
-    if let Some(url) = matches.value_of("tabasco-ip") {
+    if let Some(url) = matches.value_of("proxy-attestation-server-ip") {
         if let Ok(url) = SocketAddr::from_str(url) {
-            arguments.tabasco_ip = Some(url);
+            arguments.proxy_attestation_server_ip = Some(url);
         } else {
-            abort_with("Could not parse Tabasco IP address argument.");
+            abort_with("Could not parse Veracruz proxy attestation server IP address argument.");
         }
     } else {
-        abort_with("No Tabasco IP address was passed as a command line parameter.");
+        abort_with("No Veracruz proxy attestation server IP address was passed as a command line parameter.");
     }
 
     if let Some(fname) = matches.value_of("output-policy-file") {
@@ -639,7 +639,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         "sinaloa_url": format!("{}", &arguments.sinaloa_ip.as_ref().unwrap()),
         "enclave_cert_expiry": serialize_enclave_certificate_expiry(arguments),
         "ciphersuite": POLICY_CIPHERSUITE,
-        "tabasco_url": format!("{}", &arguments.tabasco_ip.as_ref().unwrap()),
+        "proxy_attestation_server_url": format!("{}", &arguments.proxy_attestation_server_ip.as_ref().unwrap()),
         "data_provision_order": json!(&arguments.data_provisioning_order),
         "streaming_order": json!(&arguments.streaming_provisioning_order),
         "pi_hash": compute_program_hash(arguments),
