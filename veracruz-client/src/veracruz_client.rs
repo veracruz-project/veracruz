@@ -1,4 +1,4 @@
-//! The Veracruz Client's library
+//! The Veracruz client's library
 //!
 //! ## Authors
 //!
