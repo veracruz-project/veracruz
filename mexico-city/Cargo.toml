@@ -30,7 +30,7 @@ rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "ver
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 veracruz-utils = { path = "../veracruz-utils" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
-hex = { version = "0.4.1", default-features = false }
+hex = { version = "=0.4.2", default-features = false }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 err-derive = "0.2"
 nix = { version = "0.15", optional = true}

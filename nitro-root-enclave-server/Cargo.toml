@@ -10,7 +10,7 @@ description = "The untrusted (non-secure world) socket server for the Veracruz r
 [dependencies]
 veracruz-utils = { path = "../veracruz-utils", features = ["nitro"]}
 nix = "0.19"
-hex = "0.4"
+hex = "=0.4.2"
 bincode = { git= "https://github.com/veracruz-project/bincode.git", branch= "veracruz", default-features=false }
 err-derive = "0.2"
 base64 = "0.10.1"

@@ -29,7 +29,7 @@ futures = "0.3"
 log = "0.4"
 err-derive = "0.2"
 pinecone = "0.2"
-hex = "0.4"
+hex = "=0.4.2"
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
@@ -48,7 +48,7 @@ sonora-bind = { path = "../sonora-bind", optional = true }
 optee-teec = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
 # for the error handling 
 uuid = { version = "0.7", optional = true }
-hex = {version = "0.4", optional = true }
+hex = {version = "=0.4.2", optional = true }
 
 [build-dependencies]
 target_build_utils = "0.1"

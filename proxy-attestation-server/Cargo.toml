@@ -39,7 +39,7 @@ openssl = "0.10.24"
 serde_json = "1.0"
 diesel = { version = "1.0.0", features = ["sqlite", "numeric" ] }
 dotenv = "0.9.0"
-hex = "0.3"
+hex = "=0.4.2"
 psa-attestation = { path = "../psa-attestation" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 futures = "0.3"
