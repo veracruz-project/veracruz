@@ -26,7 +26,7 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{boxed::Box, convert::TryFrom, fmt, fs::File, io::Read, process::exit, time::Instant};
+use std::{convert::TryFrom, fmt, fs::File, io::Read, process::exit, time::Instant};
 use std::sync::Mutex;
 use std::{
     collections::HashMap,
@@ -37,8 +37,8 @@ use std::{
 
 use execution_engine::{
     factory::{single_threaded_execution_engine, ExecutionStrategy},
-    hcall::common::ExecutionEngine,
     hcall::buffer::VFS,
+    hcall::common::EngineReturnCode,
 };
 
 use clap::{App, Arg};
@@ -96,64 +96,6 @@ pub enum ErrorCode {
     NotImplemented,
     /// The required platform service is not available on this platform.
     ServiceUnavailable,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Trait implementations.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Potentially-failing conversion from `i32` values.
-impl TryFrom<i32> for ErrorCode {
-    type Error = ();
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == -1 {
-            Ok(ErrorCode::Generic)
-        } else if value == -2 {
-            Ok(ErrorCode::DataSourceCount)
-        } else if value == -3 {
-            Ok(ErrorCode::DataSourceSize)
-        } else if value == -4 {
-            Ok(ErrorCode::BadInput)
-        } else if value == -5 {
-            Ok(ErrorCode::InvariantFailed)
-        } else if value == -6 {
-            Ok(ErrorCode::NotImplemented)
-        } else if value == -7 {
-            Ok(ErrorCode::ServiceUnavailable)
-        } else {
-            Err(())
-        }
-    }
-}
-
-/// Non-failing conversion to `i32` values.
-impl Into<i32> for ErrorCode {
-    fn into(self) -> i32 {
-        match self {
-            ErrorCode::Generic => -1,
-            ErrorCode::DataSourceCount => -2,
-            ErrorCode::DataSourceSize => -3,
-            ErrorCode::BadInput => -4,
-            ErrorCode::InvariantFailed => -5,
-            ErrorCode::NotImplemented => -6,
-            ErrorCode::ServiceUnavailable => -7,
-        }
-    }
-}
-
-impl fmt::Display for ErrorCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            ErrorCode::Generic => write!(f, "Generic"),
-            ErrorCode::DataSourceCount => write!(f, "DataSourceCount"),
-            ErrorCode::DataSourceSize => write!(f, "DataSourceSize"),
-            ErrorCode::BadInput => write!(f, "BadInput"),
-            ErrorCode::InvariantFailed => write!(f, "InvariantFailed"),
-            ErrorCode::NotImplemented => write!(f, "NotImplemented"),
-            ErrorCode::ServiceUnavailable => write!(f, "ServiceUnavailable"),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -377,40 +319,6 @@ fn load_file(file_path: &str) -> (String, Vec<u8>) {
     (Path::new(file_path).file_name().unwrap().to_str().unwrap().to_string(), contents)
 }
 
-
-
-/// Reads a WASM file from disk (actually, will read any file, but we only need
-/// it for WASM here) and return a collection of bytes corresponding to that
-/// file.  Will abort the program if anything goes wrong.
-fn read_program_file(fname: &str) -> Vec<u8> {
-    info!("Opening file '{}' for reading.", fname);
-
-    let mut file = File::open(fname).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot open WASM binary '{}'.  Error '{}' returned.",
-            fname, err
-        );
-        exit(-1)
-    });
-
-    let mut contents = Vec::new();
-
-    file.read_to_end(&mut contents).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot read WASM binary '{}' to completion.  Error '{}' returned.",
-            fname, err
-        );
-        exit(-1);
-    });
-
-    contents
-}
-
-
-
-
-
-
 /// Reads a static TOML configuration file from a fixed location on disk,
 /// returning a `Configuration` struct.  Will abort the program if anything
 /// goes wrong.
@@ -523,26 +431,20 @@ fn main() {
     match single_threaded_execution_engine(&cmdline.execution_strategy, vfs.clone())
           .unwrap()
           .invoke_entry_point(&prog_file_name) {
-        Ok(err_code) => {
+        Ok(EngineReturnCode::Success) => {
             if cmdline.time_computation {
                 info!("WASM program finished execution in '{:?}.", start.elapsed());
             }
-
-            if err_code == 0 {
-                info!("WASM program executed successfully.");
-
-                info!("Result {:?}.",vfs.lock().unwrap().read("output").unwrap());
-            } else {
-                let pretty = ErrorCode::try_from(err_code)
-                    .map(|e| format!("{}", e))
-                    .unwrap_or_else(|_| "<unknown error code>".to_string());
-                println!(
-                    "Veracruz program returned error code '{}' (return code = {}).",
-                    pretty, err_code
-                );
-                if cmdline.time_computation {
-                    println!("WASM program finished execution in '{:?}.", start.elapsed());
-                }
+            info!("WASM program executed successfully.");
+            info!("Result {:?}.",vfs.lock().unwrap().read("output").unwrap());
+        }
+        Ok(err_code) => {
+            println!(
+                "Veracruz program returned error code '{:?}'.",
+                err_code
+            );
+            if cmdline.time_computation {
+                println!("WASM program finished execution in '{:?}.", start.elapsed());
             }
         }
         Err(error) => {

@@ -56,13 +56,15 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use crate::error::common::VeracruzError;
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::{
     string::{String, ToString},
     vec::Vec,
+    fmt::{Formatter, Display, Error},
+    convert::TryFrom,
 };
+
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability};
 use crate::hcall::buffer::{VFS, VFSError};
 
@@ -170,14 +172,9 @@ impl From<wasmi::Error> for HostProvisioningError {
 // The Veracruz provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The state of the Veracruz machine, which captures metadata as the Veracruz
-/// state is gradually "provisioned" by the data and program providers.  Also
-/// contains enough data to properly implement the Veracruz H-calls.
+/// A wrapper for VFS, which provides common API used by execution engine.
+/// TODO: remove?
 #[derive(Clone)]
-// TODO: remove MOST, except:
-// - memory
-// - program_module ? possibly can do on-demand allocation
-// in the favour of FS.
 pub struct VFSService {
     vfs : Arc<Mutex<VFS>>,
 }
@@ -233,7 +230,7 @@ impl VFSService {
 /// release (e.g. not in debug) mode: they can give away a lot of information
 /// about what is going on inside the enclave.
 #[derive(Debug, Error, Serialize, Deserialize)]
-pub enum FatalHostError {
+pub enum FatalEngineError {
     /// The Veracruz host was passed bad arguments by the WASM program running
     /// on the platform.  This should never happen if the WASM program uses
     /// `libveracruz` as the platform should ensure H-Calls are always
@@ -328,36 +325,21 @@ pub enum FatalHostError {
     Generic,
 }
 
-impl From<String> for FatalHostError {
+impl From<String> for FatalEngineError {
     fn from(err: String) -> Self {
-        FatalHostError::DirectErrorMessage(err)
+        FatalEngineError::DirectErrorMessage(err)
     }
 }
 
-impl From<&str> for FatalHostError {
+impl From<&str> for FatalEngineError {
     fn from(err: &str) -> Self {
-        FatalHostError::DirectErrorMessage(err.to_string())
+        FatalEngineError::DirectErrorMessage(err.to_string())
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation of the H-calls.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// The return type for H-Call implementations.
-///
-/// From *the viewpoint of the host* a H-call can either fail spectacularly
-/// with a runtime trap, in which case `Err(err)` is returned, with `err`
-/// detailing what went wrong, and the Veracruz host thereafter terminating
-/// or otherwise entering an error state, or succeeds with `Ok(())`.
-///
-/// From *the viewpoint of the WASM program* a H-call can either fail
-/// spectacularly, as above, in which case WASM program execution is aborted
-/// with the WASM program itself not being able to do anything about this,
-/// succeeds with the desired effect and a success error code returned, or
-/// fails with a recoverable error in which case the error code details what
-/// went wrong and what can be done to fix it.
-pub(crate) type HCallError = Result<VeracruzError, FatalHostError>;
 
 /// Details the arguments expected by the module's entry point, if any is found.
 pub(crate) enum EntrySignature {
@@ -386,9 +368,121 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError>;
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Trait implementations
+// H-call return codes.
 ////////////////////////////////////////////////////////////////////////////////
+
+/// These are return codes that the host passes back to the Veracruz WASM program
+/// when something goes wrong with a host-call.  Any error is assumed to be
+/// recoverable by the WASM program, if it cares to, and are distinct from execution engine
+/// errors which are akin to kernel panics and are always fatal.
+///
+/// Note that both the host and any Veracruz program need to agree on how these
+/// errors are encoded.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EngineReturnCode {
+    /// The H-call completed successfully.
+    Success,
+    /// Generic failure: no more-specific information about the cause of the
+    /// error can be given.
+    Generic,
+    /// The H-call failed because an index was passed that exceeded the number
+    /// of data sources.
+    DataSourceCount,
+    /// The H-call failed because it was passed a buffer whose size did not
+    /// match the size of the data source.
+    DataSourceSize,
+    /// The H-call failed because it was passed bad inputs.
+    BadInput,
+    /// The H-call failed because an index was passed that exceeded the number
+    /// of stream sources.
+    StreamSourceCount,
+    /// The H-call failed because it was passed a buffer whose size did not
+    /// match the size of the stream source.
+    StreamSourceSize,
+    /// The H-call failed because it was passed bad streams.
+    BadStream,
+    /// The H-call failed because it was passed a buffer whose size did not
+    /// match the size of the previous result.
+    PreviousResultSize,
+    /// An internal invariant was violated (i.e. we are morally "panicking").
+    InvariantFailed,
+    /// The H-call failed because a result had already previously been written.
+    ResultAlreadyWritten,
+    /// The H-call failed because the platform service backing it is not
+    /// available on this platform.
+    ServiceUnavailable,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Trait implementations.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Pretty printing for `EngineReturnCode`.
+impl Display for EngineReturnCode {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        match self {
+            EngineReturnCode::Success => write!(f, "Success"),
+            EngineReturnCode::Generic => write!(f, "Generic"),
+            EngineReturnCode::DataSourceSize => write!(f, "DataSourceSize"),
+            EngineReturnCode::DataSourceCount => write!(f, "DataSourceCount"),
+            EngineReturnCode::BadInput => write!(f, "BadInput"),
+            EngineReturnCode::InvariantFailed => write!(f, "InvariantFailed"),
+            EngineReturnCode::ResultAlreadyWritten => write!(f, "ResultAlreadyWritten"),
+            EngineReturnCode::ServiceUnavailable => write!(f, "ServiceUnavailable"),
+            EngineReturnCode::StreamSourceSize => write!(f, "StreamSourceSize"),
+            EngineReturnCode::StreamSourceCount => write!(f, "StreamSourceCount"),
+            EngineReturnCode::BadStream => write!(f, "BadStream"),
+            EngineReturnCode::PreviousResultSize => write!(f, "PreviousResultSize"),
+        }
+    }
+}
+
+/// Serializes a `EngineReturnCode` to an `i32` value.
+///
+/// The Veracruz host passes error codes back to the WASM value encoded as an
+/// `i32` value.  These are deserialized by the WASM program.
+impl From<EngineReturnCode> for i32 {
+    fn from(error: EngineReturnCode) -> i32 {
+        match error {
+            EngineReturnCode::Success => 0,
+            EngineReturnCode::Generic => -1,
+            EngineReturnCode::DataSourceCount => -2,
+            EngineReturnCode::DataSourceSize => -3,
+            EngineReturnCode::BadInput => -4,
+            EngineReturnCode::InvariantFailed => -5,
+            EngineReturnCode::ResultAlreadyWritten => -6,
+            EngineReturnCode::ServiceUnavailable => -7,
+            EngineReturnCode::StreamSourceCount => -8,
+            EngineReturnCode::StreamSourceSize => -9,
+            EngineReturnCode::BadStream => -10,
+            EngineReturnCode::PreviousResultSize => -11,
+        }
+    }
+}
+
+/// Deserializes a `EngineReturnCode` from an `i32` value.
+impl TryFrom<i32> for EngineReturnCode {
+    type Error = FatalEngineError;
+
+    fn try_from(i: i32) -> Result<Self, Self::Error> {
+        match i {
+            0 => Ok(EngineReturnCode::Success),
+            -1 => Ok(EngineReturnCode::Generic),
+            -2 => Ok(EngineReturnCode::DataSourceCount),
+            -3 => Ok(EngineReturnCode::DataSourceSize),
+            -4 => Ok(EngineReturnCode::BadInput),
+            -5 => Ok(EngineReturnCode::InvariantFailed),
+            -6 => Ok(EngineReturnCode::ResultAlreadyWritten),
+            -7 => Ok(EngineReturnCode::ServiceUnavailable),
+            -8 => Ok(EngineReturnCode::StreamSourceCount),
+            -9 => Ok(EngineReturnCode::StreamSourceSize),
+            -10 => Ok(EngineReturnCode::BadStream),
+            -11 => Ok(EngineReturnCode::PreviousResultSize),
+            _otherwise => Err(FatalEngineError::ReturnedCodeError),
+        }
+    }
+}

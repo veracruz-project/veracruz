@@ -31,6 +31,5 @@ extern crate std;
 #[macro_use]
 extern crate lazy_static;
 
-pub mod error;
 pub mod factory;
 pub mod hcall;

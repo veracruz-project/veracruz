@@ -15,16 +15,16 @@ use std::sync::{Mutex, Arc};
 use std::sync::{SgxMutex as Mutex, Arc};
 
 use std::{time::Instant, vec::Vec, collections::HashMap};
+use std::convert::TryFrom;
 
 use byteorder::{ByteOrder, LittleEndian};
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Trap, ValType};
 
 use platform_services::{getrandom, result};
 
-use crate::{
-    error::common::VeracruzError,
-    hcall::common::{
-        ExecutionEngine, EntrySignature, FatalHostError,
+use crate::hcall::{
+    common::{
+        ExecutionEngine, EntrySignature, FatalEngineError, EngineReturnCode,
         HostProvisioningError, VFSService, HCALL_GETRANDOM_NAME,
         HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_READ_INPUT_NAME,
         HCALL_WRITE_OUTPUT_NAME,
@@ -38,6 +38,7 @@ use crate::hcall::buffer::VFS;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
+    // The initial value has NO use.
     static ref VFS_INSTANCE: Mutex<VFSService> = Mutex::new(VFSService::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
 }
 
@@ -86,6 +87,7 @@ impl WasmtimeHostProvisioningState {
     pub fn new(
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
+        // Load the VFS ref to the global environment. This is required by Wasmtime.
         *VFS_INSTANCE.lock().unwrap() = VFSService::new(vfs);
         Self{}
     }
@@ -137,7 +139,7 @@ impl WasmtimeHostProvisioningState {
             ">>> rite_output successfully executed in {:?}.",
             start.elapsed()
         );
-        Ok(i32::from(VeracruzError::Success))
+        Ok(i32::from(EngineReturnCode::Success))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_input_count()`.
@@ -166,7 +168,7 @@ impl WasmtimeHostProvisioningState {
             ">>> input_count successfully executed in {:?}.",
             start.elapsed()
         );
-        Ok(i32::from(VeracruzError::Success))
+        Ok(i32::from(EngineReturnCode::Success))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_input_size()`.
@@ -197,7 +199,7 @@ impl WasmtimeHostProvisioningState {
             ">>> input_size successfully executed in {:?}.",
             start.elapsed()
         );
-        Ok(i32::from(VeracruzError::Success))
+        Ok(i32::from(EngineReturnCode::Success))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_read_input()`.
@@ -215,7 +217,7 @@ impl WasmtimeHostProvisioningState {
         let data = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index)).map_err(|e| Trap::new(format!("read_input failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?;
 
         let return_code = if data.len() > size {
-            VeracruzError::DataSourceSize
+            EngineReturnCode::DataSourceSize
         } else {
             unsafe {
                 std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
@@ -227,7 +229,7 @@ impl WasmtimeHostProvisioningState {
                 start.elapsed()
             );
 
-            VeracruzError::Success
+            EngineReturnCode::Success
         };
         Ok(i32::from(return_code))
     }
@@ -239,7 +241,7 @@ impl WasmtimeHostProvisioningState {
         let memory = caller
             .get_export(LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
-            .ok_or(Trap::new("getrandom failed: no memory registered".to_string()))?;
+            .ok_or(Trap::new("get_random failed: no memory registered".to_string()))?;
 
         let address = address as usize;
         let size = size as usize;
@@ -256,10 +258,10 @@ impl WasmtimeHostProvisioningState {
                     start.elapsed()
                 );
 
-                VeracruzError::Success
+                EngineReturnCode::Success
             }
-            result::Result::Unavailable => VeracruzError::ServiceUnavailable,
-            result::Result::UnknownError => VeracruzError::Generic,
+            result::Result::Unavailable => EngineReturnCode::ServiceUnavailable,
+            result::Result::UnknownError => EngineReturnCode::Generic,
         };
         Ok(i32::from(return_code))
     }
@@ -334,44 +336,42 @@ impl WasmtimeHostProvisioningState {
                     ))
                 })?;
 
-                match instance.get_export(ENTRY_POINT_NAME) {
-                    Some(export) => match check_main(&export.ty()) {
-                        EntrySignature::ArgvAndArgc => {
-                            let main =
-                                export
-                                    .into_func()
-                                    .expect("Internal invariant failed: entry point not convertible to callable function.")
-                                    .get2::<i32, i32, i32>()
-                                    .expect("Internal invariant failed: entry point type-checking bug.");
+                let export = instance.get_export(ENTRY_POINT_NAME).ok_or(Trap::new("No export with name '{}' in WASM program."))?; 
+                match check_main(&export.ty()) {
+                    EntrySignature::ArgvAndArgc => {
+                        let main =
+                            export
+                                .into_func()
+                                .expect("Internal invariant failed: entry point not convertible to callable function.")
+                                .get2::<i32, i32, i32>()
+                                .expect("Internal invariant failed: entry point type-checking bug.");
 
-                            println!(
-                                ">>> invoke_main took {:?} to setup pre-main.",
-                                start.elapsed()
-                            );
-                            main(0, 0)
-                        }
-                        EntrySignature::NoParameters => {
-                            let main =
-                                export
-                                    .into_func()
-                                    .expect("Internal invariant failed: entry point not convertible to callable function.")
-                                    .get0::<i32>()
-                                    .expect("Internal invariant failed: entry point type-checking bug.");
+                        println!(
+                            ">>> invoke_main took {:?} to setup pre-main.",
+                            start.elapsed()
+                        );
+                        main(0, 0)
+                    }
+                    EntrySignature::NoParameters => {
+                        let main =
+                            export
+                                .into_func()
+                                .expect("Internal invariant failed: entry point not convertible to callable function.")
+                                .get0::<i32>()
+                                .expect("Internal invariant failed: entry point type-checking bug.");
 
-                            println!(
-                                ">>> invoke_main took {:?} to setup pre-main.",
-                                start.elapsed()
-                            );
-                            main()
-                        }
-                        EntrySignature::NoEntryFound => {
-                            return Err(Trap::new(format!(
-                                "Entry point '{}' has a missing or incorrect type signature.",
-                                ENTRY_POINT_NAME
-                            )))
-                        }
-                    },
-                    None => return Err(Trap::new("No export with name '{}' in WASM program.")),
+                        println!(
+                            ">>> invoke_main took {:?} to setup pre-main.",
+                            start.elapsed()
+                        );
+                        main()
+                    }
+                    EntrySignature::NoEntryFound => {
+                        return Err(Trap::new(format!(
+                            "Entry point '{}' has a missing or incorrect type signature.",
+                            ENTRY_POINT_NAME
+                        )))
+                    }
                 }
             }
         }
@@ -385,16 +385,16 @@ impl ExecutionEngine for WasmtimeHostProvisioningState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalHostError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
 
         //TODO check the permission XXX TODO XXX
         let program = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
 
         Self::invoke_entry_point_base(program.to_vec())
             .map_err(|e| {
-                FatalHostError::DirectErrorMessage(format!("WASM program issued trap: {}.", e))
+                FatalEngineError::DirectErrorMessage(format!("WASM program issued trap: {}.", e))
             })
-            .map(|r| r.clone())
+            .and_then(|r| EngineReturnCode::try_from(r))
     }
 }
 

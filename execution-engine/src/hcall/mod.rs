@@ -14,3 +14,4 @@ pub mod wasmi;
 #[cfg(feature = "std")]
 pub mod wasmtime;
 pub mod buffer;
+pub mod error;
