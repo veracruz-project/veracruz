@@ -30,7 +30,7 @@ use std::{ffi::CString, sync::SgxMutex as Mutex};
 use lazy_static::lazy_static;
 
 use execution_engine::{
-    factory::multi_threaded_execution_engine,
+    factory::execute,
     hcall::common::EngineReturnCode,
     hcall::buffer::VFS,
 };
@@ -39,7 +39,6 @@ use veracruz_utils::{policy::{policy::Policy, principal::ExecutionStrategy}};
 use veracruz_utils::{VeracruzCapabilityIndex, VeracruzPolicy, VeracruzCapability};
 
 pub mod session_manager;
-pub mod buffer;
 pub mod execution_engine_manager;
 pub mod error;
 pub use error::RuntimeManagerError;
@@ -106,6 +105,7 @@ pub(crate) struct ProtocolState {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
+    /// The ref to the VFS.
     vfs : Arc<Mutex<VFS>>,
 }
 
@@ -134,7 +134,7 @@ impl ProtocolState {
             global_policy_hash,
             expected_shutdown_sources,
             vfs,
-            is_modified : true
+            is_modified: true
         })
     }
 
@@ -191,20 +191,18 @@ impl ProtocolState {
         Ok(self.expected_shutdown_sources.is_empty())
     }
     
-    pub(crate) fn launch(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
+    pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = match self.global_policy.execution_strategy() {
             veracruz_utils::ExecutionStrategy::Interpretation => {
                 execution_engine::factory::ExecutionStrategy::Interpretation
             }
             veracruz_utils::ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
-        let return_code = multi_threaded_execution_engine(
+        let return_code = execute(
             &execution_strategy,
-            self.vfs.clone()
-        )
-        // TODO: change the error
-        .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?
-        .invoke_entry_point(&file_name)?;
+            self.vfs.clone(),
+            file_name,
+        )?;
         
         let response = if return_code == EngineReturnCode::Success {
             let result = self.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;

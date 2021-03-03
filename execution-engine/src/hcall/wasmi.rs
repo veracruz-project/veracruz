@@ -67,9 +67,11 @@ pub(crate) struct WasmiHostProvisioningState {
     vfs : VFSService,
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
-    pub(crate) program_module: Option<ModuleRef>,
+    program_module: Option<ModuleRef>,
     /// A reference to the WASM program's linear memory (or "heap").
-    pub(crate) memory: Option<MemoryRef>,
+    memory: Option<MemoryRef>,
+    /// Ref to the program that is executed
+    program: VeracruzCapabilityIndex,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -400,6 +402,7 @@ impl WasmiHostProvisioningState {
     ) -> Self {
         Self {
             vfs : VFSService::new(vfs),
+            program: VeracruzCapabilityIndex::NoCap,
             program_module: None,
             memory: None,
         }
@@ -463,7 +466,7 @@ impl WasmiHostProvisioningState {
                         bytes_to_be_read: size as usize,
                     }),
                     Ok(bytes) => {
-                        self.write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes)?;
+                        self.write_file(&self.program.clone(),"output",&bytes)?;
                         Ok(EngineReturnCode::Success)
                     }
                 }
@@ -514,7 +517,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL IN principal
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
+                let result = self.read_file(&self.program,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
@@ -547,7 +550,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL in appropriate principal
-                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
+                let data = self.read_file(&self.program,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
                 if data.len() > size as usize {
                     return Ok(EngineReturnCode::DataSourceSize);
                 }
@@ -607,7 +610,7 @@ impl WasmiHostProvisioningState {
             Some(memory) => 
             {
                 //TODO FILL in appropriate principal
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
+                let result = self.read_file(&self.program,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if let Err(_) = memory.set(address, &result) {
@@ -640,7 +643,7 @@ impl WasmiHostProvisioningState {
             Some(memory) =>
             {
                 //TODO FILL in appropriate principal
-                let data = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
+                let data = self.read_file(&self.program,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
                 if data.len() > size as usize {
                     return Ok(EngineReturnCode::DataSourceSize);
                 }
@@ -670,7 +673,7 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => 
             {
-                let result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,"output")?.unwrap_or(Vec::new());
+                let result = self.read_file(&self.program,"output")?.unwrap_or(Vec::new());
                 let result: Vec<u8> = result.len().to_le_bytes().to_vec();
                 if let Err(_) = memory.set(address, &result) {
                     return Err(FatalEngineError::MemoryWriteFailed {
@@ -698,7 +701,7 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => 
             {
-                let previous_result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,"output")?.unwrap_or(Vec::new());
+                let previous_result = self.read_file(&self.program,"output")?.unwrap_or(Vec::new());
 
                 if previous_result.len() > size as usize {
                     return Ok(EngineReturnCode::PreviousResultSize);
@@ -729,7 +732,7 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => 
             {
-                let previous_result = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,"output")?;
+                let previous_result = self.read_file(&self.program,"output")?;
                 let flag: u32 = match previous_result {
                     Some(_) => 1,
                     None => 0,
@@ -852,6 +855,7 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
         let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
         self.load_program(program.as_slice())?;
+        self.program = VeracruzCapabilityIndex::Program(file_name.to_string());
 
         match self.invoke_export(ENTRY_POINT_NAME) {
             Ok(Some(RuntimeValue::I32(return_code))) => {

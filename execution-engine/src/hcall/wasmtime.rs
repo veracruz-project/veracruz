@@ -40,6 +40,8 @@ use crate::hcall::buffer::VFS;
 lazy_static! {
     // The initial value has NO use.
     static ref VFS_INSTANCE: Mutex<VFSService> = Mutex::new(VFSService::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
+    // The initial value has NO use.
+    static ref CUR_PROGRAM: Mutex<VeracruzCapabilityIndex> = Mutex::new(VeracruzCapabilityIndex::NoCap);
 }
 
 /// The name of the WASM program's entry point.
@@ -73,7 +75,6 @@ fn check_main(tau: &ExternType) -> EntrySignature {
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
-///
 type WasmtimeResult = Result<i32, Trap>;
 
 /// The WASMI host provisioning state: the `HostProvisioningState` with the
@@ -81,6 +82,8 @@ type WasmtimeResult = Result<i32, Trap>;
 /// `MemoryRef` type.
 pub struct WasmtimeHostProvisioningState{ } 
 
+// This type has NO internal state. It serves as an implementation of ExecutionEngine and Wasmtime,
+// and a facade for methods related to the global state. 
 impl WasmtimeHostProvisioningState {
 
     /// Creates a new initial `HostProvisioningState`.
@@ -125,6 +128,7 @@ impl WasmtimeHostProvisioningState {
 
         let address = address as usize;
         let size = size as usize;
+        let program = CUR_PROGRAM.lock().map_err(|e|Trap::new(format!("write_output failed to load program, error: {:?} ", e)))?.clone();
         let mut bytes: Vec<u8> = vec![0; size];
 
         unsafe {
@@ -134,7 +138,7 @@ impl WasmtimeHostProvisioningState {
             ))
         };
 
-        Self::write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes).map_err(|e| Trap::new(format!("write_output failed: {:?}",e)))?;
+        Self::write_file(&program,"output",&bytes).map_err(|e| Trap::new(format!("write_output failed: {:?}",e)))?;
         println!(
             ">>> rite_output successfully executed in {:?}.",
             start.elapsed()
@@ -181,8 +185,9 @@ impl WasmtimeHostProvisioningState {
 
         let index = index as usize;
         let address = address as usize;
+        let program = CUR_PROGRAM.lock().map_err(|e|Trap::new(format!("input_size failed to load program, error: {:?} ", e)))?.clone();
 
-        let size : u32 = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index)).map_err(|e| Trap::new(format!("input_size failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?.len() as u32;
+        let size : u32 = Self::read_file(&program,&format!("input-{}",index)).map_err(|e| Trap::new(format!("input_size failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?.len() as u32;
 
         let mut buffer = vec![0u8; std::mem::size_of::<u32>()];
         LittleEndian::write_u32(&mut buffer, size);
@@ -213,8 +218,9 @@ impl WasmtimeHostProvisioningState {
         let address = address as usize;
         let index = index as usize;
         let size = size as usize;
+        let program = CUR_PROGRAM.lock().map_err(|e|Trap::new(format!("read_input failed to load program, error: {:?} ", e)))?.clone();
 
-        let data = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index)).map_err(|e| Trap::new(format!("read_input failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?;
+        let data = Self::read_file(&program,&format!("input-{}",index)).map_err(|e| Trap::new(format!("read_input failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?;
 
         let return_code = if data.len() > size {
             EngineReturnCode::DataSourceSize
@@ -282,10 +288,12 @@ impl WasmtimeHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point_base(binary : Vec<u8>) -> WasmtimeResult {
+    pub(crate) fn invoke_entry_point_base(program_name : &str, binary : Vec<u8>) -> WasmtimeResult {
         let start = Instant::now();
 
         let store = Store::default();
+
+        *CUR_PROGRAM.lock().map_err(|e|Trap::new(format!("Failed to load program {}, error: {:?} ", program_name, e)))? = VeracruzCapabilityIndex::Program(program_name.to_string());
 
         match Module::new(store.engine(), binary) {
             Err(_err) => return Err(Trap::new("Cannot create WASM module from input binary.")),
@@ -390,7 +398,7 @@ impl ExecutionEngine for WasmtimeHostProvisioningState {
         //TODO check the permission XXX TODO XXX
         let program = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
 
-        Self::invoke_entry_point_base(program.to_vec())
+        Self::invoke_entry_point_base(file_name, program.to_vec())
             .map_err(|e| {
                 FatalEngineError::DirectErrorMessage(format!("WASM program issued trap: {}.", e))
             })

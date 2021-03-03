@@ -38,7 +38,7 @@ use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
-use crate::hcall::{common::ExecutionEngine, wasmi, buffer::VFS};
+use crate::hcall::{common::{ExecutionEngine, FatalEngineError, EngineReturnCode}, wasmi, buffer::VFS};
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
@@ -63,6 +63,7 @@ pub enum ExecutionStrategy {
 /// NB: wasmtime is only supported when feature=std is set at the moment,
 /// hence the branching around the body of this function.  When we get
 /// it compiled for SGX and TZ, then this will disappear.
+#[deprecated]
 pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
@@ -91,6 +92,7 @@ pub fn single_threaded_execution_engine(
 /// NB: wasmtime is only supported when feature=std is set at the moment,
 /// hence the branching around the body of this function.  When we get
 /// it compiled for SGX and TZ, then this will disappear.
+#[deprecated]
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
@@ -107,6 +109,30 @@ pub fn multi_threaded_execution_engine(
             None
         }
     }
+}
+
+pub fn execute(
+    strategy: &ExecutionStrategy,
+    vfs : Arc<Mutex<VFS>>,
+    program_file_name: &str
+) -> Result<EngineReturnCode, FatalEngineError> {
+    let mut engine : Box<dyn ExecutionEngine> = match strategy {
+        ExecutionStrategy::Interpretation => {
+            Box::new(wasmi::WasmiHostProvisioningState::new(vfs))
+        }
+        ExecutionStrategy::JIT => 
+        {
+            #[cfg(feature = "std")]
+            {
+                Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs))
+            }
+            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
+            {
+                return Err(FatalEngineError::EngineIsNotReady);
+            }
+        }
+    };
+    engine.invoke_entry_point(&program_file_name)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -117,7 +117,7 @@ fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestRe
         let response = response_success(result);
         return Ok(ProvisioningResponse::Success { response });
     }
-    protocol_state.launch(&file_name,client_id)
+    protocol_state.execute(&file_name,client_id)
 }
 
 /// Processes a request from a client to perform a platform shutdown.  Returns
@@ -209,33 +209,21 @@ fn dispatch_on_request(
         .ok_or_else(|| RuntimeManagerError::UninitializedProtocolState)?;
 
     match request {
-        MESSAGE::data(data) => {
-            dispatch_on_data(protocol_state, data, client_id)
-        }
-        MESSAGE::program(prog) => {
-            dispatch_on_program(protocol_state, prog, client_id)
-        }
+        MESSAGE::data(data) => dispatch_on_data(protocol_state, data, client_id),
+        MESSAGE::program(prog) => dispatch_on_program(protocol_state, prog, client_id),
         MESSAGE::request_pi_hash(pi_hash_request) => dispatch_on_pi_hash(pi_hash_request, protocol_state),
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
-        MESSAGE::request_result(result_request) => {
-            dispatch_on_result(result_request,protocol_state,client_id)
-        }
+        MESSAGE::request_result(result_request) => dispatch_on_result(result_request,protocol_state,client_id),
         MESSAGE::request_state(_) => dispatch_on_request_state(protocol_state),
         MESSAGE::request_shutdown(_) => {
             let (is_dead, response) = dispatch_on_shutdown(protocol_state, client_id.into())?;
-
             if is_dead {
                 *protocol_state_guard = None;
             }
-
             response
         }
-        MESSAGE::stream(stream) => {
-            dispatch_on_stream(protocol_state, stream, client_id)
-        }
-        MESSAGE::request_next_round(_) => {
-            dispatch_on_next_round(protocol_state)
-        }
+        MESSAGE::stream(stream) => dispatch_on_stream(protocol_state, stream, client_id),
+        MESSAGE::request_next_round(_) => dispatch_on_next_round(protocol_state),
         _otherwise => response_invalid_request(),
     }
 }
