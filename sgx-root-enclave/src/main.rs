@@ -25,7 +25,7 @@ use psa_attestation::{
 use ring;
 use std::convert::TryInto;
 use std::io::Write;
-use veracruz_utils::SgxRootEnclaveSession;
+use veracruz_utils::SgxRootEnclaveOpcode;
 
 lazy_static! {
     static ref DEVICE_PRIVATE_KEY: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
@@ -145,34 +145,34 @@ fn destroy() {
 #[ta_invoke_command]
 fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()> {
     trace_println!("sgx-root-enclave:invoke_comand");
-    let cmd = SgxRootEnclaveSession::from_u32(cmd_id).map_err(|_| ErrorKind::BadParameters)?;
+    let cmd = SgxRootEnclaveOpcode::from_u32(cmd_id).map_err(|_| ErrorKind::BadParameters)?;
     match cmd {
-        SgxRootEnclaveSession::GetFirmwareVersionLen => {
+        SgxRootEnclaveOpcode::GetFirmwareVersionLen => {
             trace_println!("sgx-root-enclave::invoke_command GetFirmwareVersionLen");
             let mut values = unsafe {
                 params.0.as_value().map_err(|err| {
-                println!("sgx-root-enclave::invoke_command SgxRootEnclaveSession::GetFirmwareVersionLen failed to get params.0:{:?}", err);
+                println!("sgx-root-enclave::invoke_command SgxRootEnclaveOpcode::GetFirmwareVersionLen failed to get params.0:{:?}", err);
                 ErrorKind::Unknown
             })?
             };
             let version = env!("CARGO_PKG_VERSION");
             values.set_a(version.len() as u32);
         }
-        SgxRootEnclaveSession::GetFirmwareVersion => {
+        SgxRootEnclaveOpcode::GetFirmwareVersion => {
             trace_println!("sgx-root-enclave::invoke_command GetFirmwareVersion");
             let mut p0 = unsafe {
                 params.0.as_memref().map_err(|err| {
-                println!("sgx-root-enclave::invoke_command SgxRootEnclaveSession::GetFirmwareVersion failed to get params.0.as_memref:{:?}", err);
+                println!("sgx-root-enclave::invoke_command SgxRootEnclaveOpcode::GetFirmwareVersion failed to get params.0.as_memref:{:?}", err);
                 ErrorKind::Unknown
             })?
             };
             let version = env!("CARGO_PKG_VERSION");
             p0.buffer().write(&version.as_bytes()).map_err(|err| {
-                println!("sgx-root-enclave::invoke_command SgxRootEnclaveSession::GetFirmwareVersion failed to write to buffer:{:?}", err);
+                println!("sgx-root-enclave::invoke_command SgxRootEnclaveOpcode::GetFirmwareVersion failed to write to buffer:{:?}", err);
                 ErrorKind::Unknown
             })?;
         }
-        SgxRootEnclaveSession::SetMexicoCityHashHack => {
+        SgxRootEnclaveOpcode::SetMexicoCityHashHack => {
             // This Opcode allows the non-secure world to set the hash value
             // for the mexico city TA that is returned in the Proxy Attestation
             // token. Of course, THIS IS INCREDIBLY INSECURE, and only exists
@@ -194,7 +194,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
             })?;
             *mch_guard = Some(hash_value);
         }
-        SgxRootEnclaveSession::NativeAttestation => {
+        SgxRootEnclaveOpcode::NativeAttestation => {
             trace_println!("sgx-root-enclave::invoke_command NativeAttestation Opcode started");
             let mut values = unsafe {
                 params.0.as_value().map_err(|err| {
@@ -274,7 +274,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
             })?;
             values.set_a(public_key.len() as u32);
         }
-        SgxRootEnclaveSession::ProxyAttestation => {
+        SgxRootEnclaveOpcode::ProxyAttestation => {
             // p0 - challenge input
             // p1 - enclave_cert input / SGX root enclave Pubkey Output
             // p2 - token output

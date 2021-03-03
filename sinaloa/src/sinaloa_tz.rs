@@ -21,7 +21,7 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
-    use veracruz_utils::{EnclavePlatform, SgxRootEnclaveSession, MCOpcode, SGX_ROOT_ENCLAVE_UUID, MC_UUID};
+    use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, MCOpcode, SGX_ROOT_ENCLAVE_UUID, MC_UUID};
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
@@ -337,7 +337,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamTmpRef::new_input(&mexico_city_hash_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 sgx_root_enclave_session
-                    .invoke_command(SgxRootEnclaveSession::SetMexicoCityHashHack as u32, &mut operation)?;
+                    .invoke_command(SgxRootEnclaveOpcode::SetMexicoCityHashHack as u32, &mut operation)?;
             }
             let (challenge, device_id) =
                 SinaloaTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
@@ -350,7 +350,7 @@ pub mod sinaloa_tz {
             let p3 = ParamTmpRef::new_output(&mut public_key);
             let mut na_operation = Operation::new(0, p0, p1, p2, p3);
             sgx_root_enclave_session
-                .invoke_command(SgxRootEnclaveSession::NativeAttestation as u32, &mut na_operation)?;
+                .invoke_command(SgxRootEnclaveOpcode::NativeAttestation as u32, &mut na_operation)?;
             let token_size = na_operation.parameters().0.b();
             let public_key_size = na_operation.parameters().0.a();
             let token_vec: Vec<u8> = token[0..token_size as usize].to_vec();
@@ -385,7 +385,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut gfvl_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 jal_session
-                    .invoke_command(SgxRootEnclaveSession::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
+                    .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
                 gfvl_op.parameters().0.a()
             };
             let firmware_version: String = {
@@ -393,7 +393,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamTmpRef::new_output(&mut fwv_vec);
                 let mut gfv_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 jal_session
-                    .invoke_command(SgxRootEnclaveSession::GetFirmwareVersion as u32, &mut gfv_op)?;
+                    .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
                 String::from_utf8(fwv_vec)?
             };
             return Ok(firmware_version);
