@@ -24,7 +24,7 @@ use platform_services::{getrandom, result};
 use crate::{
     error::common::VeracruzError,
     hcall::common::{
-        ExecutionEngine, EntrySignature, FatalHostError, HCallError,
+        ExecutionEngine, EntrySignature, FatalHostError,
         HostProvisioningError, VFSService, HCALL_GETRANDOM_NAME,
         HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_READ_INPUT_NAME,
         HCALL_WRITE_OUTPUT_NAME,
@@ -73,6 +73,8 @@ fn check_main(tau: &ExternType) -> EntrySignature {
 // The Wasmtime host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
 ///
+type WasmtimeResult = Result<i32, Trap>;
+
 /// The WASMI host provisioning state: the `HostProvisioningState` with the
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
 /// `MemoryRef` type.
@@ -112,168 +114,154 @@ impl WasmtimeHostProvisioningState {
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_write_output()`.
-    fn write_output(caller: Caller, address: i32, size: i32) -> HCallError {
+    fn write_output(caller: Caller, address: i32, size: i32) -> WasmtimeResult {
         let start = Instant::now();
-        match caller
+        let memory = caller
             .get_export(LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
-        {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => {
-                let address = address as usize;
-                let size = size as usize;
-                let mut bytes: Vec<u8> = vec![0; size];
+            .ok_or(Trap::new("write_output failed: no memory registered".to_string()))?;
 
-                unsafe {
-                    bytes.copy_from_slice(std::slice::from_raw_parts(
-                        memory.data_ptr().add(address),
-                        size,
-                    ))
-                };
+        let address = address as usize;
+        let size = size as usize;
+        let mut bytes: Vec<u8> = vec![0; size];
 
-                Self::write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes)?;
-                println!(
-                    ">>> rite_output successfully executed in {:?}.",
-                    start.elapsed()
-                );
-                Ok(VeracruzError::Success)
-            }
-        }
+        unsafe {
+            bytes.copy_from_slice(std::slice::from_raw_parts(
+                memory.data_ptr().add(address),
+                size,
+            ))
+        };
+
+        Self::write_file(&VeracruzCapabilityIndex::InternalSuperUser,"output",&bytes).map_err(|e| Trap::new(format!("write_output failed: {:?}",e)))?;
+        println!(
+            ">>> rite_output successfully executed in {:?}.",
+            start.elapsed()
+        );
+        Ok(i32::from(VeracruzError::Success))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_input_count()`.
-    fn input_count(caller: Caller, address: i32) -> HCallError {
+    fn input_count(caller: Caller, address: i32) -> WasmtimeResult {
         let start = Instant::now();
-        match caller
+        let memory = caller
             .get_export(LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
-        {
-            Some(memory) => {
-                let address = address as usize;
-                let result : u32 = WasmtimeHostProvisioningState::count_file("input")? as u32;
+            .ok_or(Trap::new("input_count failed: no memory registered".to_string()))?;
 
-                let mut buffer = [0u8; std::mem::size_of::<u32>()];
-                LittleEndian::write_u32(&mut buffer, result);
+        let address = address as usize;
+        let result : u32 = WasmtimeHostProvisioningState::count_file("input").map_err(|e| Trap::new(format!("input_count failed: {:?}",e)))? as u32;
 
-                unsafe {
-                    std::slice::from_raw_parts_mut(
-                        memory.data_ptr().add(address),
-                        std::mem::size_of::<u32>(),
-                    )
-                    .copy_from_slice(&buffer)
-                };
+        let mut buffer = [0u8; std::mem::size_of::<u32>()];
+        LittleEndian::write_u32(&mut buffer, result);
 
-                println!(
-                    ">>> input_count successfully executed in {:?}.",
-                    start.elapsed()
-                );
-                Ok(VeracruzError::Success)
-            }
-            None => Err(FatalHostError::NoMemoryRegistered),
-        }
+        unsafe {
+            std::slice::from_raw_parts_mut(
+                memory.data_ptr().add(address),
+                std::mem::size_of::<u32>(),
+            )
+            .copy_from_slice(&buffer)
+        };
+
+        println!(
+            ">>> input_count successfully executed in {:?}.",
+            start.elapsed()
+        );
+        Ok(i32::from(VeracruzError::Success))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_input_size()`.
-    fn input_size(caller: Caller, index: i32, address: i32) -> HCallError {
+    fn input_size(caller: Caller, index: i32, address: i32) -> WasmtimeResult {
         let start = Instant::now();
-        match caller
+        let memory = caller
             .get_export(LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
-        {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => {
-                let index = index as usize;
-                let address = address as usize;
+            .ok_or(Trap::new("input_size failed: no memory registered".to_string()))?;
 
-                let size : u32 = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
+        let index = index as usize;
+        let address = address as usize;
 
-                let mut buffer = vec![0u8; std::mem::size_of::<u32>()];
-                LittleEndian::write_u32(&mut buffer, size);
+        let size : u32 = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index)).map_err(|e| Trap::new(format!("input_size failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?.len() as u32;
 
-                unsafe {
-                    std::slice::from_raw_parts_mut(
-                        memory.data_ptr().add(address),
-                        std::mem::size_of::<u32>(),
-                    )
-                    .copy_from_slice(&buffer)
-                };
+        let mut buffer = vec![0u8; std::mem::size_of::<u32>()];
+        LittleEndian::write_u32(&mut buffer, size);
 
-                println!(
-                    ">>> input_size successfully executed in {:?}.",
-                    start.elapsed()
-                );
-                Ok(VeracruzError::Success)
-            }
-        }
+        unsafe {
+            std::slice::from_raw_parts_mut(
+                memory.data_ptr().add(address),
+                std::mem::size_of::<u32>(),
+            )
+            .copy_from_slice(&buffer)
+        };
+
+        println!(
+            ">>> input_size successfully executed in {:?}.",
+            start.elapsed()
+        );
+        Ok(i32::from(VeracruzError::Success))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_read_input()`.
-    fn read_input(caller: Caller, index: i32, address: i32, size: i32) -> HCallError {
+    fn read_input(caller: Caller, index: i32, address: i32, size: i32) -> WasmtimeResult {
         let start = Instant::now();
-        match caller
+        let memory = caller
             .get_export(LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
-        {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => {
-                let address = address as usize;
-                let index = index as usize;
-                let size = size as usize;
+            .ok_or(Trap::new("read_input failed: no memory registered".to_string()))?;
 
-                let data = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
+        let address = address as usize;
+        let index = index as usize;
+        let size = size as usize;
 
-                if data.len() > size {
-                    Ok(VeracruzError::DataSourceSize)
-                } else {
-                    unsafe {
-                        std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
-                            .copy_from_slice(&data)
-                    };
+        let data = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,&format!("input-{}",index)).map_err(|e| Trap::new(format!("read_input failed: {:?}",e)))?.ok_or(Trap::new(format!("File input-{} cannot be found",index)))?;
 
-                    println!(
-                        ">>> read_input successfully executed in {:?}.",
-                        start.elapsed()
-                    );
+        let return_code = if data.len() > size {
+            VeracruzError::DataSourceSize
+        } else {
+            unsafe {
+                std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
+                    .copy_from_slice(&data)
+            };
 
-                    Ok(VeracruzError::Success)
-                }
-            }
-        }
+            println!(
+                ">>> read_input successfully executed in {:?}.",
+                start.elapsed()
+            );
+
+            VeracruzError::Success
+        };
+        Ok(i32::from(return_code))
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_getrandom()`.
-    fn get_random(caller: Caller, address: i32, size: i32) -> Result<i32, Trap> {
+    fn get_random(caller: Caller, address: i32, size: i32) -> WasmtimeResult {
         let start = Instant::now();
 
-        match caller
+        let memory = caller
             .get_export(LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
-        {
-            None => Err(Trap::new("getrandom failed: no memory registered".to_string())),
-            Some(memory) => {
-                let address = address as usize;
-                let size = size as usize;
-                let mut buffer: Vec<u8> = vec![0; size];
+            .ok_or(Trap::new("getrandom failed: no memory registered".to_string()))?;
 
-                let return_code = match getrandom(&mut buffer) {
-                    result::Result::Success => {
-                        unsafe {
-                            std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
-                                .copy_from_slice(&buffer)
-                        };
-                        println!(
-                            ">>> getrandom successfully executed in {:?}.",
-                            start.elapsed()
-                        );
+        let address = address as usize;
+        let size = size as usize;
+        let mut buffer: Vec<u8> = vec![0; size];
 
-                        VeracruzError::Success
-                    }
-                    result::Result::Unavailable => VeracruzError::ServiceUnavailable,
-                    result::Result::UnknownError => VeracruzError::Generic,
+        let return_code = match getrandom(&mut buffer) {
+            result::Result::Success => {
+                unsafe {
+                    std::slice::from_raw_parts_mut(memory.data_ptr().add(address), size)
+                        .copy_from_slice(&buffer)
                 };
-                Ok(i32::from(return_code))
+                println!(
+                    ">>> getrandom successfully executed in {:?}.",
+                    start.elapsed()
+                );
+
+                VeracruzError::Success
             }
-        }
+            result::Result::Unavailable => VeracruzError::ServiceUnavailable,
+            result::Result::UnknownError => VeracruzError::Generic,
+        };
+        Ok(i32::from(return_code))
     }
 
     /// Executes the entry point of the WASM program provisioned into the
@@ -292,7 +280,7 @@ impl WasmtimeHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point_base(binary : Vec<u8>) -> Result<i32, Trap> {
+    pub(crate) fn invoke_entry_point_base(binary : Vec<u8>) -> WasmtimeResult {
         let start = Instant::now();
 
         let store = Store::default();
@@ -315,34 +303,22 @@ impl WasmtimeHostProvisioningState {
                         },
                         HCALL_INPUT_COUNT_NAME => {
                             Func::wrap(&store, |caller: Caller, buffer: i32| {
-                                match WasmtimeHostProvisioningState::input_count(caller, buffer) {
-                                    Ok(return_code) => Ok(i32::from(return_code)),
-                                    Err(reason)     => Err(Trap::new(format!("input_count failed with error: '{}'.", reason)))
-                                }
+                                WasmtimeHostProvisioningState::input_count(caller, buffer)
                             })
                         }
                         HCALL_INPUT_SIZE_NAME => {
                             Func::wrap(&store, |caller: Caller, index: i32, buffer: i32| {
-                                match WasmtimeHostProvisioningState::input_size(caller, index, buffer) {
-                                    Ok(return_code) => Ok(i32::from(return_code)),
-                                    Err(reason)     => Err(Trap::new(format!("input_size failed with error: '{}'.", reason)))
-                                }
+                                WasmtimeHostProvisioningState::input_size(caller, index, buffer)
                             })
                         },
                         HCALL_READ_INPUT_NAME => {
                             Func::wrap(&store, |caller: Caller, index: i32, buffer: i32, size: i32| {
-                                match WasmtimeHostProvisioningState::read_input(caller, index, buffer, size) {
-                                    Ok(return_code) => Ok(i32::from(return_code)),
-                                    Err(reason)     => Err(Trap::new(format!("read_input failed with error: '{}'.", reason)))
-                                }
+                                WasmtimeHostProvisioningState::read_input(caller, index, buffer, size)
                             })
                         },
                         HCALL_WRITE_OUTPUT_NAME => {
                             Func::wrap(&store, |caller: Caller, buffer: i32, size: i32| {
-                                match WasmtimeHostProvisioningState::write_output(caller, buffer, size) {
-                                    Ok(return_code) => Ok(i32::from(return_code)),
-                                    Err(reason)     => Err(Trap::new(format!("write_output failed with error: '{}'.", reason)))
-                                }
+                                WasmtimeHostProvisioningState::write_output(caller, buffer, size)
                             })
                         },
                         otherwise => return Err(Trap::new(format!("Veracruz programs support only the Veracruz host interface.  Unrecognised host call: '{}'.", otherwise)))
