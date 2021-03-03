@@ -57,8 +57,9 @@ components:
 - psa-attestation: support code for the Arm PSA Attestation Protocol and
 Token.  This is the attestation protocol that the Veracruz attestation
 service exposes to client code.
-- SGXRootEnclave: this is the root attestation isolate that is assumed to be present
-on the delegate's machine, for SGX attestation, and which challenges the authenticity of other
+- The SGX Root Enclave (see the `sgx-root-enclave` directory): this is the root
+attestation isolate that is assumed to be present on the delegate's machine,
+for SGX attestation, and which challenges the authenticity of other
 isolates initialized on the machine using local attestation.  This isolate must
 be authenticated using remote attestation, making use of the native attestation
 service for the isolation technology in use to protect the Veracruz runtime (SGX only, for
