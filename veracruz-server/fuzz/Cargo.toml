@@ -25,9 +25,9 @@ webpki-roots = "0.16"
 
 
 [features]
-sgx = ["sinaloa/sgx"]
+sgx = ["veracruz-server/sgx"]
 
-[dependencies.sinaloa]
+[dependencies.veracruz-server]
 path = ".."
 
 # Prevent this from interfering with workspaces

@@ -8,17 +8,17 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx"]
-tz = ["sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz", "psa-attestation/tz"]
-nitro = ["sinaloa/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-server/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx"]
+tz = ["veracruz-server/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz", "psa-attestation/tz"]
+nitro = ["veracruz-server/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
 # cannot connect)
-debug = ["sinaloa/debug"]
+debug = ["veracruz-server/debug"]
 
 [dependencies]
-sinaloa = { path = "../sinaloa"}
+veracruz-server = { path = "../veracruz-server"}
 veracruz-utils = { path = "../veracruz-utils", features=["std"] }
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
 webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz" }

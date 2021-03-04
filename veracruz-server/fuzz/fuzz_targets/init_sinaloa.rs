@@ -15,7 +15,7 @@ use libfuzzer_sys::fuzz_target;
 use veracruz_utils;
 // use SGX to fuzz the functionality
 use sinaloa::SinaloaSGX as SinaloaEnclave;
-use sinaloa::sinaloa::Sinaloa;
+use veracruz_server::sinaloa::Sinaloa;
 
 fuzz_target!(|data: &[u8]| {
     // fuzzed code goes here

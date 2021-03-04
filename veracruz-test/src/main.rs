@@ -66,7 +66,7 @@ mod tests {
     use err_derive::Error;
     use log::info;
     use serde::Deserialize;
-    use sinaloa;
+    use veracruz_server;
     use std::{io::Read, sync::Once};
     use proxy_attestation_server;
     use veracruz_utils::{EnclavePlatform, policy, VeracruzPolicy};
@@ -420,7 +420,7 @@ mod tests {
     }
 
     async fn server_tls_loop(policy_filename: &str) -> Result<(), VeracruzTestError> {
-        sinaloa::server::server(policy_filename)?.await?;
+        veracruz_server::server::server(policy_filename)?.await?;
         Ok(())
     }
 }

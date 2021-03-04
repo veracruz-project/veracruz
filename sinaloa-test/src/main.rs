@@ -24,13 +24,13 @@ mod tests {
     use rand::Rng;
     use ring;
     use serde::Deserialize;
-    use sinaloa::sinaloa::*;
+    use veracruz_server::sinaloa::*;
     #[cfg(feature = "sgx")]
-    use sinaloa::SinaloaSGX as SinaloaEnclave;
+    use veracruz_server::SinaloaSGX as SinaloaEnclave;
     #[cfg(feature = "tz")]
-    use sinaloa::SinaloaTZ as SinaloaEnclave;
+    use veracruz_server::SinaloaTZ as SinaloaEnclave;
     #[cfg(feature = "nitro")]
-    use sinaloa::SinaloaNitro as SinaloaEnclave;
+    use veracruz_server::SinaloaNitro as SinaloaEnclave;
 
     use veracruz_utils::policy::EnclavePlatform;
 

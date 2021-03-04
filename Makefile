@@ -182,7 +182,7 @@ fmt:
 	cd runtime-manager && cargo fmt
 	cd psa-attestation && cargo fmt
 	cd sinaloa-test && cargo fmt
-	cd sinaloa && cargo fmt
+	cd veracruz-server && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
 	cd trustzone-root-enclave && cargo fmt

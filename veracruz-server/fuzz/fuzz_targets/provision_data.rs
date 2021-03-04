@@ -76,7 +76,7 @@ fuzz_target!(|buffer: &[u8]| {
     }
 });
 
-use sinaloa::sinaloa::Sinaloa;
+use veracruz_server::sinaloa::Sinaloa;
 #[cfg(feature = "sgx")]
 use sinaloa::SinaloaSGX as SinaloaEnclave;
 #[cfg(feature = "tz")]
