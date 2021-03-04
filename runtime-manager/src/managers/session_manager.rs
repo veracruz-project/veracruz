@@ -13,7 +13,7 @@ use crate::managers::*;
 use ::session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 
-pub fn init_session_manager(policy_json: &str) -> Result<(), MexicoCityError> {
+pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError> {
     let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
     let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 
@@ -38,7 +38,7 @@ pub fn init_session_manager(policy_json: &str) -> Result<(), MexicoCityError> {
     Ok(())
 }
 
-pub fn new_session() -> Result<u32, MexicoCityError> {
+pub fn new_session() -> Result<u32, RuntimeManagerError> {
     let local_session_id = {
         let mut session_counter = super::SESSION_COUNTER.lock()?;
         *session_counter += 1;
@@ -48,7 +48,7 @@ pub fn new_session() -> Result<u32, MexicoCityError> {
     let session = match &*super::MY_SESSION_MANAGER.lock()? {
         Some(my_session_manager) => my_session_manager.create_session(),
         None => {
-            return Err(MexicoCityError::UninitializedSessionError(
+            return Err(RuntimeManagerError::UninitializedSessionError(
                 "new_session",
             ))
         }
@@ -58,17 +58,17 @@ pub fn new_session() -> Result<u32, MexicoCityError> {
     Ok(local_session_id)
 }
 
-pub fn close_session(session_id: u32) -> Result<(), MexicoCityError> {
+pub fn close_session(session_id: u32) -> Result<(), RuntimeManagerError> {
     super::SESSIONS.lock()?.remove(&session_id);
     Ok(())
 }
 
-pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), MexicoCityError> {
+pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), RuntimeManagerError> {
     let mut sessions = super::SESSIONS.lock()?;
     let this_session =
         sessions
             .get_mut(&session_id)
-            .ok_or(MexicoCityError::UnavailableSessionError(
+            .ok_or(RuntimeManagerError::UnavailableSessionError(
                 session_id as u64,
             ))?;
     let _result = this_session.send_tls_data(&mut input_data.to_vec())?;
@@ -100,7 +100,7 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), MexicoCityErr
 }
 
 // TODO: The 'match' inside the and_then closure is difficult to parse
-pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), MexicoCityError> {
+pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), RuntimeManagerError> {
     let (result, _) = match super::SESSIONS.lock()?.get_mut(&session_id) {
         Some(this_session) => {
             let result = this_session.read_tls_data();
@@ -108,7 +108,7 @@ pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), MexicoCityError> {
             //TODO: change the error type
             Ok((result, needed))
         }
-        None => Err(MexicoCityError::UnavailableSessionError(
+        None => Err(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
         )),
     }?;
@@ -117,42 +117,42 @@ pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), MexicoCityError> {
 
     match result? {
         Some(output_data) => Ok((active_flag, output_data)),
-        None => Err(MexicoCityError::NoDataError),
+        None => Err(RuntimeManagerError::NoDataError),
     }
 }
 
 // TODO: the 'match' inside the 'and_then' closure is difficult to parse
-pub fn get_data_needed(session_id: u32) -> Result<bool, MexicoCityError> {
+pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
     match super::SESSIONS.lock()?.get_mut(&session_id) {
         Some(this_session) => Ok(this_session.read_tls_needed()),
-        None => Err(MexicoCityError::UnavailableSessionError(
+        None => Err(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
         )),
     }
 }
 
-pub fn get_enclave_cert_pem() -> Result<Vec<u8>, MexicoCityError> {
+pub fn get_enclave_cert_pem() -> Result<Vec<u8>, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
         Some(my_session_manager) => Ok(my_session_manager.server_certificate_buffer().clone()),
-        None => Err(MexicoCityError::UninitializedSessionError(
+        None => Err(RuntimeManagerError::UninitializedSessionError(
             "get_enclave_cert_pem",
         )),
     }
 }
 
-pub fn get_enclave_cert() -> Result<rustls::Certificate, MexicoCityError> {
+pub fn get_enclave_cert() -> Result<rustls::Certificate, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
         Some(my_session_manager) => Ok(my_session_manager.server_certificate().clone()),
-        None => Err(MexicoCityError::UninitializedSessionError(
+        None => Err(RuntimeManagerError::UninitializedSessionError(
             "get_enclave_cert",
         )),
     }
 }
 
-pub fn get_enclave_name() -> Result<std::string::String, MexicoCityError> {
+pub fn get_enclave_name() -> Result<std::string::String, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
         Some(my_session_manager) => Ok(my_session_manager.name().clone()),
-        None => Err(MexicoCityError::UninitializedSessionError(
+        None => Err(RuntimeManagerError::UninitializedSessionError(
             "get_enclave_name",
         )),
     }

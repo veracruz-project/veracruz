@@ -30,18 +30,18 @@ pub enum TransportProtocolError {
 }
 type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
-/// Parse a request to mexico-city.
-pub fn parse_mexico_city_request(buffer: &[u8]) -> Result<transport_protocol::MexicoCityRequest, TransportProtocolError> {
-    Ok(protobuf::parse_from_bytes::<transport_protocol::MexicoCityRequest>(
+/// Parse a request to the Runtime Manager.
+pub fn parse_runtime_manager_request(buffer: &[u8]) -> Result<transport_protocol::RuntimeManagerRequest, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(
         buffer,
     )?)
 }
 
-/// Parse a response from mexico-city.
-pub fn parse_mexico_city_response(
+/// Parse a response from the Runtime Manager.
+pub fn parse_runtime_manager_response(
     buffer: &[u8],
-) -> Result<transport_protocol::MexicoCityResponse, TransportProtocolError> {
-    Ok(protobuf::parse_from_bytes::<transport_protocol::MexicoCityResponse>(
+) -> Result<transport_protocol::RuntimeManagerResponse, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerResponse>(
         buffer,
     )?)
 }
@@ -173,7 +173,7 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> transport_protocol::Sg
 pub fn serialize_program(program_buffer: &[u8]) -> TransportProtocolResult {
     let mut program = transport_protocol::Program::new();
     program.set_code(program_buffer.to_vec());
-    let mut abs = transport_protocol::MexicoCityRequest::new();
+    let mut abs = transport_protocol::RuntimeManagerRequest::new();
     abs.set_program(program);
 
     Ok(abs.write_to_bytes()?)
@@ -184,7 +184,7 @@ pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> TransportP
     let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
     data.set_package_id(package_id);
-    let mut transport_protocol = transport_protocol::MexicoCityRequest::new();
+    let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_data(data);
 
     Ok(transport_protocol.write_to_bytes()?)
@@ -193,7 +193,7 @@ pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> TransportP
 /// Serialize the request for querying enclave state.
 pub fn serialize_request_enclave_state() -> TransportProtocolResult {
     let command = transport_protocol::RequestState::new();
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_state(command);
 
     Ok(request.write_to_bytes()?)
@@ -204,7 +204,7 @@ pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> TransportProtoco
     let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
     data.set_package_id(package_id);
-    let mut transport_protocol = transport_protocol::MexicoCityRequest::new();
+    let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_stream(data);
 
     Ok(transport_protocol.write_to_bytes()?)
@@ -213,7 +213,7 @@ pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> TransportProtoco
 /// Serialize the request for querying the result.
 pub fn serialize_request_result() -> TransportProtocolResult {
     let command = transport_protocol::RequestResult::new();
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_result(command);
 
     Ok(request.write_to_bytes()?)
@@ -222,7 +222,7 @@ pub fn serialize_request_result() -> TransportProtocolResult {
 /// Serialize the request for shutting down the enclave.
 pub fn serialize_request_shutdown() -> TransportProtocolResult {
     let command = transport_protocol::RequestShutdown::new();
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_shutdown(command);
 
     Ok(request.write_to_bytes()?)
@@ -231,7 +231,7 @@ pub fn serialize_request_shutdown() -> TransportProtocolResult {
 pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> TransportProtocolResult {
     let mut rpat = transport_protocol::RequestProxyPsaAttestationToken::new();
     rpat.set_challenge(challenge.to_vec());
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_proxy_psa_attestation_token(rpat);
 
     Ok(request.write_to_bytes()?)
@@ -240,7 +240,7 @@ pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> Transp
 /// Serialize the request for signalling the next round of computation.
 pub fn serialize_request_next_round() -> TransportProtocolResult {
     let command = transport_protocol::RequestNextRound::new();
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_next_round(command);
 
     Ok(request.write_to_bytes()?)
@@ -379,7 +379,7 @@ pub fn parse_psa_attestation_init(
 
 /// Serialize the request for querying the hash of the provisioned program.
 pub fn serialize_request_pi_hash() -> TransportProtocolResult {
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     let rph = transport_protocol::RequestPiHash::new();
     request.set_request_pi_hash(rph);
     Ok(request.write_to_bytes()?)
@@ -387,7 +387,7 @@ pub fn serialize_request_pi_hash() -> TransportProtocolResult {
 
 /// Serialize the request for querying the enclave policy.
 pub fn serialize_request_policy_hash() -> TransportProtocolResult {
-    let mut request = transport_protocol::MexicoCityRequest::new();
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
     let rph = transport_protocol::RequestPolicyHash::new();
     request.set_request_policy_hash(rph);
     Ok(request.write_to_bytes()?)
@@ -395,7 +395,7 @@ pub fn serialize_request_policy_hash() -> TransportProtocolResult {
 
 /// Serialize the request for querying state of the enclave.
 pub fn serialize_machine_state(machine_state: u8) -> TransportProtocolResult {
-    let mut response = transport_protocol::MexicoCityResponse::new();
+    let mut response = transport_protocol::RuntimeManagerResponse::new();
 
     response.set_status(transport_protocol::ResponseStatus::SUCCESS);
     let mut state = transport_protocol::State::new();
@@ -409,7 +409,7 @@ pub fn serialize_machine_state(machine_state: u8) -> TransportProtocolResult {
 
 /// Serialize a response containing the program hash.
 pub fn serialize_pi_hash(hash: &[u8]) -> TransportProtocolResult {
-    let mut response = transport_protocol::MexicoCityResponse::new();
+    let mut response = transport_protocol::RuntimeManagerResponse::new();
 
     response.set_status(transport_protocol::ResponseStatus::SUCCESS);
     let mut pi_hash = transport_protocol::PiHash::new();
@@ -421,7 +421,7 @@ pub fn serialize_pi_hash(hash: &[u8]) -> TransportProtocolResult {
 
 /// Serialize a response containing the policy hash.
 pub fn serialize_policy_hash(hash: &[u8]) -> TransportProtocolResult {
-    let mut response = transport_protocol::MexicoCityResponse::new();
+    let mut response = transport_protocol::RuntimeManagerResponse::new();
 
     response.set_status(transport_protocol::ResponseStatus::SUCCESS);
     let mut policy_hash = transport_protocol::PolicyHash::new();
@@ -433,7 +433,7 @@ pub fn serialize_policy_hash(hash: &[u8]) -> TransportProtocolResult {
 
 /// Serialize an empty response.
 pub fn serialize_empty_response(status: i32) -> TransportProtocolResult {
-    let mut response = transport_protocol::MexicoCityResponse::new();
+    let mut response = transport_protocol::RuntimeManagerResponse::new();
     let encoded_status =
         transport_protocol::ResponseStatus::from_i32(status).ok_or(TransportProtocolError::ResponseStatusError(status))?;
     response.set_status(encoded_status);
@@ -443,7 +443,7 @@ pub fn serialize_empty_response(status: i32) -> TransportProtocolResult {
 
 /// Serialize a response containing the computation result.
 pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> TransportProtocolResult {
-    let mut response = transport_protocol::MexicoCityResponse::new();
+    let mut response = transport_protocol::RuntimeManagerResponse::new();
 
     let encoded_status =
         transport_protocol::ResponseStatus::from_i32(status).ok_or(TransportProtocolError::ResponseStatusError(status))?;
@@ -461,7 +461,7 @@ pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> Tra
 }
 
 pub fn parse_result(
-    response: &transport_protocol::MexicoCityResponse,
+    response: &transport_protocol::RuntimeManagerResponse,
 ) -> Result<Option<std::vec::Vec<u8>>, TransportProtocolError> {
     let status = response.get_status();
     let decoded_status = match status {

@@ -40,7 +40,7 @@ pub mod session_manager;
 pub mod buffer;
 pub mod execution_engine_manager;
 pub mod error;
-pub use error::MexicoCityError;
+pub use error::RuntimeManagerError;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Various bits of persistent state.
@@ -83,7 +83,7 @@ pub enum ProvisioningResponse {
 }
 
 /// Result type of provisioning functions.
-pub type ProvisioningResult = Result<ProvisioningResponse, MexicoCityError>;
+pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 
 /// The configuration details for the ongoing provisioning of secrets into the
 /// Veracruz platform, containing information that must be persisted across the
@@ -107,7 +107,7 @@ impl ProtocolState {
     pub fn new(
         global_policy: VeracruzPolicy,
         global_policy_hash: String,
-    ) -> Result<Self, MexicoCityError> {
+    ) -> Result<Self, RuntimeManagerError> {
         let expected_data_sources = global_policy.data_provision_order();
         let expected_stream_sources = global_policy.stream_provision_order();
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
@@ -129,7 +129,7 @@ impl ProtocolState {
                 .collect::<Vec<u64>>()
                 .as_slice(),
         )
-        .ok_or(MexicoCityError::InvalidExecutionStrategyError)?;
+        .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?;
 
         Ok(ProtocolState {
             host_state,
@@ -167,7 +167,7 @@ impl ProtocolState {
     /// expected (i.e. we are a pure delegate) or
     /// `LifecycleState::DataSourcesLoading` in cases where we are expecting
     /// data to be provisioned.
-    pub(crate) fn load_program(&self, buffer: &[u8]) -> Result<(), MexicoCityError> {
+    pub(crate) fn load_program(&self, buffer: &[u8]) -> Result<(), RuntimeManagerError> {
         Ok(self.host_state.lock()?.load_program(buffer)?)
     }
 
@@ -181,7 +181,7 @@ impl ProtocolState {
     pub(crate) fn add_new_data_source(
         &self,
         metadata: DataSourceMetadata,
-    ) -> Result<(), MexicoCityError> {
+    ) -> Result<(), RuntimeManagerError> {
         Ok(self.host_state.lock()?.add_new_data_source(metadata)?)
     }
 
@@ -193,7 +193,7 @@ impl ProtocolState {
     pub(crate) fn add_new_stream_source(
         &self,
         metadata: DataSourceMetadata,
-    ) -> Result<(), MexicoCityError> {
+    ) -> Result<(), RuntimeManagerError> {
         Ok(self.host_state.lock()?.add_new_stream_source(metadata)?)
     }
 
@@ -202,20 +202,20 @@ impl ProtocolState {
     /// if the WASM program fails at runtime.  On success, bumps the lifecycle
     /// state to `LifecycleState::FinishedExecuting` and returns the error code
     /// returned by the WASM program entry point as an `i32` value.
-    pub(crate) fn invoke_entry_point(&self) -> Result<i32, MexicoCityError> {
+    pub(crate) fn invoke_entry_point(&self) -> Result<i32, RuntimeManagerError> {
         Ok(self.host_state.lock()?.invoke_entry_point()?)
     }
 
     /// Returns the current lifecycle state that the host provisioning state is
     /// in.
-    pub(crate) fn get_lifecycle_state(&self) -> Result<LifecycleState, MexicoCityError> {
+    pub(crate) fn get_lifecycle_state(&self) -> Result<LifecycleState, RuntimeManagerError> {
         Ok(self.host_state.lock()?.get_lifecycle_state().clone())
     }
 
     /// Returns a result of a WASM computation that has executed on the host
     /// provisioning state.  Returns `None` iff no such result has been
     /// registered.
-    pub(crate) fn get_result(&self) -> Result<Option<Vec<u8>>, MexicoCityError> {
+    pub(crate) fn get_result(&self) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
         Ok(self.host_state.lock()?.get_result().map(|o| o.clone()))
     }
 
@@ -223,14 +223,14 @@ impl ProtocolState {
     pub(crate) fn set_previous_result(
         &mut self,
         result: &Option<Vec<u8>>,
-    ) -> Result<(), MexicoCityError> {
+    ) -> Result<(), RuntimeManagerError> {
         self.host_state.lock()?.set_previous_result(result);
         Ok(())
     }
 
     /// Returns an SHA-256 digest of the bytes loaded into the host provisioning
     /// state.  Returns `None` iff no such program has yet been loaded.
-    pub(crate) fn get_program_digest(&self) -> Result<Option<Vec<u8>>, MexicoCityError> {
+    pub(crate) fn get_program_digest(&self) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
         Ok(self
             .host_state
             .lock()?
@@ -241,7 +241,7 @@ impl ProtocolState {
     /// Moves the host provisioning state's lifecycle state into
     /// `LifecycleState::Error`, a state which it cannot ever escape,
     /// effectively invalidating it.
-    pub(crate) fn invalidate(&self) -> Result<(), MexicoCityError> {
+    pub(crate) fn invalidate(&self) -> Result<(), RuntimeManagerError> {
         Ok(self.host_state.lock()?.invalidate())
     }
 
@@ -251,7 +251,7 @@ impl ProtocolState {
     pub(crate) fn request_and_check_shutdown(
         &self,
         client_id: u64,
-    ) -> Result<bool, MexicoCityError> {
+    ) -> Result<bool, RuntimeManagerError> {
         Ok(self
             .host_state
             .lock()?
@@ -287,7 +287,7 @@ fn print_message(message: String, code: u32) {
     {
         let mut ocall_ret = sgx_status_t::SGX_SUCCESS;
         let ocall_rst = unsafe {
-            crate::mc_sgx::debug_and_error_output_ocall(
+            crate::runtime_manager_sgx::debug_and_error_output_ocall(
                 &mut ocall_ret,
                 CString::new(message).unwrap().as_ptr(),
                 code,

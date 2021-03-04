@@ -254,7 +254,7 @@ impl VeracruzClient {
 
         let serialized_program = transport_protocol::serialize_program(&program)?;
         let response = self.send(&serialized_program)?;
-        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
@@ -271,7 +271,7 @@ impl VeracruzClient {
         let serialized_data = transport_protocol::serialize_program_data(&data, self.next_package_id())?;
         let response = self.send(&serialized_data)?;
 
-        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
@@ -289,7 +289,7 @@ impl VeracruzClient {
         let serialized_read_result = transport_protocol::serialize_request_result()?;
         let response = self.send(&serialized_read_result)?;
 
-        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(VeracruzClientError::ResponseError("get_result", status));
@@ -316,7 +316,7 @@ impl VeracruzClient {
     fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph)?;
-        let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         match parsed_response.status {
             transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
@@ -345,7 +345,7 @@ impl VeracruzClient {
         let max_iterations = 10;
         while iterations < max_iterations {
             let response = self.send(&serialized_request)?;
-            let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
+            let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
             let status = parsed_response.get_status();
             match status {
                 transport_protocol::ResponseStatus::SUCCESS => {
@@ -373,7 +373,7 @@ impl VeracruzClient {
         return Err(VeracruzClientError::ExcessiveIterationError("check_pi_hash"));
     }
 
-    /// send the data to the mexico_city path on the sinaloa server.
+    /// send the data to the runtime_manager path on the sinaloa server.
     // TODO: This function has return points scattered all over, making it very hard to follow
     fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
@@ -397,7 +397,7 @@ impl VeracruzClient {
         loop {
             for outgoing_data in &outgoing_data_vec {
                 let incoming_data_option =
-                    self.post_mexico_city(enclave_session_id, &outgoing_data)?;
+                    self.post_runtime_manager(enclave_session_id, &outgoing_data)?;
                 match incoming_data_option {
                     Some((received_session_id, received_data_vec)) => {
                         enclave_session_id = received_session_id;
@@ -470,16 +470,16 @@ impl VeracruzClient {
         Ok(ret_val)
     }
 
-    fn post_mexico_city(
+    fn post_runtime_manager(
         &self,
         enclave_session_id: u32,
         data: &Vec<u8>,
     ) -> Result<Option<(u32, Vec<Vec<u8>>)>, VeracruzClientError> {
-        println!("post_mexico_city started");
+        println!("post_runtime_manager started");
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
-        let dest_url = format!("http://{:}/mexico_city", self.policy.sinaloa_url());
+        let dest_url = format!("http://{:}/runtime_manager", self.policy.sinaloa_url());
         let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
         let mut ret = client_build
             .post(dest_url.as_str())

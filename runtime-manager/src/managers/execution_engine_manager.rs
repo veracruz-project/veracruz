@@ -11,12 +11,12 @@
 //! information on licensing and copyright.
 
 use super::{
-    buffer::MexicoCityBuffer, MexicoCityError, ProtocolState, ProvisioningResponse,
+    buffer::RuntimeManagerBuffer, RuntimeManagerError, ProtocolState, ProvisioningResponse,
     ProvisioningResult,
 };
 use execution_engine::hcall::common::{DataSourceMetadata, LifecycleState};
 use transport_protocol::transport_protocol::{
-    MexicoCityRequest as REQUEST, MexicoCityRequest_oneof_message_oneof as MESSAGE,
+    RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
 };
 use lazy_static::lazy_static;
 #[cfg(any(feature = "tz", feature = "nitro"))]
@@ -33,7 +33,7 @@ use veracruz_utils::VeracruzRole;
 
 lazy_static! {
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
-    static ref PROG_AND_DATA_BUFFER: Mutex<MexicoCityBuffer> = Mutex::new(MexicoCityBuffer::new());
+    static ref PROG_AND_DATA_BUFFER: Mutex<RuntimeManagerBuffer> = Mutex::new(RuntimeManagerBuffer::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -183,7 +183,7 @@ fn dispatch_on_result(protocol_state: &ProtocolState) -> ProvisioningResult {
 fn dispatch_on_shutdown(
     protocol_state: &ProtocolState,
     client_id: u64,
-) -> Result<(bool, ProvisioningResult), MexicoCityError> {
+) -> Result<(bool, ProvisioningResult), RuntimeManagerError> {
     Ok((
         protocol_state.request_and_check_shutdown(client_id)?,
         Ok(ProvisioningResponse::Success {
@@ -370,7 +370,7 @@ fn dispatch_on_next_round(
 
 /// Allocates a new protocol state, reloads the program and all (static) data,
 /// and loads the current result as the `previous_result` for the new instance.
-fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, MexicoCityError> {
+fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeManagerError> {
     let mut new_protocol_state = ProtocolState::new(
         old_protocol_state.get_policy().clone(),
         format!("{}", old_protocol_state.get_policy_hash()),
@@ -400,7 +400,7 @@ fn dispatch_on_request(
     let mut protocol_state_guard = super::PROTOCOL_STATE.lock()?;
     let protocol_state = protocol_state_guard
         .as_mut()
-        .ok_or_else(|| MexicoCityError::UninitializedProtocolState)?;
+        .ok_or_else(|| RuntimeManagerError::UninitializedProtocolState)?;
 
     match request {
         MESSAGE::data(data) => {
@@ -462,7 +462,7 @@ fn dispatch_on_request(
     }
 }
 
-/// Tries to parse the incoming data into a `MexicoCityRequest`.  If this is not
+/// Tries to parse the incoming data into a `RuntimeManagerRequest`.  If this is not
 /// possible, returns `Err(reason)`.  If we still need to receive more data in
 /// order to parse a full request, returns `Ok(None)`.  Otherwise, returns
 /// `Ok(request)` for the parsed request.
@@ -471,7 +471,7 @@ fn dispatch_on_request(
 fn parse_incoming_buffer(
     tls_session_id: u32,
     mut input: Vec<u8>,
-) -> Result<Option<transport_protocol::MexicoCityRequest>, MexicoCityError> {
+) -> Result<Option<transport_protocol::RuntimeManagerRequest>, RuntimeManagerError> {
     let mut incoming_buffer_hash = INCOMING_BUFFER_HASH.lock()?;
 
     // First, make sure there is an entry in the hash for the TLS session.
@@ -481,7 +481,7 @@ fn parse_incoming_buffer(
 
     // This should not panic, given the above.  If it does, something is wrong.
     let incoming_buffer = incoming_buffer_hash.get_mut(&tls_session_id).ok_or(
-        MexicoCityError::UnavailableIncomeBufferError(tls_session_id as u64),
+        RuntimeManagerError::UnavailableIncomeBufferError(tls_session_id as u64),
     )?;
 
     incoming_buffer.append(&mut input);
@@ -496,7 +496,7 @@ fn parse_incoming_buffer(
     //
     // TODO: It would be nice to check the error, and then determine if this might
     // be the case or if it is hopeless and we could just error out.
-    match protobuf::parse_from_bytes::<transport_protocol::MexicoCityRequest>(&incoming_buffer) {
+    match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer) {
         Err(_) => Ok(None),
         Ok(parsed) => {
             incoming_buffer_hash.remove(&tls_session_id);

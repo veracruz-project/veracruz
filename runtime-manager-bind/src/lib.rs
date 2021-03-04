@@ -1,4 +1,4 @@
-//! Bindings to the Mexico City enclave
+//! Bindings to the Runtime Manager enclave
 //!
 //! ## Authors
 //!

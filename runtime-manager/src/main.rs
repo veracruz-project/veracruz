@@ -1,4 +1,4 @@
-//! The Mexico City enclave
+//! The Runtime Manager enclave
 //!
 //! ## Authors
 //!
@@ -10,20 +10,20 @@
 //! information on licensing and copyright.
 
 #![cfg_attr(feature = "tz", no_main)]
-#![crate_name = "mexico_city_enclave"]
+#![crate_name = "runtime_manager_enclave"]
 #![feature(rustc_private)]
 
 #[cfg(feature = "tz")]
-pub mod mc_tz;
+pub mod runtime_manager_trustzone;
 #[cfg(feature = "tz")]
-pub use crate::mc_tz::*;
+pub use crate::runtime_manager_trustzone::*;
 pub mod managers;
 
 #[cfg(feature = "nitro")]
-pub mod mc_nitro;
+pub mod runtime_manager_nitro;
 
 #[cfg(feature = "nitro")]
 fn main() -> Result<(), String> {
-    mc_nitro::nitro_main()
-        .map_err(|err| format!("Mexico City::main nitro_main returned error:{:?}", err))
+    runtime_manager_nitro::nitro_main()
+        .map_err(|err| format!("Runtime Manager::main nitro_main returned error:{:?}", err))
 }

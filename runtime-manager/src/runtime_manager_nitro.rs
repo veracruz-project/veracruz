@@ -1,4 +1,4 @@
-//! AWS Nitro-Enclaves-specific material for the Mexico City enclave
+//! AWS Nitro-Enclaves-specific material for the Runtime Manager enclave
 //!
 //! ## Authors
 //!
@@ -23,7 +23,7 @@ use veracruz_utils::{
 };
 
 use crate::managers;
-use crate::managers::MexicoCityError;
+use crate::managers::RuntimeManagerError;
 
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
@@ -43,33 +43,33 @@ const OCALL_PORT: u32 = 5006;
 /// I guess I have to trust Amazon on this one
 const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
-/// The main function for the Nitro mexico city enclave
-pub fn nitro_main() -> Result<(), MexicoCityError> {
+/// The main function for the Nitro Runtime Manager enclave
+pub fn nitro_main() -> Result<(), RuntimeManagerError> {
     let socket_fd = socket(
         AddressFamily::Vsock,
         SockType::Stream,
         SockFlag::empty(),
         None,
     )
-    .map_err(|err| MexicoCityError::SocketError(err))?;
+    .map_err(|err| RuntimeManagerError::SocketError(err))?;
     println!(
         "mc_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
         CID, PORT
     );
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
-    bind(socket_fd, &sockaddr).map_err(|err| MexicoCityError::SocketError(err))?;
+    bind(socket_fd, &sockaddr).map_err(|err| RuntimeManagerError::SocketError(err))?;
     println!("mc_nitro::nitro_main calling accept");
 
-    listen_vsock(socket_fd, BACKLOG).map_err(|err| MexicoCityError::SocketError(err))?;
+    listen_vsock(socket_fd, BACKLOG).map_err(|err| RuntimeManagerError::SocketError(err))?;
 
-    let fd = accept(socket_fd).map_err(|err| MexicoCityError::SocketError(err))?;
+    let fd = accept(socket_fd).map_err(|err| RuntimeManagerError::SocketError(err))?;
     println!("mc_nitro::nitro_main accept succeeded. looping");
     loop {
         let received_buffer =
-            receive_buffer(fd).map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+            receive_buffer(fd).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
         let received_message: MCMessage = bincode::deserialize(&received_buffer)
-            .map_err(|err| MexicoCityError::BincodeError(err))?;
+            .map_err(|err| RuntimeManagerError::BincodeError(err))?;
         let return_message = match received_message {
             MCMessage::Initialize(policy_json) => initialize(&policy_json)?,
             MCMessage::GetEnclaveCert => {
@@ -146,17 +146,17 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
         };
         let return_buffer = bincode::serialize(&return_message)
-            .map_err(|err| MexicoCityError::BincodeError(err))?;
+            .map_err(|err| RuntimeManagerError::BincodeError(err))?;
         println!(
             "mc_nitro::main calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
-        send_buffer(fd, &return_buffer).map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+        send_buffer(fd, &return_buffer).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     }
 }
 
 /// Handler for the MCMessage::Initialize message
-fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
+fn initialize(policy_json: &str) -> Result<MCMessage, RuntimeManagerError> {
     println!("mc_nitro::initialize started");
     managers::session_manager::init_session_manager(policy_json)?;
     println!("mc_nitro::main init_session_manager completed");
@@ -164,7 +164,7 @@ fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
 }
 
 /// Handler for the MCMessage::GetPSAAttestationToken message
-fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityError> {
+fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, RuntimeManagerError> {
     println!("mc_nitro::get_psa_attestation_token started");
     println!(
         "nc_nitro::get_psa_attestation_token received challenge:{:?}",
@@ -180,7 +180,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
 
         let nsm_fd = nsm_lib::nsm_lib_init();
         if nsm_fd < 0 {
-            return Err(MexicoCityError::NsmLibError(nsm_fd));
+            return Err(RuntimeManagerError::NsmLibError(nsm_fd));
         }
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
@@ -197,7 +197,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
         };
         match status {
             nsm_io::ErrorCode::Success => (),
-            _ => return Err(MexicoCityError::NsmErrorCode(status)),
+            _ => return Err(RuntimeManagerError::NsmErrorCode(status)),
         }
         unsafe {
             att_doc.set_len(att_doc_len as usize);
@@ -208,21 +208,21 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
     let nre_message =
         NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_name);
     let nre_message_buffer =
-        bincode::serialize(&nre_message).map_err(|err| MexicoCityError::BincodeError(err))?;
+        bincode::serialize(&nre_message).map_err(|err| RuntimeManagerError::BincodeError(err))?;
 
     // send the buffer back to Sinaloa via an ocall
     let vsocksocket = vsocket::vsock_connect(HOST_CID, OCALL_PORT)
-        .map_err(|err| MexicoCityError::SocketError(err))?;
+        .map_err(|err| RuntimeManagerError::SocketError(err))?;
     send_buffer(vsocksocket.as_raw_fd(), &nre_message_buffer)
-        .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+        .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     let received_buffer = receive_buffer(vsocksocket.as_raw_fd())
-        .map_err(|err| MexicoCityError::VeracruzSocketError(err))?;
+        .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     let received_message: NitroRootEnclaveMessage =
-        bincode::deserialize(&received_buffer).map_err(|err| MexicoCityError::BincodeError(err))?;
+        bincode::deserialize(&received_buffer).map_err(|err| RuntimeManagerError::BincodeError(err))?;
 
     let (psa_token, pubkey, device_id) = match received_message {
         NitroRootEnclaveMessage::PSAToken(token, pubkey, d_id) => (token, pubkey, d_id),
-        _ => return Err(MexicoCityError::WrongMessageTypeError(received_message)),
+        _ => return Err(RuntimeManagerError::WrongMessageTypeError(received_message)),
     };
     let psa_token_message: MCMessage =
         MCMessage::PSAAttestationToken(psa_token, pubkey, device_id.try_into().unwrap());

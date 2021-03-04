@@ -996,7 +996,7 @@ pub(crate) enum EntrySignature {
 
 /// This is what an execution strategy exposes to clients outside of this
 /// library.  This functionality is sufficient to implement both
-/// `freestanding-execution-engine` and `mexico-city` and if any functionality is
+/// `freestanding-execution-engine` and `runtime-manager` and if any functionality is
 /// missing that these components require then it should be added to this trait
 /// and implemented for all supported implementation strategies.
 ///

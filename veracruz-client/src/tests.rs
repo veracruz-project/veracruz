@@ -497,9 +497,9 @@ fn veracruz_client_session() {
 }
 
 /// simple index handler
-#[post("/mexico_city")]
+#[post("/runtime_manager")]
 async fn mc(session: Session, req: HttpRequest) -> Result<HttpResponse, actix_web::Error> {
-    println!("mexico_city:{:?}", req);
+    println!("runtime_manager:{:?}", req);
     // session
     let mut counter = 1;
     if let Some(count) = session.get::<i32>("counter")? {

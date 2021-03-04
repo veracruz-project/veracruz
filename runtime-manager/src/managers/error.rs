@@ -1,4 +1,4 @@
-//! MexicoCity error
+//! Runtime Manager errors
 //!
 //! ## Authors
 //!
@@ -20,74 +20,74 @@ use std::sync::PoisonError;
 use veracruz_utils::nitro::{NitroRootEnclaveMessage, VeracruzSocketError};
 
 #[derive(Debug, Error)]
-pub enum MexicoCityError {
-    #[error(display = "MexicoCity: SessionManagerError: {:?}.", _0)]
+pub enum RuntimeManagerError {
+    #[error(display = "RuntimeManager: SessionManagerError: {:?}.", _0)]
     SessionManagerError(#[error(source)] session_manager::SessionManagerError),
-    #[error(display = "MexicoCity: TransportProtocolError: {:?}.", _0)]
-    TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "MexicoCity: VeracruzUtilError: {:?}.", _0)]
+    #[error(display = "RuntimeManager: TransportProtocolError: {:?}.", _0)]
+    TransportProtocolError(#[error(source)] colima::TransportProtocolError),
+    #[error(display = "RuntimeManager: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
-    #[error(display = "MexicoCity: FatalHostError: {:?}.", _0)]
+    #[error(display = "RuntimeManager: FatalHostError: {:?}.", _0)]
     FatalHostError(#[error(source)] execution_engine::hcall::common::FatalHostError),
-    #[error(display = "MexicoCity: HostProvisioningError: {:?}.", _0)]
+    #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
     HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
-    #[error(display = "MexicoCity: MexicoCityBufferError: {:?}.", _0)]
-    MexicoCityBufferError(#[error(source)] crate::managers::buffer::MexicoCityBufferError),
-    #[error(display = "MexicoCity: Failed to obtain lock {:?}.", _0)]
+    #[error(display = "RuntimeManager: RuntimeManagerBufferError: {:?}.", _0)]
+    RuntimeManagerBufferError(#[error(source)] crate::managers::buffer::RuntimeManagerBufferError),
+    #[error(display = "RuntimeManager: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
-    #[error(display = "MexicoCity: Uninitialized session in function {}.", _0)]
+    #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]
     UninitializedSessionError(&'static str),
     #[cfg(feature = "sgx")]
-    #[error(display = "MexicoCity: SGXError: {:?}.", _0)]
+    #[error(display = "RuntimeManager: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
-    #[error(display = "MexicoCity: {} failed with error code {:?}.", _0, _1)]
+    #[error(display = "RuntimeManager: {} failed with error code {:?}.", _0, _1)]
     UnsafeCallError(&'static str, u32),
-    #[error(display = "MexicoCity: Received no data.")]
+    #[error(display = "RuntimeManager: Received no data.")]
     NoDataError,
     #[error(
-        display = "MexicoCity: Global policy requested an execution strategy unavailable on this platform."
+        display = "RuntimeManager: Global policy requested an execution strategy unavailable on this platform."
     )]
     InvalidExecutionStrategyError,
-    #[error(display = "MexicoCity: Unavailable session with ID {}.", _0)]
+    #[error(display = "RuntimeManager: Unavailable session with ID {}.", _0)]
     UnavailableSessionError(u64),
-    #[error(display = "MexicoCity: Unavailable protocol state.")]
+    #[error(display = "RuntimeManager: Unavailable protocol state.")]
     UninitializedProtocolState,
-    #[error(display = "MexicoCity: Unavailable income buffer with ID {}.", _0)]
+    #[error(display = "RuntimeManager: Unavailable income buffer with ID {}.", _0)]
     UnavailableIncomeBufferError(u64),
     #[cfg(feature = "nitro")]
-    #[error(display = "MexicoCity: Socket Error: {:?}", _0)]
+    #[error(display = "RuntimeManager: Socket Error: {:?}", _0)]
     SocketError(nix::Error),
     #[cfg(feature = "nitro")]
-    #[error(display = "MexicoCity: Veracruz Socket error:{:?}", _0)]
+    #[error(display = "RuntimeManager: Veracruz Socket error:{:?}", _0)]
     VeracruzSocketError(VeracruzSocketError),
     #[cfg(feature = "nitro")]
-    #[error(display = "MexicoCity: Bincode error:{:?}", _0)]
+    #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
     BincodeError(bincode::Error),
     #[cfg(feature = "nitro")]
-    #[error(display = "MexicoCity: NSM Lib error:{:?}", _0)]
+    #[error(display = "RuntimeManager: NSM Lib error:{:?}", _0)]
     NsmLibError(i32),
     #[cfg(feature = "nitro")]
-    #[error(display = "MexicoCity: NSM Error code:{:?}", _0)]
+    #[error(display = "RuntimeManager: NSM Error code:{:?}", _0)]
     NsmErrorCode(nsm_io::ErrorCode),
     #[cfg(feature = "nitro")]
-    #[error(display = "MexicoCity: wrong message type received:{:?}", _0)]
+    #[error(display = "RuntimeManager: wrong message type received:{:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
 }
 
-impl<T> From<PoisonError<T>> for MexicoCityError {
+impl<T> From<PoisonError<T>> for RuntimeManagerError {
     fn from(error: PoisonError<T>) -> Self {
-        MexicoCityError::LockError(format!("{:?}", error))
+        RuntimeManagerError::LockError(format!("{:?}", error))
     }
 }
 
 #[cfg(feature = "sgx")]
-impl From<sgx_types::sgx_status_t> for MexicoCityError {
+impl From<sgx_types::sgx_status_t> for RuntimeManagerError {
     fn from(error: sgx_types::sgx_status_t) -> Self {
         match error {
             sgx_types::sgx_status_t::SGX_SUCCESS => {
                 panic!("Expected an error code but received an success status")
             }
-            e => MexicoCityError::SGXError(e),
+            e => RuntimeManagerError::SGXError(e),
         }
     }
 }

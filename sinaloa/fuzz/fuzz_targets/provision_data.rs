@@ -61,7 +61,7 @@ fuzz_target!(|buffer: &[u8]| {
 
 
         let rst = client_tls_send(&client_tls_tx, &client_tls_rx, &mut client_session, &request).unwrap();
-        let rst = protobuf::parse_from_bytes::<transport_protocol::MexicoCityResponse>(&rst);
+        let rst = protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerResponse>(&rst);
         assert!(rst.is_ok());
         //let response = rst.unwrap();
         //assert!( response.get_status() == transport_protocol::ResponseStatus::SUCCESS );

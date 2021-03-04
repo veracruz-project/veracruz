@@ -10,13 +10,13 @@
 //! the case of `JIT` an implementation using a JITting execution strategy is
 //! returned.  Note that the `ExecutionEngine` trait is essentially this library's
 //! interface to the outside world, and details exactly what external clients
-//! such as `freestanding-executuon-engine` and `mexico-city` can rely on.
+//! such as `freestanding-executuon-engine` and `runtime-manager` can rely on.
 //!
 //! ## Todo
 //!
 //! Try to merge `single_threaded_execution_engine` and
 //! `multi_threaded_execution_engine` into a single function.  Problem: if you
-//! return `boxed::Box<..>` then `mexico-city/src/managers/mod.rs` is seemingly
+//! return `boxed::Box<..>` then `runtime-manager/src/managers/mod.rs` is seemingly
 //! impossible to implement as you run into issues with no compile-time size for
 //! the trait object when converting the `Box<..>` into `Arc<Mutex<..>>`.
 //!

@@ -75,10 +75,10 @@ const VERSION: &'static str = "0.1.0";
 const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256";
 
 /// The name of the 'dd' executable to call when computing the hash of the
-/// Mexico City enclave for SGX.
+/// Runtime Manager enclave for SGX.
 const DD_EXECUTABLE_NAME: &'static str = "dd";
 /// The name of the 'xxd' executable to call when computing the hash of the
-/// Mexico City enclave for SGX.
+/// Runtime Manager enclave for SGX.
 const XXD_EXECUTABLE_NAME: &'static str = "xxd";
 
 /// The default filename of the output JSON policy file, if no alternative is
@@ -109,10 +109,10 @@ struct Arguments {
     sinaloa_ip: Option<SocketAddr>,
     /// The socket address (IP and port) of the Veracruz proxy attestation instance.
     proxy_attestation_server_ip: Option<SocketAddr>,
-    /// The filename of the Mexico City CSS file for SGX measurement.  This is
+    /// The filename of the Runtime Manager CSS file for SGX measurement.  This is
     /// optional.
     css_file: Option<PathBuf>,
-    /// The filename of the Mexico City PRCR0 file for Nitro Enclave
+    /// The filename of the Runtime Manager PRCR0 file for Nitro Enclave
     /// measurement.  This is optional.
     pcr0_file: Option<PathBuf>,
     /// The filename of the output policy file.
@@ -232,7 +232,7 @@ fn parse_command_line() -> Arguments {
                 .short("b")
                 .long("css-file")
                 .value_name("FILE")
-                .help("Filename of the CSS file for the Mexico City enclave for SGX measurement.")
+                .help("Filename of the CSS file for the Runtime Manager enclave for SGX measurement.")
                 .required(false),
         )
         .arg(
@@ -240,7 +240,7 @@ fn parse_command_line() -> Arguments {
                 .short("l")
                 .long("pcr-file")
                 .value_name("FILE")
-                .help("Filename of the PCR0 file for the Mexico City enclave for AWS Nitro Enclave measurement.")
+                .help("Filename of the PCR0 file for the Runtime Manager enclave for AWS Nitro Enclave measurement.")
                 .required(false),
         )
         .arg(
@@ -472,7 +472,7 @@ fn compute_program_hash(arguments: &Arguments) -> String {
     }
 }
 
-/// Computes the SGX hash of the Mexico City enclave making use of the external
+/// Computes the SGX hash of the Runtime Manager enclave making use of the external
 /// 'dd' and 'xxd' utilities, which are called as external processes.  Returns
 /// `None` iff no `css.bin` file was provided as a command-line argument.
 fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
@@ -532,13 +532,13 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
             abort_with("Invocation of 'dd' command failed.");
         }
     } else {
-        error!("Mexico City CSS.bin file cannot be opened.");
+        error!("Runtime Manager CSS.bin file cannot be opened.");
         error!("Continuing on without computing an SGX hash.");
         None
     }
 }
 
-/// Reads the Mexico City PCR0 file content, munging it a little, for the Nitro
+/// Reads the Runtime Manager PCR0 file content, munging it a little, for the Nitro
 /// Enclave hash.  Returns `None` iff no `pcr0` file was provided as a command
 /// line argument.
 fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
@@ -561,7 +561,7 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 
         Some(content)
     } else {
-        info!("Mexico City PCR0 file cannot be opened.");
+        info!("Runtime Manager PCR0 file cannot be opened.");
         info!("Continuing on without computing a Nitro hash.");
         None
     }
@@ -647,12 +647,12 @@ fn serialize_json(arguments: &Arguments) -> Value {
         "execution_strategy": &arguments.execution_strategy});
 
     if let Some(sgx_hash) = compute_sgx_enclave_hash(arguments) {
-        base_json["mexico_city_hash_sgx"] = JsonString(sgx_hash.clone());
-        base_json["mexico_city_hash_tz"] = JsonString(sgx_hash);
+        base_json["runtime_manager_hash_sgx"] = JsonString(sgx_hash.clone());
+        base_json["runtime_manager_hash_tz"] = JsonString(sgx_hash);
     }
 
     if let Some(nitro_hash) = compute_nitro_enclave_hash(arguments) {
-        base_json["mexico_city_hash_nitro"] = JsonString(nitro_hash);
+        base_json["runtime_manager_hash_nitro"] = JsonString(nitro_hash);
     }
 
     base_json

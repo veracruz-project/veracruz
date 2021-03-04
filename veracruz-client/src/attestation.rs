@@ -38,12 +38,12 @@ impl Attestation for AttestationPSA {
         policy: &veracruz_utils::VeracruzPolicy,
         target_platform: &EnclavePlatform,
     ) -> Result<(Vec<u8>, String), VeracruzClientError> {
-        let mexico_city_hash = policy.mexico_city_hash(target_platform)
+        let runtime_manager_hash = policy.runtime_manager_hash(target_platform)
             .map_err(|err| {
-                println!("Did not find mexico city hash for platform in policy:{:?}", err);
+                println!("Did not find Runtime Manager hash for platform in policy:{:?}", err);
                 err
             })?;
-        let expected_enclave_hash = hex::decode(mexico_city_hash.as_str())?;
+        let expected_enclave_hash = hex::decode(runtime_manager_hash.as_str())?;
         Self::attestation_flow(
             &policy.proxy_attestation_server_url().as_str(),
             &policy.sinaloa_url().as_str(),
