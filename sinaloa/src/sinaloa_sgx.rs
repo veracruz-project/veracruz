@@ -488,9 +488,9 @@ pub mod sinaloa_sgx {
                 match *trustzone_root_enclave {
                     Some(_) => (), // do nothing, we're good
                     None => {
-                        let trustzone_root_enclave = start_enclave(TRUSTZONE_ROOT_ENCLAVE_ENCLAVE_FILE)?;
-                        new_sinaloa.native_attestation(&trustzone_root_enclave, &policy.proxy_attestation_server_url())?;
-                        *trustzone_root_enclave = Some(trustzone_root_enclave)
+                        let enclave = start_enclave(TRUSTZONE_ROOT_ENCLAVE_ENCLAVE_FILE)?;
+                        new_sinaloa.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
+                        *trustzone_root_enclave = Some(enclave)
                     }
                 }
             }

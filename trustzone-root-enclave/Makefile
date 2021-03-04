@@ -38,9 +38,9 @@ SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
 RUST_SGX_SDK_PATH = ../third-party/rust-sgx-sdk
 
-$(EDL_Files): $(SGX_EDGER8R) trustzone-root-enclave.edl
-	@$(SGX_EDGER8R) --use-prefix --trusted trustzone-root-enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
-	@$(SGX_EDGER8R) --use-prefix --untrusted trustzone-root-enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
+$(EDL_Files): $(SGX_EDGER8R) trustzone_root_enclave.edl
+	@$(SGX_EDGER8R) --use-prefix --trusted trustzone_root_enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
+	@$(SGX_EDGER8R) --use-prefix --untrusted trustzone_root_enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
 	@echo $(INFO_COLOR) "GEN => $(EDL_Files)" $(RESET_COLOR)
 
 SGX_COMMON_CFLAGS += -O0 -g
