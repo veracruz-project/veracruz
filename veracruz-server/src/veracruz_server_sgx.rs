@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "sgx")]
-pub mod sinaloa_sgx {
+pub mod veracruz_server_sgx {
 
     use crate::veracruz_server::*;
     use transport_protocol;

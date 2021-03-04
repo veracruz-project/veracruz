@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "tz")]
-pub mod sinaloa_tz {
+pub mod veracruz_server_tz {
 
     use crate::veracruz_server::*;
     use hex;

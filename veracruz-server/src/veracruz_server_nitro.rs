@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "nitro")]
-pub mod sinaloa_nitro {
+pub mod veracruz_server_nitro {
     use crate::ec2_instance::EC2Instance;
     use crate::veracruz_server::Sinaloa;
     use crate::veracruz_server::SinaloaError;

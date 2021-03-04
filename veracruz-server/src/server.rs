@@ -11,11 +11,11 @@
 
 use crate::veracruz_server::*;
 #[cfg(feature = "nitro")]
-use crate::veracruz_server_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
+use crate::veracruz_server_nitro::veracruz_server_nitro::SinaloaNitro as SinaloaEnclave;
 #[cfg(feature = "sgx")]
-use crate::veracruz_server_sgx::sinaloa_sgx::SinaloaSGX as SinaloaEnclave;
+use crate::veracruz_server_sgx::veracruz_server_sgx::SinaloaSGX as SinaloaEnclave;
 #[cfg(feature = "tz")]
-use crate::veracruz_server_tz::sinaloa_tz::SinaloaTZ as SinaloaEnclave;
+use crate::veracruz_server_tz::veracruz_server_tz::SinaloaTZ as SinaloaEnclave;
 
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;
