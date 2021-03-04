@@ -1,4 +1,4 @@
-//! The Baja library
+//! The session manager's library
 //!
 //! Code for sending and receiving data over a TLS-encrypted link, inside the
 //! Veracruz runtime.
@@ -19,9 +19,9 @@
 #[macro_use]
 extern crate sgx_tstd as std;
 
-pub mod baja;
-pub use self::baja::*;
-pub mod baja_session;
-pub use self::baja_session::*;
+pub mod session_context;
+pub use self::session_context::*;
+pub mod session;
+pub use self::session::*;
 pub mod error;
-pub use self::error::BajaError;
+pub use self::error::SessionManagerError;

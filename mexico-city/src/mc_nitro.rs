@@ -74,7 +74,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             MCMessage::Initialize(policy_json) => initialize(&policy_json)?,
             MCMessage::GetEnclaveCert => {
                 println!("mc_nitro::main GetEnclaveCert");
-                let return_message = match managers::baja_manager::get_enclave_cert_pem() {
+                let return_message = match managers::session_manager::get_enclave_cert_pem() {
                     Ok(cert) => MCMessage::EnclaveCert(cert),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
@@ -82,7 +82,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
             MCMessage::GetEnclaveName => {
                 println!("mc_nitro::main GetEnclaveName");
-                let return_message = match managers::baja_manager::get_enclave_name() {
+                let return_message = match managers::session_manager::get_enclave_name() {
                     Ok(name) => MCMessage::EnclaveName(name),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
@@ -90,7 +90,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
             MCMessage::NewTLSSession => {
                 println!("mc_nitro::main NewTLSSession");
-                let ns_result = managers::baja_manager::new_session();
+                let ns_result = managers::session_manager::new_session();
                 let return_message: MCMessage = match ns_result {
                     Ok(session_id) => MCMessage::TLSSession(session_id),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
@@ -99,7 +99,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
             MCMessage::CloseTLSSession(session_id) => {
                 println!("mc_nitro::main CloseTLSSession");
-                let cs_result = managers::baja_manager::close_session(session_id);
+                let cs_result = managers::session_manager::close_session(session_id);
                 let return_message: MCMessage = match cs_result {
                     Ok(_) => MCMessage::Status(NitroStatus::Success),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
@@ -108,7 +108,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
             MCMessage::GetTLSDataNeeded(session_id) => {
                 println!("mc_nitro::main GetTLSDataNeeded");
-                let return_message = match managers::baja_manager::get_data_needed(session_id) {
+                let return_message = match managers::session_manager::get_data_needed(session_id) {
                     Ok(needed) => MCMessage::TLSDataNeeded(needed),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
@@ -116,7 +116,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
             MCMessage::SendTLSData(session_id, tls_data) => {
                 println!("mc_nitro::main SendTLSData");
-                let return_message = match managers::baja_manager::send_data(session_id, &tls_data)
+                let return_message = match managers::session_manager::send_data(session_id, &tls_data)
                 {
                     Ok(_) => MCMessage::Status(NitroStatus::Success),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
@@ -125,7 +125,7 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
             }
             MCMessage::GetTLSData(session_id) => {
                 println!("mc_nitro::main GetTLSData");
-                let return_message = match managers::baja_manager::get_data(session_id) {
+                let return_message = match managers::session_manager::get_data(session_id) {
                     Ok((active, output_data)) => MCMessage::TLSData(output_data, active),
                     Err(_) => MCMessage::Status(NitroStatus::Fail),
                 };
@@ -158,8 +158,8 @@ pub fn nitro_main() -> Result<(), MexicoCityError> {
 /// Handler for the MCMessage::Initialize message
 fn initialize(policy_json: &str) -> Result<MCMessage, MexicoCityError> {
     println!("mc_nitro::initialize started");
-    managers::baja_manager::init_baja(policy_json)?;
-    println!("mc_nitro::main init_baja completed");
+    managers::session_manager::init_session_manager(policy_json)?;
+    println!("mc_nitro::main init_session_manager completed");
     return Ok(MCMessage::Status(NitroStatus::Success));
 }
 
@@ -171,7 +171,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
         challenge
     );
 
-    let enclave_cert = managers::baja_manager::get_enclave_cert_pem()?;
+    let enclave_cert = managers::session_manager::get_enclave_cert_pem()?;
 
     let enclave_cert_hash = ring::digest::digest(&ring::digest::SHA256, &enclave_cert);
     let nitro_token: Vec<u8> = {
@@ -204,7 +204,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<MCMessage, MexicoCityEr
         }
         att_doc.clone()
     };
-    let enclave_name: String = managers::baja_manager::get_enclave_name()?;
+    let enclave_name: String = managers::session_manager::get_enclave_name()?;
     let nre_message =
         NitroRootEnclaveMessage::ProxyAttestation(challenge.to_vec(), nitro_token, enclave_name);
     let nre_message_buffer =

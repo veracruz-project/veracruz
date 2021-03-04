@@ -12,9 +12,9 @@ the isolate, and executes the WASM binary on the secret inputs once a result is
 requested by a principal.  Note that this code must be explicitly trusted by
 anybody aiming to use Veracruz.  Its major components are:
 
-- Baja: acts as the TLS endpoint inside the isolate, managing encrypted and
-intrgrity-protected communication sessions between the trusted Veracruz runtime
-and the outside world (see also: Jalisco). 
+- Session manager: acts as the TLS endpoint inside the isolate, managing
+encrypted and integrity-protected communication sessions between the trusted
+Veracruz runtime and the outside world (see also: Jalisco).
 - Execution Engine: is the WASM execution engine for Veracruz, and which actually
 executes a program to completion (or failure!).  The Execution Engine exposes a custom
 ABI to the WASM binary, and abstracts over the different execution strategies
@@ -45,7 +45,7 @@ the authenticity of the isolate with remote attestation use this for all
 communication between them and the trusted runtime.
 - Jalisco: is a TLS endpoint for use by clients, and is used to establish an
 encrypted and integrity-protected link between clients and the trusted runtime
-(see also: Baja).
+(see also: Session manager).
 - Sinaloa: is an untrusted "bridge"/server component executing on the
 delegate's machine, outside of the isolate, and which routes encrypted
 communication between the various principals and the isolate. 

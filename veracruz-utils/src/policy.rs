@@ -132,8 +132,9 @@ pub enum VeracruzRole {
 /// certificates: in some contexts these should be unparsed text representations
 /// of the certificates (e.g. in the material below), and in other circumstances
 /// a parsed format is more appropriate, e.g. the `Certificate` type from the
-/// `RusTLS` library, as used in Baja.  We therefore abstract over the concrete
-/// types of certificates to obtain a single type that suits both contexts.
+/// `RusTLS` library, as used by the session manager.  We therefore abstract
+/// over the concrete types of certificates to obtain a single type that suits
+/// both contexts.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VeracruzIdentity<U> {
     /// The cryptographic certificate associated with this identity.  Note that

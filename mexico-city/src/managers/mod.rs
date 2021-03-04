@@ -36,7 +36,7 @@ use execution_engine::{
 
 use veracruz_utils::VeracruzPolicy;
 
-pub mod baja_manager;
+pub mod session_manager;
 pub mod buffer;
 pub mod execution_engine_manager;
 pub mod error;
@@ -47,9 +47,9 @@ pub use error::MexicoCityError;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    static ref MY_BAJA: Mutex<Option<baja::Baja>> = Mutex::new(None);
+    static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> = Mutex::new(None);
     static ref SESSION_COUNTER: Mutex<u32> = Mutex::new(0);
-    static ref SESSIONS: Mutex<HashMap<u32, baja::BajaSession>> = Mutex::new(HashMap::new());
+    static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> = Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
