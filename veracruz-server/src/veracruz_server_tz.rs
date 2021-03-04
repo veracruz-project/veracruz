@@ -12,7 +12,7 @@
 #[cfg(feature = "tz")]
 pub mod sinaloa_tz {
 
-    use crate::sinaloa::*;
+    use crate::veracruz_server::*;
     use hex;
     use lazy_static::lazy_static;
     use log::debug;

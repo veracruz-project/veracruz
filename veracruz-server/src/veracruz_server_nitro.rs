@@ -12,8 +12,8 @@
 #[cfg(feature = "nitro")]
 pub mod sinaloa_nitro {
     use crate::ec2_instance::EC2Instance;
-    use crate::sinaloa::Sinaloa;
-    use crate::sinaloa::SinaloaError;
+    use crate::veracruz_server::Sinaloa;
+    use crate::veracruz_server::SinaloaError;
     use lazy_static::lazy_static;
     use std::sync::Mutex;
     use veracruz_utils::{

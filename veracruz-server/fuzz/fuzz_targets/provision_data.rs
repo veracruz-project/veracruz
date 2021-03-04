@@ -76,11 +76,11 @@ fuzz_target!(|buffer: &[u8]| {
     }
 });
 
-use veracruz_server::sinaloa::Sinaloa;
+use veracruz_server::veracruz_server::Sinaloa;
 #[cfg(feature = "sgx")]
-use sinaloa::SinaloaSGX as SinaloaEnclave;
+use veracruz_server::SinaloaSGX as SinaloaEnclave;
 #[cfg(feature = "tz")]
-use sinaloa::SinaloaTZ as SinaloaEnclave;
+use veracruz_server::SinaloaTZ as SinaloaEnclave;
 
 fn init_sinaloa_and_tls_session(
     policy: veracruz_utils::VeracruzPolicy,
@@ -133,7 +133,7 @@ fn read_priv_key_file(filename: &str) -> rustls::PrivateKey {
 }
 
 fn create_client_test_session(
-    sinaloa: &dyn sinaloa::Sinaloa,
+    sinaloa: &dyn veracruz_server::Sinaloa,
     client_cert_filename: &str,
     client_key_filename: &str,
     cert_hash: Vec<u8>,
@@ -237,7 +237,7 @@ fn client_tls_send(
 
 fn server_tls_loop(
     flag : Arc<Mutex<bool>>,
-    sinaloa: &dyn sinaloa::Sinaloa,
+    sinaloa: &dyn veracruz_server::Sinaloa,
     session_id: u32,
     tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
     rx: std::sync::mpsc::Receiver<std::vec::Vec<u8>>,

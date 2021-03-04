@@ -9,13 +9,13 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::sinaloa::*;
+use crate::veracruz_server::*;
 #[cfg(feature = "nitro")]
-use crate::sinaloa_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
+use crate::veracruz_server_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
 #[cfg(feature = "sgx")]
-use crate::sinaloa_sgx::sinaloa_sgx::SinaloaSGX as SinaloaEnclave;
+use crate::veracruz_server_sgx::sinaloa_sgx::SinaloaSGX as SinaloaEnclave;
 #[cfg(feature = "tz")]
-use crate::sinaloa_tz::sinaloa_tz::SinaloaTZ as SinaloaEnclave;
+use crate::veracruz_server_tz::sinaloa_tz::SinaloaTZ as SinaloaEnclave;
 
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;
@@ -26,7 +26,7 @@ use std::{
     thread,
 };
 
-type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::sinaloa::Sinaloa + Sync + Send>>>>;
+type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::veracruz_server::Sinaloa + Sync + Send>>>>;
 
 #[post("/sinaloa")]
 async fn sinaloa_request(

@@ -24,7 +24,7 @@ mod tests {
     use rand::Rng;
     use ring;
     use serde::Deserialize;
-    use veracruz_server::sinaloa::*;
+    use veracruz_server::veracruz_server::*;
     #[cfg(feature = "sgx")]
     use veracruz_server::SinaloaSGX as SinaloaEnclave;
     #[cfg(feature = "tz")]
@@ -1528,7 +1528,7 @@ mod tests {
     }
 
     fn server_tls_loop(
-        sinaloa: &dyn sinaloa::Sinaloa,
+        sinaloa: &dyn veracruz_server::Sinaloa,
         tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
         rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ticket: u32,
@@ -1606,7 +1606,7 @@ mod tests {
     }
 
     fn create_client_test_session(
-        sinaloa: &dyn sinaloa::Sinaloa,
+        sinaloa: &dyn veracruz_server::Sinaloa,
         client_cert_filename: &str,
         client_key_filename: &str,
         cert_hash: Vec<u8>,
@@ -1689,7 +1689,7 @@ mod tests {
     fn attestation_flow(
         proxy_attestation_server_url: &String,
         expected_enclave_hash: &String,
-        sinaloa: &dyn sinaloa::Sinaloa,
+        sinaloa: &dyn veracruz_server::Sinaloa,
     ) -> Result<Vec<u8>, SinaloaError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         info!("sinaloa-test/attestation_flow: challenge:{:?}", challenge);

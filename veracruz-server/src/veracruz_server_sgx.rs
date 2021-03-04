@@ -12,7 +12,7 @@
 #[cfg(feature = "sgx")]
 pub mod sinaloa_sgx {
 
-    use crate::sinaloa::*;
+    use crate::veracruz_server::*;
     use transport_protocol;
     use lazy_static::lazy_static;
     use log::{debug, error};
