@@ -101,7 +101,7 @@ $(RuntimeManager_u_Object): $(OUT_DIR)/runtime_manager_u.o
 	$(AR) rcsD $@ $(OUT_DIR)/runtime_manager_u.o
 	@echo $(INFO_COLOR) "AR => $@" $(RESET_COLOR)
 
-SGX_Src =  $(COMMON_Src) src/lib.rs src/mc_sgx.rs
+SGX_Src =  $(COMMON_Src) src/lib.rs src/runtime_manager_sgx.rs
 SGX_Target_Path ?= ../third-party/rust-sgx-sdk/xargo
 
 $(SGX_Enclave_Name): $(SGX_Src)
@@ -113,7 +113,7 @@ else
 endif
 
 ############# TrustZone #################
-TZ_Src =  $(COMMON_Src) src/mc_tz.rs src/main.rs
+TZ_Src =  $(COMMON_Src) src/runtime_manager_tz.rs src/main.rs
 # OPTEE_DIR and OPTEE_OS_DIR can be imported from the environment
 OPTEE_DIR ?= /work/rust-optee-trustzone-sdk/optee
 OPTEE_OS_DIR ?= $(OPTEE_DIR)/optee_os
@@ -146,7 +146,7 @@ $(OUT_DIR)/runtime_manager_enclave: $(TZ_Src)
 
 
 ############# AWS Nitro Enclaves ###################
-Nitro_Src = $(COMMON_Src) src/mc_nitro.rs src/main.rs
+Nitro_Src = $(COMMON_Src) src/runtime_manager_nitro.rs src/main.rs
 
 nitro: runtime_manager.eif
 

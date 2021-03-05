@@ -17,7 +17,7 @@ pub mod sinaloa_nitro {
     use lazy_static::lazy_static;
     use std::sync::Mutex;
     use veracruz_utils::{
-        policy::EnclavePlatform, MCMessage, NitroEnclave, NitroError, NitroStatus,
+        policy::EnclavePlatform, RuntimeManagerMessage, NitroEnclave, NitroError, NitroStatus,
     };
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
@@ -83,7 +83,7 @@ pub mod sinaloa_nitro {
             println!("SinaloaNitro::new Runtime Manager instantiated. Calling initialize");
             std::thread::sleep(std::time::Duration::from_millis(10000));
 
-            let initialize: MCMessage = MCMessage::Initialize(policy_json.to_string());
+            let initialize: RuntimeManagerMessage = RuntimeManagerMessage::Initialize(policy_json.to_string());
 
             let encoded_buffer: Vec<u8> = bincode::serialize(&initialize)?;
             meta.enclave.send_buffer(&encoded_buffer)?;
@@ -91,10 +91,10 @@ pub mod sinaloa_nitro {
             // read the response
             let status_buffer = meta.enclave.receive_buffer()?;
 
-            let message: MCMessage = bincode::deserialize(&status_buffer[..])?;
+            let message: RuntimeManagerMessage = bincode::deserialize(&status_buffer[..])?;
             let status = match message {
-                MCMessage::Status(status) => status,
-                _ => return Err(SinaloaError::MCMessageStatus(message)),
+                RuntimeManagerMessage::Status(status) => status,
+                _ => return Err(SinaloaError::RuntimeManagerMessageStatus(message)),
             };
             match status {
                 NitroStatus::Success => (),
@@ -126,15 +126,15 @@ pub mod sinaloa_nitro {
         // Note: this function will go away
         fn get_enclave_cert(&self) -> Result<Vec<u8>, SinaloaError> {
             let certificate = {
-                let message = MCMessage::GetEnclaveCert;
+                let message = RuntimeManagerMessage::GetEnclaveCert;
                 let message_buffer = bincode::serialize(&message)?;
                 self.enclave.send_buffer(&message_buffer)?;
                 // Read the resulting data as the certificate
                 let received_buffer = self.enclave.receive_buffer()?;
-                let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+                let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
                 match received_message {
-                    MCMessage::EnclaveCert(cert) => cert,
-                    _ => return Err(SinaloaError::InvalidMCMessage(received_message))?,
+                    RuntimeManagerMessage::EnclaveCert(cert) => cert,
+                    _ => return Err(SinaloaError::InvalidRuntimeManagerMessage(received_message))?,
                 }
             };
             return Ok(certificate);
@@ -143,15 +143,15 @@ pub mod sinaloa_nitro {
         // Note: This function will go away
         fn get_enclave_name(&self) -> Result<String, SinaloaError> {
             let name: String = {
-                let message = MCMessage::GetEnclaveName;
+                let message = RuntimeManagerMessage::GetEnclaveName;
                 let message_buffer = bincode::serialize(&message)?;
                 self.enclave.send_buffer(&message_buffer)?;
                 // Read the resulting data as the name
                 let received_buffer = self.enclave.receive_buffer()?;
-                let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+                let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
                 match received_message {
-                    MCMessage::EnclaveName(name) => name,
-                    _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
+                    RuntimeManagerMessage::EnclaveName(name) => name,
+                    _ => return Err(SinaloaError::InvalidRuntimeManagerMessage(received_message)),
                 }
             };
             return Ok(name);
@@ -161,47 +161,47 @@ pub mod sinaloa_nitro {
             &self,
             challenge: Vec<u8>,
         ) -> Result<(Vec<u8>, Vec<u8>, i32), SinaloaError> {
-            let message = MCMessage::GetPSAAttestationToken(challenge);
+            let message = RuntimeManagerMessage::GetPSAAttestationToken(challenge);
             let message_buffer = bincode::serialize(&message)?;
             self.enclave.send_buffer(&message_buffer)?;
 
             let received_buffer = self.enclave.receive_buffer()?;
-            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             let (token, public_key, device_id) = match received_message {
-                MCMessage::PSAAttestationToken(token, public_key, device_id) => {
+                RuntimeManagerMessage::PSAAttestationToken(token, public_key, device_id) => {
                     (token, public_key, device_id)
                 }
-                _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
+                _ => return Err(SinaloaError::InvalidRuntimeManagerMessage(received_message)),
             };
             return Ok((token, public_key, device_id));
         }
 
         fn new_tls_session(&self) -> Result<u32, SinaloaError> {
-            let nls_message = MCMessage::NewTLSSession;
+            let nls_message = RuntimeManagerMessage::NewTLSSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             let session_id = match received_message {
-                MCMessage::TLSSession(sid) => sid,
-                _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
+                RuntimeManagerMessage::TLSSession(sid) => sid,
+                _ => return Err(SinaloaError::InvalidRuntimeManagerMessage(received_message)),
             };
             return Ok(session_id);
         }
 
         fn close_tls_session(&self, session_id: u32) -> Result<(), SinaloaError> {
-            let cts_message = MCMessage::CloseTLSSession(session_id);
+            let cts_message = RuntimeManagerMessage::CloseTLSSession(session_id);
             let cts_buffer = bincode::serialize(&cts_message)?;
 
             self.enclave.send_buffer(&cts_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             return match received_message {
-                MCMessage::Status(_status) => Ok(()),
+                RuntimeManagerMessage::Status(_status) => Ok(()),
                 _ => Err(SinaloaError::NitroStatus(NitroStatus::Fail)),
             };
         }
@@ -211,35 +211,35 @@ pub mod sinaloa_nitro {
             session_id: u32,
             input: Vec<u8>,
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), SinaloaError> {
-            let std_message: MCMessage = MCMessage::SendTLSData(session_id, input);
+            let std_message: RuntimeManagerMessage = RuntimeManagerMessage::SendTLSData(session_id, input);
             let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
 
             self.enclave.send_buffer(&std_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             match received_message {
-                MCMessage::Status(status) => match status {
+                RuntimeManagerMessage::Status(status) => match status {
                     NitroStatus::Success => (),
                     _ => return Err(SinaloaError::NitroStatus(status)),
                 },
-                _ => return Err(SinaloaError::InvalidMCMessage(received_message)),
+                _ => return Err(SinaloaError::InvalidRuntimeManagerMessage(received_message)),
             }
 
             let mut active_flag = true;
             let mut ret_array = Vec::new();
             while self.tls_data_needed(session_id)? {
-                let gtd_message = MCMessage::GetTLSData(session_id);
+                let gtd_message = RuntimeManagerMessage::GetTLSData(session_id);
                 let gtd_buffer: Vec<u8> = bincode::serialize(&gtd_message)?;
 
                 self.enclave.send_buffer(&gtd_buffer)?;
 
                 let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-                let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+                let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
                 match received_message {
-                    MCMessage::TLSData(data, alive) => {
+                    RuntimeManagerMessage::TLSData(data, alive) => {
                         active_flag = alive;
                         ret_array.push(data);
                     }
@@ -258,19 +258,19 @@ pub mod sinaloa_nitro {
         }
 
         fn close(&mut self) -> Result<bool, SinaloaError> {
-            let re_message: MCMessage = MCMessage::ResetEnclave;
+            let re_message: RuntimeManagerMessage = RuntimeManagerMessage::ResetEnclave;
             let re_buffer: Vec<u8> = bincode::serialize(&re_message)?;
 
             self.enclave.send_buffer(&re_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
-            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             return match received_message {
-                MCMessage::Status(status) => match status {
+                RuntimeManagerMessage::Status(status) => match status {
                     NitroStatus::Success => Ok(true),
                     _ => Err(SinaloaError::NitroStatus(status)),
                 },
-                _ => Err(SinaloaError::InvalidMCMessage(received_message)),
+                _ => Err(SinaloaError::InvalidRuntimeManagerMessage(received_message)),
             };
         }
     }
@@ -313,16 +313,16 @@ pub mod sinaloa_nitro {
         }
 
         fn tls_data_needed(&self, session_id: u32) -> Result<bool, SinaloaError> {
-            let gtdn_message = MCMessage::GetTLSDataNeeded(session_id);
+            let gtdn_message = RuntimeManagerMessage::GetTLSDataNeeded(session_id);
             let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
 
             self.enclave.send_buffer(&gtdn_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: MCMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             let tls_data_needed = match received_message {
-                MCMessage::TLSDataNeeded(needed) => needed,
+                RuntimeManagerMessage::TLSDataNeeded(needed) => needed,
                 _ => return Err(SinaloaError::NitroStatus(NitroStatus::Fail)),
             };
             return Ok(tls_data_needed);

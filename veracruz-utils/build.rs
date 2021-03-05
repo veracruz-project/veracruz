@@ -17,7 +17,7 @@ use uuid::Uuid;
 fn main() {
     #[cfg(feature = "tz")]
     {
-        let mc_uuid = match fs::read_to_string("../runtime-manager-uuid.txt") {
+        let runtime_manager_uuid = match fs::read_to_string("../runtime-manager-uuid.txt") {
             Ok(u) => u.trim().to_string(),
             Err(_) => {
                 let u = Uuid::new_v4().to_string();
@@ -27,7 +27,7 @@ fn main() {
         };
         let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
         let mut buffer = File::create(out.join("runtime-manager-uuid.txt")).unwrap();
-        write!(buffer, "{}", mc_uuid).unwrap();
+        write!(buffer, "{}", runtime_manager_uuid).unwrap();
 
         let root_enclave_uuid = match fs::read_to_string("../sgx-root-enclave-uuid.txt") {
             Ok(u) => u.trim().to_string(),

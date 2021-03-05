@@ -21,7 +21,11 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
+<<<<<<< HEAD
     use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, RuntimeManagerOpcode, SGX_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
+=======
+    use veracruz_utils::{EnclavePlatform, JaliscoOpcode, RuntimeManagerOpcode, JALISCO_UUID, RUNTIME_MANAGER_UUID};
+>>>>>>> a46d55a (mexico-city-renaming: further renaming of Mexico City)
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
@@ -59,7 +63,11 @@ pub mod sinaloa_tz {
                 }
             }
 
+<<<<<<< HEAD
             let mc_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
+=======
+            let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
+>>>>>>> a46d55a (mexico-city-renaming: further renaming of Mexico City)
 
             let p0 = ParamTmpRef::new_input(&policy_json.as_bytes());
 
@@ -70,8 +78,8 @@ pub mod sinaloa_tz {
                 let context = context_opt
                     .as_mut()
                     .ok_or(SinaloaError::UninitializedEnclaveError)?;
-                let mut mc_session = context.open_session(mc_uuid)?;
-                mc_session.invoke_command(RuntimeManagerOpcode::Initialize as u32, &mut operation)?;
+                let mut session = context.open_session(runtime_manager_uuid)?;
+                session.invoke_command(RuntimeManagerOpcode::Initialize as u32, &mut operation)?;
             }
 
             Ok(Self {
@@ -106,8 +114,8 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
 
             // get the certificate size
             let certificate_len = {
@@ -134,8 +142,8 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
 
             // get the enclave name size
             let name_len = {
@@ -167,8 +175,8 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
 
             // Get the token, public key and device_id
             // p0 - challenge input
@@ -205,8 +213,8 @@ pub mod sinaloa_tz {
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
 
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
 
             let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
@@ -223,8 +231,8 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
             session.invoke_command(RuntimeManagerOpcode::CloseTLSSession as u32, &mut operation)?;
@@ -240,8 +248,8 @@ pub mod sinaloa_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
 
             {
                 let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
@@ -280,13 +288,13 @@ pub mod sinaloa_tz {
 
         fn close(&mut self) -> Result<bool, SinaloaError> {
             let mut context_guard = CONTEXT.lock()?;
-            let mc_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             match &mut *context_guard {
                 None => {
                     return Err(SinaloaError::UninitializedEnclaveError);
                 }
                 Some(context) => {
-                    let mut session = context.open_session(mc_uuid)?;
+                    let mut session = context.open_session(runtime_manager_uuid)?;
                     let mut null_operation =
                         Operation::new(0, ParamNone, ParamNone, ParamNone, ParamNone);
                     session.invoke_command(RuntimeManagerOpcode::ResetEnclave as u32, &mut null_operation)?;

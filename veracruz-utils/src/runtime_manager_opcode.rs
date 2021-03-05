@@ -48,4 +48,4 @@ impl RuntimeManagerOpcode {
     }
 }
 
-pub const MC_UUID: &str = &include_str!(concat!(env!("OUT_DIR"), "/runtime-manager-uuid.txt"));
+pub const RUNTIME_MANAGER_UUID: &str = &include_str!(concat!(env!("OUT_DIR"), "/runtime-manager-uuid.txt"));

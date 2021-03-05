@@ -20,11 +20,11 @@ fn main() -> std::io::Result<()> {
     let target = target_build_utils::TargetInfo::new().expect("could not get target info");
     if target.target_arch() == "aarch64" {
         let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-        let mc_uuid: &str = &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
+        let runtime_manager_uuid: &str = &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
 
         let mut buffer = File::create(out.join("user_ta_header.rs"))?;
         buffer.write_all(include_bytes!("ta_static.rs"))?;
-        let tee_uuid_result = Uuid::parse_str(mc_uuid);
+        let tee_uuid_result = Uuid::parse_str(runtime_manager_uuid);
         let tee_uuid = tee_uuid_result.unwrap();
         let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) = tee_uuid.as_fields();
 
