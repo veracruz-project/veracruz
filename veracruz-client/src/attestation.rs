@@ -90,7 +90,7 @@ impl AttestationPSA {
 
     fn post_veracruz_server(remote_url: &str, data: &Vec<u8>) -> Result<String, VeracruzClientError> {
         let string_data = base64::encode(data);
-        let dest_url = format!("http://{:}/sinaloa", remote_url);
+        let dest_url = format!("http://{:}/veracruz_server", remote_url);
         let post_result_string = AttestationPSA::post_string(&dest_url, string_data);
         post_result_string
     }

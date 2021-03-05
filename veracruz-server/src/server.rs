@@ -28,7 +28,7 @@ use std::{
 
 type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>>>>;
 
-#[post("/sinaloa")]
+#[post("/veracruz_server")]
 async fn veracruz_server_request(
     enclave_handler: web::Data<EnclaveHandler>,
     _request: HttpRequest,
