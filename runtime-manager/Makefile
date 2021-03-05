@@ -113,7 +113,7 @@ else
 endif
 
 ############# TrustZone #################
-TZ_Src =  $(COMMON_Src) src/runtime_manager_tz.rs src/main.rs
+TZ_Src =  $(COMMON_Src) src/runtime_manager_trustzone.rs src/main.rs
 # OPTEE_DIR and OPTEE_OS_DIR can be imported from the environment
 OPTEE_DIR ?= /work/rust-optee-trustzone-sdk/optee
 OPTEE_OS_DIR ?= $(OPTEE_DIR)/optee_os
