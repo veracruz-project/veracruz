@@ -24,108 +24,108 @@ pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
 #[derive(Debug, Error)]
 pub enum VeracruzServerError {
-    #[error(display = "Sinaloa: TLSError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: TLSError: {:?}.", _0)]
     TLSError(#[error(source)] rustls::TLSError),
-    #[error(display = "Sinaloa: HexError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: HexError: {:?}.", _0)]
     HexError(#[error(source)] hex::FromHexError),
-    #[error(display = "Sinaloa: Utf8Error: {:?}.", _0)]
+    #[error(display = "VeracruzServer: Utf8Error: {:?}.", _0)]
     Utf8Error(#[error(source)] std::str::Utf8Error),
-    #[error(display = "Sinaloa: FromUtf8Error: {:?}.", _0)]
+    #[error(display = "VeracruzServer: FromUtf8Error: {:?}.", _0)]
     FromUtf8Error(#[error(source)] std::string::FromUtf8Error),
-    #[error(display = "Sinaloa: SerdeJsonError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: SerdeJsonError: {:?}.", _0)]
     SerdeJsonError(#[error(source)] serde_json::Error),
     #[error(
-        display = "Sinaloa: Function {} received non-success status: {:?}",
+        display = "VeracruzServer: Function {} received non-success status: {:?}",
         _0,
         _1
     )]
     ResponseError(&'static str, transport_protocol::ResponseStatus),
-    #[error(display = "Sinaloa: IOError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
-    #[error(display = "Sinaloa: Base64Error: {:?}.", _0)]
+    #[error(display = "VeracruzServer: Base64Error: {:?}.", _0)]
     Base64Error(#[error(source)] base64::DecodeError),
-    #[error(display = "Sinaloa: TLSError: unspecified.")]
+    #[error(display = "VeracruzServer: TLSError: unspecified.")]
     TLSUnspecifiedError,
-    #[error(display = "Sinaloa: webpki: {:?}.", _0)]
+    #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),
-    #[error(display = "Sinaloa: webpki: {:?}.", _0)]
+    #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
     WebpkiDNSNameError(#[error(source)] webpki::InvalidDNSNameError),
-    #[error(display = "Sinaloa: Failed to obtain lock {:?}.", _0)]
+    #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
-    #[error(display = "Sinaloa: TryIntoError: {}.", _0)]
+    #[error(display = "VeracruzServer: TryIntoError: {}.", _0)]
     TryIntoError(#[error(source)] std::num::TryFromIntError),
-    #[error(display = "Sinaloa: ParseIntError: {}.", _0)]
+    #[error(display = "VeracruzServer: ParseIntError: {}.", _0)]
     ParseIntError(#[error(source)] std::num::ParseIntError),
-    #[error(display = "Sinaloa: MpscSendError (of type ()) Error: {}.", _0)]
+    #[error(display = "VeracruzServer: MpscSendError (of type ()) Error: {}.", _0)]
     MpscSendEmptyError(#[error(source)] std::sync::mpsc::SendError<()>),
     #[error(
-        display = "Sinaloa: MpscSendError (of type std::sync::mpsc::SendError<(u32, std::vec::Vec<u8>)>) Error: {}.",
+        display = "VeracruzServer: MpscSendError (of type std::sync::mpsc::SendError<(u32, std::vec::Vec<u8>)>) Error: {}.",
         _0
     )]
     MpscSendU32VecU8Error(#[error(source)] std::sync::mpsc::SendError<(u32, std::vec::Vec<u8>)>),
     #[error(
-        display = "Sinaloa: MpscSendError (of type std::vec::Vec<u8>) Error: {}.",
+        display = "VeracruzServer: MpscSendError (of type std::vec::Vec<u8>) Error: {}.",
         _0
     )]
     MpscSendVecU8Error(#[error(source)] std::sync::mpsc::SendError<std::vec::Vec<u8>>),
-    #[error(display = "Sinaloa: Mpsc TryRecvError: {}.", _0)]
+    #[error(display = "VeracruzServer: Mpsc TryRecvError: {}.", _0)]
     MpscTryRecvError(#[error(source)] std::sync::mpsc::TryRecvError),
-    #[error(display = "Sinaloa: CurlError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: CurlError: {:?}.", _0)]
     CurlError(#[error(source)] curl::Error),
     #[cfg(feature = "sgx")]
-    #[error(display = "Sinaloa: SGXError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: BincodeError: {:?}", _0)]
+    #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: RuntimeManagerMessage::Status: {:?}", _0)]
+    #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
     RuntimeManagerMessageStatus(veracruz_utils::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: NitroStatus: {:?}", _0)]
+    #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
     NitroStatus(veracruz_utils::NitroStatus),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Received Invalid Runtime Manager Message: {:?}", _0)]
+    #[error(display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}", _0)]
     InvalidRuntimeManagerMessage(veracruz_utils::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
-        display = "Sinaloa: Received Invalid Nitro Root Enclave Message: {:?}",
+        display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
         _0
     )]
     InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Received Invalid Protocol Buffer Message")]
+    #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Nix Error: {:?}", _0)]
+    #[error(display = "VeracruzServer: Nix Error: {:?}", _0)]
     NixError(#[error(source)] nix::Error),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Serde Error")]
+    #[error(display = "VeracruzServer: Serde Error")]
     SerdeError,
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Veracruz Socket Error:{:?}", _0)]
+    #[error(display = "VeracruzServer: Veracruz Socket Error:{:?}", _0)]
     VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Nitro Error:{:?}", _0)]
+    #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: EC2 Error:{:?}", _0)]
+    #[error(display = "VeracruzServer: EC2 Error:{:?}", _0)]
     EC2Error(#[error(source)] EC2Error),
     #[cfg(feature = "tz")]
-    #[error(display = "Sinaloa: UUIDError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: UUIDError: {:?}.", _0)]
     UUIDError(#[error(source)] uuid::parser::ParseError),
     #[cfg(feature = "tz")]
-    #[error(display = "Sinaloa: OpteeError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: OpteeError: {:?}.", _0)]
     OpteeError(#[error(source)] optee_teec::Error),
-    #[error(display = "Sinaloa: Enclave function {} failed.", _0)]
+    #[error(display = "VeracruzServer: Enclave function {} failed.", _0)]
     EnclaveCallError(&'static str),
     #[error(
-        display = "Sinaloa: Missing {}, which is caused by non-existence, empty field, null, zero, etc.",
+        display = "VeracruzServer: Missing {}, which is caused by non-existence, empty field, null, zero, etc.",
         _0
     )]
     MissingFieldError(&'static str),
     #[error(
-        display = "Sinaloa: MismatchError: variable `{}` mismatch, expected {:?} but received {:?}.",
+        display = "VeracruzServer: MismatchError: variable `{}` mismatch, expected {:?} but received {:?}.",
         variable,
         expected,
         received
@@ -135,39 +135,39 @@ pub enum VeracruzServerError {
         expected: std::vec::Vec<u8>,
         received: std::vec::Vec<u8>,
     },
-    #[error(display = "Sinaloa: TransportProtocolError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "Sinaloa: VeracruzUtilError: {:?}.", _0)]
+    #[error(display = "VeracruzServer: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
-    #[error(display = "Sinaloa: Pinecone Error: {:?}.", _0)]
+    #[error(display = "VeracruzServer: Pinecone Error: {:?}.", _0)]
     PineconeError(#[error(source)] pinecone::Error),
-    #[error(display = "Sinaloa: Join Error: {:?}.", _0)]
+    #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]
     JoinError(std::boxed::Box<dyn std::any::Any + Send + 'static>),
     #[error(
-        display = "Sinaloa: Invalid length of variable `{}`, expected {}",
+        display = "VeracruzServer: Invalid length of variable `{}`, expected {}",
         _0,
         _1
     )]
     InvalidLengthError(&'static str, usize),
-    #[error(display = "Sinaloa: Uninitialized enclave.")]
+    #[error(display = "VeracruzServer: Uninitialized enclave.")]
     UninitializedEnclaveError,
-    #[error(display = "Sinaloa: Unknown attestation protocol.")]
+    #[error(display = "VeracruzServer: Unknown attestation protocol.")]
     UnknownAttestationTokenError,
-    #[error(display = "Sinaloa: Unsupported request (not implemented in this platform).")]
+    #[error(display = "VeracruzServer: Unsupported request (not implemented in this platform).")]
     UnimplementedRequestError,
-    #[error(display = "Sinaloa: Unsupported request (not found).")]
+    #[error(display = "VeracruzServer: Unsupported request (not found).")]
     UnsupportedRequestError,
-    #[error(display = "Sinaloa: Invalid request format")]
+    #[error(display = "VeracruzServer: Invalid request format")]
     InvalidRequestFormatError,
-    #[error(display = "Sinaloa: Received non-success post status.")]
+    #[error(display = "VeracruzServer: Received non-success post status.")]
     ReceivedNonSuccessPostStatusError,
-    #[error(display = "Sinaloa: Debug is disable.")]
+    #[error(display = "VeracruzServer: Debug is disable.")]
     DebugIsDisableError,
-    #[error(display = "Sinaloa: Direct response message {}.", _0)]
+    #[error(display = "VeracruzServer: Direct response message {}.", _0)]
     DirectMessageError(String, StatusCode),
-    #[error(display = "Sinaloa: Error message {}.", _0)]
+    #[error(display = "VeracruzServer: Error message {}.", _0)]
     DirectStrError(&'static str),
-    #[error(display = "Sinaloa: Unimplemented")]
+    #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
 }
 
