@@ -8,10 +8,10 @@
 #
 OUT_DIR?=.
 FINAL_DIR?=.
-Signed_RustEnclave_RootName = sonora.signed.so
+Signed_RustEnclave_RootName = trustzone_root_enclave.signed.so
 Signed_RustEnclave_Name := $(OUT_DIR)/$(Signed_RustEnclave_RootName)
-Untrusted_Lib_Name := $(OUT_DIR)/libsonora_u.a
-SGX_Enclave_Name ?= $(OUT_DIR)/libsonora_enclave.a
+Untrusted_Lib_Name := $(OUT_DIR)/libtrustzone_root_enclave_u.a
+SGX_Enclave_Name ?= $(OUT_DIR)/libtrustzone_root_enclave_t.a
 
 .PHONY: all clean
 
@@ -28,7 +28,7 @@ RESET_COLOR := "\e[0m"
 COMMON_Src = src/lib.rs
 
 ############# Files generated from the EDL File ###############
-EDL_Files := sonora_t.c sonora_t.h sonora_u.c sonora_u.h
+EDL_Files := trustzone_root_enclave_t.c trustzone_root_enclave_t.h trustzone_root_enclave_u.c trustzone_root_enclave_u.h
 
 SGX_SDK ?= /work/sgxsdk
 
@@ -38,30 +38,30 @@ SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
 RUST_SGX_SDK_PATH = ../third-party/rust-sgx-sdk
 
-$(EDL_Files): $(SGX_EDGER8R) sonora.edl
-	@$(SGX_EDGER8R) --use-prefix --trusted sonora.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
-	@$(SGX_EDGER8R) --use-prefix --untrusted sonora.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
+$(EDL_Files): $(SGX_EDGER8R) trustzone_root_enclave.edl
+	@$(SGX_EDGER8R) --use-prefix --trusted trustzone_root_enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
+	@$(SGX_EDGER8R) --use-prefix --untrusted trustzone_root_enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
 	@echo $(INFO_COLOR) "GEN => $(EDL_Files)" $(RESET_COLOR)
 
 SGX_COMMON_CFLAGS += -O0 -g
 CUSTOM_EDL_PATH :=$(RUST_SGX_SDK_PATH)/edl
 Sinaloa_Include_Paths := -I ./src -I$(SGX_SDK)/include -I$(CUSTOM_EDL_PATH)
 Sinaloa_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Sinaloa_Include_Paths)
-$(OUT_DIR)/sonora_u.o: $(EDL_Files)
-	@$(CC) $(Sinaloa_C_Flags) -c ./sonora_u.c -o $@
+$(OUT_DIR)/trustzone_root_enclave_u.o: $(EDL_Files)
+	@$(CC) $(Sinaloa_C_Flags) -c ./trustzone_root_enclave_u.c -o $@
 	@echo $(INFO_COLOR) "CC => $<" $(RESET_COLOR)
 
 CUSTOM_COMMON_PATH := $(RUST_SGX_SDK_PATH)/common
 RustEnclave_Include_Paths := -I$(CUSTOM_COMMON_PATH)/inc -I$(CUSTOM_EDL_PATH) -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid -I ,
 RustEnclave_Compile_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(RustEnclave_Include_Paths)
-$(OUT_DIR)/sonora_t.o: $(EDL_Files)
-	@$(CC) $(RustEnclave_Compile_Flags) -c ./sonora_t.c -o $@
+$(OUT_DIR)/trustzone_root_enclave_t.o: $(EDL_Files)
+	@$(CC) $(RustEnclave_Compile_Flags) -c ./trustzone_root_enclave_t.c -o $@
 	@echo "CC >= $<"
-$(Untrusted_Lib_Name): $(OUT_DIR)/sonora_u.o
-	@$(AR) rcsD $@ $(OUT_DIR)/sonora_u.o
+$(Untrusted_Lib_Name): $(OUT_DIR)/trustzone_root_enclave_u.o
+	@$(AR) rcsD $@ $(OUT_DIR)/trustzone_root_enclave_u.o
 	echo $(INFO_COLOR) "LINK => $@" $(RESET_COLOR)
 
-RustEnclave_Link_Libs := -L$(CUSTOM_LIBRARY_PATH) -L$(OUT_DIR) -lsonora_enclave
+RustEnclave_Link_Libs := -L$(CUSTOM_LIBRARY_PATH) -L$(OUT_DIR) -ltrustzone_root_enclave
 RustEnclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
 	-Wl,--whole-archive -lsgx_trts -Wl,--no-whole-archive \
 	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -lsgx_tkey_exchange -lsgx_tservice -lsgx_tcrypto $(RustEnclave_Link_Libs) -Wl,--end-group \
@@ -71,19 +71,19 @@ RustEnclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nod
 	-Wl,--gc-sections \
 	-Wl,--version-script=./Enclave.lds
 
-RustEnclave_Name := $(OUT_DIR)/sonora.so
+RustEnclave_Name := $(OUT_DIR)/trustzone_root_enclave.so
 
 
-$(RustEnclave_Name): $(OUT_DIR)/sonora_t.o $(SGX_Enclave_Name)
+$(RustEnclave_Name): $(OUT_DIR)/trustzone_root_enclave_t.o $(SGX_Enclave_Name)
 	@echo $(INFO_COLOR) "LINK =>  $@" $(RESET_COLOR)
-	$(CXX) $(OUT_DIR)/sonora_t.o -o $@ -L$(OUT_DIR) $(RustEnclave_Link_Flags)
+	$(CXX) $(OUT_DIR)/trustzone_root_enclave_t.o -o $@ -L$(OUT_DIR) $(RustEnclave_Link_Flags)
 
 $(Signed_RustEnclave_Name): $(RustEnclave_Name) $(SGX_Enclave_Name)
 	@echo $(INFO_COLOR) "SIGN =>  $@" $(RESET_COLOR)
 	@$(SGX_ENCLAVE_SIGNER) sign -key ./Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config ./Enclave.config.xml -cssfile css.bin
 
-$(Sonora_u_Object): $(OUT_DIR)/sonora_u.o
-	@$(AR) rcsD $@ $(OUT_DIR)/sonora_u.o
+$(TrustZone_Root_Enclave_u_Object): $(OUT_DIR)/trustzone_root_enclave_u.o
+	@$(AR) rcsD $@ $(OUT_DIR)/trustzone_root_enclave_u.o
 	echo $(INFO_COLOR) "LINK => $@" $(RESET_COLOR)
 ############# SGX #################
 SGX_Src =  $(COMMON_Src) src/lib.rs
@@ -102,6 +102,6 @@ clean:
 	@cargo clean
 	@xargo clean
 	@rm -rf target
-	@rm -f sonora_t.? sonora_u.?
+	@rm -f trustzone_root_enclave_t.? trustzone_root_enclave_u.?
 	@rm -f *.so
 	@rm -f ccs.bin

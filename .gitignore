@@ -33,3 +33,5 @@ sdk/data-generators/**/*.dat
 sdk/data-generators/idash2017-logistic-regression-generator/*.csv
 *.ta
 sdk/datasets/
+*/.idea/
+*/*/.idea/

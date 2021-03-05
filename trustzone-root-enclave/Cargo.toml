@@ -1,5 +1,5 @@
 [package]
-name = "sonora_enclave"
+name = "trustzone_root_enclave"
 # NOTE: when update this version, please also update sgx entry in populate_test_database.sh in sinaloa-test and veracruz-test 
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
@@ -7,7 +7,7 @@ edition = "2018"
 description = "The root attestation isolate that challenges additional isolates on the delegate's machine using local attestation.  This is a key component of the Veracruz proxied attestation system."
 
 [lib]
-name = "sonora_enclave"
+name = "trustzone_root_enclave"
 crate-type = ["staticlib"]
 path = "src/lib.rs"
 

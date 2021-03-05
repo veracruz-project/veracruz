@@ -1,4 +1,4 @@
-hash_value=$(dd skip=960 count=32 if=../sonora/css.bin bs=1 status=none| xxd -ps -cols 32)
+hash_value=$(dd skip=960 count=32 if=../trustzone-root-enclave/css.bin bs=1 status=none| xxd -ps -cols 32)
 echo $hash_value
 rm -f proxy-attestation-server.db
 diesel --config-file ../proxy-attestation-server/diesel.toml setup

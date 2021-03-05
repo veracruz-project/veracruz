@@ -44,7 +44,7 @@ trustzone-durango-test: trustzone test_cases
 # offset the CC OPENSSL_DIR, which might be used in compiling trustzone
 sgx: sdk sgx-env
 	cd mexico-city-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
-	cd sonora-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
+	cd trustzone-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd durango && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
 nitro: sdk
@@ -152,7 +152,7 @@ sgx-env:
 
 clean:
 	cd mexico-city-bind && cargo clean 
-	cd sonora-bind && cargo clean
+	cd trustzone-root-enclave-bind && cargo clean
 	cd psa-attestation && cargo clean
 	cd proxy-attestation-server && cargo clean
 	cd session-manager && cargo clean
@@ -164,14 +164,14 @@ clean:
 	$(MAKE) clean -C sgx-root-enclave
 	$(MAKE) clean -C sinaloa
 	$(MAKE) clean -C test-collateral 
-	$(MAKE) clean -C sonora
+	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine colima durango sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa sonora-bind sonora proxy-attestation-server veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine colima durango sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd session-manager && cargo fmt
@@ -185,6 +185,6 @@ fmt:
 	cd sinaloa && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
-	cd sonora && cargo fmt
+	cd trustzone-root-enclave && cargo fmt
 	cd proxy-attestation-server && cargo fmt
 	$(MAKE) -C sdk fmt

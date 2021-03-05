@@ -1,4 +1,4 @@
-//! Sonora bindings
+//! TrustZone root enclave bindings
 //!
 //! ## Authors
 //!

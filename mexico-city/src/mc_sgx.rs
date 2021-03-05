@@ -24,7 +24,7 @@ extern "C" {
         ret: &mut sgx_status_t,
         dh_msg1: &sgx_dh_msg1_t,
         dh_msg2: &mut sgx_dh_msg2_t,
-        sonora_session_id: &mut u64,
+        trustzone_root_enclave_session_id: &mut u64,
     ) -> sgx_status_t;
 
     pub fn finish_local_attest_ocall(
@@ -36,7 +36,7 @@ extern "C" {
         enclave_cert_hash_size: usize,
         enclave_name: *const i8,
         enclave_name_size: usize,
-        sonora_session_id: u64,
+        trustzone_root_enclave_session_id: u64,
         token: *mut u8,
         token_buf_size: usize,
         token_size: &mut usize,
@@ -130,13 +130,13 @@ pub extern "C" fn psa_attestation_get_token_enc(
 
         let mut dh_msg2: SgxDhMsg2 = SgxDhMsg2::default();
         let mut ocall_ret = sgx_status_t::SGX_SUCCESS;
-        let mut sonora_session_id: u64 = 0;
+        let mut trustzone_root_enclave_session_id: u64 = 0;
         let ocall_status = unsafe {
             start_local_attest_ocall(
                 &mut ocall_ret,
                 &dh_msg1,
                 &mut dh_msg2,
-                &mut sonora_session_id,
+                &mut trustzone_root_enclave_session_id,
             )
         };
         if ocall_status != sgx_status_t::SGX_SUCCESS {
@@ -179,7 +179,7 @@ pub extern "C" fn psa_attestation_get_token_enc(
                 enclave_cert_hash.as_ref().len(),
                 enclave_name.as_ptr() as *const i8,
                 enclave_name.len(),
-                sonora_session_id,
+                trustzone_root_enclave_session_id,
                 token,
                 token_buf_size,
                 token_size,
