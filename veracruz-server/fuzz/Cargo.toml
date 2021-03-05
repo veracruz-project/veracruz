@@ -1,6 +1,6 @@
 
 [package]
-name = "sinaloa-fuzz"
+name = "veracruz-server-fuzz"
 version = "0.0.0"
 authors = ["Shale Xiong"]
 publish = false
@@ -35,8 +35,8 @@ path = ".."
 members = ["."]
 
 [[bin]]
-name = "init_sinaloa"
-path = "fuzz_targets/init_sinaloa.rs"
+name = "init_veracruz_server"
+path = "fuzz_targets/init_veracruz_server.rs"
 
 [[bin]]
 name = "provision_data"
