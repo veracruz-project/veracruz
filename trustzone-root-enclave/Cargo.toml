@@ -1,6 +1,6 @@
 [package]
 name = "trustzone-root-enclave"
-# NOTE: when you update this version, please also update the psa entry in populate-test-database.sh in sinaloa-test and veracruz-test 
+# NOTE: when you update this version, please also update the psa entry in populate-test-database.sh in veracruz-server-test and veracruz-test 
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
