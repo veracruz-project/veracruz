@@ -20,10 +20,10 @@ use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
 
-pub type SinaloaResponder = Result<String, SinaloaError>;
+pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
 #[derive(Debug, Error)]
-pub enum SinaloaError {
+pub enum VeracruzServerError {
     #[error(display = "Sinaloa: TLSError: {:?}.", _0)]
     TLSError(#[error(source)] rustls::TLSError),
     #[error(display = "Sinaloa: HexError: {:?}.", _0)]
@@ -171,83 +171,83 @@ pub enum SinaloaError {
     UnimplementedError,
 }
 
-impl<T> From<std::sync::PoisonError<T>> for SinaloaError {
+impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
-        SinaloaError::LockError(format!("{:?}", error))
+        VeracruzServerError::LockError(format!("{:?}", error))
     }
 }
 
 #[cfg(feature = "sgx")]
-impl From<sgx_types::sgx_status_t> for SinaloaError {
+impl From<sgx_types::sgx_status_t> for VeracruzServerError {
     fn from(error: sgx_types::sgx_status_t) -> Self {
         match error {
             sgx_types::sgx_status_t::SGX_SUCCESS => {
                 panic!("Expected an error code but received an success status")
             }
-            e => SinaloaError::SGXError(e),
+            e => VeracruzServerError::SGXError(e),
         }
     }
 }
 
-impl error::ResponseError for SinaloaError {
+impl error::ResponseError for VeracruzServerError {
     fn error_response(&self) -> HttpResponse {
         ResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
     }
     fn status_code(&self) -> StatusCode {
         match self {
-            SinaloaError::DirectMessageError(_, e) => e.clone(),
-            SinaloaError::UnimplementedRequestError
-            | SinaloaError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
-            SinaloaError::UnsupportedRequestError => StatusCode::NOT_FOUND,
+            VeracruzServerError::DirectMessageError(_, e) => e.clone(),
+            VeracruzServerError::UnimplementedRequestError
+            | VeracruzServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
+            VeracruzServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
             _otherwise => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
 
 #[cfg(feature = "nitro")]
-impl From<std::boxed::Box<bincode::ErrorKind>> for SinaloaError {
+impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError {
     fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
-        SinaloaError::BincodeError(*error)
+        VeracruzServerError::BincodeError(*error)
     }
 }
 
-pub trait Sinaloa {
-    fn new(policy: &str) -> Result<Self, SinaloaError>
+pub trait VeracruzServer {
+    fn new(policy: &str) -> Result<Self, VeracruzServerError>
     where
         Self: Sized;
 
     fn proxy_psa_attestation_get_token(
         &self,
         challenge: Vec<u8>,
-    ) -> Result<(Vec<u8>, Vec<u8>, i32), SinaloaError>;
+    ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError>;
 
-    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError>;
+    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
 
     // Note: this function will go away
-    fn get_enclave_cert(&self) -> Result<Vec<u8>, SinaloaError>;
+    fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError>;
 
     // Note: This function will go away
-    fn get_enclave_name(&self) -> Result<String, SinaloaError>;
+    fn get_enclave_name(&self) -> Result<String, VeracruzServerError>;
 
-    fn new_tls_session(&self) -> Result<u32, SinaloaError>;
+    fn new_tls_session(&self) -> Result<u32, VeracruzServerError>;
 
-    fn close_tls_session(&self, session_id: u32) -> Result<(), SinaloaError>;
+    fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError>;
 
     // The first bool indicates if the enclave is active, and the second vec contains the response
     fn tls_data(
         &self,
         session_id: u32,
         input: Vec<u8>,
-    ) -> Result<(bool, Option<Vec<Vec<u8>>>), SinaloaError>;
+    ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError>;
 
-    fn close(&mut self) -> Result<bool, SinaloaError>;
+    fn close(&mut self) -> Result<bool, VeracruzServerError>;
 }
 
 pub fn send_proxy_attestation_server_start(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
-) -> Result<transport_protocol::ProxyAttestationServerResponse, SinaloaError> {
+) -> Result<transport_protocol::ProxyAttestationServerResponse, VeracruzServerError> {
     let serialized_start_msg = transport_protocol::serialize_start_msg(protocol, firmware_version)?;
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
@@ -259,7 +259,7 @@ pub fn send_proxy_attestation_server_start(
     return Ok(response);
 }
 
-pub fn post_buffer(url: &str, buffer: &String) -> Result<String, SinaloaError> {
+pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerError> {
     let mut buffer_reader = stringreader::StringReader::new(buffer);
 
     let mut curl_request = Easy::new();
@@ -303,7 +303,7 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, SinaloaError> {
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
-        return Err(SinaloaError::ReceivedNonSuccessPostStatusError);
+        return Err(VeracruzServerError::ReceivedNonSuccessPostStatusError);
     }
 
     debug!("sinaloa::post_buffer header_lines:{:?}", header_lines);

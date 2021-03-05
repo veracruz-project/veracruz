@@ -155,10 +155,10 @@ fn native_attestation(
     let firmware_version = fetch_firmware_version(&nre_enclave)?;
     println!("nitro-root-enclave-server::native_attestation fetch_firmware_version complete. Now setting Runtime Manager hash");
 
-    println!("SinaloaNitro::native_attestation completed setting Runtime Manager hash. Now sending start to proxy attestation server.");
+    println!("VeracruzServerNitro::native_attestation completed setting Runtime Manager hash. Now sending start to proxy attestation server.");
     let (challenge, device_id) = send_start(proxy_attestation_server_url, "nitro", &firmware_version)?;
 
-    println!("SinaloaNitro::native_attestation completed send to the proxy attestation server. Now sending NativeAttestation message to Nitro Root Enclave");
+    println!("VeracruzServerNitro::native_attestation completed send to the proxy attestation server. Now sending NativeAttestation message to Nitro Root Enclave");
     let message = NitroRootEnclaveMessage::NativeAttestation(challenge, device_id);
     let message_buffer =
         bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
@@ -215,7 +215,7 @@ fn fetch_firmware_version(nre_enclave: &NitroEnclave) -> Result<String, NitroSer
         let message_buffer =
             bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
         println!(
-            "SinaloaNitro::Fetch_firmware_version sending message_buffer:{:?}",
+            "VeracruzServerNitro::Fetch_firmware_version sending message_buffer:{:?}",
             message_buffer
         );
         nre_enclave.send_buffer(&message_buffer)?;

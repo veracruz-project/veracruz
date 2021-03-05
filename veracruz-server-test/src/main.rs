@@ -26,11 +26,11 @@ mod tests {
     use serde::Deserialize;
     use veracruz_server::veracruz_server::*;
     #[cfg(feature = "sgx")]
-    use veracruz_server::SinaloaSGX as SinaloaEnclave;
+    use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
     #[cfg(feature = "tz")]
-    use veracruz_server::SinaloaTZ as SinaloaEnclave;
+    use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
     #[cfg(feature = "nitro")]
-    use veracruz_server::SinaloaNitro as SinaloaEnclave;
+    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
 
     use veracruz_utils::policy::EnclavePlatform;
 
@@ -181,18 +181,18 @@ mod tests {
             assert!(policy.is_ok());
             if let Ok(policy) = policy {
                 setup(policy.proxy_attestation_server_url().clone());
-                let result = SinaloaEnclave::new(&policy_json);
+                let result = VeracruzServerEnclave::new(&policy_json);
                 assert!(result.is_ok(), "error:{:?}", result.err());
             }
         });
 
         // If any json in test-collateral/invalid_policy is valid in VeracruzPolicy::new(),
-        // it must also valid in term of SinaloaEnclave::new()
+        // it must also valid in term of VeracruzServerEnclave::new()
         iterate_over_policy("../test-collateral/invalid_policy/", |policy_json| {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json);
             if let Ok(policy) = policy {
                 setup(policy.proxy_attestation_server_url().clone());
-                let result = SinaloaEnclave::new(&policy_json);
+                let result = VeracruzServerEnclave::new(&policy_json);
                 assert!(
                     result.is_ok(),
                     "error:{:?}, json:{:?}",
@@ -217,8 +217,8 @@ mod tests {
 
     /// Auxiliary function: self signed certificate for enclave
     fn enclave_self_signed_cert(
-        sinaloa: &SinaloaEnclave,
-    ) -> Result<rustls::Certificate, SinaloaError> {
+        sinaloa: &VeracruzServerEnclave,
+    ) -> Result<rustls::Certificate, VeracruzServerError> {
         let enclave_cert_vec = sinaloa.get_enclave_cert()?;
         Ok(rustls::Certificate(enclave_cert_vec))
     }
@@ -230,7 +230,7 @@ mod tests {
         iterate_over_policy("../test-collateral/", |policy_json| {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
-            let result = SinaloaEnclave::new(&policy_json)
+            let result = VeracruzServerEnclave::new(&policy_json)
                 .and_then(|sinaloa| enclave_self_signed_cert(&sinaloa));
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -242,7 +242,7 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
 
-        let ret = SinaloaEnclave::new(&policy_json);
+        let ret = VeracruzServerEnclave::new(&policy_json);
 
         let sinaloa = ret.unwrap();
 
@@ -745,7 +745,7 @@ mod tests {
         stream_id_paths: &[(u64, &str)],
         // if there is an attestation
         attestation_flag: bool,
-    ) -> Result<(), SinaloaError> {
+    ) -> Result<(), VeracruzServerError> {
         info!("### Step 0.  Initialise test configuration.");
         // initialise the pipe
         let (server_tls_tx, client_tls_rx): (
@@ -769,10 +769,10 @@ mod tests {
         );
         info!("### Step 2.  Initialise enclave.");
         let time_init = Instant::now();
-        let sinaloa = SinaloaEnclave::new(&policy_json)?;
+        let sinaloa = VeracruzServerEnclave::new(&policy_json)?;
         let client_session_id = sinaloa.new_tls_session().and_then(|id| {
             if id == 0 {
-                Err(SinaloaError::MissingFieldError("client_session_id"))
+                Err(VeracruzServerError::MissingFieldError("client_session_id"))
             } else {
                 Ok(id)
             }
@@ -1093,7 +1093,7 @@ mod tests {
                         // decode the result
                         let response = transport_protocol::parse_runtime_manager_response(&response)?;
                         let response = transport_protocol::parse_result(&response)?;
-                        response.ok_or(SinaloaError::MissingFieldError(
+                        response.ok_or(VeracruzServerError::MissingFieldError(
                             "Result retrievers response",
                         ))
                     })?;
@@ -1164,7 +1164,7 @@ mod tests {
                     // decode the result
                     let response = transport_protocol::parse_runtime_manager_response(&response)?;
                     let response = transport_protocol::parse_result(&response)?;
-                    response.ok_or(SinaloaError::MissingFieldError(
+                    response.ok_or(VeracruzServerError::MissingFieldError(
                         "Result retrievers response",
                     ))
                 })?;
@@ -1204,7 +1204,7 @@ mod tests {
                 "             Shutdown time (μs): {}.",
                 time_shutdown.elapsed().as_micros()
             );
-            Ok::<(), SinaloaError>(())
+            Ok::<(), VeracruzServerError>(())
         };
 
         thread::spawn(move || {
@@ -1215,12 +1215,12 @@ mod tests {
         })
         .join()
         // double `?` one for join and one for client_body
-        .map_err(|e| SinaloaError::JoinError(e))??;
+        .map_err(|e| VeracruzServerError::JoinError(e))??;
 
         // double `?` one for join and one for client_body
         server_loop_handle
             .join()
-            .map_err(|e| SinaloaError::JoinError(e))??;
+            .map_err(|e| VeracruzServerError::JoinError(e))??;
         Ok(())
     }
 
@@ -1277,7 +1277,7 @@ mod tests {
     /// Auxiliary function: read policy file
     fn read_policy(
         fname: &str,
-    ) -> Result<(veracruz_utils::VeracruzPolicy, String, String), SinaloaError> {
+    ) -> Result<(veracruz_utils::VeracruzPolicy, String, String), VeracruzServerError> {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
@@ -1309,8 +1309,8 @@ mod tests {
     /// Auxiliary function: initialise sinaloa from policy and open a tls session
     fn init_sinaloa_and_tls_session(
         policy_json: &str,
-    ) -> Result<(SinaloaEnclave, u32), SinaloaError> {
-        let sinaloa = SinaloaEnclave::new(&policy_json)?;
+    ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
+        let sinaloa = VeracruzServerEnclave::new(&policy_json)?;
 
         let one_tenth_sec = std::time::Duration::from_millis(100);
         std::thread::sleep(one_tenth_sec); // wait for the client to start
@@ -1319,7 +1319,7 @@ mod tests {
             if session_id != 0 {
                 Ok((sinaloa, session_id))
             } else {
-                Err(SinaloaError::MissingFieldError("Session id"))
+                Err(VeracruzServerError::MissingFieldError("Session id"))
             }
         })
     }
@@ -1331,7 +1331,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<Vec<u8>, SinaloaError> {
+    ) -> Result<Vec<u8>, VeracruzServerError> {
         let mut program_file = std::fs::File::open(filename)?;
         let mut program_text = std::vec::Vec::new();
 
@@ -1355,7 +1355,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<(), SinaloaError> {
+    ) -> Result<(), VeracruzServerError> {
         let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()?;
         let response = client_tls_send(
             client_tls_tx,
@@ -1368,7 +1368,7 @@ mod tests {
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
-            return Err(SinaloaError::ResponseError(
+            return Err(VeracruzServerError::ResponseError(
                 "check_policy_hash parse_runtime_manager_response",
                 status,
             ));
@@ -1377,7 +1377,7 @@ mod tests {
         if received_hash == expected_policy_hash {
             return Ok(());
         } else {
-            return Err(SinaloaError::MismatchError {
+            return Err(VeracruzServerError::MismatchError {
                 variable: "request_policy_hash",
                 received: received_hash.as_bytes().to_vec(),
                 expected: expected_policy_hash.as_bytes().to_vec(),
@@ -1392,7 +1392,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<bool, SinaloaError> {
+    ) -> Result<bool, VeracruzServerError {
         let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash()?;
         let data = client_tls_send(
             client_tls_tx,
@@ -1411,14 +1411,14 @@ mod tests {
                     info!("             request_pi_hash compare succeeded");
                     return Ok(true);
                 } else {
-                    return Err(SinaloaError::MismatchError {
+                    return Err(VeracruzServerError::MismatchError {
                         variable: "request_pi_hash",
                         received: received_hash.as_bytes().to_vec(),
                         expected: expected_program_hash.as_bytes().to_vec(),
                     });
                 }
             }
-            _ => Err(SinaloaError::ResponseError(
+            _ => Err(VeracruzServerNitro::ResponseError(
                 "request_program_hash parse_runtime_manager_response",
                 status,
             )),
@@ -1431,7 +1431,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<Vec<u8>, SinaloaError> {
+    ) -> Result<Vec<u8>, VeracruzServerError> {
         let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
 
         client_tls_send(
@@ -1452,7 +1452,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
         package_id: u64,
-    ) -> Result<Vec<u8>, SinaloaError> {
+    ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
         let data = {
             let mut data_file = std::fs::File::open(filename)?;
@@ -1480,7 +1480,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
         package_id: u64,
-    ) -> Result<Vec<u8>, SinaloaError> {
+    ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
         let serialized_stream = transport_protocol::serialize_stream(data, package_id as u32)?;
 
@@ -1501,7 +1501,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
         expecting: u8,
-    ) -> Result<(), SinaloaError> {
+    ) -> Result<(), VeracruzServerError> {
         let encoded_state = request_enclave_state(
             client_session_id,
             client_session,
@@ -1516,27 +1516,27 @@ mod tests {
             if state == vec![expecting] {
                 Ok(())
             } else {
-                Err(SinaloaError::MismatchError {
+                Err(VeracruzServerError::MismatchError {
                     variable: "parsed.get_state().get_state().to_vec()",
                     received: state,
                     expected: vec![expecting],
                 })
             }
         } else {
-            Err(SinaloaError::MissingFieldError("enclave state in response"))
+            Err(VeracruzServerError::MissingFieldError("enclave state in response"))
         }
     }
 
     fn server_tls_loop(
-        sinaloa: &dyn veracruz_server::Sinaloa,
+        sinaloa: &dyn veracruz_server::VeracruzServer,
         tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
         rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ticket: u32,
-    ) -> Result<(), SinaloaError> {
+    ) -> Result<(), VeracruzServerError> {
         while *CONTINUE_FLAG_HASH
             .lock()?
             .get(&ticket)
-            .ok_or(SinaloaError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
+            .ok_or(VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
         {
             let received = rx.try_recv();
             let (session_id, received_buffer) = received.unwrap_or_else(|_| (0, Vec::new()));
@@ -1555,7 +1555,7 @@ mod tests {
                 }
             }
         }
-        Err(SinaloaError::DirectStrError("No message arrives server"))
+        Err(VeracruzServerError::DirectStrError("No message arrives server"))
     }
 
     fn client_tls_send(
@@ -1565,7 +1565,7 @@ mod tests {
         session: &mut dyn rustls::Session,
         ticket: u32,
         send_data: &[u8],
-    ) -> Result<Vec<u8>, SinaloaError> {
+    ) -> Result<Vec<u8>, VeracruzServerError> {
         session.write_all(&send_data)?;
 
         let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
@@ -1577,7 +1577,7 @@ mod tests {
         while *CONTINUE_FLAG_HASH
             .lock()?
             .get(&ticket)
-            .ok_or(SinaloaError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
+            .ok_or(VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
         {
             let received = rx.try_recv();
 
@@ -1600,17 +1600,17 @@ mod tests {
                 let _res = tx.send((session_id, output))?;
             }
         }
-        Err(SinaloaError::DirectStrError(
+        Err(VeracruzServerError::DirectStrError(
             "Terminate due to server crash",
         ))
     }
 
     fn create_client_test_session(
-        sinaloa: &dyn veracruz_server::Sinaloa,
+        sinaloa: &dyn veracruz_server::VeracruzServer,
         client_cert_filename: &str,
         client_key_filename: &str,
         cert_hash: Vec<u8>,
-    ) -> Result<rustls::ClientSession, SinaloaError> {
+    ) -> Result<rustls::ClientSession, VeracruzServerError> {
         let client_cert = read_cert_file(client_cert_filename)?;
 
         let client_priv_key = read_priv_key_file(client_key_filename)?;
@@ -1633,7 +1633,7 @@ mod tests {
         ))
     }
 
-    fn post_buffer(url: &str, data: &str) -> Result<String, SinaloaError> {
+    fn post_buffer(url: &str, data: &str) -> Result<String, VeracruzServerError> {
         let mut data_reader = stringreader::StringReader::new(&data);
         let mut curl_request = Easy::new();
         curl_request.url(url)?;
@@ -1689,14 +1689,14 @@ mod tests {
     fn attestation_flow(
         proxy_attestation_server_url: &String,
         expected_enclave_hash: &String,
-        sinaloa: &dyn veracruz_server::Sinaloa,
-    ) -> Result<Vec<u8>, SinaloaError> {
+        sinaloa: &dyn veracruz_server::VeracruzServer,
+    ) -> Result<Vec<u8>, VeracruzServerError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         info!("sinaloa-test/attestation_flow: challenge:{:?}", challenge);
         let serialized_pagt = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let pagt_ret = sinaloa.plaintext_data(serialized_pagt)?;
         let received_bytes =
-            pagt_ret.ok_or(SinaloaError::MissingFieldError("attestation_flow pagt_ret"))?;
+            pagt_ret.ok_or(VeracruzServerError::MissingFieldError("attestation_flow pagt_ret"))?;
 
         let encoded_token = base64::encode(&received_bytes);
         let complete_proxy_attestation_server_url = format!("{:}/VerifyPAT", proxy_attestation_server_url);
@@ -1705,7 +1705,7 @@ mod tests {
         let received_payload = base64::decode(&received_buffer)?;
 
         if challenge != received_payload[8..40] {
-            return Err(SinaloaError::MismatchError {
+            return Err(VeracruzServerError::MismatchError {
                 variable: "attestation_flow challenge",
                 received: received_payload[8..40].to_vec(),
                 expected: challenge.to_vec(),
@@ -1723,7 +1723,7 @@ mod tests {
             }
             #[cfg(not(feature = "debug"))]
             {
-                return Err(SinaloaError::MismatchError {
+                return Err(VeracruzServerError::MismatchError {
                     variable: "attestation_flow hash_bin",
                     received: received_payload[47..79].to_vec(),
                     expected: hash_bin.to_vec(),
@@ -1734,27 +1734,27 @@ mod tests {
         Ok(enclave_cert_hash)
     }
 
-    fn read_cert_file(filename: &str) -> Result<rustls::Certificate, SinaloaError> {
+    fn read_cert_file(filename: &str) -> Result<rustls::Certificate, VeracruzServerError> {
         let mut cert_file = std::fs::File::open(filename)?;
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer)?;
         let mut cursor = std::io::Cursor::new(cert_buffer);
         let certs = rustls::internal::pemfile::certs(&mut cursor)
-            .map_err(|_| SinaloaError::TLSUnspecifiedError)?;
+            .map_err(|_| VeracruzServerError::TLSUnspecifiedError)?;
         if certs.len() == 0 {
-            Err(SinaloaError::InvalidLengthError("certs.len()", 1))
+            Err(VeracruzServerError::InvalidLengthError("certs.len()", 1))
         } else {
             Ok(certs[0].clone())
         }
     }
 
-    fn read_priv_key_file(filename: &str) -> Result<rustls::PrivateKey, SinaloaError> {
+    fn read_priv_key_file(filename: &str) -> Result<rustls::PrivateKey, VeracruzServerError> {
         let mut key_file = std::fs::File::open(filename)?;
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer)?;
         let mut cursor = std::io::Cursor::new(key_buffer);
         let rsa_keys = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
-            .map_err(|_| SinaloaError::TLSUnspecifiedError)?;
+            .map_err(|_| VeracruzServerError::TLSUnspecifiedError)?;
         Ok(rsa_keys[0].clone())
     }
 }

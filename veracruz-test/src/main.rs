@@ -81,8 +81,8 @@ mod tests {
         VeracruzClientError(#[error(source)] veracruz_client::VeracruzClientError),
         #[error(display = "VeracruzTest: VeracruzUtilError: {:?}.", _0)]
         VeracruzUtilError(#[error(source)] policy::VeracruzUtilError),
-        #[error(display = "VeracruzTest: SinaloaError: {:?}.", _0)]
-        SinaloaError(#[error(source)] veracruz_server::SinaloaError),
+        #[error(display = "VeracruzTest: VeracruzServerError: {:?}.", _0)]
+        VeracruzServerError(#[error(source)] veracruz_server::VeracruzServerError),
         #[error(display = "VeracruzTest: TransportProtocolError: {:?}.", _0)]
         TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
         #[error(display = "VeracruzTest: Failed to find client with index {}.", _0)]

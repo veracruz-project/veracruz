@@ -28,12 +28,12 @@ pub mod veracruz_server_tz {
         static ref TRUSTZONE_ROOT_ENCLAVE_INITIALIZED: Mutex<bool> = Mutex::new(false);
     }
 
-    pub struct SinaloaTZ {
-        runtime_manager_uuid: String,
+    pub struct VeracruzServerTZ {
+        mexico_city_uuid: String,
     }
 
-    impl Sinaloa for SinaloaTZ {
-        fn new(policy_json: &str) -> Result<Self, SinaloaError> {
+    impl VeracruzServer for VeracruzServerTZ {
+        fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             // Set up, initialize SgxRootEnclave
             //let trustzone_root_enclave_uuid = Uuid::parse_str("8aaaf200-2450-11e4-abe2-0002a5d5c51b").unwrap();
             let policy: veracruz_utils::VeracruzPolicy =
@@ -44,13 +44,13 @@ pub mod veracruz_server_tz {
                 let runtime_manager_hash = {
                     match policy.runtime_manager_hash(&EnclavePlatform::TrustZone) {
                         Ok(hash) => hash,
-                        Err(_) => return Err(SinaloaError::MissingFieldError("runtime_manager_hash_tz")),
+                        Err(_) => return Err(VeracruzServerError::MissingFieldError("runtime_manager_hash_tz")),
                     }
                 };
                 let mut ji_guard = TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.lock()?;
                 if !*ji_guard {
                     debug!("The SGX root enclave is uninitialized.");
-                    SinaloaTZ::native_attestation(
+                    VeracruzServerTZ::native_attestation(
                         &policy.proxy_attestation_server_url(),
                         trustzone_root_enclave_uuid,
                         &runtime_manager_hash,
@@ -68,7 +68,7 @@ pub mod veracruz_server_tz {
                 let mut context_opt = CONTEXT.lock()?;
                 let context = context_opt
                     .as_mut()
-                    .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
                 let mut session = context.open_session(runtime_manager_uuid)?;
                 session.invoke_command(RuntimeManagerOpcode::Initialize as u32, &mut operation)?;
             }
@@ -78,7 +78,7 @@ pub mod veracruz_server_tz {
             })
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
+        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
@@ -93,18 +93,18 @@ pub mod veracruz_server_tz {
                 )?;
                 Ok(Some(serialized_pat))
             } else {
-                Err(SinaloaError::MissingFieldError(
+                Err(VeracruzServerError::MissingFieldError(
                     "plaintext_data proxy_psa_attestation_toke",
                 ))
             }
         }
 
         // Note: this function will go away
-        fn get_enclave_cert(&self) -> Result<Vec<u8>, SinaloaError> {
+        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
 
@@ -128,11 +128,11 @@ pub mod veracruz_server_tz {
         }
 
         // Note: This function will go away
-        fn get_enclave_name(&self) -> Result<String, SinaloaError> {
+        fn get_enclave_name(&self) -> Result<String, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
 
@@ -158,14 +158,14 @@ pub mod veracruz_server_tz {
         fn proxy_psa_attestation_get_token(
             &self,
             challenge: Vec<u8>,
-        ) -> Result<(Vec<u8>, Vec<u8>, i32), SinaloaError> {
+        ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
             let mut token: Vec<u8> = Vec::with_capacity(2 * 8192); // TODO: Don't do
             let mut pubkey = Vec::with_capacity(256); // TODO: Don't do this
 
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
 
@@ -198,11 +198,11 @@ pub mod veracruz_server_tz {
             Ok((token, pubkey, device_id))
         }
 
-        fn new_tls_session(&self) -> Result<u32, SinaloaError> {
+        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
@@ -217,11 +217,11 @@ pub mod veracruz_server_tz {
             Ok(session_id)
         }
 
-        fn close_tls_session(&self, session_id: u32) -> Result<(), SinaloaError> {
+        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
@@ -234,13 +234,13 @@ pub mod veracruz_server_tz {
             &self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> Result<(bool, Option<Vec<Vec<u8>>>), SinaloaError> {
+        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(runtime_manager_uuid)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
+            let mut session = context.open_session(mc_uuid)?;
 
             {
                 let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
@@ -277,12 +277,12 @@ pub mod veracruz_server_tz {
             ))
         }
 
-        fn close(&mut self) -> Result<bool, SinaloaError> {
+        fn close(&mut self) -> Result<bool, VeracruzServerError> {
             let mut context_guard = CONTEXT.lock()?;
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             match &mut *context_guard {
                 None => {
-                    return Err(SinaloaError::UninitializedEnclaveError);
+                    return Err(VeracruzServerError::UninitializedEnclaveError);
                 }
                 Some(context) => {
                     let mut session = context.open_session(runtime_manager_uuid)?;
@@ -296,22 +296,22 @@ pub mod veracruz_server_tz {
         }
     }
 
-    impl Drop for SinaloaTZ {
+    impl Drop for VeracruzServerTZ {
         fn drop(&mut self) {
             match self.close() {
                 // We can only panic here since drop function cannot return.
-                Err(err) => panic!("SinaloaTZ::drop failed in call to self.close:{:?}", err),
+                Err(err) => panic!("VeracruzServerTZ::drop failed in call to self.close:{:?}", err),
                 _ => (),
             }
         }
     }
 
-    impl SinaloaTZ {
+    impl VeracruzServerTZ {
         fn tls_data_needed(
             &self,
             session_id: u32,
             session: &mut Session,
-        ) -> Result<bool, SinaloaError> {
+        ) -> Result<bool, VeracruzServerError> {
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInout);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
             session.invoke_command(RuntimeManagerOpcode::GetTLSDataNeeded as u32, &mut operation)?;
@@ -322,14 +322,14 @@ pub mod veracruz_server_tz {
             proxy_attestation_server_url: &String,
             trustzone_root_enclave_uuid: Uuid,
             runtime_manager_hash: &String,
-        ) -> Result<(), SinaloaError> {
+        ) -> Result<(), VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(SinaloaError::UninitializedEnclaveError)?;
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
             let mut trustzone_root_enclave_session = context.open_session(trustzone_root_enclave_uuid)?;
 
-            let firmware_version = SinaloaTZ::fetch_firmware_version(&mut trustzone_root_enclave_session)?;
+            let firmware_version = VeracruzServerTZ::fetch_firmware_version(&mut trustzone_root_enclave_session)?;
 
             {
                 let runtime_manager_hash_vec = hex::decode(runtime_manager_hash.as_str())?;
@@ -339,7 +339,7 @@ pub mod veracruz_server_tz {
                     .invoke_command(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
             }
 	    let (challenge, device_id) =
-                SinaloaTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
+                VeracruzServerTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
 
             let p0 = ParamValue::new(device_id.try_into()?, 0, ParamType::ValueInout);
             let p1 = ParamTmpRef::new_input(&challenge);
@@ -355,7 +355,7 @@ pub mod veracruz_server_tz {
             let token_vec: Vec<u8> = token[0..token_size as usize].to_vec();
             unsafe { public_key.set_len(public_key_size as usize) };
 
-            SinaloaTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token_vec, device_id)?;
+            VeracruzServerTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token_vec, device_id)?;
             debug!("sinaloa_tz::native_attestation returning Ok");
             return Ok(());
         }
@@ -364,7 +364,7 @@ pub mod veracruz_server_tz {
             proxy_attestation_server_url: &String,
             token: &Vec<u8>,
             device_id: i32,
-        ) -> Result<(), SinaloaError> {
+        ) -> Result<(), VeracruzServerError> {
             debug!("sinaloa_tz::post_psa_attestation_token started");
             let proxy_attestation_server_request =
                 transport_protocol::serialize_native_psa_attestation_token(token, device_id)?;
@@ -379,7 +379,7 @@ pub mod veracruz_server_tz {
             return Ok(());
         }
 
-        fn fetch_firmware_version(session: &mut Session) -> Result<String, SinaloaError> {
+        fn fetch_firmware_version(session: &mut Session) -> Result<String, VeracruzServerError> {
             let firmware_version_len = {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut gfvl_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
@@ -402,7 +402,7 @@ pub mod veracruz_server_tz {
             url_base: &str,
             protocol: &str,
             firmware_version: &str,
-        ) -> Result<(Vec<u8>, i32), SinaloaError> {
+        ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
             let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_psa_attestation_init() {
                 let (challenge, device_id) = transport_protocol::parse_psa_attestation_init(
@@ -410,7 +410,7 @@ pub mod veracruz_server_tz {
                 )?;
                 Ok((challenge, device_id))
             } else {
-                Err(SinaloaError::MissingFieldError(
+                Err(VeracruzServerError::MissingFieldError(
                     "proxy_attestation_server_response psa_attestation_init",
                 ))
             }

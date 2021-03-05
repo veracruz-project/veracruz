@@ -76,16 +76,16 @@ fuzz_target!(|buffer: &[u8]| {
     }
 });
 
-use veracruz_server::veracruz_server::Sinaloa;
+use veracruz_server::veracruz_server::VeracruzServer;
 #[cfg(feature = "sgx")]
-use veracruz_server::SinaloaSGX as SinaloaEnclave;
+use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
 #[cfg(feature = "tz")]
-use veracruz_server::SinaloaTZ as SinaloaEnclave;
+use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
 
 fn init_sinaloa_and_tls_session(
     policy: veracruz_utils::VeracruzPolicy,
-) -> Result<(SinaloaEnclave, u32), String> {
-    SinaloaEnclave::new(&policy).and_then(|sinaloa| {
+) -> Result<(VeracruzServerEnclave, u32), String> {
+    VeracruzServerEnclave::new(&policy).and_then(|sinaloa| {
         sinaloa.new_tls_session().and_then(|session_id| {
             if session_id != 0 {
                 Ok((sinaloa, session_id))
@@ -96,7 +96,7 @@ fn init_sinaloa_and_tls_session(
     })
 }
 
-fn enclave_self_signed_cert(sinaloa: &SinaloaEnclave) -> Result<rustls::Certificate, String> {
+fn enclave_self_signed_cert(sinaloa: &VeracruzServerEnclave) -> Result<rustls::Certificate, String> {
     let enclave_cert_vec = sinaloa.get_enclave_cert()?;
     Ok(rustls::Certificate(enclave_cert_vec))
 }
@@ -133,7 +133,7 @@ fn read_priv_key_file(filename: &str) -> rustls::PrivateKey {
 }
 
 fn create_client_test_session(
-    sinaloa: &dyn veracruz_server::Sinaloa,
+    sinaloa: &dyn veracruz_server::VeracruzServer,
     client_cert_filename: &str,
     client_key_filename: &str,
     cert_hash: Vec<u8>,
@@ -237,7 +237,7 @@ fn client_tls_send(
 
 fn server_tls_loop(
     flag : Arc<Mutex<bool>>,
-    sinaloa: &dyn veracruz_server::Sinaloa,
+    sinaloa: &dyn veracruz_server::VeracruzServer,
     session_id: u32,
     tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
     rx: std::sync::mpsc::Receiver<std::vec::Vec<u8>>,

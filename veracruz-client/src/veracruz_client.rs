@@ -295,7 +295,7 @@ impl VeracruzClient {
             return Err(VeracruzClientError::ResponseError("get_result", status));
         }
         if !parsed_response.has_result() {
-            return Err(VeracruzClientError::SinaloaResponseNoResultError);
+            return Err(VeracruzClientError::VeracruzServerResponseNoResultError);
         }
         let response_data = &parsed_response.get_result().data;
         return Ok(response_data.clone());
