@@ -83,12 +83,6 @@ pub enum VeracruzClientError {
     VeracruzServerResponseNoResultError,
     #[error(display = "VeracruzClient: Too many interation: {:?}", _0)]
     ExcessiveIterationError(&'static str),
-    #[error(
-        display = "VeracruzClient: client with certificate {:?} has no role of {:?}.",
-        _0,
-        _1
-    )]
-    InvalidRoleError(Vec<u8>, veracruz_utils::policy::principal::Role),
     #[error(display = "VeracruzClient: Unauthorized client certificate: {}.", _0)]
     InvalidClientCertificateError(String),
     #[error(display = "VeracruzClient: Direct message: {}.", _0)]

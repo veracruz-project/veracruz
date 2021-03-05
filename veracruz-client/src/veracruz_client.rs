@@ -17,7 +17,7 @@ use std::{
     io::{Read, Write},
     str::from_utf8,
 };
-use veracruz_utils::{platform::Platform, policy::{policy::Policy, principal::Role}};
+use veracruz_utils::{platform::Platform, policy::policy::Policy};
 use webpki;
 use webpki_roots;
 
@@ -244,29 +244,7 @@ impl VeracruzClient {
         })
     }
 
-    fn check_role_permission(&self, role: &Role) -> Result<(), VeracruzClientError> {
-        match self
-            .policy
-            .identities()
-            .iter()
-            .find(|&x| *x.certificate() == self.client_cert)
-        {
-            Some(identity) => match identity.roles().iter().find(|&x| *x == *role) {
-                Some(_) => Ok(()),
-                None => Err(VeracruzClientError::InvalidRoleError(
-                    self.client_cert.clone().into_bytes(),
-                    role.clone(),
-                )),
-            },
-            None => Err(VeracruzClientError::InvalidClientCertificateError(
-                self.client_cert.to_string(),
-            )),
-        }
-    }
-
     pub fn send_program(&mut self, file_name:&str, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
-        self.check_role_permission(&Role::ProgramProvider)?;
-
         self.check_policy_hash()?;
 
         let serialized_program = transport_protocol::serialize_program(&program, file_name)?;
@@ -282,9 +260,7 @@ impl VeracruzClient {
     }
 
     pub fn send_data(&mut self,file_name:&str, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
-        self.check_role_permission(&Role::DataProvider)?;
         self.check_policy_hash()?;
-        //self.check_pi_hash(file_name)?;
         let serialized_data = transport_protocol::serialize_program_data(&data, file_name)?;
         let response = self.send(&serialized_data)?;
 
@@ -299,9 +275,7 @@ impl VeracruzClient {
     }
 
     pub fn get_results(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
-        self.check_role_permission(&Role::ResultReader)?;
         self.check_policy_hash()?;
-        self.check_pi_hash(file_name)?;
 
         let serialized_read_result = transport_protocol::serialize_request_result(file_name)?;
         let response = self.send(&serialized_read_result)?;
@@ -361,6 +335,7 @@ impl VeracruzClient {
             let status = parsed_response.get_status();
             match status {
                 transport_protocol::ResponseStatus::SUCCESS => {
+                    //Since it is a deprecated function, we assume it always succeeds
                     return Ok(());
                 }
                 transport_protocol::ResponseStatus::FAILED_NOT_READY => {

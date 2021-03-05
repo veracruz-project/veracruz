@@ -135,8 +135,6 @@ mod tests {
 	
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
-            std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
-            env_logger::init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 #[cfg(feature="debug")]
@@ -1019,13 +1017,13 @@ mod tests {
                         &mut client_session,
                         ticket,
                         //TODO: change to the output file specified in policy
-                        &colima::serialize_request_result(program_file_name)?.as_slice(),
+                        &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
                     )
                     .and_then(|response| {
                         // decode the result
-                        let response = colima::parse_mexico_city_response(&response)?;
-                        let response = colima::parse_result(&response)?;
-                        response.ok_or(SinaloaError::MissingFieldError(
+                        let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                        let response = transport_protocol::parse_result(&response)?;
+                        response.ok_or(VeracruzServerError::MissingFieldError(
                             "Result retrievers response",
                         ))
                     })?;
@@ -1102,13 +1100,13 @@ mod tests {
                     client_session_id,
                     &mut client_session,
                     ticket,
-                    &colima::serialize_request_result(program_file_name)?.as_slice(),
+                    &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
                 )
                 .and_then(|response| {
                     // decode the result
-                    let response = colima::parse_mexico_city_response(&response)?;
-                    let response = colima::parse_result(&response)?;
-                    response.ok_or(SinaloaError::MissingFieldError(
+                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                    let response = transport_protocol::parse_result(&response)?;
+                    response.ok_or(VeracruzServerError::MissingFieldError(
                         "Result retrievers response",
                     ))
                 })?;

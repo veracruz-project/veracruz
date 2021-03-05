@@ -1,3 +1,14 @@
+//! The Veracruz host-call interface, and its implementation.
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Copyright
+//!
+//! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
+//! and copyright information.
+//!
 ///! GLUE CODE FOR NEW API.
 ///! IT SHOULD BE REPLACED BY VFS IMPLEMENTATION OF WASI API.
 

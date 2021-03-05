@@ -51,7 +51,6 @@ lazy_static! {
     static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> = Mutex::new(None);
     static ref SESSION_COUNTER: AtomicU32 = AtomicU32::new(1);
     static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> = Mutex::new(HashMap::new());
-    //TODO REMOVE?
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
@@ -60,31 +59,11 @@ lazy_static! {
 // Error and response codes and messages.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The possible responses to a provisioning step: either a protocol error (i.e.
-/// somebody did something out of turn, they didn't have permission to do
-/// something, or similar), we need to wait for more data to complete an action,
-/// or success.
-pub enum ProvisioningResponse {
-    /// Signals a message has arrived too soon, and the enclave's state machine
-    /// is in the incorrect state to process this message.
-    ProtocolError {
-        /// The server response.
-        response: Vec<u8>,
-    },
-    /// The incoming buffer is not full, so we cannot parse a complete protobuf
-    /// message.  We need to wait longer for this to arrive.
-    WaitForMoreData,
-    /// Provisioning succeeded, in which case an optional response was
-    /// generated.  In the case of waiting for more data (e.g. when the incoming
-    /// buffer does not contain enough data to parse a correct protobuf message)
-    /// this response will be empty.
-    Success {
-        /// The server response.
-        response: Vec<u8>,
-    },
-}
+/// `None` means that the incoming buffer is not full,
+/// so we cannot parse a complete protobuf message. 
+/// We need to wait longer for this to arrive.
+type ProvisioningResponse = Option<Vec<u8>>;
 
-//TODO MOVE THIS TO A SEPARATE FILE?
 /// Result type of provisioning functions.
 pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 
@@ -119,12 +98,6 @@ impl ProtocolState {
     ) -> Result<Self, RuntimeManagerError> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let execution_strategy = match global_policy.execution_strategy() {
-            ExecutionStrategy::Interpretation => {
-                execution_engine::factory::ExecutionStrategy::Interpretation
-            }
-            ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
-        };
         let capability_table = global_policy.get_capability_table();
         let program_digests = global_policy.get_program_digests()?;
         let vfs = Arc::new(Mutex::new(VFS::new(&capability_table,&program_digests)));
@@ -138,7 +111,6 @@ impl ProtocolState {
         })
     }
 
-    #[deprecated]
     pub fn reload(&mut self) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
         Ok(())
@@ -212,17 +184,17 @@ impl ProtocolState {
         };
 
         self.is_modified = false;
-        Ok(ProvisioningResponse::Success { response })
+        Ok(Some(response))
     }
 
     fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
-        colima::serialize_result(colima::ResponseStatus::SUCCESS as i32, result)
+        transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
             .unwrap_or_else(|err| panic!(err))
     }
 
     fn response_error_code_returned(error_code: EngineReturnCode) -> std::vec::Vec<u8> {
-        colima::serialize_result(
-            colima::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
+        transport_protocol::serialize_result(
+            transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
             Some(i32::from(error_code).to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!(err))

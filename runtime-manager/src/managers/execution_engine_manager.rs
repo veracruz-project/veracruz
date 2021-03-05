@@ -11,7 +11,7 @@
 //! information on licensing and copyright.
 
 use super::{
-    RuntimeManagerError, ProtocolState, ProvisioningResponse,
+    RuntimeManagerError, ProtocolState,
     ProvisioningResult,
 };
 use transport_protocol::transport_protocol::{
@@ -24,8 +24,7 @@ use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 use std::{collections::HashMap, result::Result, vec::Vec};
-use veracruz_utils::policy::principal::Role;
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzRole};
+use veracruz_utils::VeracruzCapabilityIndex;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The buffer of incoming data.
@@ -49,28 +48,12 @@ fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
         .unwrap_or_else(|err| panic!(err))
 }
 
-/// Encodes an error code that the virtual machine program produced, ready for
-/// transmission back to swhoever requested a result.
-fn response_error_code_returned(error_code: &i32) -> std::vec::Vec<u8> {
-    transport_protocol::serialize_result(
-        transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
-        Some(error_code.to_le_bytes().to_vec()),
-    )
-    .unwrap_or_else(|err| panic!(err))
-}
-
 /// Encodes an error code indicating that the enclace is not ready to receive a
 /// particular type of message.
+#[deprecated]
 fn response_not_ready() -> super::ProvisioningResult {
     let rst = transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_NOT_READY as i32, None)?;
-    Ok(super::ProvisioningResponse::ProtocolError { response: rst })
-}
-
-/// Encodes an error code indicating that a principal with an invalid role tried
-/// to perform an action.
-fn response_invalid_role() -> super::ProvisioningResult {
-    let rst = transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_INVALID_ROLE as i32, None)?;
-    Ok(super::ProvisioningResponse::ProtocolError { response: rst })
+    Ok(Some(rst))
 }
 
 /// Encodes an error code indicating that somebody sent an invalid or malformed
@@ -78,7 +61,7 @@ fn response_invalid_role() -> super::ProvisioningResult {
 fn response_invalid_request() -> super::ProvisioningResult {
     let rst =
         transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST as i32, None)?;
-    Ok(super::ProvisioningResponse::ProtocolError { response: rst })
+    Ok(Some(rst))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -87,53 +70,37 @@ fn response_invalid_request() -> super::ProvisioningResult {
 
 /// Returns the SHA-256 digest of the provisioned program.  Fails if no hash has
 /// yet been computed.
-fn dispatch_on_pi_hash(_ : transport_protocol::RequestPiHash, protocol_state: &ProtocolState) -> ProvisioningResult {
-    let response = colima::serialize_pi_hash(b"deprecated")?;
-    Ok(ProvisioningResponse::Success { response })
+#[deprecated]
+fn dispatch_on_pi_hash(_ : transport_protocol::RequestPiHash, _protocol_state: &ProtocolState) -> ProvisioningResult {
+    let response = transport_protocol::serialize_pi_hash(b"deprecated")?;
+    Ok(Some(response))
 }
 
 /// Returns the SHA-256 digest of the policy.
 fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
     let hash = protocol_state.get_policy_hash();
     let response = transport_protocol::serialize_policy_hash(hash.as_bytes())?;
-    Ok(ProvisioningResponse::Success { response })
+    Ok(Some(response))
 }
 
 /// Returns the current lifecycle state of the host provisioning state.  This
 /// state can be queried unconditionally (though it may change between the query
 /// being serviced and being received back/being acted upon...)
 #[deprecated]
-//TODO REMOVE???
 fn dispatch_on_request_state(_ : &ProtocolState) -> ProvisioningResult {
     let response =
-        transport_protocol::serialize_machine_state(u8::from(protocol_state.get_lifecycle_state()?))?;
-    Ok(ProvisioningResponse::Success { response })
+        transport_protocol::serialize_machine_state(u8::from(0))?;
+    Ok(Some(response))
 }
 
 /// Returns the result of a computation, computing the result first.
-fn dispatch_on_result(colima::RequestResult{ file_name, .. } : colima::RequestResult, protocol_state: &mut ProtocolState, client_id: u64,) -> ProvisioningResult {
+fn dispatch_on_result(transport_protocol::RequestResult{ file_name, .. } : transport_protocol::RequestResult, protocol_state: &mut ProtocolState, client_id: u64,) -> ProvisioningResult {
     if !protocol_state.is_modified() {
         let result = protocol_state.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
         let response = response_success(result);
-        return Ok(ProvisioningResponse::Success { response });
+        return Ok(Some(response));
     }
     protocol_state.execute(&file_name,client_id)
-}
-
-/// Processes a request from a client to perform a platform shutdown.  Returns
-/// `true` iff we have reached a threshold wherein everybody who needs to
-/// request a shutdown can go ahead and do so.
-#[inline]
-fn dispatch_on_shutdown(
-    protocol_state: &mut ProtocolState,
-    client_id: u64,
-) -> Result<(bool, ProvisioningResult), RuntimeManagerError> {
-    Ok((
-        protocol_state.request_and_check_shutdown(client_id)?,
-        Ok(ProvisioningResponse::Success {
-            response: response_success(None),
-        }),
-    ))
 }
 
 /// Provisions a program into the VFS.  Fails if the client has no permission.
@@ -147,8 +114,8 @@ fn dispatch_on_program(
     client_id: u64,
 ) -> ProvisioningResult {
     protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),&file_name,&code)?; 
-    let response = transport_protocol::serialize_result(colima::ResponseStatus::SUCCESS as i32, None)?;
-    Ok(ProvisioningResponse::Success { response })
+    let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
+    Ok(Some(response))
 }
 
 /// Provisions a data source into the VFS. Fails if the client has no permission.
@@ -161,7 +128,7 @@ fn dispatch_on_data(
 ) -> ProvisioningResult {
     protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),file_name.as_str(),data.as_slice())?; 
     let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
-    Ok(ProvisioningResponse::Success { response })
+    Ok(Some(response))
 }
 
 /// Provisions a data source into the VFS. Fails if the client has no permission.
@@ -174,21 +141,17 @@ fn dispatch_on_stream(
 ) -> ProvisioningResult {
     protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),file_name.as_str(),data.as_slice())?;
     let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
-    Ok(ProvisioningResponse::Success { response })
+    Ok(Some(response))
 }
 
 /// Signals the next round of computation.
 /// The next result request is guaranteed to execute the
 /// program before reading the result from the VFS.
-//TODO REMOVE???
-#[deprecated]
 fn dispatch_on_next_round(
     protocol_state: &mut ProtocolState,
 ) -> ProvisioningResult {
     protocol_state.reload()?;
-    Ok(ProvisioningResponse::Success {
-        response: response_success(None),
-    })
+    Ok(Some(response_success(None)))
 }
 
 /// Branches on a decoded protobuf message, `request`, and invokes appropriate
@@ -200,7 +163,6 @@ fn dispatch_on_next_round(
 /// may want the ability.
 fn dispatch_on_request(
     client_id: u64,
-    roles: &Vec<Role>,
     request: MESSAGE,
 ) -> ProvisioningResult {
     let mut protocol_state_guard = super::PROTOCOL_STATE.lock()?;
@@ -216,11 +178,11 @@ fn dispatch_on_request(
         MESSAGE::request_result(result_request) => dispatch_on_result(result_request,protocol_state,client_id),
         MESSAGE::request_state(_) => dispatch_on_request_state(protocol_state),
         MESSAGE::request_shutdown(_) => {
-            let (is_dead, response) = dispatch_on_shutdown(protocol_state, client_id.into())?;
+            let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
             if is_dead {
                 *protocol_state_guard = None;
             }
-            response
+            Ok(Some(response_success(None)))
         }
         MESSAGE::stream(stream) => dispatch_on_stream(protocol_state, stream, client_id),
         MESSAGE::request_next_round(_) => dispatch_on_next_round(protocol_state),
@@ -280,11 +242,10 @@ fn parse_incoming_buffer(
 pub fn dispatch_on_incoming_data(
     tls_session_id: u32,
     client_id: u64,
-    roles: &Vec<Role>,
     input: &Vec<u8>,
 ) -> ProvisioningResult {
     match parse_incoming_buffer(tls_session_id, input.clone())? {
-        None => Ok(ProvisioningResponse::WaitForMoreData),
+        None => Ok(None),
         Some(REQUEST {
             message_oneof: None,
             ..
@@ -292,6 +253,6 @@ pub fn dispatch_on_incoming_data(
         Some(REQUEST {
             message_oneof: Some(request),
             ..
-        }) => dispatch_on_request(client_id, roles, request),
+        }) => dispatch_on_request(client_id, request),
     }
 }

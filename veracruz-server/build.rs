@@ -17,6 +17,7 @@ use std::process::Command;
 fn main() {
     #[cfg(feature = "sgx")]
     {
+        let _target = target_build_utils::TargetInfo::new().expect("could not get target info");
         let sdk_dir = env::var("SGX_SDK").unwrap_or_else(|_| "/work/sgxsdk".to_string());
         let is_sim = env::var("SGX_MODE").unwrap_or_else(|_| "HW".to_string());
 

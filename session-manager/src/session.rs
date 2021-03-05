@@ -12,7 +12,7 @@
 //! information on licensing and copyright.
 
 use crate::error::SessionManagerError;
-use veracruz_utils::policy::principal::{Identity, Role};
+use veracruz_utils::policy::principal::Identity;
 
 use std::{
     io::{Read, Write},
@@ -86,7 +86,7 @@ impl Session {
     /// data.
     pub fn read_plaintext_data(
         &mut self,
-    ) -> Result<Option<(u32, Vec<Role>, Vec<u8>)>, SessionManagerError> {
+    ) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
         let num_bytes = self.tls_session.read_to_end(&mut received_buffer)?;
 
@@ -100,21 +100,15 @@ impl Session {
                 return Err(SessionManagerError::InvalidLengthError("peer_certs", 1));
             }
 
-            let mut roles = Vec::new();
             let mut client_id = 0;
 
             for principal in self.principals.iter() {
                 if principal.certificate() == &peer_certs[0] {
-                    roles = principal.roles().clone();
                     client_id = principal.id().clone();
                 }
             }
 
-            if roles.is_empty() {
-                return Err(SessionManagerError::EmptyRoleError(client_id.into()));
-            }
-
-            Ok(Some((client_id, roles, received_buffer)))
+            Ok(Some((client_id, received_buffer)))
         } else {
             Ok(None)
         }

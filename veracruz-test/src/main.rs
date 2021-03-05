@@ -310,6 +310,7 @@ mod tests {
             let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
             let program_data = read_binary_file(&program_path)?;
             client.send_program(program_filename,&program_data)?;
+            client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
         };
         let data_provider_handle = async {
@@ -405,15 +406,21 @@ mod tests {
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
             // fetch result
-            for result_retriever_index in result_retrievers.iter() {
+            for result_retriever_index in result_retrievers {
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
                 let result = result_retriever_veracruz_client.get_results(program_name)?;
                 let result: T = pinecone::from_bytes(&result)?;
                 info!("            Result: {:?}", result);
+            }
 
-                let _result = result_retriever_veracruz_client.request_shutdown()?;
+            for client_index in 0..client_configs.len() {
+                clients
+                    .get_mut(client_index)
+                    .ok_or(VeracruzTestError::ClientIndexError(client_index))?
+                    .request_shutdown()?;
+                info!("            Client {} disconnects", client_index);
             }
             Ok::<(), VeracruzTestError>(())
         };

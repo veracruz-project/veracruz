@@ -71,29 +71,25 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), RuntimeManage
             ))?;
     let _result = this_session.send_tls_data(&mut input_data.to_vec())?;
 
-    //TODO: change the error type
     let plaintext_option = this_session.read_plaintext_data()?;
 
     let proc_ret: super::ProvisioningResponse = match plaintext_option {
-        Some((client_id, roles, plaintext_data)) => {
+        Some((client_id, plaintext_data)) => {
             super::execution_engine_manager::dispatch_on_incoming_data(
                 session_id,
                 client_id as u64,
-                &roles,
                 &plaintext_data,
             )?
         }
-        None => super::ProvisioningResponse::WaitForMoreData,
+        // We need to wait longer for this to arrive.
+        None => return Ok(()),
     };
 
     match proc_ret {
-        super::ProvisioningResponse::ProtocolError { response } => {
-            Ok(this_session.return_data(&response)?)
-        }
-        super::ProvisioningResponse::WaitForMoreData => Ok(()),
-        super::ProvisioningResponse::Success { response } => {
-            Ok(this_session.return_data(&response)?)
-        }
+        // The incoming buffer is not full, so we cannot parse a complete protobuf
+        // message.  We need to wait longer for this to arrive.
+        None => Ok(()),
+        Some(response) => Ok(this_session.return_data(&response)?)
     }
 }
 
@@ -119,7 +115,6 @@ pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), RuntimeManagerError>
     }
 }
 
-// TODO: the 'match' inside the 'and_then' closure is difficult to parse
 pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
     match super::SESSIONS.lock()?.get_mut(&session_id) {
         Some(this_session) => Ok(this_session.read_tls_needed()),
