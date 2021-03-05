@@ -212,9 +212,9 @@ fn parse_command_line() -> Arguments {
                 .multiple(true)
         )
         .arg(
-            Arg::with_name("sinaloa-ip")
+            Arg::with_name("veracruz-server-ip")
                 .short("s")
-                .long("sinaloa-ip")
+                .long("veracruz-server-ip")
                 .value_name("IP ADDRESS")
                 .help("IP address of the Sinaloa server.")
                 .required(true),
@@ -338,7 +338,7 @@ binary.",
         abort_with("The number of certificates and role attributes differ.");
     }
 
-    if let Some(url) = matches.value_of("sinaloa-ip") {
+    if let Some(url) = matches.value_of("veracruz-server-ip") {
         if let Ok(url) = SocketAddr::from_str(url) {
             arguments.veracruz_server_ip = Some(url);
         } else {
