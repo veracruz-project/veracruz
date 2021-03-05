@@ -1,4 +1,4 @@
-//! Fuzz Initializing sinaloa sgx enclave
+//! Fuzz Initializing Veracruz server sgx enclave
 //!
 //! ## Authors
 //!

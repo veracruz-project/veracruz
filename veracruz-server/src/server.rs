@@ -1,4 +1,4 @@
-//! The Sinaloa server
+//! The Veracruz server
 //!
 //! ## Authors
 //!
@@ -106,7 +106,7 @@ pub fn server(policy_filename: &str) -> Result<Server, VeracruzServerError> {
     let policy_json = std::fs::read_to_string(policy_filename)?;
     let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]
-    let SINALOA: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
+    let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
         &policy_json,
     )?))));
 
@@ -116,10 +116,10 @@ pub fn server(policy_filename: &str) -> Result<Server, VeracruzServerError> {
     let server = HttpServer::new(move || {
         // give the server a Sender in .data
         App::new()
-            // pass in the shutdown channel and enclave handler SINALOA to the server
+            // pass in the shutdown channel and enclave handler VERACRUZ_SERVER to the server
             .wrap(middleware::Logger::default())
             .data(shutdown_channel_tx.clone())
-            .data(SINALOA.clone())
+            .data(VERACRUZ_SERVER.clone())
             .service(veracruz_server_request)
             .service(runtime_manager_request)
     })

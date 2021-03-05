@@ -105,7 +105,7 @@ struct Arguments {
     /// each certificate has an accompanying set of roles to form a compound
     /// "identity".
     roles: Vec<Vec<String>>,
-    /// The socket address (IP and port) of the Sinaloa instance.
+    /// The socket address (IP and port) of the Veracruz server instance.
     veracruz_server_ip: Option<SocketAddr>,
     /// The socket address (IP and port) of the Veracruz proxy attestation instance.
     proxy_attestation_server_ip: Option<SocketAddr>,
@@ -216,7 +216,7 @@ fn parse_command_line() -> Arguments {
                 .short("s")
                 .long("veracruz-server-ip")
                 .value_name("IP ADDRESS")
-                .help("IP address of the Sinaloa server.")
+                .help("IP address of the Veracruz server.")
                 .required(true),
         )
         .arg(
@@ -342,10 +342,10 @@ binary.",
         if let Ok(url) = SocketAddr::from_str(url) {
             arguments.veracruz_server_ip = Some(url);
         } else {
-            abort_with("Could not parse Sinaloa IP address argument.");
+            abort_with("Could not parse the Veracruz server IP address argument.");
         }
     } else {
-        abort_with("No Sinaloa IP address was passed as a command line parameter.");
+        abort_with("No Veracruz server IP address was passed as a command line parameter.");
     }
 
     if let Some(url) = matches.value_of("proxy-attestation-server-ip") {

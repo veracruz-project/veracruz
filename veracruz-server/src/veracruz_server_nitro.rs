@@ -1,4 +1,4 @@
-//! Nitro-Enclave-specific material for Sinaloa
+//! Nitro-Enclave-specific material for the Veracruz server
 //!
 //! ## Authors
 //!

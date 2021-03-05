@@ -1,4 +1,4 @@
-//! Sinaloa
+//! Veracruz server
 //!
 //! ## Authors
 //!

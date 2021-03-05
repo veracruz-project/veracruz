@@ -373,7 +373,7 @@ impl VeracruzClient {
         return Err(VeracruzClientError::ExcessiveIterationError("check_pi_hash"));
     }
 
-    /// send the data to the runtime_manager path on the sinaloa server.
+    /// send the data to the runtime_manager path on the Veracruz server.
     // TODO: This function has return points scattered all over, making it very hard to follow
     fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;

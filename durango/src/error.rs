@@ -79,7 +79,7 @@ pub enum DurangoError {
         _1
     )]
     ResponseError(&'static str, transport_protocol::ResponseStatus),
-    #[error(display = "Durango: Received no result from Sinaloa")]
+    #[error(display = "Durango: Received no result from the Veracruz server")]
     VeracruzServerResponseNoResultError,
     #[error(display = "Durango: Too many interation: {:?}", _0)]
     ExcessiveIterationError(&'static str),

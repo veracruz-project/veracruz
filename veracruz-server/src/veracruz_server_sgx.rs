@@ -1,4 +1,4 @@
-//! Intel SGX-specific material for Sinaloa
+//! Intel SGX-specific material for the Veracruz server
 //!
 //! ## Authors
 //!

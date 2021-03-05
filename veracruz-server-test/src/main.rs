@@ -1,4 +1,4 @@
-//! Sinaloa-specific tests
+//! Veracruz-server-specific tests
 //!
 //! One of the main integration tests for Veracruz, as a lot of material is
 //! imported directly or indirectly via these tests.
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    /// Load sinaloa and generate the self-signed certificate
+    /// Load the Veracruz server and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
         // start the proxy attestation server
         iterate_over_policy("../test-collateral/", |policy_json| {
@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    /// Test the attestation flow without sending any program or data into Sinaloa
+    /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    /// Attempt to establish a client session with the Sinaloa server with an invalid client certificate
+    /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
@@ -728,7 +728,7 @@ mod tests {
         });
     }
 
-    /// This is the template of test cases for sinaloa,
+    /// This is the template of test cases for veracruz-server,
     /// ensuring it is a single client policy,
     /// and the client_cert and client_key match the policy
     /// The type T is the return type of the computation
@@ -807,7 +807,7 @@ mod tests {
             time_init.elapsed().as_micros()
         );
 
-        info!("### Step 3.  Spawn sinaloa server thread.");
+        info!("### Step 3.  Spawn Veracruz server thread.");
         let time_server_boot = Instant::now();
         CONTINUE_FLAG_HASH.lock()?.insert(ticket, true);
         let server_loop_handle = thread::spawn(move || {
@@ -817,7 +817,7 @@ mod tests {
             })
         });
         info!(
-            "             Booting sinaloa server time (μs): {}.",
+            "             Booting Veracruz server time (μs): {}.",
             time_server_boot.elapsed().as_micros()
         );
 
@@ -1306,7 +1306,7 @@ mod tests {
         }
     }
 
-    /// Auxiliary function: initialise sinaloa from policy and open a tls session
+    /// Auxiliary function: initialise the Veracruz server from policy and open a tls session
     fn init_veracruz_server_and_tls_session(
         policy_json: &str,
     ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
@@ -1692,7 +1692,7 @@ mod tests {
         veracruz_server: &dyn veracruz_server::VeracruzServer,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
-        info!("sinaloa-test/attestation_flow: challenge:{:?}", challenge);
+        info!("veracruz-server-test/attestation_flow: challenge:{:?}", challenge);
         let serialized_pagt = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let pagt_ret = veracruz_server.plaintext_data(serialized_pagt)?;
         let received_bytes =
@@ -1719,7 +1719,7 @@ mod tests {
         if hash_bin[0..32] != received_payload[47..79] {
             #[cfg(all(feature = "debug", feature = "nitro"))]
             {
-                println!("sinaloa-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
+                println!("veracruz-server-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
             }
             #[cfg(not(feature = "debug"))]
             {

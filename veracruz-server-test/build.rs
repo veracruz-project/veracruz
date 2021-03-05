@@ -1,4 +1,4 @@
-//! Sinaloa-test build script
+//! Veracruz-server-test build script
 //!
 //! ## Authors
 //!

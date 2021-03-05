@@ -1,4 +1,4 @@
-//! Arm TrustZone-specific material for Sinaloa
+//! Arm TrustZone-specific material for the Veracruz server
 //!
 //! ## Authors
 //!

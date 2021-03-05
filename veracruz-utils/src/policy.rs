@@ -5,8 +5,8 @@
 //! computation.  This includes:
 //!
 //! - The identities and roles of every principals in the computation,
-//! - Important URLs, both for the Sinaloa bridge server on the untrusted host's
-//!   machine and the Veracruz proxy attestation service,
+//! - Important URLs, both for the Veracruz bridge server on the untrusted
+//!   host's machine and the Veracruz proxy attestation service,
 //! - Permissible ciphersuites for TLS connections between clients and the
 //!   trusted Veracruz runtime, as well as the hashes of the expected program
 //!   and of the trusted Veracruz runtime itself,
@@ -334,7 +334,7 @@ impl VeracruzExpiry {
 pub struct VeracruzPolicy {
     /// The identities of every principal involved in a computation.
     identities: Vec<VeracruzIdentity<String>>,
-    /// The URL of the Sinaloa server.
+    /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
     /// issued during the Veracruz bootstrapping process prior to the
@@ -440,7 +440,7 @@ impl VeracruzPolicy {
         &self.identities
     }
 
-    /// Returns the URL of the Sinaloa server associated with this policy.
+    /// Returns the URL of the Veracruz server associated with this policy.
     #[inline]
     pub fn veracruz_server_url(&self) -> &String {
         &self.veracruz_server_url

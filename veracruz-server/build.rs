@@ -1,4 +1,4 @@
-//! Sinaloa build file.
+//! Veracruz server build file.
 //!
 //! ## Authors
 //!
