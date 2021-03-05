@@ -371,7 +371,7 @@ pub mod veracruz_server_nitro {
             println!("Waiting for NRE Instance to authenticate.");
             std::thread::sleep(std::time::Duration::from_millis(15000));
 
-            println!("sinaloa_tz::native_attestation returning Ok");
+            println!("veracruz_server_tz::native_attestation returning Ok");
             return Ok(nre_instance);
         }
     }

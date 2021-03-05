@@ -356,7 +356,7 @@ pub mod veracruz_server_tz {
             unsafe { public_key.set_len(public_key_size as usize) };
 
             VeracruzServerTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token_vec, device_id)?;
-            debug!("sinaloa_tz::native_attestation returning Ok");
+            debug!("veracruz_server_tz::native_attestation returning Ok");
             return Ok(());
         }
 
@@ -365,7 +365,7 @@ pub mod veracruz_server_tz {
             token: &Vec<u8>,
             device_id: i32,
         ) -> Result<(), VeracruzServerError> {
-            debug!("sinaloa_tz::post_psa_attestation_token started");
+            debug!("veracruz_server_tz::post_psa_attestation_token started");
             let proxy_attestation_server_request =
                 transport_protocol::serialize_native_psa_attestation_token(token, device_id)?;
             let encoded_str = base64::encode(&proxy_attestation_server_request);
@@ -373,7 +373,7 @@ pub mod veracruz_server_tz {
             let response = crate::post_buffer(&url, &encoded_str)?;
 
             debug!(
-                "sinaloa_tz::post_psa_attestation_token received buffer:{:?}",
+                "veracruz_server_tz::post_psa_attestation_token received buffer:{:?}",
                 response
             );
             return Ok(());

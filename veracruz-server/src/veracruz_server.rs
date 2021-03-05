@@ -299,14 +299,14 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerE
         lines.collect()
     };
     println!(
-        "sinaloa::send_proxy_attestation_server_start received header:{:?}",
+        "veracruz_server::send_proxy_attestation_server_start received header:{:?}",
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
         return Err(VeracruzServerError::ReceivedNonSuccessPostStatusError);
     }
 
-    debug!("sinaloa::post_buffer header_lines:{:?}", header_lines);
+    debug!("veracruz_server::post_buffer header_lines:{:?}", header_lines);
 
     return Ok(received_body);
 }
