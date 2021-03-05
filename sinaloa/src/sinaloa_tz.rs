@@ -21,11 +21,7 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
-<<<<<<< HEAD
     use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, RuntimeManagerOpcode, SGX_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
-=======
-    use veracruz_utils::{EnclavePlatform, JaliscoOpcode, RuntimeManagerOpcode, JALISCO_UUID, RUNTIME_MANAGER_UUID};
->>>>>>> a46d55a (mexico-city-renaming: further renaming of Mexico City)
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
@@ -63,12 +59,7 @@ pub mod sinaloa_tz {
                 }
             }
 
-<<<<<<< HEAD
-            let mc_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
-=======
             let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
->>>>>>> a46d55a (mexico-city-renaming: further renaming of Mexico City)
-
             let p0 = ParamTmpRef::new_input(&policy_json.as_bytes());
 
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
