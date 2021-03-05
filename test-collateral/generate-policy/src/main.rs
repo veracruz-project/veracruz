@@ -106,7 +106,7 @@ struct Arguments {
     /// "identity".
     roles: Vec<Vec<String>>,
     /// The socket address (IP and port) of the Sinaloa instance.
-    sinaloa_ip: Option<SocketAddr>,
+    veracruz_server_ip: Option<SocketAddr>,
     /// The socket address (IP and port) of the Veracruz proxy attestation instance.
     proxy_attestation_server_ip: Option<SocketAddr>,
     /// The filename of the Runtime Manager CSS file for SGX measurement.  This is
@@ -147,7 +147,7 @@ impl Arguments {
         Arguments {
             certificates: Vec::new(),
             roles: Vec::new(),
-            sinaloa_ip: None,
+            veracruz_server_ip: None,
             proxy_attestation_server_ip: None,
             css_file: None,
             pcr0_file: None,
@@ -340,7 +340,7 @@ binary.",
 
     if let Some(url) = matches.value_of("sinaloa-ip") {
         if let Ok(url) = SocketAddr::from_str(url) {
-            arguments.sinaloa_ip = Some(url);
+            arguments.veracruz_server_ip = Some(url);
         } else {
             abort_with("Could not parse Sinaloa IP address argument.");
         }
@@ -636,7 +636,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
 
     let mut base_json = json!({
         "identities": serialize_identities(arguments),
-        "sinaloa_url": format!("{}", &arguments.sinaloa_ip.as_ref().unwrap()),
+        "veracruz_server_url": format!("{}", &arguments.veracruz_server_ip.as_ref().unwrap()),
         "enclave_cert_expiry": serialize_enclave_certificate_expiry(arguments),
         "ciphersuite": POLICY_CIPHERSUITE,
         "proxy_attestation_server_url": format!("{}", &arguments.proxy_attestation_server_ip.as_ref().unwrap()),

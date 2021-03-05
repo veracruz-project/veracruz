@@ -467,14 +467,14 @@ pub mod veracruz_server_sgx {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 
-            let mut new_sinaloa = VeracruzServerSGX {
+            let mut new_veracruz_server = VeracruzServerSGX {
                 runtime_manager_enclave: runtime_manager_enclave,
             };
 
             let mut result: u32 = 0;
             let ret = unsafe {
                 runtime_manager_init_session_manager_enc(
-                    new_sinaloa.runtime_manager_enclave.geteid(),
+                    new_veracruz_server.runtime_manager_enclave.geteid(),
                     &mut result,
                     policy_json.as_bytes().as_ptr() as *const u8,
                     policy_json.len() as u64,
@@ -489,14 +489,14 @@ pub mod veracruz_server_sgx {
                     Some(_) => (), // do nothing, we're good
                     None => {
                         let enclave = start_enclave(SGX_ROOT_ENCLAVE_ENCLAVE_FILE)?;
-                        new_sinaloa.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
+                        new_veracruz_server.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
                         *sgx_root_enclave = Some(enclave)
                     }
                 }
             }
 
             if (result == 0) && (ret == 0) {
-                Ok(new_sinaloa)
+                Ok(new_veracruz_server)
             } else {
                 debug!(
                     "runtime_manager_init_session_manager_enc result:{:?}, ret:{:?}",

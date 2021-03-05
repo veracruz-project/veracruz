@@ -479,7 +479,7 @@ impl VeracruzClient {
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
-        let dest_url = format!("http://{:}/runtime_manager", self.policy.sinaloa_url());
+        let dest_url = format!("http://{:}/runtime_manager", self.policy.veracruz_server_url());
         let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
         let mut ret = client_build
             .post(dest_url.as_str())

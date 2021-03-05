@@ -46,7 +46,7 @@ impl Attestation for AttestationPSA {
         let expected_enclave_hash = hex::decode(runtime_manager_hash.as_str())?;
         Self::attestation_flow(
             &policy.proxy_attestation_server_url().as_str(),
-            &policy.sinaloa_url().as_str(),
+            &policy.veracruz_server_url().as_str(),
             &expected_enclave_hash,
         )
     }
@@ -60,7 +60,7 @@ impl AttestationPSA {
     ) -> Result<(Vec<u8>, String), VeracruzClientError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         let serialized_rpat = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
-        let received_string = AttestationPSA::post_sinaloa(remote_url, &serialized_rpat)?;
+        let received_string = AttestationPSA::post_veracruz_server(remote_url, &serialized_rpat)?;
 
         let complete_proxy_attestation_server_url = format!("http://{:}/VerifyPAT", proxy_attestation_server_url);
         let received_buffer = AttestationPSA::post_string(&complete_proxy_attestation_server_url, received_string)?;
@@ -88,7 +88,7 @@ impl AttestationPSA {
         Ok((enclave_cert_hash, enclave_name.to_string()))
     }
 
-    fn post_sinaloa(remote_url: &str, data: &Vec<u8>) -> Result<String, VeracruzClientError> {
+    fn post_veracruz_server(remote_url: &str, data: &Vec<u8>) -> Result<String, VeracruzClientError> {
         let string_data = base64::encode(data);
         let dest_url = format!("http://{:}/sinaloa", remote_url);
         let post_result_string = AttestationPSA::post_string(&dest_url, string_data);

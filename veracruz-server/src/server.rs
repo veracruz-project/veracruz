@@ -29,7 +29,7 @@ use std::{
 type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>>>>;
 
 #[post("/sinaloa")]
-async fn sinaloa_request(
+async fn veracruz_server_request(
     enclave_handler: web::Data<EnclaveHandler>,
     _request: HttpRequest,
     input_data: String,
@@ -120,10 +120,10 @@ pub fn server(policy_filename: &str) -> Result<Server, VeracruzServerError> {
             .wrap(middleware::Logger::default())
             .data(shutdown_channel_tx.clone())
             .data(SINALOA.clone())
-            .service(sinaloa_request)
+            .service(veracruz_server_request)
             .service(runtime_manager_request)
     })
-    .bind(&policy.sinaloa_url())?
+    .bind(&policy.veracruz_server_url())?
     .run();
 
     // clone the Server handle and pass the the thread for shuting down the server

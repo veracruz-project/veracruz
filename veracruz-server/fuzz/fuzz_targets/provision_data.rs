@@ -29,15 +29,15 @@ fuzz_target!(|buffer: &[u8]| {
 
         let policy = veracruz_utils::VeracruzPolicy::new(&policy).unwrap();
 
-        let (sinaloa, session_id) = init_sinaloa_and_tls_session(policy).unwrap();
-        let enclave_cert = enclave_self_signed_cert(&sinaloa).unwrap();
+        let (veracruz_server, session_id) = init_veracruz_server_and_tls_session(policy).unwrap();
+        let enclave_cert = enclave_self_signed_cert(&veracruz_server).unwrap();
 
         let client_cert_filename = "../test-collateral/client_rsa_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
         let cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
 
         let mut client_session = create_client_test_session(
-            &sinaloa,
+            &veracruz_server,
             client_cert_filename,
             client_key_filename,
             cert_hash.as_ref().to_vec(),
@@ -56,7 +56,7 @@ fuzz_target!(|buffer: &[u8]| {
         let flag_server = flag_main.clone();
 
         let server_loop_handle = std::thread::spawn(move || {
-            server_tls_loop(flag_server, &sinaloa, session_id, server_tls_tx, server_tls_rx);
+            server_tls_loop(flag_server, &veracruz_server, session_id, server_tls_tx, server_tls_rx);
         });
 
 
@@ -82,13 +82,13 @@ use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
 #[cfg(feature = "tz")]
 use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
 
-fn init_sinaloa_and_tls_session(
+fn init_veracruz_server_and_tls_session(
     policy: veracruz_utils::VeracruzPolicy,
 ) -> Result<(VeracruzServerEnclave, u32), String> {
-    VeracruzServerEnclave::new(&policy).and_then(|sinaloa| {
-        sinaloa.new_tls_session().and_then(|session_id| {
+    VeracruzServerEnclave::new(&policy).and_then(|veracruz_server| {
+        veracruz_server.new_tls_session().and_then(|session_id| {
             if session_id != 0 {
-                Ok((sinaloa, session_id))
+                Ok((veracruz_server, session_id))
             } else {
                 Err("Session id is zero".to_string())
             }
@@ -96,8 +96,8 @@ fn init_sinaloa_and_tls_session(
     })
 }
 
-fn enclave_self_signed_cert(sinaloa: &VeracruzServerEnclave) -> Result<rustls::Certificate, String> {
-    let enclave_cert_vec = sinaloa.get_enclave_cert()?;
+fn enclave_self_signed_cert(veracruz_server: &VeracruzServerEnclave) -> Result<rustls::Certificate, String> {
+    let enclave_cert_vec = veracruz_server.get_enclave_cert()?;
     Ok(rustls::Certificate(enclave_cert_vec))
 }
 
@@ -133,7 +133,7 @@ fn read_priv_key_file(filename: &str) -> rustls::PrivateKey {
 }
 
 fn create_client_test_session(
-    sinaloa: &dyn veracruz_server::VeracruzServer,
+    veracruz_server: &dyn veracruz_server::VeracruzServer,
     client_cert_filename: &str,
     client_key_filename: &str,
     cert_hash: Vec<u8>,
@@ -153,7 +153,7 @@ fn create_client_test_session(
 
     client_config.pinned_cert_hashes.push(cert_hash);
 
-    let enclave_name = sinaloa
+    let enclave_name = veracruz_server
 	.get_enclave_name()
 	.expect("Error obtaining Enclave name");
     let dns_name_ret = webpki::DNSNameRef::try_from_ascii_str(enclave_name.as_str());
@@ -237,7 +237,7 @@ fn client_tls_send(
 
 fn server_tls_loop(
     flag : Arc<Mutex<bool>>,
-    sinaloa: &dyn veracruz_server::VeracruzServer,
+    veracruz_server: &dyn veracruz_server::VeracruzServer,
     session_id: u32,
     tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
     rx: std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
@@ -247,7 +247,7 @@ fn server_tls_loop(
         let received_buffer = received.unwrap_or_else(|_| std::vec::Vec::new());
 
         if received_buffer.len() > 0 {
-            let output_data_option_result = sinaloa.tls_data(session_id, received_buffer);
+            let output_data_option_result = veracruz_server.tls_data(session_id, received_buffer);
             match output_data_option_result {
                 Err(err) => panic!(format!("tls_data failed with error: {:?}", err)),
                 Ok(output_data_option) => match output_data_option {

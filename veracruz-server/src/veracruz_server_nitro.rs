@@ -61,7 +61,7 @@ pub mod veracruz_server_nitro {
                     false,
                     RUNTIME_MANAGER_EIF_PATH,
                     true,
-                    Some(VeracruzServerNitro::sinaloa_ocall_handler),
+                    Some(VeracruzServerNitro::veracruz_server_ocall_handler),
                 )
                 .map_err(|err| VeracruzServerError::NitroError(err))?
             };
@@ -72,7 +72,7 @@ pub mod veracruz_server_nitro {
                     false,
                     RUNTIME_MANAGER_EIF_PATH,
                     false,
-                    Some(VeracruzServerNitro::sinaloa_ocall_handler),
+                    Some(VeracruzServerNitro::veracruz_server_ocall_handler),
                 )
                 .map_err(|err| VeracruzServerError::NitroError(err))?
             };
@@ -285,21 +285,21 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServerNitro {
-        fn sinaloa_ocall_handler(input_buffer: Vec<u8>) -> Result<Vec<u8>, NitroError> {
+        fn veracruz_server_ocall_handler(input_buffer: Vec<u8>) -> Result<Vec<u8>, NitroError> {
             let return_buffer: Vec<u8> = {
                 let mut nre_guard = NRE_CONTEXT.lock().map_err(|_| NitroError::MutexError)?;
                 match &mut *nre_guard {
                     Some(nre) => {
                         nre.send_buffer(&input_buffer).map_err(|err| {
                             println!(
-                                "VeracruzServerNitro::sinaloa_ocall_handler send_buffer failed:{:?}",
+                                "VeracruzServerNitro::veracruz_server_ocall_handler send_buffer failed:{:?}",
                                 err
                             );
                             NitroError::EC2Error
                         })?;
                         let ret_buffer = nre.receive_buffer().map_err(|err| {
                             println!(
-                                "VeracruzServerNitro::sinaloa_ocall_handler receive_buffer failed:{:?}",
+                                "VeracruzServerNitro::veracruz_server_ocall_handler receive_buffer failed:{:?}",
                                 err
                             );
                             NitroError::EC2Error

@@ -335,7 +335,7 @@ pub struct VeracruzPolicy {
     /// The identities of every principal involved in a computation.
     identities: Vec<VeracruzIdentity<String>>,
     /// The URL of the Sinaloa server.
-    sinaloa_url: String,
+    veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
     /// issued during the Veracruz bootstrapping process prior to the
     /// computation.
@@ -391,7 +391,7 @@ impl VeracruzPolicy {
     /// well-formedness checks pass.
     pub fn new(
         identities: Vec<VeracruzIdentity<String>>,
-        sinaloa_url: String,
+        veracruz_server_url: String,
         enclave_cert_expiry: VeracruzExpiry,
         ciphersuite: String,
         runtime_manager_hash_sgx: Option<String>,
@@ -406,7 +406,7 @@ impl VeracruzPolicy {
     ) -> Result<Self, VeracruzUtilError> {
         let policy = Self {
             identities,
-            sinaloa_url,
+            veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
             runtime_manager_hash_sgx,
@@ -442,8 +442,8 @@ impl VeracruzPolicy {
 
     /// Returns the URL of the Sinaloa server associated with this policy.
     #[inline]
-    pub fn sinaloa_url(&self) -> &String {
-        &self.sinaloa_url
+    pub fn veracruz_server_url(&self) -> &String {
+        &self.veracruz_server_url
     }
 
     /// Returns the enclave certificate expiry moment associated with this

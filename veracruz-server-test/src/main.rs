@@ -210,16 +210,16 @@ mod tests {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
             // start the proxy attestation server
             setup(policy.proxy_attestation_server_url().clone());
-            let result = init_sinaloa_and_tls_session(policy_json);
+            let result = init_veracruz_server_and_tls_session(policy_json);
             assert!(result.is_ok(), "error:{:?}", result.err());
         });
     }
 
     /// Auxiliary function: self signed certificate for enclave
     fn enclave_self_signed_cert(
-        sinaloa: &VeracruzServerEnclave,
+        veracruz_server: &VeracruzServerEnclave,
     ) -> Result<rustls::Certificate, VeracruzServerError> {
-        let enclave_cert_vec = sinaloa.get_enclave_cert()?;
+        let enclave_cert_vec = veracruz_server.get_enclave_cert()?;
         Ok(rustls::Certificate(enclave_cert_vec))
     }
 
@@ -231,7 +231,7 @@ mod tests {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
             let result = VeracruzServerEnclave::new(&policy_json)
-                .and_then(|sinaloa| enclave_self_signed_cert(&sinaloa));
+                .and_then(|veracruz_server| enclave_self_signed_cert(&veracruz_server));
             assert!(result.is_ok(), "error:{:?}", result);
         });
     }
@@ -244,7 +244,7 @@ mod tests {
 
         let ret = VeracruzServerEnclave::new(&policy_json);
 
-        let sinaloa = ret.unwrap();
+        let veracruz_server = ret.unwrap();
 
         #[cfg(feature = "nitro")]
         let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
@@ -255,7 +255,7 @@ mod tests {
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &sinaloa);
+            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &veracruz_server);
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -285,15 +285,15 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (sinaloa, _) = init_sinaloa_and_tls_session(&policy_json).unwrap();
-        let enclave_cert = enclave_self_signed_cert(&sinaloa).unwrap();
+        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
+        let enclave_cert = enclave_self_signed_cert(&veracruz_server).unwrap();
 
         let client_cert_filename = "../test-collateral/never_used_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
         let cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
 
         let mut _client_session = create_client_test_session(
-            &sinaloa,
+            &veracruz_server,
             client_cert_filename,
             client_key_filename,
             cert_hash.as_ref().to_vec(),
@@ -769,8 +769,8 @@ mod tests {
         );
         info!("### Step 2.  Initialise enclave.");
         let time_init = Instant::now();
-        let sinaloa = VeracruzServerEnclave::new(&policy_json)?;
-        let client_session_id = sinaloa.new_tls_session().and_then(|id| {
+        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+        let client_session_id = veracruz_server.new_tls_session().and_then(|id| {
             if id == 0 {
                 Err(VeracruzServerError::MissingFieldError("client_session_id"))
             } else {
@@ -786,9 +786,9 @@ mod tests {
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &sinaloa)?
+            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &veracruz_server)?
         } else {
-            let enclave_cert = enclave_self_signed_cert(&sinaloa)?;
+            let enclave_cert = enclave_self_signed_cert(&veracruz_server)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
                 .as_ref()
                 .to_vec()
@@ -797,7 +797,7 @@ mod tests {
         info!("             Enclave generated a self-signed certificate:");
 
         let mut client_session = create_client_test_session(
-            &sinaloa,
+            &veracruz_server,
             client_cert_path,
             client_key_path,
             enclave_cert_hash,
@@ -811,7 +811,7 @@ mod tests {
         let time_server_boot = Instant::now();
         CONTINUE_FLAG_HASH.lock()?.insert(ticket, true);
         let server_loop_handle = thread::spawn(move || {
-            server_tls_loop(&sinaloa, server_tls_tx, server_tls_rx, ticket).map_err(|e| {
+            server_tls_loop(&veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(|e| {
                 CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
                 e
             })
@@ -1307,17 +1307,17 @@ mod tests {
     }
 
     /// Auxiliary function: initialise sinaloa from policy and open a tls session
-    fn init_sinaloa_and_tls_session(
+    fn init_veracruz_server_and_tls_session(
         policy_json: &str,
     ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
-        let sinaloa = VeracruzServerEnclave::new(&policy_json)?;
+        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
 
         let one_tenth_sec = std::time::Duration::from_millis(100);
         std::thread::sleep(one_tenth_sec); // wait for the client to start
 
-        sinaloa.new_tls_session().and_then(|session_id| {
+        veracruz_server.new_tls_session().and_then(|session_id| {
             if session_id != 0 {
-                Ok((sinaloa, session_id))
+                Ok((veracruz_server, session_id))
             } else {
                 Err(VeracruzServerError::MissingFieldError("Session id"))
             }
@@ -1528,7 +1528,7 @@ mod tests {
     }
 
     fn server_tls_loop(
-        sinaloa: &dyn veracruz_server::VeracruzServer,
+        veracruz_server: &dyn veracruz_server::VeracruzServer,
         tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
         rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ticket: u32,
@@ -1543,7 +1543,7 @@ mod tests {
 
             if received_buffer.len() > 0 {
                 let (active_flag, output_data_option) =
-                    sinaloa.tls_data(session_id, received_buffer)?;
+                    veracruz_server.tls_data(session_id, received_buffer)?;
                 let output_data = output_data_option.unwrap_or_else(|| Vec::new());
                 for output in output_data.iter() {
                     if output.len() > 0 {
@@ -1606,7 +1606,7 @@ mod tests {
     }
 
     fn create_client_test_session(
-        sinaloa: &dyn veracruz_server::VeracruzServer,
+        veracruz_server: &dyn veracruz_server::VeracruzServer,
         client_cert_filename: &str,
         client_key_filename: &str,
         cert_hash: Vec<u8>,
@@ -1625,7 +1625,7 @@ mod tests {
 
         client_config.pinned_cert_hashes.push(cert_hash);
 
-        let enclave_name = sinaloa.get_enclave_name()?;
+        let enclave_name = veracruz_server.get_enclave_name()?;
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(enclave_name.as_str())?;
         Ok(rustls::ClientSession::new(
             &std::sync::Arc::new(client_config),
@@ -1689,12 +1689,12 @@ mod tests {
     fn attestation_flow(
         proxy_attestation_server_url: &String,
         expected_enclave_hash: &String,
-        sinaloa: &dyn veracruz_server::VeracruzServer,
+        veracruz_server: &dyn veracruz_server::VeracruzServer,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         info!("sinaloa-test/attestation_flow: challenge:{:?}", challenge);
         let serialized_pagt = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
-        let pagt_ret = sinaloa.plaintext_data(serialized_pagt)?;
+        let pagt_ret = veracruz_server.plaintext_data(serialized_pagt)?;
         let received_bytes =
             pagt_ret.ok_or(VeracruzServerError::MissingFieldError("attestation_flow pagt_ret"))?;
 
