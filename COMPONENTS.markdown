@@ -44,7 +44,7 @@ runtime.  Principals provisioning secrets into the isolate/challenging the
 authenticity of the isolate with remote attestation use this for all
 communication between them and the trusted runtime.  It is located in the
 `veracruz-client` directory
-- Sinaloa: is an untrusted "bridge"/server component executing on the
+- Veracruz server: is an untrusted "bridge"/server component executing on the
 delegate's machine, outside of the isolate, and which routes encrypted
 communication between the various principals and the isolate. 
 

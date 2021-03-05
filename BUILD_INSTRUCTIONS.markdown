@@ -56,7 +56,7 @@ source /work/veracruz/sgx_env.sh
 cd /work/veracruz/runtime-manager/
 make
 
-cd /work/veracruz/sinaloa/
+cd /work/veracruz/veracruz-server/
 make
 ```
 
@@ -70,10 +70,10 @@ make sgx
 With that, all major sub-components of Veracruz (including the SDK) will be
 built for SGX.
 
-Now, to run the Sinaloa tests.  Simply run:
+Now, to run the Veracruz server tests.  Simply run:
 
 ```
-make sgx-sinaloa-test
+make sgx-veracruz-server-test
 ```
 
 You should see that all (_7_) tests pass.  Now, to run the full system
@@ -103,11 +103,11 @@ Now that your environment is set up, build the enclave binary by executing the
 make trustzone
 ```
 
-Everything is now built for TrustZone, and the Sinaloa and Veracruz integration
-tests can now be run:
+Everything is now built for TrustZone, and the Veracruz server and Veracruz
+integration tests can now be run:
 
 ```
-make trustzone-sinaloa-test
+make trustzone-veracruz-server-test
 ```
 
 and
