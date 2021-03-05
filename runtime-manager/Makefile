@@ -53,9 +53,9 @@ SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
 SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
 RUST_SGX_SDK_PATH = ../third-party/rust-sgx-sdk
 
-$(EDL_Files): $(SGX_EDGER8R) runtime-manager.edl
-	$(SGX_EDGER8R) --use-prefix --trusted runtime-manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
-	$(SGX_EDGER8R) --use-prefix --untrusted runtime-manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
+$(EDL_Files): $(SGX_EDGER8R) runtime_manager.edl
+	$(SGX_EDGER8R) --use-prefix --trusted runtime_manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
+	$(SGX_EDGER8R) --use-prefix --untrusted runtime_manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
 	@echo $(INFO_COLOR) "GEN => $(EDL_Files)" $(RESET_COLOR)
 
 SGX_COMMON_CFLAGS += -O0 -g
