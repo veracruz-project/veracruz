@@ -300,12 +300,12 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     ))
                 })?;
 
-            // Need to construct a parameter list for Jalisco::ProxyAttestation
+            // Need to construct a parameter list for SgxRootEnclave::ProxyAttestation
             // p0 - challenge input
-            // p1 - enclave_cert input / Jalisco Pubkey Output
+            // p1 - enclave_cert input / SGXRootEnclave Pubkey Output
             // p2 - token output
             // p3 - a: device_id output b:none
-            let mut jalisco_parameters = {
+            let mut sgx_root_enclave_parameters = {
                 let p0 = DifferentParameter::from_vec(&mut challenge, ParamType::MemrefInput).map_err(|err| {
                     print_error_and_return(format!("mc_tz::invoke_command::GetPSAAttestationToken failed to create Parameter from challenge:{:?}", err))
                 })?;
@@ -324,22 +324,22 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 0x11ea,
                 [0xbb, 0x37, 0x02, 0x42, 0xac, 0x13, 0x00, 0x02],
             )?;
-            session.invoke_command(3, &mut jalisco_parameters)?;
+            session.invoke_command(3, &mut sgx_root_enclave_parameters)?;
 
             let token = unsafe {
-                let mut memref = jalisco_parameters.2.as_memref().map_err(|err| {
-                    print_error_and_return(format!("mc_tz::invoke_command GetPSAAttestationToken failed to get jalisco_parameters.2 as memref:{:?}", err))
+                let mut memref = sgx_root_enclave_parameters.2.as_memref().map_err(|err| {
+                    print_error_and_return(format!("mc_tz::invoke_command GetPSAAttestationToken failed to get sgx_root_enclave_parameters.2 as memref:{:?}", err))
                 })?;
                 memref.buffer().to_vec()
             };
             let device_id = unsafe {
-                jalisco_parameters.3.as_value().map_err(|err| {
-                print_error_and_return(format!("mc_tz::invoke_command GetPSAAttestationToken failed to get jalisco_parameters.3 as value:{:?}", err))
+                sgx_root_enclave_parameters.3.as_value().map_err(|err| {
+                print_error_and_return(format!("mc_tz::invoke_command GetPSAAttestationToken failed to get sgx_root_enclave_parameters.3 as value:{:?}", err))
             })?.a()
             };
             let pubkey = unsafe {
-                let mut memref = jalisco_parameters.1.as_memref().map_err(|err| {
-                    print_error_and_return(format!("mc_tz::invoke_command GetPSAAttestationToken failed to get jalisco_parameters.1 as memref:{:?}", err))
+                let mut memref = sgx_root_enclave_parameters.1.as_memref().map_err(|err| {
+                    print_error_and_return(format!("mc_tz::invoke_command GetPSAAttestationToken failed to get sgx_root_enclave_parameters.1 as memref:{:?}", err))
                 })?;
                 memref.buffer().to_vec()
             };

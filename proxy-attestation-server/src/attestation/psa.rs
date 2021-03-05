@@ -20,7 +20,7 @@ use psa_attestation::{
 use rand::Rng;
 use std::{collections::HashMap, ffi::c_void, sync::Mutex};
 
-// Yes, I'm doing what you think I'm doing here. Each instance of Jalisco
+// Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
 // will have the same public key. Yes, I'm embedding that key in the source
 // code. I could come up with a complicated system for auto generating a key
 // for each instance, and then populate the device database with they key.

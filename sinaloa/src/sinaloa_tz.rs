@@ -21,11 +21,11 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
-    use veracruz_utils::{EnclavePlatform, JaliscoOpcode, MCOpcode, JALISCO_UUID, MC_UUID};
+    use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, MCOpcode, SGX_ROOT_ENCLAVE_UUID, MC_UUID};
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
-        static ref JALISCO_INITIALIZED: Mutex<bool> = Mutex::new(false);
+        static ref SGX_ROOT_ENCLAVE_INITIALIZED: Mutex<bool> = Mutex::new(false);
     }
 
     pub struct SinaloaTZ {
@@ -34,12 +34,12 @@ pub mod sinaloa_tz {
 
     impl Sinaloa for SinaloaTZ {
         fn new(policy_json: &str) -> Result<Self, SinaloaError> {
-            // Set up, initialize Jalisco
-            //let jalisco_uuid = Uuid::parse_str("8aaaf200-2450-11e4-abe2-0002a5d5c51b").unwrap();
+            // Set up, initialize SgxRootEnclave
+            //let sgx_root_enclave_uuid = Uuid::parse_str("8aaaf200-2450-11e4-abe2-0002a5d5c51b").unwrap();
             let policy: veracruz_utils::VeracruzPolicy =
                 veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 
-            let jalisco_uuid = Uuid::parse_str(&JALISCO_UUID.to_string())?;
+            let sgx_root_enclave_uuid = Uuid::parse_str(&SGX_ROOT_ENCLAVE_UUID.to_string())?;
             {
                 let mexico_city_hash = {
                     match policy.mexico_city_hash(&EnclavePlatform::TrustZone) {
@@ -47,12 +47,12 @@ pub mod sinaloa_tz {
                         Err(_) => return Err(SinaloaError::MissingFieldError("mexico_city_hash_tz")),
                     }
                 };
-                let mut ji_guard = JALISCO_INITIALIZED.lock()?;
+                let mut ji_guard = SGX_ROOT_ENCLAVE_INITIALIZED.lock()?;
                 if !*ji_guard {
-                    debug!("Jalisco is uninitialized.");
+                    debug!("The SGX root enclave is uninitialized.");
                     SinaloaTZ::native_attestation(
                         &policy.proxy_attestation_server_url(),
-                        jalisco_uuid,
+                        sgx_root_enclave_uuid,
                         &mexico_city_hash,
                     )?;
                     *ji_guard = true;
@@ -321,23 +321,23 @@ pub mod sinaloa_tz {
 
         fn native_attestation(
             proxy_attestation_server_url: &String,
-            jalisco_uuid: Uuid,
+            sgx_root_enclave_uuid: Uuid,
             mexico_city_hash: &String,
         ) -> Result<(), SinaloaError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
                 .ok_or(SinaloaError::UninitializedEnclaveError)?;
-            let mut jalisco_session = context.open_session(jalisco_uuid)?;
+            let mut sgx_root_enclave_session = context.open_session(sgx_root_enclave_uuid)?;
 
-            let firmware_version = SinaloaTZ::fetch_firmware_version(&mut jalisco_session)?;
+            let firmware_version = SinaloaTZ::fetch_firmware_version(&mut sgx_root_enclave_session)?;
 
             {
                 let mexico_city_hash_vec = hex::decode(mexico_city_hash.as_str())?;
                 let p0 = ParamTmpRef::new_input(&mexico_city_hash_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                jalisco_session
-                    .invoke_command(JaliscoOpcode::SetMexicoCityHashHack as u32, &mut operation)?;
+                sgx_root_enclave_session
+                    .invoke_command(SgxRootEnclaveOpcode::SetMexicoCityHashHack as u32, &mut operation)?;
             }
             let (challenge, device_id) =
                 SinaloaTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
@@ -349,8 +349,8 @@ pub mod sinaloa_tz {
             let mut public_key: Vec<u8> = Vec::with_capacity(128); // TODO: Don't do this
             let p3 = ParamTmpRef::new_output(&mut public_key);
             let mut na_operation = Operation::new(0, p0, p1, p2, p3);
-            jalisco_session
-                .invoke_command(JaliscoOpcode::NativeAttestation as u32, &mut na_operation)?;
+            sgx_root_enclave_session
+                .invoke_command(SgxRootEnclaveOpcode::NativeAttestation as u32, &mut na_operation)?;
             let token_size = na_operation.parameters().0.b();
             let public_key_size = na_operation.parameters().0.a();
             let token_vec: Vec<u8> = token[0..token_size as usize].to_vec();
@@ -385,7 +385,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut gfvl_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 jal_session
-                    .invoke_command(JaliscoOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
+                    .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
                 gfvl_op.parameters().0.a()
             };
             let firmware_version: String = {
@@ -393,7 +393,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamTmpRef::new_output(&mut fwv_vec);
                 let mut gfv_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 jal_session
-                    .invoke_command(JaliscoOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
+                    .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
                 String::from_utf8(fwv_vec)?
             };
             return Ok(firmware_version);

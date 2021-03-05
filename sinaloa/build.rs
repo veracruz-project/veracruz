@@ -51,12 +51,12 @@ fn main() {
         };
 
         let make_result = Command::new("make")
-            .current_dir("../jalisco")
+            .current_dir("../sgx-root-enclave")
             .args(&[out_dir_arg.clone(), final_dir_arg.clone()])
             .status()
             .unwrap();
         if !make_result.success() {
-            panic!("sinaloa::build.rs: make jalisco failed");
+            panic!("sinaloa::build.rs: make sgx-root-enclave failed");
         }
 
         let make_result = Command::new("make")
