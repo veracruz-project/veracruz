@@ -117,7 +117,7 @@ TZ_Src =  $(COMMON_Src) src/runtime_manager_trustzone.rs src/main.rs
 # OPTEE_DIR and OPTEE_OS_DIR can be imported from the environment
 OPTEE_DIR ?= /work/rust-optee-trustzone-sdk/optee
 OPTEE_OS_DIR ?= $(OPTEE_DIR)/optee_os
-TZ_UUID_PATH ?= ../runtime_manager_uuid.txt
+TZ_UUID_PATH ?= ../runtime-manager-uuid.txt
 TZ_UUID = $(shell cat "${TZ_UUID_PATH}")
 
 TZ_TA_SIGN_KEY = $(OPTEE_OS_DIR)/out/arm/export-ta_arm64/keys/default_ta.pem
