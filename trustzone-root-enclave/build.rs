@@ -1,4 +1,4 @@
-//! SGXRootEnclave build script
+//! TrustZoneRootEnclave build script
 //!
 //! ## Authors
 //!
@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 fn main() -> std::io::Result<()> {
     let out_dir = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    let root_enclave_uuid: &str = &std::fs::read_to_string("../sgx-root-enclave-uuid.txt").unwrap();
+    let root_enclave_uuid: &str = &std::fs::read_to_string("../trustzone-root-enclave-uuid.txt").unwrap();
 
     let mut buffer = File::create(out_dir.join("user_ta_header.rs"))?;
     buffer.write_all(include_bytes!("ta_static.rs"))?;

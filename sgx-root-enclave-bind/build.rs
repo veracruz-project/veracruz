@@ -1,4 +1,4 @@
-//! TrustZone root enclave build file.
+//! SGX root enclave build file.
 //!
 //! ## Authors
 //!
@@ -28,20 +28,20 @@ fn main() {
 
     let out_dir_link_search = format!("cargo:rustc-link-search={:}", out_dir);
     // link against the runtime manager non-secure library
-    println!("cargo:rustc-link-search=../trustzone-root-enclave/bin");
+    println!("cargo:rustc-link-search=../sgx-root-enclave/bin");
     println!("{:}", out_dir_link_search);
-    println!("cargo:rustc-link-lib=static=trustzone_root_enclave_u");
+    println!("cargo:rustc-link-lib=static=sgx_root_enclave_u");
     println!("cargo:rustc-link-lib=dylib=sgx_urts");
     println!("cargo:rustc-link-lib=dylib=sgx_uae_service");
     println!("cargo:rustc-link-lib=dylib=sgx_ukey_exchange");
 
     let make_result = Command::new("make")
-        .current_dir("../trustzone-root-enclave")
+        .current_dir("../sgx-root-enclave")
         .args(&[out_dir_arg, final_dir_arg])
         .status()
         .unwrap();
     if !make_result.success() {
-        panic!("trustzone-root-enclave-bind: make trustzone-root-enclave failed");
+        panic!("sgx-root-enclave-bind: make sgx-root-enclave failed");
     }
 
     let bindings = bindgen::Builder::default()

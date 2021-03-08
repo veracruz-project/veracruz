@@ -1,4 +1,4 @@
-//! The TrustZone root enclave
+//! The SGX root enclave
 //!
 //! ## Authors
 //!
@@ -168,7 +168,7 @@ pub extern "C" fn sgx_get_pubkey_report(
 pub extern "C" fn start_local_attest_enc(
     msg1: &sgx_dh_msg1_t,
     msg2: &mut sgx_dh_msg2_t,
-    trustzone_root_enclave_session_id: &mut u64,
+    sgx_root_enclave_session_id: &mut u64,
 ) -> sgx_status_t {
     let mut initiator = SgxDhInitiator::init_session();
 
@@ -188,12 +188,12 @@ pub extern "C" fn start_local_attest_enc(
             .expect("Failed to obtain lock on INITIATOR_HASH");
         initiator_hash.insert(session_id, initiator);
     }
-    *trustzone_root_enclave_session_id = session_id;
+    *sgx_root_enclave_session_id = session_id;
 
     sgx_status_t::SGX_SUCCESS
 }
 
-pub enum TrustZoneRootEnclave {
+pub enum SgxRootEnclave {
     Success = 0x00,
     Msg3RawError = 0x01,
     ProcMsg3Error = 0x02,
@@ -208,7 +208,7 @@ pub extern "C" fn finish_local_attest_enc(
     enclave_cert_hash_size: usize,
     enclave_name: *const i8,
     enclave_name_size: usize,
-    trustzone_root_enclave_session_id: u64,
+    sgx_root_enclave_session_id: u64,
     token: *mut u8,
     token_buf_size: usize,
     token_size: *mut usize,
@@ -216,25 +216,25 @@ pub extern "C" fn finish_local_attest_enc(
     pubkey_buf_size: usize,
     p_pubkey_size: *mut usize,
     p_device_id: &mut i32,
-) -> TrustZoneRootEnclave {
+) -> SgxRootEnclave {
     let dh_msg3_raw_len =
         mem::size_of::<sgx_dh_msg3_t>() as u32 + dh_msg3_raw.msg3_body.additional_prop_length;
     let dh_msg3 = unsafe { SgxDhMsg3::from_raw_dh_msg3_t(dh_msg3_raw, dh_msg3_raw_len) };
     assert!(!dh_msg3.is_none());
     if dh_msg3.is_none() {
-        return TrustZoneRootEnclave::Msg3RawError;
+        return SgxRootEnclave::Msg3RawError;
     }
     let dh_msg3 = dh_msg3.unwrap();
     {
         let mut initiator_hash = INITIATOR_HASH.lock().unwrap();
-        let mut initiator = initiator_hash.remove(&trustzone_root_enclave_session_id).unwrap();
+        let mut initiator = initiator_hash.remove(&sgx_root_enclave_session_id).unwrap();
         //.unwrap("Failed to get entry. Something is wrong");
         let mut dh_aek: sgx_key_128bit_t = sgx_key_128bit_t::default(); // Session Key, we won't use this
 
         let mut responder_identity = sgx_dh_session_enclave_identity_t::default();
         let status = initiator.proc_msg3(&dh_msg3, &mut dh_aek, &mut responder_identity);
         if status.is_err() {
-            return TrustZoneRootEnclave::ProcMsg3Error;
+            return SgxRootEnclave::ProcMsg3Error;
         }
         // TODO: Decide what/how we are going to put in the PSA Attestation token
         // cpu_svn? attributes?
@@ -284,7 +284,7 @@ pub extern "C" fn finish_local_attest_enc(
         };
     }
 
-    TrustZoneRootEnclave::Success
+    SgxRootEnclave::Success
 }
 
 fn from_slice(bytes: &[u8]) -> [u8; 32] {

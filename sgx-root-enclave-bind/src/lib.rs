@@ -1,4 +1,4 @@
-//! TrustZone root enclave bindings
+//! SGX root enclave bindings
 //!
 //! ## Authors
 //!
