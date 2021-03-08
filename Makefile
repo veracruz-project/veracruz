@@ -44,7 +44,7 @@ trustzone-veracruz-client-test: trustzone test_cases
 # offset the CC OPENSSL_DIR, which might be used in compiling trustzone
 sgx: sdk sgx-env
 	cd runtime-manager-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
-	cd trustzone-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
+	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
 nitro: sdk
@@ -152,7 +152,7 @@ sgx-env:
 
 clean:
 	cd runtime-manager-bind && cargo clean 
-	cd trustzone-root-enclave-bind && cargo clean
+	cd sgx-root-enclave-bind && cargo clean
 	cd psa-attestation && cargo clean
 	cd proxy-attestation-server && cargo clean
 	cd session-manager && cargo clean
@@ -171,7 +171,7 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave runtime-manager-bind runtime-manager psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave runtime-manager-bind runtime-manager psa-attestation sinaloa-test sinaloa sgx-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd session-manager && cargo fmt
