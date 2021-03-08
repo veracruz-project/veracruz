@@ -1,33 +1,27 @@
 [package]
-name = "sgx-root-enclave"
-# NOTE: when you update this version, please also update the psa entry in populate-test-database.sh in sinaloa-test and veracruz-test 
+name = "sgx_root_enclave"
+# NOTE: when update this version, please also update sgx entry in populate_test_database.sh in sinaloa-test and veracruz-test 
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
-build = "build.rs"
-description = "TLS endpoint code for clients interacting with a trusted Veracruz runtime"
+description = "The root attestation isolate that challenges additional isolates on the delegate's machine using local attestation.  This is a key component of the Veracruz proxied attestation system."
 
-[[bin]]
-name = "sgx-root-enclave"
-path = "src/main.rs"
-
-[features]
-default = ["tz"]
-tz = []
+[lib]
+name = "sgx_root_enclave"
+crate-type = ["staticlib"]
+path = "src/lib.rs"
 
 [dependencies]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
-transport-protocol = { path = "../transport-protocol", features=["tz"] }
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz"}
-psa-attestation = { path = "../psa-attestation", features=["tz"]}
-optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
-veracruz-utils = { path = "../veracruz-utils", features = ["tz"] }
-lazy_static = {version = "1.4.0", features=["spin_no_std"] }
-ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz" }
+lazy_static = { version = "1.4.0", features= ["spin_no_std"] }
+colima = { path = "../colima", features=["sgx"] }
+ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", features = ["mesalock_sgx"] }
+veracruz-utils = { path = "../veracruz-utils", features = ["sgx"] }
+psa-attestation = { path = "../psa-attestation", features = ["sgx"] }
 
-[build-dependencies]
-uuid = { version = "=0.7.4", features = ["v4"] }
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
+sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
+sgx_tdh = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
 
-[profile.release]
-lto = true
+[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
+sgx_alloc = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz" }

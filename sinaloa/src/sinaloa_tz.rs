@@ -21,11 +21,11 @@ pub mod sinaloa_tz {
     };
     use std::convert::TryInto;
     use std::sync::Mutex;
-    use veracruz_utils::{EnclavePlatform, SgxRootEnclaveOpcode, RuntimeManagerOpcode, SGX_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
+    use veracruz_utils::{EnclavePlatform, TrustZoneRootEnclaveOpcode, RuntimeManagerOpcode, TRUSTZONE_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
-        static ref SGX_ROOT_ENCLAVE_INITIALIZED: Mutex<bool> = Mutex::new(false);
+        static ref TRUSTZONE_ROOT_ENCLAVE_INITIALIZED: Mutex<bool> = Mutex::new(false);
     }
 
     pub struct SinaloaTZ {
@@ -39,7 +39,7 @@ pub mod sinaloa_tz {
             let policy: veracruz_utils::VeracruzPolicy =
                 veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 
-            let sgx_root_enclave_uuid = Uuid::parse_str(&SGX_ROOT_ENCLAVE_UUID.to_string())?;
+            let sgx_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
             {
                 let runtime_manager_hash = {
                     match policy.runtime_manager_hash(&EnclavePlatform::TrustZone) {
@@ -47,7 +47,7 @@ pub mod sinaloa_tz {
                         Err(_) => return Err(SinaloaError::MissingFieldError("runtime_manager_hash_tz")),
                     }
                 };
-                let mut ji_guard = SGX_ROOT_ENCLAVE_INITIALIZED.lock()?;
+                let mut ji_guard = TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.lock()?;
                 if !*ji_guard {
                     debug!("The SGX root enclave is uninitialized.");
                     SinaloaTZ::native_attestation(
@@ -336,8 +336,8 @@ pub mod sinaloa_tz {
                 let p0 = ParamTmpRef::new_input(&runtime_manager_hash_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 sgx_root_enclave_session
-                    .invoke_command(SgxRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
-	    }
+                    .invoke_command(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
+            }
             let (challenge, device_id) =
                 SinaloaTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
 
@@ -349,7 +349,7 @@ pub mod sinaloa_tz {
             let p3 = ParamTmpRef::new_output(&mut public_key);
             let mut na_operation = Operation::new(0, p0, p1, p2, p3);
             sgx_root_enclave_session
-                .invoke_command(SgxRootEnclaveOpcode::NativeAttestation as u32, &mut na_operation)?;
+                .invoke_command(TrustZoneRootEnclaveOpcode::NativeAttestation as u32, &mut na_operation)?;
             let token_size = na_operation.parameters().0.b();
             let public_key_size = na_operation.parameters().0.a();
             let token_vec: Vec<u8> = token[0..token_size as usize].to_vec();
@@ -384,7 +384,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut gfvl_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 session
-                    .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
+                    .invoke_command(TrustZoneRootEnclaveOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
                 gfvl_op.parameters().0.a()
             };
             let firmware_version: String = {
@@ -392,7 +392,7 @@ pub mod sinaloa_tz {
                 let p0 = ParamTmpRef::new_output(&mut fwv_vec);
                 let mut gfv_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 session
-                    .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
+                    .invoke_command(TrustZoneRootEnclaveOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
                 String::from_utf8(fwv_vec)?
             };
             return Ok(firmware_version);

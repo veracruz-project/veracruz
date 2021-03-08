@@ -1,64 +1,107 @@
-# Makefile for building the SGX Root Enclave.
+#@file  Makefile
+# @author Derek Miller, Arm Research.
+# @date   June 2019.
 #
-# AUTHORS
+# @section LICENSE
 #
-# The Veracruz Development Team.
+# Copyright (c) Arm Limited, 2019.  All rights reserved.
 #
-# COPYRIGHT
-#
-# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
-# and copyright information.
- 
-.PHONY: all trustzone clean format
-
 OUT_DIR?=.
 FINAL_DIR?=.
+Signed_RustEnclave_RootName = sgx_root_enclave.signed.so
+Signed_RustEnclave_Name := $(OUT_DIR)/$(Signed_RustEnclave_RootName)
+Untrusted_Lib_Name := $(OUT_DIR)/libsgx_root_enclave_u.a
+SGX_Enclave_Name ?= $(OUT_DIR)/libsgx_root_enclave_t.a
 
-all: trustzone
+.PHONY: all clean
+
+all:$(FINAL_DIR)/$(SignedRustEnclave_RootName) $(SGX_Enclave_Name) $(Signed_RustEnclave_Name) $(Untrusted_Lib_Name)
+
+$(FINAL_DIR)/$(SignedRustEnclave_RootName): $(Signed_RustEnclave_Name)
+	cp $< $@
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
+############# Source code #################
 
-############# TrustZone #################
-TZ_Src =  $(COMMON_Src) src/*.rs
-# OPTEE_DIR and OPTEE_OS_DIR can be imported from the environment
-OPTEE_DIR ?= /work/rust-optee-trustzone-sdk/optee
-OPTEE_OS_DIR ?= $(OPTEE_DIR)/optee_os
-TZ_UUID_PATH ?= ../sgx-root-enclave-uuid.txt
-TZ_UUID = $(shell cat "${TZ_UUID_PATH}")
+COMMON_Src = src/lib.rs
 
-TZ_TA_SIGN_KEY = $(OPTEE_OS_DIR)/out/arm/export-ta_arm64/keys/default_ta.pem
-TZ_SIGN := python2 $(OPTEE_OS_DIR)/out/arm/export-ta_arm64/scripts/sign.py
-OPTEE_BIN := $(OPTEE_DIR)/toolchains/aarch64/bin
-TZ_OBJCOPY := $(OPTEE_BIN)/aarch64-linux-gnu-objcopy
-TZ_TARGET := aarch64-unknown-optee-trustzone
-#OUT_DIR := $(CURDIR)/target/$(TZ_TARGET)/release
+############# Files generated from the EDL File ###############
+EDL_Files := sgx_root_enclave_t.c sgx_root_enclave_t.h sgx_root_enclave_u.c sgx_root_enclave_u.h
 
-trustzone: $(FINAL_DIR)/$(TZ_UUID).ta
+SGX_SDK ?= /work/sgxsdk
 
-$(FINAL_DIR)/$(TZ_UUID).ta: $(OUT_DIR)/$(TZ_UUID).ta
-	cp $< $@
+SGX_COMMON_CFLAGS := -m64
+SGX_LIBRARY_PATH := $(SGX_SDK)/lib64
+SGX_ENCLAVE_SIGNER := $(SGX_SDK)/bin/x64/sgx_sign
+SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
+RUST_SGX_SDK_PATH = ../third-party/rust-sgx-sdk
 
-$(OUT_DIR)/$(TZ_UUID).ta: $(OUT_DIR)/stripped_ta $(TZ_TA_SIGN_KEY) $(TZ_UUID_PATH)
-	@$(TZ_SIGN) --uuid $(TZ_UUID) --key $(TZ_TA_SIGN_KEY) --in $(OUT_DIR)/stripped_ta --out $@
-	@echo $(INFO_COLOR)"SIGN  =>  $(TZ_UUID)" $(RESET_COLOR)
+$(EDL_Files): $(SGX_EDGER8R) sgx_root_enclave.edl
+	@$(SGX_EDGER8R) --use-prefix --trusted sgx_root_enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
+	@$(SGX_EDGER8R) --use-prefix --untrusted sgx_root_enclave.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
+	@echo $(INFO_COLOR) "GEN => $(EDL_Files)" $(RESET_COLOR)
 
-$(OUT_DIR)/stripped_ta: $(OUT_DIR)/sgx-root-enclave
-	@$(TZ_OBJCOPY) --strip-unneeded $(OUT_DIR)/sgx-root-enclave $(OUT_DIR)/stripped_ta
-	@echo $(INFO_COLOR)"STRIP =>  sgx-root-enclave ---> stripped_ta" $(RESET_COLOR)
+SGX_COMMON_CFLAGS += -O0 -g
+CUSTOM_EDL_PATH :=$(RUST_SGX_SDK_PATH)/edl
+Sinaloa_Include_Paths := -I ./src -I$(SGX_SDK)/include -I$(CUSTOM_EDL_PATH)
+Sinaloa_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Sinaloa_Include_Paths)
+$(OUT_DIR)/sgx_root_enclave_u.o: $(EDL_Files)
+	@$(CC) $(Sinaloa_C_Flags) -c ./sgx_root_enclave_u.c -o $@
+	@echo $(INFO_COLOR) "CC => $<" $(RESET_COLOR)
 
-$(OUT_DIR)/sgx-root-enclave: $(TZ_Src)
-	@echo $(INFO_COLOR)"XARGO <=  $(TZ_Src)" $(RESET_COLOR)
-	@xargo build --target $(TZ_TARGET) --release -vv --out-dir $(OUT_DIR) -Z unstable-options
-	@echo $(INFO_COLOR)"GEN   =>  sgx-root-enclave" $(RESET_COLOR)
+CUSTOM_COMMON_PATH := $(RUST_SGX_SDK_PATH)/common
+RustEnclave_Include_Paths := -I$(CUSTOM_COMMON_PATH)/inc -I$(CUSTOM_EDL_PATH) -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/stlport -I$(SGX_SDK)/include/epid -I ,
+RustEnclave_Compile_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(RustEnclave_Include_Paths)
+$(OUT_DIR)/sgx_root_enclave_t.o: $(EDL_Files)
+	@$(CC) $(RustEnclave_Compile_Flags) -c ./sgx_root_enclave_t.c -o $@
+	@echo "CC >= $<"
+$(Untrusted_Lib_Name): $(OUT_DIR)/sgx_root_enclave_u.o
+	@$(AR) rcsD $@ $(OUT_DIR)/sgx_root_enclave_u.o
+	echo $(INFO_COLOR) "LINK => $@" $(RESET_COLOR)
+
+RustEnclave_Link_Libs := -L$(CUSTOM_LIBRARY_PATH) -L$(OUT_DIR) -lsgx_root_enclave
+RustEnclave_Link_Flags := $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
+	-Wl,--whole-archive -lsgx_trts -Wl,--no-whole-archive \
+	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -lsgx_tkey_exchange -lsgx_tservice -lsgx_tcrypto $(RustEnclave_Link_Libs) -Wl,--end-group \
+	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
+	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
+	-Wl,--defsym,__ImageBase=0 \
+	-Wl,--gc-sections \
+	-Wl,--version-script=./Enclave.lds
+
+RustEnclave_Name := $(OUT_DIR)/sgx_root_enclave.so
+
+
+$(RustEnclave_Name): $(OUT_DIR)/sgx_root_enclave_t.o $(SGX_Enclave_Name)
+	@echo $(INFO_COLOR) "LINK =>  $@" $(RESET_COLOR)
+	$(CXX) $(OUT_DIR)/sgx_root_enclave_t.o -o $@ -L$(OUT_DIR) $(RustEnclave_Link_Flags)
+
+$(Signed_RustEnclave_Name): $(RustEnclave_Name) $(SGX_Enclave_Name)
+	@echo $(INFO_COLOR) "SIGN =>  $@" $(RESET_COLOR)
+	@$(SGX_ENCLAVE_SIGNER) sign -key ./Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config ./Enclave.config.xml -cssfile css.bin
+
+$(Sgx_Root_Enclave_u_Object): $(OUT_DIR)/sgx_root_enclave_u.o
+	@$(AR) rcsD $@ $(OUT_DIR)/sgx_root_enclave_u.o
+	echo $(INFO_COLOR) "LINK => $@" $(RESET_COLOR)
+############# SGX #################
+SGX_Src =  $(COMMON_Src) src/lib.rs
+SGX_Target_Path ?= ../third-party/rust-sgx-sdk/xargo
+
+$(SGX_Enclave_Name): $(SGX_Src)
+	@echo $(INFO_COLOR) "compiling $(SGX_Src)" $(RESET_COLOR)
+ifeq ($(XARGO_SGX), 1)
+	SGX_TARGET_PATH=$(SGX_Target_Path) xargo build --target x86_64-unknown-linux-sgx --release
+else
+	cargo build --lib --release --out-dir $(OUT_DIR) -Z unstable-options
+endif
 
 clean:
+	@echo $(INFO_COLOR) "Cleaning..." $(RESET_COLOR)
 	@cargo clean
-	@rm -rf lib
 	@xargo clean
 	@rm -rf target
-	@rm -rf $(FINAL_DIR)/$(TZ_UUID).ta
-	@rm -f $(OUT_DIR)/$(TZ_UUID).ta 
-	@rm -f $(OUT_DIR)/stripped_ta
-	@rm -f $(OUT_DIR)/sgx-root-enclave
+	@rm -f sgx_root_enclave_t.? sgx_root_enclave_u.?
+	@rm -f *.so
+	@rm -f ccs.bin
