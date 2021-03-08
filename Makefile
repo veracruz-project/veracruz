@@ -56,7 +56,7 @@ nitro: sdk
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
 	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC)
-	$(MAKE) -C sgx-root-enclave trustzone
+	$(MAKE) -C trustzone-root-enclave trustzone
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
 
 sgx-sinaloa-test: sgx test_cases
