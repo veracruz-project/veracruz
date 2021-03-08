@@ -27,20 +27,20 @@ pub mod sinaloa_sgx {
     use sgx_types::*;
     use sgx_urts::SgxEnclave;
     use sgx_root_enclave_bind::{
-        trustzone_root_enclave_finish_local_attest_enc, trustzone_root_enclave_get_firmware_version,
-        trustzone_root_enclave_get_firmware_version_len, trustzone_root_enclave_init_remote_attestation_enc,
-        trustzone_root_enclave_sgx_get_pubkey_report, trustzone_root_enclave_sgx_ra_get_ga, trustzone_root_enclave_sgx_ra_get_msg3_trusted,
-        trustzone_root_enclave_sgx_ra_proc_msg2_trusted, trustzone_root_enclave_start_local_attest_enc,
+        sgx_root_enclave_finish_local_attest_enc, sgx_root_enclave_get_firmware_version,
+        sgx_root_enclave_get_firmware_version_len, sgx_root_enclave_init_remote_attestation_enc,
+        sgx_root_enclave_sgx_get_pubkey_report, sgx_root_enclave_sgx_ra_get_ga, sgx_root_enclave_sgx_ra_get_msg3_trusted,
+        sgx_root_enclave_sgx_ra_proc_msg2_trusted, sgx_root_enclave_start_local_attest_enc,
     };
     use std::{ffi::CStr, mem};
     use veracruz_utils;
 
     lazy_static! {
-        static ref TRUSTZONE_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
+        static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
     }
 
     static RUNTIME_MANAGER_FILE: &'static str = "./target/debug/runtime_manager.signed.so";
-    static TRUSTZONE_ROOT_ENCLAVE_FILE: &'static str = "./target/debug/trustzone_root_enclave.signed.so";
+    static SGX_ROOT_ENCLAVE_ENCLAVE_FILE: &'static str = "./target/debug/sgx_root_enclave.signed.so";
 
     pub struct SinaloaSGX {
         runtime_manager_enclave: SgxEnclave,
@@ -91,11 +91,11 @@ pub mod sinaloa_sgx {
         let mut gfvl_result: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_ret = unsafe {
-            trustzone_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_result, &mut fv_length)
+            sgx_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_result, &mut fv_length)
         };
         if gfvl_ret != 0 || gfvl_result != 0 {
             return Err(SinaloaError::EnclaveCallError(
-                "trustzone_root_enclave_get_firmware_version_len",
+                "sgx_root_enclave_get_firmware_version_len",
             ));
         }
 
@@ -104,11 +104,11 @@ pub mod sinaloa_sgx {
 
         let mut gfv_result: u32 = 0;
         let gfv_ret = unsafe {
-            trustzone_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_result, p_output, fv_length)
+            sgx_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_result, p_output, fv_length)
         };
         if gfv_ret != 0 || gfv_result != 0 {
             return Err(SinaloaError::EnclaveCallError(
-                "trustzone_root_enclave_get_firmware_version",
+                "sgx_root_enclave_get_firmware_version",
             ));
         }
 
@@ -197,7 +197,7 @@ pub mod sinaloa_sgx {
                     *mut sgx_types::sgx_report_t,
                     *mut sgx_types::sgx_quote_nonce_t,
                 ) -> sgx_types::sgx_status_t,
-            >(trustzone_root_enclave_sgx_ra_proc_msg2_trusted)
+            >(sgx_root_enclave_sgx_ra_proc_msg2_trusted)
         };
         let bindgen_get_msg3 = unsafe {
             mem::transmute::<
@@ -219,7 +219,7 @@ pub mod sinaloa_sgx {
                     *mut sgx_types::sgx_ra_msg3_t,
                     u32,
                 ) -> sgx_types::sgx_status_t,
-            >(trustzone_root_enclave_sgx_ra_get_msg3_trusted)
+            >(sgx_root_enclave_sgx_ra_get_msg3_trusted)
         };
         // </DIRTY_MESS>
         let proc_msg2_ret = unsafe {
@@ -273,7 +273,7 @@ pub mod sinaloa_sgx {
             )
         };
         let gpr_ret = unsafe {
-            trustzone_root_enclave_sgx_get_pubkey_report(
+            sgx_root_enclave_sgx_get_pubkey_report(
                 enclave.geteid(),
                 &mut gpr_result,
                 pubkey_challenge.as_ptr(),
@@ -284,7 +284,7 @@ pub mod sinaloa_sgx {
         };
         if gpr_ret != 0 || gpr_result != 0 {
             return Err(SinaloaError::EnclaveCallError(
-                "trustzone_root_enclave_sgx_get_pubkey_report",
+                "sgx_root_enclave_sgx_get_pubkey_report",
             ));
         }
 
@@ -380,18 +380,18 @@ pub mod sinaloa_sgx {
     impl SinaloaSGX {
         fn native_attestation(
             &mut self,
-            trustzone_root_enclave: &SgxEnclave,
+            sgx_root_enclave: &SgxEnclave,
             proxy_attestation_server_url: &String,
         ) -> Result<(), SinaloaError> {
-            let firmware_version = fetch_firmware_version(trustzone_root_enclave)?;
+            let firmware_version = fetch_firmware_version(sgx_root_enclave)?;
             let (public_key, device_id) = self.send_start(proxy_attestation_server_url, "sgx", &firmware_version)?;
 
             let mut ra_context = sgx_ra_context_t::default();
 
             let mut ira_result: u32 = 0;
             let ira_ret = unsafe {
-                trustzone_root_enclave_init_remote_attestation_enc(
-                    trustzone_root_enclave.geteid(),
+                sgx_root_enclave_init_remote_attestation_enc(
+                    sgx_root_enclave.geteid(),
                     &mut ira_result,
                     public_key.as_ptr() as *const u8,
                     public_key.len() as u64,
@@ -401,7 +401,7 @@ pub mod sinaloa_sgx {
             };
             if ira_ret != 0 || ira_result != 0 {
                 return Err(SinaloaError::EnclaveCallError(
-                    "trustzone_root_enclave_init_remote_attestation_enc",
+                    "sgx_root_enclave_init_remote_attestation_enc",
                 ));
             }
 
@@ -413,7 +413,7 @@ pub mod sinaloa_sgx {
             // function signatures no longer match what sgx_ra_get_msg1 requires.
             // By "transmuting" the function, this should "solve" the problem.
             // Notice that this is unsafe, and might blow up in my face
-            let bindgen_trustzone_root_enclave_get_ga = unsafe {
+            let bindgen_sgx_root_enclave_get_ga = unsafe {
                 mem::transmute::<
                     unsafe extern "C" fn(
                         u64,
@@ -427,14 +427,14 @@ pub mod sinaloa_sgx {
                         u32,
                         *mut sgx_types::sgx_ec256_public_t,
                     ) -> sgx_types::sgx_status_t,
-                >(trustzone_root_enclave_sgx_ra_get_ga)
+                >(sgx_root_enclave_sgx_ra_get_ga)
             };
             // </DIRTY_MESS>
             let msg1_ret = unsafe {
                 sgx_ra_get_msg1(
                     ra_context,
-                    trustzone_root_enclave.geteid(),
-                    bindgen_trustzone_root_enclave_get_ga,
+                    sgx_root_enclave.geteid(),
+                    bindgen_sgx_root_enclave_get_ga,
                     &mut msg1,
                 )
             };
@@ -446,7 +446,7 @@ pub mod sinaloa_sgx {
                 self.send_sgx_msg1(&proxy_attestation_server_url, &ra_context, &msg1, device_id)?;
 
             let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_quote_sig) =
-                attestation_challenge(&trustzone_root_enclave, &challenge, &ra_context, &msg2)
+                attestation_challenge(&sgx_root_enclave, &challenge, &ra_context, &msg2)
                     .expect("Attestation challenge failed");
             self.send_msg3(
                 proxy_attestation_server_url,
@@ -484,13 +484,13 @@ pub mod sinaloa_sgx {
             let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 
             {
-                let mut trustzone_root_enclave = TRUSTZONE_ROOT_ENCLAVE.lock()?;
-                match *trustzone_root_enclave {
+                let mut sgx_root_enclave = SGX_ROOT_ENCLAVE.lock()?;
+                match *sgx_root_enclave {
                     Some(_) => (), // do nothing, we're good
                     None => {
-                        let enclave = start_enclave(TRUSTZONE_ROOT_ENCLAVE_FILE)?;
+                        let enclave = start_enclave(SGX_ROOT_ENCLAVE_ENCLAVE_FILE)?;
                         new_sinaloa.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
-                        *trustzone_root_enclave = Some(enclave)
+                        *sgx_root_enclave = Some(enclave)
                     }
                 }
             }
@@ -738,24 +738,24 @@ pub mod sinaloa_sgx {
     pub extern "C" fn start_local_attest_ocall(
         dh_msg1: &sgx_dh_msg1_t,
         dh_msg2: &mut sgx_dh_msg2_t,
-        trustzone_root_enclave_session_id: &mut u64,
+        sgx_root_enclave_session_id: &mut u64,
     ) -> sgx_status_t {
         let mut result: u32 = 0;
-        let trustzone_root_enclave = TRUSTZONE_ROOT_ENCLAVE.lock().unwrap();
+        let sgx_root_enclave = SGX_ROOT_ENCLAVE.lock().unwrap();
         let bindgen_msg1_ref =
             unsafe { mem::transmute::<&sgx_dh_msg1_t, &sgx_root_enclave_bind::_sgx_dh_msg1_t>(dh_msg1) };
         let bindgen_msg2_ref = unsafe {
             mem::transmute::<&mut sgx_dh_msg2_t, &mut sgx_root_enclave_bind::_sgx_dh_msg2_t>(dh_msg2)
         };
-        match &*trustzone_root_enclave {
-            Some(trustzone_root_enclave) => {
+        match &*sgx_root_enclave {
+            Some(sgx_root_enclave) => {
                 let ret = unsafe {
-                    trustzone_root_enclave_start_local_attest_enc(
-                        trustzone_root_enclave.geteid(),
+                    sgx_root_enclave_start_local_attest_enc(
+                        sgx_root_enclave.geteid(),
                         &mut result,
                         bindgen_msg1_ref,
                         bindgen_msg2_ref,
-                        trustzone_root_enclave_session_id,
+                        sgx_root_enclave_session_id,
                     )
                 };
                 if (ret != 0) || (result != 0) {
@@ -778,7 +778,7 @@ pub mod sinaloa_sgx {
         enclave_cert_hash_size: u64,
         enclave_name: *const i8,
         enclave_name_size: u64,
-        trustzone_root_enclave_session_id: u64,
+        sgx_root_enclave_session_id: u64,
         token: *mut u8,
         token_buf_size: u64,
         token_size: &mut u64,
@@ -787,16 +787,16 @@ pub mod sinaloa_sgx {
         p_pubkey_size: *mut u64,
         p_device_id: &mut i32,
     ) -> sgx_status_t {
-        let trustzone_root_enclave = TRUSTZONE_ROOT_ENCLAVE.lock().unwrap();
-        match &*trustzone_root_enclave {
-            Some(trustzone_root_enclave) => {
+        let sgx_root_enclave = SGX_ROOT_ENCLAVE.lock().unwrap();
+        match &*sgx_root_enclave {
+            Some(sgx_root_enclave) => {
                 let mut result: u32 = 0;
                 let bindgen_msg3_ref = unsafe {
                     mem::transmute::<&sgx_dh_msg3_t, &sgx_root_enclave_bind::_sgx_dh_msg3_t>(dh_msg3)
                 };
                 let ret = unsafe {
-                    trustzone_root_enclave_finish_local_attest_enc(
-                        trustzone_root_enclave.geteid(),
+                    sgx_root_enclave_finish_local_attest_enc(
+                        sgx_root_enclave.geteid(),
                         &mut result,
                         bindgen_msg3_ref,
                         challenge,
@@ -805,7 +805,7 @@ pub mod sinaloa_sgx {
                         enclave_cert_hash_size,
                         enclave_name,
                         enclave_name_size,
-                        trustzone_root_enclave_session_id,
+                        sgx_root_enclave_session_id,
                         token,
                         token_buf_size,
                         token_size,
