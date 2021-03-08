@@ -50,7 +50,7 @@ lazy_static! {
     // therefore we've got this dirty hack here that COMPLETELY COMPROMISES
     // the security of the system. THIS IS FOR DEMONSTRATION PURPOSES ONLY
     // AND IS NOT SECURE IN ANY MEANINGFUL WAY!
-    static ref TrustZone_ROOT_ENCLAVE_HASH: Vec<u8> = vec![
+    static ref TRUSTZONE_ROOT_ENCLAVE_HASH: Vec<u8> = vec![
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
     ];
@@ -448,7 +448,7 @@ fn native_attestation(device_id: i32, challenge: &Vec<u8>) -> Result<Vec<u8>, St
     // }
 
     let mut trustzone_root_enclave_hash: [u8; 32] = [0; 32];
-    trustzone_root_enclave_hash.clone_from_slice(&TrustZone_ROOT_ENCLAVE_HASH[0..32]);
+    trustzone_root_enclave_hash.clone_from_slice(&TRUSTZONE_ROOT_ENCLAVE_HASH[0..32]);
     let mut token_buffer: Vec<u8> = Vec::with_capacity(1024); // TODO: Don't do this
     let mut token_size: u64 = 0;
     trace_println!("token_buffer.capacity():{:?}", token_buffer.capacity());
