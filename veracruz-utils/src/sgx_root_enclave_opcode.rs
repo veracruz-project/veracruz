@@ -15,7 +15,7 @@ pub enum SgxRootEnclaveOpcode {
     GetFirmwareVersion,
     NativeAttestation,
     ProxyAttestation,
-    SetMexicoCityHashHack,
+    SetRuntimeManagerHashHack,
 }
 
 impl SgxRootEnclaveOpcode {
@@ -25,7 +25,7 @@ impl SgxRootEnclaveOpcode {
             1 => Ok(SgxRootEnclaveOpcode::GetFirmwareVersion),
             2 => Ok(SgxRootEnclaveOpcode::NativeAttestation),
             3 => Ok(SgxRootEnclaveOpcode::ProxyAttestation),
-            4 => Ok(SgxRootEnclaveOpcode::SetMexicoCityHashHack),
+            4 => Ok(SgxRootEnclaveOpcode::SetRuntimeManagerHashHack),
             _ => Err(format!("SgxRootEnclaveOpcode:from_u32: Unknown value: {}", value)),
         }
     }

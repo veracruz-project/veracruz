@@ -26,8 +26,8 @@ deprecated:
 ############# SGX #################
 Signed_RustEnclave_RootName := runtime_manager.signed.so
 Signed_RustEnclave_Name := $(OUT_DIR)/$(Signed_RustEnclave_RootName)
-Untrusted_Lib_Name := $(OUT_DIR)/libruntime_manager_city_u.a
-SGX_Enclave_Name ?= $(OUT_DIR)/libruntime_manager_city_enclave.a
+Untrusted_Lib_Name := $(OUT_DIR)/libruntime_manager_u.a
+SGX_Enclave_Name ?= $(OUT_DIR)/libruntime_manager_enclave.a
 
 $(FINAL_DIR)/$(Signed_RustEnclave_RootName): $(Signed_RustEnclave_Name)
 	cp $< $@

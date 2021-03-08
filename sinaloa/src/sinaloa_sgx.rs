@@ -19,7 +19,7 @@ pub mod sinaloa_sgx {
     use runtime_manager_bind::{
         runtime_manager_close_session_enc, runtime_manager_get_enclave_cert_enc,
         runtime_manager_get_enclave_cert_len_enc, runtime_manager_get_enclave_name_enc,
-        runtime_manager_get_enclave_name_len_enc, runtime_manager_init_baja_enc,
+        runtime_manager_get_enclave_name_len_enc, runtime_manager_init_session_manager_enc,
         runtime_manager_new_session_enc, runtime_manager_psa_attestation_get_token_enc,
         runtime_manager_tls_get_data_enc, runtime_manager_tls_get_data_needed_enc,
         runtime_manager_tls_send_data_enc,
@@ -465,7 +465,7 @@ pub mod sinaloa_sgx {
 
     impl Sinaloa for SinaloaSGX {
         fn new(policy_json: &str) -> Result<Self, SinaloaError> {
-            cet runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
+            let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 
             let mut new_sinaloa = SinaloaSGX {
                 runtime_manager_enclave: runtime_manager_enclave,
@@ -503,9 +503,6 @@ pub mod sinaloa_sgx {
                     result, ret
                 );
                 Err(SinaloaError::EnclaveCallError("runtime_manager_init_session_manager_enc"))
-                    "runtime_manager_init_baja_enc result:{:?}, ret:{:?}",
-                    result, ret
-                );
             }
         }
 
