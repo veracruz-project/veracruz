@@ -88,9 +88,9 @@ test:trustzone:veracruz-client:
         key: TRUSTZONE
         policy: pull
 
-test:sgx:sinaloa:
+test:sgx:veracruz-server:
     stage: test
-    script: make sgx-sinaloa-test
+    script: make sgx-veracruz-server-test
     needs:
         - build:sgx
     cache:
@@ -98,9 +98,9 @@ test:sgx:sinaloa:
         key: SGX
         policy: pull
 
-test:trustzone:sinaloa:
+test:trustzone:veracruz-server:
     stage: test
-    script: make trustzone-sinaloa-test
+    script: make trustzone-veracruz-server-test
     needs:
         - build:trustzone
     cache:
