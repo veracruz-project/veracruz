@@ -26,7 +26,7 @@ pub mod sinaloa_sgx {
     };
     use sgx_types::*;
     use sgx_urts::SgxEnclave;
-    use trustzone_root_enclave_bind::{
+    use sgx_root_enclave_bind::{
         trustzone_root_enclave_finish_local_attest_enc, trustzone_root_enclave_get_firmware_version,
         trustzone_root_enclave_get_firmware_version_len, trustzone_root_enclave_init_remote_attestation_enc,
         trustzone_root_enclave_sgx_get_pubkey_report, trustzone_root_enclave_sgx_ra_get_ga, trustzone_root_enclave_sgx_ra_get_msg3_trusted,
@@ -183,10 +183,10 @@ pub mod sinaloa_sgx {
                     u64,
                     *mut u32,
                     u32,
-                    *const trustzone_root_enclave_bind::_ra_msg2_t,
-                    *const trustzone_root_enclave_bind::_target_info_t,
-                    *mut trustzone_root_enclave_bind::_report_t,
-                    *mut trustzone_root_enclave_bind::_quote_nonce,
+                    *const sgx_root_enclave_bind::_ra_msg2_t,
+                    *const sgx_root_enclave_bind::_target_info_t,
+                    *mut sgx_root_enclave_bind::_report_t,
+                    *mut sgx_root_enclave_bind::_quote_nonce,
                 ) -> u32,
                 unsafe extern "C" fn(
                     u64,
@@ -206,8 +206,8 @@ pub mod sinaloa_sgx {
                     *mut u32,
                     u32,
                     u32,
-                    *mut trustzone_root_enclave_bind::_report_t,
-                    *mut trustzone_root_enclave_bind::_ra_msg3_t,
+                    *mut sgx_root_enclave_bind::_report_t,
+                    *mut sgx_root_enclave_bind::_ra_msg3_t,
                     u32,
                 ) -> u32,
                 unsafe extern "C" fn(
@@ -263,12 +263,12 @@ pub mod sinaloa_sgx {
         let mut pubkey_report = sgx_types::sgx_report_t::default();
         let mut gpr_result: u32 = 0;
         let bindgen_target_info_ref = unsafe {
-            mem::transmute::<&sgx_types::sgx_target_info_t, &trustzone_root_enclave_bind::_target_info_t>(
+            mem::transmute::<&sgx_types::sgx_target_info_t, &sgx_root_enclave_bind::_target_info_t>(
                 &target_info,
             )
         };
         let bindgen_pubkey_report_ref = unsafe {
-            mem::transmute::<&mut sgx_types::sgx_report_t, &mut trustzone_root_enclave_bind::_report_t>(
+            mem::transmute::<&mut sgx_types::sgx_report_t, &mut sgx_root_enclave_bind::_report_t>(
                 &mut pubkey_report,
             )
         };
@@ -419,7 +419,7 @@ pub mod sinaloa_sgx {
                         u64,
                         *mut u32,
                         u32,
-                        *mut trustzone_root_enclave_bind::_sgx_ec256_public_t,
+                        *mut sgx_root_enclave_bind::_sgx_ec256_public_t,
                     ) -> u32,
                     unsafe extern "C" fn(
                         u64,
@@ -743,9 +743,9 @@ pub mod sinaloa_sgx {
         let mut result: u32 = 0;
         let trustzone_root_enclave = TRUSTZONE_ROOT_ENCLAVE.lock().unwrap();
         let bindgen_msg1_ref =
-            unsafe { mem::transmute::<&sgx_dh_msg1_t, &trustzone_root_enclave_bind::_sgx_dh_msg1_t>(dh_msg1) };
+            unsafe { mem::transmute::<&sgx_dh_msg1_t, &sgx_root_enclave_bind::_sgx_dh_msg1_t>(dh_msg1) };
         let bindgen_msg2_ref = unsafe {
-            mem::transmute::<&mut sgx_dh_msg2_t, &mut trustzone_root_enclave_bind::_sgx_dh_msg2_t>(dh_msg2)
+            mem::transmute::<&mut sgx_dh_msg2_t, &mut sgx_root_enclave_bind::_sgx_dh_msg2_t>(dh_msg2)
         };
         match &*trustzone_root_enclave {
             Some(trustzone_root_enclave) => {
@@ -792,7 +792,7 @@ pub mod sinaloa_sgx {
             Some(trustzone_root_enclave) => {
                 let mut result: u32 = 0;
                 let bindgen_msg3_ref = unsafe {
-                    mem::transmute::<&sgx_dh_msg3_t, &trustzone_root_enclave_bind::_sgx_dh_msg3_t>(dh_msg3)
+                    mem::transmute::<&sgx_dh_msg3_t, &sgx_root_enclave_bind::_sgx_dh_msg3_t>(dh_msg3)
                 };
                 let ret = unsafe {
                     trustzone_root_enclave_finish_local_attest_enc(

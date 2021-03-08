@@ -32,9 +32,9 @@ use sgx_types::{
 };
 use sgx_urts::SgxEnclave;
 
-extern crate trustzone_root_enclave_bind;
+extern crate sgx_root_enclave_bind;
 
-use trustzone_root_enclave_bind::{
+use sgx_root_enclave_bind::{
     _quote_nonce, _ra_msg2_t, _ra_msg3_t, _report_t, _sgx_ec256_public_t, _target_info_t,
     trustzone_root_enclave_get_firmware_version, trustzone_root_enclave_get_firmware_version_len,
     trustzone_root_enclave_init_remote_attestation_enc, trustzone_root_enclave_sgx_get_pubkey_report, trustzone_root_enclave_sgx_ra_get_ga,
