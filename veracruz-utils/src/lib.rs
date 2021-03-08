@@ -25,9 +25,9 @@ pub mod runtime_manager_opcode;
 pub use crate::runtime_manager_opcode::*;
 
 #[cfg(feature = "tz")]
-pub mod sgx_root_enclave_opcode;
+pub mod trustzone_root_enclave_opcode;
 #[cfg(feature = "tz")]
-pub use crate::sgx_root_enclave_opcode::*;
+pub use crate::trustzone_root_enclave_opcode::*;
 
 #[cfg(feature = "nitro")]
 pub mod nitro;
