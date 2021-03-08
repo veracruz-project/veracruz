@@ -16,7 +16,7 @@ cargo-fuzz = true
 libfuzzer-sys = "=0.1.1"
 veracruz_utils = { path = "../../veracruz_utils_std" }
 serde_json = "1.0"
-colima = { path = "../../colima_std"}
+transport-protocol = { path = "../../transport-protocol_std"}
 rustls = { path = "../../third-party/rustls" }
 protobuf = "=2.6.2"
 ring = "0.14.6"

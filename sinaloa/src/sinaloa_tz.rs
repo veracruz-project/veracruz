@@ -80,14 +80,14 @@ pub mod sinaloa_tz {
         }
 
         fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
-            let parsed = colima::parse_mexico_city_request(&data)?;
+            let parsed = transport_protocol::parse_mexico_city_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
                 let rpat = parsed.get_request_proxy_psa_attestation_token();
-                let challenge = colima::parse_request_proxy_psa_attestation_token(rpat);
+                let challenge = transport_protocol::parse_request_proxy_psa_attestation_token(rpat);
                 let (psa_attestation_token, pubkey, device_id) =
                     self.proxy_psa_attestation_get_token(challenge)?;
-                let serialized_pat = colima::serialize_proxy_psa_attestation_token(
+                let serialized_pat = transport_protocol::serialize_proxy_psa_attestation_token(
                     &psa_attestation_token,
                     &pubkey,
                     device_id,
@@ -368,7 +368,7 @@ pub mod sinaloa_tz {
         ) -> Result<(), SinaloaError> {
             debug!("sinaloa_tz::post_psa_attestation_token started");
             let proxy_attestation_server_request =
-                colima::serialize_native_psa_attestation_token(token, device_id)?;
+                transport_protocol::serialize_native_psa_attestation_token(token, device_id)?;
             let encoded_str = base64::encode(&proxy_attestation_server_request);
             let url = format!("{:}/PSA/AttestationToken", proxy_attestation_server_url);
             let response = crate::post_buffer(&url, &encoded_str)?;
@@ -406,7 +406,7 @@ pub mod sinaloa_tz {
         ) -> Result<(Vec<u8>, i32), SinaloaError> {
             let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_psa_attestation_init() {
-                let (challenge, device_id) = colima::parse_psa_attestation_init(
+                let (challenge, device_id) = transport_protocol::parse_psa_attestation_init(
                     proxy_attestation_server_response.get_psa_attestation_init(),
                 )?;
                 Ok((challenge, device_id))

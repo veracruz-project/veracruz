@@ -171,12 +171,12 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine colima durango sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol durango sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd session-manager && cargo fmt
 	cd execution-engine && cargo fmt
-	cd colima && cargo fmt
+	cd transport-protocol && cargo fmt
 	cd durango && cargo fmt
 	cd sgx-root-enclave && cargo fmt
 	cd mexico-city && cargo fmt

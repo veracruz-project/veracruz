@@ -1,4 +1,4 @@
-//! Colima build script
+//! Transport protocol build script
 //!
 //! ## Authors
 //!
@@ -12,11 +12,11 @@
 extern crate protoc_rust;
 
 fn main() {
-    println!("cargo:rerun-if-changed=protos/colima.proto");
+    println!("cargo:rerun-if-changed=protos/transport_protocol.proto");
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: "src/",
-        input: &["protos/colima.proto"],
+        input: &["protos/transport_protocol.proto"],
         includes: &["protos"],
         customize: protoc_rust::Customize {
             ..Default::default()

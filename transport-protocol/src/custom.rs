@@ -1,4 +1,4 @@
-//! Custom and derived functionality relating to Colima.
+//! Custom and derived functionality relating to the transport protocol.
 //!
 //! ## Authors
 //!
@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::colima;
+use crate::transport_protocol;
 #[cfg(feature = "sgx_attestation")]
 use core::convert::TryInto;
 use err_derive::Error;
@@ -19,20 +19,20 @@ use sgx_types;
 use std::{result::Result, string::ToString};
 
 #[derive(Debug, Error)]
-pub enum ColimaError {
+pub enum TransportProtocolError {
     // NOTE: Protobuf does not implement clone, hence derive(clone) is impossible.
-    #[error(display = "Colima: ProtobufError: {:?}.", _0)]
+    #[error(display = "TransportProtocol: ProtobufError: {:?}.", _0)]
     ProtobufError(#[error(source)] ProtobufError),
-    #[error(display = "Colima: Invalid response status: {:?}.", _0)]
+    #[error(display = "TransportProtocol: Invalid response status: {:?}.", _0)]
     ResponseStatusError(i32),
-    #[error(display = "Colima: TryIntoError: {}.", _0)]
+    #[error(display = "TransportProtocol: TryIntoError: {}.", _0)]
     TryIntoError(#[error(source)] std::num::TryFromIntError),
 }
-type ColimaResult = Result<std::vec::Vec<u8>, ColimaError>;
+type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
 /// Parse a request to mexico-city.
-pub fn parse_mexico_city_request(buffer: &[u8]) -> Result<colima::MexicoCityRequest, ColimaError> {
-    Ok(protobuf::parse_from_bytes::<colima::MexicoCityRequest>(
+pub fn parse_mexico_city_request(buffer: &[u8]) -> Result<transport_protocol::MexicoCityRequest, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<transport_protocol::MexicoCityRequest>(
         buffer,
     )?)
 }
@@ -40,28 +40,28 @@ pub fn parse_mexico_city_request(buffer: &[u8]) -> Result<colima::MexicoCityRequ
 /// Parse a response from mexico-city.
 pub fn parse_mexico_city_response(
     buffer: &[u8],
-) -> Result<colima::MexicoCityResponse, ColimaError> {
-    Ok(protobuf::parse_from_bytes::<colima::MexicoCityResponse>(
+) -> Result<transport_protocol::MexicoCityResponse, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<transport_protocol::MexicoCityResponse>(
         buffer,
     )?)
 }
 
-pub fn parse_proxy_attestation_server_request(buffer: &[u8]) -> Result<colima::ProxyAttestationServerRequest, ColimaError> {
-    Ok(protobuf::parse_from_bytes::<colima::ProxyAttestationServerRequest>(
+pub fn parse_proxy_attestation_server_request(buffer: &[u8]) -> Result<transport_protocol::ProxyAttestationServerRequest, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<transport_protocol::ProxyAttestationServerRequest>(
         buffer,
     )?)
 }
 
-pub fn parse_proxy_attestation_server_response(buffer: &[u8]) -> Result<colima::ProxyAttestationServerResponse, ColimaError> {
-    Ok(protobuf::parse_from_bytes::<colima::ProxyAttestationServerResponse>(
+pub fn parse_proxy_attestation_server_response(buffer: &[u8]) -> Result<transport_protocol::ProxyAttestationServerResponse, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<transport_protocol::ProxyAttestationServerResponse>(
         buffer,
     )?)
 }
 
 #[cfg(feature = "sgx_attestation")]
 fn parse_report_body(
-    proto: &colima::SgxReportBody,
-) -> Result<sgx_types::sgx_report_body_t, ColimaError> {
+    proto: &transport_protocol::SgxReportBody,
+) -> Result<sgx_types::sgx_report_body_t, TransportProtocolError> {
     let mut report_body = sgx_types::sgx_report_body_t::default();
     report_body.cpu_svn.svn.copy_from_slice(proto.get_cpu_svn());
     report_body.misc_select = proto.misc_select;
@@ -96,7 +96,7 @@ fn parse_report_body(
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn parse_quote(proto: &colima::SgxQuote) -> Result<sgx_types::sgx_quote_t, ColimaError> {
+fn parse_quote(proto: &transport_protocol::SgxQuote) -> Result<sgx_types::sgx_quote_t, TransportProtocolError> {
     let mut quote = sgx_types::sgx_quote_t::default();
     quote.version = proto.get_version().try_into()?;
     quote.sign_type = proto.get_sign_type().try_into()?;
@@ -113,8 +113,8 @@ fn parse_quote(proto: &colima::SgxQuote) -> Result<sgx_types::sgx_quote_t, Colim
 }
 
 #[cfg(feature = "sgx_attestation")]
-pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> colima::SgxQuote {
-    let mut result = colima::SgxQuote::default();
+pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> transport_protocol::SgxQuote {
+    let mut result = transport_protocol::SgxQuote::default();
     result.version = quote.version.into();
     result.sign_type = quote.sign_type.into();
     result.epid_group_id.resize(quote.epid_group_id.len(), 0);
@@ -125,7 +125,7 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> colima::SgxQuote {
     result.basename.resize(quote.basename.name.len(), 0);
     result.basename.copy_from_slice(&quote.basename.name);
     let report_body = {
-        let mut ret = colima::SgxReportBody::default();
+        let mut ret = transport_protocol::SgxReportBody::default();
         ret.cpu_svn.resize(quote.report_body.cpu_svn.svn.len(), 0);
         ret.cpu_svn.copy_from_slice(&quote.report_body.cpu_svn.svn);
         ret.misc_select = quote.report_body.misc_select;
@@ -134,7 +134,7 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> colima::SgxQuote {
         ret.isv_ext_prod_id
             .copy_from_slice(&quote.report_body.isv_ext_prod_id);
         let attributes = {
-            let mut attributes = colima::SgxAttributes::default();
+            let mut attributes = transport_protocol::SgxAttributes::default();
             attributes.flags = quote.report_body.attributes.flags;
             attributes.xfrm = quote.report_body.attributes.xfrm;
 
@@ -170,84 +170,84 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> colima::SgxQuote {
 }
 
 /// Serialize a program binary.
-pub fn serialize_program(program_buffer: &[u8]) -> ColimaResult {
-    let mut program = colima::Program::new();
+pub fn serialize_program(program_buffer: &[u8]) -> TransportProtocolResult {
+    let mut program = transport_protocol::Program::new();
     program.set_code(program_buffer.to_vec());
-    let mut abs = colima::MexicoCityRequest::new();
+    let mut abs = transport_protocol::MexicoCityRequest::new();
     abs.set_program(program);
 
     Ok(abs.write_to_bytes()?)
 }
 
 /// Serialize a (static) data package and its package ID.
-pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> ColimaResult {
-    let mut data = colima::Data::new();
+pub fn serialize_program_data(data_buffer: &[u8], package_id: u32) -> TransportProtocolResult {
+    let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
     data.set_package_id(package_id);
-    let mut colima = colima::MexicoCityRequest::new();
-    colima.set_data(data);
+    let mut transport_protocol = transport_protocol::MexicoCityRequest::new();
+    transport_protocol.set_data(data);
 
-    Ok(colima.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 /// Serialize the request for querying enclave state.
-pub fn serialize_request_enclave_state() -> ColimaResult {
-    let command = colima::RequestState::new();
-    let mut request = colima::MexicoCityRequest::new();
+pub fn serialize_request_enclave_state() -> TransportProtocolResult {
+    let command = transport_protocol::RequestState::new();
+    let mut request = transport_protocol::MexicoCityRequest::new();
     request.set_request_state(command);
 
     Ok(request.write_to_bytes()?)
 }
 
 /// Serialize a stream data package and its package ID.
-pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> ColimaResult {
-    let mut data = colima::Data::new();
+pub fn serialize_stream(data_buffer: &[u8], package_id: u32) -> TransportProtocolResult {
+    let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
     data.set_package_id(package_id);
-    let mut colima = colima::MexicoCityRequest::new();
-    colima.set_stream(data);
+    let mut transport_protocol = transport_protocol::MexicoCityRequest::new();
+    transport_protocol.set_stream(data);
 
-    Ok(colima.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 /// Serialize the request for querying the result.
-pub fn serialize_request_result() -> ColimaResult {
-    let command = colima::RequestResult::new();
-    let mut request = colima::MexicoCityRequest::new();
+pub fn serialize_request_result() -> TransportProtocolResult {
+    let command = transport_protocol::RequestResult::new();
+    let mut request = transport_protocol::MexicoCityRequest::new();
     request.set_request_result(command);
 
     Ok(request.write_to_bytes()?)
 }
 
 /// Serialize the request for shutting down the enclave.
-pub fn serialize_request_shutdown() -> ColimaResult {
-    let command = colima::RequestShutdown::new();
-    let mut request = colima::MexicoCityRequest::new();
+pub fn serialize_request_shutdown() -> TransportProtocolResult {
+    let command = transport_protocol::RequestShutdown::new();
+    let mut request = transport_protocol::MexicoCityRequest::new();
     request.set_request_shutdown(command);
 
     Ok(request.write_to_bytes()?)
 }
 
-pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> ColimaResult {
-    let mut rpat = colima::RequestProxyPsaAttestationToken::new();
+pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> TransportProtocolResult {
+    let mut rpat = transport_protocol::RequestProxyPsaAttestationToken::new();
     rpat.set_challenge(challenge.to_vec());
-    let mut request = colima::MexicoCityRequest::new();
+    let mut request = transport_protocol::MexicoCityRequest::new();
     request.set_request_proxy_psa_attestation_token(rpat);
 
     Ok(request.write_to_bytes()?)
 }
 
 /// Serialize the request for signalling the next round of computation.
-pub fn serialize_request_next_round() -> ColimaResult {
-    let command = colima::RequestNextRound::new();
-    let mut request = colima::MexicoCityRequest::new();
+pub fn serialize_request_next_round() -> TransportProtocolResult {
+    let command = transport_protocol::RequestNextRound::new();
+    let mut request = transport_protocol::MexicoCityRequest::new();
     request.set_request_next_round(command);
 
     Ok(request.write_to_bytes()?)
 }
 
 pub fn parse_request_proxy_psa_attestation_token(
-    proto: &colima::RequestProxyPsaAttestationToken,
+    proto: &transport_protocol::RequestProxyPsaAttestationToken,
 ) -> std::vec::Vec<u8> {
     proto.get_challenge().to_vec()
 }
@@ -256,19 +256,19 @@ pub fn serialize_proxy_psa_attestation_token(
     token: &[u8],
     pubkey: &[u8],
     device_id: i32,
-) -> ColimaResult {
-    let mut pat_proto = colima::ProxyPsaAttestationToken::new();
+) -> TransportProtocolResult {
+    let mut pat_proto = transport_protocol::ProxyPsaAttestationToken::new();
     pat_proto.set_token(token.to_vec());
     pat_proto.set_pubkey(pubkey.to_vec());
     pat_proto.set_device_id(device_id);
-    let mut proxy_attestation_server_request = colima::ProxyAttestationServerRequest::new();
+    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_proxy_psa_attestation_token(pat_proto);
 
     Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
 pub fn parse_proxy_psa_attestation_token(
-    proto: &colima::ProxyPsaAttestationToken,
+    proto: &transport_protocol::ProxyPsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
     (
         proto.get_token().to_vec(),
@@ -277,46 +277,46 @@ pub fn parse_proxy_psa_attestation_token(
     )
 }
 
-pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> ColimaResult {
-    let mut pat_proto = colima::NativePsaAttestationToken::new();
+pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> TransportProtocolResult {
+    let mut pat_proto = transport_protocol::NativePsaAttestationToken::new();
     pat_proto.set_token(token.to_vec());
     pat_proto.set_device_id(device_id);
-    let mut proxy_attestation_server_request = colima::ProxyAttestationServerRequest::new();
+    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_native_psa_attestation_token(pat_proto);
 
     Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
 pub fn parse_native_psa_attestation_token(
-    proto: &colima::NativePsaAttestationToken,
+    proto: &transport_protocol::NativePsaAttestationToken,
 ) -> (std::vec::Vec<u8>, i32) {
     (proto.get_token().to_vec(), proto.get_device_id())
 }
 
-pub fn parse_sgx_attestation_init(proto: &colima::SgxAttestationInit) -> (std::vec::Vec<u8>, i32) {
+pub fn parse_sgx_attestation_init(proto: &transport_protocol::SgxAttestationInit) -> (std::vec::Vec<u8>, i32) {
     (proto.get_public_key().to_vec(), proto.get_device_id())
 }
 
-pub fn serialize_sgx_attestation_init(pubkey: &[u8], device_id: i32) -> ColimaResult {
-    let mut attest_init_proto = colima::SgxAttestationInit::new();
+pub fn serialize_sgx_attestation_init(pubkey: &[u8], device_id: i32) -> TransportProtocolResult {
+    let mut attest_init_proto = transport_protocol::SgxAttestationInit::new();
     attest_init_proto.set_public_key(pubkey.to_vec());
     attest_init_proto.set_device_id(device_id);
-    let mut colima = colima::ProxyAttestationServerResponse::new();
-    colima.set_sgx_attestation_init(attest_init_proto);
+    let mut transport_protocol = transport_protocol::ProxyAttestationServerResponse::new();
+    transport_protocol.set_sgx_attestation_init(attest_init_proto);
 
-    Ok(colima.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_sgx_attestation_challenge(
-    parsed: &colima::ProxyAttestationServerResponse,
+    parsed: &transport_protocol::ProxyAttestationServerResponse,
 ) -> Result<
     (
         sgx_types::sgx_ra_context_t,
         sgx_types::sgx_ra_msg2_t,
         [u8; 16],
     ),
-    ColimaError,
+    TransportProtocolError,
 > {
     let context = parsed.get_context();
     let attestation_challenge = parsed.get_sgx_attestation_challenge();
@@ -336,12 +336,12 @@ pub fn serialize_sgx_attestation_challenge(
     context: sgx_types::sgx_ra_context_t,
     msg2: &sgx_types::sgx_ra_msg2_t,
     pubkey_challenge: &[u8],
-) -> ColimaResult {
-    let colima = {
+) -> TransportProtocolResult {
+    let transport_protocol = {
         let attestation_challenge = {
             let msg2_proto = serialize_msg2(msg2);
 
-            let mut attestation_challenge = colima::SgxAttestationChallenge::new();
+            let mut attestation_challenge = transport_protocol::SgxAttestationChallenge::new();
             attestation_challenge
                 .challenge
                 .resize(pubkey_challenge.len(), 0);
@@ -353,18 +353,18 @@ pub fn serialize_sgx_attestation_challenge(
             attestation_challenge
         };
 
-        let mut proto = colima::ProxyAttestationServerResponse::new();
+        let mut proto = transport_protocol::ProxyAttestationServerResponse::new();
         proto.set_sgx_attestation_challenge(attestation_challenge);
         proto.set_context(context);
         proto
     };
 
-    Ok(colima.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
-pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> ColimaResult {
-    let mut request = colima::ProxyAttestationServerResponse::new();
-    let mut pai = colima::PsaAttestationInit::new();
+pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> TransportProtocolResult {
+    let mut request = transport_protocol::ProxyAttestationServerResponse::new();
+    let mut pai = transport_protocol::PsaAttestationInit::new();
     pai.set_challenge(challenge.to_vec());
     pai.set_device_id(device_id);
     request.set_psa_attestation_init(pai);
@@ -372,33 +372,33 @@ pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> Colim
 }
 
 pub fn parse_psa_attestation_init(
-    pai: &colima::PsaAttestationInit,
-) -> Result<(std::vec::Vec<u8>, i32), ColimaError> {
+    pai: &transport_protocol::PsaAttestationInit,
+) -> Result<(std::vec::Vec<u8>, i32), TransportProtocolError> {
     Ok((pai.get_challenge().to_vec(), pai.get_device_id()))
 }
 
 /// Serialize the request for querying the hash of the provisioned program.
-pub fn serialize_request_pi_hash() -> ColimaResult {
-    let mut request = colima::MexicoCityRequest::new();
-    let rph = colima::RequestPiHash::new();
+pub fn serialize_request_pi_hash() -> TransportProtocolResult {
+    let mut request = transport_protocol::MexicoCityRequest::new();
+    let rph = transport_protocol::RequestPiHash::new();
     request.set_request_pi_hash(rph);
     Ok(request.write_to_bytes()?)
 }
 
 /// Serialize the request for querying the enclave policy.
-pub fn serialize_request_policy_hash() -> ColimaResult {
-    let mut request = colima::MexicoCityRequest::new();
-    let rph = colima::RequestPolicyHash::new();
+pub fn serialize_request_policy_hash() -> TransportProtocolResult {
+    let mut request = transport_protocol::MexicoCityRequest::new();
+    let rph = transport_protocol::RequestPolicyHash::new();
     request.set_request_policy_hash(rph);
     Ok(request.write_to_bytes()?)
 }
 
 /// Serialize the request for querying state of the enclave.
-pub fn serialize_machine_state(machine_state: u8) -> ColimaResult {
-    let mut response = colima::MexicoCityResponse::new();
+pub fn serialize_machine_state(machine_state: u8) -> TransportProtocolResult {
+    let mut response = transport_protocol::MexicoCityResponse::new();
 
-    response.set_status(colima::ResponseStatus::SUCCESS);
-    let mut state = colima::State::new();
+    response.set_status(transport_protocol::ResponseStatus::SUCCESS);
+    let mut state = transport_protocol::State::new();
     let slice = &vec![machine_state];
 
     state.state.resize(slice.len(), 0);
@@ -408,11 +408,11 @@ pub fn serialize_machine_state(machine_state: u8) -> ColimaResult {
 }
 
 /// Serialize a response containing the program hash.
-pub fn serialize_pi_hash(hash: &[u8]) -> ColimaResult {
-    let mut response = colima::MexicoCityResponse::new();
+pub fn serialize_pi_hash(hash: &[u8]) -> TransportProtocolResult {
+    let mut response = transport_protocol::MexicoCityResponse::new();
 
-    response.set_status(colima::ResponseStatus::SUCCESS);
-    let mut pi_hash = colima::PiHash::new();
+    response.set_status(transport_protocol::ResponseStatus::SUCCESS);
+    let mut pi_hash = transport_protocol::PiHash::new();
     pi_hash.data.resize(hash.len(), 0);
     pi_hash.data.copy_from_slice(hash);
     response.set_pi_hash(pi_hash);
@@ -420,11 +420,11 @@ pub fn serialize_pi_hash(hash: &[u8]) -> ColimaResult {
 }
 
 /// Serialize a response containing the policy hash.
-pub fn serialize_policy_hash(hash: &[u8]) -> ColimaResult {
-    let mut response = colima::MexicoCityResponse::new();
+pub fn serialize_policy_hash(hash: &[u8]) -> TransportProtocolResult {
+    let mut response = transport_protocol::MexicoCityResponse::new();
 
-    response.set_status(colima::ResponseStatus::SUCCESS);
-    let mut policy_hash = colima::PolicyHash::new();
+    response.set_status(transport_protocol::ResponseStatus::SUCCESS);
+    let mut policy_hash = transport_protocol::PolicyHash::new();
     policy_hash.data.resize(hash.len(), 0);
     policy_hash.data.copy_from_slice(hash);
     response.set_policy_hash(policy_hash);
@@ -432,26 +432,26 @@ pub fn serialize_policy_hash(hash: &[u8]) -> ColimaResult {
 }
 
 /// Serialize an empty response.
-pub fn serialize_empty_response(status: i32) -> ColimaResult {
-    let mut response = colima::MexicoCityResponse::new();
+pub fn serialize_empty_response(status: i32) -> TransportProtocolResult {
+    let mut response = transport_protocol::MexicoCityResponse::new();
     let encoded_status =
-        colima::ResponseStatus::from_i32(status).ok_or(ColimaError::ResponseStatusError(status))?;
+        transport_protocol::ResponseStatus::from_i32(status).ok_or(TransportProtocolError::ResponseStatusError(status))?;
     response.set_status(encoded_status);
 
     Ok(response.write_to_bytes()?)
 }
 
 /// Serialize a response containing the computation result.
-pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> ColimaResult {
-    let mut response = colima::MexicoCityResponse::new();
+pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> TransportProtocolResult {
+    let mut response = transport_protocol::MexicoCityResponse::new();
 
     let encoded_status =
-        colima::ResponseStatus::from_i32(status).ok_or(ColimaError::ResponseStatusError(status))?;
+        transport_protocol::ResponseStatus::from_i32(status).ok_or(TransportProtocolError::ResponseStatusError(status))?;
 
     response.set_status(encoded_status);
 
     if let Some(ref data) = data_opt {
-        let mut result = colima::Result::new();
+        let mut result = transport_protocol::Result::new();
         result.data.resize(data.len(), 0);
         result.data.copy_from_slice(&data);
         response.set_result(result);
@@ -461,21 +461,21 @@ pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> Col
 }
 
 pub fn parse_result(
-    response: &colima::MexicoCityResponse,
-) -> Result<Option<std::vec::Vec<u8>>, ColimaError> {
+    response: &transport_protocol::MexicoCityResponse,
+) -> Result<Option<std::vec::Vec<u8>>, TransportProtocolError> {
     let status = response.get_status();
     let decoded_status = match status {
-        colima::ResponseStatus::UNSET => -1,
-        colima::ResponseStatus::SUCCESS => 0,
-        colima::ResponseStatus::FAILED_INVALID_ROLE => 1,
-        colima::ResponseStatus::FAILED_NOT_READY => 2,
-        colima::ResponseStatus::FAILED_GENERIC => 3,
-        colima::ResponseStatus::FAILED_VM_ERROR => 4,
-        colima::ResponseStatus::FAILED_ERROR_CODE_RETURNED => 5,
-        colima::ResponseStatus::FAILED_INVALID_REQUEST => 6,
+        transport_protocol::ResponseStatus::UNSET => -1,
+        transport_protocol::ResponseStatus::SUCCESS => 0,
+        transport_protocol::ResponseStatus::FAILED_INVALID_ROLE => 1,
+        transport_protocol::ResponseStatus::FAILED_NOT_READY => 2,
+        transport_protocol::ResponseStatus::FAILED_GENERIC => 3,
+        transport_protocol::ResponseStatus::FAILED_VM_ERROR => 4,
+        transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED => 5,
+        transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST => 6,
     };
-    if status != colima::ResponseStatus::SUCCESS {
-        return Err(ColimaError::ResponseStatusError(decoded_status));
+    if status != transport_protocol::ResponseStatus::SUCCESS {
+        return Err(TransportProtocolError::ResponseStatusError(decoded_status));
     }
 
     let data_opt = {
@@ -494,7 +494,7 @@ pub fn parse_result(
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn parse_msg3(abs: &colima::SgxAttestationTokens) -> (sgx_types::sgx_ra_msg3_t, i32) {
+fn parse_msg3(abs: &transport_protocol::SgxAttestationTokens) -> (sgx_types::sgx_ra_msg3_t, i32) {
     let proto = abs.get_msg3();
     let device_id = proto.get_device_id();
     let mut msg3 = sgx_types::sgx_ra_msg3_t::default();
@@ -509,7 +509,7 @@ fn parse_msg3(abs: &colima::SgxAttestationTokens) -> (sgx_types::sgx_ra_msg3_t, 
 
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_attestation_tokens(
-    parsed: &colima::ProxyAttestationServerRequest,
+    parsed: &transport_protocol::ProxyAttestationServerRequest,
 ) -> Result<
     (
         sgx_types::sgx_ra_msg3_t,
@@ -519,7 +519,7 @@ pub fn parse_attestation_tokens(
         std::vec::Vec<u8>,
         i32,
     ),
-    ColimaError,
+    TransportProtocolError,
 > {
     let attest_tokens = parsed.get_sgx_attestation_tokens();
     let (msg3, device_id) = parse_msg3(attest_tokens);
@@ -553,14 +553,14 @@ pub fn serialize_sgx_attestation_tokens(
     pubkey_quote: &sgx_types::sgx_quote_t,
     pubkey_sig: &std::vec::Vec<u8>,
     device_id: i32,
-) -> ColimaResult {
+) -> TransportProtocolResult {
     let msg3_proto = {
-        let mut result = colima::SgxMsg3::new();
+        let mut result = transport_protocol::SgxMsg3::new();
         result.set_device_id(device_id);
         result.mac.resize(msg3.mac.len(), 0);
         result.mac.copy_from_slice(&msg3.mac);
         let g_a = {
-            let mut ret = colima::SgxEc256Public::default();
+            let mut ret = transport_protocol::SgxEc256Public::default();
             ret.gx.resize(msg3.g_a.gx.len(), 0);
             ret.gx.copy_from_slice(&msg3.g_a.gx);
             ret.gy.resize(msg3.g_a.gy.len(), 0);
@@ -577,7 +577,7 @@ pub fn serialize_sgx_attestation_tokens(
 
         result
     };
-    let mut attestation_tokens = colima::SgxAttestationTokens::new();
+    let mut attestation_tokens = transport_protocol::SgxAttestationTokens::new();
     attestation_tokens.set_msg3(msg3_proto);
 
     let msg3_quote_proto = serialize_quote(&msg3_quote);
@@ -590,15 +590,15 @@ pub fn serialize_sgx_attestation_tokens(
 
     attestation_tokens.set_pubkey_sig(pubkey_sig.to_vec());
 
-    let mut colima = colima::ProxyAttestationServerRequest::new();
-    colima.set_sgx_attestation_tokens(attestation_tokens);
-    colima.set_context(context);
+    let mut transport_protocol = transport_protocol::ProxyAttestationServerRequest::new();
+    transport_protocol.set_sgx_attestation_tokens(attestation_tokens);
+    transport_protocol.set_context(context);
 
-    Ok(colima.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 pub fn parse_start_msg(
-    parsed: &colima::ProxyAttestationServerRequest,
+    parsed: &transport_protocol::ProxyAttestationServerRequest,
 ) -> (std::string::String, std::string::String) {
     let start_msg = parsed.get_start_msg();
     (
@@ -607,18 +607,18 @@ pub fn parse_start_msg(
     )
 }
 
-pub fn serialize_start_msg(protocol: &str, firmware_version: &str) -> ColimaResult {
-    let mut colima = colima::ProxyAttestationServerRequest::new();
-    let mut start_msg = colima::StartMsg::new();
+pub fn serialize_start_msg(protocol: &str, firmware_version: &str) -> TransportProtocolResult {
+    let mut transport_protocol = transport_protocol::ProxyAttestationServerRequest::new();
+    let mut start_msg = transport_protocol::StartMsg::new();
     start_msg.set_protocol(protocol.to_string());
     start_msg.set_firmware_version(firmware_version.to_string());
-    colima.set_start_msg(start_msg);
-    Ok(colima.write_to_bytes()?)
+    transport_protocol.set_start_msg(start_msg);
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_msg1(
-    parsed: &colima::ProxyAttestationServerRequest,
+    parsed: &transport_protocol::ProxyAttestationServerRequest,
 ) -> (sgx_types::sgx_ra_context_t, sgx_types::sgx_ra_msg1_t, i32) {
     let context = parsed.get_context();
     let msg1_proto = parsed.get_msg1();
@@ -636,24 +636,24 @@ pub fn serialize_msg1(
     context: sgx_types::sgx_ra_context_t,
     msg1: &sgx_types::sgx_ra_msg1_t,
     device_id: i32,
-) -> ColimaResult {
-    let mut g_a = colima::SgxEc256Public::new();
+) -> TransportProtocolResult {
+    let mut g_a = transport_protocol::SgxEc256Public::new();
     g_a.set_gx(msg1.g_a.gx.to_vec());
     g_a.set_gy(msg1.g_a.gy.to_vec());
-    let mut msg1_proto = colima::SgxMsg1::new();
+    let mut msg1_proto = transport_protocol::SgxMsg1::new();
     msg1_proto.set_g_a(g_a);
     msg1_proto.set_gid(msg1.gid.to_vec());
     msg1_proto.set_device_id(device_id);
 
-    let mut colima = colima::ProxyAttestationServerRequest::new();
-    colima.set_msg1(msg1_proto);
-    colima.set_context(context);
+    let mut transport_protocol = transport_protocol::ProxyAttestationServerRequest::new();
+    transport_protocol.set_msg1(msg1_proto);
+    transport_protocol.set_context(context);
 
-    Ok(colima.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn parse_msg2(proto: &colima::SgxMsg2) -> Result<sgx_types::sgx_ra_msg2_t, ColimaError> {
+fn parse_msg2(proto: &transport_protocol::SgxMsg2) -> Result<sgx_types::sgx_ra_msg2_t, TransportProtocolError> {
     let mut msg2 = sgx_types::sgx_ra_msg2_t::default();
     msg2.g_b.gx.copy_from_slice(proto.get_g_b().get_gx());
     msg2.g_b.gy.copy_from_slice(proto.get_g_b().get_gy());
@@ -673,10 +673,10 @@ fn parse_msg2(proto: &colima::SgxMsg2) -> Result<sgx_types::sgx_ra_msg2_t, Colim
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn serialize_msg2(msg2: &sgx_types::sgx_ra_msg2_t) -> colima::SgxMsg2 {
-    let mut proto = colima::SgxMsg2::new();
+fn serialize_msg2(msg2: &sgx_types::sgx_ra_msg2_t) -> transport_protocol::SgxMsg2 {
+    let mut proto = transport_protocol::SgxMsg2::new();
     let g_b = {
-        let mut g_b = colima::SgxEc256Public::new();
+        let mut g_b = transport_protocol::SgxEc256Public::new();
         g_b.gx.resize(msg2.g_b.gx.len(), 0);
         g_b.gx.copy_from_slice(&msg2.g_b.gx);
         g_b.gy.resize(msg2.g_b.gy.len(), 0);
@@ -689,7 +689,7 @@ fn serialize_msg2(msg2: &sgx_types::sgx_ra_msg2_t) -> colima::SgxMsg2 {
     proto.quote_type = msg2.quote_type.into();
     proto.kdf_id = msg2.kdf_id.into();
     let sign_gb_ga = {
-        let mut sig = colima::SgxEc256Signature::new();
+        let mut sig = transport_protocol::SgxEc256Signature::new();
         sig.x.resize(msg2.sign_gb_ga.x.len(), 0);
         sig.x.copy_from_slice(&msg2.sign_gb_ga.x);
         sig.y.resize(msg2.sign_gb_ga.y.len(), 0);

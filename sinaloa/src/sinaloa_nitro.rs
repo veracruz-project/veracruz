@@ -105,14 +105,14 @@ pub mod sinaloa_nitro {
         }
 
         fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
-            let parsed = colima::parse_mexico_city_request(&data)?;
+            let parsed = transport_protocol::parse_mexico_city_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
                 let rpat = parsed.get_request_proxy_psa_attestation_token();
-                let challenge = colima::parse_request_proxy_psa_attestation_token(rpat);
+                let challenge = transport_protocol::parse_request_proxy_psa_attestation_token(rpat);
                 let (psa_attestation_token, pubkey, device_id) =
                     self.proxy_psa_attestation_get_token(challenge)?;
-                let serialized_pat = colima::serialize_proxy_psa_attestation_token(
+                let serialized_pat = transport_protocol::serialize_proxy_psa_attestation_token(
                     &psa_attestation_token,
                     &pubkey,
                     device_id,

@@ -226,7 +226,7 @@ fn test_psa_attestation() {
     unsafe { token.set_len(token_size.try_into().unwrap()) }
 
     let serialized_pat =
-        colima::serialize_psa_attestation_token(&token, public_key.as_ref(), fake_device_id);
+        transport_protocol::serialize_psa_attestation_token(&token, public_key.as_ref(), fake_device_id);
     let encoded_token = base64::encode(&serialized_pat);
 
     let url = "127.0.0.1:3016/VerifyPAT";
@@ -242,7 +242,7 @@ pub fn setup() {
 }
 
 fn send_sgx_start(url_base: &str, protocol: &str, firmware_version: &str) -> (Vec<u8>, i32) {
-    let serialized_start_msg = colima::serialize_start_msg(protocol, firmware_version);
+    let serialized_start_msg = transport_protocol::serialize_start_msg(protocol, firmware_version);
     let encoded_start_msg = base64::encode(&serialized_start_msg);
     println!(
         "proxy-attestation-server::test::send_sgx_start encoded_start_msg:{:?}",
@@ -255,10 +255,10 @@ fn send_sgx_start(url_base: &str, protocol: &str, firmware_version: &str) -> (Ve
 
     let body_vec =
         base64::decode(&received_body).expect("Failed to base64 decode the received body");
-    let parsed = colima::parse_request(&body_vec);
+    let parsed = transport_protocol::parse_request(&body_vec);
     assert!(parsed.has_attestation_init());
     let attestation_init = parsed.get_attestation_init();
-    let (public_key, device_id) = colima::parse_attestation_init(attestation_init);
+    let (public_key, device_id) = transport_protocol::parse_attestation_init(attestation_init);
     (public_key, device_id)
 }
 
@@ -268,7 +268,7 @@ fn send_sgx_msg1(
     msg1: &sgx_ra_msg1_t,
     device_id: i32,
 ) -> (Vec<u8>, sgx_ra_msg2_t) {
-    let serialized_msg1 = colima::serialize_msg1(*attestation_context, msg1, device_id);
+    let serialized_msg1 = transport_protocol::serialize_msg1(*attestation_context, msg1, device_id);
     let encoded_msg1 = base64::encode(&serialized_msg1);
     let mut encoded_msg1_reader = stringreader::StringReader::new(&encoded_msg1);
 
@@ -278,9 +278,9 @@ fn send_sgx_msg1(
 
     let body_vec =
         base64::decode(&received_body).expect("Failed to base64 decode the received body");
-    let parsed = colima::parse_request(&body_vec);
+    let parsed = transport_protocol::parse_request(&body_vec);
     assert!(parsed.has_attestation_challenge());
-    let (_context, msg2, challenge) = colima::parse_attestation_challenge(&parsed);
+    let (_context, msg2, challenge) = transport_protocol::parse_attestation_challenge(&parsed);
     (challenge.to_vec(), msg2)
 }
 
@@ -294,7 +294,7 @@ fn send_msg3(
     pubkey_quote_sig: &Vec<u8>,
     device_id: i32,
 ) {
-    let serialized_tokens = colima::serialize_attestation_tokens(
+    let serialized_tokens = transport_protocol::serialize_attestation_tokens(
         *attestation_context,
         msg3,
         msg3_quote,

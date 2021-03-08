@@ -13,7 +13,7 @@
 pub mod sinaloa_sgx {
 
     use crate::sinaloa::*;
-    use colima;
+    use transport_protocol;
     use lazy_static::lazy_static;
     use log::{debug, error};
     use mexico_city_bind::{
@@ -126,7 +126,7 @@ pub mod sinaloa_sgx {
             let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_sgx_attestation_init() {
                 let attestation_init = proxy_attestation_server_response.get_sgx_attestation_init();
-                let (public_key, device_id) = colima::parse_sgx_attestation_init(attestation_init);
+                let (public_key, device_id) = transport_protocol::parse_sgx_attestation_init(attestation_init);
                 Ok((public_key, device_id))
             } else {
                 Err(SinaloaError::MissingFieldError("sgx_attestation_init"))
@@ -142,7 +142,7 @@ pub mod sinaloa_sgx {
             msg1: &sgx_ra_msg1_t,
             device_id: i32,
         ) -> Result<(Vec<u8>, sgx_ra_msg2_t), SinaloaError> {
-            let serialized_msg1 = colima::serialize_msg1(*attestation_context, msg1, device_id)?;
+            let serialized_msg1 = transport_protocol::serialize_msg1(*attestation_context, msg1, device_id)?;
             let encoded_msg1 = base64::encode(&serialized_msg1);
 
             let url = format!("{:}/SGX/Msg1", url_base);
@@ -150,9 +150,9 @@ pub mod sinaloa_sgx {
             let received_body = crate::post_buffer(&url, &encoded_msg1)?;
 
             let body_vec = base64::decode(&received_body)?;
-            let parsed = colima::parse_proxy_attestation_server_response(&body_vec)?;
+            let parsed = transport_protocol::parse_proxy_attestation_server_response(&body_vec)?;
             if parsed.has_sgx_attestation_challenge() {
-                let (_context, msg2, challenge) = colima::parse_sgx_attestation_challenge(&parsed)?;
+                let (_context, msg2, challenge) = transport_protocol::parse_sgx_attestation_challenge(&parsed)?;
                 Ok((challenge.to_vec(), msg2))
             } else {
                 Err(SinaloaError::MissingFieldError("sgx_attestation_challenge"))
@@ -352,7 +352,7 @@ pub mod sinaloa_sgx {
             pubkey_quote_sig: &Vec<u8>,
             device_id: i32,
         ) -> Result<(), SinaloaError> {
-            let serialized_tokens = colima::serialize_sgx_attestation_tokens(
+            let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens(
                 *attestation_context,
                 msg3,
                 msg3_quote,
@@ -507,14 +507,14 @@ pub mod sinaloa_sgx {
         }
 
         fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
-            let parsed = colima::parse_mexico_city_request(&data)?;
+            let parsed = transport_protocol::parse_mexico_city_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
                 let rpat = parsed.get_request_proxy_psa_attestation_token();
-                let challenge = colima::parse_request_proxy_psa_attestation_token(rpat);
+                let challenge = transport_protocol::parse_request_proxy_psa_attestation_token(rpat);
                 let (psa_attestation_token, pubkey, device_id) =
                     self.proxy_psa_attestation_get_token(challenge)?;
-                let serialized_pat = colima::serialize_proxy_psa_attestation_token(
+                let serialized_pat = transport_protocol::serialize_proxy_psa_attestation_token(
                     &psa_attestation_token,
                     &pubkey,
                     device_id,

@@ -46,7 +46,7 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
             err
         })?;
 
-    let proto = colima::parse_proxy_attestation_server_request(&proto_bytes)
+    let proto = transport_protocol::parse_proxy_attestation_server_request(&proto_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::verify_iat parse_proxy_attestation_server_request failed:{:?}", err);
             err
@@ -57,7 +57,7 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
     }
 
     let (token, pubkey, device_id) =
-        colima::parse_proxy_psa_attestation_token(proto.get_proxy_psa_attestation_token());
+        transport_protocol::parse_proxy_psa_attestation_token(proto.get_proxy_psa_attestation_token());
     let pubkey_hash = {
         let conn = crate::orm::establish_connection()
             .map_err(|err| {

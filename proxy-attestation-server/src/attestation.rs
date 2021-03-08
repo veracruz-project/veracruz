@@ -31,7 +31,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
             err
         })?;
 
-    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::start failed to parse_proxy_attestation_server_request:{:?}", err);
             err
@@ -41,7 +41,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
         println!("proxy-attestation-server::attestation::start doesn't have start_msg");
         return Err(ProxyAttestationServerError::MissingFieldError("start msg"));
     }
-    let (protocol, firmware_version) = colima::parse_start_msg(&parsed);
+    let (protocol, firmware_version) = transport_protocol::parse_start_msg(&parsed);
 
     let device_id = {
         let mut device_id_wrapper = DEVICE_ID.lock()

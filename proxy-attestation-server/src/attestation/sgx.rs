@@ -11,7 +11,7 @@
 
 use crate::error::*;
 use base64;
-use colima;
+use transport_protocol;
 use curl::easy::{Easy, List};
 use lazy_static::lazy_static;
 use openssl;
@@ -92,7 +92,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
         ac_hash.insert(device_id, attestation_context);
     }
     let serialized_attestation_init =
-        colima::serialize_sgx_attestation_init(&serialized_pubkey, device_id)
+        transport_protocol::serialize_sgx_attestation_init(&serialized_pubkey, device_id)
             .map_err(|err| {
                 println!("proxy-attestation-server::attestation::sgx::start serialize_sgx_attestation_init failed:{:?}", err);
                 err
@@ -107,7 +107,7 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
             err
         })?;
 
-    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg1 failed to parse_proxy_attestation_server_request:{:?}", err);
             err
@@ -115,7 +115,7 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
     if !parsed.has_msg1() {
         return Err(ProxyAttestationServerError::MissingFieldError("msg1"));
     }
-    let (context, msg1, device_id) = colima::parse_msg1(&parsed);
+    let (context, msg1, device_id) = transport_protocol::parse_msg1(&parsed);
     let (msg2, pubkey_challenge) = {
         let mut pubkey_challenge: [u8; 16] = [0; 16];
         let mut rng = rand::thread_rng();
@@ -186,7 +186,7 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
     };
 
     let serialized_challenge =
-        colima::serialize_sgx_attestation_challenge(context, &msg2, &pubkey_challenge)
+        transport_protocol::serialize_sgx_attestation_challenge(context, &msg2, &pubkey_challenge)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg1 serialize_sgx_attestation_challenge failed:{:?}", err);
             err
@@ -202,7 +202,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             err
         })?;
 
-    let parsed = colima::parse_proxy_attestation_server_request(&received_bytes)
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg3 parse_proxy_attestation_server_request failed:{:?}", err);
             err
@@ -212,7 +212,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
     }
     let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_sig, device_id) =
-        colima::parse_attestation_tokens(&parsed)
+        transport_protocol::parse_attestation_tokens(&parsed)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
             err

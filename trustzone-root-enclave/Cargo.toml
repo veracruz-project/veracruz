@@ -14,7 +14,7 @@ path = "src/lib.rs"
 [dependencies]
 #libc = { path = "/work/rust-optee-trustzone-sdk/rust/libc" }
 lazy_static = { version = "1.4.0", features= ["spin_no_std"] }
-colima = { path = "../colima", features=["sgx"] }
+transport-protocol = { path = "../transport-protocol", features=["sgx"] }
 ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", features = ["mesalock_sgx"] }
 veracruz-utils = { path = "../veracruz-utils", features = ["sgx"] }
 psa-attestation = { path = "../psa-attestation", features = ["sgx"] }

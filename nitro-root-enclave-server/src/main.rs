@@ -12,7 +12,7 @@
 use base64;
 use bincode;
 use clap::{App, Arg};
-use colima;
+use transport_protocol;
 use curl::easy::{Easy, List};
 use err_derive::Error;
 use hex;
@@ -59,9 +59,9 @@ pub enum NitroServerError {
     /// A remote http server returned a non-success (200) status
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
     NonSuccessHttp,
-    /// Colima protocol buffer handling returned an error
-    #[error(display = "NitroServer: Colima error:{:?}", _0)]
-    Colima(colima::custom::ColimaError),
+    /// Transport protocol buffer handling returned an error
+    #[error(display = "NitroServer: TransportProtocol error:{:?}", _0)]
+    TransportProtocol(transport_protocol::custom::TransportProtocolError),
     /// Curl returned an error
     #[error(display = "NitroServer: Curl error:{:?}", _0)]
     Curl(curl::Error),
@@ -189,8 +189,8 @@ fn post_native_attestation_token(
 ) -> Result<(), NitroServerError> {
     println!("nitro-root-enclave-server::post_native_attestation_token started");
     let serialized_proxy_attestation_server_request =
-        colima::serialize_native_psa_attestation_token(token, device_id)
-            .map_err(|err| NitroServerError::Colima(err))?;
+        transport_protocol::serialize_native_psa_attestation_token(token, device_id)
+            .map_err(|err| NitroServerError::TransportProtocol(err))?;
     let encoded_str = base64::encode(&serialized_proxy_attestation_server_request);
     let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
     println!(
@@ -242,8 +242,8 @@ fn send_start(
     let proxy_attestation_server_response = send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
     if proxy_attestation_server_response.has_psa_attestation_init() {
         let (challenge, device_id) =
-            colima::parse_psa_attestation_init(proxy_attestation_server_response.get_psa_attestation_init())
-                .map_err(|err| NitroServerError::Colima(err))?;
+            transport_protocol::parse_psa_attestation_init(proxy_attestation_server_response.get_psa_attestation_init())
+                .map_err(|err| NitroServerError::TransportProtocol(err))?;
         return Ok((challenge, device_id));
     } else {
         return Err(NitroServerError::InvalidProtoBufMessage);
@@ -327,9 +327,9 @@ pub fn send_proxy_attestation_server_start(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
-) -> Result<colima::ProxyAttestationServerResponse, NitroServerError> {
-    let serialized_start_msg = colima::serialize_start_msg(protocol, firmware_version)
-        .map_err(|err| NitroServerError::Colima(err))?;
+) -> Result<transport_protocol::ProxyAttestationServerResponse, NitroServerError> {
+    let serialized_start_msg = transport_protocol::serialize_start_msg(protocol, firmware_version)
+        .map_err(|err| NitroServerError::TransportProtocol(err))?;
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
 
@@ -343,7 +343,7 @@ pub fn send_proxy_attestation_server_start(
     let body_vec =
         base64::decode(&received_body).map_err(|err| NitroServerError::Base64Decode(err))?;
     let response =
-        colima::parse_proxy_attestation_server_response(&body_vec).map_err(|err| NitroServerError::Colima(err))?;
+        transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| NitroServerError::TransportProtocol(err))?;
     println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed. Returning.");
     return Ok(response);
 }
