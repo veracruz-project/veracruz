@@ -14,14 +14,14 @@ name = "tabasco"
 path = "src/main.rs"
 
 [features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-utils/std", "tabasco/sgx"]
-tz = ["veracruz-utils/tz", "tabasco/psa"]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-utils/std", "proxy-attestation-server/sgx"]
+tz = ["veracruz-utils/tz", "proxy-attestation-server/psa"]
 
 [dependencies]
 veracruz-utils = {path = "../veracruz-utils", features=["std"] }
-tabasco = { path = "../tabasco" }
+proxy-attestation-server = { path = "../proxy-attestation-server" }
 structopt = { version="0.3", features=["wrap_help"] }
-log = "0.4"
+log = "=0.4.13"
 env_logger = "0.7"
 actix-rt = "1.0.0"
 

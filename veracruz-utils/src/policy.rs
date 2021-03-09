@@ -33,7 +33,6 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
-    slice::Iter,
     string::{String, ToString},
     vec::Vec,
     collections::{HashMap, HashSet},
@@ -46,6 +45,8 @@ use hex;
 use std::{
     fs,
     path,
+    str::FromStr,
+    fmt,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +99,8 @@ pub enum VeracruzUtilError {
     MissingPolicyFieldError(String),
     #[error(display = "VeracruzUtil: Policy has no program file: {:?}.",_0)]
     NoProgramFileError(String),
+    #[error(display = "VeracruzUtil: Enclave platform is not supported: {:?}.",_0)]
+    InvalidEnclavePlatform(String),
     #[error(display = "VeracruzUtil: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
 }
@@ -469,12 +472,40 @@ pub struct VeracruzPolicy {
 }
 
 /// an enumerated type representing the platform the enclave is running on
+#[derive(Debug)]
 pub enum EnclavePlatform {
     SGX,
     TrustZone,
     Nitro,
     /// The Mock platform is for unit testing (durango unit tests, at the moment)
     Mock, 
+}
+
+#[cfg(feature = "std")]
+impl FromStr for EnclavePlatform {
+    type Err = VeracruzUtilError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "sgx"       => Ok(EnclavePlatform::SGX),
+            "trustzone" => Ok(EnclavePlatform::TrustZone),
+            "nitro"     => Ok(EnclavePlatform::Nitro),
+            _           => Err(
+                VeracruzUtilError::InvalidEnclavePlatform(format!("{}", s))
+            ),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl fmt::Display for EnclavePlatform {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EnclavePlatform::SGX        => write!(f, "sgx"),
+            EnclavePlatform::TrustZone  => write!(f, "trustzone"),
+            EnclavePlatform::Nitro      => write!(f, "nitro"),
+            EnclavePlatform::Mock       => write!(f, "mock"),
+        }
+    }
 }
 
 impl VeracruzPolicy {

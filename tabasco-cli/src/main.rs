@@ -16,7 +16,7 @@ use log::{info, error};
 use std::process;
 use actix_rt;
 use std::env;
-use tabasco;
+use proxy_attestation_server;
 use veracruz_utils;
 
 
@@ -31,6 +31,10 @@ struct Opt {
     /// DATABASE_URL environment variable
     #[structopt(long)]
     database_url: Option<String>,
+
+    /// Enable/disable debugging
+    #[structopt(long)]
+    debug: bool,
 }
 
 
@@ -75,8 +79,9 @@ fn main() {
     let mut sys = actix_rt::System::new("Tabasco Server");
 
     // create Tabasco instance
-    let tabasco_server = match tabasco::server::server(
-        policy.tabasco_url().clone()
+    let tabasco_server = match proxy_attestation_server::server::server(
+        policy.proxy_attestation_server_url().clone(),
+        opt.debug
     ) {
         Ok(tabasco_server) => tabasco_server,
         Err(err) => {
@@ -85,7 +90,7 @@ fn main() {
         }
     };
 
-    info!("Tabasco running on {}", policy.tabasco_url());
+    info!("Tabasco running on {}", policy.proxy_attestation_server_url());
     match sys.block_on(tabasco_server) {
         Ok(()) => {}
         Err(err) => {

@@ -55,11 +55,12 @@ $ ls target/wasm32-arm-veracruz/release/shamir-secret-sharing.wasm
 target/wasm32-arm-veracruz/release/shamir-secret-sharing.wasm
 ```
 
-Lets go ahead and copy this to the root directory to make the path a bit
-easy to use:
+Lets go ahead and copy this to an example directory to make the paths a bit
+easier to use:
 
 ``` bash
-$ cp sdk/rust-language-support/examples/shamir-secret-sharing/target/wasm32-arm-veracruz/release/shamir-secret-sharing.wasm example-binary.wasm
+$ mkdir example
+$ cp sdk/rust-language-support/examples/shamir-secret-sharing/target/wasm32-arm-veracruz/release/shamir-secret-sharing.wasm example/example-binary.wasm
 ```
 
 ## Generating certificates
@@ -72,34 +73,34 @@ we're going to create a separate identity for the program provide, result
 reader, and three data providers:
 
 ``` bash
-$ openssl genrsa -out example-program-key.pem 2048
+$ openssl genrsa -out example/example-program-key.pem 2048
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
-    -key example-program-key.pem \
-    -out example-program-cert.pem \
+    -key example/example-program-key.pem \
+    -out example/example-program-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example-data0-key.pem 2048
+$ openssl genrsa -out example/example-data0-key.pem 2048
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
-    -key example-data0-key.pem \
-    -out example-data0-cert.pem \
+    -key example/example-data0-key.pem \
+    -out example/example-data0-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example-data1-key.pem 2048
+$ openssl genrsa -out example/example-data1-key.pem 2048
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
-    -key example-data1-key.pem \
-    -out example-data1-cert.pem \
+    -key example/example-data1-key.pem \
+    -out example/example-data1-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example-data2-key.pem 2048
+$ openssl genrsa -out example/example-data2-key.pem 2048
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
-    -key example-data2-key.pem \
-    -out example-data2-cert.pem \
+    -key example/example-data2-key.pem \
+    -out example/example-data2-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example-result-key.pem 2048
+$ openssl genrsa -out example/example-result-key.pem 2048
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
-    -key example-result-key.pem \
-    -out example-result-cert.pem \
+    -key example/example-result-key.pem \
+    -out example/example-result-cert.pem \
     -config test-collateral/cert.conf
 ```
 
@@ -115,28 +116,31 @@ computation, the URLs for the Sinaloa and Tabasco servers (we'll use localhost
 for now), and a hash of the WebAssembly file we plan to execute.
 
 ``` bash
-$ cd test-collateral
-$ ./generate_policy.py \
-    --template-file policy.template \
-    --data-provision-order 1 2 3 \
-    --identity ../example-program-cert.pem "\"PiProvider\"" \
-    --identity ../example-data0-cert.pem "\"DataProvider\"" \
-    --identity ../example-data1-cert.pem "\"DataProvider\"" \
-    --identity ../example-data2-cert.pem "\"DataProvider\"" \
-    --identity ../example-result-cert.pem "\"ResultReader\"" \
-    --sinaloa-url 127.0.0.1:3017 \
-    --tabasco-url 127.0.0.1:3010 \
-    --certificate-lifetime-in-hours 8760 \
-    --pi-binary ../example-binary.wasm \
-    --execution-strategy "\"Interpretation\"" \
-    --output-policy-file ../example-policy.json
+$ ./test-collateral/generate-policy/target/release/generate-policy \
+    --proxy-attestation-server-ip 127.0.0.1:3010 \
+    --sinaloa-ip 127.0.0.1:3017 \
+    --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
+    --css-file mexico-city/css.bin \
+    --certificate example-program-cert.pem \
+    --capability "example-binary.wasm:wx" \
+    --certificate example-data0-cert.pem \
+    --capability "input-0:w" \
+    --certificate example-data1-cert.pem \
+    --capability "input-1:w" \
+    --certificate example-data2-cert.pem \
+    --capability "input-2:w" \
+    --certificate example-result-cert.pem \
+    --capability "output:r" \
+    --binary example-binary.wasm \
+    --capability "input-0:r,input-1:r,input-2:r,output:w" \
+    --output-policy-file example/example-policy.json
 ```
 
 This should create a policy.json file in the current directory:
 
 ``` bash
-$ ls example-policy.json
-example-policy.json
+$ ls example/example-policy.json
+example/example-policy.json
 ```
 
 ## Running Tabasco
@@ -162,7 +166,7 @@ program in the `bin` directory. Note we are using `&` to launch Tabasco in the
 background:
 
 ``` bash
-$ ./bin/tabasco example-policy.json --database-url=tabasco-cli/tabasco.db &
+$ ./bin/tabasco example/example-policy.json --database-url=tabasco-cli/tabasco.db &
 [2021-02-12T00:23:33Z INFO  tabasco] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 [2021-02-12T00:23:33Z INFO  tabasco] Using database "tabasco-cli/tabasco.db"
 [2021-02-12T00:23:33Z INFO  actix_server::builder] Starting 12 workers
@@ -181,8 +185,8 @@ requires just one command. Note again we are launching Sinaloa in the
 background:
 
 ``` bash
-$ ./bin/sinaloa example-policy.json &
-[2021-02-12T00:55:40Z INFO  sinaloa] Loading policy "example-policy.json"
+$ ./bin/sinaloa example/example-policy.json &
+[2021-02-12T00:55:40Z INFO  sinaloa] Loading policy "example/example-policy.json"
 [2021-02-12T00:55:40Z INFO  sinaloa] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 [2021-02-12T00:55:44Z INFO  actix_web::middleware::logger] 127.0.0.1:54762 "POST /Start HTTP/1.1" 200 96 "-" "-" 0.000542
 [2021-02-12T00:55:44Z INFO  actix_web::middleware::logger] 127.0.0.1:54764 "POST /SGX/Msg1 HTTP/1.1" 200 312 "-" "-" 0.233101
@@ -202,14 +206,14 @@ First lets send over the program to our Sinaloa server, this requires an
 identity with the "PiProvider" role:
 
 ``` bash
-$ ./bin/durango example-policy.json \
-    --key example-program-key.pem \
-    --identity example-program-cert.pem \
-    --program example-binary.wasm
-[2021-02-12T01:27:18Z INFO  durango] Loading policy "example-policy.json"
+$ ./bin/durango example/example-policy.json \
+    --key example/example-program-key.pem \
+    --identity example/example-program-cert.pem \
+    --program example-binary.wasm:example/example-binary.wasm
+[2021-02-12T01:27:18Z INFO  durango] Loading policy "example/example-policy.json"
 [2021-02-12T01:27:18Z INFO  durango] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
-[2021-02-12T01:27:18Z INFO  durango] Submitted program "example-binary.wasm"
+[2021-02-12T01:27:18Z INFO  durango] Submitted program "example/example-binary.wasm"
 ```
 
 Then lets send over our datas with identities with the "DataProvider" role.
@@ -218,29 +222,29 @@ secret message. Keep in mind in practice these datas may be coming from
 different devices:
 
 ``` bash
-$ ./bin/durango example-policy.json \
-    --key example-data0-key.pem \
-    --identity example-data0-cert.pem \
-    --data <(echo "018b76552fa61d7f7661d2119b" | xxd -r -p)
-[2021-02-12T01:27:18Z INFO  durango] Loading policy "example-policy.json"
+$ ./bin/durango example/example-policy.json \
+    --key example/example-data0-key.pem \
+    --identity example/example-data0-cert.pem \
+    --data input-0:<(echo "018b76552fa61d7f7661d2119b" | xxd -r -p)
+[2021-02-12T01:27:18Z INFO  durango] Loading policy "example/example-policy.json"
 [2021-02-12T01:27:18Z INFO  durango] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
 [2021-02-12T01:27:18Z INFO  durango] Submitted data "/dev/fd/63"
 
-$ ./bin/durango example-policy.json \
-    --key example-data1-key.pem \
-    --identity example-data1-cert.pem \
-    --data <(echo "02063622071451f67d6b00e602" | xxd -r -p)
-[2021-02-12T01:36:35Z INFO  durango] Loading policy "example-policy.json"
+$ ./bin/durango example/example-policy.json \
+    --key example/example-data1-key.pem \
+    --identity example/example-data1-cert.pem \
+    --data input-1:<(echo "02063622071451f67d6b00e602" | xxd -r -p)
+[2021-02-12T01:36:35Z INFO  durango] Loading policy "example/example-policy.json"
 [2021-02-12T01:36:35Z INFO  durango] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
 [2021-02-12T01:36:35Z INFO  durango] Submitted data "/dev/fd/63"
 
-$ ./bin/durango example-policy.json \
-    --key example-data2-key.pem \
-    --identity example-data2-cert.pem \
-    --data <(echo "03c5251b44dd6cde6478be93b8" | xxd -r -p)
-[2021-02-12T01:37:58Z INFO  durango] Loading policy "example-policy.json"
+$ ./bin/durango example/example-policy.json \
+    --key example/example-data2-key.pem \
+    --identity example/example-data2-cert.pem \
+    --data input-2:<(echo "03c5251b44dd6cde6478be93b8" | xxd -r -p)
+[2021-02-12T01:37:58Z INFO  durango] Loading policy "example/example-policy.json"
 [2021-02-12T01:37:58Z INFO  durango] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
 [2021-02-12T01:37:58Z INFO  durango] Submitted data "/dev/fd/63"
@@ -250,11 +254,11 @@ And finally, we can request the result using an identity with the
 "RequestResult" role:
 
 ``` bash
-$ ./bin/durango example-policy.json \
-    --key example-result-key.pem \
-    --identity example-result-cert.pem \
-    --output -
-[2021-02-12T01:40:21Z INFO  durango] Loading policy "example-policy.json"
+$ ./bin/durango example/example-policy.json \
+    --key example/example-result-key.pem \
+    --identity example/example-result-cert.pem \
+    --output example-binary.wasm:-
+[2021-02-12T01:40:21Z INFO  durango] Loading policy "example/example-policy.json"
 [2021-02-12T01:40:21Z INFO  durango] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
 [2021-02-12T01:40:21Z INFO  durango] Read results into "-"
