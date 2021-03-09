@@ -79,8 +79,8 @@ pub enum VeracruzClientError {
         _1
     )]
     ResponseError(&'static str, transport_protocol::ResponseStatus),
-    #[error(display = "VeracruzClient: Received no result from Sinaloa")]
-    SinaloaResponseNoResultError,
+    #[error(display = "VeracruzClient: Received no result from the Veracruz server")]
+    VeracruzServerResponseNoResultError,
     #[error(display = "VeracruzClient: Too many interation: {:?}", _0)]
     ExcessiveIterationError(&'static str),
     #[error(
