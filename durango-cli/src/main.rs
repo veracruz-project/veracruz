@@ -19,6 +19,52 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
+use std::ffi;
+use veracruz_utils::EnclavePlatform;
+
+
+/// parser for file paths either in the form of
+/// --program=a.wasm or --program=b:a.wasm if a file should
+/// be provided as a different name.
+///
+/// Also accepts comma-separated lists of files.
+///
+/// Note we can't fail, because a malformed string may be
+/// interpreted as a really ugly filename. Fortunately these
+/// sort of mistakes should still be caught by a later
+/// "file-not-found" error.
+fn parse_file_paths(
+    s: &ffi::OsStr
+) -> Result<Vec<(String, path::PathBuf)>, ffi::OsString> {
+    match s.to_str() {
+        Some(s) => {
+            Ok(
+                s.split(",")
+                    .map(|s| {
+                        // TODO should we actually use = as a separator? more
+                        // common in CLIs
+                        match s.splitn(2, ":").collect::<Vec<_>>().as_slice() {
+                            [name, path] => (
+                                String::from(*name),
+                                path::PathBuf::from(*path)
+                            ),
+                            [path] => (
+                                String::from(*path),
+                                path::PathBuf::from(*path)
+                            ),
+                            _ => unreachable!(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            )
+        },
+        None => {
+            Err(ffi::OsString::from(
+                format!("invalid path: {:?}", s)
+            ))
+        }
+    }
+}
 
 
 #[derive(Debug, StructOpt)]
@@ -28,6 +74,10 @@ struct Opt {
     #[structopt(parse(from_os_str))]
     policy_path: path::PathBuf,
 
+    /// Target enclave platform
+    #[structopt(short, long)]
+    target: EnclavePlatform,
+
     /// Path to client certificate file
     #[structopt(short, long, parse(from_os_str))]
     identity: path::PathBuf,
@@ -36,36 +86,66 @@ struct Opt {
     #[structopt(short, long, parse(from_os_str))]
     key: path::PathBuf,
 
-    /// Specify optional program file to upload
+    /// Specify optional program files to upload
     ///
-    /// Accepts "-" to read from stdin
+    /// This can be in the form of "--program=name", or in the form
+    /// of "--program=enclave_name:name" if you want to supply the file
+    /// as a different name in the enclave. Multiple --program flags
+    /// or a comma-separated list of files may be provided. Also
+    /// accepts "-" to read from stdin.
     ///
     /// Note: This requires "PiProvider" permissions in the
     /// policy file.
-    #[structopt(short, long, parse(from_os_str))]
-    program: Option<path::PathBuf>,
-
-    /// Specify optional data file to upload
     ///
-    /// Accepts "-" to read from stdin
+    #[structopt(
+        short, long, multiple=true, number_of_values=1,
+        visible_alias="programs",
+        parse(try_from_os_str=parse_file_paths)
+    )]
+    program: Vec<Vec<(String, path::PathBuf)>>,
+
+    /// Specify optional data files to upload
+    ///
+    /// This can be in the form of "--data=name", or in the form
+    /// of "--data=enclave_name:name" if you want to supply the file
+    /// as a different name in the enclave. Multiple --data flags
+    /// or a comma-separated list of files may be provided. Also
+    /// accepts "-" to read from stdin.
     ///
     /// Note: This requires "DataProvider" permissions in the
     /// policy file.
-    #[structopt(short, long, multiple=true, number_of_values=1, parse(from_os_str))]
-    data: Vec<path::PathBuf>,
+    ///
+    #[structopt(
+        short, long, multiple=true, number_of_values=1,
+        visible_alias="datas",
+        parse(try_from_os_str=parse_file_paths)
+    )]
+    data: Vec<Vec<(String, path::PathBuf)>>,
 
-    /// Specify optional output file to store results. If not provided
+    // TODO does this need to be vec?
+    /// Specify optional output files to store results. If not provided
     /// the results will not be fetched.
+    ///
+    /// This can be in the form of "--result=name", or in the form
+    /// of "--result=enclave_name:name" if you want to fetch with a
+    /// different name in the enclave. Multiple --result flags
+    /// or a comma-separated list of files may be provided. Also
+    /// accepts "-" to write to stdout.
     ///
     /// If --no-shutdown is not provided, Durango will request a shutdown
     /// from the Sinaloa server after recieving the results.
     ///
-    /// Accepts "-" to write to stdout
-    ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
-    #[structopt(short, long, visible_alias="result", parse(from_os_str))]
-    output: Option<path::PathBuf>,
+    ///
+    #[structopt(
+        short, long, multiple=true, number_of_values=1,
+        visible_alias="outputs",
+        visible_alias="result",
+        visible_alias="results",
+        parse(try_from_os_str=parse_file_paths)
+    )]
+    output: Vec<Vec<(String, path::PathBuf)>>,
 
     /// Do not request a shutdown of the Sinaloa server after recieving the
     /// results. This can be useful if you have multiple result readers.
@@ -106,23 +186,6 @@ fn main() {
     };
     info!("Loaded policy {}", policy_hash);
 
-    // need to convert to str for Durango
-    // TODO allow Durango to accept Paths?
-    let client_cert_path = match opt.identity.to_str() {
-        Some(client_cert_path) => client_cert_path,
-        None => {
-            error!("Invalid client_cert_path (not utf8?)");
-            process::exit(1);
-        }
-    };
-    let client_key_path = match opt.key.to_str() {
-        Some(client_key_path) => client_key_path,
-        None => {
-            error!("Invalid client_key_path (not utf8?)");
-            process::exit(1);
-        }
-    };
-
     // create Durango instance
     // TODO allow AsRef<VeracruzPolicy>?
     let mut durango = match Durango::with_policy_and_hash(
@@ -130,6 +193,7 @@ fn main() {
         opt.key,
         policy.clone(),
         policy_hash,
+        &opt.target,
     ) {
         Ok(durango) => durango,
         Err(err) => {
@@ -141,14 +205,14 @@ fn main() {
 
     let mut did_something = false;
 
-    // send program?
-    if let Some(ref program_path) = opt.program {
+    // send program(s)?
+    for (program_name, program_path) in opt.program.iter().flatten() {
         did_something = true;
 
-        let program = if program_path == &path::PathBuf::from("-") {
-            let mut program = Vec::new();
-            match io::stdin().read_to_end(&mut program) {
-                Ok(_) => program,
+        let program_data = if program_path == &path::PathBuf::from("-") {
+            let mut program_data = Vec::new();
+            match io::stdin().read_to_end(&mut program_data) {
+                Ok(_) => program_data,
                 Err(err) => {
                     error!("{}", err);
                     process::exit(1);
@@ -156,7 +220,7 @@ fn main() {
             }
         } else {
             match fs::read(program_path) {
-                Ok(program) => program,
+                Ok(program_data) => program_data,
                 Err(err) => {
                     error!("{}", err);
                     process::exit(1);
@@ -164,7 +228,7 @@ fn main() {
             }
         };
 
-        match durango.send_program(&program) {
+        match durango.send_program(&program_name, &program_data) {
             Ok(()) => {}
             Err(err) => {
                 error!("{}", err);
@@ -176,14 +240,13 @@ fn main() {
     }
 
     // send data(s)?
-    // TODO can we specify these in any order?
-    for data_path in opt.data.iter() {
+    for (data_name, data_path) in opt.data.iter().flatten() {
         did_something = true;
 
-        let data = if data_path == &path::PathBuf::from("-") {
-            let mut data = Vec::new();
-            match io::stdin().read_to_end(&mut data) {
-                Ok(_) => data,
+        let data_data = if data_path == &path::PathBuf::from("-") {
+            let mut data_data = Vec::new();
+            match io::stdin().read_to_end(&mut data_data) {
+                Ok(_) => data_data,
                 Err(err) => {
                     error!("{}", err);
                     process::exit(1);
@@ -191,7 +254,7 @@ fn main() {
             }
         } else {
             match fs::read(data_path) {
-                Ok(data) => data,
+                Ok(data_data) => data_data,
                 Err(err) => {
                     error!("{}", err);
                     process::exit(1);
@@ -199,7 +262,7 @@ fn main() {
             }
         };
 
-        match durango.send_data(&data) {
+        match durango.send_data(data_name, &data_data) {
             Ok(()) => {}
             Err(err) => {
                 error!("{}", err);
@@ -210,10 +273,11 @@ fn main() {
         info!("Submitted data {:?}", data_path);
     }
 
-    if let Some(ref output_path) = opt.output {
+    // fetch result(s)?
+    for (output_name, output_path) in opt.output.iter().flatten() {
         did_something = true;
 
-        let results = match durango.get_results() {
+        let results = match durango.get_results(output_name) {
             Ok(results) => results,
             Err(err) => {
                 error!("{}", err);
@@ -244,7 +308,7 @@ fn main() {
     }
 
     // shutdown?
-    if (opt.output.is_some() && !opt.no_shutdown) || opt.shutdown {
+    if (!opt.output.is_empty() && !opt.no_shutdown) || opt.shutdown {
         did_something = true;
 
         match durango.request_shutdown() {

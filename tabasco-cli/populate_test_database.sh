@@ -4,7 +4,7 @@
 #
 # TODO should there be a different way to create a test database?
 
-hash_value=$(dd skip=960 count=32 if=../sonora/css.bin bs=1 status=none| xxd -ps -cols 32)
+hash_value=$(dd skip=960 count=32 if=../trustzone-root-enclave/css.bin bs=1 status=none| xxd -ps -cols 32)
 echo $hash_value
 rm -f tabasco.db
 diesel --database-url=${1:-tabasco.db} --config-file ../tabasco/diesel.toml setup
