@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-durango-test trustzone-durango-test sgx trustzone sgx-sinaloa-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env tlaxcala trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-sinaloa-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env tlaxcala trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -32,20 +32,20 @@ sdk:
 test_cases: sdk
 	$(MAKE) -C test-collateral
 
-# Test durango for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
-sgx-durango-test: sgx test_cases 
-	cd durango && RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --lib --features "mock sgx" -- --test-threads=1
+# Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
+sgx-veracruz-client-test: sgx test_cases 
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --lib --features "mock sgx" -- --test-threads=1
 
-# Test durango for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
-trustzone-durango-test: trustzone test_cases
-	cd durango && cargo test --lib --features "mock tz" -- --test-threads=1
+# Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
+trustzone-veracruz-client-test: trustzone test_cases
+	cd veracruz-client && cargo test --lib --features "mock tz" -- --test-threads=1
 
 # Compile for sgx
 # offset the CC OPENSSL_DIR, which might be used in compiling trustzone
 sgx: sdk sgx-env
 	cd mexico-city-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd trustzone-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
-	cd durango && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
 nitro: sdk
 	pwd
@@ -57,7 +57,7 @@ nitro: sdk
 trustzone: sdk trustzone-env
 	$(MAKE) -C mexico-city trustzone CC=$(AARCH64_GCC)
 	$(MAKE) -C sgx-root-enclave trustzone
-	cd durango && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
 
 sgx-sinaloa-test: sgx test_cases
 	cd sinaloa-test \
@@ -171,13 +171,13 @@ clean:
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol durango sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
+	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave mexico-city-bind mexico-city psa-attestation sinaloa-test sinaloa trustzone-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
 
 fmt:
 	cd session-manager && cargo fmt
 	cd execution-engine && cargo fmt
 	cd transport-protocol && cargo fmt
-	cd durango && cargo fmt
+	cd veracruz-client && cargo fmt
 	cd sgx-root-enclave && cargo fmt
 	cd mexico-city && cargo fmt
 	cd psa-attestation && cargo fmt

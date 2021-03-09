@@ -7,12 +7,12 @@ description = "Veracruz integration test.  This is a full system test that shoul
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["durango/sgx","sinaloa/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation"]
-tz = ["durango/tz","sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz"]
-nitro = ["durango/nitro", "sinaloa/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
+sgx = ["veracruz-client/sgx","sinaloa/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation"]
+tz = ["veracruz-client/tz","sinaloa/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz"]
+nitro = ["veracruz-client/nitro", "sinaloa/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
 
 [dependencies]
-durango = {path = "../durango"}
+veracruz-client = {path = "../veracruz-client"}
 sinaloa = { path = "../sinaloa"}
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 serde_json = "1.0"

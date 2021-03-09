@@ -1,4 +1,4 @@
-//! The Durango library
+//! The Veracruz client's library
 //!
 //! ## Authors
 //!
@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::{attestation::Attestation, error::DurangoError};
+use crate::{attestation::Attestation, error::VeracruzClientError};
 use ring::signature::KeyPair;
 use rustls::Session;
 use std::{
@@ -28,7 +28,7 @@ use crate::attestation::AttestationPSA as AttestationHandler;
 use crate::attestation::MockAttestation as AttestationHandler;
 
 #[derive(Debug)]
-pub struct Durango {
+pub struct VeracruzClient {
     tls_session: rustls::ClientSession,
     remote_session_id: Option<u32>,
     policy: VeracruzPolicy,
@@ -37,12 +37,12 @@ pub struct Durango {
     client_cert: String,
 }
 
-impl Durango {
+impl VeracruzClient {
     /// Provide file path.
     /// Read all the bytes in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_all_bytes_in_file(filename: &str) -> Result<Vec<u8>, DurangoError> {
+    fn read_all_bytes_in_file(filename: &str) -> Result<Vec<u8>, VeracruzClientError> {
         let mut file = std::fs::File::open(filename)?;
         let mut buffer = std::vec::Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -54,15 +54,15 @@ impl Durango {
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
     // TODO: use generic functions to unify read_cert and read_private_key
-    fn read_cert(filename: &str) -> Result<rustls::Certificate, DurangoError> {
-        let buffer = Durango::read_all_bytes_in_file(filename)?;
+    fn read_cert(filename: &str) -> Result<rustls::Certificate, VeracruzClientError> {
+        let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let cert_vec = rustls::internal::pemfile::certs(&mut cursor)
-            .map_err(|_| DurangoError::TLSUnspecifiedError)?;
+            .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
         if cert_vec.len() == 1 {
             Ok(cert_vec[0].clone())
         } else {
-            Err(DurangoError::InvalidLengthError("cert_vec", 1))
+            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
         }
     }
 
@@ -70,15 +70,15 @@ impl Durango {
     /// Read the private in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_private_key(filename: &str) -> Result<rustls::PrivateKey, DurangoError> {
-        let buffer = Durango::read_all_bytes_in_file(filename)?;
+    fn read_private_key(filename: &str) -> Result<rustls::PrivateKey, VeracruzClientError> {
+        let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let pkey_vec = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
-            .map_err(|_| DurangoError::TLSUnspecifiedError)?;
+            .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
         if pkey_vec.len() == 1 {
             Ok(pkey_vec[0].clone())
         } else {
-            Err(DurangoError::InvalidLengthError("cert_vec", 1))
+            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
         }
     }
 
@@ -90,7 +90,7 @@ impl Durango {
         enclave_cert_hash: Vec<u8>,
         _enclave_name: &str,
         ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, DurangoError> {
+    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
         let mut client_config = rustls::ClientConfig::new_self_signed();
 
         let client_cert_vec = vec![client_cert];
@@ -116,12 +116,12 @@ impl Durango {
     fn set_up_client_ciphersuite(
         mut client_config: rustls::ClientConfig,
         ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, DurangoError> {
+    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
         client_config.ciphersuites.clear();
 
         let policy_ciphersuite =
             rustls::CipherSuite::lookup_value(ciphersuite_string).map_err(|_| {
-                DurangoError::TLSInvalidCyphersuiteError(ciphersuite_string.to_string())
+                VeracruzClientError::TLSInvalidCyphersuiteError(ciphersuite_string.to_string())
             })?;
         let supported_ciphersuite = rustls::ALL_CIPHERSUITES
             .iter()
@@ -132,7 +132,7 @@ impl Durango {
                     None
                 })
             })
-            .ok_or(DurangoError::TLSUnsupportedCyphersuiteError(
+            .ok_or(VeracruzClientError::TLSUnsupportedCyphersuiteError(
                 policy_ciphersuite,
             ))?;
         client_config.ciphersuites.push(supported_ciphersuite);
@@ -145,23 +145,23 @@ impl Durango {
     fn check_certificate_validity(
         client_cert_filename: &str,
         public_key: &[u8],
-    ) -> Result<(), DurangoError> {
+    ) -> Result<(), VeracruzClientError> {
         let cert_file = std::fs::File::open(client_cert_filename)?;
         let parsed_cert = x509_parser::pem::Pem::read(std::io::BufReader::new(cert_file))?;
         let parsed_cert = parsed_cert
             .0
             .parse_x509()
-            .map_err(|e| DurangoError::X509ParserError(e.to_string()))?
+            .map_err(|e| VeracruzClientError::X509ParserError(e.to_string()))?
             .tbs_certificate;
 
         if parsed_cert.subject_pki.subject_public_key.data != public_key {
-            Err(DurangoError::MismatchError {
+            Err(VeracruzClientError::MismatchError {
                 variable: "public_key",
                 expected: parsed_cert.subject_pki.subject_public_key.data.to_vec(),
                 received: public_key.to_vec(),
             })
         } else if let None = parsed_cert.validity.time_to_expiration() {
-            Err(DurangoError::CertificateExpireError(
+            Err(VeracruzClientError::CertificateExpireError(
                 client_cert_filename.to_string(),
             ))
         } else {
@@ -177,7 +177,7 @@ impl Durango {
         client_key_filename: &str,
         policy_json: &str,
         target_platform: &EnclavePlatform
-    ) -> Result<Durango, DurangoError> {
+    ) -> Result<VeracruzClient, VeracruzClientError> {
         let policy_hash = hex::encode(ring::digest::digest(
             &ring::digest::SHA256,
             policy_json.as_bytes(),
@@ -189,7 +189,7 @@ impl Durango {
         // check if the certificate is valid
         let key_pair = ring::signature::RsaKeyPair::from_der(client_priv_key.0.as_slice())
             .map_err(|err| {
-                DurangoError::RingError(format!("from_der failed:{:?}", err))
+                VeracruzClientError::RingError(format!("from_der failed:{:?}", err))
             })?;
         Self::check_certificate_validity(client_cert_filename, key_pair.public_key().as_ref())?;
 
@@ -206,7 +206,7 @@ impl Durango {
         )?;
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&enclave_name)?;
         let session = rustls::ClientSession::new(&std::sync::Arc::new(client_config), dns_name);
-        let client_cert_text = Durango::read_all_bytes_in_file(client_cert_filename)?;
+        let client_cert_text = VeracruzClient::read_all_bytes_in_file(client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
         client_cert_raw.retain(|c| c != '\n');
@@ -217,7 +217,7 @@ impl Durango {
             )
             .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
 
-        Ok(Durango {
+        Ok(VeracruzClient {
             tls_session: session,
             remote_session_id: None,
             policy: policy,
@@ -227,7 +227,7 @@ impl Durango {
         })
     }
 
-    fn check_role_permission(&self, role: &VeracruzRole) -> Result<(), DurangoError> {
+    fn check_role_permission(&self, role: &VeracruzRole) -> Result<(), VeracruzClientError> {
         match self
             .policy
             .identities()
@@ -236,18 +236,18 @@ impl Durango {
         {
             Some(identity) => match identity.roles().iter().find(|&x| *x == *role) {
                 Some(_) => Ok(()),
-                None => Err(DurangoError::InvalidRoleError(
+                None => Err(VeracruzClientError::InvalidRoleError(
                     self.client_cert.clone().into_bytes(),
                     role.clone(),
                 )),
             },
-            None => Err(DurangoError::InvalidClientCertificateError(
+            None => Err(VeracruzClientError::InvalidClientCertificateError(
                 self.client_cert.to_string(),
             )),
         }
     }
 
-    pub fn send_program(&mut self, program: &Vec<u8>) -> Result<(), DurangoError> {
+    pub fn send_program(&mut self, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_role_permission(&VeracruzRole::ProgramProvider)?;
 
         self.check_policy_hash()?;
@@ -259,12 +259,12 @@ impl Durango {
         match status {
             transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
             _ => {
-                return Err(DurangoError::ResponseError("send_program", status));
+                return Err(VeracruzClientError::ResponseError("send_program", status));
             }
         }
     }
 
-    pub fn send_data(&mut self, data: &Vec<u8>) -> Result<(), DurangoError> {
+    pub fn send_data(&mut self, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_role_permission(&VeracruzRole::DataProvider)?;
         self.check_policy_hash()?;
         self.check_pi_hash()?;
@@ -276,12 +276,12 @@ impl Durango {
         match status {
             transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
             _ => {
-                return Err(DurangoError::ResponseError("send_data", status));
+                return Err(VeracruzClientError::ResponseError("send_data", status));
             }
         }
     }
 
-    pub fn get_results(&mut self) -> Result<Vec<u8>, DurangoError> {
+    pub fn get_results(&mut self) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_role_permission(&VeracruzRole::ResultReader)?;
         self.check_policy_hash()?;
         self.check_pi_hash()?;
@@ -292,16 +292,16 @@ impl Durango {
         let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
-            return Err(DurangoError::ResponseError("get_result", status));
+            return Err(VeracruzClientError::ResponseError("get_result", status));
         }
         if !parsed_response.has_result() {
-            return Err(DurangoError::SinaloaResponseNoResultError);
+            return Err(VeracruzClientError::SinaloaResponseNoResultError);
         }
         let response_data = &parsed_response.get_result().data;
         return Ok(response_data.clone());
     }
 
-    pub fn request_shutdown(&mut self) -> Result<(), DurangoError> {
+    pub fn request_shutdown(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_request = transport_protocol::serialize_request_shutdown()?;
         let _response = self.send(&serialized_request)?;
         Ok(())
@@ -313,7 +313,7 @@ impl Durango {
         rst
     }
 
-    fn check_policy_hash(&mut self) -> Result<(), DurangoError> {
+    fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph)?;
         let parsed_response = transport_protocol::parse_mexico_city_response(&response)?;
@@ -321,7 +321,7 @@ impl Durango {
             transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
                 if self.policy_hash != received_hash {
-                    return Err(DurangoError::MismatchError {
+                    return Err(VeracruzClientError::MismatchError {
                         variable: "check_pi_hash",
                         expected: self.policy.pi_hash().clone().into_bytes(),
                         received: received_hash.as_bytes().to_vec(),
@@ -331,7 +331,7 @@ impl Durango {
                 }
             }
             _ => {
-                return Err(DurangoError::ResponseError(
+                return Err(VeracruzClientError::ResponseError(
                     "check_policy_hash",
                     parsed_response.status,
                 ));
@@ -339,7 +339,7 @@ impl Durango {
         }
     }
 
-    fn check_pi_hash(&mut self) -> Result<(), DurangoError> {
+    fn check_pi_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_request = transport_protocol::serialize_request_pi_hash()?;
         let mut iterations = 0;
         let max_iterations = 10;
@@ -353,7 +353,7 @@ impl Durango {
                     if received_hash == *self.policy.pi_hash() {
                         return Ok(());
                     } else {
-                        return Err(DurangoError::MismatchError {
+                        return Err(VeracruzClientError::MismatchError {
                             variable: "check_pi_hash",
                             expected: self.policy.pi_hash().clone().into_bytes(),
                             received: received_hash.into_bytes(),
@@ -365,17 +365,17 @@ impl Durango {
                     // go for another iteration
                 }
                 _ => {
-                    return Err(DurangoError::ResponseError("check_pi_hash", status));
+                    return Err(VeracruzClientError::ResponseError("check_pi_hash", status));
                 }
             }
             iterations = iterations + 1;
         }
-        return Err(DurangoError::ExcessiveIterationError("check_pi_hash"));
+        return Err(VeracruzClientError::ExcessiveIterationError("check_pi_hash"));
     }
 
     /// send the data to the mexico_city path on the sinaloa server.
     // TODO: This function has return points scattered all over, making it very hard to follow
-    fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, DurangoError> {
+    fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
         match self.remote_session_id {
             Some(session_id) => enclave_session_id = session_id,
@@ -442,7 +442,7 @@ impl Durango {
         }
     }
 
-    fn process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, DurangoError> {
+    fn process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
         let mut ret_option = None;
         let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
         if input.len() > 0 && (!self.tls_session.is_handshaking() || self.tls_session.wants_read())
@@ -459,7 +459,7 @@ impl Durango {
         Ok(ret_option)
     }
 
-    fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, DurangoError> {
+    fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
         let mut ret_val = None;
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
         self.tls_session.process_new_packets()?;
@@ -474,7 +474,7 @@ impl Durango {
         &self,
         enclave_session_id: u32,
         data: &Vec<u8>,
-    ) -> Result<Option<(u32, Vec<Vec<u8>>)>, DurangoError> {
+    ) -> Result<Option<(u32, Vec<Vec<u8>>)>, VeracruzClientError> {
         println!("post_mexico_city started");
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
@@ -486,7 +486,7 @@ impl Durango {
             .body(combined_string)
             .send()?;
         if ret.status() != reqwest::StatusCode::OK {
-            return Err(DurangoError::InvalidReqwestError(ret.status()));
+            return Err(VeracruzClientError::InvalidReqwestError(ret.status()));
         }
         let body = ret.text()?;
 
@@ -510,18 +510,18 @@ impl Durango {
 
     // APIs for testing: expose internal functions
     #[cfg(test)]
-    pub fn pub_read_all_bytes_in_file(filename: &str) -> Result<Vec<u8>, DurangoError> {
-        Durango::read_all_bytes_in_file(filename)
+    pub fn pub_read_all_bytes_in_file(filename: &str) -> Result<Vec<u8>, VeracruzClientError> {
+        VeracruzClient::read_all_bytes_in_file(filename)
     }
 
     #[cfg(test)]
-    pub fn pub_read_cert(filename: &str) -> Result<rustls::Certificate, DurangoError> {
-        Durango::read_cert(filename)
+    pub fn pub_read_cert(filename: &str) -> Result<rustls::Certificate, VeracruzClientError> {
+        VeracruzClient::read_cert(filename)
     }
 
     #[cfg(test)]
-    pub fn pub_read_private_key(filename: &str) -> Result<rustls::PrivateKey, DurangoError> {
-        Durango::read_private_key(filename)
+    pub fn pub_read_private_key(filename: &str) -> Result<rustls::PrivateKey, VeracruzClientError> {
+        VeracruzClient::read_private_key(filename)
     }
 
     #[cfg(test)]
@@ -531,8 +531,8 @@ impl Durango {
         enclave_cert_hash: Vec<u8>,
         enclave_name: &str,
         ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, DurangoError> {
-        Durango::init_self_signed_cert_client_config(
+    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
+        VeracruzClient::init_self_signed_cert_client_config(
             client_cert,
             client_priv_key,
             enclave_cert_hash,
@@ -542,17 +542,17 @@ impl Durango {
     }
 
     #[cfg(test)]
-    pub fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, DurangoError> {
+    pub fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         self.send(data)
     }
 
     #[cfg(test)]
-    pub fn pub_process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, DurangoError> {
+    pub fn pub_process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
         self.process(input)
     }
 
     #[cfg(test)]
-    pub fn pub_get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, DurangoError> {
+    pub fn pub_get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
         self.get_data()
     }
 }

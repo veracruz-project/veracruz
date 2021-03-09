@@ -68,9 +68,9 @@ build:trustzone:
         key: TRUSTZONE
         policy: push
 
-test:sgx:durango:
+test:sgx:veracruz-client:
     stage: test
-    script: make sgx-durango-test
+    script: make sgx-veracruz-client-test
     needs:
         - build:sgx
     cache:
@@ -78,9 +78,9 @@ test:sgx:durango:
         key: SGX
         policy: pull
 
-test:trustzone:durango:
+test:trustzone:veracruz-client:
     stage: test
-    script: make trustzone-durango-test
+    script: make trustzone-veracruz-client-test
     needs:
         - build:trustzone
     cache:

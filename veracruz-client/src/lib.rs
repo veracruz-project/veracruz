@@ -1,4 +1,4 @@
-//! The Durango library
+//! The Veracruz client's library
 //!
 //! ## Authors
 //!
@@ -12,8 +12,8 @@
 // NB: added to avoid a compile-failure in Rust's futures library.
 #![feature(proc_macro_hygiene)]
 
-pub mod durango;
-pub use self::durango::*;
+pub mod veracruz_client;
+pub use self::veracruz_client::*;
 pub mod attestation;
 pub mod error;
 pub use self::error::*;

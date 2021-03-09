@@ -19,10 +19,10 @@ pub trait Attestation {
     fn attestation(
         policy: &veracruz_utils::VeracruzPolicy,
         target_platform: &EnclavePlatform,
-    ) -> Result<(Vec<u8>, String), DurangoError>;
+    ) -> Result<(Vec<u8>, String), VeracruzClientError>;
 }
 
-use crate::error::DurangoError;
+use crate::error::VeracruzClientError;
 use base64;
 use transport_protocol;
 use hex;
@@ -37,7 +37,7 @@ impl Attestation for AttestationPSA {
     fn attestation(
         policy: &veracruz_utils::VeracruzPolicy,
         target_platform: &EnclavePlatform,
-    ) -> Result<(Vec<u8>, String), DurangoError> {
+    ) -> Result<(Vec<u8>, String), VeracruzClientError> {
         let mexico_city_hash = policy.mexico_city_hash(target_platform)
             .map_err(|err| {
                 println!("Did not find mexico city hash for platform in policy:{:?}", err);
@@ -57,7 +57,7 @@ impl AttestationPSA {
         proxy_attestation_server_url: &str,
         remote_url: &str,
         expected_enclave_hash: &Vec<u8>,
-    ) -> Result<(Vec<u8>, String), DurangoError> {
+    ) -> Result<(Vec<u8>, String), VeracruzClientError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         let serialized_rpat = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let received_string = AttestationPSA::post_sinaloa(remote_url, &serialized_rpat)?;
@@ -68,7 +68,7 @@ impl AttestationPSA {
         let received_payload = base64::decode(&received_buffer)?;
 
         if challenge != received_payload[8..40] {
-            return Err(DurangoError::MismatchError {
+            return Err(VeracruzClientError::MismatchError {
                 variable: "challenge",
                 expected: challenge.to_vec(),
                 received: received_payload[8..40].to_vec(),
@@ -76,7 +76,7 @@ impl AttestationPSA {
         }
 
         if *expected_enclave_hash != received_payload[47..79].to_vec() {
-            return Err(DurangoError::MismatchError {
+            return Err(VeracruzClientError::MismatchError {
                 variable: "expected_enclave_hash",
                 expected: expected_enclave_hash.to_vec(),
                 received: received_payload[47..79].to_vec(),
@@ -88,17 +88,17 @@ impl AttestationPSA {
         Ok((enclave_cert_hash, enclave_name.to_string()))
     }
 
-    fn post_sinaloa(remote_url: &str, data: &Vec<u8>) -> Result<String, DurangoError> {
+    fn post_sinaloa(remote_url: &str, data: &Vec<u8>) -> Result<String, VeracruzClientError> {
         let string_data = base64::encode(data);
         let dest_url = format!("http://{:}/sinaloa", remote_url);
         let post_result_string = AttestationPSA::post_string(&dest_url, string_data);
         post_result_string
     }
 
-    fn post_string(url: &str, data: String) -> Result<String, DurangoError> {
+    fn post_string(url: &str, data: String) -> Result<String, VeracruzClientError> {
         let mut response = reqwest::Client::new().post(url).body(data).send()?;
         if response.status() != reqwest::StatusCode::OK {
-            return Err(DurangoError::InvalidReqwestError(response.status()));
+            return Err(VeracruzClientError::InvalidReqwestError(response.status()));
         }
         response.text().map_err(|e| e.into())
     }
