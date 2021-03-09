@@ -101,13 +101,13 @@ fn get_firmware_version() -> Result<String, String> {
 /// token.
 /// I DO NOT THINK THIS IS NECESSARY ANYMORE
 fn set_runtime_manager_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
-    let mut mch_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
+    let mut runtime_manager_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
         format!(
             "set_runtime_manager_hash failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}",
             err
         )
     })?;
-    *mch_guard = Some(hash);
+    *runtime_manager_guard = Some(hash);
     Ok(NitroStatus::Success)
 }
 

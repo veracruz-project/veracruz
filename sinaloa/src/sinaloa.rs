@@ -85,7 +85,7 @@ pub enum SinaloaError {
     #[error(display = "Sinaloa: NitroStatus: {:?}", _0)]
     NitroStatus(veracruz_utils::NitroStatus),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Received Invalid MC Message: {:?}", _0)]
+    #[error(display = "Sinaloa: Received Invalid Runtime Manager Message: {:?}", _0)]
     InvalidRuntimeManagerMessage(veracruz_utils::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(

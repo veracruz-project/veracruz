@@ -201,7 +201,7 @@ pub extern "C" fn psa_attestation_get_token_enc(
         Ok(_) => return sgx_status_t::SGX_SUCCESS,
         Err(err) => {
             println!(
-                "mc::psa_attestation_get_token_enc returning an error:{:?}",
+                "runtime_manager::psa_attestation_get_token_enc returning an error:{:?}",
                 err
             );
             return sgx_status_t::SGX_ERROR_INVALID_STATE;
@@ -222,7 +222,7 @@ pub extern "C" fn tls_send_data_enc(
         Ok(_) => sgx_status_t::SGX_SUCCESS,
         Err(err) => {
             println!(
-                "mc::tls_send_data_enc session_manager::send_data failed with err:{:?}",
+                "runtime_manager::tls_send_data_enc session_manager::send_data failed with err:{:?}",
                 err
             );
             sgx_status_t::SGX_ERROR_UNEXPECTED
