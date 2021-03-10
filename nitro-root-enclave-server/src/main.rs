@@ -153,9 +153,9 @@ fn native_attestation(
         "nitro-root-enclave-server::native_attstation new completed. fetching firmware version"
     );
     let firmware_version = fetch_firmware_version(&nre_enclave)?;
-    println!("nitro-root-enclave-server::native_attestation fetch_firmware_version complete. Now setting mexico city hash");
+    println!("nitro-root-enclave-server::native_attestation fetch_firmware_version complete. Now setting Runtime Manager hash");
 
-    println!("SinaloaNitro::native_attestation completed setting Mexico City Hash. Now sending start to proxy attestation server.");
+    println!("SinaloaNitro::native_attestation completed setting Runtime Manager hash. Now sending start to proxy attestation server.");
     let (challenge, device_id) = send_start(proxy_attestation_server_url, "nitro", &firmware_version)?;
 
     println!("SinaloaNitro::native_attestation completed send to the proxy attestation server. Now sending NativeAttestation message to Nitro Root Enclave");

@@ -1,4 +1,4 @@
-//! The Mexico City enclave
+//! The Runtime Manager enclave
 //!
 //! ## Authors
 //!
@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![crate_name = "mexico_city_enclave"]
+#![crate_name = "runtime_manager_enclave"]
 #![cfg_attr(feature = "sgx", no_std)]
 #![feature(rustc_private)]
 
@@ -18,7 +18,7 @@
 extern crate sgx_tstd as std;
 
 #[cfg(feature = "sgx")]
-pub mod mc_sgx;
+pub mod runtime_manager_sgx;
 #[cfg(feature = "sgx")]
-pub use crate::mc_sgx::*;
+pub use crate::runtime_manager_sgx::*;
 pub mod managers;

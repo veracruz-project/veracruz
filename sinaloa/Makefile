@@ -57,8 +57,8 @@ Sinaloa_Name := $(CUSTOM_BIN_PATH)/libsinaloa.rlib
 
 Crypto_Library_Name := sgx_tcrypto
 
-RustEnclave_Link_Libs := -L$(CUSTOM_LIBRARY_PATH) -lmexico_city_enclave -L$(MEXICO_CITY_PATH)/lib/
-Signed_RustEnclave_Name := $(CUSTOM_BIN_PATH)/mexico_city.signed.so
+RustEnclave_Link_Libs := -L$(CUSTOM_LIBRARY_PATH) -lruntime_manager_enclave -L$(RUNTIME_MANAGER_PATH)/lib/
+Signed_RustEnclave_Name := $(CUSTOM_BIN_PATH)/runtime_manager.signed.so
 
 sgx: $(Sinaloa_Name)
 
@@ -78,7 +78,7 @@ trustzone: $(Sinaloa_SRC_Files)
 .PHONY: clean
 clean:
 	@rm -f $(Sinaloa_Name) \
-		$(MEXICO_CITY_PATH)/*_t.* *_u.* lib/*.a ./bin/libsinaloa_lib.rlib \
+		$(RUNTIME_MANAGER_PATH)/*_t.* *_u.* lib/*.a ./bin/libsinaloa_lib.rlib \
 		Cargo.lock
 	@rm -rf target lib
 	@cargo clean

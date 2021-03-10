@@ -1,5 +1,5 @@
 [package]
-name = "mexico_city_enclave"
+name = "runtime_manager_enclave"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
@@ -7,12 +7,12 @@ build = "build.rs"
 description = "The trusted Veracruz runtime's command-and-control module.  Co-ordinates and directs the rest of the runtime."
 
 [lib]
-name = "mexico_city_enclave"
+name = "runtime_manager_enclave"
 crate-type = ["staticlib"]
 path = "src/lib.rs"
 
 [[bin]]
-name = "mexico_city_enclave"
+name = "runtime_manager_enclave"
 path = "src/main.rs"
 
 [features]

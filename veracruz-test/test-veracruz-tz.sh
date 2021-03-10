@@ -14,7 +14,7 @@ mkdir -p /tmp/vc_test/shared/test/
 (cd /tmp/vc_test/ && curl http://mesalock-linux.org/assets/optee-qemuv8-3.4.0.tar.gz | tar zxv)
 #cp /work/rust-optee-trustzone-sdk/examples/hello_world/ta/target/aarch64-unknown-optee-trustzone/release/*.ta /tmp/vc_test/shared
 #cp /work/rust-optee-trustzone-sdk/examples/hello_world/host/target/aarch64-unknown-linux-gnu/release/hello_world /tmp/vc_test/shared
-cp ../mexico-city/target/aarch64-unknown-optee-trustzone/release/*.ta /tmp/vc_test/shared/test/
+cp ../runtime-manager/target/aarch64-unknown-optee-trustzone/release/*.ta /tmp/vc_test/shared/test/
 cp ./target/aarch64-unknown-linux-gnu/debug/veracruz_test-* /tmp/vc_test/shared/test
 cp -r ../test-collateral/ /tmp/vc_test/shared/test_collateral/
 cp ./optee-qemuv8.sh /tmp/vc_test/

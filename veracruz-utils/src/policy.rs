@@ -344,11 +344,11 @@ pub struct VeracruzPolicy {
     /// principals of the computation and the enclave.
     ciphersuite: String,
     /// The hash of the Veracruz trusted runtime for SGX enclaves.
-    mexico_city_hash_sgx: Option<String>,
+    runtime_manager_hash_sgx: Option<String>,
     /// The hash of the Veracruz trusted runtime for TrustZone TAs.
-    mexico_city_hash_tz: Option<String>,
+    runtime_manager_hash_tz: Option<String>,
     /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
-    mexico_city_hash_nitro: Option<String>,
+    runtime_manager_hash_nitro: Option<String>,
     /// The declared ordering of data inputs, provided by the various data
     /// providers, as specified in the policy.  Note that data providers can
     /// provision their inputs asynchronously, and in an arbitrary order.  Once
@@ -394,9 +394,9 @@ impl VeracruzPolicy {
         sinaloa_url: String,
         enclave_cert_expiry: VeracruzExpiry,
         ciphersuite: String,
-        mexico_city_hash_sgx: Option<String>,
-        mexico_city_hash_tz: Option<String>,
-        mexico_city_hash_nitro: Option<String>,
+        runtime_manager_hash_sgx: Option<String>,
+        runtime_manager_hash_tz: Option<String>,
+        runtime_manager_hash_nitro: Option<String>,
         data_provision_order: Vec<u64>,
         streaming_order: Vec<u64>,
         proxy_attestation_server_url: String,
@@ -409,9 +409,9 @@ impl VeracruzPolicy {
             sinaloa_url,
             enclave_cert_expiry,
             ciphersuite,
-            mexico_city_hash_sgx,
-            mexico_city_hash_tz,
-            mexico_city_hash_nitro,
+            runtime_manager_hash_sgx,
+            runtime_manager_hash_tz,
+            runtime_manager_hash_nitro,
             data_provision_order,
             proxy_attestation_server_url,
             pi_hash,
@@ -463,23 +463,23 @@ impl VeracruzPolicy {
     /// Returns the hash of the trusted Veracruz runtime, associated with this
     /// policy.
     #[inline]
-    pub fn mexico_city_hash(&self, platform: &EnclavePlatform) -> Result<&String, VeracruzUtilError>  {
+    pub fn runtime_manager_hash(&self, platform: &EnclavePlatform) -> Result<&String, VeracruzUtilError>  {
         let hash = match platform {
-            EnclavePlatform::SGX => match &self.mexico_city_hash_sgx {
+            EnclavePlatform::SGX => match &self.runtime_manager_hash_sgx {
                 Some(hash) => hash,
-                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_sgx".to_string())),
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("runtime_manager_hash_sgx".to_string())),
             },
-            EnclavePlatform::TrustZone => match &self.mexico_city_hash_tz {
+            EnclavePlatform::TrustZone => match &self.runtime_manager_hash_tz {
                 Some(hash) => hash,
-                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_tz".to_string())),
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("runtime_manager_hash_tz".to_string())),
             },
-            EnclavePlatform::Nitro => match &self.mexico_city_hash_nitro {
+            EnclavePlatform::Nitro => match &self.runtime_manager_hash_nitro {
                 Some(hash) => hash,
-                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_nitro".to_string())),
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("runtime_manager_hash_nitro".to_string())),
             },
-            EnclavePlatform::Mock => match &self.mexico_city_hash_sgx {
+            EnclavePlatform::Mock => match &self.runtime_manager_hash_sgx {
                 Some(hash) => hash,
-                None => return Err(VeracruzUtilError::MissingPolicyFieldError("mexico_city_hash_sgx".to_string())),
+                None => return Err(VeracruzUtilError::MissingPolicyFieldError("runtime_manager_hash_sgx".to_string())),
             },
         };
         return Ok(&hash);

@@ -55,7 +55,7 @@ lazy_static! {
         0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
     ];
     static ref NATIVE_ATTESTATION_DONE: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
-    static ref MEXICO_CITY_HASH: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
+    static ref RUNTIME_MANAGER_HASH: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
 }
 
 #[ta_create]
@@ -172,27 +172,26 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
                 ErrorKind::Unknown
             })?;
         }
-        SgxRootEnclaveOpcode::SetMexicoCityHashHack => {
+        SgxRootEnclaveOpcode::SetRuntimeManagerHashHack => {
             // This Opcode allows the non-secure world to set the hash value
-            // for the mexico city TA that is returned in the Proxy Attestation
+            // for the Runtime Manager TA that is returned in the Proxy Attestation
             // token. Of course, THIS IS INCREDIBLY INSECURE, and only exists
             // because at the moment, OPTEE does not provide a way for one TA
             // to reliably get the hash of another TA.
             // THIS IS A DIRTY HACK AND COMPROMISES THE SECURITY OF THE ENTIRE
             // SYSTEM AND IS ONLY HERE TO ALLOW FOR DEMONSTRATIONS
-            trace_println!("sgx-root-enclave::invoke_command SetMexicoCityHashHack");
             let hash_value = unsafe {
                 let mut memref = params.0.as_memref().map_err(|err| {
-                    trace_println!("sgx-root-enclave::invoke_command::SetMexicoCityHashHack failed to get params.0 as mem_ref:{:?}", err);
+                    trace_println!("sgx-root-enclave::invoke_command::SetRuntimeManagerHashHack failed to get params.0 as mem_ref:{:?}", err);
                     ErrorKind::BadParameters
                 })?;
                 memref.buffer().to_vec()
             };
-            let mut mch_guard = MEXICO_CITY_HASH.lock().map_err(|err| {
-                trace_println!("sgx-root-enclave::invoke_command::SetMexicoCityHashHack failed to obtain lock on MEXICO_CITY_HASH:{:?}", err);
+            let mut rmh_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
+                trace_println!("sgx-root-enclave::invoke_command::SetRuntimeManagerHashHack failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}", err);
                 ErrorKind::TargetDead
             })?;
-            *mch_guard = Some(hash_value);
+            *rmh_guard = Some(hash_value);
         }
         SgxRootEnclaveOpcode::NativeAttestation => {
             trace_println!("sgx-root-enclave::invoke_command NativeAttestation Opcode started");
@@ -504,16 +503,16 @@ fn proxy_attestation(challenge: &Vec<u8>, enclave_cert: &Vec<u8>) -> Result<Vec<
         )
     };
     trace_println!("sgx-root-enclave::proxy_attestation started");
-    let mexico_city_hash = {
-        let mch_guard = MEXICO_CITY_HASH.lock().map_err(|err| {
+    let runtime_manager_hash = {
+        let rmh_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
             format!(
-                "sgx-root-enclave::proxy_attestation failed to obtain lock on MEXICO_CITY_HASH:{:?}",
+                "sgx-root-enclave::proxy_attestation failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}",
                 err
             )
         })?;
-        match &*mch_guard {
+        match &*rmh_guard {
             Some(hash) => hash.clone(),
-            None => return Err(format!("sgx-root-enclave::proxy_attestation MEXICO_CITY_HASH does not contain data and that's a problem")),
+            None => return Err(format!("sgx-root-enclave::proxy_attestation RUNTIME_MANAGER_HASH does not contain data and that's a problem")),
         }
     };
     let mut token: Vec<u8> = Vec::with_capacity(2048);
@@ -523,8 +522,8 @@ fn proxy_attestation(challenge: &Vec<u8>, enclave_cert: &Vec<u8>) -> Result<Vec<
     let enclave_name_vec = enclave_name.as_bytes();
     let status = unsafe {
         psa_initial_attest_get_token(
-            mexico_city_hash.as_ptr() as *const u8,
-            mexico_city_hash.len() as u64,
+            runtime_manager_hash.as_ptr() as *const u8,
+            runtime_manager_hash.len() as u64,
             enclave_cert_hash.as_ref().as_ptr() as *const u8,
             enclave_cert_hash.as_ref().len() as u64,
             enclave_name_vec.as_ptr() as *const u8,

@@ -1,6 +1,6 @@
 OPTEE_DIR ?= /work/rust-optee-trustzone-sdk
 OPTEE_OS_DIR ?= $(OPTEE_DIR)/optee_os
-UUID ?= $(shell cat "../mexico_city_uuid.txt")
+UUID ?= $(shell cat "../runtime-manager-uuid.txt")
 
 TA_SIGN_KEY ?= $(OPTEE_OS_DIR)/out/arm/export-ta_arm64/keys/default_ta.pem
 SIGN := python2 $(OPTEE_OS_DIR)/out/arm/export-ta_arm64/scripts/sign.py
@@ -11,13 +11,13 @@ TARGET := aarch64-unknown-optee-trustzone
 
 OUT_DIR := $(CURDIR)/target/$(TARGET)/release
 
-all: mexico_city_enclave strip sign
+all: runtime_manager_enclave strip sign
 
-mexico_city_enclave:
+runtime_manager_enclave:
 	@xargo build --target $(TARGET) --features tz --release --verbose
 
 strip:
-	@$(OBJCOPY) --strip-unneeded $(OUT_DIR)/mexico_city_enclave $(OUT_DIR)/stripped_ta
+	@$(OBJCOPY) --strip-unneeded $(OUT_DIR)/runtime_manager_enclave $(OUT_DIR)/stripped_ta
 
 sign:
 	@$(SIGN) --uuid $(UUID) --key $(TA_SIGN_KEY) --in $(OUT_DIR)/stripped_ta --out $(OUT_DIR)/$(UUID).ta

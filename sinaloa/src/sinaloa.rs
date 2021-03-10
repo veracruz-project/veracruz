@@ -79,14 +79,14 @@ pub enum SinaloaError {
     #[error(display = "Sinaloa: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: MCMessage::Status: {:?}", _0)]
-    MCMessageStatus(veracruz_utils::MCMessage),
+    #[error(display = "Sinaloa: RuntimeManagerMessage::Status: {:?}", _0)]
+    RuntimeManagerMessageStatus(veracruz_utils::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "Sinaloa: NitroStatus: {:?}", _0)]
     NitroStatus(veracruz_utils::NitroStatus),
     #[cfg(feature = "nitro")]
-    #[error(display = "Sinaloa: Received Invalid MC Message: {:?}", _0)]
-    InvalidMCMessage(veracruz_utils::MCMessage),
+    #[error(display = "Sinaloa: Received Invalid Runtime Manager Message: {:?}", _0)]
+    InvalidRuntimeManagerMessage(veracruz_utils::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
         display = "Sinaloa: Received Invalid Nitro Root Enclave Message: {:?}",

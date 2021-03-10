@@ -497,9 +497,9 @@ fn veracruz_client_session() {
 }
 
 /// simple index handler
-#[post("/mexico_city")]
-async fn mc(session: Session, req: HttpRequest) -> Result<HttpResponse, actix_web::Error> {
-    println!("mexico_city:{:?}", req);
+#[post("/runtime_manager")]
+async fn runtime_manager(session: Session, req: HttpRequest) -> Result<HttpResponse, actix_web::Error> {
+    println!("runtime_manager:{:?}", req);
     // session
     let mut counter = 1;
     if let Some(count) = session.get::<i32>("counter")? {
@@ -519,7 +519,7 @@ async fn policy_server_loop(
     _server_sess: &mut dyn rustls::Session,
     server_url: &str,
 ) -> Result<(), VeracruzClientError> {
-    HttpServer::new(|| App::new().service(mc))
+    HttpServer::new(|| App::new().service(runtime_manager))
         .bind(server_url)
         .unwrap()
         .run()

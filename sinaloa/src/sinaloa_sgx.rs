@@ -16,13 +16,13 @@ pub mod sinaloa_sgx {
     use transport_protocol;
     use lazy_static::lazy_static;
     use log::{debug, error};
-    use mexico_city_bind::{
-        mexico_city_close_session_enc, mexico_city_get_enclave_cert_enc,
-        mexico_city_get_enclave_cert_len_enc, mexico_city_get_enclave_name_enc,
-        mexico_city_get_enclave_name_len_enc, mexico_city_init_session_manager_enc,
-        mexico_city_new_session_enc, mexico_city_psa_attestation_get_token_enc,
-        mexico_city_tls_get_data_enc, mexico_city_tls_get_data_needed_enc,
-        mexico_city_tls_send_data_enc,
+    use runtime_manager_bind::{
+        runtime_manager_close_session_enc, runtime_manager_get_enclave_cert_enc,
+        runtime_manager_get_enclave_cert_len_enc, runtime_manager_get_enclave_name_enc,
+        runtime_manager_get_enclave_name_len_enc, runtime_manager_init_session_manager_enc,
+        runtime_manager_new_session_enc, runtime_manager_psa_attestation_get_token_enc,
+        runtime_manager_tls_get_data_enc, runtime_manager_tls_get_data_needed_enc,
+        runtime_manager_tls_send_data_enc,
     };
     use sgx_types::*;
     use sgx_urts::SgxEnclave;
@@ -39,11 +39,11 @@ pub mod sinaloa_sgx {
         static ref TRUSTZONE_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
     }
 
-    static MC_ENCLAVE_FILE: &'static str = "./target/debug/mexicocity.signed.so";
-    static TRUSTZONE_ROOT_ENCLAVE_ENCLAVE_FILE: &'static str = "./target/debug/trustzone_root_enclave.signed.so";
+    static RUNTIME_MANAGER_FILE: &'static str = "./target/debug/runtime_manager.signed.so";
+    static TRUSTZONE_ROOT_ENCLAVE_FILE: &'static str = "./target/debug/trustzone_root_enclave.signed.so";
 
     pub struct SinaloaSGX {
-        mc_enclave: SgxEnclave,
+        runtime_manager_enclave: SgxEnclave,
     }
 
     impl SinaloaSGX {
@@ -51,8 +51,8 @@ pub mod sinaloa_sgx {
             let mut needed: u8 = 4;
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_tls_get_data_needed_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_tls_get_data_needed_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut result,
                     session_id,
                     &mut needed,
@@ -60,7 +60,7 @@ pub mod sinaloa_sgx {
             };
             if ret != 0 || result != 0 {
                 return Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_tls_get_data_needed_enc",
+                    "runtime_manager_tls_get_data_needed_enc",
                 ));
             }
             return Ok(needed == 1);
@@ -465,16 +465,16 @@ pub mod sinaloa_sgx {
 
     impl Sinaloa for SinaloaSGX {
         fn new(policy_json: &str) -> Result<Self, SinaloaError> {
-            let mc_enclave = start_enclave(MC_ENCLAVE_FILE)?;
+            let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 
             let mut new_sinaloa = SinaloaSGX {
-                mc_enclave: mc_enclave,
+                runtime_manager_enclave: runtime_manager_enclave,
             };
 
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_init_session_manager_enc(
-                    new_sinaloa.mc_enclave.geteid(),
+                runtime_manager_init_session_manager_enc(
+                    new_sinaloa.runtime_manager_enclave.geteid(),
                     &mut result,
                     policy_json.as_bytes().as_ptr() as *const u8,
                     policy_json.len() as u64,
@@ -488,7 +488,7 @@ pub mod sinaloa_sgx {
                 match *trustzone_root_enclave {
                     Some(_) => (), // do nothing, we're good
                     None => {
-                        let enclave = start_enclave(TRUSTZONE_ROOT_ENCLAVE_ENCLAVE_FILE)?;
+                        let enclave = start_enclave(TRUSTZONE_ROOT_ENCLAVE_FILE)?;
                         new_sinaloa.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
                         *trustzone_root_enclave = Some(enclave)
                     }
@@ -499,15 +499,15 @@ pub mod sinaloa_sgx {
                 Ok(new_sinaloa)
             } else {
                 debug!(
-                    "mexico_city_init_session_manager_enc result:{:?}, ret:{:?}",
+                    "runtime_manager_init_session_manager_enc result:{:?}, ret:{:?}",
                     result, ret
                 );
-                Err(SinaloaError::EnclaveCallError("mexico_city_init_session_manager_enc"))
+                Err(SinaloaError::EnclaveCallError("runtime_manager_init_session_manager_enc"))
             }
         }
 
         fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
-            let parsed = transport_protocol::parse_mexico_city_request(&data)?;
+            let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
                 let rpat = parsed.get_request_proxy_psa_attestation_token();
@@ -536,8 +536,8 @@ pub mod sinaloa_sgx {
             let mut pubkey_size: u64 = 0;
             let mut device_id: i32 = 0;
             let pagt_ret = unsafe {
-                mexico_city_psa_attestation_get_token_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_psa_attestation_get_token_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut pagt_result,
                     challenge.as_ptr() as *const u8,
                     challenge.len() as u64,
@@ -552,7 +552,7 @@ pub mod sinaloa_sgx {
             };
             if (pagt_ret != 0) || (pagt_result != 0) {
                 Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_psa_attestation_get_token_enc",
+                    "runtime_manager_psa_attestation_get_token_enc",
                 ))
             } else {
                 unsafe { token.set_len(token_size as usize) };
@@ -566,15 +566,15 @@ pub mod sinaloa_sgx {
             let mut len_result: u32 = 0;
             let mut cert_len: u64 = 0;
             let len_ret = unsafe {
-                mexico_city_get_enclave_cert_len_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_get_enclave_cert_len_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut len_result,
                     &mut cert_len,
                 )
             };
             if (len_ret != 0) || (len_result != 0) {
                 return Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_get_enclave_cert_len_enc",
+                    "runtime_manager_get_enclave_cert_len_enc",
                 ));
             }
             let output_size: u64 = cert_len;
@@ -583,8 +583,8 @@ pub mod sinaloa_sgx {
             let mut output_len: u64 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_get_enclave_cert_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_get_enclave_cert_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut result,
                     p_output,
                     output_size,
@@ -593,7 +593,7 @@ pub mod sinaloa_sgx {
             };
             if (ret != 0) || (result != 0) || (output_len == 0) {
                 Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_get_enclave_cert_enc",
+                    "runtime_manager_get_enclave_cert_enc",
                 ))
             } else {
                 unsafe { output.set_len(output_len as usize) };
@@ -606,15 +606,15 @@ pub mod sinaloa_sgx {
             let mut len_result: u32 = 0;
             let mut name_len: u64 = 0;
             let len_ret = unsafe {
-                mexico_city_get_enclave_name_len_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_get_enclave_name_len_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut len_result,
                     &mut name_len,
                 )
             };
             if (len_ret != 0) || (len_result != 0) {
                 return Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_get_enclave_cert_enc",
+                    "runtime_manager_get_enclave_cert_enc",
                 ));
             }
             let output_size = name_len;
@@ -623,8 +623,8 @@ pub mod sinaloa_sgx {
             let p_output = output.as_mut_ptr();
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_get_enclave_name_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_get_enclave_name_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut result,
                     p_output,
                     output_size as u64,
@@ -632,7 +632,7 @@ pub mod sinaloa_sgx {
             };
             if (ret != 0) || (result != 0) {
                 Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_get_enclave_name_enc",
+                    "runtime_manager_get_enclave_name_enc",
                 ))
             } else {
                 unsafe { output.set_len(output_size as usize) };
@@ -644,13 +644,13 @@ pub mod sinaloa_sgx {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_new_session_enc(self.mc_enclave.geteid(), &mut result, &mut session_id)
+                runtime_manager_new_session_enc(self.runtime_manager_enclave.geteid(), &mut result, &mut session_id)
             };
             if (ret == 0) && (result == 0) {
                 Ok(session_id)
             } else {
                 Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_new_session_enc",
+                    "runtime_manager_new_session_enc",
                 ))
             }
         }
@@ -658,13 +658,13 @@ pub mod sinaloa_sgx {
         fn close_tls_session(&self, session_id: u32) -> Result<(), SinaloaError> {
             let mut result: u32 = 0;
             let ret = unsafe {
-                mexico_city_close_session_enc(self.mc_enclave.geteid(), &mut result, session_id)
+                runtime_manager_close_session_enc(self.runtime_manager_enclave.geteid(), &mut result, session_id)
             };
             if (ret == 0) && (result == 0) {
                 Ok(())
             } else {
                 Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_close_session_enc",
+                    "runtime_manager_close_session_enc",
                 ))
             }
         }
@@ -676,8 +676,8 @@ pub mod sinaloa_sgx {
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), SinaloaError> {
             let mut ret_code: u32 = 0;
             let ret_val = unsafe {
-                mexico_city_tls_send_data_enc(
-                    self.mc_enclave.geteid(),
+                runtime_manager_tls_send_data_enc(
+                    self.runtime_manager_enclave.geteid(),
                     &mut ret_code,
                     session_id,
                     input.as_ptr() as *const u8,
@@ -686,7 +686,7 @@ pub mod sinaloa_sgx {
             };
             if ret_val != 0 || ret_code != 0 {
                 return Err(SinaloaError::EnclaveCallError(
-                    "mexico_city_tls_send_data_enc",
+                    "runtime_manager_tls_send_data_enc",
                 ));
             }
 
@@ -699,8 +699,8 @@ pub mod sinaloa_sgx {
                 let p_output = output.as_mut_ptr();
                 let mut output_len: u64 = 0;
                 let ret = unsafe {
-                    mexico_city_tls_get_data_enc(
-                        self.mc_enclave.geteid(),
+                    runtime_manager_tls_get_data_enc(
+                        self.runtime_manager_enclave.geteid(),
                         &mut get_ret,
                         session_id,
                         p_output,
@@ -711,7 +711,7 @@ pub mod sinaloa_sgx {
                 };
                 if get_ret != 0 || ret != 0 || output_len == 0 {
                     return Err(SinaloaError::EnclaveCallError(
-                        "mexico_city_tls_get_data_enc",
+                        "runtime_manager_tls_get_data_enc",
                     ));
                 }
                 unsafe { output.set_len(output_len as usize) };
@@ -729,7 +729,7 @@ pub mod sinaloa_sgx {
         }
 
         fn close(&mut self) -> Result<bool, SinaloaError> {
-            //self.mc_enclave.destroy();
+            //self.runtime_manager_enclave.destroy();
             Ok(true)
         }
     }

@@ -20,9 +20,9 @@ pub mod policy;
 pub use crate::policy::*;
 
 #[cfg(feature = "tz")]
-pub mod mexico_city_opcode;
+pub mod runtime_manager_opcode;
 #[cfg(feature = "tz")]
-pub use crate::mexico_city_opcode::*;
+pub use crate::runtime_manager_opcode::*;
 
 #[cfg(feature = "tz")]
 pub mod sgx_root_enclave_opcode;

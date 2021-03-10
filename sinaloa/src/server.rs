@@ -47,8 +47,8 @@ async fn sinaloa_request(
     Ok(result_string)
 }
 
-#[post("/mexico_city")]
-async fn mexico_city_request(
+#[post("/runtime_manager")]
+async fn runtime_manager_request(
     enclave_handler: web::Data<EnclaveHandler>,
     stopper: web::Data<mpsc::Sender<()>>,
     _request: HttpRequest,
@@ -121,7 +121,7 @@ pub fn server(policy_filename: &str) -> Result<Server, SinaloaError> {
             .data(shutdown_channel_tx.clone())
             .data(SINALOA.clone())
             .service(sinaloa_request)
-            .service(mexico_city_request)
+            .service(runtime_manager_request)
     })
     .bind(&policy.sinaloa_url())?
     .run();

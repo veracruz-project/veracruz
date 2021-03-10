@@ -6,7 +6,7 @@ edition = "2018"
 description = "An untrusted server/bridge that allows the outside world and the trusted Veracruz runtime to communicate with each other."
 
 [features]
-sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "mexico-city-bind", "trustzone-root-enclave-bind"]
+sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "trustzone-root-enclave-bind"]
 tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid"]
 nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2" ]
 debug = []
@@ -41,7 +41,7 @@ ssh2 = {version = "0.8.3", optional = true }
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-mexico-city-bind = { path = "../mexico-city-bind", optional = true }
+runtime-manager-bind = { path = "../runtime-manager-bind", optional = true }
 trustzone-root-enclave-bind = { path = "../trustzone-root-enclave-bind", optional = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]

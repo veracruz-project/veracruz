@@ -200,7 +200,7 @@ message ProxyAttestationServerResponse {
   uint32 context = 1;
 }
 
-message MexicoCityRequest {
+message RuntimeManagerRequest {
   oneof message_oneof {
     Data data = 2;
     Program program = 3;
@@ -217,7 +217,7 @@ message MexicoCityRequest {
   uint32 context = 1;
 }
 
-message MexicoCityResponse {
+message RuntimeManagerResponse {
   ResponseStatus status = 1;
   oneof message_oneof {
     Result result = 4;

@@ -15,9 +15,9 @@ type ClientID = u64;
 type PackageID = u64;
 type DataPackage = execution_engine::hcall::common::DataSourceMetadata;
 
-/// Error type for mexico-city buffer.
+/// Error type for the Runtime Manager buffer.
 #[derive(Clone, Debug, Error)]
-pub enum MexicoCityBufferError {
+pub enum RuntimeManagerBufferError {
     /// There is already a buffered program.
     #[error(display = "Already have a buffered program.")]
     AlreadyHaveBufferedProgram,
@@ -67,7 +67,7 @@ pub enum MexicoCityBufferError {
 }
 
 /// Buffer for storing program, (static) data, and stream data.
-pub(crate) struct MexicoCityBuffer {
+pub(crate) struct RuntimeManagerBuffer {
     // Program in binary form, initially None.
     program: Option<Vec<u8>>,
     // All initial data indexed by ClientID and then PackageID, that is availalble in each stream round.
@@ -76,10 +76,10 @@ pub(crate) struct MexicoCityBuffer {
     stream: HashMap<ClientID, HashMap<PackageID, DataPackage>>,
 }
 
-impl MexicoCityBuffer {
+impl RuntimeManagerBuffer {
     /// Initialize a new empty buffer.
     pub(crate) fn new() -> Self {
-        MexicoCityBuffer {
+        RuntimeManagerBuffer {
             program: None,
             data: HashMap::new(),
             stream: HashMap::new(),
@@ -87,9 +87,9 @@ impl MexicoCityBuffer {
     }
 
     /// Buffer a program. Raise an error if there is already a program.
-    pub(crate) fn buffer_program(&mut self, prog: &[u8]) -> Result<(), MexicoCityBufferError> {
+    pub(crate) fn buffer_program(&mut self, prog: &[u8]) -> Result<(), RuntimeManagerBufferError> {
         if self.program.is_some() {
-            Err(MexicoCityBufferError::AlreadyHaveBufferedProgram)
+            Err(RuntimeManagerBufferError::AlreadyHaveBufferedProgram)
         } else {
             self.program = Some(prog.to_vec());
             Ok(())
@@ -100,13 +100,13 @@ impl MexicoCityBuffer {
     pub(crate) fn buffer_data(
         &mut self,
         package: &DataPackage,
-    ) -> Result<(), MexicoCityBufferError> {
+    ) -> Result<(), RuntimeManagerBufferError> {
         let client_id = package.get_client_id();
         let package_id = package.get_package_id();
         if Self::buffer_package(&mut self.data, package) {
             Ok(())
         } else {
-            Err(MexicoCityBufferError::AlreadyHaveBufferedData {
+            Err(RuntimeManagerBufferError::AlreadyHaveBufferedData {
                 client_id,
                 package_id,
             })
@@ -117,13 +117,13 @@ impl MexicoCityBuffer {
     pub(crate) fn buffer_stream(
         &mut self,
         package: &DataPackage,
-    ) -> Result<(), MexicoCityBufferError> {
+    ) -> Result<(), RuntimeManagerBufferError> {
         let client_id = package.get_client_id();
         let package_id = package.get_package_id();
         if Self::buffer_package(&mut self.stream, package) {
             Ok(())
         } else {
-            Err(MexicoCityBufferError::AlreadyHaveBufferedStream {
+            Err(RuntimeManagerBufferError::AlreadyHaveBufferedStream {
                 client_id,
                 package_id,
             })
@@ -156,11 +156,11 @@ impl MexicoCityBuffer {
     }
 
     /// Assume there is buffered program, otherwise return error
-    pub(crate) fn get_program(&self) -> Result<&[u8], MexicoCityBufferError> {
+    pub(crate) fn get_program(&self) -> Result<&[u8], RuntimeManagerBufferError> {
         self.program
             .as_ref()
             .map(|l| l.as_slice())
-            .ok_or(MexicoCityBufferError::NoBufferedProgram)
+            .ok_or(RuntimeManagerBufferError::NoBufferedProgram)
     }
 
     /// Fetch a buffered (static) data of a client and a package ID.
@@ -169,9 +169,9 @@ impl MexicoCityBuffer {
         &self,
         client_id: ClientID,
         package_id: PackageID,
-    ) -> Result<&DataPackage, MexicoCityBufferError> {
+    ) -> Result<&DataPackage, RuntimeManagerBufferError> {
         Self::get_package(&self.data, client_id, package_id).ok_or(
-            MexicoCityBufferError::NoBufferedData {
+            RuntimeManagerBufferError::NoBufferedData {
                 client_id,
                 package_id,
             },
@@ -179,7 +179,7 @@ impl MexicoCityBuffer {
     }
 
     /// Fetch all (static) data packages
-    pub(crate) fn all_data(&self) -> Result<Vec<DataPackage>, MexicoCityBufferError> {
+    pub(crate) fn all_data(&self) -> Result<Vec<DataPackage>, RuntimeManagerBufferError> {
         Ok(self
             .data
             .values()
@@ -194,9 +194,9 @@ impl MexicoCityBuffer {
         &self,
         client_id: ClientID,
         package_id: PackageID,
-    ) -> Result<&DataPackage, MexicoCityBufferError> {
+    ) -> Result<&DataPackage, RuntimeManagerBufferError> {
         Self::get_package(&self.data, client_id, package_id).ok_or(
-            MexicoCityBufferError::NoBufferedStream {
+            RuntimeManagerBufferError::NoBufferedStream {
                 client_id,
                 package_id,
             },

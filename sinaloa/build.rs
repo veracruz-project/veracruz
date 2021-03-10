@@ -60,12 +60,12 @@ fn main() {
         }
 
         let make_result = Command::new("make")
-            .current_dir("../mexico-city")
+            .current_dir("../runtime-manager")
             .args(&["trustzone".to_string(), out_dir_arg, final_dir_arg])
             .status()
             .unwrap();
         if !make_result.success() {
-            panic!("sinaloa::build.rs: make mexico-city failed");
+            panic!("sinaloa::build.rs: make runtime-manager failed");
         }
     }
 }

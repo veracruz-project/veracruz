@@ -1,4 +1,4 @@
-//! Intel SGX-specific material for the Mexico City enclave
+//! Intel SGX-specific material for the Runtime Manager enclave
 //!
 //! ## Authors
 //!
@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 pub use crate::managers;
-pub use crate::managers::MexicoCityError;
+pub use crate::managers::RuntimeManagerError;
 
 use sgx_tdh::{SgxDhMsg1, SgxDhMsg2, SgxDhMsg3, SgxDhResponder};
 use sgx_types::{
@@ -72,7 +72,7 @@ pub extern "C" fn init_session_manager_enc(policy_buf: *const u8, policy_buf_siz
     if ret.is_ok() {
         sgx_status_t::SGX_SUCCESS
     } else {
-        println!("mc_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
+        println!("runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
         sgx_status_t::SGX_ERROR_UNEXPECTED
     }
 }
@@ -121,7 +121,7 @@ pub extern "C" fn psa_attestation_get_token_enc(
     //    closure can use the ? operator or call return Err...
     // 2. call the closure and match the Result. Return 0 for no error,
     //    non-zero for Err
-    let mut body_closure = || -> Result<(), MexicoCityError> {
+    let mut body_closure = || -> Result<(), RuntimeManagerError> {
         *token_size = 0;
         let mut dh_msg1: SgxDhMsg1 = SgxDhMsg1::default();
 
@@ -140,10 +140,10 @@ pub extern "C" fn psa_attestation_get_token_enc(
             )
         };
         if ocall_status != sgx_status_t::SGX_SUCCESS {
-            return Err(MexicoCityError::SGXError(ocall_status));
+            return Err(RuntimeManagerError::SGXError(ocall_status));
         }
         if ocall_ret != sgx_status_t::SGX_SUCCESS {
-            return Err(MexicoCityError::SGXError(ocall_ret));
+            return Err(RuntimeManagerError::SGXError(ocall_ret));
         }
 
         let mut dh_msg3 = SgxDhMsg3::default();
@@ -190,10 +190,10 @@ pub extern "C" fn psa_attestation_get_token_enc(
             )
         };
         if ocall_status != sgx_status_t::SGX_SUCCESS {
-            return Err(MexicoCityError::SGXError(ocall_status));
+            return Err(RuntimeManagerError::SGXError(ocall_status));
         }
         if ocall_ret != sgx_status_t::SGX_SUCCESS {
-            return Err(MexicoCityError::SGXError(ocall_ret));
+            return Err(RuntimeManagerError::SGXError(ocall_ret));
         }
         return Ok(());
     };
@@ -201,7 +201,7 @@ pub extern "C" fn psa_attestation_get_token_enc(
         Ok(_) => return sgx_status_t::SGX_SUCCESS,
         Err(err) => {
             println!(
-                "mc::psa_attestation_get_token_enc returning an error:{:?}",
+                "runtime_manager::psa_attestation_get_token_enc returning an error:{:?}",
                 err
             );
             return sgx_status_t::SGX_ERROR_INVALID_STATE;
@@ -222,7 +222,7 @@ pub extern "C" fn tls_send_data_enc(
         Ok(_) => sgx_status_t::SGX_SUCCESS,
         Err(err) => {
             println!(
-                "mc::tls_send_data_enc session_manager::send_data failed with err:{:?}",
+                "runtime_manager::tls_send_data_enc session_manager::send_data failed with err:{:?}",
                 err
             );
             sgx_status_t::SGX_ERROR_UNEXPECTED

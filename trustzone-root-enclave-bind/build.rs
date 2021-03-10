@@ -27,7 +27,7 @@ fn main() {
     };
 
     let out_dir_link_search = format!("cargo:rustc-link-search={:}", out_dir);
-    // link against the mexico city non-secure library
+    // link against the runtime manager non-secure library
     println!("cargo:rustc-link-search=../trustzone-root-enclave/bin");
     println!("{:}", out_dir_link_search);
     println!("cargo:rustc-link-lib=static=trustzone_root_enclave_u");

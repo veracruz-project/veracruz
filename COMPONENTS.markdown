@@ -25,7 +25,7 @@ interpretation as the only selectable execution strategy for TrustZone and SGX
 - Transport protocol: is a support library that manages the parsing and
 serialization of `protobuf` messages used in the various Veracruz wire
 protocols.
-- Mexico City: is a "command and control" module for the trusted Veracruz
+- Runtime Manager: is a "command and control" module for the trusted Veracruz
 runtime which drives the other components.
 - platform_services: provides an abstraction layer over important services that
 each isolate implementation provides.  At the moment, this consists of a single
