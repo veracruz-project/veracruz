@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -68,7 +68,7 @@ sgx-veracruz-server-test-dry-run: sgx test_cases
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run 
 
-sgx-sinaloa-performance: sgx test_cases
+sgx-veracruz-server-performance: sgx test_cases
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_performance_ --features sgx -- --ignored 
 
@@ -90,9 +90,9 @@ trustzone-veracruz-server-test: trustzone test_cases trustzone-test-env
 	cd veracruz-server-test \
 		&& export OPENSSL_DIR=$(AARCH64_OPENSSL_DIR) \
 		&& cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
-		&& ./cp-sinaloa-test-tz.sh
-	chmod u+x run_sinaloa_test_tz.sh
-	./run_sinaloa_test_tz.sh
+		&& ./cp-veracruz-server-test-tz.sh
+	chmod u+x run_veracruz_server_test_tz.sh
+	./run_veracruz_server_test_tz.sh
 
 trustzone-veracruz-test: trustzone test_cases trustzone-test-env
 	cd veracruz-test \
@@ -118,7 +118,7 @@ nitro-veracruz-server-test-dry-run: nitro test_cases
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features sgx --no-run
 
-nitro-sinaloa-performance: nitro test_cases
+nitro-veracruz-server-performance: nitro test_cases
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_performance_ --features nitro -- --ignored
 	cd veracruz-server-test \
@@ -162,7 +162,7 @@ clean:
 	cd nitro-root-enclave-server && cargo clean
 	$(MAKE) clean -C runtime-manager
 	$(MAKE) clean -C sgx-root-enclave
-	$(MAKE) clean -C sinaloa
+	$(MAKE) clean -C veracruz-server
 	$(MAKE) clean -C test-collateral 
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk

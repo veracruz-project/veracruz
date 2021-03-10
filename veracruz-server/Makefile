@@ -45,13 +45,13 @@ CUSTOM_BIN_PATH := ./bin
 CUSTOM_COMMON_PATH := $(RUST_SGX_SDK_PATH)/common
 
 
-Sinaloa_Rust_Flags :=
-Sinaloa_SRC_Files := $(shell find src/ -type f -name '*.rs') $(shell find src/ -type f -name 'Cargo.toml')
-Sinaloa_Include_Paths := -I ./src -I$(SGX_SDK)/include
-Sinaloa_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Sinaloa_Include_Paths)
+Veracruz_Server_Rust_Flags :=
+Veracruz_Server_SRC_Files := $(shell find src/ -type f -name '*.rs') $(shell find src/ -type f -name 'Cargo.toml')
+Veracruz_Server_Include_Paths := -I ./src -I$(SGX_SDK)/include
+Veracruz_Server_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Veracruz_Server_Include_Paths)
 
-Sinaloa_Rust_Path := ./target/debug
-Sinaloa_Name := $(CUSTOM_BIN_PATH)/libsinaloa.rlib
+Veracruz_Server_Rust_Path := ./target/debug
+Veracruz_Server_Name := $(CUSTOM_BIN_PATH)/libveracruz_server.rlib
 
 ######## Enclave Settings ########
 
@@ -60,25 +60,25 @@ Crypto_Library_Name := sgx_tcrypto
 RustEnclave_Link_Libs := -L$(CUSTOM_LIBRARY_PATH) -lruntime_manager_enclave -L$(RUNTIME_MANAGER_PATH)/lib/
 Signed_RustEnclave_Name := $(CUSTOM_BIN_PATH)/runtime_manager.signed.so
 
-sgx: $(Sinaloa_Name)
+sgx: $(Veracruz_Server_Name)
 
 $(CUSTOM_LIBRARY_PATH): 
 	mkdir -p $@
 
-$(Sinaloa_Name): $(Sinaloa_SRC_Files) $(CUSTOM_LIBRARY_PATH)
-	@SGX_SDK=$(SGX_SDK) cargo build $(Sinaloa_Rust_Flags) --features sgx
+$(Veracruz_Server_Name): $(Veracruz_Server_SRC_Files) $(CUSTOM_LIBRARY_PATH)
+	@SGX_SDK=$(SGX_SDK) cargo build $(Veracruz_Server_Rust_Flags) --features sgx
 	@echo $(INFO_COLOR)"CARGO =>  $@"$(RESET_COLOR)
 
 
 ################## trustzone ###################
-trustzone: $(Sinaloa_SRC_Files)
+trustzone: $(Veracruz_Server_SRC_Files)
 	cargo build --features tz --target aarch64-unknown-linux-gnu --release 
 	@echo $(INFO_COLOR)"CARGO => $^"$(RESET_COLOR)
 
 .PHONY: clean
 clean:
-	@rm -f $(Sinaloa_Name) \
-		$(RUNTIME_MANAGER_PATH)/*_t.* *_u.* lib/*.a ./bin/libsinaloa_lib.rlib \
+	@rm -f $(Veracruz_Server_Name) \
+		$(RUNTIME_MANAGER_PATH)/*_t.* *_u.* lib/*.a ./bin/libveracruz_server_lib.rlib \
 		Cargo.lock
 	@rm -rf target lib
 	@cargo clean
