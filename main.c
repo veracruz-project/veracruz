@@ -18,6 +18,7 @@
 
 #include <net/socket.h>
 #include <net/http_client.h>
+#include <random/rand32.h>
 #include <kernel.h>
 
 // TODO log?
@@ -70,21 +71,41 @@
 #define HTTP_PORT 3017
 #endif
 
+struct http_get_state {
+    uint8_t *buf;
+    size_t buf_len;
+    size_t pos;
+};
+
 static void http_get_cb(
         struct http_response *rsp,
-        enum http_final_call state,
+        enum http_final_call final,
         void *udata) {
-    // TODO probably handle this?
-    if (state != HTTP_DATA_MORE) {
-        printf("http rsp state != HTTP_DATA_FINAL (%d), "
-            "should handle this\n", state);
-    }
+//    // TODO probably handle this?
+//    if (state != HTTP_DATA_MORE) {
+//        printf("http rsp state != HTTP_DATA_FINAL (%d), "
+//            "should handle this\n", state);
+//    }
 
     printf("rsp = %s (%d bytes)\n", rsp->http_status, rsp->data_len);
+
+    struct http_get_state *state = udata;
+    uint8_t *start = (rsp->body_start) ? rsp->body_start : rsp->recv_buf;
+    size_t len = rsp->data_len;
+
+    if (state->pos + len > state->buf_len) {
+        printf("http get buffer overflow! truncating (%d > %d)\n",
+            state->pos + len, state->buf_len);
+
+        len = state->buf_len - state->pos;
+    }
+
+    memcpy(&state->buf[state->pos], start, len);
+    state->pos += len;
 }
 
 // TODO TLS? https_get?
-int http_get(
+ssize_t http_get(
         struct sockaddr *server_addr,
         socklen_t server_addr_len,
         // TODO dedup this?
@@ -92,22 +113,40 @@ int http_get(
         const char *path,
         // TODO headers?
         uint8_t *buf,
-        size_t buf_size,
+        size_t buf_len,
         int32_t timeout) {
+    // allocate packet buffer for managing http connection
+    void *pbuf = malloc(256);
+    size_t pbuf_len = 256;
+    if (!pbuf) {
+        printf("http malloc failed (-ENOMEM)\n");
+        return -ENOMEM;
+    }
+
     // create socket and connect to server
     // TODO IPv6? can use net_sin(addr)->sin_family here
     // DNS? Take in a string more useful API?
     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0) {
         printf("http socket open failed (%d)\n", -errno);
+        free(pbuf);
         return -errno;
     }
 
     int res = connect(sock, server_addr, server_addr_len);
     if (res < 0) {
         printf("http connect failed (%d)\n", -errno);
+        free(pbuf);
+        close(sock);
         return -errno;
     }
+
+    // state for filling in buffer
+    struct http_get_state state = {
+        .buf = buf,
+        .buf_len = buf_len,
+        .pos = 0,
+    };
 
     // perform client request, Zephyr handles most of this for us
     struct http_request req;
@@ -117,21 +156,24 @@ int http_get(
     req.host = host;
     req.protocol = "HTTP/1.1";
     req.response = http_get_cb;
-    req.recv_buf = buf;
-    req.recv_buf_len = buf_size;
+    req.recv_buf = pbuf;
+    req.recv_buf_len = pbuf_len;
 
-    int err = http_client_req(sock, &req, timeout, NULL);
+    int err = http_client_req(sock, &req, timeout, &state);
     if (err < 0) {
         printf("http req failed (%d)\n", err);
+        free(pbuf);
+        close(sock);
         return err;
     }
 
     // done, close
+    free(pbuf);
     close(sock);
-    return 0;
+    return state.pos;
 }
 
-uint8_t buffer[1024];
+uint8_t buffer[10*1024];
 
 // hack to exit QEMU
 //__attribute__((noreturn))
@@ -145,6 +187,12 @@ void qemu_exit(void) {
 
 void main(void)
 {
+    // get random challenge
+    // TODO Zephyr notes this is not cryptographically secure, is that an
+    // issue? This will be an area to explore
+    uint8_t challenge[32];
+    sys_rand_get(challenge, sizeof(challenge));
+
     // setup address, TODO use DNS?
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -154,7 +202,7 @@ void main(void)
 
     // perform GET
     printf("connecting to %s:%d...\n", HTTP_SERVER, HTTP_PORT);
-    int err = http_get(
+    ssize_t res = http_get(
             (struct sockaddr*)&addr,
             sizeof(addr),
             HTTP_SERVER,
@@ -162,14 +210,19 @@ void main(void)
             buffer,
             sizeof(buffer),
             3000);
-    if (err) {
-        printf("http_get failed (%d)\n", err);
+    if (res < 0) {
+        printf("http_get failed (%d)\n", res);
         qemu_exit();
     }
 
-    printf("get worked?");
-    printf("%s", buffer);
+    printf("http get -> %d\n", res);
+    for (int i = 0; i < res; i++) {
+        if (buffer[i] != '\r') {
+            printf("%c", buffer[i]);
+        }
+    }
     printf("\n");
+
 //
 //	while (1) {
 //		int len = recv(sock, response, sizeof(response) - 1, 0);
