@@ -1,4 +1,4 @@
-//! Colima, protocol buffer for Veracruz
+//! Protocol buffers for Veracruz transport protocol messages
 //!
 //! ## Authors
 //!

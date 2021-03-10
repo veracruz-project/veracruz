@@ -105,6 +105,6 @@ of the `wasm32-unknown-unknown` build target, and makes the forking of
 existing Rust libraries (e.g. `getrandom` and `rand` above) easier, as the
 `wasm32-unknown-unknown` target is often interpreted as implying the WASI ABI
 in existing Rust code.
-- Tlaxcala: this is an ABI-validator for Veracruz binaries, which takes a
+- WASM Checker: this is an ABI-validator for Veracruz binaries, which takes a
 binary as input and certifies that it only assumes the presence of WASM host
 functions that are exposed by the Veracruz ABI.

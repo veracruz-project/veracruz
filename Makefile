@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-sinaloa-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env tlaxcala trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-sinaloa-test sgx-sinaloa-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-sinaloa-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
