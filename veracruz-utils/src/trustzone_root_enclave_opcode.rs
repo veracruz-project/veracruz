@@ -15,7 +15,7 @@ pub enum TrustZoneRootEnclaveOpcode {
     GetFirmwareVersion,
     NativeAttestation,
     ProxyAttestation,
-    SetMexicoCityHashHack,
+    SetRuntimeManagerHashHack,
 }
 
 impl TrustZoneRootEnclaveOpcode {
@@ -25,7 +25,7 @@ impl TrustZoneRootEnclaveOpcode {
             1 => Ok(TrustZoneRootEnclaveOpcode::GetFirmwareVersion),
             2 => Ok(TrustZoneRootEnclaveOpcode::NativeAttestation),
             3 => Ok(TrustZoneRootEnclaveOpcode::ProxyAttestation),
-            4 => Ok(TrustZoneRootEnclaveOpcode::SetMexicoCityHashHack),
+            4 => Ok(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack),
             _ => Err(format!("TrustZoneRootEnclaveOpcode:from_u32: Unknown value: {}", value)),
         }
     }
