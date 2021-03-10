@@ -39,11 +39,8 @@ pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError
 }
 
 pub fn new_session() -> Result<u32, RuntimeManagerError> {
-    let local_session_id = {
-        let mut session_counter = super::SESSION_COUNTER.lock()?;
-        *session_counter += 1;
-        session_counter.clone()
-    };
+    
+    let local_session_id = super::SESSION_COUNTER.fetch_add(1, Ordering::SeqCst);
 
     let session = match &*super::MY_SESSION_MANAGER.lock()? {
         Some(my_session_manager) => my_session_manager.create_session(),

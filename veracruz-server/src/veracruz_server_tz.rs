@@ -19,13 +19,12 @@ pub mod veracruz_server_tz {
     use optee_teec::{
         Context, Operation, ParamNone, ParamTmpRef, ParamType, ParamValue, Session, Uuid,
     };
-    use std::convert::TryInto;
-    use std::sync::Mutex;
+    use std::{convert::TryInto, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
     use veracruz_utils::{EnclavePlatform, TrustZoneRootEnclaveOpcode, RuntimeManagerOpcode, TRUSTZONE_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
-        static ref TRUSTZONE_ROOT_ENCLAVE_INITIALIZED: Mutex<bool> = Mutex::new(false);
+        static ref TRUSTZONE_ROOT_ENCLAVE_INITIALIZED: AtomicBool = AtomicBool::new(false);
     }
 
     pub struct VeracruzServerTZ {
@@ -34,8 +33,6 @@ pub mod veracruz_server_tz {
 
     impl VeracruzServer for VeracruzServerTZ {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
-            // Set up, initialize SgxRootEnclave
-            //let trustzone_root_enclave_uuid = Uuid::parse_str("8aaaf200-2450-11e4-abe2-0002a5d5c51b").unwrap();
             let policy: veracruz_utils::VeracruzPolicy =
                 veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
 
@@ -47,16 +44,18 @@ pub mod veracruz_server_tz {
                         Err(_) => return Err(VeracruzServerError::MissingFieldError("runtime_manager_hash_tz")),
                     }
                 };
-                let mut ji_guard = TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.lock()?;
-                if !*ji_guard {
-                    debug!("The SGX root enclave is uninitialized.");
-                    VeracruzServerTZ::native_attestation(
-                        &policy.proxy_attestation_server_url(),
-                        trustzone_root_enclave_uuid,
-                        &runtime_manager_hash,
-                    )?;
-                    *ji_guard = true;
-                }
+
+		if !TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.load(Ordering::SeqCst) {
+		    debug!("The SGX root enclave is not initialized.");
+
+		    VeracruzServerTZ::native_attestation(
+			&policy.proxy_attestation_server_url(),
+			trustzone_root_enclave_uuid,
+			&runtime_manager_hash,
+		    )?;
+
+		    TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.store(true, Ordering::SeqCst);
+		}
             }
 
             let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
