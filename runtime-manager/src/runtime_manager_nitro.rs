@@ -210,7 +210,7 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, 
     let nre_message_buffer =
         bincode::serialize(&nre_message).map_err(|err| RuntimeManagerError::BincodeError(err))?;
 
-    // send the buffer back to Sinaloa via an ocall
+    // send the buffer back to the Veracruz server via an ocall
     let vsocksocket = vsocket::vsock_connect(HOST_CID, OCALL_PORT)
         .map_err(|err| RuntimeManagerError::SocketError(err))?;
     send_buffer(vsocksocket.as_raw_fd(), &nre_message_buffer)
