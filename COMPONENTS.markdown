@@ -2,8 +2,7 @@
 
 This document describes all of the major current Veracruz components, and their
 purpose.  If adding a new component, please make sure to update this document
-so that we can keep track of what everything does.  We largely use Mexican
-States to name our components.
+so that we can keep track of what everything does.
 
 ## Components of the Veracruz trusted runtime
 
