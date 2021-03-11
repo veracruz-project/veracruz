@@ -27,6 +27,8 @@ pub enum ProxyAttestationServerError {
     DieselError(#[error(source)] diesel::result::Error),
     #[error(display = "ProxyAttestationServer: DieselError: {:?}.", _0)]
     DieselConnectionError(#[error(source)] diesel::ConnectionError),
+    #[error(display = "ProxyAttestationServer: DieselError: {:?}.", _0)]
+    DieselMigrationError(#[error(source)] diesel_migrations::RunMigrationsError),
     #[error(display = "ProxyAttestationServer: Utf8Error: {:?}.", _0)]
     Utf8Error(#[error(source)] std::str::Utf8Error),
     #[error(display = "ProxyAttestationServer: SerdeJsonError: {:?}.", _0)]
