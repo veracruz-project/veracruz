@@ -22,7 +22,7 @@ use optee_utee::{
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, t_cose_sign1_get_verification_pubkey,
 };
-use ring;;
+use ring;
 use std::{convert::TryInto, io::Write};
 use veracruz_utils::TrustZoneRootEnclaveOpcode;
 
