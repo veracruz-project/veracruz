@@ -29,7 +29,7 @@ pub mod veracruz_server_tz {
     }
 
     pub struct VeracruzServerTZ {
-        mexico_city_uuid: String,
+        runtime_manager_uuid: String,
     }
 
     impl VeracruzServer for VeracruzServerTZ {
@@ -239,8 +239,8 @@ pub mod veracruz_server_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            let mc_uuid = Uuid::parse_str(&self.mexico_city_uuid)?;
-            let mut session = context.open_session(mc_uuid)?;
+            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
+            let mut session = context.open_session(runtime_manager_uuid)?;
 
             {
                 let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
