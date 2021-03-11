@@ -51,7 +51,7 @@ fn main() {
         };
 
         let make_result = Command::new("make")
-            .current_dir("../sgx-root-enclave")
+            .current_dir("../trustzone-root-enclave")
             .args(&[out_dir_arg.clone(), final_dir_arg.clone()])
             .status()
             .unwrap();
