@@ -1418,7 +1418,7 @@ mod tests {
                     });
                 }
             }
-            _ => Err(VeracruzServerNitro::ResponseError(
+            _ => Err(VeracruzServerError::ResponseError(
                 "request_program_hash parse_runtime_manager_response",
                 status,
             )),
