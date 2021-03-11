@@ -1392,7 +1392,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<bool, VeracruzServerError {
+    ) -> Result<bool, VeracruzServerError> {
         let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash()?;
         let data = client_tls_send(
             client_tls_tx,
