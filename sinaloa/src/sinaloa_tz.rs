@@ -379,11 +379,11 @@ pub mod sinaloa_tz {
             return Ok(());
         }
 
-        fn fetch_firmware_version(jal_session: &mut Session) -> Result<String, SinaloaError> {
+        fn fetch_firmware_version(session: &mut Session) -> Result<String, SinaloaError> {
             let firmware_version_len = {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut gfvl_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                jal_session
+                session
                     .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
                 gfvl_op.parameters().0.a()
             };
@@ -391,7 +391,7 @@ pub mod sinaloa_tz {
                 let mut fwv_vec = vec![0; firmware_version_len as usize];
                 let p0 = ParamTmpRef::new_output(&mut fwv_vec);
                 let mut gfv_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                jal_session
+                session
                     .invoke_command(SgxRootEnclaveOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
                 String::from_utf8(fwv_vec)?
             };

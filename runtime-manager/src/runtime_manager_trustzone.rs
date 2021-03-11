@@ -373,10 +373,6 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
         }
         RuntimeManagerOpcode::ResetEnclave => {
             debug_message("runtime_manager_trustzone::invoke_command::ResetEnclave".to_string());
-            //TODO: Check if this is necessary.
-            //      If so, implmenent as the follows:
-            //      let mut cs_guard = CHIHUAHUA_STATE.lock().unwrap();
-            //      *cs_guard = Some(ChihuahuaState::new())
         }
     }
     Ok(())

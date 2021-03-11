@@ -1,6 +1,13 @@
-# Authors: Veracruz Team, Arm Research
-
-# This makefile is used to generate the Tlaxcala wasm binary analyzer
+# Makefile for the WASM Checker binary ABI validator.
+#
+# Authors
+#
+# The Veracruz Development Team.
+#
+# Copyright and Licensing
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# copyright and licensing information.
 
 bin/wasm-checker: src/main.cc wabt json
 	mkdir -p bin/
