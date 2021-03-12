@@ -295,7 +295,7 @@ impl VeracruzClient {
             return Err(VeracruzClientError::ResponseError("get_result", status));
         }
         if !parsed_response.has_result() {
-            return Err(VeracruzClientError::SinaloaResponseNoResultError);
+            return Err(VeracruzClientError::VeracruzServerResponseNoResultError);
         }
         let response_data = &parsed_response.get_result().data;
         return Ok(response_data.clone());
@@ -373,7 +373,7 @@ impl VeracruzClient {
         return Err(VeracruzClientError::ExcessiveIterationError("check_pi_hash"));
     }
 
-    /// send the data to the runtime_manager path on the sinaloa server.
+    /// send the data to the runtime_manager path on the Veracruz server.
     // TODO: This function has return points scattered all over, making it very hard to follow
     fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
@@ -479,7 +479,7 @@ impl VeracruzClient {
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
-        let dest_url = format!("http://{:}/runtime_manager", self.policy.sinaloa_url());
+        let dest_url = format!("http://{:}/runtime_manager", self.policy.veracruz_server_url());
         let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
         let mut ret = client_build
             .post(dest_url.as_str())

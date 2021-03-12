@@ -66,7 +66,7 @@ mod tests {
     use err_derive::Error;
     use log::info;
     use serde::Deserialize;
-    use sinaloa;
+    use veracruz_server;
     use std::{io::Read, sync::Once};
     use proxy_attestation_server;
     use veracruz_utils::{EnclavePlatform, policy, VeracruzPolicy};
@@ -81,8 +81,8 @@ mod tests {
         VeracruzClientError(#[error(source)] veracruz_client::VeracruzClientError),
         #[error(display = "VeracruzTest: VeracruzUtilError: {:?}.", _0)]
         VeracruzUtilError(#[error(source)] policy::VeracruzUtilError),
-        #[error(display = "VeracruzTest: SinaloaError: {:?}.", _0)]
-        SinaloaError(#[error(source)] sinaloa::SinaloaError),
+        #[error(display = "VeracruzTest: VeracruzServerError: {:?}.", _0)]
+        VeracruzServerError(#[error(source)] veracruz_server::VeracruzServerError),
         #[error(display = "VeracruzTest: TransportProtocolError: {:?}.", _0)]
         TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
         #[error(display = "VeracruzTest: Failed to find client with index {}.", _0)]
@@ -420,7 +420,7 @@ mod tests {
     }
 
     async fn server_tls_loop(policy_filename: &str) -> Result<(), VeracruzTestError> {
-        sinaloa::server::server(policy_filename)?.await?;
+        veracruz_server::server::server(policy_filename)?.await?;
         Ok(())
     }
 }

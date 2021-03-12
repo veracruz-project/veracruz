@@ -1,6 +1,6 @@
 [package]
 name = "sgx_root_enclave"
-# NOTE: when update this version, please also update sgx entry in populate_test_database.sh in sinaloa-test and veracruz-test 
+# NOTE: when update this version, please also update sgx entry in populate_test_database.sh in veracruz-server-test and veracruz-test 
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"

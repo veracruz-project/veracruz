@@ -1,4 +1,4 @@
-//! The Sinaloa server
+//! The Veracruz server
 //!
 //! ## Authors
 //!
@@ -9,13 +9,13 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::sinaloa::*;
+use crate::veracruz_server::*;
 #[cfg(feature = "nitro")]
-use crate::sinaloa_nitro::sinaloa_nitro::SinaloaNitro as SinaloaEnclave;
+use crate::veracruz_server_nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 #[cfg(feature = "sgx")]
-use crate::sinaloa_sgx::sinaloa_sgx::SinaloaSGX as SinaloaEnclave;
+use crate::veracruz_server_sgx::veracruz_server_sgx::VeracruzServerSGX as VeracruzServerEnclave;
 #[cfg(feature = "tz")]
-use crate::sinaloa_tz::sinaloa_tz::SinaloaTZ as SinaloaEnclave;
+use crate::veracruz_server_tz::veracruz_server_tz::VeracruzServerTZ as VeracruzServerEnclave;
 
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;
@@ -26,18 +26,18 @@ use std::{
     thread,
 };
 
-type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::sinaloa::Sinaloa + Sync + Send>>>>;
+type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>>>>;
 
-#[post("/sinaloa")]
-async fn sinaloa_request(
+#[post("/veracruz_server")]
+async fn veracruz_server_request(
     enclave_handler: web::Data<EnclaveHandler>,
     _request: HttpRequest,
     input_data: String,
-) -> SinaloaResponder {
+) -> VeracruzServerResponder {
     let enclave_handler_locked = enclave_handler.lock()?;
     let enclave = enclave_handler_locked
         .as_ref()
-        .ok_or(SinaloaError::UninitializedEnclaveError)?;
+        .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
     let input_data_decoded = base64::decode(&input_data)?;
     let result = enclave.plaintext_data(input_data_decoded)?;
     let result_string = match result {
@@ -53,16 +53,16 @@ async fn runtime_manager_request(
     stopper: web::Data<mpsc::Sender<()>>,
     _request: HttpRequest,
     input_data: String,
-) -> SinaloaResponder {
+) -> VeracruzServerResponder {
     let fields = input_data.split_whitespace().collect::<Vec<&str>>();
     if fields.len() < 2 {
-        return Err(SinaloaError::InvalidRequestFormatError);
+        return Err(VeracruzServerError::InvalidRequestFormatError);
     }
     let session_id = match fields[0].parse::<u32>()? {
         0 => enclave_handler
             .lock()?
             .as_ref()
-            .ok_or(SinaloaError::UninitializedEnclaveError)?
+            .ok_or(VeracruzServerError::UninitializedEnclaveError)?
             .new_tls_session()?,
         n @ 1u32..=std::u32::MAX => n,
     };
@@ -74,7 +74,7 @@ async fn runtime_manager_request(
         enclave_handler
             .lock()?
             .as_ref()
-            .ok_or(SinaloaError::UninitializedEnclaveError)?
+            .ok_or(VeracruzServerError::UninitializedEnclaveError)?
             .tls_data(session_id, received_data_decoded)?
     };
 
@@ -102,11 +102,11 @@ async fn runtime_manager_request(
 }
 
 /// Return an actix server. The caller should call .await for starting the service.
-pub fn server(policy_filename: &str) -> Result<Server, SinaloaError> {
+pub fn server(policy_filename: &str) -> Result<Server, VeracruzServerError> {
     let policy_json = std::fs::read_to_string(policy_filename)?;
     let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]
-    let SINALOA: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(SinaloaEnclave::new(
+    let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
         &policy_json,
     )?))));
 
@@ -116,14 +116,14 @@ pub fn server(policy_filename: &str) -> Result<Server, SinaloaError> {
     let server = HttpServer::new(move || {
         // give the server a Sender in .data
         App::new()
-            // pass in the shutdown channel and enclave handler SINALOA to the server
+            // pass in the shutdown channel and enclave handler VERACRUZ_SERVER to the server
             .wrap(middleware::Logger::default())
             .data(shutdown_channel_tx.clone())
-            .data(SINALOA.clone())
-            .service(sinaloa_request)
+            .data(VERACRUZ_SERVER.clone())
+            .service(veracruz_server_request)
             .service(runtime_manager_request)
     })
-    .bind(&policy.sinaloa_url())?
+    .bind(&policy.veracruz_server_url())?
     .run();
 
     // clone the Server handle and pass the the thread for shuting down the server

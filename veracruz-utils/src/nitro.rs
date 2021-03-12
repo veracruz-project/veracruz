@@ -89,7 +89,8 @@ pub enum NitroRootEnclaveMessage {
 }
 
 /// An enumerated type describing messages passed between to/from the Runtime
-/// Manager enclave (These originate from the Untrusted Pass-through (Sinaloa)
+/// Manager enclave (These originate from the Untrusted Pass-through (Veracruz
+/// server)
 /// These messages are inteded to be serialized using bincode before transport,
 /// and deserialized using bincode after transport
 #[derive(Serialize, Deserialize, Debug)]

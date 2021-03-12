@@ -14,11 +14,11 @@ phases:
     commands:
       # Compile and run tests on trustzone
       - make trustzone-veracruz-client-test
-      - make trustzone-sinaloa-test
+      - make trustzone-veracruz-server-test
       - make trustzone-veracruz-test
       # Compile and run veracruz-client tests on sgx; other tests require SGX enable machine.
       - make sgx-veracruz-client-test
-      - make sgx-sinaloa-test-dry-run
+      - make sgx-veracruz-server-test-dry-run
       - make sgx-veracruz-test-dry-run
 
 

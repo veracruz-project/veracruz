@@ -28,7 +28,7 @@ test-collateral/*.wasm
 test-collateral/invalid_policy/**
 *.vscode/
 *.orig
-sinaloa/fuzz/*
+veracruz-server/fuzz/*
 sdk/data-generators/**/*.dat
 sdk/data-generators/idash2017-logistic-regression-generator/*.csv
 *.ta

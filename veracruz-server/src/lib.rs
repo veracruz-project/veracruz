@@ -1,4 +1,4 @@
-//! Sinaloa
+//! Veracruz server
 //!
 //! ## Authors
 //!
@@ -9,26 +9,26 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub mod sinaloa;
-pub use self::sinaloa::*;
+pub mod veracruz_server;
+pub use self::veracruz_server::*;
 
 pub mod server;
 pub use self::server::*;
 
 #[cfg(feature = "tz")]
-pub mod sinaloa_tz;
+pub mod veracruz_server_tz;
 #[cfg(feature = "tz")]
-pub use self::sinaloa_tz::sinaloa_tz::*;
+pub use self::veracruz_server_tz::veracruz_server_tz::*;
 
 #[cfg(feature = "sgx")]
-pub mod sinaloa_sgx;
+pub mod veracruz_server_sgx;
 #[cfg(feature = "sgx")]
-pub use self::sinaloa_sgx::sinaloa_sgx::*;
+pub use self::veracruz_server_sgx::veracruz_server_sgx::*;
 
 #[cfg(feature = "nitro")]
-pub mod sinaloa_nitro;
+pub mod veracruz_server_nitro;
 #[cfg(feature = "nitro")]
-pub use self::sinaloa_nitro::sinaloa_nitro::*;
+pub use self::veracruz_server_nitro::veracruz_server_nitro::*;
 
 #[cfg(feature = "nitro")]
 mod ec2_instance;

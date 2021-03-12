@@ -1,4 +1,4 @@
-//! Sinaloa build file.
+//! Veracruz server build file.
 //!
 //! ## Authors
 //!
@@ -56,7 +56,7 @@ fn main() {
             .status()
             .unwrap();
         if !make_result.success() {
-            panic!("sinaloa::build.rs: make sgx-root-enclave failed");
+            panic!("veracruz-server::build.rs: make sgx-root-enclave failed");
         }
 
         let make_result = Command::new("make")
@@ -65,7 +65,7 @@ fn main() {
             .status()
             .unwrap();
         if !make_result.success() {
-            panic!("sinaloa::build.rs: make runtime-manager failed");
+            panic!("veracruz-server::build.rs: make runtime-manager failed");
         }
     }
 }

@@ -1,4 +1,4 @@
-//! Sinaloa-test build script
+//! Veracruz-server-test build script
 //!
 //! ## Authors
 //!
@@ -22,7 +22,7 @@ fn main() {
         .status()
         .unwrap();
     if !make_result.success() {
-        panic!("sinaloa-test:build.rs: failed to make test-collateral");
+        panic!("veracruz-server-test:build.rs: failed to make test-collateral");
     }
 
     // Destroy, and then re-create and repopulate, the proxy attestation servers'

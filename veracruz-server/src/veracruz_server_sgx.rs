@@ -1,4 +1,4 @@
-//! Intel SGX-specific material for Sinaloa
+//! Intel SGX-specific material for the Veracruz server
 //!
 //! ## Authors
 //!
@@ -10,9 +10,9 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "sgx")]
-pub mod sinaloa_sgx {
+pub mod veracruz_server_sgx {
 
-    use crate::sinaloa::*;
+    use crate::veracruz_server::*;
     use transport_protocol;
     use lazy_static::lazy_static;
     use log::{debug, error};
@@ -42,12 +42,12 @@ pub mod sinaloa_sgx {
     static RUNTIME_MANAGER_FILE: &'static str = "./target/debug/runtime_manager.signed.so";
     static SGX_ROOT_ENCLAVE_ENCLAVE_FILE: &'static str = "./target/debug/sgx_root_enclave.signed.so";
 
-    pub struct SinaloaSGX {
+    pub struct VeracruzServerSGX {
         runtime_manager_enclave: SgxEnclave,
     }
 
-    impl SinaloaSGX {
-        fn tls_data_needed(&self, session_id: u32) -> Result<bool, SinaloaError> {
+    impl VeracruzServerSGX {
+        fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
             let mut needed: u8 = 4;
             let mut result: u32 = 0;
             let ret = unsafe {
@@ -59,7 +59,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if ret != 0 || result != 0 {
-                return Err(SinaloaError::EnclaveCallError(
+                return Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_tls_get_data_needed_enc",
                 ));
             }
@@ -67,7 +67,7 @@ pub mod sinaloa_sgx {
         }
     }
 
-    fn start_enclave(library_fn: &str) -> Result<SgxEnclave, SinaloaError> {
+    fn start_enclave(library_fn: &str) -> Result<SgxEnclave, VeracruzServerError> {
         let mut launch_token: sgx_launch_token_t = [0; 1024];
         let mut launch_token_updated: i32 = 0;
 
@@ -87,14 +87,14 @@ pub mod sinaloa_sgx {
         Ok(enclave)
     }
 
-    fn fetch_firmware_version(enclave: &SgxEnclave) -> Result<String, SinaloaError> {
+    fn fetch_firmware_version(enclave: &SgxEnclave) -> Result<String, VeracruzServerError> {
         let mut gfvl_result: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_ret = unsafe {
             sgx_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_result, &mut fv_length)
         };
         if gfvl_ret != 0 || gfvl_result != 0 {
-            return Err(SinaloaError::EnclaveCallError(
+            return Err(VeracruzServerError::EnclaveCallError(
                 "sgx_root_enclave_get_firmware_version_len",
             ));
         }
@@ -107,7 +107,7 @@ pub mod sinaloa_sgx {
             sgx_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_result, p_output, fv_length)
         };
         if gfv_ret != 0 || gfv_result != 0 {
-            return Err(SinaloaError::EnclaveCallError(
+            return Err(VeracruzServerError::EnclaveCallError(
                 "sgx_root_enclave_get_firmware_version",
             ));
         }
@@ -116,32 +116,32 @@ pub mod sinaloa_sgx {
         Ok(std::str::from_utf8(&output[..]).unwrap().to_string())
     }
 
-    impl SinaloaSGX {
+    impl VeracruzServerSGX {
         fn send_start(
             &mut self,
             url_base: &str,
             protocol: &str,
             firmware_version: &str,
-        ) -> Result<(Vec<u8>, i32), SinaloaError> {
+        ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
             let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_sgx_attestation_init() {
                 let attestation_init = proxy_attestation_server_response.get_sgx_attestation_init();
                 let (public_key, device_id) = transport_protocol::parse_sgx_attestation_init(attestation_init);
                 Ok((public_key, device_id))
             } else {
-                Err(SinaloaError::MissingFieldError("sgx_attestation_init"))
+                Err(VeracruzServerError::MissingFieldError("sgx_attestation_init"))
             }
         }
     }
 
-    impl SinaloaSGX {
+    impl VeracruzServerSGX {
         fn send_sgx_msg1(
             &mut self,
             url_base: &str,
             attestation_context: &sgx_ra_context_t,
             msg1: &sgx_ra_msg1_t,
             device_id: i32,
-        ) -> Result<(Vec<u8>, sgx_ra_msg2_t), SinaloaError> {
+        ) -> Result<(Vec<u8>, sgx_ra_msg2_t), VeracruzServerError> {
             let serialized_msg1 = transport_protocol::serialize_msg1(*attestation_context, msg1, device_id)?;
             let encoded_msg1 = base64::encode(&serialized_msg1);
 
@@ -155,7 +155,7 @@ pub mod sinaloa_sgx {
                 let (_context, msg2, challenge) = transport_protocol::parse_sgx_attestation_challenge(&parsed)?;
                 Ok((challenge.to_vec(), msg2))
             } else {
-                Err(SinaloaError::MissingFieldError("sgx_attestation_challenge"))
+                Err(VeracruzServerError::MissingFieldError("sgx_attestation_challenge"))
             }
         }
     }
@@ -165,7 +165,7 @@ pub mod sinaloa_sgx {
         pubkey_challenge: &Vec<u8>,
         context: &sgx_ra_context_t,
         msg2: &sgx_ra_msg2_t,
-    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>), SinaloaError> {
+    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>), VeracruzServerError> {
         let mut p_msg3 = std::ptr::null_mut();
         let mut msg3_size = 0;
         let msg2_size: u32 = std::mem::size_of::<sgx_ra_msg2_t>() as u32;
@@ -238,7 +238,7 @@ pub mod sinaloa_sgx {
         let p_msg3_byte = p_msg3 as *mut u8;
         if proc_msg2_ret != sgx_types::sgx_status_t::SGX_SUCCESS {
             debug!("proc_msg2_ret:{:?}", proc_msg2_ret);
-            return Err(SinaloaError::SGXError(proc_msg2_ret));
+            return Err(VeracruzServerError::SGXError(proc_msg2_ret));
         }
 
         let msg3 = unsafe { *p_msg3 as sgx_ra_msg3_t };
@@ -283,7 +283,7 @@ pub mod sinaloa_sgx {
             )
         };
         if gpr_ret != 0 || gpr_result != 0 {
-            return Err(SinaloaError::EnclaveCallError(
+            return Err(VeracruzServerError::EnclaveCallError(
                 "sgx_root_enclave_sgx_get_pubkey_report",
             ));
         }
@@ -340,7 +340,7 @@ pub mod sinaloa_sgx {
         ))
     }
 
-    impl SinaloaSGX {
+    impl VeracruzServerSGX {
         fn send_msg3(
             &self,
             url_base: &str,
@@ -351,7 +351,7 @@ pub mod sinaloa_sgx {
             pubkey_quote: &sgx_quote_t,
             pubkey_quote_sig: &Vec<u8>,
             device_id: i32,
-        ) -> Result<(), SinaloaError> {
+        ) -> Result<(), VeracruzServerError> {
             let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens(
                 *attestation_context,
                 msg3,
@@ -368,7 +368,7 @@ pub mod sinaloa_sgx {
             if received_body == "All's well that ends well" {
                 Ok(())
             } else {
-                Err(SinaloaError::MismatchError {
+                Err(VeracruzServerError::MismatchError {
                     variable: "msg3 received_body",
                     expected: "All's well that ends well".as_bytes().to_vec(),
                     received: received_body.as_bytes().to_vec(),
@@ -377,12 +377,12 @@ pub mod sinaloa_sgx {
         }
     }
 
-    impl SinaloaSGX {
+    impl VeracruzServerSGX {
         fn native_attestation(
             &mut self,
             sgx_root_enclave: &SgxEnclave,
             proxy_attestation_server_url: &String,
-        ) -> Result<(), SinaloaError> {
+        ) -> Result<(), VeracruzServerError> {
             let firmware_version = fetch_firmware_version(sgx_root_enclave)?;
             let (public_key, device_id) = self.send_start(proxy_attestation_server_url, "sgx", &firmware_version)?;
 
@@ -400,7 +400,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if ira_ret != 0 || ira_result != 0 {
-                return Err(SinaloaError::EnclaveCallError(
+                return Err(VeracruzServerError::EnclaveCallError(
                     "sgx_root_enclave_init_remote_attestation_enc",
                 ));
             }
@@ -439,7 +439,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if msg1_ret != sgx_status_t::SGX_SUCCESS {
-                return Err(SinaloaError::SGXError(msg1_ret));
+                return Err(VeracruzServerError::SGXError(msg1_ret));
             }
 
             let (challenge, msg2) =
@@ -463,18 +463,18 @@ pub mod sinaloa_sgx {
         }
     }
 
-    impl Sinaloa for SinaloaSGX {
-        fn new(policy_json: &str) -> Result<Self, SinaloaError> {
+    impl VeracruzServer for VeracruzServerSGX {
+        fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 
-            let mut new_sinaloa = SinaloaSGX {
+            let mut new_veracruz_server = VeracruzServerSGX {
                 runtime_manager_enclave: runtime_manager_enclave,
             };
 
             let mut result: u32 = 0;
             let ret = unsafe {
                 runtime_manager_init_session_manager_enc(
-                    new_sinaloa.runtime_manager_enclave.geteid(),
+                    new_veracruz_server.runtime_manager_enclave.geteid(),
                     &mut result,
                     policy_json.as_bytes().as_ptr() as *const u8,
                     policy_json.len() as u64,
@@ -489,24 +489,24 @@ pub mod sinaloa_sgx {
                     Some(_) => (), // do nothing, we're good
                     None => {
                         let enclave = start_enclave(SGX_ROOT_ENCLAVE_ENCLAVE_FILE)?;
-                        new_sinaloa.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
+                        new_veracruz_server.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
                         *sgx_root_enclave = Some(enclave)
                     }
                 }
             }
 
             if (result == 0) && (ret == 0) {
-                Ok(new_sinaloa)
+                Ok(new_veracruz_server)
             } else {
                 debug!(
                     "runtime_manager_init_session_manager_enc result:{:?}, ret:{:?}",
                     result, ret
                 );
-                Err(SinaloaError::EnclaveCallError("runtime_manager_init_session_manager_enc"))
+                Err(VeracruzServerError::EnclaveCallError("runtime_manager_init_session_manager_enc"))
             }
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, SinaloaError> {
+        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
@@ -528,7 +528,7 @@ pub mod sinaloa_sgx {
         fn proxy_psa_attestation_get_token(
             &self,
             challenge: Vec<u8>,
-        ) -> Result<(Vec<u8>, Vec<u8>, i32), SinaloaError> {
+        ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
             let mut pagt_result: u32 = 0;
             let mut token = Vec::with_capacity(2 * 8192); // TODO: Don't do this
             let mut token_size: u64 = 0;
@@ -551,7 +551,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if (pagt_ret != 0) || (pagt_result != 0) {
-                Err(SinaloaError::EnclaveCallError(
+                Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_psa_attestation_get_token_enc",
                 ))
             } else {
@@ -562,7 +562,7 @@ pub mod sinaloa_sgx {
         }
 
         // TODO: This function will go away when we use attestation
-        fn get_enclave_cert(&self) -> Result<Vec<u8>, SinaloaError> {
+        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError> {
             let mut len_result: u32 = 0;
             let mut cert_len: u64 = 0;
             let len_ret = unsafe {
@@ -573,7 +573,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if (len_ret != 0) || (len_result != 0) {
-                return Err(SinaloaError::EnclaveCallError(
+                return Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_get_enclave_cert_len_enc",
                 ));
             }
@@ -592,7 +592,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if (ret != 0) || (result != 0) || (output_len == 0) {
-                Err(SinaloaError::EnclaveCallError(
+                Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_get_enclave_cert_enc",
                 ))
             } else {
@@ -602,7 +602,7 @@ pub mod sinaloa_sgx {
         }
 
         // TODO: This function will go away when we use attestation
-        fn get_enclave_name(&self) -> Result<String, SinaloaError> {
+        fn get_enclave_name(&self) -> Result<String, VeracruzServerError> {
             let mut len_result: u32 = 0;
             let mut name_len: u64 = 0;
             let len_ret = unsafe {
@@ -613,7 +613,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if (len_ret != 0) || (len_result != 0) {
-                return Err(SinaloaError::EnclaveCallError(
+                return Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_get_enclave_cert_enc",
                 ));
             }
@@ -631,7 +631,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if (ret != 0) || (result != 0) {
-                Err(SinaloaError::EnclaveCallError(
+                Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_get_enclave_name_enc",
                 ))
             } else {
@@ -640,7 +640,7 @@ pub mod sinaloa_sgx {
             }
         }
 
-        fn new_tls_session(&self) -> Result<u32, SinaloaError> {
+        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
@@ -649,13 +649,13 @@ pub mod sinaloa_sgx {
             if (ret == 0) && (result == 0) {
                 Ok(session_id)
             } else {
-                Err(SinaloaError::EnclaveCallError(
+                Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_new_session_enc",
                 ))
             }
         }
 
-        fn close_tls_session(&self, session_id: u32) -> Result<(), SinaloaError> {
+        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError> {
             let mut result: u32 = 0;
             let ret = unsafe {
                 runtime_manager_close_session_enc(self.runtime_manager_enclave.geteid(), &mut result, session_id)
@@ -663,7 +663,7 @@ pub mod sinaloa_sgx {
             if (ret == 0) && (result == 0) {
                 Ok(())
             } else {
-                Err(SinaloaError::EnclaveCallError(
+                Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_close_session_enc",
                 ))
             }
@@ -673,7 +673,7 @@ pub mod sinaloa_sgx {
             &self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> Result<(bool, Option<Vec<Vec<u8>>>), SinaloaError> {
+        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
             let mut ret_code: u32 = 0;
             let ret_val = unsafe {
                 runtime_manager_tls_send_data_enc(
@@ -685,7 +685,7 @@ pub mod sinaloa_sgx {
                 )
             };
             if ret_val != 0 || ret_code != 0 {
-                return Err(SinaloaError::EnclaveCallError(
+                return Err(VeracruzServerError::EnclaveCallError(
                     "runtime_manager_tls_send_data_enc",
                 ));
             }
@@ -710,7 +710,7 @@ pub mod sinaloa_sgx {
                     )
                 };
                 if get_ret != 0 || ret != 0 || output_len == 0 {
-                    return Err(SinaloaError::EnclaveCallError(
+                    return Err(VeracruzServerError::EnclaveCallError(
                         "runtime_manager_tls_get_data_enc",
                     ));
                 }
@@ -728,7 +728,7 @@ pub mod sinaloa_sgx {
             ))
         }
 
-        fn close(&mut self) -> Result<bool, SinaloaError> {
+        fn close(&mut self) -> Result<bool, VeracruzServerError> {
             //self.runtime_manager_enclave.destroy();
             Ok(true)
         }
