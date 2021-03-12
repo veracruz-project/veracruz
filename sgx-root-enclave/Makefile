@@ -45,10 +45,10 @@ $(EDL_Files): $(SGX_EDGER8R) sgx_root_enclave.edl
 
 SGX_COMMON_CFLAGS += -O0 -g
 CUSTOM_EDL_PATH :=$(RUST_SGX_SDK_PATH)/edl
-Sinaloa_Include_Paths := -I ./src -I$(SGX_SDK)/include -I$(CUSTOM_EDL_PATH)
-Sinaloa_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Sinaloa_Include_Paths)
+Veracruz_Server_Include_Paths := -I ./src -I$(SGX_SDK)/include -I$(CUSTOM_EDL_PATH)
+Veracruz_Server_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(Veracruz_Server_Include_Paths)
 $(OUT_DIR)/sgx_root_enclave_u.o: $(EDL_Files)
-	@$(CC) $(Sinaloa_C_Flags) -c ./sgx_root_enclave_u.c -o $@
+	@$(CC) $(Veracruz_Server_C_Flags) -c ./sgx_root_enclave_u.c -o $@
 	@echo $(INFO_COLOR) "CC => $<" $(RESET_COLOR)
 
 CUSTOM_COMMON_PATH := $(RUST_SGX_SDK_PATH)/common
