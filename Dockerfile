@@ -37,8 +37,10 @@ RUN apt-get update && \
         libsdl2-dev \
         make \
         ninja-build \
+        protobuf-compiler \
         python3-dev \
         python3-pip \
+        python3-protobuf \
         python3-setuptools \
         python3-tk \
         python3-wheel \

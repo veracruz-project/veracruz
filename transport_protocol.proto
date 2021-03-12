@@ -1,0 +1,7 @@
+// Protocol buffers for Veracruz's transport protocol messages
+
+syntax = "proto3";
+
+message RequestProxyPsaAttestationToken {
+  bytes challenge = 1;
+}

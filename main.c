@@ -21,6 +21,11 @@
 #include <random/rand32.h>
 #include <kernel.h>
 
+#include "nanopb/pb.h"
+#include "nanopb/pb_encode.h"
+#include "nanopb/pb_decode.h"
+#include "transport_protocol.pb.h"
+
 // TODO log?
 //#include <logging/log.h>
 //LOG_MODULE_REGISTER(http, CONFIG_FOO_LOG_LEVEL);
@@ -185,13 +190,61 @@ void qemu_exit(void) {
     );
 }
 
+void xxd(const void *pbuf, size_t len) {
+    const uint8_t *buf = pbuf;
+
+    for (int i = 0; i < len; i += 16) {
+        printf("%08x: ", i);
+
+        for (int j = 0; j < 16; j++) {
+            if (i+j < len) {
+                printf("%02x ", buf[i+j]);
+            } else {
+                printf("   ");
+            }
+        }
+
+        printf(" ");
+
+        for (int j = 0; j < 16 && i+j < len; j++) {
+            if (i+j < len) {
+                if (buf[i+j] >= ' ' && buf[i+j] <= '~') {
+                    printf("%c", buf[i+j]);
+                } else {
+                    printf(".");
+                }
+            } else {
+                printf(" ");
+            }
+        }
+
+        printf("\n");
+    }
+}
+
 void main(void)
 {
+    // construct attestation token request
+    RequestProxyPsaAttestationToken psa_request;
+
     // get random challenge
     // TODO Zephyr notes this is not cryptographically secure, is that an
     // issue? This will be an area to explore
-    uint8_t challenge[32];
-    sys_rand_get(challenge, sizeof(challenge));
+    sys_rand_get(psa_request.challenge, sizeof(psa_request.challenge));
+
+    // TODO log? can we incrementally log?
+    printf("attest: challenge: ");
+    for (int i = 0; i < sizeof(psa_request.challenge); i++) {
+        printf("%02x", psa_request.challenge[i]);
+    }
+    printf("\n");
+
+    // encode
+    // TODO this could be smaller, but instead could we tie protobuf encoding
+    // directly into our GET function?
+    uint8_t prbuf[256];
+    pb_ostream_t prstream = pb_ostream_from_buffer(prbuf, sizeof(prbuf));
+    pb_encode(&prstream, &RequestProxyPsaAttestationToken_msg, &psa_request);
 
     // setup address, TODO use DNS?
     struct sockaddr_in addr;

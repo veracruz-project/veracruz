@@ -43,16 +43,26 @@ update:
 	west update
 
 # TODO move these into west?
-policy.h policy.c: policy.json
+# Generate policy.h/c
+policy.h policy.c: policy.json policy_to_header.py
 	./policy_to_header.py $< policy.h policy.c
+
+# Generate transport_protocol.pb.h/c
+transport_protocol.pb.h transport_protocol.pb.c: \
+		transport_protocol.proto transport_protocol.options
+	./nanopb/generator/nanopb_generator.py $< -f $(word 2,$^)
 
 .DEFAULT_GOAL :=
 .PHONY: build
 build: policy.h policy.c
+build: transport_protocol.pb.h transport_protocol.pb.c
+build:
 	west build -p auto -b qemu_cortex_m3
 
 .PHONY: clean
 clean:
+	rm -rf policy.h policy.c
+	rm -rf transport_protocol.pb.h transport_protocol.pb.c
 	rm -rf build
 
 .PHONY: rom_report

@@ -1,0 +1,3 @@
+# Options for internal representation of protobufs
+
+RequestProxyPsaAttestationToken.challenge	max_size:32 fixed_length:true
