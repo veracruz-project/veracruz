@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all policy-files clean
+.PHONY: all policy-files clean pgen
 
 
 WARNING_COLOR := "\e[1;33m"
