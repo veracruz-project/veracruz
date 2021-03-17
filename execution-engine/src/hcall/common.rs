@@ -13,24 +13,24 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, LookupFlags,
-    OpenFlags, Prestat, Rights, Size, Whence, IoVec
+    OpenFlags, Prestat, Rights, Size, Whence, IoVec, DirEnt
 };
-use veracruz_util::policy::principal::{Principal, FileOperation};
+use veracruz_utils::policy::principal::{Principal, FileOperation};
 use std::{
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
     mem::size_of,
     slice::from_raw_parts,
     string::{String, ToString},
-    fmt::{Formatter, Display, Error},
-    string::{String, ToString},
+    vec::Vec,
 };
 use crate::hcall::buffer::VFSError;
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 #[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
+use std::sync::{Arc, SgxMutex as Mutex};
 use super::{fs::FileSystem, fs::FileSystemError};
+use crate::hcall::buffer::VFS;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
@@ -211,34 +211,6 @@ pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// The machine lifecycle state.
-////////////////////////////////////////////////////////////////////////////////
-
-/// The lifecycle state of the Veracruz host.
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum LifecycleState {
-    /// The initial state: nothing yet has been provisioned into the Veracruz
-    /// machine.  The state is essentially "pristine", having just been created.
-    Initial,
-    /// The program has been provisioned into the machine, and now the data
-    /// sources are in the process of being provisioned.  Not all data sources
-    /// are yet provisioned, per the global policy.
-    DataSourcesLoading,
-    /// The program and (initial) data have been provisioned into the machine,
-    /// and now the stream sources are in the process of being provisioned.
-    /// Not all stream sources are yet provisioned, per the global policy.
-    StreamSourcesLoading,
-    /// All data sources (and the program) have now been provisioned according
-    /// to the global policy.  The machine is now ready to execute.
-    ReadyToExecute,
-    /// The machine has executed, and finished successfully.  The result of the
-    /// machine's execution can now be extracted.
-    FinishedExecuting,
-    /// An error occurred during the provisioning or machine execution process.
-    Error,
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Provisioning errors.
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -249,18 +221,6 @@ pub enum LifecycleState {
 /// errors due to programming bugs.
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum HostProvisioningError {
-    /// The host state was in an unexpected, or invalid, lifecycle state and
-    /// there is a mismatch between actual provisioning state and what was
-    /// expected.
-    #[error(
-        display = "ProvisioningError: Invalid host state, found {:?}, expected {:?}.",
-        found,
-        expected
-    )]
-    InvalidLifeCycleState {
-        found: LifecycleState,
-        expected: Vec<LifecycleState>,
-    },
     /// The WASM module supplied by the program supplier was invalid and could
     /// not be parsed.
     #[error(display = "ProvisioningError: Invalid WASM program (e.g. failed to parse it).")]
@@ -288,17 +248,16 @@ pub enum HostProvisioningError {
         display = "ProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
     )]
     HostProvisioningStateNotInitialized,
-    /// The runtime was trying to register two inputs at the same path in the
-    /// synthetic filesystem.
+    /// TODO doc 
     #[error(
-        display = "ProvisioningError: The global policy ascribes two inputs the same filename {}.",
-        _0
+        display = "HostProvisioningError: VFS Error {}.", _0
     )]
-    CannotSortDataOrStream,
-    #[error(display = "HostProvisioningError: VFS Error {}.", _0)]
-    VFSError(#[error(source)] crate::hcall::buffer::VFSError),
-    #[error(display = "HostProvisioningError: File {} cannot be found.", _0)]
+    VFSError(#[error(source)]VFSError),
+    #[error(
+        display = "HostProvisioningError: File {} cannot be found.", _0
+    )]
     FileNotFound(String),
+    /// TODO doc
     #[error(
         display = "HostProvisioningError: Principal or program {:?} cannot be found.",_0
     )]
@@ -337,6 +296,17 @@ impl From<wasmi::Error> for HostProvisioningError {
 /// A wrapper for VFS, which provides common API used by execution engine.
 #[derive(Clone)]
 pub struct VFSService {
+    //TODO REMOVE
+    vfs : Arc<Mutex<VFS>>,
+    /// The synthetic filesystem associated with this machine.
+    filesystem: FileSystem,
+    /// The environment variables that have been passed to this program from the
+    /// global policy file.  These are stored as a key-value mapping from
+    /// variable name to value.
+    environment_variables: Vec<(String, String)>,
+    /// The array of program arguments that have been passed to this program,
+    /// again from the global policy file.
+    program_arguments: Vec<String>,
 }
 
 impl VFSService {
@@ -348,8 +318,35 @@ impl VFSService {
     pub fn new(
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
-        Self { vfs }
+        Self { 
+            vfs,
+            filesystem : FileSystem::new(),
+            environment_variables : Vec::new(),
+            program_arguments : Vec::new(),
+        }
     }
+
+
+    // TODO REMOVE REMOVE
+    pub(crate) fn write_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.write(client_id,file_name,data)?;
+        Ok(())
+    }
+
+    pub(crate) fn append_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.append(client_id,file_name,data)?;
+        Ok(())
+    }
+
+    pub(crate) fn read_file_base(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        Ok(self.vfs.lock()?.read(client_id,file_name)?)
+    }
+
+    pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        Ok(self.vfs.lock()?.count(prefix)?)
+    }
+
+    // TODO REMOVE REMOVE
 
     ////////////////////////////////////////////////////////////////////////////
     // The program's environment.
@@ -624,76 +621,7 @@ impl VFSService {
             .path_rename(old_fd, old_path, new_fd, new_path)
     }
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Querying the host state.
-    ////////////////////////////////////////////////////////////////////////////
-
-    /// Queries the current lifecycle transition system state of the runtime
-    /// state.
-    #[inline]
-    pub(crate) fn lifecycle_state(&self) -> &LifecycleState {
-        &self.lifecycle_state
-    }
-
-    /// Returns the number of expected data sources that we are expecting.  This
-    /// is specified in the global policy file.
-    #[inline]
-    pub(crate) fn expected_data_source_count(&self) -> usize {
-        self.expected_data_source_count
-    }
-
-    /// Returns the number of expected stream sources that we are expecting.
-    /// This is specified in the global policy file.
-    #[inline]
-    pub(crate) fn expected_stream_source_count(&self) -> usize {
-        self.expected_data_source_count
-    }
-
-    /// Returns the number of data sources that have so far been registered with
-    /// the runtime state.  This value should never exceed
-    /// `expected_data_source_count`.
-    #[inline]
-    pub(crate) fn registered_data_source_count(&self) -> usize {
-        self.registered_data_source_count
-    }
-
-    /// Returns the number of stream sources that have so far been registered
-    /// with the runtime state.  This value should never exceed
-    /// `expected_stream_source_count`.
-    #[inline]
-    pub(crate) fn registered_stream_source_count(&self) -> usize {
-        self.registered_stream_source_count
-    }
-
-    /// Returns `Some(digest)`, for `digest` a SHA-256 digest of the program
-    /// module, iff a digest has been registered with the runtime state.
-    #[inline]
-    pub(crate) fn program_digest(&self) -> Option<&Vec<u8>> {
-        self.program_digest.as_ref()
-    }
-
-    /// Returns `Some(memory)`, for `memory` a WASM heap or "linear memory", iff
-    /// a memory has been registered with the runtime state.
-    #[inline]
-    pub(crate) fn memory(&self) -> Option<&Memory> {
-        self.memory.as_ref()
-    }
-
-    /// Returns `Some(fname)`, for `fname` a filename in the state's synthetic
-    /// filesystem, iff a result filename has been registered.  Otherwise, if
-    /// the WASM program is not expected to produce a result, returns `None`.
-    #[inline]
-    pub(crate) fn result_filename(&self) -> Option<&String> {
-        self.result_filename.as_ref()
-    }
-
-    /// Returns `Some(module)`, for `module` a WASM program module, iff a module
-    /// has been registered with the runtime state.
-    #[inline]
-    pub(crate) fn program_module(&self) -> Option<&Module> {
-        self.program_module.as_ref()
-    }
-
+    //TODO REMOVE REMOVE REMOVE REMOVE
     /// Append to a file.
     pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
@@ -711,6 +639,7 @@ impl VFSService {
     pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
         Ok(self.vfs.lock()?.count(prefix)?)
     }
+    //TODO REMOVE REMOVE REMOVE REMOVE
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -730,7 +659,7 @@ pub enum FatalEngineError {
     /// The WASM program called `proc_exit`, or similar, to signal an early exit
     /// from the program, returning a specific error code.
     #[error(
-        display = "RuntimePanic: Early exit requested by program, error code returned: '{}'.",
+        display = "FatalEngineError: Early exit requested by program, error code returned: '{}'.",
         _0
     )]
     EarlyExit(i32),
@@ -741,7 +670,7 @@ pub enum FatalEngineError {
     /// programming error in the source that originated the WASM programming if
     /// `libveracruz` was not used.
     #[error(
-        display = "RuntimePanic: Bad arguments passed to host function '{}'.",
+        display = "FatalEngineError: Bad arguments passed to host function '{}'.",
         function_name
     )]
     BadArgumentsToHostFunction {
@@ -749,7 +678,7 @@ pub enum FatalEngineError {
         function_name: String,
     },
     /// The WASM program tried to invoke an unknown H-call on the Veracruz host.
-    #[error(display = "RuntimePanic: Unknown H-call invoked: '{}'.", index)]
+    #[error(display = "FatalEngineError: Unknown H-call invoked: '{}'.", index)]
     UnknownHostFunction {
         /// The host call index of the unknown function that was invoked.
         index: usize,
@@ -757,7 +686,7 @@ pub enum FatalEngineError {
     /// The host failed to read a range of bytes, starting at a base address,
     /// from the running WASM program's linear memory.
     #[error(
-        display = "RuntimePanic: Failed to read {} byte(s) from WASM memory at address {}.",
+        display = "FatalEngineError: Failed to read {} byte(s) from WASM memory at address {}.",
         bytes_to_be_read,
         memory_address
     )]
@@ -770,7 +699,7 @@ pub enum FatalEngineError {
     /// The host failed to write a range of bytes, starting from a base address,
     /// to the running WASM program's linear memory.
     #[error(
-        display = "RuntimePanic: Failed to write {} byte(s) to WASM memory at address {}.",
+        display = "FatalEngineError: Failed to write {} byte(s) to WASM memory at address {}.",
         bytes_to_be_written,
         memory_address
     )]
@@ -782,26 +711,26 @@ pub enum FatalEngineError {
     },
     /// No linear memory was registered: this is a programming error (a bug)
     /// that should be fixed.
-    #[error(display = "RuntimePanic: No WASM memory registered.")]
+    #[error(display = "FatalEngineError: No WASM memory registered.")]
     NoMemoryRegistered,
     /// No program module was registered: this is a programming error (a bug)
     /// that should be fixed.
-    #[error(display = "RuntimePanic: No WASM program module registered.")]
+    #[error(display = "FatalEngineError: No WASM program module registered.")]
     NoProgramModuleRegistered,
     /// The WASM program's entry point was missing or malformed.
-    #[error(display = "RuntimePanic: Failed to find the entry point in the WASM program.")]
+    #[error(display = "FatalEngineError: Failed to find the entry point in the WASM program.")]
     NoProgramEntryPoint,
     /// The WASM program's entry point was missing or malformed.
-    #[error(display = "RuntimePanic: Execution engine is not ready.")]
+    #[error(display = "FatalEngineError: Execution engine is not ready.")]
     EngineIsNotReady,
     /// Wrapper for direct error message.
-    #[error(display = "RuntimePanic: WASM program returns code other than i32.")]
+    #[error(display = "FatalEngineError: WASM program returns code other than i32.")]
     ReturnedCodeError,
     /// Wrapper for WASI Trap.
-    #[error(display = "RuntimePanic: WASMIError: Trap: {:?}.", _0)]
+    #[error(display = "FatalEngineError: WASMIError: Trap: {:?}.", _0)]
     WASMITrapError(#[source(error)] wasmi::Trap),
     /// Wrapper for WASI Error other than Trap.
-    #[error(display = "RuntimePanic: WASMIError {:?}.", _0)]
+    #[error(display = "FatalEngineError: WASMIError {:?}.", _0)]
     WASMIError(#[source(error)] wasmi::Error),
     /// Program cannot be found in VFS, when any principal (programs or participants) try to access
     /// the `file_name`.
@@ -813,16 +742,16 @@ pub enum FatalEngineError {
     /// Wrapper for Virtual FS Error.
     #[error(display = "FatalVeracruzHostError: VFS Error: {:?}.", _0)]
     VFSError(#[error(source)] VFSError),
-    #[error(display = "RuntimePanic: Wasi-ErrNo {:?}.", _0)]
+    #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
     WASIError(#[source(error)] wasi_types::ErrNo),
     /// Wrapper for direct error message.
-    #[error(display = "RuntimePanic: Error message {:?}.", _0)]
+    #[error(display = "FatalEngineError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
     #[error(display = "FatalVeracruzHostError: provisioning error {:?}.", _0)]
     ProvisionError(#[error(source)] HostProvisioningError),
     /// Something unknown or unexpected went wrong, and there's no more detailed
     /// information.
-    #[error(display = "RuntimePanic: Unknown error.")]
+    #[error(display = "FatalEngineError: Unknown error.")]
     Generic,
 }
 
@@ -835,25 +764,27 @@ impl From<String> for FatalEngineError {
 impl From<&str> for FatalEngineError {
     fn from(err: &str) -> Self {
         FatalEngineError::DirectErrorMessage(err.to_string())
+    }
+}
 
-impl RuntimePanic {
-    /// Constructs a `RuntimePanic::DirectErrorMessage` out of anything that can
+impl FatalEngineError {
+    /// Constructs a `FatalEngineError::DirectErrorMessage` out of anything that can
     /// be converted into a string.
     #[inline]
     pub fn direct_error_message<T>(message: T) -> Self
     where
         T: Into<String>,
     {
-        RuntimePanic::DirectErrorMessage(message.into())
+        FatalEngineError::DirectErrorMessage(message.into())
     }
 
-    /// Constructs a `RuntimePanic::BadArgumentsToHostFunction` out of anything
+    /// Constructs a `FatalEngineError::BadArgumentsToHostFunction` out of anything
     /// that can be converted into a string.
     pub fn bad_arguments_to_host_function<T>(fname: T) -> Self
     where
         T: Into<String>,
     {
-        RuntimePanic::BadArgumentsToHostFunction {
+        FatalEngineError::BadArgumentsToHostFunction {
             function_name: fname.into(),
         }
     }
@@ -862,21 +793,6 @@ impl RuntimePanic {
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation of the H-calls.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// The return type for H-Call implementations.
-///
-/// From *the viewpoint of the host* a H-call can either fail spectacularly
-/// with a runtime trap, in which case `Err(err)` is returned, with `err`
-/// detailing what went wrong, and the Veracruz host thereafter terminating
-/// or otherwise entering an error state, or succeeds with `Ok(())`.
-///
-/// From *the viewpoint of the WASM program* a H-call can either fail
-/// spectacularly, as above, in which case WASM program execution is aborted
-/// with the WASM program itself not being able to do anything about this,
-/// succeeds with the desired effect and a success error code returned, or
-/// fails with a recoverable error in which case the error code details what
-/// went wrong and what can be done to fix it.
-pub(crate) type WASIError = Result<ErrNo, RuntimePanic>;
 
 /// Details the arguments expected by the module's entry point, if any is found.
 pub(crate) enum EntrySignature {
@@ -1022,37 +938,3 @@ impl TryFrom<i32> for EngineReturnCode {
     }
 }
 
-/// Pretty printing for `LifecycleState`.
-impl Display for LifecycleState {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match self {
-            LifecycleState::Initial => write!(f, "Initial"),
-            LifecycleState::DataSourcesLoading => write!(f, "DataSourcesLoading"),
-            LifecycleState::StreamSourcesLoading => write!(f, "StreamSourcesLoading"),
-            LifecycleState::ReadyToExecute => write!(f, "ReadyToExecute"),
-            LifecycleState::FinishedExecuting => write!(f, "FinishedExecuting"),
-            LifecycleState::Error => write!(f, "Error"),
-        }
-    }
-}
-
-// Conversion from any error raised by any `Mutex<T>` to `ProvisioningError`.
-impl<T> From<std::sync::PoisonError<T>> for ProvisioningError {
-    fn from(error: std::sync::PoisonError<T>) -> Self {
-        ProvisioningError::FailedToObtainLock(format!("{:?}", error))
-    }
-}
-
-/// Lifting string error messages into `RuntimePanic`.
-impl From<String> for RuntimePanic {
-    fn from(err: String) -> Self {
-        RuntimePanic::DirectErrorMessage(err)
-    }
-}
-
-/// Lifting string error messages into `RuntimePanic`.
-impl From<&str> for RuntimePanic {
-    fn from(err: &str) -> Self {
-        RuntimePanic::DirectErrorMessage(err.to_string())
-    }
-}
