@@ -9,9 +9,10 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use std::{string::String, vec::Vec};
 use super::error::{mk_error_code, mk_host_trap};
 use crate::hcall::common::{
-    sha_256_digest, EntrySignature, LifecycleState, ProvisioningError, RuntimePanic, RuntimeState,
+    sha_256_digest, EntrySignature, ProvisioningError, RuntimePanic, RuntimeState,
     WASIError, WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
     WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
     WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,

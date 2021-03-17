@@ -37,17 +37,18 @@ use std::sync::Mutex;
 use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
-use crate::hcall::wasmtime;
+use crate::hcall::wasi::wasmtime::runtime_state::WasmtimeRuntimeState;
 use crate::hcall::{
     buffer::VFS,
-    common::{EngineReturnCode, ExecutionEngine, FatalEngineError, RuntimeState},
-    wasmi::runtime_state::WASMIRuntimeState,
+    common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
+    wasi::wasmi::runtime_state::WASMIRuntimeState,
 };
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
     sync::Arc,
 };
+
 
 /// The following type captures the execution strategy which is being requested,
 /// for the WASM program, from ExecutionEngine.
@@ -76,12 +77,12 @@ pub fn single_threaded_execution_engine(
 ) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
     let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
+            Some(Box::new(WASMIRuntimeState::new(vfs)))
         }
         ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
             {
-                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
+                Some(Box::new(WasmtimeRuntimeState::new(vfs)))
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
@@ -105,13 +106,11 @@ pub fn multi_threaded_execution_engine(
 ) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
     let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
+            Some(Box::new(WASMIRuntimeState::new(vfs)))
         }
         ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
-            {
-                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
-            }
+            { Some(Box::new(WasmtimeRuntimeState::new(vfs))) }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
         }
@@ -124,12 +123,13 @@ pub fn execute(
     vfs: Arc<Mutex<VFS>>,
     program_file_name: &str,
 ) -> Result<EngineReturnCode, FatalEngineError> {
-    let mut engine: Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(wasmi::WasmiHostProvisioningState::new(vfs)),
-        ExecutionStrategy::JIT => {
+    let mut engine : Box<dyn ExecutionEngine> = match strategy {
+        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(vfs)),
+        ExecutionStrategy::JIT => 
+        {
             #[cfg(feature = "std")]
             {
-                Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?)
+                Box::new(WasmtimeRuntimeState::new(vfs))
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             {

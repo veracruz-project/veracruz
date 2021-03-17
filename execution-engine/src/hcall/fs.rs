@@ -11,7 +11,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{collections::HashMap, convert::TryFrom, string::String};
+use std::{collections::HashMap, convert::TryFrom, string::String, vec::Vec};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,

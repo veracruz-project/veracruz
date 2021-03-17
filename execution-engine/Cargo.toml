@@ -9,7 +9,7 @@ description = "WASM execution engine for the trusted Veracruz runtime"
 default = []
 # NOTE: Introduce non_sgx in the dependencies to deal with sgx-related modification.
 std = ["wasmi/non_sgx", "platform-services/std", "wasmtime", "ring/non_sgx", "veracruz-utils/std", "wasi-types/std"]
-sgx = ["sgx_tstd", "wasmi/mesalock_sgx", "platform-services/sgx", "serde/mesalock_sgx", "typetag/mesalock_sgx", "ring/mesalock_sgx", "veracruz-utils/sgx", , "wasi-types/sgx"]
+sgx = ["sgx_tstd", "wasmi/mesalock_sgx", "platform-services/sgx", "serde/mesalock_sgx", "typetag/mesalock_sgx", "ring/mesalock_sgx", "veracruz-utils/sgx", "wasi-types/sgx"]
 tz = ["platform-services/tz", "wasmi/non_sgx", "ring/non_sgx", "veracruz-utils/tz", "wasi-types/std"]
 nitro = ["platform-services/nitro", "veracruz-utils/std", "wasi-types/std"]
 
@@ -24,7 +24,8 @@ wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch="veracru
 wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
 veracruz-utils = { path = "../veracruz-utils" }
 err-derive = "0.2"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { path = "../wasi-types" }
+#wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 pinecone = "0.2"
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 wast = "=35.0.0"
