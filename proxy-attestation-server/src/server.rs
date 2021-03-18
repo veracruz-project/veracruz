@@ -168,6 +168,18 @@ async fn sgx_router(psa_request: web::Path<String>, input_data: String) -> Proxy
 }
 
 #[allow(unused)]
+async fn sgx_router2(sgx_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
+    #[cfg(feature = "sgx")]
+    match sgx_request.into_inner().as_str() {
+        "Msg1" => sgx::msg1(input_data),
+        "Msg3" => sgx::msg3a(input_data),
+        _      => Err(ProxyAttestationServerError::UnsupportedRequestError),
+    }
+    #[cfg(not(feature = "sgx"))]
+    Err(ProxyAttestationServerError::UnimplementedRequestError)
+}
+
+#[allow(unused)]
 async fn psa_router(psa_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
     #[cfg(feature = "psa")]
     if psa_request.into_inner().as_str() == "AttestationToken" {
@@ -205,6 +217,7 @@ pub fn server(url: String, debug: bool) -> Result<Server, String> {
             .route("/VerifyPAT", web::post().to(verify_iat))
             .route("/Start", web::post().to(attestation::start))
             .route("/SGX/{sgx_request}", web::post().to(sgx_router))
+            .route("/SGX2/{sgx_request}", web::post().to(sgx_router2))
             .route("/PSA/{psa_request}", web::post().to(psa_router))
             .route("/Nitro/{nitro_request}", web::post().to(nitro_router))
     })

@@ -1,0 +1,52 @@
+@startuml
+title "CA-based Attestation"
+hide footbox
+participant "Client" as client
+box "Target Platform"
+    participant "Compute Enclave" as compute
+    participant "Root Enclave" as root
+    participant "Platform Firmware" as firmware
+end box
+participant "Proxy Attestation Service" as proxy
+participant "Native Attestation Service" as native
+
+hnote over proxy:CA private key,CACert
+/ hnote over client:CACert, ClientCert
+
+alt Native Attestation
+hnote over root: Root Private Key
+proxy->root: challenge
+note over root
+    generate RootCSR(Root Private Key)
+end note
+root->firmware: request native token(challenge, RootCSR)
+firmware-->root: native_token
+root-->proxy: native_token
+proxy->native: native_token
+native-->proxy: pass/fail
+note over proxy
+    Generate RootCert(RootCSR, CA Private Key)
+end note
+proxy-->root: RootCert,CACert
+hnote over root: RootCert,CACert
+end
+alt Proxy Attestation
+hnote over compute: Compute Private Key
+note over compute
+    generate computeCSR(Compute Private Key)
+end note
+compute->firmware: request local token(challenge, computeCSR)
+firmware-->compute: local_token
+compute->root: local_token
+root->firmware: local_token
+firmware-->root: pass/fail
+note over root
+    Generate ComputeCert(ComputeCSR, Root Private Key)
+end note
+root-->compute: ComputeCert, RootCert, CACert
+hnote over compute: ComputeCert, RootCert, CACert
+end
+client->compute: ClientHello(ClientCert)
+compute-->client: ServerHello(ComputeCert, RootCert, CACert)
+
+@enduml

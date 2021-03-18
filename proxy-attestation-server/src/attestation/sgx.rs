@@ -335,7 +335,9 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             .map_err(|err| {
                 println!("proxy-attestation-server::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
                 err
-            })?
+            })?;
+
+        
     }
 
     // clean up the Attestation Context by removing this context
@@ -344,6 +346,216 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         ac_hash.remove(&device_id);
     }
     Ok("All's well that ends well".to_string())
+}
+
+pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
+    let received_bytes = base64::decode(&body_string)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::sgx::msg3 base64 decode ov body_string failed:{:?}", err);
+            err
+        })?;
+
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::sgx::msg3 parse_proxy_attestation_server_request failed:{:?}", err);
+            err
+        })?;
+    if !parsed.has_sgx_attestation_tokens2() {
+        println!("received data is incorrect. TODO: Handle this");
+        return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
+    }
+    let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_sig, pubkey_hash, csr, device_id) =
+        transport_protocol::parse_attestation_tokens2(&parsed)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::sgx::msg3a parse_attestation_tokens2 failed:{:?}", err);
+            err
+        })?;
+    {
+        let attestation_context = {
+            let ac_hash = ATTESTATION_CONTEXT.lock()
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
+                    err
+                })?;
+            let context = ac_hash
+                .get(&device_id)
+                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
+                    err
+                })?;
+            (*context).clone()
+        };
+
+        let expected_enclave_hash = {
+            let connection = crate::orm::establish_connection()
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
+                    err
+                })?;
+            crate::orm::get_firmware_version_hash(
+                &connection,
+                &"sgx".to_string(),
+                &attestation_context.firmware_version,
+            )
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::sgx::msg3 get_firmware_version_hash failed:{:?}", err);
+                err
+            })?
+            .ok_or(ProxyAttestationServerError::MissingFieldError("firmware version"))
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                err
+            })?
+        };
+
+        let msg3_epid_pseudonym = authenticate_msg3(
+            &attestation_context
+                .msg1
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg1"))
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
+            &attestation_context
+                .msg2
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg2"))
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
+            &msg3,
+            &msg3_quote,
+            &msg3_sig,
+            &attestation_context
+                .smk
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.smk"))
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
+            &attestation_context
+                .vk
+                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.vk"))
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
+            &expected_enclave_hash,
+        )?;
+
+        let (pubkey_epid_pseudonym, collateral_hash, enclave_name) = authenticate_pubkey_quote(
+            &attestation_context
+                .pubkey_challenge
+                .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    err
+                })?,
+            &collateral_quote,
+            &collateral_sig,
+        )?;
+
+        if pubkey_epid_pseudonym != msg3_epid_pseudonym {
+            // We cannot verify that msg3 and pubkey_quote came from the same SGX system
+            return Err(ProxyAttestationServerError::MismatchError {
+                variable: "msg3 and pubkey_quote",
+                expected: pubkey_epid_pseudonym.into_bytes(),
+                received: msg3_epid_pseudonym.into_bytes(),
+            });
+        }
+
+        // check that the enclave that generated collateral_quote has the same firmware as the enclave that
+        // generated msg3
+        if msg3_quote.report_body.mr_enclave.m != collateral_quote.report_body.mr_enclave.m {
+            // TODO: Even if this is true, does this eman that they are from the same enclave?
+            // Or could they be different enclaves running the same firmware?
+            // What is the consequence if they are?
+            println!("msg3 and collateral_quote came from different system");
+            return Err(ProxyAttestationServerError::MismatchError {
+                variable: "function msg3 msg3_quote.report_body.mr_enclave.m",
+                expected: collateral_quote.report_body.mr_enclave.m.to_vec(),
+                received: msg3_quote.report_body.mr_enclave.m.to_vec(),
+            });
+        }
+
+        let connection = crate::orm::establish_connection()
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
+                err
+            })?;
+        crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
+                err
+            })?;
+        
+        // All's good. Generate a Certificate from the CSR...
+        let certificate_signing_request = openssl::x509::X509Req::from_der(&csr)?;
+        let cert = convert_csr_to_certificate(&certificate_signing_request).unwrap();
+
+        let root_cert_pem = {
+            let mut f = std::fs::File::open("/work/veracruz/proxy-attestation-server/CACert.pem").unwrap();
+            let mut buffer: Vec<u8> = Vec::new();
+            f.read_to_end(&mut buffer).unwrap();
+            buffer
+        };
+        let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_pem()?, &root_cert_pem)?;
+        
+        let response_b64 = base64::encode(&response_bytes);
+
+        // clean up the Attestation Context by removing this context
+        {
+            let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+            ac_hash.remove(&device_id);
+        }
+        return Ok(response_b64);
+    }
+
+    //Ok("All's well that ends well".to_string())
+}
+
+fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
+    let mut cert_builder = openssl::x509::X509Builder::new().unwrap();
+    cert_builder.set_version(csr.version()).unwrap();
+    let now = {
+        openssl::asn1::Asn1Time::days_from_now(0).unwrap()
+    };
+    cert_builder.set_not_before(&now).unwrap();
+
+    let expiry = {
+        openssl::asn1::Asn1Time::days_from_now(1).unwrap()
+    };
+    cert_builder.set_not_after(&expiry).unwrap();
+
+    let serial_number = {
+        let sn_bignum = openssl::bn::BigNum::from_u32(1).unwrap();
+        openssl::asn1::Asn1Integer::from_bn(&sn_bignum).unwrap()
+    };
+    cert_builder.set_serial_number(&serial_number).unwrap();
+
+    let issuer_name = {
+        let mut issuer_name_builder = openssl::x509::X509NameBuilder::new().unwrap();
+        issuer_name_builder.append_entry_by_text("C", "US").unwrap();
+        issuer_name_builder.append_entry_by_text("ST", "TX").unwrap();
+        issuer_name_builder.append_entry_by_text("O", "Proxies R Us").unwrap();
+        issuer_name_builder.append_entry_by_text("CN", "Veracruz Proxy Attestation Server").unwrap();
+        issuer_name_builder.build()
+    };
+    cert_builder.set_issuer_name(&issuer_name);
+
+    cert_builder.set_subject_name(csr.subject_name()).unwrap();
+    cert_builder.set_pubkey(&csr.public_key().unwrap()).unwrap();
+
+    let key_pem = {
+        let mut f = std::fs::File::open("/work/veracruz/proxy-attestation-server/CAKey.pem").unwrap();
+        let mut buffer: Vec<u8> = Vec::new();
+        f.read_to_end(&mut buffer).unwrap();
+        buffer
+    };
+    let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem).unwrap();
+    cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256());
+    Ok(cert_builder.build())
 }
 
 fn generate_sgx_symmetric_keys(
