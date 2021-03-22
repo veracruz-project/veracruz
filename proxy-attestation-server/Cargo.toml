@@ -52,6 +52,7 @@ env_logger = "0.7"
 err-derive = "0.2"
 serde_cbor = {version = "0.11", optional = true }
 nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main", optional = true }
+nb-connect = "=1.0.3"
 
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
