@@ -13,6 +13,7 @@ use crate::{attestation::Attestation, error::VeracruzClientError};
 use ring::signature::KeyPair;
 use rustls::Session;
 use std::{
+    path,
     io::{Read, Write},
     str::from_utf8,
 };
@@ -42,7 +43,10 @@ impl VeracruzClient {
     /// Read all the bytes in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_all_bytes_in_file(filename: &str) -> Result<Vec<u8>, VeracruzClientError> {
+    fn read_all_bytes_in_file<P>(filename: P) -> Result<Vec<u8>, VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
         let mut file = std::fs::File::open(filename)?;
         let mut buffer = std::vec::Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -54,7 +58,10 @@ impl VeracruzClient {
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
     // TODO: use generic functions to unify read_cert and read_private_key
-    fn read_cert(filename: &str) -> Result<rustls::Certificate, VeracruzClientError> {
+    fn read_cert<P>(filename: P) -> Result<rustls::Certificate, VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let cert_vec = rustls::internal::pemfile::certs(&mut cursor)
@@ -70,7 +77,10 @@ impl VeracruzClient {
     /// Read the private in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_private_key(filename: &str) -> Result<rustls::PrivateKey, VeracruzClientError> {
+    fn read_private_key<P>(filename: P) -> Result<rustls::PrivateKey, VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let pkey_vec = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
@@ -142,11 +152,14 @@ impl VeracruzClient {
     /// Check the validity of client_cert:
     /// parse the certificate and match it with the public key generated from the private key;
     /// check if the certificate is valid in term of time.
-    fn check_certificate_validity(
-        client_cert_filename: &str,
+    fn check_certificate_validity<P>(
+        client_cert_filename: P,
         public_key: &[u8],
-    ) -> Result<(), VeracruzClientError> {
-        let cert_file = std::fs::File::open(client_cert_filename)?;
+    ) -> Result<(), VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
+        let cert_file = std::fs::File::open(&client_cert_filename)?;
         let parsed_cert = x509_parser::pem::Pem::read(std::io::BufReader::new(cert_file))?;
         let parsed_cert = parsed_cert
             .0
@@ -162,7 +175,7 @@ impl VeracruzClient {
             })
         } else if let None = parsed_cert.validity.time_to_expiration() {
             Err(VeracruzClientError::CertificateExpireError(
-                client_cert_filename.to_string(),
+                client_cert_filename.as_ref().to_string_lossy().to_string(),
             ))
         } else {
             Ok(())
@@ -172,26 +185,30 @@ impl VeracruzClient {
     /// Load the client certificate and key, and the global policy, which contains information
     /// about the enclave.
     /// Attest the enclave.
-    pub fn new(
-        client_cert_filename: &str,
-        client_key_filename: &str,
+    pub fn new<P1, P2>(
+        client_cert_filename: P1,
+        client_key_filename: P2,
         policy_json: &str,
         target_platform: &EnclavePlatform
-    ) -> Result<VeracruzClient, VeracruzClientError> {
+    ) -> Result<VeracruzClient, VeracruzClientError>
+    where
+        P1: AsRef<path::Path>,
+        P2: AsRef<path::Path>
+    {
         let policy_hash = hex::encode(ring::digest::digest(
             &ring::digest::SHA256,
             policy_json.as_bytes(),
         ));
         let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json)?;
-        let client_cert = Self::read_cert(client_cert_filename)?;
-        let client_priv_key = Self::read_private_key(client_key_filename)?;
+        let client_cert = Self::read_cert(&client_cert_filename)?;
+        let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
         // check if the certificate is valid
         let key_pair = ring::signature::RsaKeyPair::from_der(client_priv_key.0.as_slice())
             .map_err(|err| {
                 VeracruzClientError::RingError(format!("from_der failed:{:?}", err))
             })?;
-        Self::check_certificate_validity(client_cert_filename, key_pair.public_key().as_ref())?;
+        Self::check_certificate_validity(&client_cert_filename, key_pair.public_key().as_ref())?;
 
         let (enclave_cert_hash, enclave_name) = AttestationHandler::attestation(&policy, target_platform)?;
 
@@ -206,7 +223,7 @@ impl VeracruzClient {
         )?;
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&enclave_name)?;
         let session = rustls::ClientSession::new(&std::sync::Arc::new(client_config), dns_name);
-        let client_cert_text = VeracruzClient::read_all_bytes_in_file(client_cert_filename)?;
+        let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
         client_cert_raw.retain(|c| c != '\n');
@@ -510,17 +527,26 @@ impl VeracruzClient {
 
     // APIs for testing: expose internal functions
     #[cfg(test)]
-    pub fn pub_read_all_bytes_in_file(filename: &str) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn pub_read_all_bytes_in_file<P>(filename: P) -> Result<Vec<u8>, VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
         VeracruzClient::read_all_bytes_in_file(filename)
     }
 
     #[cfg(test)]
-    pub fn pub_read_cert(filename: &str) -> Result<rustls::Certificate, VeracruzClientError> {
+    pub fn pub_read_cert<P>(filename: P) -> Result<rustls::Certificate, VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
         VeracruzClient::read_cert(filename)
     }
 
     #[cfg(test)]
-    pub fn pub_read_private_key(filename: &str) -> Result<rustls::PrivateKey, VeracruzClientError> {
+    pub fn pub_read_private_key<P>(filename: P) -> Result<rustls::PrivateKey, VeracruzClientError>
+    where
+        P: AsRef<path::Path>
+    {
         VeracruzClient::read_private_key(filename)
     }
 
