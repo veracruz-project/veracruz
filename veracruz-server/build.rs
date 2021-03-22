@@ -28,7 +28,7 @@ fn main() {
             "SW" => println!("cargo:rustc-link-lib=dylib=sgx_urts_sim"),
             "HW" => {
                 let target = target_build_utils::TargetInfo::new().unwrap();
-                if target.target_arch() == "x86_64" {
+                if target.target_env() == "sgx" {
                     println!("cargo:rustc-link-lib=dylib=sgx_urts");
                     println!("cargo:rustc-link-lib=dylib=sgx_tkey_exchange");
                     println!("cargo:rustc-link-lib=dylib=sgx_uae_service");

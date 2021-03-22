@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 fn main() -> std::io::Result<()> {
     let target = target_build_utils::TargetInfo::new().expect("could not get target info");
-    if target.target_arch() == "aarch64" {
+    if target.target_os() == "optee" {
         let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
         let runtime_manager_uuid: &str = &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
 

@@ -47,7 +47,7 @@ lazy_static = "1.4"
 regex = "1.4"
 local_ipaddress = "0.1.3"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
+[target.'cfg(target_env = "sgx")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }

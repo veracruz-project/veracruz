@@ -18,7 +18,7 @@ err-derive = "0.2"
 [build-dependencies]
 protoc-rust = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
+[target.'cfg(target_env = "sgx")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
