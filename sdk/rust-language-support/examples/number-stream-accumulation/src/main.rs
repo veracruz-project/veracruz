@@ -35,7 +35,6 @@ fn read_init_value() -> Result<f64, i32> {
 }
 
 fn read_last_result() -> Result<Option<f64>, i32> {
-    //Ok(None)
     match host::read_previous_result() {
         host::HCallReturnCode::Success(previous_result) => match previous_result {
             None => Ok(None),

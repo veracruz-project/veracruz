@@ -1002,13 +1002,13 @@ mod tests {
                     );
                     let time_result = Instant::now();
                     info!("             Result retrievers request result.");
-                    let _response = client_tls_send(
+                    // NOTE: Fetch result twice on purpose.
+                    client_tls_send(
                         &client_tls_tx,
                         &client_tls_rx,
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        //TODO: change to the output file specified in policy
                         &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
                     )
                     .and_then(|response| {
@@ -1025,7 +1025,6 @@ mod tests {
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        //TODO: change to the output file specified in policy
                         &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
                     )
                     .and_then(|response| {
@@ -1063,14 +1062,13 @@ mod tests {
                 );
                 let time_result = Instant::now();
                 info!("             Result retrievers request result.");
-                // Request the result twice on purpose
+                    // NOTE: Fetch result twice on purpose.
                 let _response = client_tls_send(
                     &client_tls_tx,
                     &client_tls_rx,
                     client_session_id,
                     &mut client_session,
                     ticket,
-                    //TODO: change to the output file specified in policy
                     &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
                 )
                 .and_then(|response| {

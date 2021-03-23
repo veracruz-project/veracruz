@@ -39,7 +39,6 @@ lazy_static! {
 // Protocol response messages.
 ////////////////////////////////////////////////////////////////////////////////
 
-//TODO: wrap inside protocol_state
 /// Encodes a successful computation result, ready for transmission back to whoever requested a
 /// result.
 #[inline]

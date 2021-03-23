@@ -104,7 +104,6 @@ pub(crate) const HCALL_READ_STREAM_NAME: &str = "__veracruz_hcall_read_stream";
 // Provisioning errors
 ////////////////////////////////////////////////////////////////////////////////
 
-//TODO: REMOVE THIS ERROR
 /// Errors that can occur during host provisioning.  These are errors that may
 /// be reported back to principals in the Veracruz computation over the Veracruz
 /// wire protocols, for example if somebody tries to provision data when that is
@@ -154,7 +153,6 @@ pub enum HostProvisioningError {
     FileNotFound(String),
 }
 
-//TODO: move to a separate fill error.rs
 // Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
 impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
@@ -173,7 +171,6 @@ impl From<wasmi::Error> for HostProvisioningError {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A wrapper for VFS, which provides common API used by execution engine.
-/// TODO: remove?
 #[derive(Clone)]
 pub struct VFSService {
     vfs : Arc<Mutex<VFS>>,
@@ -316,7 +313,6 @@ pub enum FatalEngineError {
     /// Wrapper for direct error message.
     #[error(display = "FatalVeracruzHostError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
-    //TODO REMOVE
     #[error(display = "FatalVeracruzHostError: provisioning error {:?}.", _0)]
     ProvisionError(#[error(source)] HostProvisioningError),
     /// Something unknown or unexpected went wrong, and there's no more detailed
