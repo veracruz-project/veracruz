@@ -54,14 +54,6 @@ mod tests {
     use stringreader;
     use proxy_attestation_server;
 
-    //// Constants corresponding to the `execution_engine::hcall::MachineState` enum which is
-    //// encoded as a `u8` value when servicing an enclave state request.  Included here
-    //// to avoid adding `execution_engine` as a direct dependency of this crate.
-    //const ENCLAVE_STATE_INITIAL: u8 = 0;
-    //const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
-    //const ENCLAVE_STATE_STREAM_SOURCE_SLOADING: u8 = 2;
-    //const ENCLAVE_STATE_READY_TO_EXECUTE: u8 = 3;
-    //const ENCLAVE_STATE_FINISHED_EXECUTING: u8 = 4;
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "../test-collateral/one_data_source_policy.json";
     const GET_RANDOM_POLICY: &'static str = "../test-collateral/get_random_policy.json";
