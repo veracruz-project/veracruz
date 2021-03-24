@@ -131,7 +131,7 @@ mod tests {
 
     pub fn setup(proxy_attestation_server_url: String) -> u32 {
         #[allow(unused_assignments)]
-        let mut rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
+        let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
 	
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
