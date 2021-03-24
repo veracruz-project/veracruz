@@ -21,7 +21,7 @@ use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 lazy_static! {
-    static ref DEVICE_ID: AtomicI32 = AtomicI32::new(0);
+    static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
 }
 
 pub async fn start(body_string: String) -> ProxyAttestationServerResponder {

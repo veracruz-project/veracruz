@@ -28,7 +28,7 @@ use sgx_types::{
 use std::{collections::HashMap, mem, string::ToString, sync::atomic::{AtomicU64, Ordering}};
 
 lazy_static! {
-    static ref SESSION_ID: AtomicU64 = AtomuicU64::new(0);
+    static ref SESSION_ID: AtomicU64 = AtomicU64::new(1);
     static ref DEVICE_ID: std::sync::SgxMutex<Option<i32>> = std::sync::SgxMutex::new(None);
     static ref INITIATOR_HASH: std::sync::SgxMutex<HashMap<u64, SgxDhInitiator>> =
         std::sync::SgxMutex::new(HashMap::new());

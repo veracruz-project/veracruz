@@ -48,7 +48,7 @@ pub use error::RuntimeManagerError;
 
 lazy_static! {
     static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> = Mutex::new(None);
-    static ref SESSION_COUNTER: AtomicU32 = AtomicU32::new(0);
+    static ref SESSION_COUNTER: AtomicU32 = AtomicU32::new(1);
     static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> = Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
