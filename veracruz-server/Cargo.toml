@@ -44,7 +44,6 @@ runtime-manager-bind = { path = "../runtime-manager-bind", optional = true }
 sgx-root-enclave-bind = { path = "../sgx-root-enclave-bind", optional = true }
 optee-teec = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
 uuid = { version = "0.7", optional = true }
-hex = {version = "=0.4.2", optional = true }
 
 [build-dependencies]
 target_build_utils = "0.1"
