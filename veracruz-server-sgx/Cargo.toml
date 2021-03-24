@@ -1,0 +1,40 @@
+[package]
+name = "veracruz-server-sgx"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "An untrusted server/bridge that allows the outside world and the trusted Veracruz runtime to communicate with each other."
+
+[features]
+debug = []
+
+[dependencies]
+dirs = "1.0.2"
+veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
+serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
+transport-protocol = { path = "../transport-protocol", features = ["sgx_attestation"] }
+rouille = "3.0"
+base64 = "0.10.1"
+untrusted = "0.6.2"
+ring = "0.16"
+stringreader = "0.1"
+curl = "0.4"
+lazy_static = "1.4"
+actix-web = "2.0.0"
+actix-http = "1.0"
+futures = "0.3"
+log = "0.4"
+err-derive = "0.2"
+pinecone = "0.2"
+hex = "=0.4.2"
+webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
+sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
+runtime-manager-bind = { path = "../runtime-manager-bind" }
+sgx-root-enclave-bind = { path = "../sgx-root-enclave-bind" }
+
+[build-dependencies]
+target_build_utils = "0.1"

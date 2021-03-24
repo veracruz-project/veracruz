@@ -1,0 +1,40 @@
+
+[package]
+name = "veracruz-server-sgx-fuzz"
+version = "0.0.0"
+authors = ["Shale Xiong"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+
+# Has to use 0.1.1 due to any later versions import arbitrary packages 
+# that are incompatable with the rust version we are using.
+[dependencies]
+libfuzzer-sys = "=0.1.1"
+veracruz_utils = { path = "../../veracruz_utils_std" }
+serde_json = "1.0"
+transport-protocol = { path = "../../transport-protocol_std"}
+rustls = { path = "../../third-party/rustls" }
+protobuf = "=2.6.2"
+ring = "0.14.6"
+webpki = "0.19"                                               
+webpki-roots = "0.16"
+
+
+[dependencies.veracruz-server-sgx]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "init_veracruz_server"
+path = "fuzz_targets/init_veracruz_server.rs"
+
+[[bin]]
+name = "provision_data"
+path = "fuzz_targets/provision_data.rs"
