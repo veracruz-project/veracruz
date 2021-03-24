@@ -21,11 +21,7 @@ cfg-if = "0.1.10"
 getrandom = { version = "0.1.14", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib", optional = true }
 nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
-
-[target.'cfg(target_env = "sgx")'.dependencies]
 sgx_trts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-
-[target.'cfg(target_os = "optee")'.dependencies]
 optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
 
 [profile.release]

@@ -53,9 +53,6 @@ err-derive = "0.2"
 serde_cbor = {version = "0.11", optional = true }
 nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main", optional = true }
 nb-connect = "=1.0.3"
-
-
-[target.'cfg(target_env = "sgx")'.dependencies]
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
