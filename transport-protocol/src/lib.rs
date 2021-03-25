@@ -12,7 +12,7 @@
 #![crate_name = "transport_protocol"]
 #![crate_type = "staticlib"]
 #![cfg_attr(feature = "sgx", no_std)]
-#![cfg_attr(target_env = "sgx", feature(rustc_private))]
+#![cfg_attr(feature = "sgx", feature(rustc_private))]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
