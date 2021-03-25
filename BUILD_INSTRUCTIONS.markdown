@@ -1,1 +1,1 @@
-@[:markdown](https://github.com/basmaelgaabouri/veracruz-docker-image/blob/main/README.md)
+Please follow [build instructions](https://github.com/veracruz-project/veracruz-docker-image) in the Docker submodule.
