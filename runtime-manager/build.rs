@@ -9,7 +9,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-extern crate target_build_utils;
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -17,8 +16,8 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 fn main() -> std::io::Result<()> {
-    let target = target_build_utils::TargetInfo::new().expect("could not get target info");
-    if target.target_os() == "optee" {
+    #[cfg(feature = "tz")]
+    {
         let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
         let runtime_manager_uuid: &str = &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
 
