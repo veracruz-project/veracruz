@@ -25,10 +25,10 @@ use sgx_types::{
     sgx_dh_session_enclave_identity_t, sgx_ec256_public_t, sgx_key_128bit_t, sgx_ra_context_t,
     sgx_ra_init, sgx_status_t, sgx_target_info_t,
 };
-use std::{collections::HashMap, mem, string::ToString};
+use std::{collections::HashMap, mem, string::ToString, sync::atomic::{AtomicU64, Ordering}};
 
 lazy_static! {
-    static ref SESSION_ID: std::sync::SgxMutex<u64> = std::sync::SgxMutex::new(0);
+    static ref SESSION_ID: AtomicU64 = AtomicU64::new(1);
     static ref DEVICE_ID: std::sync::SgxMutex<Option<i32>> = std::sync::SgxMutex::new(None);
     static ref INITIATOR_HASH: std::sync::SgxMutex<HashMap<u64, SgxDhInitiator>> =
         std::sync::SgxMutex::new(HashMap::new());
@@ -174,13 +174,7 @@ pub extern "C" fn start_local_attest_enc(
 
     let status = initiator.proc_msg1(msg1, msg2);
     assert!(!status.is_err());
-    let session_id = {
-        let mut sess_id_wrap = SESSION_ID
-            .lock()
-            .expect("Failed to obtain lock on SESSION_ID");
-        *sess_id_wrap = *sess_id_wrap + 1;
-        *sess_id_wrap
-    };
+    let session_id = SESSION_ID.fetch_add(1, Ordering::SeqCst);
 
     {
         let mut initiator_hash = INITIATOR_HASH

@@ -23,8 +23,7 @@ use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, t_cose_sign1_get_verification_pubkey,
 };
 use ring;
-use std::convert::TryInto;
-use std::io::Write;
+use std::{convert::TryInto, io::Write};
 use veracruz_utils::TrustZoneRootEnclaveOpcode;
 
 lazy_static! {
@@ -54,7 +53,6 @@ lazy_static! {
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
     ];
-    static ref NATIVE_ATTESTATION_DONE: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
     static ref RUNTIME_MANAGER_HASH: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
 }
 

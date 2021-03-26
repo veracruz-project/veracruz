@@ -18,10 +18,10 @@ pub mod nitro;
 
 use crate::error::*;
 use lazy_static::lazy_static;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 lazy_static! {
-    static ref DEVICE_ID: Mutex<i32> = Mutex::new(0);
+    static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
 }
 
 pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
@@ -43,15 +43,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
     }
     let (protocol, firmware_version) = transport_protocol::parse_start_msg(&parsed);
 
-    let device_id = {
-        let mut device_id_wrapper = DEVICE_ID.lock()
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::start failed to obtain lock on DEVICE_ID:{:?}", err);
-                err
-            })?;
-        *device_id_wrapper = *device_id_wrapper + 1;
-        *device_id_wrapper
-    };
+    let device_id = DEVICE_ID.fetch_add(1, Ordering::SeqCst); 
 
     match protocol.as_str() {
         #[cfg(feature = "sgx")]

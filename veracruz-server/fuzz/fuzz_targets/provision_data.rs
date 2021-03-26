@@ -14,7 +14,7 @@ use transport_protocol;
 use libfuzzer_sys::fuzz_target;
 use std::io::prelude::*;
 use std::fs::File;
-use std::sync::{Arc, Mutex};
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 
 const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
 
@@ -52,7 +52,7 @@ fuzz_target!(|buffer: &[u8]| {
             std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
         ) = std::sync::mpsc::channel();
         
-        let flag_main = Arc::new(Mutex::new(true));
+        let flag_main = Arc::new(AtomicBool::new(true));
         let flag_server = flag_main.clone();
 
         let server_loop_handle = std::thread::spawn(move || {
@@ -63,15 +63,9 @@ fuzz_target!(|buffer: &[u8]| {
         let rst = client_tls_send(&client_tls_tx, &client_tls_rx, &mut client_session, &request).unwrap();
         let rst = protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerResponse>(&rst);
         assert!(rst.is_ok());
-        //let response = rst.unwrap();
-        //assert!( response.get_status() == transport_protocol::ResponseStatus::SUCCESS );
-        //check_enclave_state(
-            //&mut client_session,
-            //&client_tls_tx,
-            //&client_tls_rx,
-            //ENCLAVE_STATE_DATA_SOURCES_LOADING,
-        //);
-        *flag_main.lock().unwrap() = false;
+
+        flag_main.store(false, Ordering::SeqCst);
+
         server_loop_handle.join().unwrap();
     }
 });
@@ -236,13 +230,13 @@ fn client_tls_send(
 }
 
 fn server_tls_loop(
-    flag : Arc<Mutex<bool>>,
+    flag : Arc<AtomicBool>,
     veracruz_server: &dyn veracruz_server::VeracruzServer,
     session_id: u32,
     tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
     rx: std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
 ) {
-     while *flag.lock().unwrap() {
+     while flag.load(Ordering::SeqCst) {
         let received = rx.try_recv();
         let received_buffer = received.unwrap_or_else(|_| std::vec::Vec::new());
 

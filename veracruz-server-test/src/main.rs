@@ -43,7 +43,7 @@ mod tests {
         io::{Read, Write},
         path::Path,
         sync::{
-            atomic::{AtomicBool, Ordering},
+            atomic::{AtomicBool, AtomicU32, Ordering},
             Mutex, Once,
         },
         thread,
@@ -126,17 +126,13 @@ mod tests {
         // If one of the two threads hits an Error, it sets the flag to `false` and
         // thus stops another thread. Without this hack, a failure can cause non-termination.
         static ref CONTINUE_FLAG_HASH: Mutex<HashMap<u32,bool>> = Mutex::new(HashMap::<u32,bool>::new());
-        static ref NEXT_TICKET: Mutex<u32> = Mutex::new(0);
+        static ref NEXT_TICKET: AtomicU32 = AtomicU32::new(0);
     }
 
     pub fn setup(proxy_attestation_server_url: String) -> u32 {
         #[allow(unused_assignments)]
-        let mut rst = 0;
-        {
-            let mut next = NEXT_TICKET.lock().unwrap();
-            rst = next.clone();
-            *next = *next + 1;
-        }
+        let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
+	
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
             std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
