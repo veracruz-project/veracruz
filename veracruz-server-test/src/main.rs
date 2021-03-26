@@ -155,9 +155,9 @@ mod tests {
                     proxy_attestation_server_url
                 };
                 #[cfg(feature="debug")]
-                let server = tabasco::server::server(ip_addr, true).unwrap();
+                let server = proxy_attestation_server::server::server(ip_addr, true).unwrap();
                 #[cfg(not(feature="debug"))]
-                let server = tabasco::server::server(ip_addr, false).unwrap();
+                let server = proxy_attestation_server::server::server(ip_addr, false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
