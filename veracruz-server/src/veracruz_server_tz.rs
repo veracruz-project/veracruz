@@ -77,7 +77,7 @@ pub mod veracruz_server_tz {
             })
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
@@ -99,7 +99,7 @@ pub mod veracruz_server_tz {
         }
 
         // Note: this function will go away
-        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError> {
+        fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
@@ -127,7 +127,7 @@ pub mod veracruz_server_tz {
         }
 
         // Note: This function will go away
-        fn get_enclave_name(&self) -> Result<String, VeracruzServerError> {
+        fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
@@ -155,7 +155,7 @@ pub mod veracruz_server_tz {
         }
 
         fn proxy_psa_attestation_get_token(
-            &self,
+            &mut self,
             challenge: Vec<u8>,
         ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
             let mut token: Vec<u8> = Vec::with_capacity(2 * 8192); // TODO: Don't do
@@ -197,7 +197,7 @@ pub mod veracruz_server_tz {
             Ok((token, pubkey, device_id))
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
@@ -216,7 +216,7 @@ pub mod veracruz_server_tz {
             Ok(session_id)
         }
 
-        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError> {
+        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
@@ -230,7 +230,7 @@ pub mod veracruz_server_tz {
         }
 
         fn tls_data(
-            &self,
+            &mut self,
             session_id: u32,
             input: Vec<u8>,
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {

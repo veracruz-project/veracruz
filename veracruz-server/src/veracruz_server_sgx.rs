@@ -517,7 +517,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
@@ -537,7 +537,7 @@ pub mod veracruz_server_sgx {
         }
 
         fn proxy_psa_attestation_get_token(
-            &self,
+            &mut self,
             challenge: Vec<u8>,
         ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
             let mut pagt_result: u32 = 0;
@@ -573,7 +573,7 @@ pub mod veracruz_server_sgx {
         }
 
         // TODO: This function will go away when we use attestation
-        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError> {
+        fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
             let mut len_result: u32 = 0;
             let mut cert_len: u64 = 0;
             let len_ret = unsafe {
@@ -613,7 +613,7 @@ pub mod veracruz_server_sgx {
         }
 
         // TODO: This function will go away when we use attestation
-        fn get_enclave_name(&self) -> Result<String, VeracruzServerError> {
+        fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError> {
             let mut len_result: u32 = 0;
             let mut name_len: u64 = 0;
             let len_ret = unsafe {
@@ -651,7 +651,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
@@ -666,7 +666,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError> {
+        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
             let mut result: u32 = 0;
             let ret = unsafe {
                 runtime_manager_close_session_enc(self.runtime_manager_enclave.geteid(), &mut result, session_id)
@@ -681,7 +681,7 @@ pub mod veracruz_server_sgx {
         }
 
         fn tls_data(
-            &self,
+            &mut self,
             session_id: u32,
             input: Vec<u8>,
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {

@@ -27,7 +27,8 @@ use std::{
     thread,
 };
 
-type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>>>>;
+type EnclaveHandlerServer = Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>;
+type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
 #[post("/veracruz_server")]
 async fn veracruz_server_request(
@@ -35,16 +36,19 @@ async fn veracruz_server_request(
     _request: HttpRequest,
     input_data: String,
 ) -> VeracruzServerResponder {
-    let enclave_handler_locked = enclave_handler.lock()?;
-    let enclave = enclave_handler_locked
-        .as_ref()
-        .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
     let input_data_decoded = base64::decode(&input_data)?;
+    
+    let mut enclave_handler_locked = enclave_handler.lock()?;
+
+    let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+
     let result = enclave.plaintext_data(input_data_decoded)?;
+
     let result_string = match result {
         Some(return_data) => base64::encode(&return_data),
         None => String::new(),
     };
+    
     Ok(result_string)
 }
 
@@ -60,11 +64,13 @@ async fn runtime_manager_request(
         return Err(VeracruzServerError::InvalidRequestFormatError);
     }
     let session_id = match fields[0].parse::<u32>()? {
-        0 => enclave_handler
-            .lock()?
-            .as_ref()
-            .ok_or(VeracruzServerError::UninitializedEnclaveError)?
-            .new_tls_session()?,
+        0 => {
+            let mut enclave_handler_locked = enclave_handler.lock()?;
+
+            let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+
+            enclave.new_tls_session()?
+        }    
         n @ 1u32..=std::u32::MAX => n,
     };
 
@@ -72,11 +78,11 @@ async fn runtime_manager_request(
     let received_data_decoded = base64::decode(&received_data)?;
 
     let (active_flag, output_data_option) = {
-        enclave_handler
-            .lock()?
-            .as_ref()
-            .ok_or(VeracruzServerError::UninitializedEnclaveError)?
-            .tls_data(session_id, received_data_decoded)?
+        let mut enclave_handler_locked = enclave_handler.lock()?;
+
+        let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+
+        enclave.tls_data(session_id, received_data_decoded)?
     };
 
     // Shutdown the enclave

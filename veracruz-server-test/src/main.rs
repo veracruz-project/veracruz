@@ -213,7 +213,7 @@ mod tests {
 
     /// Auxiliary function: self signed certificate for enclave
     fn enclave_self_signed_cert(
-        veracruz_server: &VeracruzServerEnclave,
+        veracruz_server: &mut VeracruzServerEnclave,
     ) -> Result<rustls::Certificate, VeracruzServerError> {
         let enclave_cert_vec = veracruz_server.get_enclave_cert()?;
         Ok(rustls::Certificate(enclave_cert_vec))
@@ -227,7 +227,7 @@ mod tests {
             let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
             let result = VeracruzServerEnclave::new(&policy_json)
-                .and_then(|veracruz_server| enclave_self_signed_cert(&veracruz_server));
+                .and_then(|mut veracruz_server| enclave_self_signed_cert(&mut veracruz_server));
             assert!(result.is_ok(), "error:{:?}", result);
         });
     }
@@ -240,7 +240,7 @@ mod tests {
 
         let ret = VeracruzServerEnclave::new(&policy_json);
 
-        let veracruz_server = ret.unwrap();
+        let mut veracruz_server = ret.unwrap();
 
         #[cfg(feature = "nitro")]
         let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
@@ -251,7 +251,7 @@ mod tests {
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &veracruz_server);
+            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &mut veracruz_server);
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -281,15 +281,15 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
-        let enclave_cert = enclave_self_signed_cert(&veracruz_server).unwrap();
+        let (mut veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
+        let enclave_cert = enclave_self_signed_cert(&mut veracruz_server).unwrap();
 
         let client_cert_filename = "../test-collateral/never_used_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
         let cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
 
         let mut _client_session = create_client_test_session(
-            &veracruz_server,
+            &mut veracruz_server,
             client_cert_filename,
             client_key_filename,
             cert_hash.as_ref().to_vec(),
@@ -765,7 +765,7 @@ mod tests {
         );
         info!("### Step 2.  Initialise enclave.");
         let time_init = Instant::now();
-        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
         let client_session_id = veracruz_server.new_tls_session().and_then(|id| {
             if id == 0 {
                 Err(VeracruzServerError::MissingFieldError("client_session_id"))
@@ -782,9 +782,9 @@ mod tests {
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &veracruz_server)?
+            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &mut veracruz_server)?
         } else {
-            let enclave_cert = enclave_self_signed_cert(&veracruz_server)?;
+            let enclave_cert = enclave_self_signed_cert(&mut veracruz_server)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
                 .as_ref()
                 .to_vec()
@@ -793,7 +793,7 @@ mod tests {
         info!("             Enclave generated a self-signed certificate:");
 
         let mut client_session = create_client_test_session(
-            &veracruz_server,
+            &mut veracruz_server,
             client_cert_path,
             client_key_path,
             enclave_cert_hash,
@@ -807,7 +807,7 @@ mod tests {
         let time_server_boot = Instant::now();
         CONTINUE_FLAG_HASH.lock()?.insert(ticket, true);
         let server_loop_handle = thread::spawn(move || {
-            server_tls_loop(&veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(|e| {
+            server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(|e| {
                 CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
                 e
             })
@@ -1306,7 +1306,7 @@ mod tests {
     fn init_veracruz_server_and_tls_session(
         policy_json: &str,
     ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
-        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
 
         let one_tenth_sec = std::time::Duration::from_millis(100);
         std::thread::sleep(one_tenth_sec); // wait for the client to start
@@ -1524,7 +1524,7 @@ mod tests {
     }
 
     fn server_tls_loop(
-        veracruz_server: &dyn veracruz_server::VeracruzServer,
+        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
         tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
         rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ticket: u32,
@@ -1602,7 +1602,7 @@ mod tests {
     }
 
     fn create_client_test_session(
-        veracruz_server: &dyn veracruz_server::VeracruzServer,
+        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
         client_cert_filename: &str,
         client_key_filename: &str,
         cert_hash: Vec<u8>,
@@ -1685,7 +1685,7 @@ mod tests {
     fn attestation_flow(
         proxy_attestation_server_url: &String,
         expected_enclave_hash: &String,
-        veracruz_server: &dyn veracruz_server::VeracruzServer,
+        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
         info!("veracruz-server-test/attestation_flow: challenge:{:?}", challenge);
