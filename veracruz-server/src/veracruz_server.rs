@@ -217,25 +217,25 @@ pub trait VeracruzServer {
         Self: Sized;
 
     fn proxy_psa_attestation_get_token(
-        &self,
+        &mut self,
         challenge: Vec<u8>,
     ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError>;
 
-    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
+    fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
 
     // Note: this function will go away
-    fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError>;
+    fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError>;
 
     // Note: This function will go away
-    fn get_enclave_name(&self) -> Result<String, VeracruzServerError>;
+    fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError>;
 
-    fn new_tls_session(&self) -> Result<u32, VeracruzServerError>;
+    fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError>;
 
-    fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError>;
+    fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError>;
 
     // The first bool indicates if the enclave is active, and the second vec contains the response
     fn tls_data(
-        &self,
+        &mut self,
         session_id: u32,
         input: Vec<u8>,
     ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError>;

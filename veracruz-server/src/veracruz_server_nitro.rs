@@ -104,7 +104,7 @@ pub mod veracruz_server_nitro {
             return Ok(meta);
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
@@ -124,7 +124,7 @@ pub mod veracruz_server_nitro {
         }
 
         // Note: this function will go away
-        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError> {
+        fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
             let certificate = {
                 let message = RuntimeManagerMessage::GetEnclaveCert;
                 let message_buffer = bincode::serialize(&message)?;
@@ -141,7 +141,7 @@ pub mod veracruz_server_nitro {
         }
 
         // Note: This function will go away
-        fn get_enclave_name(&self) -> Result<String, VeracruzServerError> {
+        fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError> {
             let name: String = {
                 let message = RuntimeManagerMessage::GetEnclaveName;
                 let message_buffer = bincode::serialize(&message)?;
@@ -158,7 +158,7 @@ pub mod veracruz_server_nitro {
         }
 
         fn proxy_psa_attestation_get_token(
-            &self,
+            &mut self,
             challenge: Vec<u8>,
         ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
             let message = RuntimeManagerMessage::GetPSAAttestationToken(challenge);
@@ -176,7 +176,7 @@ pub mod veracruz_server_nitro {
             return Ok((token, public_key, device_id));
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerMessage::NewTLSSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
@@ -191,7 +191,7 @@ pub mod veracruz_server_nitro {
             return Ok(session_id);
         }
 
-        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError> {
+        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
             let cts_message = RuntimeManagerMessage::CloseTLSSession(session_id);
             let cts_buffer = bincode::serialize(&cts_message)?;
 
@@ -207,7 +207,7 @@ pub mod veracruz_server_nitro {
         }
 
         fn tls_data(
-            &self,
+            &mut self,
             session_id: u32,
             input: Vec<u8>,
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
