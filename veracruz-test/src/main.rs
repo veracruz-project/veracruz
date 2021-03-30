@@ -69,7 +69,7 @@ mod tests {
     use veracruz_server;
     use std::{io::Read, sync::Once};
     use proxy_attestation_server;
-    use veracruz_utils::{EnclavePlatform, policy, VeracruzPolicy};
+    use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
     #[derive(Debug, Error)]
     pub enum VeracruzTestError {
@@ -79,8 +79,8 @@ mod tests {
         PineconeError(#[error(source)] pinecone::Error),
         #[error(display = "VeracruzTest: VeracruzClientError: {:?}.", _0)]
         VeracruzClientError(#[error(source)] veracruz_client::VeracruzClientError),
-        #[error(display = "VeracruzTest: VeracruzUtilError: {:?}.", _0)]
-        VeracruzUtilError(#[error(source)] policy::VeracruzUtilError),
+        #[error(display = "VeracruzTest: PolicyError: {:?}.", _0)]
+        VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
         #[error(display = "VeracruzTest: VeracruzServerError: {:?}.", _0)]
         VeracruzServerError(#[error(source)] veracruz_server::VeracruzServerError),
         #[error(display = "VeracruzTest: TransportProtocolError: {:?}.", _0)]
@@ -287,7 +287,7 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
         let policy_json = std::fs::read_to_string(LINEAR_REGRESSION_PARALLEL_POLICY).unwrap();
-        let policy = VeracruzPolicy::from_json(&policy_json).unwrap();
+        let policy = Policy::from_json(&policy_json).unwrap();
 
         setup(policy.proxy_attestation_server_url().clone());
 
@@ -295,11 +295,11 @@ mod tests {
         let server_handle = server_tls_loop(LINEAR_REGRESSION_PARALLEL_POLICY);
 
         #[cfg(feature = "sgx")]
-        let target_platform = EnclavePlatform::SGX;
+        let target_platform = Platform::SGX;
         #[cfg(feature = "tz")]
-        let target_platform = EnclavePlatform::TrustZone;
+        let target_platform = Platform::TrustZone;
         #[cfg(feature = "nitro")]
-        let target_platform = EnclavePlatform::Nitro;
+        let target_platform = Platform::Nitro;
 
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
@@ -349,7 +349,7 @@ mod tests {
         result_retrievers: &[usize],
     ) -> Result<(), VeracruzTestError> {
         let policy_json = std::fs::read_to_string(policy_path)?;
-        let policy = VeracruzPolicy::from_json(&policy_json)?;
+        let policy = Policy::from_json(&policy_json)?;
         setup(policy.proxy_attestation_server_url().clone());
         info!("### Step 0. Read the policy file {}.", policy_path);
 
@@ -366,11 +366,11 @@ mod tests {
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
                 #[cfg(feature = "sgx")]
-                let target_platform = EnclavePlatform::SGX;
+                let target_platform = Platform::SGX;
                 #[cfg(feature = "tz")]
-                let target_platform = EnclavePlatform::TrustZone;
+                let target_platform = Platform::TrustZone;
                 #[cfg(feature = "nitro")]
-                let target_platform = EnclavePlatform::Nitro;
+                let target_platform = Platform::Nitro;
 
                 clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json, &target_platform)?);
             }

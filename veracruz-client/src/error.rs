@@ -52,8 +52,8 @@ pub enum VeracruzClientError {
     ParseIntError(#[error(source)] std::num::ParseIntError),
     #[error(display = "VeracruzClient: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "VeracruzClient: VeracruzUtilError: {:?}.", _0)]
-    VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
+    #[error(display = "VeracruzClient: PolicyError: {:?}.", _0)]
+    VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
     #[error(display = "VeracruzClient: Certificate expired: {:?}.", _0)]
     CertificateExpireError(String),
     #[error(
@@ -88,7 +88,7 @@ pub enum VeracruzClientError {
         _0,
         _1
     )]
-    InvalidRoleError(Vec<u8>, veracruz_utils::VeracruzRole),
+    InvalidRoleError(Vec<u8>, veracruz_utils::policy::principal::Role),
     #[error(display = "VeracruzClient: Unauthorized client certificate: {}.", _0)]
     InvalidClientCertificateError(String),
     #[error(display = "VeracruzClient: Direct message: {}.", _0)]

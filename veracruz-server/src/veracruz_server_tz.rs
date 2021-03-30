@@ -20,7 +20,16 @@ pub mod veracruz_server_tz {
         Context, Operation, ParamNone, ParamTmpRef, ParamType, ParamValue, Session, Uuid,
     };
     use std::{convert::TryInto, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
-    use veracruz_utils::{EnclavePlatform, TrustZoneRootEnclaveOpcode, RuntimeManagerOpcode, TRUSTZONE_ROOT_ENCLAVE_UUID, RUNTIME_MANAGER_UUID};
+    use veracruz_utils::{
+        platform::{
+            Platform,
+            tz::{
+                root_enclave_opcode::{TrustZoneRootEnclaveOpcode, TRUSTZONE_ROOT_ENCLAVE_UUID},
+                runtime_manager_opcode::{RuntimeManagerOpcode, RUNTIME_MANAGER_UUID}
+            },
+        },
+        policy::policy::Policy
+    };
 
     lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
@@ -33,13 +42,13 @@ pub mod veracruz_server_tz {
 
     impl VeracruzServer for VeracruzServerTZ {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
-            let policy: veracruz_utils::VeracruzPolicy =
-                veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
+            let policy: Policy =
+                Policy::from_json(policy_json)?;
 
             let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
             {
                 let runtime_manager_hash = {
-                    match policy.runtime_manager_hash(&EnclavePlatform::TrustZone) {
+                    match policy.runtime_manager_hash(&Platform::TrustZone) {
                         Ok(hash) => hash,
                         Err(_) => return Err(VeracruzServerError::MissingFieldError("runtime_manager_hash_tz")),
                     }

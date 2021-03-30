@@ -17,7 +17,7 @@ use std::{
     io::{Read, Write},
     str::from_utf8,
 };
-use veracruz_utils::{EnclavePlatform, VeracruzPolicy, VeracruzRole};
+use veracruz_utils::{platform::Platform, policy::{policy::Policy, principal::Role}};
 use webpki;
 use webpki_roots;
 
@@ -32,7 +32,7 @@ use crate::attestation::MockAttestation as AttestationHandler;
 pub struct VeracruzClient {
     tls_session: rustls::ClientSession,
     remote_session_id: Option<u32>,
-    policy: VeracruzPolicy,
+    policy: Policy,
     policy_hash: String,
     package_id: u32,
     client_cert: String,
@@ -189,7 +189,7 @@ impl VeracruzClient {
         client_cert_filename: P1,
         client_key_filename: P2,
         policy_json: &str,
-        target_platform: &EnclavePlatform
+        target_platform: &Platform
     ) -> Result<VeracruzClient, VeracruzClientError>
     where
         P1: AsRef<path::Path>,
@@ -199,7 +199,7 @@ impl VeracruzClient {
             &ring::digest::SHA256,
             policy_json.as_bytes(),
         ));
-        let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json)?;
+        let policy = Policy::from_json(&policy_json)?;
         let client_cert = Self::read_cert(&client_cert_filename)?;
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
@@ -244,7 +244,7 @@ impl VeracruzClient {
         })
     }
 
-    fn check_role_permission(&self, role: &VeracruzRole) -> Result<(), VeracruzClientError> {
+    fn check_role_permission(&self, role: &Role) -> Result<(), VeracruzClientError> {
         match self
             .policy
             .identities()
@@ -265,7 +265,7 @@ impl VeracruzClient {
     }
 
     pub fn send_program(&mut self, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
-        self.check_role_permission(&VeracruzRole::ProgramProvider)?;
+        self.check_role_permission(&Role::ProgramProvider)?;
 
         self.check_policy_hash()?;
 
@@ -282,7 +282,7 @@ impl VeracruzClient {
     }
 
     pub fn send_data(&mut self, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
-        self.check_role_permission(&VeracruzRole::DataProvider)?;
+        self.check_role_permission(&Role::DataProvider)?;
         self.check_policy_hash()?;
         self.check_pi_hash()?;
         let serialized_data = transport_protocol::serialize_program_data(&data, self.next_package_id())?;
@@ -299,7 +299,7 @@ impl VeracruzClient {
     }
 
     pub fn get_results(&mut self) -> Result<Vec<u8>, VeracruzClientError> {
-        self.check_role_permission(&VeracruzRole::ResultReader)?;
+        self.check_role_permission(&Role::ResultReader)?;
         self.check_policy_hash()?;
         self.check_pi_hash()?;
 

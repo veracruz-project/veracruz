@@ -16,6 +16,8 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 
+use veracruz_utils::policy::policy::Policy;
+
 const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
 
 fuzz_target!(|buffer: &[u8]| {
@@ -27,7 +29,7 @@ fuzz_target!(|buffer: &[u8]| {
     	let mut policy = String::new();
         f.read_to_string(&mut policy).unwrap();
 
-        let policy = veracruz_utils::VeracruzPolicy::new(&policy).unwrap();
+        let policy = Policy::new(&policy).unwrap();
 
         let (veracruz_server, session_id) = init_veracruz_server_and_tls_session(policy).unwrap();
         let enclave_cert = enclave_self_signed_cert(&veracruz_server).unwrap();
@@ -77,7 +79,7 @@ use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
 use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
 
 fn init_veracruz_server_and_tls_session(
-    policy: veracruz_utils::VeracruzPolicy,
+    policy: Policy,
 ) -> Result<(VeracruzServerEnclave, u32), String> {
     VeracruzServerEnclave::new(&policy).and_then(|veracruz_server| {
         veracruz_server.new_tls_session().and_then(|session_id| {

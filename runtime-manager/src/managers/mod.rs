@@ -34,7 +34,7 @@ use execution_engine::{
     hcall::common::{ExecutionEngine, DataSourceMetadata, LifecycleState},
 };
 
-use veracruz_utils::VeracruzPolicy;
+use veracruz_utils::{policy::{policy::Policy, principal::ExecutionStrategy}};
 
 pub mod session_manager;
 pub mod buffer;
@@ -95,7 +95,7 @@ struct ProtocolState {
     host_state: Arc<Mutex<dyn ExecutionEngine>>,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
-    global_policy: veracruz_utils::VeracruzPolicy,
+    global_policy: Policy,
     /// A hex-encoding of the raw JSON global policy.
     global_policy_hash: String,
 }
@@ -105,7 +105,7 @@ impl ProtocolState {
     /// execution strategy is extrated from the global policy and a suitable
     /// Veracruz execution strategy is selected based on that.
     pub fn new(
-        global_policy: VeracruzPolicy,
+        global_policy: Policy,
         global_policy_hash: String,
     ) -> Result<Self, RuntimeManagerError> {
         let expected_data_sources = global_policy.data_provision_order();
@@ -113,10 +113,10 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let execution_strategy = match global_policy.execution_strategy() {
-            veracruz_utils::ExecutionStrategy::Interpretation => {
+            ExecutionStrategy::Interpretation => {
                 execution_engine::factory::ExecutionStrategy::Interpretation
             }
-            veracruz_utils::ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
+            ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
 
         let host_state = multi_threaded_execution_engine(
@@ -140,7 +140,7 @@ impl ProtocolState {
 
     /// Returns the global policy associated with the protocol state.
     #[inline]
-    pub(crate) fn get_policy(&self) -> &VeracruzPolicy {
+    pub(crate) fn get_policy(&self) -> &Policy {
         &self.global_policy
     }
 

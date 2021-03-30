@@ -32,7 +32,7 @@ mod tests {
     #[cfg(feature = "nitro")]
     use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
 
-    use veracruz_utils::policy::EnclavePlatform;
+    use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
     #[cfg(feature = "nitro")]
     use regex::Regex;
@@ -173,7 +173,7 @@ mod tests {
     fn test_phase1_init_destroy_enclave() {
         // all the json in test-collateral should be valid policy
         iterate_over_policy("../test-collateral/", |policy_json| {
-            let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json);
+            let policy = Policy::from_json(&policy_json);
             assert!(policy.is_ok());
             if let Ok(policy) = policy {
                 setup(policy.proxy_attestation_server_url().clone());
@@ -182,10 +182,10 @@ mod tests {
             }
         });
 
-        // If any json in test-collateral/invalid_policy is valid in VeracruzPolicy::new(),
+        // If any json in test-collateral/invalid_policy is valid in Policy::new(),
         // it must also valid in term of VeracruzServerEnclave::new()
         iterate_over_policy("../test-collateral/invalid_policy/", |policy_json| {
-            let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json);
+            let policy = Policy::from_json(&policy_json);
             if let Ok(policy) = policy {
                 setup(policy.proxy_attestation_server_url().clone());
                 let result = VeracruzServerEnclave::new(&policy_json);
@@ -203,7 +203,7 @@ mod tests {
     /// Load policy file and check if a new session tls can be opened
     fn test_phase1_new_session() {
         iterate_over_policy("../test-collateral/", |policy_json| {
-            let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
+            let policy = Policy::from_json(&policy_json).unwrap();
             // start the proxy attestation server
             setup(policy.proxy_attestation_server_url().clone());
             let result = init_veracruz_server_and_tls_session(policy_json);
@@ -224,7 +224,7 @@ mod tests {
     fn test_phase1_enclave_self_signed_cert() {
         // start the proxy attestation server
         iterate_over_policy("../test-collateral/", |policy_json| {
-            let policy = veracruz_utils::VeracruzPolicy::from_json(&policy_json).unwrap();
+            let policy = Policy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
             let result = VeracruzServerEnclave::new(&policy_json)
                 .and_then(|mut veracruz_server| enclave_self_signed_cert(&mut veracruz_server));
@@ -243,11 +243,11 @@ mod tests {
         let mut veracruz_server = ret.unwrap();
 
         #[cfg(feature = "nitro")]
-        let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
+        let test_target_platform: Platform = Platform::Nitro;
         #[cfg(feature = "sgx")]
-        let test_target_platform: EnclavePlatform = EnclavePlatform::SGX;
+        let test_target_platform: Platform = Platform::SGX;
         #[cfg(feature = "tz")]
-        let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
+        let test_target_platform: Platform = Platform::TrustZone;
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash_ret =
@@ -774,11 +774,11 @@ mod tests {
             }
         })?;
         #[cfg(feature = "nitro")]
-        let test_target_platform: EnclavePlatform = EnclavePlatform::Nitro;
+        let test_target_platform: Platform = Platform::Nitro;
         #[cfg(feature = "sgx")]
-        let test_target_platform: EnclavePlatform = EnclavePlatform::SGX;
+        let test_target_platform: Platform = Platform::SGX;
         #[cfg(feature = "tz")]
-        let test_target_platform: EnclavePlatform = EnclavePlatform::TrustZone;
+        let test_target_platform: Platform = Platform::TrustZone;
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
@@ -1273,7 +1273,7 @@ mod tests {
     /// Auxiliary function: read policy file
     fn read_policy(
         fname: &str,
-    ) -> Result<(veracruz_utils::VeracruzPolicy, String, String), VeracruzServerError> {
+    ) -> Result<(Policy, String, String), VeracruzServerError> {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
@@ -1290,14 +1290,14 @@ mod tests {
 
             let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
             let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
-            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json_cow.as_ref())?;
+            let policy = Policy::from_json(policy_json_cow.as_ref())?;
             Ok((policy, policy_json_cow.as_ref().to_string(), policy_hash_str))
         }
         #[cfg(not(feature = "nitro"))]
         {
             let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
             let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
-            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json.as_ref())?;
+            let policy = Policy::from_json(policy_json.as_ref())?;
             Ok((policy, policy_json.to_string(), policy_hash_str))
         }
     }

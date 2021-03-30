@@ -137,8 +137,8 @@ pub enum VeracruzServerError {
     },
     #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "VeracruzServer: VeracruzUtilError: {:?}.", _0)]
-    VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
+    #[error(display = "VeracruzServer: PolicyError: {:?}.", _0)]
+    VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
     #[error(display = "VeracruzServer: Pinecone Error: {:?}.", _0)]
     PineconeError(#[error(source)] pinecone::Error),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]

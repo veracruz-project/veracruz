@@ -17,8 +17,8 @@ use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
     DifferentParameter, DifferentParameters, ErrorKind, ParamType, Parameters, Result, Session,
 };
-use std::{convert::TryInto, io::Write};
-use veracruz_utils::RuntimeManagerOpcode;
+use std::{convert::{TryFrom, TryInto}, io::Write};
+use veracruz_utils::platform::tz::runtime_manager_opcode::RuntimeManagerOpcode;
 
 fn print_error_and_return(message: String) -> ErrorKind {
     crate::managers::error_message(message, std::u32::MAX);
@@ -55,7 +55,7 @@ fn destroy() {
 #[cfg(feature = "tz")]
 fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
     debug_message("runtime_manager_trustzone:invoke_command".to_string());
-    let cmd = RuntimeManagerOpcode::from_u32(cmd_id).map_err(|err| {
+    let cmd = RuntimeManagerOpcode::try_from(cmd_id).map_err(|err| {
         print_error_and_return(format!(
             "runtime_manager_trustzone::invoke_command Failed to convert opcode:{:?} to RuntimeManagerOpcode:{:?}",
             cmd_id, err

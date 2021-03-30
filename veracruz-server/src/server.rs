@@ -26,6 +26,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use veracruz_utils::policy::policy::Policy;
 
 type EnclaveHandlerServer = Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
@@ -114,7 +115,7 @@ where
     P: AsRef<path::Path>
 {
     let policy_json = std::fs::read_to_string(policy_filename)?;
-    let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
+    let policy: Policy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]
     let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
         &policy_json,

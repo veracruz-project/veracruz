@@ -26,7 +26,7 @@ pub enum RuntimeManagerError {
     #[error(display = "RuntimeManager: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "RuntimeManager: VeracruzUtilError: {:?}.", _0)]
-    VeracruzUtilError(#[error(source)] veracruz_utils::policy::VeracruzUtilError),
+    VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
     #[error(display = "RuntimeManager: FatalHostError: {:?}.", _0)]
     FatalHostError(#[error(source)] execution_engine::hcall::common::FatalHostError),
     #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
