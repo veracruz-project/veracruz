@@ -5,7 +5,9 @@ Enclave_u.h
 bin/
 lib/
 sgx_root_enclave.so
+sgx_root_enclave.signed.so
 sgx_root_enclave_u.c
 sgx_root_enclave_u.h
 sgx_root_enclave_t.c
 sgx_root_enclave_t.h
+libsgx_root_enclave.a
