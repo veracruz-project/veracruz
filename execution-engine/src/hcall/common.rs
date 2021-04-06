@@ -192,8 +192,22 @@ pub(crate) fn pack_dirent(dirent: &DirEnt) -> Vec<u8> {
 /// Unpacks an `IoVec` structure from a series of bytes, starting at the offset,
 /// `offset`.  Returns `None` iff the structure cannot be unpacked, for example
 /// if `offset` lies too close to the end of `bytes`.
-unsafe fn unpack_iovec(bytes: &[u8], offset: usize) -> Option<IoVec> {
-    unimplemented!()
+fn unpack_iovec(bytes: &[u8]) -> Option<IoVec> {
+    if bytes.len() != 8 {
+        return None;
+    }
+
+    let mut buf_bytes: [u8; 4] = Default::default();
+    let mut len_bytes: [u8; 4] = Default::default();
+    buf_bytes.copy_from_slice(&bytes[0..4]);
+    len_bytes.copy_from_slice(&bytes[4..8]);
+    let buf = u32::from_le_bytes(buf_bytes);
+    let len = u32::from_le_bytes(len_bytes);
+
+    Some(IoVec{
+        buf,
+        len,
+    })
 }
 
 /// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
@@ -202,12 +216,12 @@ pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
     let mut offset = 0;
     let mut iovecs = Vec::new();
 
-    while offset < bytes.len() {
-        let iovec = unsafe { unpack_iovec(bytes, offset)? };
-        iovecs.push(iovec);
+    for iovec_byte in bytes.chunks(8) {
+        iovecs.push(unpack_iovec(iovec_byte).unwrap());
     }
 
     Some(iovecs)
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -296,7 +310,7 @@ impl From<wasmi::Error> for HostProvisioningError {
 /// A wrapper for VFS, which provides common API used by execution engine.
 #[derive(Clone)]
 pub struct VFSService {
-    //TODO REMOVE
+    // TODO REMOVE REMOVE
     vfs : Arc<Mutex<VFS>>,
     /// The synthetic filesystem associated with this machine.
     filesystem: FileSystem,
@@ -620,26 +634,6 @@ impl VFSService {
         self.filesystem
             .path_rename(old_fd, old_path, new_fd, new_path)
     }
-
-    //TODO REMOVE REMOVE REMOVE REMOVE
-    /// Append to a file.
-    pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
-        self.vfs.lock()?.append(file_name,data)?;
-        Ok(())
-    }
-
-    /// Read from a file
-    pub(crate) fn read_file_base(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
-        Ok(self.vfs.lock()?.read(file_name)?)
-    }
-    
-    /// Read from a file
-    pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        Ok(self.vfs.lock()?.count(prefix)?)
-    }
-    //TODO REMOVE REMOVE REMOVE REMOVE
 }
 
 ////////////////////////////////////////////////////////////////////////////////

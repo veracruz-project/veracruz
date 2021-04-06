@@ -14,7 +14,7 @@
 use std::{collections::HashMap, convert::TryFrom, string::String, vec::Vec};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
-    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence,
+    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -149,12 +149,61 @@ impl FileSystem {
     /// need to preallocate some files corresponding to those, here.
     #[inline]
     pub(crate) fn new() -> Self {
-        Self {
+        let mut rst = Self {
             file_table: HashMap::new(),
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
-        }
+        };
+
+        //TODO remove test stub
+        rst.install_file("test",&(42 as u64).into(), &vec![4]);
+        rst.install_file("stdin",&(43 as u64).into(), &vec![4]);
+        rst.install_file("stdout",&(44 as u64).into(), &vec![4]);
+        rst.install_file("stderr",&(45 as u64).into(), &vec![4]);
+        rst.install_fd(&Fd(2),&(45 as u64).into());
+        rst
     }
+    
+    fn install_file(&mut self, path : &str, inode : &Inode, raw_file_data : &[u8]) {
+        let file_size = raw_file_data.len();
+        let file_stat = FileStat{
+            device: (0 as u64).into(),
+            inode : inode.clone(),
+            file_type: FileType::RegularFile,
+            num_links: 0,
+            file_size : file_size as u64,
+            atime: Timestamp::from_nanos(0),
+            mtime: Timestamp::from_nanos(0),
+            ctime: Timestamp::from_nanos(0),
+        };
+        let node = InodeImpl {
+            file_stat,
+            raw_file_data : raw_file_data.to_vec(),
+        };
+        self.inode_table.insert(inode.clone(),node);
+        self.path_table.insert(path.to_string(),inode.clone());
+    }
+
+    fn install_fd(&mut self, fd : &Fd, inode : &Inode) {
+
+        let fd_stat = FdStat {
+            file_type : FileType::RegularFile,
+            flags : FdFlags::APPEND,
+            //TODO add the corresponding right.
+            rights_base : Rights::FD_READ,
+            rights_inheriting : Rights::FD_READ,
+        };
+
+        let fd_entry = FileTableEntry {
+            inode: inode.clone(),
+            fd_stat,
+            offset: 0,
+            /// Advice on how regions of the file are to be used.
+            advice: vec![(0, 1, Advice::Normal)],
+        };
+        self.file_table.insert(fd.clone(),fd_entry);
+    }
+
 
     ////////////////////////////////////////////////////////////////////////////
     // XXX: remove and replace with wasi-functionality
@@ -487,6 +536,7 @@ impl FileSystem {
     ///       Finish the rest functionality required the WASI spec.
     pub(crate) fn path_open(
         &mut self,
+        // The parent fd for searching
         _fd: &Fd,
         _dirflags: LookupFlags,
         path: String,
@@ -495,7 +545,9 @@ impl FileSystem {
         rights_inheriting: Rights,
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
-        let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
+        //TODO recover the actual code
+        //let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
+        let inode = self.path_table.get("test").ok_or(ErrNo::NoEnt)?.clone();
         // TODO: It is an insecure implementation of choosing a new FD.
         //       The new FD should be choisen randomly.
         // NOTE: the FD 0,1 and 2 are reserved to in out err.
@@ -527,6 +579,7 @@ impl FileSystem {
                 advice: vec![(0, file_size, Advice::Normal)],
             },
         );
+        println!("new fd: {:?} -> {:?}",next_fd, self.file_table.get(&next_fd).is_some());
         Ok(next_fd)
     }
 

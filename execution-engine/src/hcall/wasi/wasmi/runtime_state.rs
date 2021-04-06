@@ -248,6 +248,8 @@ const REPRESENTATION_WASI_WHENCE: ValueType = ValueType::I32;
 const REPRESENTATION_WASM_CONST_POINTER: ValueType = ValueType::I32;
 /// The representation type of WASM pointers (assuming `wasm32`).
 const REPRESENTATION_WASM_POINTER: ValueType = ValueType::I32;
+/// The representation type of WASM buffer length (assuming `wasm32`).
+const REPRESENTATION_WASM_SIZE_T: ValueType = ValueType::I32;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Function well-formedness checks.
@@ -763,6 +765,7 @@ fn check_path_open_signature(signature: &Signature) -> bool {
             REPRESENTATION_WASI_FD,
             REPRESENTATION_WASI_LOOKUP_FLAGS,
             REPRESENTATION_WASM_POINTER,
+            REPRESENTATION_WASM_SIZE_T,
             REPRESENTATION_WASI_OFLAGS,
             REPRESENTATION_WASI_RIGHTS,
             REPRESENTATION_WASI_RIGHTS,
@@ -1076,43 +1079,45 @@ impl ModuleImportResolver for WASMIRuntimeState {
     /// the corresponding H-call code, and dispatching appropriately.
     fn resolve_func(&self, field_name: &str, signature: &Signature) -> Result<FuncRef, Error> {
         let index = match field_name {
+            //TODO FILLING VERYTHING 
             WASI_ARGS_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_ARGS_SIZES_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_ENVIRON_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_ENVIRON_SIZES_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_CLOCK_RES_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_CLOCK_TIME_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_ADVISE_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_ALLOCATE_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_CLOSE_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_DATASYNC_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_FDSTAT_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_FDSTAT_SET_FLAGS_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_FDSTAT_SET_RIGHTS_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_FILESTAT_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_FILESTAT_SET_SIZE_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_FILESTAT_SET_TIMES_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_PREAD_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_PRESTAT_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_PRESTAT_DIR_NAME_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_PWRITE_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_READ_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_READDIR_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_RENUMBER_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_SEEK_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_SYNC_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_TELL_NAME => WASI_ARGS_GET_INDEX,
-            WASI_FD_WRITE_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_CREATE_DIRECTORY_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_FILESTAT_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_FILESTAT_SET_TIMES_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_LINK_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_OPEN_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_READLINK_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_REMOVE_DIRECTORY_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_RENAME_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_SYMLINK_NAME => WASI_ARGS_GET_INDEX,
-            WASI_PATH_UNLINK_FILE_NAME => WASI_ARGS_GET_INDEX,
+            WASI_ARGS_SIZES_GET_NAME => WASI_ARGS_SIZES_GET_INDEX,
+            WASI_ENVIRON_GET_NAME => WASI_ENVIRON_GET_INDEX,
+            WASI_ENVIRON_SIZES_GET_NAME => WASI_ENVIRON_SIZES_GET_INDEX,
+            WASI_CLOCK_RES_GET_NAME => WASI_CLOCK_RES_GET_INDEX,
+            WASI_CLOCK_TIME_GET_NAME => WASI_CLOCK_TIME_GET_INDEX,
+            WASI_FD_ADVISE_NAME => WASI_FD_ADVISE_INDEX,
+            WASI_FD_ALLOCATE_NAME => WASI_FD_ALLOCATE_INDEX,
+            WASI_FD_CLOSE_NAME => WASI_FD_CLOSE_INDEX,
+            WASI_FD_DATASYNC_NAME => WASI_FD_DATASYNC_INDEX,
+            WASI_FD_FDSTAT_GET_NAME => WASI_FD_FDSTAT_GET_INDEX,
+            WASI_FD_FDSTAT_SET_FLAGS_NAME => WASI_FD_FDSTAT_SET_FLAGS_INDEX,
+            WASI_FD_FDSTAT_SET_RIGHTS_NAME => WASI_FD_FDSTAT_SET_RIGHTS_INDEX,
+            WASI_FD_FILESTAT_GET_NAME => WASI_FD_FILESTAT_GET_INDEX,
+            WASI_FD_FILESTAT_SET_SIZE_NAME => WASI_FD_FILESTAT_SET_SIZE_INDEX,
+            WASI_FD_FILESTAT_SET_TIMES_NAME => WASI_FD_FILESTAT_SET_TIMES_INDEX,
+            WASI_FD_PREAD_NAME => WASI_FD_PREAD_INDEX,
+            WASI_FD_PRESTAT_GET_NAME => WASI_FD_PRESTAT_GET_INDEX,
+            WASI_FD_PRESTAT_DIR_NAME_NAME => WASI_FD_PRESTAT_DIR_NAME_INDEX,
+            WASI_FD_PWRITE_NAME => WASI_FD_PWRITE_INDEX,
+            WASI_FD_READ_NAME => WASI_FD_READ_INDEX,
+            WASI_FD_READDIR_NAME => WASI_FD_READDIR_INDEX,
+            WASI_FD_RENUMBER_NAME => WASI_FD_RENUMBER_INDEX,
+            WASI_FD_SEEK_NAME => WASI_FD_SEEK_INDEX,
+            WASI_FD_SYNC_NAME => WASI_FD_SYNC_INDEX,
+            WASI_FD_TELL_NAME => WASI_FD_TELL_INDEX,
+            WASI_FD_WRITE_NAME => WASI_FD_WRITE_INDEX,
+            WASI_PATH_CREATE_DIRECTORY_NAME => WASI_PATH_CREATE_DIRECTORY_INDEX,
+            WASI_PATH_FILESTAT_GET_NAME => WASI_PATH_FILESTAT_GET_INDEX,
+            WASI_PATH_FILESTAT_SET_TIMES_NAME => WASI_PATH_FILESTAT_SET_TIMES_INDEX,
+            WASI_PATH_LINK_NAME => WASI_PATH_LINK_INDEX,
+            WASI_PATH_OPEN_NAME => WASI_PATH_OPEN_INDEX,
+            WASI_PATH_READLINK_NAME => WASI_PATH_READLINK_INDEX,
+            WASI_PATH_REMOVE_DIRECTORY_NAME => WASI_PATH_REMOVE_DIRECTORY_INDEX,
+            WASI_PATH_RENAME_NAME => WASI_PATH_RENAME_INDEX,
+            WASI_PATH_SYMLINK_NAME => WASI_PATH_SYMLINK_INDEX,
+            WASI_PATH_UNLINK_FILE_NAME => WASI_PATH_UNLINK_FILE_INDEX,
+            WASI_PROC_EXIT_NAME => WASI_PROC_EXIT_INDEX,
             otherwise => {
                 return Err(Error::Instantiation(format!(
                     "Unknown function {} with signature: {:?}.",
@@ -1262,7 +1267,7 @@ impl WASMIRuntimeState {
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
         let module = Module::from_buffer(buffer)?;
-        let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
+        let env_resolver = wasmi::ImportsBuilder::new().with_resolver("wasi_snapshot_preview1", self);
 
         let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
         if not_started_module_ref.has_start() {
@@ -1359,29 +1364,17 @@ impl WASMIRuntimeState {
     /// TODO: should this not be OsStr rather than a valid UTF-8 string?  Most
     /// POSIX-style implementations allow arbitrary nonsense filenames/paths and
     /// do not mandate valid UTF-8.  How "real" do we really want to be, here?
-    fn read_cstring(&self, address: u32) -> Result<String, FatalEngineError> {
-        if let Some(memory) = self.memory() {
-            let mut buffer = Vec::new();
+    fn read_cstring(&self, address: u32, length: usize) -> Result<String, FatalEngineError> {
+        let memory = self.memory().ok_or(FatalEngineError::NoMemoryRegistered)?;
+        let bytes = memory.get(address, length)?;
 
-            while let Ok(byte) = memory.get(address, 1) {
-                let byte = byte[0].clone();
-
-                if byte == 0 {
-                    break;
-                }
-
-                buffer.push(byte);
-            }
-
-            buffer.push(0);
-
-            String::from_utf8(buffer).map_err(|_e| FatalEngineError::MemoryReadFailed {
-                memory_address: address as usize,
-                bytes_to_be_read: 1,
-            })
-        } else {
-            Err(FatalEngineError::NoMemoryRegistered)
-        }
+        // TODO: erase the debug code
+        let rst = String::from_utf8(bytes).map_err(|_e| FatalEngineError::MemoryReadFailed {
+            memory_address: address as usize,
+            bytes_to_be_read: length,
+        })?;
+        println!("read_cstring: {}",rst);
+        Ok(rst)
     }
 
     /// Performs a scattered read from several locations, as specified by a list
@@ -1956,11 +1949,12 @@ impl WASMIRuntimeState {
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
+        //let fd = (3 as u32).into();
         let iovec_base: u32 = args.nth::<u32>(1);
-        let iovec_length: u32 = args.nth::<u32>(2);
+        let iovec_number: u32 = args.nth::<u32>(2);
         let address: u32 = args.nth::<u32>(3);
 
-        let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
+        let buffer = self.read_buffer(iovec_base, (iovec_number as usize) * 8)?;
         let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
 
         let bufs = self.read_iovec_scattered(&iovec_array)?;
@@ -1968,6 +1962,7 @@ impl WASMIRuntimeState {
         let mut size_written = 0;
 
         for buf in bufs.iter() {
+            println!("write {:?} to fd {:?}", buffer, fd);
             size_written += self.vfs.fd_write_base(&fd, buf.clone())?;
         }
 
@@ -1987,7 +1982,8 @@ impl WASMIRuntimeState {
         let fd: Fd = args.nth::<u32>(0).into();
         let path_address: u32 = args.nth::<u32>(1);
 
-        let path = self.read_cstring(path_address)?;
+        //TODO: change !!!!!
+        let path = self.read_cstring(path_address,1)?;
 
         Ok(self.vfs.path_create_directory(&fd, path))
     }
@@ -2006,7 +2002,8 @@ impl WASMIRuntimeState {
             Err(_err) => return Ok(ErrNo::Inval),
         };
         let path_address = args.nth::<u32>(2);
-        let path = self.read_cstring(path_address)?;
+        //TODO: change !!!!!
+        let path = self.read_cstring(path_address,1)?;
 
         let address = args.nth::<u32>(3);
 
@@ -2043,37 +2040,41 @@ impl WASMIRuntimeState {
 
     /// The implementation of the WASI `path_open` function.
     fn wasi_path_open(&mut self, args: RuntimeArgs) -> WASIError {
-        if args.len() != 8 {
+        if args.len() != 9 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
                 WASI_PATH_OPEN_NAME,
             ));
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
+
         let dirflags = match args.nth::<u32>(1).try_into() {
             Err(_err) => return Ok(ErrNo::Inval),
             Ok(dirflags) => dirflags,
         };
         let path_address = args.nth::<u32>(2);
-        let path = self.read_cstring(path_address)?;
-        let oflags = match args.nth::<u16>(3).try_into() {
+        let path_length = args.nth::<u32>(3);
+        let path = self.read_cstring(path_address, path_length as usize)?;
+
+        let oflags = match args.nth::<u16>(4).try_into() {
             Err(_err) => return Ok(ErrNo::Inval),
             Ok(oflags) => oflags,
         };
-        let fs_rights_base = match args.nth::<u64>(4).try_into() {
+        let fs_rights_base = match args.nth::<u64>(5).try_into() {
             Err(_err) => return Ok(ErrNo::Inval),
             Ok(fs_rights_base) => fs_rights_base,
         };
-        let fs_rights_inheriting = match args.nth::<u64>(5).try_into() {
+        let fs_rights_inheriting = match args.nth::<u64>(6).try_into() {
             Err(_err) => return Ok(ErrNo::Inval),
             Ok(fs_rights_inheriting) => fs_rights_inheriting,
         };
-        let fd_flags = match args.nth::<u16>(6).try_into() {
+        let fd_flags = match args.nth::<u16>(7).try_into() {
             Err(_err) => return Ok(ErrNo::Inval),
             Ok(fd_flags) => fd_flags,
         };
-        let address: u32 = args.nth(7);
+        let address: u32 = args.nth(8);
 
+        println!("path_open {}",path);
         let result = self.vfs.path_open(
             &fd,
             dirflags,
@@ -2114,7 +2115,8 @@ impl WASMIRuntimeState {
         let fd: Fd = args.nth::<u32>(0).into();
         let path_address: u32 = args.nth::<u32>(1).into();
 
-        let path = self.read_cstring(path_address)?;
+        //TODO: change !!!!!!!
+        let path = self.read_cstring(path_address,1)?;
 
         Ok(self.vfs.path_remove_directory(&fd, &path))
     }
@@ -2132,8 +2134,9 @@ impl WASMIRuntimeState {
         let new_fd: Fd = args.nth::<u32>(2).into();
         let new_path_address = args.nth::<u32>(3);
 
-        let old_path = self.read_cstring(old_path_address)?;
-        let new_path = self.read_cstring(new_path_address)?;
+        //TODO: change !!!!!!!
+        let old_path = self.read_cstring(old_path_address,1)?;
+        let new_path = self.read_cstring(new_path_address,1)?;
 
         Ok(self.vfs.path_rename(&old_fd, &old_path, &new_fd, new_path))
     }
