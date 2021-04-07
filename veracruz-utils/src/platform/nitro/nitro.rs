@@ -12,12 +12,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use byteorder::{ByteOrder, LittleEndian};
-use err_derive::Error;
-use nix::errno::Errno::EINTR;
-use nix::sys::socket::{recv, send, MsgFlags};
-use std::os::unix::io::RawFd;
-
 /// The Status value returned by the Nitro enclave for operations
 /// This is intended to be received as a bincode serialized 
 /// `NitroRootEnclaveMessage::Status`
@@ -183,85 +177,4 @@ pub enum RuntimeManagerMessage {
     TLSData(Vec<u8>, bool),    // TLS Data, alive_flag
     /// A request to reset the enclave
     ResetEnclave,
-}
-
-/// a enumerated type for Veracruz-specific socket errors
-#[derive(Debug, Error)]
-pub enum VeracruzSocketError {
-    /// An error was returned by nix
-    #[error(display = "VeracruzSocketError: Nix Error: {:?}", _0)]
-    NixError(#[error(source)] nix::Error),
-}
-
-/// Send a buffer of data (using a length, buffer protocol) to the file 
-/// descriptor `fd`
-pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), VeracruzSocketError> {
-    let len = buffer.len();
-    // first, send the length of the buffer
-    {
-        let mut buf = [0u8; 9];
-        LittleEndian::write_u64(&mut buf, buffer.len() as u64);
-        let mut sent_bytes = 0;
-        while sent_bytes < buf.len() {
-            sent_bytes += match send(fd, &buf[sent_bytes..buf.len()], MsgFlags::empty()) {
-                Ok(size) => size,
-                Err(err) => {
-                    return Err(VeracruzSocketError::NixError(err));
-                }
-            };
-        }
-    }
-    // next, send the buffer
-    {
-        let mut sent_bytes = 0;
-        while sent_bytes < len {
-            let size = match send(fd, &buffer[sent_bytes..len], MsgFlags::empty()) {
-                Ok(size) => size,
-                Err(nix::Error::Sys(_)) => 0,
-                Err(err) => {
-                    return Err(VeracruzSocketError::NixError(err));
-                }
-            };
-            sent_bytes += size;
-        }
-    }
-    return Ok(());
-}
-
-/// Read a buffer of data (using a length, buffer protocol) from the file 
-/// descriptor `fd`
-pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, VeracruzSocketError> {
-    // first, read the length
-    let length = {
-        let mut buf = [0u8; 9];
-        let len = buf.len();
-        let mut received_bytes = 0;
-        while received_bytes < len {
-            received_bytes += match recv(fd, &mut buf[received_bytes..len], MsgFlags::empty()) {
-                Ok(size) => size,
-                Err(nix::Error::Sys(EINTR)) => 0,
-                Err(err) => {
-                    println!("I have experienced an error:{:?}", err);
-                    return Err(VeracruzSocketError::NixError(err));
-                }
-            }
-        }
-        LittleEndian::read_u64(&buf) as usize
-    };
-    let mut buffer: Vec<u8> = vec![0; length];
-    // next, read the buffer
-    {
-        let mut received_bytes: usize = 0;
-        while received_bytes < length {
-            received_bytes += match recv(fd, &mut buffer[received_bytes..length], MsgFlags::empty())
-            {
-                Ok(size) => size,
-                Err(nix::Error::Sys(EINTR)) => 0,
-                Err(err) => {
-                    return Err(VeracruzSocketError::NixError(err));
-                }
-            }
-        }
-    }
-    return Ok(buffer);
 }

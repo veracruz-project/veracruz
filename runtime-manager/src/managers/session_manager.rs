@@ -12,10 +12,11 @@
 use crate::managers::*;
 use ::session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
+use veracruz_utils::policy::policy::Policy;
 
 pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError> {
     let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
-    let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
+    let policy = Policy::from_json(policy_json)?;
 
     if *policy.debug() {
         super::DEBUG_FLAG.store(true, Ordering::SeqCst);

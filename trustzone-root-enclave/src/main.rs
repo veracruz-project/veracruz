@@ -23,8 +23,8 @@ use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, t_cose_sign1_get_verification_pubkey,
 };
 use ring;
-use std::{convert::TryInto, io::Write};
-use veracruz_utils::TrustZoneRootEnclaveOpcode;
+use std::{convert::{TryFrom, TryInto}, io::Write};
+use veracruz_utils::platform::tz::root_enclave_opcode::TrustZoneRootEnclaveOpcode;
 
 lazy_static! {
     static ref DEVICE_PRIVATE_KEY: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
@@ -143,7 +143,7 @@ fn destroy() {
 #[ta_invoke_command]
 fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()> {
     trace_println!("trustzone-root-enclave:invoke_comand");
-    let cmd = TrustZoneRootEnclaveOpcode::from_u32(cmd_id).map_err(|_| ErrorKind::BadParameters)?;
+    let cmd = TrustZoneRootEnclaveOpcode::try_from(cmd_id).map_err(|_| ErrorKind::BadParameters)?;
     match cmd {
         TrustZoneRootEnclaveOpcode::GetFirmwareVersionLen => {
             trace_println!("trustzone-root-enclave::invoke_command GetFirmwareVersionLen");

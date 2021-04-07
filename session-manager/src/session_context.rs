@@ -22,7 +22,7 @@ use crate::{
     session::{Session, Principal},
     error::SessionManagerError,
 };
-use veracruz_utils::VeracruzPolicy;
+use veracruz_utils::policy::policy::Policy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use rustls::{AllowAnyAuthenticatedClient, Certificate, CipherSuite, RootCertStore, ServerConfig};
@@ -115,7 +115,7 @@ fn generate_certificate(
     common_name_bytes: Vec<u8>,
     private_key: rustls::PrivateKey,
     public_key: Vec<u8>,
-    policy: &veracruz_utils::VeracruzPolicy,
+    policy: &Policy,
 ) -> Result<Vec<u8>, SessionManagerError> {
     let ring_private_key = EcdsaKeyPair::from_pkcs8(
         &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
@@ -305,7 +305,7 @@ pub struct SessionContext {
     server_config: ServerConfig,
     /// The global policy associated with the Veracruz computation, detailing
     /// identities and roles for all principals, amongst other things.
-    policy: VeracruzPolicy,
+    policy: Policy,
     /// A randomly generated name for the server.
     name: String,
     /// The set of principals, as specified in the Veracruz global policy, with
@@ -315,7 +315,7 @@ pub struct SessionContext {
 
 impl SessionContext {
     /// Creates a new context using the global Veracruz policy, `policy`.
-    pub fn new(policy: VeracruzPolicy) -> Result<Self, SessionManagerError> {
+    pub fn new(policy: Policy) -> Result<Self, SessionManagerError> {
         // create the root_cert_store that contains all of the certs of the clients that can connect
         // Note: We are not using a CA here, so each client that needs to connect must have it's
         // cert directly in the RootCertStore

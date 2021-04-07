@@ -12,7 +12,7 @@
 //! information on licensing and copyright.
 
 use crate::error::SessionManagerError;
-use veracruz_utils::{VeracruzIdentity, VeracruzRole};
+use veracruz_utils::policy::principal::{Identity, Role};
 
 use std::{
     io::{Read, Write},
@@ -28,7 +28,7 @@ use rustls::{Certificate, ServerSession, Session as TLSSession};
 /// A principal is an individual identified with a cryptographic certificate,
 /// and assigned a set of roles that dictate what that principal can and cannot
 /// do in a Veracruz computation.
-pub type Principal = VeracruzIdentity<Certificate>;
+pub type Principal = Identity<Certificate>;
 
 /// A session consists of a TLS server session with a list of principals and
 /// their identifying information.
@@ -86,7 +86,7 @@ impl Session {
     /// data.
     pub fn read_plaintext_data(
         &mut self,
-    ) -> Result<Option<(u32, Vec<VeracruzRole>, Vec<u8>)>, SessionManagerError> {
+    ) -> Result<Option<(u32, Vec<Role>, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
         let num_bytes = self.tls_session.read_to_end(&mut received_buffer)?;
 

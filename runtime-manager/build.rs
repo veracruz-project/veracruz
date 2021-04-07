@@ -9,10 +9,9 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::env;
-use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "tz")]
+use std::{env, fs::File, io::Write, path::{Path, PathBuf}};
+#[cfg(feature = "tz")]
 use uuid::Uuid;
 
 fn main() -> std::io::Result<()> {

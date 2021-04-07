@@ -35,7 +35,7 @@ pub mod veracruz_server_sgx {
     use std::{ffi::CStr, mem};
     use std::io::Write;
     use tempfile;
-    use veracruz_utils;
+    use veracruz_utils::policy::policy::Policy;
 
     lazy_static! {
         static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
@@ -492,7 +492,7 @@ pub mod veracruz_server_sgx {
                 )
             };
 
-            let policy = veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
+            let policy = Policy::from_json(policy_json)?;
 
             {
                 let mut sgx_root_enclave = SGX_ROOT_ENCLAVE.lock()?;

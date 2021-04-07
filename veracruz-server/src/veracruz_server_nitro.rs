@@ -17,7 +17,8 @@ pub mod veracruz_server_nitro {
     use lazy_static::lazy_static;
     use std::sync::Mutex;
     use veracruz_utils::{
-        policy::EnclavePlatform, RuntimeManagerMessage, NitroEnclave, NitroError, NitroStatus,
+        platform::{Platform, nitro::{RuntimeManagerMessage, NitroEnclave, NitroError, NitroStatus},
+        policy::policy::Policy,
     };
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
@@ -37,15 +38,15 @@ pub mod veracruz_server_nitro {
     impl VeracruzServer for VeracruzServerNitro {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             // Set up, initialize Nitro Root Enclave
-            let policy: veracruz_utils::VeracruzPolicy =
-                veracruz_utils::VeracruzPolicy::from_json(policy_json)?;
+            let policy: Policy =
+                Policy::from_json(policy_json)?;
 
             {
                 let mut nre_guard = NRE_CONTEXT.lock()?;
                 if nre_guard.is_none() {
                     println!("NITRO ROOT ENCLAVE IS UNINITIALIZED.");
                     let runtime_manager_hash = policy
-                        .runtime_manager_hash(&EnclavePlatform::Nitro)
+                        .runtime_manager_hash(&Platform::Nitro)
                         .map_err(|err| VeracruzServerError::VeracruzUtilError(err))?;
                     let nre_context =
                         VeracruzServerNitro::native_attestation(&policy.proxy_attestation_server_url(), &runtime_manager_hash)?;

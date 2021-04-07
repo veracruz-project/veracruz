@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use veracruz_utils::EnclavePlatform;
+use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
 #[cfg(feature = "mock")]
 use mockall::{automock, predicate::*};
@@ -17,8 +17,8 @@ use mockall::{automock, predicate::*};
 #[cfg_attr(feature = "mock", automock)]
 pub trait Attestation {
     fn attestation(
-        policy: &veracruz_utils::VeracruzPolicy,
-        target_platform: &EnclavePlatform,
+        policy: &Policy,
+        target_platform: &Platform,
     ) -> Result<(Vec<u8>, String), VeracruzClientError>;
 }
 
@@ -35,8 +35,8 @@ pub struct AttestationPSA();
 impl Attestation for AttestationPSA {
     /// Attestation against the global policy
     fn attestation(
-        policy: &veracruz_utils::VeracruzPolicy,
-        target_platform: &EnclavePlatform,
+        policy: &Policy,
+        target_platform: &Platform,
     ) -> Result<(Vec<u8>, String), VeracruzClientError> {
         let runtime_manager_hash = policy.runtime_manager_hash(target_platform)
             .map_err(|err| {

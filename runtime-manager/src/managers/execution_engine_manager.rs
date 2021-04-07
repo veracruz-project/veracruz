@@ -25,7 +25,7 @@ use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 use std::{collections::HashMap, result::Result, vec::Vec};
-use veracruz_utils::VeracruzRole;
+use veracruz_utils::policy::principal::Role;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The buffer of incoming data.
@@ -51,7 +51,7 @@ fn check_state(current: &LifecycleState, expected: &[LifecycleState]) -> bool {
 /// Checks that the expected set of roles is satisfied by the roles possessed
 /// by the current principal.  Returns `false` iff this is not the case.
 #[inline]
-fn check_roles(current: &Vec<VeracruzRole>, expected: &[VeracruzRole]) -> bool {
+fn check_roles(current: &Vec<Role>, expected: &[Role]) -> bool {
     current.iter().any(|rho| expected.contains(rho))
 }
 
@@ -394,7 +394,7 @@ fn reload(old_protocol_state: &ProtocolState) -> Result<ProtocolState, RuntimeMa
 /// may want the ability.
 fn dispatch_on_request(
     client_id: u64,
-    roles: &Vec<VeracruzRole>,
+    roles: &Vec<Role>,
     request: MESSAGE,
 ) -> ProvisioningResult {
     let mut protocol_state_guard = super::PROTOCOL_STATE.lock()?;
@@ -404,14 +404,14 @@ fn dispatch_on_request(
 
     match request {
         MESSAGE::data(data) => {
-            if check_roles(roles, &[VeracruzRole::DataProvider]) {
+            if check_roles(roles, &[Role::DataProvider]) {
                 dispatch_on_data(protocol_state, data, client_id)
             } else {
                 response_invalid_role()
             }
         }
         MESSAGE::program(prog) => {
-            if check_roles(roles, &[VeracruzRole::ProgramProvider]) {
+            if check_roles(roles, &[Role::ProgramProvider]) {
                 dispatch_on_program(protocol_state, prog)
             } else {
                 response_invalid_role()
@@ -420,7 +420,7 @@ fn dispatch_on_request(
         MESSAGE::request_pi_hash(_) => dispatch_on_pi_hash(protocol_state),
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
         MESSAGE::request_result(_) => {
-            if check_roles(roles, &[VeracruzRole::ResultReader]) {
+            if check_roles(roles, &[Role::ResultReader]) {
                 dispatch_on_result(protocol_state)
             } else {
                 response_invalid_role()
@@ -428,7 +428,7 @@ fn dispatch_on_request(
         }
         MESSAGE::request_state(_) => dispatch_on_request_state(protocol_state),
         MESSAGE::request_shutdown(_) => {
-            if check_roles(roles, &[VeracruzRole::ResultReader]) {
+            if check_roles(roles, &[Role::ResultReader]) {
                 let (is_dead, response) = dispatch_on_shutdown(protocol_state, client_id.into())?;
 
                 // If we're not alive, clobber the global lock guarding the
@@ -443,14 +443,14 @@ fn dispatch_on_request(
             }
         }
         MESSAGE::stream(stream) => {
-            if check_roles(roles, &vec![veracruz_utils::VeracruzRole::DataProvider]) {
+            if check_roles(roles, &vec![Role::DataProvider]) {
                 dispatch_on_stream(protocol_state, stream, client_id)
             } else {
                 response_invalid_role()
             }
         }
         MESSAGE::request_next_round(_) => {
-            if check_roles(roles, &vec![veracruz_utils::VeracruzRole::ResultReader]) {
+            if check_roles(roles, &vec![Role::ResultReader]) {
                 let (new_protocol_state, response) = dispatch_on_next_round(protocol_state);
                 *protocol_state_guard = new_protocol_state;
                 response
@@ -514,7 +514,7 @@ fn parse_incoming_buffer(
 pub fn dispatch_on_incoming_data(
     tls_session_id: u32,
     client_id: u64,
-    roles: &Vec<VeracruzRole>,
+    roles: &Vec<Role>,
     input: &Vec<u8>,
 ) -> ProvisioningResult {
     match parse_incoming_buffer(tls_session_id, input.clone())? {
