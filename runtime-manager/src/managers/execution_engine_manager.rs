@@ -24,7 +24,7 @@ use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 use std::{collections::HashMap, result::Result, vec::Vec};
-use veracruz_utils::VeracruzCapabilityIndex;
+use veracruz_utils::policy::principal::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The buffer of incoming data.
@@ -95,7 +95,7 @@ fn dispatch_on_request_state(_ : &ProtocolState) -> ProvisioningResult {
 /// Returns the result of a computation, computing the result first.
 fn dispatch_on_result(transport_protocol::RequestResult{ file_name, .. } : transport_protocol::RequestResult, protocol_state: &mut ProtocolState, client_id: u64,) -> ProvisioningResult {
     if !protocol_state.is_modified() {
-        let result = protocol_state.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
+        let result = protocol_state.read_file(&Principal::Participant(client_id),"output")?;
         let response = response_success(result);
         return Ok(Some(response));
     }
@@ -112,7 +112,7 @@ fn dispatch_on_program(
     transport_protocol::Program { file_name, code, .. }: transport_protocol::Program,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),&file_name,&code)?; 
+    protocol_state.write_file(&Principal::Participant(client_id),&file_name,&code)?; 
     let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
     Ok(Some(response))
 }
@@ -125,7 +125,7 @@ fn dispatch_on_data(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),file_name.as_str(),data.as_slice())?; 
+    protocol_state.write_file(&Principal::Participant(client_id),file_name.as_str(),data.as_slice())?; 
     let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
     Ok(Some(response))
 }
@@ -138,7 +138,7 @@ fn dispatch_on_stream(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(&VeracruzCapabilityIndex::Principal(client_id),file_name.as_str(),data.as_slice())?;
+    protocol_state.write_file(&Principal::Participant(client_id),file_name.as_str(),data.as_slice())?;
     let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
     Ok(Some(response))
 }

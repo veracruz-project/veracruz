@@ -31,7 +31,7 @@ use crate::hcall::{
         HCALL_WRITE_OUTPUT_NAME,
     },
 };
-use veracruz_utils::VeracruzCapabilityIndex;
+use veracruz_utils::policy::principal::Principal;
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
@@ -71,7 +71,7 @@ pub(crate) struct WasmiHostProvisioningState {
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<MemoryRef>,
     /// Ref to the program that is executed
-    program: VeracruzCapabilityIndex,
+    program: Principal,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -402,7 +402,7 @@ impl WasmiHostProvisioningState {
     ) -> Self {
         Self {
             vfs : VFSService::new(vfs),
-            program: VeracruzCapabilityIndex::NoCap,
+            program: Principal::NoCap,
             program_module: None,
             memory: None,
         }
@@ -811,19 +811,19 @@ impl WasmiHostProvisioningState {
 
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.append_file_base(client_id,file_name,data)
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         self.vfs.write_file_base(client_id,file_name,data)
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+    fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         self.vfs.read_file_base(client_id,file_name)
     }
 
@@ -853,9 +853,9 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
-        let program = self.read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+        let program = self.read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
         self.load_program(program.as_slice())?;
-        self.program = VeracruzCapabilityIndex::Program(file_name.to_string());
+        self.program = Principal::Program(file_name.to_string());
 
         match self.invoke_export(ENTRY_POINT_NAME) {
             Ok(Some(RuntimeValue::I32(return_code))) => {

@@ -35,8 +35,7 @@ use execution_engine::{
     hcall::buffer::VFS,
 };
 
-use veracruz_utils::{policy::{policy::Policy, principal::ExecutionStrategy}};
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzPolicy, VeracruzCapability};
+use veracruz_utils::policy::{policy::Policy, principal::{ExecutionStrategy, Principal, FileOperation}};
 
 pub mod session_manager;
 pub mod execution_engine_manager;
@@ -133,22 +132,22 @@ impl ProtocolState {
     ////////////////////////////////////////////////////////////////////////////
 
     //TODO: add description
-    pub(crate) fn write_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
+    pub(crate) fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
         Ok(self.vfs.lock()?.write(file_name,data)?)
     }
 
     //TODO: add description
-    pub(crate) fn append_file(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
+    pub(crate) fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
         Ok(self.vfs.lock()?.append(file_name,data)?)
     }
 
     //TODO: add description
-    pub(crate) fn read_file(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
+    pub(crate) fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
+        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Read)?;
         Ok(self.vfs.lock()?.read(file_name)?)
     }
 
@@ -165,10 +164,10 @@ impl ProtocolState {
     
     pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = match self.global_policy.execution_strategy() {
-            veracruz_utils::ExecutionStrategy::Interpretation => {
+            ExecutionStrategy::Interpretation => {
                 execution_engine::factory::ExecutionStrategy::Interpretation
             }
-            veracruz_utils::ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
+            ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
         let return_code = execute(
             &execution_strategy,
@@ -177,7 +176,7 @@ impl ProtocolState {
         )?;
         
         let response = if return_code == EngineReturnCode::Success {
-            let result = self.read_file(&VeracruzCapabilityIndex::Principal(client_id),"output")?;
+            let result = self.read_file(&Principal::Participant(client_id),"output")?;
             Self::response_success(result)
         } else {
             Self::response_error_code_returned(return_code)

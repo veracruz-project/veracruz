@@ -24,7 +24,12 @@ use data_encoding::HEXLOWER;
 use log::{error, info};
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
-use veracruz_utils::{VeracruzFileCapability, VeracruzProgram, ExecutionStrategy, VeracruzIdentity, VeracruzPolicy, VeracruzExpiry};
+use veracruz_utils::policy::{
+    policy::Policy,
+    error::PolicyError,
+    expiry::Timepoint,
+    principal::{ExecutionStrategy, Identity, Program, FileCapability}
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
@@ -535,7 +540,7 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 
 /// Serializes the identities of all principals in the Veracruz computation into
 /// a vec of VeracruzIdentity<String>.
-fn serialize_identities(arguments: &Arguments) -> Vec<VeracruzIdentity<String>> {
+fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
     info!("Serializing identities of computation Principals.");
     
     assert_eq!(arguments.certificates.len(), arguments.certificate_capabilities.len());
@@ -559,7 +564,7 @@ fn serialize_identities(arguments: &Arguments) -> Vec<VeracruzIdentity<String>> 
                                  .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
             let file_permissions = serialize_capability(capability);
 
-            values.push(VeracruzIdentity::new(
+            values.push(Identity::new(
                 certificates,
                 id as u32,
                 file_permissions,
@@ -573,7 +578,7 @@ fn serialize_identities(arguments: &Arguments) -> Vec<VeracruzIdentity<String>> 
 
 /// Serializes the identities of all principals in the Veracruz computation into
 /// a vec of VeracruzProgram.
-fn serialize_binaries(arguments: &Arguments) -> Vec<VeracruzProgram> {
+fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
     info!("Serializing programs.");
     
     assert_eq!(arguments.program_binaries.len(), arguments.binary_capabilities.len());
@@ -589,7 +594,7 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<VeracruzProgram> {
         let pi_hash = compute_program_hash(program_file_name);
         let file_permissions = serialize_capability(capability);
 
-        values.push(VeracruzProgram::new(
+        values.push(Program::new(
             program_file_name.to_str().unwrap().trim().to_string(),
             id as u32,
             pi_hash,
@@ -602,34 +607,34 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<VeracruzProgram> {
 /// Serializes the enclave server certificate expiry timepoint to a JSON value,
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
-fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> VeracruzExpiry {
+fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
     info!("Serializing enclave certificate expiry timepoint.");
     
-    let expiry = arguments
+    let timepoint = arguments
         .certificate_expiry
         .expect("Internal invariant failed: certificate lifetime is missing.");
 
-    VeracruzExpiry::new(
-        expiry.year() as u32,
-        expiry.month() as u8,
-        expiry.day() as u8,
-        expiry.hour() as u8,
-        expiry.minute() as u8,
-    )
+    Timepoint::new(
+        timepoint.year() as u32,
+        timepoint.month() as u8,
+        timepoint.day() as u8,
+        timepoint.hour() as u8,
+        timepoint.minute() as u8,
+    ).unwrap()
 }
 
-fn serialize_capability(cap_string : &[String]) -> Vec<VeracruzFileCapability> {
+fn serialize_capability(cap_string : &[String]) -> Vec<FileCapability> {
     cap_string.iter().map(|c| serialize_capability_entry(c.as_str())).collect()
 }
 
-fn serialize_capability_entry(cap_string : &str) -> VeracruzFileCapability {
+fn serialize_capability_entry(cap_string : &str) -> FileCapability {
     let mut split = cap_string.split(':'); 
     let file_name = split.next().unwrap();
     let cap = split.next().unwrap(); 
     let read = if cap.contains("r") {true} else {false};
     let write = if cap.contains("w") {true} else {false};
     let execute = if cap.contains("x") {true} else {false};
-    VeracruzFileCapability::new(file_name.trim().to_string(),read,write,execute)
+    FileCapability::new(file_name.trim().to_string(),read,write,execute)
 }
 
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
@@ -652,11 +657,11 @@ fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
     let sgx_hash = compute_sgx_enclave_hash(arguments);
-    let policy = VeracruzPolicy::new(
+    let policy = Policy::new(
         serialize_identities(arguments),
         serialize_binaries(arguments),
         format!("{}", &arguments.veracruz_server_ip.as_ref().unwrap()),
-        serialize_enclave_certificate_expiry(arguments),
+        serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
         sgx_hash.clone(),
         // TODO should be tz_hash

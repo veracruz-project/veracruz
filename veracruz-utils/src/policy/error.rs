@@ -42,6 +42,8 @@ pub enum PolicyError {
     SystemTimeError(#[error(source)] SystemTimeError),
     #[error(display = "PolicyError: unauthorized client certificate: {}.", _0)]
     InvalidClientCertificateError(String),
+    #[error(display = "PolicyError: HexDecodeError: {:?}.", _0)]
+    HexDecodeError(String),
     #[error(display = "PolicyError: Enclave expired.")]
     EnclaveExpireError,
     #[error(display = "PolicyError: Certificate expired: {:?}.", _0)]
@@ -55,14 +57,10 @@ pub enum PolicyError {
     DuplicatedClientIDError(u64),
     #[error(display = "PolicyError: Client {} has no role.", _0)]
     EmptyRoleError(u64),
-    #[error(display = "PolicyError: Policy has no program provider.")]
-    NoProgramProviderError,
-    #[error(display = "PolicyError: Policy has an invalid data provider order field.")]
-    DataProviderError,
-    #[error(display = "PolicyError: Policy has no result retriever.")]
-    NoResultRetrieverError,
     #[error(display = "PolicyError: Policy is missing a field: {:?}", _0)]
     MissingPolicyFieldError(String),
+    #[error(display = "VeracruzUtil: Policy has no program file: {:?}.",_0)]
+    NoProgramFileError(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -30,7 +30,7 @@ use crate::hcall::{
         HCALL_WRITE_OUTPUT_NAME,
     },
 };
-use veracruz_utils::VeracruzCapabilityIndex;
+use veracruz_utils::policy::principal::Principal;
 use crate::hcall::buffer::VFS;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +41,7 @@ lazy_static! {
     // The initial value has NO use.
     static ref VFS_INSTANCE: Mutex<VFSService> = Mutex::new(VFSService::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
     // The initial value has NO use.
-    static ref CUR_PROGRAM: Mutex<VeracruzCapabilityIndex> = Mutex::new(VeracruzCapabilityIndex::NoCap);
+    static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
 }
 
 /// The name of the WASM program's entry point.
@@ -97,19 +97,19 @@ impl WasmtimeHostProvisioningState {
 
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn append_file(client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    fn append_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         VFS_INSTANCE.lock()?.append_file_base(client_id,file_name, data)
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn write_file(client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+    fn write_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
         VFS_INSTANCE.lock()?.write_file_base(client_id,file_name, data)
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn read_file(client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+    fn read_file(client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
         VFS_INSTANCE.lock()?.read_file_base(client_id,file_name)
     }
 
@@ -293,7 +293,7 @@ impl WasmtimeHostProvisioningState {
 
         let store = Store::default();
 
-        *CUR_PROGRAM.lock().map_err(|e|Trap::new(format!("Failed to load program {}, error: {:?} ", program_name, e)))? = VeracruzCapabilityIndex::Program(program_name.to_string());
+        *CUR_PROGRAM.lock().map_err(|e|Trap::new(format!("Failed to load program {}, error: {:?} ", program_name, e)))? = Principal::Program(program_name.to_string());
 
         match Module::new(store.engine(), binary) {
             Err(_err) => return Err(Trap::new("Cannot create WASM module from input binary.")),
@@ -394,9 +394,7 @@ impl ExecutionEngine for WasmtimeHostProvisioningState {
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
-
-        //TODO check the permission XXX TODO XXX
-        let program = Self::read_file(&VeracruzCapabilityIndex::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+        let program = Self::read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
 
         Self::invoke_entry_point_base(file_name, program.to_vec())
             .map_err(|e| {

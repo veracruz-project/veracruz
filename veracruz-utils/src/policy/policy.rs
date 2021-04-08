@@ -34,7 +34,7 @@ use crate::{
     policy::{
         error::PolicyError,
         expiry::Timepoint,
-        principal::{ExecutionStrategy, Identity, Role}
+        principal::{ExecutionStrategy, Identity, Program, CapabilityTable, FileCapability, Principal, FileOperation}
     }
 };
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,7 @@ use serde_json;
 use std::{
     string::{String, ToString},
     vec::Vec,
+    collections::{HashMap, HashSet},
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -57,6 +58,8 @@ use std::{
 pub struct Policy {
     /// The identities of every principal involved in a computation.
     identities: Vec<Identity<String>>,
+    /// The candidate programs that can be loaded in the execution engine.
+    programs : Vec<Program>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -72,31 +75,14 @@ pub struct Policy {
     runtime_manager_hash_tz: Option<String>,
     /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
     runtime_manager_hash_nitro: Option<String>,
-    /// The declared ordering of data inputs, provided by the various data
-    /// providers, as specified in the policy.  Note that data providers can
-    /// provision their inputs asynchronously, and in an arbitrary order.  Once
-    /// all are provisioned, however, we reorder these inputs into this fixed
-    /// declared order so that the Veracruz host ABI, which allows access to
-    /// inputs via an index, remains well-defined.
-    data_provision_order: Vec<u64>,
     /// The URL of the proxy attestation service.
     proxy_attestation_server_url: String,
-    /// The hash of the program which will be provisioned into Veracruz by the
-    /// program provider.
-    pi_hash: String,
     /// The debug configuration flag.  This dictates whether the WASM program
     /// will be able to print debug configuration messages to *stdout* on the
     /// host's machine.
     debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
-    /// The declared ordering of stream package data inputs, provided by the various data
-    /// providers, as specified in the policy.  Note that data providers can
-    /// provision their inputs asynchronously, and in an arbitrary order.  Once
-    /// all are provisioned, however, we reorder these inputs into this fixed
-    /// declared order so that the Veracruz host ABI, which allows access to
-    /// inputs via an index, remains well-defined.
-    streaming_order: Vec<u64>,
 }
 
 impl Policy {
@@ -105,33 +91,29 @@ impl Policy {
     /// well-formedness checks pass.
     pub fn new(
         identities: Vec<Identity<String>>,
+        programs : Vec<Program>,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
         runtime_manager_hash_sgx: Option<String>,
         runtime_manager_hash_tz: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
-        data_provision_order: Vec<u64>,
-        streaming_order: Vec<u64>,
         proxy_attestation_server_url: String,
-        pi_hash: String,
         debug: bool,
         execution_strategy: ExecutionStrategy,
     ) -> Result<Self, PolicyError> {
         let policy = Self {
             identities,
+            programs,
             veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
             runtime_manager_hash_sgx,
             runtime_manager_hash_tz,
             runtime_manager_hash_nitro,
-            data_provision_order,
             proxy_attestation_server_url,
-            pi_hash,
             debug,
             execution_strategy,
-            streaming_order,
         };
 
         policy.assert_valid()?;
@@ -215,29 +197,11 @@ impl Policy {
         return Ok(&hash);
     }
 
-    /// Returns the fixed data provisioning order, associated with this policy.
-    #[inline]
-    pub fn data_provision_order(&self) -> &Vec<u64> {
-        &self.data_provision_order
-    }
-
-    /// Returns the fixed stream provisioning order, associated with this policy.
-    #[inline]
-    pub fn stream_provision_order(&self) -> &Vec<u64> {
-        &self.streaming_order
-    }
-
     /// Returns the URL of the proxy attestation service, associated with this
     /// policy.
     #[inline]
     pub fn proxy_attestation_server_url(&self) -> &String {
         &self.proxy_attestation_server_url
-    }
-
-    /// Returns the hash of the WASM binary, associated with this policy.
-    #[inline]
-    pub fn pi_hash(&self) -> &String {
-        &self.pi_hash
     }
 
     /// Returns the debug configuration flag associated with this policy.
@@ -256,8 +220,6 @@ impl Policy {
     /// is found to be invalid.  In all other cases, `Ok(())` is returned.
     fn assert_valid(&self) -> Result<(), PolicyError> {
         let mut client_ids = Vec::new();
-        let mut has_pi_provider = false;
-        let mut has_result_reader = false;
 
         for identity in self.identities.iter() {
             identity.assert_valid()?;
@@ -269,42 +231,6 @@ impl Policy {
                 ));
             }
             client_ids.push(*identity.id());
-
-            // check there is at least one role per client, and there is at least one PiProvider
-            // and ResultReader
-            if identity.roles().is_empty() {
-                return Err(PolicyError::EmptyRoleError(*identity.id() as u64));
-            }
-
-            has_result_reader =
-                has_result_reader || identity.roles().contains(&Role::ResultReader);
-
-            let new_pi_flag = identity.has_role(&Role::ProgramProvider);
-
-            if has_pi_provider && new_pi_flag {
-                return Err(PolicyError::NoProgramProviderError);
-            } else {
-                has_pi_provider = has_pi_provider || new_pi_flag;
-            }
-        }
-
-        // check if the data_provision_order contains the valid IDs.
-        if !self
-            .data_provision_order()
-            .iter()
-            .fold(true, |last_rst, i| {
-                last_rst && client_ids.contains(&(*i as u32))
-            })
-        {
-            return Err(PolicyError::DataProviderError);
-        }
-
-        if !has_result_reader {
-            return Err(PolicyError::NoResultRetrieverError);
-        }
-
-        if !has_pi_provider {
-            return Err(PolicyError::NoProgramProviderError);
         }
 
         // Check the ciphersuite
@@ -336,22 +262,13 @@ impl Policy {
     /// Returns the identity of any principal in the computation who is capable
     /// of requesting a shutdown of the computation.  At the moment, only the
     /// principals who can request the result can also request shutdown.
-    pub fn expected_shutdown_list(&self) -> Vec<u32> {
+    pub fn expected_shutdown_list(&self) -> Vec<u64> {
         self.identities()
             .iter()
             .fold(Vec::new(), |mut acc, identity| {
-                if identity.has_role(&Role::ResultReader) {
-                    acc.push(*identity.id());
-                }
+                acc.push(*identity.id() as u64);
                 acc
             })
-    }
-
-    /// Returns the count of data providers expected, as specified in this
-    /// policy.
-    #[inline]
-    pub fn expected_data_source_count(&self) -> usize {
-        self.data_provision_order().len()
     }
 
     /// Returns `Ok(identity)` if a principal with a certificate matching the
@@ -367,5 +284,94 @@ impl Policy {
         Err(PolicyError::InvalidClientCertificateError(
             cert.to_string(),
         ))
+    }
+
+    pub fn get_capability_table(&self) -> CapabilityTable {
+        let mut table = HashMap::new();
+        for identity in self.identities() {
+            let Identity {
+                id,
+                file_permissions,
+                ..
+            } = identity;
+            let capabilities_table = Self::to_capabilities(&file_permissions);
+            table.insert(Principal::Participant(*id as u64),capabilities_table);
+        }
+        for program in &self.programs {
+            let Program{
+                program_file_name,
+                file_permissions,
+                ..
+            } = program;
+            let capabilities_table = Self::to_capabilities(&file_permissions);
+            table.insert(Principal::Program(program_file_name.to_string()),capabilities_table);
+        }
+        table
+    }
+
+    fn to_capabilities(file_permissions : &[FileCapability]) -> HashMap<String, HashSet<FileOperation>> {
+        let mut capabilities_table = HashMap::new();
+        for permission in file_permissions {
+            let (file_name,capabilities) = Self::to_capability_entry(permission);
+            capabilities_table.insert(file_name,capabilities);
+        }
+        capabilities_table 
+    }
+
+    fn to_capability_entry(FileCapability {
+                    file_name,
+                    read,
+                    write,
+                    execute,
+                } : &FileCapability) -> (String, HashSet<FileOperation>) {
+
+        let mut capabilities = HashSet::new();
+        if *read {
+            capabilities.insert(FileOperation::Read);
+        }
+        if *write {
+            capabilities.insert(FileOperation::Write);
+        }
+        if *execute {
+            capabilities.insert(FileOperation::Execute);
+        }
+        (file_name.to_string(), capabilities)
+    }
+
+    pub fn get_program_digests(&self) -> Result<HashMap<String, Vec<u8>>, PolicyError> {
+        let mut table = HashMap::new();
+        for program in &self.programs {
+            let Program{
+                program_file_name,
+                pi_hash,
+                ..
+            } = program;
+            table.insert(program_file_name.to_string(),hex::decode(pi_hash).map_err(|_e|PolicyError::HexDecodeError(program_file_name.to_string()))?);
+        }
+        Ok(table)
+    }
+
+    pub fn get_input_table(&self) -> Result<HashMap<String, Vec<String>>, PolicyError> {
+        let mut table = HashMap::new();
+        for program in &self.programs {
+            let Program{
+                program_file_name,
+                file_permissions,
+                ..
+            } = program;
+            table.insert(program_file_name.to_string(),Self::get_required_inputs(&file_permissions));
+        }
+        Ok(table)
+    }
+
+    fn get_required_inputs(cap : &[FileCapability] )-> Vec<String> {
+        let mut rst = cap.iter().fold(Vec::new(), |mut acc, x| {
+            if x.read() {
+                acc.push(x.file_name().to_string());
+            }
+            acc
+        });
+        rst.sort();
+        rst
     }
 }

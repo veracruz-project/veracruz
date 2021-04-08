@@ -14,7 +14,7 @@
 
 use err_derive::Error;
 use std::{collections::HashMap, result::Result, vec::Vec, string::{ToString, String}};
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability, VeracruzCapabilityTable};
+use veracruz_utils::policy::principal::{Principal, FileOperation, CapabilityTable};
 use serde::{Deserialize, Serialize};
 
 /// Error type for mexico-city buffer.
@@ -28,13 +28,13 @@ pub enum VFSError {
     #[error(
         display = "VFSError: Principal or program {:?} cannot be found.",_0
     )]
-    IndexNotFound(VeracruzCapabilityIndex),
+    IndexNotFound(Principal),
     #[error(
         display = "VFSError: Client {:?} is disallowed to {:?}.",client_id,operation
     )]
     CapabilityDenial {
-        client_id: VeracruzCapabilityIndex,
-        operation : VeracruzCapability,
+        client_id: Principal,
+        operation : FileOperation,
     },
     #[error(
         display = "VFSError: File {:?} digest mismatches, model: {:?}, received: {:?}.",file_name, model, received
@@ -50,7 +50,7 @@ pub enum VFSError {
 #[derive(Clone, Debug)]
 pub struct VFS {
     fs: HashMap<String, Vec<u8>>,
-    capabilities: VeracruzCapabilityTable,
+    capabilities: CapabilityTable,
     digests: HashMap<String, Vec<u8>>,
 }
 
@@ -63,7 +63,7 @@ impl VFS {
     }
 
     /// Initialize a new empty buffer.
-    pub fn new(capabilities: &VeracruzCapabilityTable, digests: &HashMap<String, Vec<u8>>) -> Self {
+    pub fn new(capabilities: &CapabilityTable, digests: &HashMap<String, Vec<u8>>) -> Self {
         VFS {
             fs: HashMap::new(),
             capabilities: capabilities.clone(),
@@ -115,8 +115,8 @@ impl VFS {
     /// Return Some(CapabilityFlags) if `id` has the permission 
     /// to read, write and execute on the `file_name`.
     /// Return None if `id` or `file_name` do not exist.
-    pub fn check_capability(&self, id: &VeracruzCapabilityIndex, file_name: &str, cap: &VeracruzCapability) -> Result<(), VFSError> {
-        if *id == VeracruzCapabilityIndex::InternalSuperUser {
+    pub fn check_capability(&self, id: &Principal, file_name: &str, cap: &FileOperation) -> Result<(), VFSError> {
+        if *id == Principal::InternalSuperUser {
             return Ok(());
         }
         self.capabilities

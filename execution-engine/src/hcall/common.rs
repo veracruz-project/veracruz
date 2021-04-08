@@ -65,7 +65,7 @@ use std::{
     convert::TryFrom,
 };
 
-use veracruz_utils::{VeracruzCapabilityIndex, VeracruzCapability};
+use veracruz_utils::policy::principal::{Principal, FileOperation};
 use crate::hcall::buffer::{VFS, VFSError};
 
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
@@ -189,22 +189,22 @@ impl VFSService {
     }
 
     /// Append to a file.
-    pub(crate) fn write_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+    pub(crate) fn write_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
         self.vfs.lock()?.write(file_name,data)?;
         Ok(())
     }
 
     /// Append to a file.
-    pub(crate) fn append_file_base(&mut self, client_id: &VeracruzCapabilityIndex, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Write)?;
+    pub(crate) fn append_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
         self.vfs.lock()?.append(file_name,data)?;
         Ok(())
     }
 
     /// Read from a file
-    pub(crate) fn read_file_base(&self, client_id: &VeracruzCapabilityIndex, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &VeracruzCapability::Read)?;
+    pub(crate) fn read_file_base(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Read)?;
         Ok(self.vfs.lock()?.read(file_name)?)
     }
     
