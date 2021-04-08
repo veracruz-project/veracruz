@@ -7,7 +7,7 @@ Some potential use-cases for Veracruz include:
 
 * Privacy-preserving collaborative machine learning,
 * Privacy-preserving delegated computations from a computationally weak device to a more capable (but potentially untrusted) edge device or server,
-* Secret auctions, elections or polls, and surveys,
+* Secret auctions, elections or polls, surveys,
 * ...and many more.
 
 Veracruz uses *strong isolation* technology (a mixture of *trusted hardware* and high-assurance *hypervisor-based* isolation), along with  *remote attestation protocols*, to establish a safe, "neutral ground" within which a collaborative computation takes place on an untrusted device.
