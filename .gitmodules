@@ -17,3 +17,4 @@
 [submodule "docker"]
 	path = docker
 	url = https://github.com/veracruz-project/veracruz-docker-image.git
+    branch = main
