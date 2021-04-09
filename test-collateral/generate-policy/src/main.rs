@@ -595,7 +595,7 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
         let file_permissions = serialize_capability(capability);
 
         values.push(Program::new(
-            program_file_name.to_str().expect(format!("Failed to convert {} to str",program_file_name)).trim().to_string(),
+            program_file_name.to_str().expect(&format!("Failed to convert {:?} to str",program_file_name)).trim().to_string(),
             id as u32,
             pi_hash,
             file_permissions,
