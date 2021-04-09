@@ -25,3 +25,31 @@ pub mod io;
 pub mod platform;
 /// Types and definitions relating to the Veracruz global policy file.
 pub mod policy;
+pub use crate::policy::*;
+
+#[cfg(feature = "tz")]
+pub mod runtime_manager_opcode;
+#[cfg(feature = "tz")]
+pub use crate::runtime_manager_opcode::*;
+
+#[cfg(feature = "tz")]
+pub mod trustzone_root_enclave_opcode;
+#[cfg(feature = "tz")]
+pub use crate::trustzone_root_enclave_opcode::*;
+
+#[cfg(feature = "nitro")]
+pub mod nitro;
+#[cfg(feature = "nitro")]
+pub use crate::nitro::*;
+
+#[cfg(feature = "nitro")]
+pub mod vsocket;
+#[cfg(feature = "nitro")]
+pub use self::vsocket::*;
+#[cfg(feature = "nitro")]
+pub mod nitro_enclave;
+#[cfg(feature = "nitro")]
+pub use self::nitro_enclave::*;
+
+#[cfg(feature = "sgx")]
+pub mod csr;
