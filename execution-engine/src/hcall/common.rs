@@ -162,54 +162,6 @@ impl From<wasmi::Error> for HostProvisioningError {
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////////
-//// The Veracruz provisioning state.
-//////////////////////////////////////////////////////////////////////////////////
-
-///// A wrapper for VFS, which provides common API used by execution engine.
-//#[derive(Clone)]
-//pub struct VFSService {
-    //vfs : Arc<Mutex<VFS>>,
-//}
-
-//impl VFSService {
-    //////////////////////////////////////////////////////////////////////////////
-    //// Creating and modifying host states.
-    //////////////////////////////////////////////////////////////////////////////
-    
-    ///// Creates a new initial `HostProvisioningState`.
-    //pub fn new(
-        //vfs : Arc<Mutex<VFS>>,
-    //) -> Self {
-        //Self { vfs }
-    //}
-
-    ///// Write to a file.
-    //pub(crate) fn write_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        //self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
-        //self.vfs.lock()?.write(file_name,data)?;
-        //Ok(())
-    //}
-
-    ///// Append to a file.
-    //pub(crate) fn append_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        //self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
-        //self.vfs.lock()?.append(file_name,data)?;
-        //Ok(())
-    //}
-
-    ///// Read from a file
-    //pub(crate) fn read_file_base(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        //self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Read)?;
-        //Ok(self.vfs.lock()?.read(file_name)?)
-    //}
-    
-    ///// Count the number of files start with the prefix
-    //pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        //Ok(self.vfs.lock()?.count(prefix)?)
-    //}
-//}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Fatal host errors
 ////////////////////////////////////////////////////////////////////////////////

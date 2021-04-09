@@ -595,7 +595,7 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
         let file_permissions = serialize_capability(capability);
 
         values.push(Program::new(
-            program_file_name.to_str().unwrap().trim().to_string(),
+            program_file_name.to_str().expect(format!("Failed to convert {} to str",program_file_name)).trim().to_string(),
             id as u32,
             pi_hash,
             file_permissions,
@@ -620,17 +620,18 @@ fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
         timepoint.day() as u8,
         timepoint.hour() as u8,
         timepoint.minute() as u8,
-    ).unwrap()
+    ).expect("Failed to instantiate a timepoint")
 }
 
+#[inline]
 fn serialize_capability(cap_string : &[String]) -> Vec<FileCapability> {
     cap_string.iter().map(|c| serialize_capability_entry(c.as_str())).collect()
 }
 
 fn serialize_capability_entry(cap_string : &str) -> FileCapability {
     let mut split = cap_string.split(':'); 
-    let file_name = split.next().unwrap();
-    let cap = split.next().unwrap(); 
+    let file_name = split.next().expect(&format!("Failed to parse {}, empty string", cap_string));
+    let cap = split.next().expect(&format!("Failed to parse {}, contain no `:`", cap_string)); 
     let read = if cap.contains("r") {true} else {false};
     let write = if cap.contains("w") {true} else {false};
     let execute = if cap.contains("x") {true} else {false};
@@ -660,19 +661,19 @@ fn serialize_json(arguments: &Arguments) -> Value {
     let policy = Policy::new(
         serialize_identities(arguments),
         serialize_binaries(arguments),
-        format!("{}", &arguments.veracruz_server_ip.as_ref().unwrap()),
+        format!("{}", &arguments.veracruz_server_ip.as_ref().expect(&format!("Failed to get the veracruz server ip"))),
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
         sgx_hash.clone(),
         // TODO should be tz_hash
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
-        format!("{}", &arguments.proxy_attestation_server_ip.as_ref().unwrap()),
+        format!("{}", &arguments.proxy_attestation_server_ip.as_ref().expect(&format!("Failed to get the proxy attestation server ip"))),
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
-    );
+    ).expect("Failed to instantiate a (struct) policy");
 
-    json!(policy.unwrap())
+    json!(policy)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
