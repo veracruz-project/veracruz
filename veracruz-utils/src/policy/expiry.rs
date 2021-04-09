@@ -46,13 +46,16 @@ impl Timepoint {
     ///
     /// Fails if the fields do not conform with the formatting expectations of
     /// ISO-8601.
-    pub fn new(
-        year: u32,
-        month: u8,
-        day: u8,
-        hour: u8,
-        minute: u8,
+    pub fn new<T,U>(
+        year: T,
+        month: U,
+        day: U,
+        hour: U,
+        minute: U,
     ) -> Result<Self, PolicyError>
+    where
+        T: Into<u32>,
+        U: Into<u8>,
     {
         let month = month.into();
         let day = day.into();

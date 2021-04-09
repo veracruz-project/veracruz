@@ -25,7 +25,7 @@ use platform_services::{getrandom, result};
 use crate::hcall::{
     common::{
         ExecutionEngine, EntrySignature, FatalEngineError, EngineReturnCode,
-        HostProvisioningError, VFSService, HCALL_GETRANDOM_NAME,
+        HostProvisioningError, HCALL_GETRANDOM_NAME,
         HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME, HCALL_READ_INPUT_NAME,
         HCALL_WRITE_OUTPUT_NAME,
     },
@@ -39,7 +39,7 @@ use crate::hcall::buffer::VFS;
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<VFSService> = Mutex::new(VFSService::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
+    static ref VFS_INSTANCE: Mutex<Arc<Mutex<VFS>>> = Mutex::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new()))));
     // The initial value has NO use.
     static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
 }
@@ -89,33 +89,35 @@ impl WasmtimeHostProvisioningState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
         vfs : Arc<Mutex<VFS>>,
-    ) -> Self {
+    ) -> Result<Self, HostProvisioningError> {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock().unwrap() = VFSService::new(vfs);
-        Self{}
+        *VFS_INSTANCE.lock()? = vfs;
+        Ok(Self{})
     }
 
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn append_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.append_file_base(client_id,file_name, data)
+        VFS_INSTANCE.lock()?.lock()?.append(client_id,file_name, data)?;
+        Ok(())
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn write_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.write_file_base(client_id,file_name, data)
+        VFS_INSTANCE.lock()?.lock()?.write(client_id,file_name, data)?;
+        Ok(())
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        VFS_INSTANCE.lock()?.read_file_base(client_id,file_name)
+        Ok(VFS_INSTANCE.lock()?.lock()?.read(client_id,file_name)?)
     }
 
     #[inline]
     fn count_file(prefix: &str) -> Result<u64, HostProvisioningError> {
-        VFS_INSTANCE.lock()?.count_file_base(prefix)
+        Ok(VFS_INSTANCE.lock()?.lock()?.count(prefix)?)
     }
 
     /// The Wasmtime implementation of `__veracruz_hcall_write_output()`.
@@ -393,7 +395,8 @@ impl ExecutionEngine for WasmtimeHostProvisioningState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> 
+    {
         let program = Self::read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
 
         Self::invoke_entry_point_base(file_name, program.to_vec())

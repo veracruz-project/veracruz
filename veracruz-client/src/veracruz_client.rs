@@ -307,8 +307,8 @@ impl VeracruzClient {
                 let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
                 if self.policy_hash != received_hash {
                     return Err(VeracruzClientError::MismatchError {
-                        variable: "check_pi_hash",
-                        expected: b"check policy file".to_vec(),
+                        variable: "check_policy_hash",
+                        expected: self.policy_hash.as_bytes().to_vec(),
                         received: received_hash.as_bytes().to_vec(),
                     });
                 } else {

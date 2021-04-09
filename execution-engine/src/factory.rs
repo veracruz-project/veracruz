@@ -67,8 +67,8 @@ pub enum ExecutionStrategy {
 pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
-) -> Option<Box<dyn ExecutionEngine>> {
-    match strategy {
+) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
+    let instance : Option<Box<dyn ExecutionEngine>> = match strategy {
         ExecutionStrategy::Interpretation => {
             Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
         }
@@ -76,12 +76,13 @@ pub fn single_threaded_execution_engine(
         {
             #[cfg(feature = "std")]
             {
-                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)))
+                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
         }
-    }
+    };
+    Ok(instance)
 }
 
 /// Selects an ExecutionEngine implementation based on a stated preference for
@@ -96,19 +97,20 @@ pub fn single_threaded_execution_engine(
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
     vfs : Arc<Mutex<VFS>>,
-) -> Option<Box<dyn ExecutionEngine>> {
-    match strategy {
+) -> Result<Option<Box<dyn ExecutionEngine>>,FatalEngineError> {
+    let instance : Option<Box<dyn ExecutionEngine>> = match strategy {
         ExecutionStrategy::Interpretation => {
             Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
         }
         ExecutionStrategy::JIT => 
         {
             #[cfg(feature = "std")]
-            { Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs))) }
+            { Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?)) }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
         }
-    }
+    };
+    Ok(instance)
 }
 
 pub fn execute(
@@ -124,7 +126,7 @@ pub fn execute(
         {
             #[cfg(feature = "std")]
             {
-                Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs))
+                Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?)
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             {

@@ -26,13 +26,14 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{convert::TryFrom, fmt, fs::File, io::Read, process::exit, time::Instant};
-use std::sync::Mutex;
 use std::{
     collections::HashMap,
     sync::Arc,
     vec::Vec,
     path::Path,
+    sync::Mutex,
+    convert::TryFrom,
+    fmt, fs::File, io::Read, process::exit, time::Instant
 };
 
 use execution_engine::{
@@ -40,6 +41,7 @@ use execution_engine::{
     hcall::buffer::VFS,
     hcall::common::EngineReturnCode,
 };
+use veracruz_utils::policy::principal::Principal;
 
 use clap::{App, Arg};
 use log::*;
@@ -316,7 +318,7 @@ fn load_file(file_path: &str) -> (String, Vec<u8>) {
         exit(-1);
     });
 
-    (Path::new(file_path).file_name().unwrap().to_str().unwrap().to_string(), contents)
+    (Path::new(file_path).file_name().expect(&format!("Failed to extract file name from path {}", file_path)).to_str().expect(&format!("Failed to convert the filename in path {}", file_path)).to_string(), contents)
 }
 
 /// Reads a static TOML configuration file from a fixed location on disk,
@@ -394,7 +396,7 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs : Arc<Mutex<VFS>>) {
         // XXX: may panic! if u64 and usize have differing bitwidths...
         let id = u64::try_from(id).unwrap();
         let file_name = format!("input-{}",id);
-        vfs.lock().unwrap().write(&file_name,&buffer).unwrap();
+        vfs.lock().unwrap().write(&Principal::InternalSuperUser, &file_name,&buffer).unwrap();
 
         info!("Loading '{}' as file_name '{}' into vfs.", file_path, file_name);
     }
@@ -416,7 +418,7 @@ fn main() {
 
     let vfs = Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())));
     let (prog_file_name, program) = load_file(&cmdline.binary);
-    vfs.lock().unwrap().write(&prog_file_name,&program).unwrap();
+    vfs.lock().expect("Failed to lock the vfs").write(&Principal::InternalSuperUser,&prog_file_name,&program).expect(&format!("Failed to write to file {}", prog_file_name));
     
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
@@ -429,14 +431,15 @@ fn main() {
     let start = Instant::now();
 
     match single_threaded_execution_engine(&cmdline.execution_strategy, vfs.clone())
-          .unwrap()
+          .expect("Failed to instantiate the execution engine due to error")
+          .expect("Failed to instantiate the execution engine due to engine is not supported")
           .invoke_entry_point(&prog_file_name) {
         Ok(EngineReturnCode::Success) => {
             if cmdline.time_computation {
                 info!("WASM program finished execution in '{:?}.", start.elapsed());
             }
             info!("WASM program executed successfully.");
-            info!("Result {:?}.",vfs.lock().unwrap().read("output").unwrap());
+            info!("Result {:?}.",vfs.lock().expect("Failed to lock the vfs").read(&Principal::InternalSuperUser, "output").expect("Failed to read the file output"));
         }
         Ok(err_code) => {
             println!(

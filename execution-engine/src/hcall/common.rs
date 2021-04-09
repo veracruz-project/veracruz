@@ -60,18 +60,14 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::{
     string::{String, ToString},
-    vec::Vec,
     fmt::{Formatter, Display, Error},
     convert::TryFrom,
 };
-
-use veracruz_utils::policy::principal::{Principal, FileOperation};
-use crate::hcall::buffer::{VFS, VFSError};
-
+use crate::hcall::buffer::VFSError;
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
-use std::sync::{Mutex, Arc};
+use std::sync::Mutex;
 #[cfg(feature = "sgx")]
-use std::sync::{SgxMutex as Mutex, Arc};
+use std::sync::SgxMutex as Mutex;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The H-Call API
@@ -120,6 +116,7 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: No linear memory could be found in the supplied WASM module."
     )]
     NoLinearMemoryFound,
+    /// No wasm memory registered in the execution engine
     #[error(display = "HostProvisioningError: No WASM memory registered.")]
     NoMemoryRegistered,
     /// The program module could not be properly instantiated by the WASM engine
@@ -146,7 +143,6 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: VFS Error {}.", _0
     )]
     VFSError(#[error(source)]VFSError),
-    //TODO: potential remove this 
     #[error(
         display = "HostProvisioningError: File {} cannot be found.", _0
     )]
@@ -166,53 +162,53 @@ impl From<wasmi::Error> for HostProvisioningError {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// The Veracruz provisioning state.
-////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
+//// The Veracruz provisioning state.
+//////////////////////////////////////////////////////////////////////////////////
 
-/// A wrapper for VFS, which provides common API used by execution engine.
-#[derive(Clone)]
-pub struct VFSService {
-    vfs : Arc<Mutex<VFS>>,
-}
+///// A wrapper for VFS, which provides common API used by execution engine.
+//#[derive(Clone)]
+//pub struct VFSService {
+    //vfs : Arc<Mutex<VFS>>,
+//}
 
-impl VFSService {
-    ////////////////////////////////////////////////////////////////////////////
-    // Creating and modifying host states.
-    ////////////////////////////////////////////////////////////////////////////
+//impl VFSService {
+    //////////////////////////////////////////////////////////////////////////////
+    //// Creating and modifying host states.
+    //////////////////////////////////////////////////////////////////////////////
     
-    /// Creates a new initial `HostProvisioningState`.
-    pub fn new(
-        vfs : Arc<Mutex<VFS>>,
-    ) -> Self {
-        Self { vfs }
-    }
+    ///// Creates a new initial `HostProvisioningState`.
+    //pub fn new(
+        //vfs : Arc<Mutex<VFS>>,
+    //) -> Self {
+        //Self { vfs }
+    //}
 
-    /// Append to a file.
-    pub(crate) fn write_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
-        self.vfs.lock()?.write(file_name,data)?;
-        Ok(())
-    }
+    ///// Write to a file.
+    //pub(crate) fn write_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        //self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
+        //self.vfs.lock()?.write(file_name,data)?;
+        //Ok(())
+    //}
 
-    /// Append to a file.
-    pub(crate) fn append_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
-        self.vfs.lock()?.append(file_name,data)?;
-        Ok(())
-    }
+    ///// Append to a file.
+    //pub(crate) fn append_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
+        //self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
+        //self.vfs.lock()?.append(file_name,data)?;
+        //Ok(())
+    //}
 
-    /// Read from a file
-    pub(crate) fn read_file_base(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Read)?;
-        Ok(self.vfs.lock()?.read(file_name)?)
-    }
+    ///// Read from a file
+    //pub(crate) fn read_file_base(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        //self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Read)?;
+        //Ok(self.vfs.lock()?.read(file_name)?)
+    //}
     
-    /// Read from a file
-    pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        Ok(self.vfs.lock()?.count(prefix)?)
-    }
-}
+    ///// Count the number of files start with the prefix
+    //pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        //Ok(self.vfs.lock()?.count(prefix)?)
+    //}
+//}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Fatal host errors
@@ -303,6 +299,8 @@ pub enum FatalEngineError {
     /// Wrapper for WASI Error other than Trap.
     #[error(display = "FatalVeracruzHostError: WASMIError {:?}.", _0)]
     WASMIError(#[source(error)] wasmi::Error),
+    /// Program cannot be found in VFS, when any principal (programs or participants) try to access
+    /// the `file_name`.
     #[error(display = "FatalVeracruzHostError: Program {} cannot be found.", file_name)]
     ProgramCannotFound{
         file_name : String,

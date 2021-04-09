@@ -9,8 +9,7 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{boxed::Box, string::ToString, vec::Vec};
-use std::convert::TryFrom;
+use std::{boxed::Box, string::ToString, vec::Vec, convert::TryFrom};
 
 use platform_services::{getrandom, result};
 
@@ -24,7 +23,7 @@ use wasmi::{
 use crate::hcall::{
     common::{
         ExecutionEngine, EntrySignature, EngineReturnCode,
-        HostProvisioningError, FatalEngineError, VFSService, HCALL_GETRANDOM_NAME,
+        HostProvisioningError, FatalEngineError, HCALL_GETRANDOM_NAME,
         HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
         HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
         HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
@@ -64,7 +63,8 @@ pub(crate) type HCallError = Result<EngineReturnCode, FatalEngineError>;
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
 /// `MemoryRef` type.
 pub(crate) struct WasmiHostProvisioningState {
-    vfs : VFSService,
+    /// The VFS installed to this execution 
+    vfs : Arc<Mutex<VFS>>,
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
     program_module: Option<ModuleRef>,
@@ -401,7 +401,7 @@ impl WasmiHostProvisioningState {
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
         Self {
-            vfs : VFSService::new(vfs),
+            vfs,
             program: Principal::NoCap,
             program_module: None,
             memory: None,
@@ -489,7 +489,6 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
                 if let Err(_) = memory.set_value(address, result) {
-                    assert!(false);
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: std::mem::size_of::<u32>(),
@@ -516,12 +515,10 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => 
             {
-                //TODO FILL IN principal
                 let result = self.read_file(&self.program,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
-                if let Err(_) = memory.set(address, &result) {
-                    assert!(false);
+                if memory.set(address, &result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: result.len() as usize,
@@ -549,13 +546,11 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => 
             {
-                //TODO FILL in appropriate principal
                 let data = self.read_file(&self.program,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
                 if data.len() > size as usize {
                     return Ok(EngineReturnCode::DataSourceSize);
                 }
-                if let Err(_) = memory.set(address, &data) {
-                    assert!(false);
+                if memory.set(address, &data).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: data.len(),
@@ -582,7 +577,7 @@ impl WasmiHostProvisioningState {
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
-                if let Err(_) = memory.set_value(address, result) {
+                if memory.set_value(address, result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: std::mem::size_of::<u32>(),
@@ -609,14 +604,13 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => 
             {
-                //TODO FILL in appropriate principal
                 let result = self.read_file(&self.program,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
-                if let Err(_) = memory.set(address, &result) {
+                if memory.set(address, &result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
-                        bytes_to_be_written: result.len() as usize,
+                        bytes_to_be_written: result.len(),
                     });
                 }
 
@@ -642,12 +636,11 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) =>
             {
-                //TODO FILL in appropriate principal
                 let data = self.read_file(&self.program,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
                 if data.len() > size as usize {
                     return Ok(EngineReturnCode::DataSourceSize);
                 }
-                if let Err(_) = memory.set(address, &data) {
+                if memory.set(address, &data).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: data.len(),
@@ -675,10 +668,10 @@ impl WasmiHostProvisioningState {
             {
                 let result = self.read_file(&self.program,"output")?.unwrap_or(Vec::new());
                 let result: Vec<u8> = result.len().to_le_bytes().to_vec();
-                if let Err(_) = memory.set(address, &result) {
+                if memory.set(address, &result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
-                        bytes_to_be_written: result.len() as usize,
+                        bytes_to_be_written: result.len(),
                     });
                 }
                 Ok(EngineReturnCode::Success)
@@ -707,7 +700,7 @@ impl WasmiHostProvisioningState {
                     return Ok(EngineReturnCode::PreviousResultSize);
                 }
 
-                if let Err(_) = memory.set(address, &previous_result) {
+                if memory.set(address, &previous_result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: previous_result.len(),
@@ -739,10 +732,10 @@ impl WasmiHostProvisioningState {
                 };
                 let result: Vec<u8> = flag.to_le_bytes().to_vec();
 
-                if let Err(_) = memory.set(address, &result) {
+                if memory.set(address, &result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
-                        bytes_to_be_written: result.len() as usize,
+                        bytes_to_be_written: result.len(),
                     });
                 }
                 Ok(EngineReturnCode::Success)
@@ -766,7 +759,7 @@ impl WasmiHostProvisioningState {
             None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => match getrandom(&mut buffer) {
                 result::Result::Success => {
-                    if let Err(_) = memory.set(address, &buffer) {
+                    if memory.set(address, &buffer).is_err() {
                         return Err(FatalEngineError::MemoryWriteFailed {
                             memory_address: address as usize,
                             bytes_to_be_written: size as usize,
@@ -812,24 +805,26 @@ impl WasmiHostProvisioningState {
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.append_file_base(client_id,file_name,data)
+        self.vfs.lock()?.append(client_id,file_name,data)?;
+        Ok(())
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.write_file_base(client_id,file_name,data)
+        self.vfs.lock()?.write(client_id,file_name,data)?;
+        Ok(())
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.vfs.read_file_base(client_id,file_name)
+        Ok(self.vfs.lock()?.read(client_id,file_name)?)
     }
 
     #[inline]
     fn count_file(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        self.vfs.count_file_base(prefix)
+        Ok(self.vfs.lock()?.count(prefix)?)
     }
 }
 
@@ -852,7 +847,8 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> 
+    {
         let program = self.read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());

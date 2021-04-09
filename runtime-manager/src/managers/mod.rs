@@ -54,6 +54,8 @@ lazy_static! {
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
+const OUTPUT_FILE : &'static str = "output";
+
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,6 +112,8 @@ impl ProtocolState {
         })
     }
 
+    /// Force re-execute the program even if there is no new data coming from participants.
+    #[inline]
     pub fn reload(&mut self) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
         Ok(())
@@ -131,24 +135,21 @@ impl ProtocolState {
     // The ExecutionEngine facade.
     ////////////////////////////////////////////////////////////////////////////
 
-    //TODO: add description
+    /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
     pub(crate) fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
-        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
-        Ok(self.vfs.lock()?.write(file_name,data)?)
+        Ok(self.vfs.lock()?.write(client_id, file_name, data)?)
     }
 
-    //TODO: add description
+    /// Check if a client has capability to write to a file, and then append it with new `data`.
     pub(crate) fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
-        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Write)?;
-        Ok(self.vfs.lock()?.append(file_name,data)?)
+        Ok(self.vfs.lock()?.append(client_id, file_name, data)?)
     }
 
-    //TODO: add description
+    /// Check if a client has capability to read from a file, if so, return the content in bytes.
     pub(crate) fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        self.vfs.lock()?.check_capability(client_id,file_name, &FileOperation::Read)?;
-        Ok(self.vfs.lock()?.read(file_name)?)
+        Ok(self.vfs.lock()?.read(client_id, file_name)?)
     }
 
     /// Requests shutdown on behalf of a client, as identified by their client
@@ -162,6 +163,7 @@ impl ProtocolState {
         Ok(self.expected_shutdown_sources.is_empty())
     }
     
+    /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
     pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = match self.global_policy.execution_strategy() {
             ExecutionStrategy::Interpretation => {
@@ -176,7 +178,7 @@ impl ProtocolState {
         )?;
         
         let response = if return_code == EngineReturnCode::Success {
-            let result = self.read_file(&Principal::Participant(client_id),"output")?;
+            let result = self.read_file(&Principal::Participant(client_id),OUTPUT_FILE)?;
             Self::response_success(result)
         } else {
             Self::response_error_code_returned(return_code)
@@ -186,11 +188,13 @@ impl ProtocolState {
         Ok(Some(response))
     }
 
+    #[inline]
     fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
         transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
             .unwrap_or_else(|err| panic!(err))
     }
 
+    #[inline]
     fn response_error_code_returned(error_code: EngineReturnCode) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(
             transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
@@ -199,6 +203,7 @@ impl ProtocolState {
         .unwrap_or_else(|err| panic!(err))
     }
 
+    #[inline]
     fn is_modified(&self) -> bool {
         self.is_modified
     }

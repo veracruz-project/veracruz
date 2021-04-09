@@ -71,12 +71,16 @@ impl VFS {
         }
     }
     
-    pub fn write(&mut self, file_name : &str, new_data : &[u8]) -> Result<(),VFSError> {
+    /// Write to a file
+    pub fn write(&mut self, client_id: &Principal, file_name : &str, new_data : &[u8]) -> Result<(),VFSError> {
+        self.check_capability(client_id,file_name, &FileOperation::Write)?;
         self.fs.insert(file_name.to_string(),new_data.to_vec());
         self.digest_check(file_name,new_data)
     }
 
-    pub fn append(&mut self, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
+    /// Append to a file
+    pub fn append(&mut self, client_id: &Principal, file_name : &str, buf : &[u8]) -> Result<(),VFSError> {
+        self.check_capability(client_id,file_name, &FileOperation::Write)?;
         match self.fs.get_mut(file_name) {
             Some(b) => {
                 b.append(&mut buf.to_vec());
@@ -103,7 +107,8 @@ impl VFS {
         Ok(())
     }
 
-    pub fn read(&self, file_name : &str) -> Result<Option<Vec<u8>>,VFSError> {
+    pub fn read(&self, client_id: &Principal, file_name : &str) -> Result<Option<Vec<u8>>,VFSError> {
+        self.check_capability(client_id,file_name, &FileOperation::Read)?;
         Ok(self.fs.get(file_name).map(|v|v.clone()))
     }
 
@@ -115,7 +120,7 @@ impl VFS {
     /// Return Some(CapabilityFlags) if `id` has the permission 
     /// to read, write and execute on the `file_name`.
     /// Return None if `id` or `file_name` do not exist.
-    pub fn check_capability(&self, id: &Principal, file_name: &str, cap: &FileOperation) -> Result<(), VFSError> {
+    fn check_capability(&self, id: &Principal, file_name: &str, cap: &FileOperation) -> Result<(), VFSError> {
         if *id == Principal::InternalSuperUser {
             return Ok(());
         }

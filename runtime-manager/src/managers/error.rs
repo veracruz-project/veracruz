@@ -33,7 +33,7 @@ pub enum RuntimeManagerError {
     HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
     #[error(display = "RuntimeManager: VFS Error: {:?}.", _0)]
     VFSError(#[error(source)] execution_engine::hcall::buffer::VFSError),
-    #[error(display = "MexicoCity: Failed to obtain lock {:?}.", _0)]
+    #[error(display = "RuntimeManager: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
     #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]
     UninitializedSessionError(&'static str),
