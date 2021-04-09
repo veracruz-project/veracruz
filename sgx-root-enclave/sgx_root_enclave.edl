@@ -27,6 +27,22 @@ enclave {
                                                   size_t pubkey_challenge_size,
                                                   [in, readonly] const sgx_target_info_t *p_target_info,
                                                   [out] sgx_report_t *p_report);
+        public sgx_status_t sgx_get_collateral_report([in, size = collateral_challenge_size, readonly] const uint8_t *p_collateral_challenge,
+                                                      size_t collateral_challenge_size,
+                                                      [in, readonly] const sgx_target_info_t *p_target_info,
+                                                      [out] sgx_report_t *p_report,
+                                                      [out, size=pubkey_hash_buf_size] uint8_t *p_pubkey_hash,
+                                                      size_t pubkey_hash_buf_size,
+                                                      [out] size_t *p_pubkey_size,
+                                                      [out, size=csr_buf_size] uint8_t *p_csr_buffer,
+                                                      size_t csr_buf_size,
+                                                      [out] size_t *p_csr_size);
+
+        public sgx_status_t sgx_send_cert_chain([in, size = root_cert_size, readonly] const uint8_t *p_root_cert,
+                                                size_t root_cert_size,
+                                                [in, size = enclave_cert_size, readonly] const uint8_t *p_enclave_cert,
+                                                size_t enclave_cert_size);
+
         public sgx_status_t start_local_attest_enc([in, readonly] const sgx_dh_msg1_t *p_msg1,
                                                    [out] sgx_dh_msg2_t *p_msg2,
                                                    [out] uint64_t *sgx_root_enclave_session_id);
@@ -45,5 +61,13 @@ enclave {
                                                     size_t pubkey_buf_size,
                                                     [out] size_t *p_pubkey_size,
                                                     [out] int32_t *p_device_id);
+
+        public sgx_status_t finish_local_attest_ca_enc([in, readonly] const sgx_dh_msg3_t *dh_msg3_raw,
+                                                       [in, size=csr_size, readonly] const uint8_t *csr,
+                                                       size_t csr_size,
+                                                       uint64_t sgx_root_enclave_session_id,
+                                                       [out, size=cert_buf_size] uint8_t *p_cert,
+                                                       size_t cert_buf_size,
+                                                       [out] size_t *p_cert_size);
     };
 };

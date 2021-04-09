@@ -18,6 +18,7 @@ use sgx_types::{
     sgx_key_128bit_t, sgx_status_t,
 };
 use std::mem;
+use crate::managers::debug_message;
 
 extern "C" {
     pub fn start_local_attest_ocall(
@@ -46,6 +47,17 @@ extern "C" {
         p_device_id: *mut i32,
     ) -> sgx_status_t;
 
+    pub fn finish_local_attest_ca_ocall(
+        ret: &mut sgx_status_t,
+        dh_msg3: &sgx_dh_msg3_t,
+        csr: *const u8,
+        csr_size: usize,
+        sgx_root_enclave_session_id: u64,
+        cert: *mut u8,
+        cert_buf_size: usize,
+        cert_size: &mut usize,
+    ) -> sgx_status_t;
+
     pub fn debug_and_error_output_ocall(
         ret: &mut sgx_status_t,
         message: *const c_char,
@@ -72,15 +84,28 @@ pub extern "C" fn init_session_manager_enc(
     };
 
     let ret = crate::managers::session_manager::init_session_manager(&policy_str);
-    if ret.is_ok() {
-        sgx_status_t::SGX_SUCCESS
-    } else {
-        println!(
-            "runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}",
-            ret
-        );
-        sgx_status_t::SGX_ERROR_UNEXPECTED
+    if ret.is_err() {
+        println!("runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
+        return sgx_status_t::SGX_ERROR_UNEXPECTED
     }
+
+    debug_message(format!("init_session_manager_enc getting csr"));
+    // TODO: Make this conditional on a field in the policy
+    let csr_result = managers::session_manager::get_csr();
+    let csr = match csr_result {
+        Ok(val) => val,
+        Err(err) => {
+            println!("runtime_manager_sgx::init_session_manager_enc call to get_csr failed:{:?}", err);
+            return sgx_status_t::SGX_ERROR_UNEXPECTED; 
+        }
+    };
+
+    debug_message(format!("init_session_manager_enc performing local attestation with cert"));
+    let cert = local_attestation_get_cert_enc(&csr);
+
+    // TODO: Seomthing with cert, probably add it to managers::session_manager
+
+    return sgx_status_t::SGX_SUCCESS;
 }
 
 #[no_mangle]
@@ -213,6 +238,82 @@ pub extern "C" fn psa_attestation_get_token_enc(
             return sgx_status_t::SGX_ERROR_INVALID_STATE;
         }
     }
+}
+
+#[cfg(feature = "sgx")]
+fn local_attestation_get_cert_enc(
+    csr: &std::vec::Vec<u8>,
+) -> Result<std::vec::Vec<u8>, RuntimeManagerError> {
+    let mut dh_msg1: SgxDhMsg1 = SgxDhMsg1::default();
+
+    let mut responder = SgxDhResponder::init_session();
+    responder.gen_msg1(&mut dh_msg1)?;
+
+    let mut dh_msg2: SgxDhMsg2 = SgxDhMsg2::default();
+    let mut ocall_ret = sgx_status_t::SGX_SUCCESS;
+    let mut sgx_root_enclave_session_id: u64 = 0;
+    let ocall_status = unsafe {
+        start_local_attest_ocall(
+            &mut ocall_ret,
+            &dh_msg1,
+            &mut dh_msg2,
+            &mut sgx_root_enclave_session_id,
+        )
+    };
+    if ocall_status != sgx_status_t::SGX_SUCCESS {
+        return Err(RuntimeManagerError::SGXError(ocall_status));
+    }
+    if ocall_ret != sgx_status_t::SGX_SUCCESS {
+        return Err(RuntimeManagerError::SGXError(ocall_ret));
+    }
+
+    let mut dh_msg3 = SgxDhMsg3::default();
+    let mut dh_aek = sgx_key_128bit_t::default(); // session key. Will not use
+    let mut initiator_identity = sgx_dh_session_enclave_identity_t::default();
+    responder.proc_msg2(&dh_msg2, &mut dh_msg3, &mut dh_aek, &mut initiator_identity)?;
+
+    let mut dh_msg3_raw = sgx_dh_msg3_t::default();
+
+    unsafe {
+        dh_msg3.to_raw_dh_msg3_t(
+            &mut dh_msg3_raw,
+            (dh_msg3_raw.msg3_body.additional_prop_length as usize
+                + mem::size_of::<sgx_dh_msg3_t>()) as u32,
+        )
+    };
+
+    let enclave_cert = managers::session_manager::get_enclave_cert()?;
+
+    let enclave_cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
+
+    let mut ocall_ret = sgx_status_t::SGX_SUCCESS;
+
+    let enclave_name: std::string::String = managers::session_manager::get_enclave_name()?;
+
+    let mut cert: std::vec::Vec<u8> = std::vec::Vec::with_capacity(2048);
+    let mut cert_size: usize = 0;
+    let ocall_status = unsafe {
+        finish_local_attest_ca_ocall(
+            &mut ocall_ret,
+            &dh_msg3_raw,
+            csr.as_ptr() as *const u8,
+            csr.len(),
+            sgx_root_enclave_session_id,
+            cert.as_mut_ptr() as *mut u8,
+            cert.capacity(),
+            &mut cert_size,
+        )
+    };
+    if ocall_status != sgx_status_t::SGX_SUCCESS {
+        return Err(RuntimeManagerError::SGXError(ocall_status));
+    }
+    if ocall_ret != sgx_status_t::SGX_SUCCESS {
+        return Err(RuntimeManagerError::SGXError(ocall_ret));
+    }
+
+    unsafe { cert.set_len(cert_size) };
+
+    return Ok(cert);
 }
 
 #[no_mangle]

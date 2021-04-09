@@ -299,7 +299,8 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerE
         lines.collect()
     };
     println!(
-        "veracruz_server::send_proxy_attestation_server_start received header:{:?}",
+        "veracruz_server::post_buffer received header (from url:{:?}):{:?}",
+        url,
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {

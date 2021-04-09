@@ -25,7 +25,7 @@ use crate::{
 use veracruz_utils::policy::policy::Policy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
-use rustls::{AllowAnyAuthenticatedClient, Certificate, CipherSuite, RootCertStore, ServerConfig};
+use rustls::{AllowAnyAuthenticatedClient, Certificate, CipherSuite, PrivateKey, RootCertStore, ServerConfig};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -311,6 +311,10 @@ pub struct SessionContext {
     /// The set of principals, as specified in the Veracruz global policy, with
     /// their identifying certificates and roles.
     principals: Vec<Principal>,
+    /// The private key used by the server
+    server_private_key: PrivateKey,
+    /// The public key used by the server (as a Vec<u8> for convenience)
+    server_public_key: Vec<u8>,
 }
 
 impl SessionContext {
@@ -364,7 +368,7 @@ impl SessionContext {
         let server_certificate_buffer = generate_certificate(
             name.as_bytes().to_vec(),
             server_private_key.clone(),
-            server_public_key,
+            server_public_key.clone(),
             &policy,
         )?;
 
@@ -403,9 +407,11 @@ impl SessionContext {
             server_certificate_buffer,
             server_certificate,
             server_config,
-            policy,
+            //policy,
             name,
             principals,
+            server_public_key,
+            server_private_key,
         })
     }
 
@@ -438,6 +444,21 @@ impl SessionContext {
     #[inline]
     pub fn principals(&self) -> &Vec<Principal> {
         &self.principals
+    }
+
+    /// Returns the public key (as a Vec<u8>) of the server
+    #[inline]
+    pub fn public_key(&self) -> Vec<u8> {
+        return self.server_public_key.clone();
+    }
+
+    /// Returns the private key of the server
+    /// TODO: Should we do any operations with this key inside this struct instead?
+    /// Returning the private key seems a little irresponsible (not that the
+    /// software requesting it couldn't just inspect the memory, but still...)
+    #[inline]
+    pub fn private_key(&self) -> PrivateKey {
+        return self.server_private_key.clone();
     }
 
     /// Creates a new session, using server configuration and information about

@@ -409,6 +409,7 @@ pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
             })?
         };
 
+        // TODO: This function call needs to be reworked
         let msg3_epid_pseudonym = authenticate_msg3(
             &attestation_context
                 .msg1
@@ -455,6 +456,8 @@ pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
             &collateral_quote,
             &collateral_sig,
         )?;
+
+        //TODO: Check collateral_hash against a hash of the collateral
 
         if pubkey_epid_pseudonym != msg3_epid_pseudonym {
             // We cannot verify that msg3 and pubkey_quote came from the same SGX system
@@ -516,6 +519,17 @@ pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
 }
 
 fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
+    // first, verify the signature on the CSR
+    let public_key = csr.public_key().unwrap();
+    let public_key_vec = public_key.public_key_to_der().unwrap();
+    let verify_result = csr.verify(&public_key).unwrap();
+    
+    if verify_result {
+        println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR passed");
+    } else {
+        // TODO: Make sure we fail on this
+        println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR failed");
+    }
     let mut cert_builder = openssl::x509::X509Builder::new().unwrap();
     cert_builder.set_version(csr.version()).unwrap();
     let now = {
@@ -542,7 +556,7 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
         issuer_name_builder.append_entry_by_text("CN", "Veracruz Proxy Attestation Server").unwrap();
         issuer_name_builder.build()
     };
-    cert_builder.set_issuer_name(&issuer_name);
+    cert_builder.set_issuer_name(&issuer_name).unwrap();
 
     cert_builder.set_subject_name(csr.subject_name()).unwrap();
     cert_builder.set_pubkey(&csr.public_key().unwrap()).unwrap();
@@ -554,7 +568,7 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
         buffer
     };
     let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem).unwrap();
-    cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256());
+    cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256()).unwrap();
     Ok(cert_builder.build())
 }
 
@@ -783,6 +797,7 @@ fn authenticate_msg3(
 
     let expected_hash = sha_handle.get_hash()?;
     if expected_hash != msg3_quote.report_body.report_data.d[0..32] {
+        println!("proxy_attestation_server::attestation::sgx::authenticate_msg3 msg3_quote hash don't match");
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "msg3_quote.report_body.report_data.d[0..32]",
             expected: expected_hash.to_vec(),
@@ -791,6 +806,7 @@ fn authenticate_msg3(
     }
 
     if msg3_quote.report_body.mr_enclave.m != expected_enclave_hash[0..32] {
+        println!("proxy_attestation_server::attestation::sgx::authenticate_msg3 mr_enclave.m hash don't match");
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "function authenticate_msg3 msg3_quote.report_body.mr_enclave.m",
             expected: expected_enclave_hash[0..32].to_vec(),

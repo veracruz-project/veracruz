@@ -34,6 +34,8 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=sgx_urts");
     println!("cargo:rustc-link-lib=dylib=sgx_uae_service");
     println!("cargo:rustc-link-lib=dylib=sgx_ukey_exchange");
+    println!("cargo:rerun-if-changed=../sgx-root-enclave/sgx_root_enclave.edl");
+    println!("cargo:rerun-if-changed=../sgx-root-enclave/src/lib.rs");
 
     let make_result = Command::new("make")
         .current_dir("../sgx-root-enclave")

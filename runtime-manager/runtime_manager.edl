@@ -85,6 +85,13 @@ enclave {
                                            size_t pubkey_buf_size,
                                            [out] size_t *p_pubkey_size,
                                            [out] int32_t *p_device_id);
+        uint32_t finish_local_attest_ca_ocall([in, readonly] const sgx_dh_msg3_t *dh_msg3,
+                                           [in, size=csr_size, readonly] const uint8_t *p_csr,
+                                           size_t csr_size,
+                                           uint64_t sgx_root_enclave_session_id,
+                                           [out, size=cert_buf_size] uint8_t *p_cert,
+                                           size_t cert_buf_size,
+                                           [out] size_t *p_cert_size);
         uint32_t debug_and_error_output_ocall([in, string, readonly] const char *message,
                                               uint32_t error_code);
     };

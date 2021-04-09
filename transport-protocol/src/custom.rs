@@ -254,6 +254,14 @@ pub fn parse_request_proxy_psa_attestation_token(
     proto.get_challenge().to_vec()
 }
 
+pub fn serialize_sgx_collateral(collateral: &transport_protocol::SgxCollateral) -> TransportProtocolResult {
+    return Ok(collateral.write_to_bytes()?);
+}
+
+pub fn parse_cert_chain(chain: &transport_protocol::CertChain) -> (std::vec::Vec<u8>, std::vec::Vec<u8>) {
+    return (chain.get_root_cert().to_vec(), chain.get_enclave_cert().to_vec())
+}
+
 pub fn serialize_proxy_psa_attestation_token(
     token: &[u8],
     pubkey: &[u8],
@@ -267,6 +275,14 @@ pub fn serialize_proxy_psa_attestation_token(
     proxy_attestation_server_request.set_proxy_psa_attestation_token(pat_proto);
 
     Ok(proxy_attestation_server_request.write_to_bytes()?)
+}
+
+pub fn serialize_certificate(cert: &[u8]) -> TransportProtocolResult {
+    let mut proto_cert = transport_protocol::Cert::new();
+    proto_cert.set_data(cert.to_vec());
+    let mut rmr = transport_protocol::RuntimeManagerResponse::new();
+    rmr.set_cert(proto_cert);
+    return Ok(rmr.write_to_bytes()?);
 }
 
 pub fn parse_proxy_psa_attestation_token(
