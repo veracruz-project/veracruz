@@ -42,6 +42,10 @@ const CSR_TEMPLATE: [u8; 302] = [
 const PUBLIC_KEY_LOCATION: (usize, usize) = (149, 214);
 const SIGNATURE_LOCATION: (usize, usize) = (231, 302);
 const SIGNATURE_RANGE: (usize, usize) = (4, 216);
+const OVERALL_LENGTH_FIELD: (usize, usize) = (2, 4);
+const OVERALL_LENGTH_INITIAL: u16 = 227;
+const SIGNATURE_LENGTH_FIELD: (usize, usize) = (229, 230);
+const SIGNATURE_LENGTH_INITIAL: u8 = 1;
 
 pub fn generate_csr(private_key: &EcdsaKeyPair) -> Result<Vec<u8>, String> {
     let public_key = private_key.public_key().as_ref().clone();
@@ -61,21 +65,21 @@ pub fn generate_csr(private_key: &EcdsaKeyPair) -> Result<Vec<u8>, String> {
 
     println!("veracruz_utils::csr::generate_csr signature:{:02x?}", signature);
 
-    if signature.len() != (SIGNATURE_LOCATION.1 - SIGNATURE_LOCATION.0) {
-        return Err(format!("veracruz_utils::csr::generate_csr Invalid length: signature, wanted:{:?}, got{:?}", SIGNATURE_LOCATION.1 - SIGNATURE_LOCATION.0, signature.len()));
-    }
+    let signature_length = signature.len();
     constructed_csr.splice(
             SIGNATURE_LOCATION.0..SIGNATURE_LOCATION.1,
             signature,
     );
 
-    if constructed_csr.len() != CSR_TEMPLATE.len() {
-        return Err(format!("veracruz_utils::csr::generate_csr Invalid length: constructed_csr: wanted: {:?}, got:{:?}",
-            CSR_TEMPLATE.len(),
-            constructed_csr.len()
-        ));
-    } else {
-        println!("veracruz_utils::generate_csr generated csr:{:02x?}", constructed_csr);
-        Ok(constructed_csr.clone())
-    }
+    let signature_field_length:u8 = (SIGNATURE_LENGTH_INITIAL + signature_length as u8) as u8;
+    println!("Setting signature field length:{:?}", signature_field_length);
+    constructed_csr[SIGNATURE_LENGTH_FIELD.0] = signature_field_length;
+
+    let overall_length:u16 = (OVERALL_LENGTH_INITIAL + signature_length as u16) as u16;
+    println!("Setting overall_length to:{:?}", overall_length);
+    constructed_csr[OVERALL_LENGTH_FIELD.0] = ((overall_length & 0xff00) >> 8) as u8;
+    constructed_csr[OVERALL_LENGTH_FIELD.0 + 1] = (overall_length & 0xff) as u8;
+
+    println!("veracruz_utils::generate_csr generated csr:{:02x?}", constructed_csr);
+    Ok(constructed_csr.clone())
 }

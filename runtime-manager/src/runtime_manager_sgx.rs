@@ -91,7 +91,7 @@ pub extern "C" fn init_session_manager_enc(
 
     debug_message(format!("init_session_manager_enc getting csr"));
     // TODO: Make this conditional on a field in the policy
-    let csr_result = managers::session_manager::get_csr();
+    let csr_result = managers::session_manager::generate_csr();
     let csr = match csr_result {
         Ok(val) => val,
         Err(err) => {

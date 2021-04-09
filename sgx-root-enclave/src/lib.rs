@@ -29,6 +29,8 @@ use std::{collections::HashMap, mem, string::ToString, sync::atomic::{AtomicU64,
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use ring::signature::KeyPair;
 
+use veracruz_utils::csr;
+
 lazy_static! {
     static ref SESSION_ID: AtomicU64 = AtomicU64::new(1);
     static ref DEVICE_ID: std::sync::SgxMutex<Option<i32>> = std::sync::SgxMutex::new(None);
@@ -38,8 +40,6 @@ lazy_static! {
     static ref PRIVATE_KEY: std::sync::SgxMutex<Option<std::vec::Vec<u8>>> = std::sync::SgxMutex::new(None);
     static ref CERT_CHAIN: std::sync::SgxMutex<Option<(std::vec::Vec<u8>, std::vec::Vec<u8>)>> = std::sync::SgxMutex::new(None);
 }
-
-pub mod csr;
 
 #[no_mangle]
 pub extern "C" fn get_firmware_version_len(p_fwv_len: &mut usize) -> sgx_status_t {
@@ -244,6 +244,7 @@ pub extern "C" fn sgx_get_collateral_report(
     let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, private_key_ring.public_key().as_ref());
 
     // generate the certificate signing request
+    println!("sgx-root-enclave::sgx_get_collateral_report calling generate_csr");
     let csr = csr::generate_csr(&private_key_ring).unwrap();
 
     proto_collateral.set_pubkey_hash(pubkey_hash.as_ref().to_vec());
@@ -418,8 +419,9 @@ pub extern "C" fn finish_local_attest_enc(
     SgxRootEnclave::Success
 }
 
-const CSR_BODY_LENGTH: usize = 231;
-const CSR_PUBKEY_LOCATION: (usize, usize) = (138, 229);
+const CSR_BODY_LOCATION: (usize, usize) = (4, 216);
+const CSR_PUBKEY_LOCATION: (usize, usize) = (123, 215);
+
 #[no_mangle]
 pub extern "C" fn finish_local_attest_ca_enc(
     dh_msg3_raw: &mut sgx_dh_msg3_t,
@@ -460,7 +462,7 @@ pub extern "C" fn finish_local_attest_ca_enc(
     let pubkey_bytes = &csr_slice[CSR_PUBKEY_LOCATION.0..CSR_PUBKEY_LOCATION.1];
     let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_ASN1, pubkey_bytes);
 
-    let verify_result = public_key.verify(&csr_slice[0..CSR_BODY_LENGTH], &csr_slice[CSR_BODY_LENGTH..]);
+    let verify_result = public_key.verify(&csr_slice[CSR_BODY_LOCATION.0..CSR_BODY_LOCATION.1], &csr_slice[228..]);
     if verify_result.is_err() {
         println!("verify_result is fail:{:?}", verify_result);
     } else {
