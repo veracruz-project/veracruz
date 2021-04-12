@@ -245,10 +245,10 @@ pub extern "C" fn sgx_get_collateral_report(
 
     // generate the certificate signing request
     println!("sgx-root-enclave::sgx_get_collateral_report calling generate_csr");
-    let csr = csr::generate_csr(&private_key_ring).unwrap();
+    let csr_vec = csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &private_key_ring).unwrap();
 
     proto_collateral.set_pubkey_hash(pubkey_hash.as_ref().to_vec());
-    proto_collateral.set_csr(csr.clone());
+    proto_collateral.set_csr(csr_vec.clone());
     let collateral = transport_protocol::serialize_sgx_collateral(&proto_collateral).unwrap();
     // // place the hash of the collateral in the report
     let collateral_hash = ring::digest::digest(&ring::digest::SHA256, collateral.as_ref());
@@ -269,12 +269,12 @@ pub extern "C" fn sgx_get_collateral_report(
         unsafe { *p_pubkey_hash_size = pubkey_hash.as_ref().len() };
     }
     // place the csr where it needs to be
-    if csr.len() > csr_buf_size {
+    if csr_vec.len() > csr_buf_size {
         assert!(false);
     } else {
-        let csr_buf_slice = unsafe { std::slice::from_raw_parts_mut(csr_buffer, csr.len()) };
-        csr_buf_slice.clone_from_slice(&csr);
-        unsafe { *p_csr_size = csr.len() };
+        let csr_buf_slice = unsafe { std::slice::from_raw_parts_mut(csr_buffer, csr_vec.len()) };
+        csr_buf_slice.clone_from_slice(&csr_vec);
+        unsafe { *p_csr_size = csr_vec.len() };
     }
 
     sgx_status_t::SGX_SUCCESS
@@ -330,6 +330,7 @@ pub enum SgxRootEnclave {
     Msg3RawError = 0x01,
     ProcMsg3Error = 0x02,
     CsrVerifyFail = 0x03,
+    CsrToCertFail = 0x04,
 }
 
 #[no_mangle]
@@ -440,6 +441,11 @@ fn verify_csr(csr: &[u8]) -> Result<bool, std::string::String> {
         return Ok(true);
     }
 }
+
+fn convert_csr_to_cert(csr: &[u8]) -> Result<std::vec::Vec<u8>, std::string::String> {
+    return Err(format!("Unimplemented"));
+}
+
 #[no_mangle]
 pub extern "C" fn finish_local_attest_ca_enc(
     dh_msg3_raw: &mut sgx_dh_msg3_t,
@@ -490,7 +496,13 @@ pub extern "C" fn finish_local_attest_ca_enc(
     }
 
     //generate cert from csr, signed by PRIVATE_KEY
-    //how we gonna do this?
+    let cert = match convert_csr_to_cert(&csr_slice) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            println!("Failed to convert csr to cert:{:?}", err);
+            return SgxRootEnclave::CsrToCertFail;
+        },
+    };
     return SgxRootEnclave::Success;
 }
 
