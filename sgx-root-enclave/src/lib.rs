@@ -329,6 +329,7 @@ pub enum SgxRootEnclave {
     Success = 0x00,
     Msg3RawError = 0x01,
     ProcMsg3Error = 0x02,
+    CsrVerifyFail = 0x03,
 }
 
 #[no_mangle]
@@ -420,8 +421,25 @@ pub extern "C" fn finish_local_attest_enc(
 }
 
 const CSR_BODY_LOCATION: (usize, usize) = (4, 216);
-const CSR_PUBKEY_LOCATION: (usize, usize) = (123, 215);
+const CSR_PUBKEY_LOCATION: (usize, usize) = (123 + 26, 214);
 
+fn verify_csr(csr: &[u8]) -> Result<bool, std::string::String> {
+    let pubkey_bytes = &csr[CSR_PUBKEY_LOCATION.0..CSR_PUBKEY_LOCATION.1];
+    let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_ASN1, pubkey_bytes);
+    println!("sgx_root_enclave::verify_csr public_key:{:02x?}", pubkey_bytes);
+    let csr_body = &csr[CSR_BODY_LOCATION.0..CSR_BODY_LOCATION.1];
+    println!("sgx-root-enclave::verify_csr calculating signature over body:{:02x?}", csr_body);
+    let csr_signature = &csr[231..];
+    println!("sgx-root-enclave::verify_csr signature:{:02x?}", csr_signature);
+    let verify_result = public_key.verify(&csr_body, &csr_signature);
+    if verify_result.is_err() {
+        println!("verify_result is fail:{:?}", verify_result);
+        return Err(format!("verify_csr failed:{:?}", verify_result));
+    } else {
+        println!("Verify_result is success:{:?}", verify_result);
+        return Ok(true);
+    }
+}
 #[no_mangle]
 pub extern "C" fn finish_local_attest_ca_enc(
     dh_msg3_raw: &mut sgx_dh_msg3_t,
@@ -457,16 +475,18 @@ pub extern "C" fn finish_local_attest_ca_enc(
     // now that the msg3 is authenticated, we can generate the cert from the csr
     let csr_slice = unsafe { std::slice::from_raw_parts(csr, csr_size) };
 
-    // Authenticate the signature on the csr
-    // first, get the public key
-    let pubkey_bytes = &csr_slice[CSR_PUBKEY_LOCATION.0..CSR_PUBKEY_LOCATION.1];
-    let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_ASN1, pubkey_bytes);
-
-    let verify_result = public_key.verify(&csr_slice[CSR_BODY_LOCATION.0..CSR_BODY_LOCATION.1], &csr_slice[228..]);
-    if verify_result.is_err() {
-        println!("verify_result is fail:{:?}", verify_result);
-    } else {
-        println!("Verify_resultis success:{:?}", verify_result);
+    match verify_csr(&csr_slice) {
+        Ok(status) => match status {
+            true => println!("CSR verified successfully"),
+            false => {
+                println!("CSR Did not verify successfully");
+                return SgxRootEnclave::CsrVerifyFail;
+            },
+        },
+        Err(err) => {
+            println!("CSR did not verify. Returning error");
+            return SgxRootEnclave::CsrVerifyFail;
+        },
     }
 
     //generate cert from csr, signed by PRIVATE_KEY
