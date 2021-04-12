@@ -171,7 +171,7 @@ pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
     let private_key = ring::signature::EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec)
         .map_err(|err| RuntimeManagerError::RingKeyRejected(err))?;
     println!("runtime-manager::session_manager::generate_csr calling veracruz_utils::csr::generate_csr");
-    let csr = csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &private_key).unwrap();
+    let csr = csr::generate_csr(&csr::COMPUTE_ENCLAVE_CSR_TEMPLATE, &private_key).unwrap();
     return Ok(csr);
 }
 
