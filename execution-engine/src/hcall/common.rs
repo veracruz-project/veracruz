@@ -193,6 +193,7 @@ pub(crate) fn pack_dirent(dirent: &DirEnt) -> Vec<u8> {
 /// `offset`.  Returns `None` iff the structure cannot be unpacked, for example
 /// if `offset` lies too close to the end of `bytes`.
 fn unpack_iovec(bytes: &[u8]) -> Option<IoVec> {
+    println!("unpack_iovec : {:?}",bytes);
     if bytes.len() != 8 {
         return None;
     }
@@ -202,12 +203,14 @@ fn unpack_iovec(bytes: &[u8]) -> Option<IoVec> {
     buf_bytes.copy_from_slice(&bytes[0..4]);
     len_bytes.copy_from_slice(&bytes[4..8]);
     let buf = u32::from_le_bytes(buf_bytes);
-    let len = u32::from_le_bytes(len_bytes);
+    let len = u32::from_le_bytes(len_bytes);    
 
-    Some(IoVec{
+    let rst = IoVec{
         buf,
         len,
-    })
+    };
+    println!("unpack_iovec rst {:?}",rst);
+    Some(rst)
 }
 
 /// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
@@ -219,6 +222,8 @@ pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
     for iovec_byte in bytes.chunks(8) {
         iovecs.push(unpack_iovec(iovec_byte).unwrap());
     }
+
+    println!("unpack_iovec_array rst {:?}",iovecs);
 
     Some(iovecs)
 
@@ -435,6 +440,7 @@ impl VFSService {
 
     /// Implementation of the WASI `environ_sizes_get` function.
     pub(crate) fn environ_sizes_get(&self) -> (Size, Size) {
+        println!("environ_sizes_get is called");
         let environc = self.environment_variables.len();
         let mut environ_buf_size = 0usize;
 
@@ -448,6 +454,8 @@ impl VFSService {
 
     /// Implementation of the WASI `environ_get` function.
     pub(crate) fn environ_get(&self) -> Vec<Vec<u8>> {
+        println!("environ_get is called");
+        let environc = self.environment_variables.len();
         let mut buffer = Vec::new();
 
         for (key, value) in self.environment_variables.iter() {
