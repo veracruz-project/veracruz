@@ -15,6 +15,7 @@ log = "0.4.8"
 serde = { version = "1.0.103", features = ["derive"] }
 toml = "0.5.5"
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch="veracruz", features = ["non_sgx"] }
+wast = "=35.0.0"
 
 [[bin]]
 name = "freestanding-execution-engine"
