@@ -47,7 +47,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
+        fn tls_data_needed<A>(&self, session_id: u32) -> Result<bool, VeracruzServerError<A>> {
             let mut needed: u8 = 4;
             let mut result: u32 = 0;
             let ret = unsafe {
@@ -67,7 +67,7 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    fn start_enclave(library_fn: &str) -> Result<SgxEnclave, VeracruzServerError> {
+    fn start_enclave<A>(library_fn: &str) -> Result<SgxEnclave, VeracruzServerError<A>> {
         let mut launch_token: sgx_launch_token_t = [0; 1024];
         let mut launch_token_updated: i32 = 0;
 
@@ -87,7 +87,7 @@ pub mod veracruz_server_sgx {
         Ok(enclave)
     }
 
-    fn fetch_firmware_version(enclave: &SgxEnclave) -> Result<String, VeracruzServerError> {
+    fn fetch_firmware_version<A>(enclave: &SgxEnclave) -> Result<String, VeracruzServerError<A>> {
         let mut gfvl_result: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_ret = unsafe {
@@ -117,12 +117,12 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn send_start(
+        fn send_start<A>(
             &mut self,
             url_base: &str,
             protocol: &str,
             firmware_version: &str,
-        ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
+        ) -> Result<(Vec<u8>, i32), VeracruzServerError<A>> {
             let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_sgx_attestation_init() {
                 let attestation_init = proxy_attestation_server_response.get_sgx_attestation_init();
@@ -135,13 +135,13 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn send_sgx_msg1(
+        fn send_sgx_msg1<A>(
             &mut self,
             url_base: &str,
             attestation_context: &sgx_ra_context_t,
             msg1: &sgx_ra_msg1_t,
             device_id: i32,
-        ) -> Result<(Vec<u8>, sgx_ra_msg2_t), VeracruzServerError> {
+        ) -> Result<(Vec<u8>, sgx_ra_msg2_t), VeracruzServerError<A>> {
             let serialized_msg1 = transport_protocol::serialize_msg1(*attestation_context, msg1, device_id)?;
             let encoded_msg1 = base64::encode(&serialized_msg1);
 
@@ -160,12 +160,12 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    fn attestation_challenge(
+    fn attestation_challenge<A>(
         enclave: &SgxEnclave,
         pubkey_challenge: &Vec<u8>,
         context: &sgx_ra_context_t,
         msg2: &sgx_ra_msg2_t,
-    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>), VeracruzServerError> {
+    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>), VeracruzServerError<A>> {
         let mut p_msg3 = std::ptr::null_mut();
         let mut msg3_size = 0;
         let msg2_size: u32 = std::mem::size_of::<sgx_ra_msg2_t>() as u32;
@@ -341,7 +341,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn send_msg3(
+        fn send_msg3<A>(
             &self,
             url_base: &str,
             attestation_context: &sgx_ra_context_t,
@@ -351,7 +351,7 @@ pub mod veracruz_server_sgx {
             pubkey_quote: &sgx_quote_t,
             pubkey_quote_sig: &Vec<u8>,
             device_id: i32,
-        ) -> Result<(), VeracruzServerError> {
+        ) -> Result<(), VeracruzServerError<A>> {
             let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens(
                 *attestation_context,
                 msg3,
@@ -378,11 +378,11 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn native_attestation(
+        fn native_attestation<A>(
             &mut self,
             sgx_root_enclave: &SgxEnclave,
             proxy_attestation_server_url: &String,
-        ) -> Result<(), VeracruzServerError> {
+        ) -> Result<(), VeracruzServerError<A>> {
             let firmware_version = fetch_firmware_version(sgx_root_enclave)?;
             let (public_key, device_id) = self.send_start(proxy_attestation_server_url, "sgx", &firmware_version)?;
 
@@ -463,8 +463,8 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    impl VeracruzServer for VeracruzServerSGX {
-        fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
+    impl<A> VeracruzServer<A> for VeracruzServerSGX {
+        fn new(policy_json: &str) -> Result<Self, VeracruzServerError<A>> {
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 
             let mut new_veracruz_server = VeracruzServerSGX {
@@ -506,7 +506,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError<A>> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             if parsed.has_request_proxy_psa_attestation_token() {
@@ -528,7 +528,7 @@ pub mod veracruz_server_sgx {
         fn proxy_psa_attestation_get_token(
             &self,
             challenge: Vec<u8>,
-        ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
+        ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError<A>> {
             let mut pagt_result: u32 = 0;
             let mut token = Vec::with_capacity(2 * 8192); // TODO: Don't do this
             let mut token_size: u64 = 0;
@@ -562,7 +562,7 @@ pub mod veracruz_server_sgx {
         }
 
         // TODO: This function will go away when we use attestation
-        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError> {
+        fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError<A>> {
             let mut len_result: u32 = 0;
             let mut cert_len: u64 = 0;
             let len_ret = unsafe {
@@ -602,7 +602,7 @@ pub mod veracruz_server_sgx {
         }
 
         // TODO: This function will go away when we use attestation
-        fn get_enclave_name(&self) -> Result<String, VeracruzServerError> {
+        fn get_enclave_name(&self) -> Result<String, VeracruzServerError<A>> {
             let mut len_result: u32 = 0;
             let mut name_len: u64 = 0;
             let len_ret = unsafe {
@@ -640,7 +640,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&self) -> Result<u32, VeracruzServerError<A>> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
@@ -655,7 +655,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError> {
+        fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError<A>> {
             let mut result: u32 = 0;
             let ret = unsafe {
                 runtime_manager_close_session_enc(self.runtime_manager_enclave.geteid(), &mut result, session_id)
@@ -673,7 +673,7 @@ pub mod veracruz_server_sgx {
             &self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
+        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError<A>> {
             let mut ret_code: u32 = 0;
             let ret_val = unsafe {
                 runtime_manager_tls_send_data_enc(
@@ -728,7 +728,7 @@ pub mod veracruz_server_sgx {
             ))
         }
 
-        fn close(&mut self) -> Result<bool, VeracruzServerError> {
+        fn close(&mut self) -> Result<bool, VeracruzServerError<A>> {
             //self.runtime_manager_enclave.destroy();
             Ok(true)
         }

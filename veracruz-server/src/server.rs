@@ -26,11 +26,11 @@ use std::{
     thread,
 };
 
-type EnclaveHandler = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>>>>;
+type EnclaveHandler<A> = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer<A> + Sync + Send>>>>;
 
 #[post("/veracruz_server")]
-async fn veracruz_server_request(
-    enclave_handler: web::Data<EnclaveHandler>,
+async fn veracruz_server_request<A>(
+    enclave_handler: web::Data<EnclaveHandler<A>>,
     _request: HttpRequest,
     input_data: String,
 ) -> VeracruzServerResponder {
@@ -48,8 +48,8 @@ async fn veracruz_server_request(
 }
 
 #[post("/runtime_manager")]
-async fn runtime_manager_request(
-    enclave_handler: web::Data<EnclaveHandler>,
+async fn runtime_manager_request<A>(
+    enclave_handler: web::Data<EnclaveHandler<A>>,
     stopper: web::Data<mpsc::Sender<()>>,
     _request: HttpRequest,
     input_data: String,
@@ -102,7 +102,7 @@ async fn runtime_manager_request(
 }
 
 /// Return an actix server. The caller should call .await for starting the service.
-pub fn server(policy_filename: &str) -> Result<Server, VeracruzServerError> {
+pub fn server<A>(policy_filename: &str) -> Result<Server, VeracruzServerError<A>> {
     let policy_json = std::fs::read_to_string(policy_filename)?;
     let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]

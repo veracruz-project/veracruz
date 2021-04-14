@@ -20,10 +20,10 @@ use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
 
-pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
+pub type VeracruzServerResponder<A> = Result<String, VeracruzServerError<A>>;
 
 #[derive(Debug, Error)]
-pub enum VeracruzServerError {
+pub enum VeracruzServerError<A> {
     #[error(display = "VeracruzServer: TLSError: {:?}.", _0)]
     TLSError(#[error(source)] rustls::TLSError),
     #[error(display = "VeracruzServer: HexError: {:?}.", _0)]
@@ -169,16 +169,17 @@ pub enum VeracruzServerError {
     DirectStrError(&'static str),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
+    Extension(A)
 }
 
-impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
+impl<T, A> From<std::sync::PoisonError<T>> for VeracruzServerError<A> {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         VeracruzServerError::LockError(format!("{:?}", error))
     }
 }
 
 #[cfg(feature = "sgx")]
-impl From<sgx_types::sgx_status_t> for VeracruzServerError {
+impl<A> From<sgx_types::sgx_status_t> for VeracruzServerError<A> {
     fn from(error: sgx_types::sgx_status_t) -> Self {
         match error {
             sgx_types::sgx_status_t::SGX_SUCCESS => {
@@ -189,7 +190,7 @@ impl From<sgx_types::sgx_status_t> for VeracruzServerError {
     }
 }
 
-impl error::ResponseError for VeracruzServerError {
+impl<A> error::ResponseError for VeracruzServerError<A> {
     fn error_response(&self) -> HttpResponse {
         ResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
     }
@@ -205,49 +206,49 @@ impl error::ResponseError for VeracruzServerError {
 }
 
 #[cfg(feature = "nitro")]
-impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError {
+impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError<A> {
     fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
         VeracruzServerError::BincodeError(*error)
     }
 }
 
-pub trait VeracruzServer {
-    fn new(policy: &str) -> Result<Self, VeracruzServerError>
+pub trait VeracruzServer<A> {
+    fn new(policy: &str) -> Result<Self, VeracruzServerError<A>>
     where
         Self: Sized;
 
     fn proxy_psa_attestation_get_token(
         &self,
         challenge: Vec<u8>,
-    ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError>;
+    ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError<A>>;
 
-    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
+    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError<A>>;
 
     // Note: this function will go away
-    fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError>;
+    fn get_enclave_cert(&self) -> Result<Vec<u8>, VeracruzServerError<A>>;
 
     // Note: This function will go away
-    fn get_enclave_name(&self) -> Result<String, VeracruzServerError>;
+    fn get_enclave_name(&self) -> Result<String, VeracruzServerError<A>>;
 
-    fn new_tls_session(&self) -> Result<u32, VeracruzServerError>;
+    fn new_tls_session(&self) -> Result<u32, VeracruzServerError<A>>;
 
-    fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError>;
+    fn close_tls_session(&self, session_id: u32) -> Result<(), VeracruzServerError<A>>;
 
     // The first bool indicates if the enclave is active, and the second vec contains the response
     fn tls_data(
         &self,
         session_id: u32,
         input: Vec<u8>,
-    ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError>;
+    ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError<A>>;
 
-    fn close(&mut self) -> Result<bool, VeracruzServerError>;
+    fn close(&mut self) -> Result<bool, VeracruzServerError<A>>;
 }
 
-pub fn send_proxy_attestation_server_start(
+pub fn send_proxy_attestation_server_start<A>(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
-) -> Result<transport_protocol::ProxyAttestationServerResponse, VeracruzServerError> {
+) -> Result<transport_protocol::ProxyAttestationServerResponse, VeracruzServerError<A>> {
     let serialized_start_msg = transport_protocol::serialize_start_msg(protocol, firmware_version)?;
     let encoded_start_msg: String = base64::encode(&serialized_start_msg);
     let url = format!("{:}/Start", url_base);
@@ -259,7 +260,7 @@ pub fn send_proxy_attestation_server_start(
     return Ok(response);
 }
 
-pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerError> {
+pub fn post_buffer<A>(url: &str, buffer: &String) -> Result<String, VeracruzServerError<A>> {
     let mut buffer_reader = stringreader::StringReader::new(buffer);
 
     let mut curl_request = Easy::new();

@@ -19,17 +19,26 @@ use std::io::Read;
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
 #[derive(Debug, Error)]
-pub enum VeracruzServerError {
-// TODO WIP: extend it
+// TODO WIP: extend
+pub enum VeracruzServerSGXError {
+    #[error(display = "VeracruzServerSGX: SGXError: {:?}.", _0)]
+    SGXError(sgx_types::sgx_status_t),
+
 }
 
-impl From<sgx_types::sgx_status_t> for VeracruzServerError {
+impl<T> From<std::sync::PoisonError<T>> for VeracruzServerSGXError {
+    fn from(error: std::sync::PoisonError<T>) -> Self {
+        VeracruzServerSGXError::LockError(format!("{:?}", error))
+    }
+}
+
+impl From<sgx_types::sgx_status_t> for VeracruzServerSGXError {
     fn from(error: sgx_types::sgx_status_t) -> Self {
         match error {
             sgx_types::sgx_status_t::SGX_SUCCESS => {
                 panic!("Expected an error code but received an success status")
             }
-            e => VeracruzServerError::SGXError(e),
+            e => VeracruzServerSGXError::SGXError(e),
         }
     }
 }
