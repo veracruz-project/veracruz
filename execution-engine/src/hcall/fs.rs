@@ -14,8 +14,10 @@
 use std::{collections::HashMap, convert::TryFrom, string::String, vec::Vec};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
-    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType
+    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
+    PreopenType
 };
+use crate::hcall::common::ROOT_DIRECTORY;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -155,15 +157,35 @@ impl FileSystem {
             inode_table: HashMap::new(),
         };
 
+        // Use inode 2 as the root
+        // Install directory??
+        rst.install_dir(ROOT_DIRECTORY,&(2 as u64).into());
+        rst.install_fd(&Fd(3),&(2 as u64).into());
         //TODO remove test stub
-        rst.install_file("test",&(42 as u64).into(), &vec![4]);
-        rst.install_file("stdin",&(43 as u64).into(), &vec![4]);
-        rst.install_file("stdout",&(44 as u64).into(), &vec![4]);
-        rst.install_file("stderr",&(45 as u64).into(), &vec![4]);
-        rst.install_fd(&Fd(2),&(45 as u64).into());
+        rst.install_file("test",&(42 as u64).into(), "test content".as_bytes());
         rst
     }
     
+    fn install_dir(&mut self, path : &str, inode : &Inode) {
+        let file_stat = FileStat{
+            device: (0 as u64).into(),
+            inode : inode.clone(),
+            file_type: FileType::Directory,
+            num_links: 0,
+            file_size : 0 as u64,
+            atime: Timestamp::from_nanos(0),
+            mtime: Timestamp::from_nanos(0),
+            ctime: Timestamp::from_nanos(0),
+        };
+        let node = InodeImpl {
+            file_stat,
+            // TODO introduce dir structure.
+            raw_file_data : Vec::new(),
+        };
+        self.inode_table.insert(inode.clone(),node);
+        self.path_table.insert(path.to_string(),inode.clone());
+    }
+
     fn install_file(&mut self, path : &str, inode : &Inode, raw_file_data : &[u8]) {
         let file_size = raw_file_data.len();
         let file_stat = FileStat{
@@ -380,12 +402,26 @@ impl FileSystem {
 
     pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
         println!("call fd_prestat_get on {:?}",fd);
-        unimplemented!()
+        // Only support ONE preopen on Fd(3)
+        if fd != &(3 as u32).into() {
+            return Err(ErrNo::BadF);
+        }
+
+        let resource_type =  PreopenType::Dir {
+            name_len : ROOT_DIRECTORY.len() as u32
+        };
+
+        Ok(Prestat{
+            resource_type 
+        })
     }
 
     pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
-        println!("call fd_prestat_dir_name on {:?}",fd);
-        unimplemented!()
+        // Only support ONE preopen on Fd(3)
+        if fd != &(3 as u32).into() {
+            return Err(ErrNo::BadF);
+        }
+        Ok(ROOT_DIRECTORY.to_string())
     }
 
     /// This is a rust-style base implementation for fd_pwrite_base.
