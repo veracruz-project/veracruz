@@ -321,9 +321,9 @@ impl From<wasmi::Error> for HostProvisioningError {
 // The host runtime state.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// A wrapper for VFS, which provides common API used by execution engine.
+/// A wrapper on VFS for WASI, which provides common API used by wasm execution engine.
 #[derive(Clone)]
-pub struct VFSService {
+pub struct WASIWrapper {
     // TODO REMOVE REMOVE
     vfs : Arc<Mutex<VFS>>,
     /// The synthetic filesystem associated with this machine.
@@ -337,7 +337,7 @@ pub struct VFSService {
     program_arguments: Vec<String>,
 }
 
-impl VFSService {
+impl WASIWrapper {
     ////////////////////////////////////////////////////////////////////////////
     // Creating and modifying runtime states.
     ////////////////////////////////////////////////////////////////////////////
@@ -484,7 +484,10 @@ impl VFSService {
 
     #[inline]
     pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
-        self.filesystem.fd_close(fd)
+        match self.filesystem.fd_close(fd) {
+            Ok(_) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]

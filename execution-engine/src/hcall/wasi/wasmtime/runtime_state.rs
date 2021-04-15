@@ -29,7 +29,7 @@ use crate::hcall::{
         WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
         WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
         WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
-        VFSService,
+        WASIWrapper,
     }
 };
 use lazy_static::lazy_static;
@@ -53,7 +53,7 @@ use wasi_types::{
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<VFSService> = Mutex::new(VFSService::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
+    static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
     // The initial value has NO use.
     static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
 }
@@ -105,7 +105,7 @@ impl WasmtimeRuntimeState {
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock().unwrap() = VFSService::new(vfs);
+        *VFS_INSTANCE.lock().unwrap() = WASIWrapper::new(vfs);
         Self{}
     }
 
