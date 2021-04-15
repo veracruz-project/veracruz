@@ -162,7 +162,7 @@ impl FileSystem {
         rst.install_dir(ROOT_DIRECTORY,&(2 as u64).into());
         rst.install_fd(&Fd(3),&(2 as u64).into());
         //TODO remove test stub
-        rst.install_file("test",&(42 as u64).into(), "test content".as_bytes());
+        rst.install_file("test.txt",&(42 as u64).into(), "test content".as_bytes());
         rst
     }
     
@@ -226,6 +226,29 @@ impl FileSystem {
         self.file_table.insert(fd.clone(),fd_entry);
     }
 
+    fn next_fd(&self) -> Fd {
+        // TODO: It is an insecure implementation of choosing a new FD.
+        //       The new FD should be choisen randomly.
+        // NOTE: the FD 0,1 and 2 are reserved to in out err.
+        self
+        .file_table
+        .keys()
+        .max()
+        .map(|Fd(fd_num)| Fd(fd_num + 1))
+        .unwrap_or(Fd(4))
+    }
+
+    fn next_inode(&self) -> Inode {
+        // TODO: It is an insecure implementation of choosing a new Inode.
+        //       The new Inode should be choisen randomly.
+        // NOTE: the Inode 2 is reserved to the root.
+        self
+        .inode_table
+        .keys()
+        .max()
+        .map(|Inode(inode_num)| Inode(inode_num + 1))
+        .unwrap_or(Inode(3))
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // XXX: remove and replace with wasi-functionality
@@ -256,12 +279,10 @@ impl FileSystem {
     ///    case there are no changes to the underlying filesystem.
     /// 2. `ErrNo::Success` if `fd` is a current file-descriptor.  In this case,
     ///    the file-descriptor is closed and no longer a valid file-descriptor.
-    pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
+    pub(crate) fn fd_close(&mut self, fd: &Fd) -> FileSystemError<()> {
         println!("call fd_close on {:?}", fd);
-        match self.file_table.remove(fd) {
-            Some(_) => ErrNo::Success,
-            None => ErrNo::BadF,
-        }
+        self.file_table.remove(fd).ok_or(ErrNo::BadF);
+        Ok(())
     }
 
     /// Allows the programmer to declare how they intend to use various parts of
@@ -370,12 +391,14 @@ impl FileSystem {
         buffer_len: usize,
         offset: &FileSize,
     ) -> FileSystemError<Vec<u8>> {
-        println!("call fd_pread_base on {:?}", fd);
+        println!("call fd_pread_base on fd {:?} buffer_len {:?} and offset {:?}", fd, buffer_len, offset);
         let inode = self
             .file_table
             .get(fd)
             .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
+        // NOTE: It should be safe to convert a u64 to usize.
+        let offset = *offset as usize;
 
         self.inode_table
             .get(inode)
@@ -384,16 +407,13 @@ impl FileSystem {
                      raw_file_data: buffer,
                      ..
                  }| {
-                    // TODO: It should be safe to convert a u64 to usize.
-                    let usize_offset = *offset as usize;
-                    let (_, to_read) = buffer.split_at(if usize_offset < buffer.len() {
-                        usize_offset
-                    } else {
-                        buffer.len()
-                    });
-                    let segment = vec![usize_offset, buffer_len, to_read.len()];
+                    let (_, to_read) = buffer.split_at(offset);
+                    println!("call fd_pread_base on content {:?}",String::from_utf8(to_read.to_vec()).unwrap());
+                    let segment = vec![buffer_len, to_read.len()];
                     let read_length = segment.iter().min().unwrap_or(&0);
+                    println!("call fd_pread_base on read_length {:?}",read_length);
                     let (rst, _) = to_read.split_at(*read_length);
+                    println!("call fd_pread_base result {:?}",String::from_utf8(rst.to_vec()).unwrap());
                     rst.to_vec()
                 },
             )
@@ -436,22 +456,25 @@ impl FileSystem {
         mut buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemError<Size> {
-        println!("call fd_pwrite_base on {:?}", fd);
-        //TODO REMOVE
-        if *fd == (2 as u32).into() {
-            return Ok(0);
-        }
+        println!("call fd_pwrite_base on fd {:?}, offset {:?} and buf {:?}", fd, offset, String::from_utf8(buf.clone()).unwrap());
         let inode = self
             .file_table
             .get(fd)
             .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
 
-        if let Some(inode) = self.inode_table.get_mut(inode) {
+        if let Some(inode_impl) = self.inode_table.get_mut(inode) {
+            let remain_length = (inode_impl.file_stat.file_size - offset) as usize;
+            let offset = offset as usize;
+            if remain_length <= buf.len() {
+                println!("call fd_pwrite_base grows length");
+                let mut grow_vec = vec![0; buf.len() - remain_length];
+                inode_impl.raw_file_data.append(&mut grow_vec);
+            }
             let rst = buf.len();
-            inode.raw_file_data.remove(offset as usize);
-            inode.raw_file_data.append(&mut buf);
-            inode.file_stat.file_size += rst as u64;
+            inode_impl.raw_file_data[offset..(offset + rst)].copy_from_slice(&buf);
+            inode_impl.file_stat.file_size = inode_impl.raw_file_data.len() as u64;
+            println!("call fd_pwrite_base result: {:?}",String::from_utf8(inode_impl.raw_file_data.clone()).unwrap());
             return Ok(rst as Size);
         } else {
             return Err(ErrNo::BadF);
@@ -465,6 +488,7 @@ impl FileSystem {
         } else {
             return Err(ErrNo::BadF);
         };
+        println!("call fd_read_base current offset {:?}", offset);
 
         let rst = self.fd_pread_base(fd, len, &offset)?;
         self.fd_seek(fd, rst.len() as i64, Whence::Current)?;
@@ -502,6 +526,7 @@ impl FileSystem {
         offset: FileDelta,
         whence: Whence,
     ) -> FileSystemError<FileSize> {
+        println!("call fd_seek on fd {:?}, offset {:?} and whence {:?}", fd, offset, whence);
         let (inode, cur_file_offset) = match self.file_table.get(fd) {
             // Use temporary variable `o` to reduce the ambiguity with the function parameter `offset`.
             Some(FileTableEntry {
@@ -521,11 +546,14 @@ impl FileSystem {
             Whence::Start => 0,
         };
 
+        println!("call fd_seek on file_size {:?}, base {:?}", file_size, new_base_offset);
+
         // NOTE: Ensure the computation does not overflow.
         let new_offset: FileSize = if offset >= 0 {
             // It is safe to convert a positive i64 to u64.
             let t_offset = new_base_offset + (offset.abs() as u64);
-            if t_offset >= file_size {
+            // Offset is allowed to equal to file size
+            if t_offset > file_size {
                 return Err(ErrNo::Inval);
             }
             t_offset
@@ -536,6 +564,8 @@ impl FileSystem {
             }
             new_base_offset - (offset.abs() as u64)
         };
+
+        println!("call fd_seek on new offset {:?}", new_offset);
 
         // Update the offset
         if let Some(entry) = self.file_table.get_mut(fd) {
@@ -558,10 +588,6 @@ impl FileSystem {
 
     pub(crate) fn fd_write_base(&mut self, fd: &Fd, buf: Vec<u8>) -> FileSystemError<Size> {
         println!("call fd_write_base on {:?}", fd);
-        //TODO REMOVE 
-        if *fd == (2 as u32).into() {
-            return Ok(0);
-        }
         let offset = if let Some(entry) = self.file_table.get(fd) {
             entry.offset
         } else {
@@ -569,15 +595,7 @@ impl FileSystem {
         };
 
         let rst = self.fd_pwrite_base(fd, buf, offset)?;
-
-        let file_entry = self.file_table.get(fd).unwrap();
-        let inode = file_entry.inode;
-        let file = self.inode_table.get(&inode).unwrap();
-        println!("fd_write_base final result entry {:?}", file_entry);
-        println!("fd_write_base final result file {:?}", file);
-        println!("fd_write_base moving forwarding {}", rst);
-
-        //self.fd_seek(fd, rst as i64, Whence::Current)?;
+        self.fd_seek(fd, rst as i64, Whence::Current)?;
         Ok(rst)
     }
 
@@ -604,27 +622,41 @@ impl FileSystem {
     pub(crate) fn path_open(
         &mut self,
         // The parent fd for searching
-        _fd: &Fd,
+        fd: &Fd,
         _dirflags: LookupFlags,
         path: String,
-        _oflags: OpenFlags,
+        oflags: OpenFlags,
         rights_base: Rights,
         rights_inheriting: Rights,
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
-        println!("call path_open on {:?}", path);
-        //TODO recover the actual code
-        //let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
-        let inode = self.path_table.get("test").ok_or(ErrNo::NoEnt)?.clone();
-        // TODO: It is an insecure implementation of choosing a new FD.
-        //       The new FD should be choisen randomly.
-        // NOTE: the FD 0,1 and 2 are reserved to in out err.
-        let next_fd = self
-            .file_table
-            .keys()
-            .max()
-            .map(|Fd(fd_num)| Fd(fd_num + 1))
-            .unwrap_or(Fd(3));
+        // ONLY allow search on the root for now.
+        if *fd != (3 as u32).into() {
+            return Err(ErrNo::NotDir);
+        }
+
+        println!("call path_open on {:?} with flag {}", path, oflags.bits());
+        // TODO IMPL oflags logic
+        let inode = match self.path_table.get(&path){
+            Some(i) => i.clone(),
+            None => {
+                println!("call path_open create");
+                if !oflags.contains(OpenFlags::CREATE) {
+                    return Err(ErrNo::NoEnt);
+                }
+                let new_inode = self.next_inode();
+                self.install_file(&path, &new_inode, &vec![]);
+                new_inode
+            }
+        };
+
+        if oflags.contains(OpenFlags::TRUNC) {
+            self.inode_table.get_mut(&inode).map(|inode_impl|{
+                println!("call path_open trunc");
+                inode_impl.raw_file_data = Vec::new();
+            });
+        }
+        let next_fd = self.next_fd();
         let (file_type, file_size) = self
             .inode_table
             .get(&inode)

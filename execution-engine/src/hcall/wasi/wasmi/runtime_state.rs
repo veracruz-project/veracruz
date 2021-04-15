@@ -28,7 +28,7 @@ use crate::hcall::{
         WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
         WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
         WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
-        VFSService,
+        WASIWrapper,
     }
 };
 use platform_services::{getrandom, result};
@@ -64,7 +64,7 @@ impl HostError for FatalEngineError {}
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
 /// `MemoryRef` type.
 pub(crate) struct WASMIRuntimeState {
-    vfs : VFSService,
+    vfs : WASIWrapper,
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
     program_module: Option<ModuleRef>,
@@ -1232,7 +1232,7 @@ impl WASMIRuntimeState {
         vfs : Arc<Mutex<VFS>>,
     ) -> Self {
         Self {
-            vfs : VFSService::new(vfs),
+            vfs : WASIWrapper::new(vfs),
             program: Principal::NoCap,
             program_module: None,
             memory: None,
@@ -1841,18 +1841,22 @@ impl WASMIRuntimeState {
         let iovec_len: u32 = args.nth(2);
         let address: u32 = args.nth(3);
 
-        println!("{:?} {:?} {:?} {:?}", fd, iovec_base, iovec_len, address);
+        println!("call wasi_fd_read on fd {:?} iovec_base {:?} len {:?} address {:?}", fd, iovec_base, iovec_len, address);
 
-        let buffer = self.read_buffer(iovec_base, iovec_len as usize)?;
+        let buffer = self.read_buffer(iovec_base, iovec_len as usize * 8)?;
         let iovecs = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
+
+        println!("call wasi_fd_read on invecs {:?}", iovecs);
 
         let mut size_read = 0;
 
         for iovec in iovecs.iter() {
             let to_write = self.vfs.fd_read_base(&fd, iovec.len as usize)?;
             self.write_buffer(iovec.buf, &to_write)?;
-            size_read += iovec.len;
+            size_read += to_write.len() as u32;
         }
+
+        println!("call wasi_fd_read returned size {:?}", size_read);
 
         self.write_buffer(address, &u32::to_le_bytes(size_read))?;
 
