@@ -94,7 +94,7 @@ pub(crate) type WASIError = Result<ErrNo, FatalEngineError>;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The name of the WASM program's entry point.
-const ENTRY_POINT_NAME: &str = "main";
+const ENTRY_POINT_NAME: &str = "_start";
 /// The name of the WASM program's linear memory.
 const LINEAR_MEMORY_NAME: &str = "memory";
 /// The name of the containing module for all WASI imports.
@@ -1042,7 +1042,7 @@ fn check_main_signature(signature: &Signature) -> EntrySignature {
     let params = signature.params();
     let return_type = signature.return_type();
 
-    if params == [] && return_type == Some(ValueType::I32) {
+    if params == [] && return_type == None {
         EntrySignature::NoParameters
     } else if params == [ValueType::I32, ValueType::I32] && return_type == Some(ValueType::I32) {
         EntrySignature::ArgvAndArgc
@@ -1752,11 +1752,16 @@ impl WASMIRuntimeState {
             Ok(fd) => fd,
         };
         let address: u32 = args.nth(1);
+        println!("call wasi_fd_prestat_get on fd {:?} and address {:?}", fd, address);
 
-        let result = self.vfs.fd_prestat_get(&fd)?;
-
+        let result = match self.vfs.fd_prestat_get(&fd) {
+            Ok(o) => o,
+            // Pipe back the result to the wasm program. 
+            // The wasm callee will iterate on file descriptor from Fd(3) 
+            // and only stop until hit a BadF. 
+            Err(e) => return Ok(e),
+        };
         self.write_buffer(address, &pack_prestat(&result))?;
-
         Ok(ErrNo::Success)
     }
 
@@ -1775,6 +1780,7 @@ impl WASMIRuntimeState {
         };
         let address: u32 = args.nth(1);
         let size: Size = args.nth(2);
+        println!("call wasi_fd_prestat_dir_name on fd {:?}, address {:?}, size {:?}", fd, address, size);
 
         let result = self.vfs.fd_prestat_dir_name(&fd)?;
 
@@ -2406,10 +2412,11 @@ impl ExecutionEngine for WASMIRuntimeState {
         self.program = Principal::Program(file_name.to_string());
 
         match self.invoke_export(ENTRY_POINT_NAME) {
-            Ok(Some(RuntimeValue::I32(return_code))) => {
-                EngineReturnCode::try_from(return_code)
+            Ok(None) => {
+                // TODO ADD correct return
+                EngineReturnCode::try_from(0)
             }
-            Ok(_) => {
+            Ok(Some(_)) => {
                 Err(FatalEngineError::ReturnedCodeError)
             }
             Err(Error::Trap(trap)) => {

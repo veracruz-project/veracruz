@@ -37,16 +37,22 @@ use crate::hcall::buffer::VFS;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The directory in the synthetic filesystem where all inputs will be stored.
+/// TODO REMOVE ?
 pub(crate) const INPUT_DIRECTORY: &str = "/vcrz/in/";
 /// The directory in the synthetic filesystem where the WASM program will write
 /// its outputs.
+/// TODO REMOVE ?
 pub(crate) const OUTPUT_DIRECTORY: &str = "/vcrz/out";
 /// The directory, under `INPUT_DIRECTORY`, in the synthetic filesystem where
 /// block-oriented inputs will be stored and can be read by the WASM program.
+/// TODO REMOVE ?
 pub(crate) const BLOCK_INPUT_DIRECTORY_NAME: &str = "block";
 /// The directory, under `INPUT_DIRECTORY`, in the synthetic filesystem where
 /// stream-oriented inputs will be stored and can be read by the WASM program.
+/// TODO REMOVE ?
 pub(crate) const STREAM_INPUT_DIRECTORY_NAME: &str = "stream";
+/// The root directory. It will be pre-opened for any wasm program
+pub(crate) const ROOT_DIRECTORY: &str = "/";
 
 /// Name of the WASI `args_get` function.
 pub(crate) const WASI_ARGS_GET_NAME: &str = "args_get";
@@ -156,6 +162,7 @@ unsafe fn pack_sized_as_bytes<T>(element: &T) -> Vec<u8>
 where
     T: Sized,
 {
+    println!("pack_sized_as_bytes: {}",size_of::<T>());
     let slice: &[u8] = from_raw_parts((element as *const T) as *const u8, size_of::<T>());
 
     slice.to_vec()
@@ -189,6 +196,7 @@ pub(crate) fn pack_dirent(dirent: &DirEnt) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(dirent) }
 }
 
+//TODO CHANGE TYPE WITH RESULT
 /// Unpacks an `IoVec` structure from a series of bytes, starting at the offset,
 /// `offset`.  Returns `None` iff the structure cannot be unpacked, for example
 /// if `offset` lies too close to the end of `bytes`.
@@ -213,6 +221,7 @@ fn unpack_iovec(bytes: &[u8]) -> Option<IoVec> {
     Some(rst)
 }
 
+//TODO CHANGE TYPE WITH RESULT
 /// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
 /// any `IoVec` fails, for any reason.
 pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
