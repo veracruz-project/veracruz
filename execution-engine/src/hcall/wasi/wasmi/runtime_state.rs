@@ -1366,8 +1366,7 @@ impl WASMIRuntimeState {
     /// do not mandate valid UTF-8.  How "real" do we really want to be, here?
     fn read_cstring(&self, address: u32, length: usize) -> Result<String, FatalEngineError> {
         println!("read_cstring is called on {} with length {}",address, length);
-        let memory = self.memory().ok_or(FatalEngineError::NoMemoryRegistered)?;
-        let bytes = memory.get(address, length)?;
+        let bytes = self.read_buffer(address, length)?;
 
         // TODO: erase the debug code
         let rst = String::from_utf8(bytes).map_err(|_e| FatalEngineError::MemoryReadFailed {
