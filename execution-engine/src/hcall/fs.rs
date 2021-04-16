@@ -1,6 +1,9 @@
 //! A synthetic filesystem.
 //!
-//! This file defines a simple filesystem with named directories and files.
+//! This virtual file system(VFS) for Veracruz runtime and execution engine.
+//! The VFS adopts most WASI API with *strict typing* and *Rust-style error handling*. 
+//! The Veracruz runtime will use this VFS directly, while any execution engine 
+//! can wrap all methods here to match the WASI API.
 //!
 //! ## Authors
 //!
@@ -17,7 +20,6 @@ use wasi_types::{
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
     PreopenType
 };
-use crate::hcall::common::ROOT_DIRECTORY;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -143,6 +145,10 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////////
     // Creating filesystems.
     ////////////////////////////////////////////////////////////////////////////
+    /// The root directory name, inode, and fd. It will be pre-opened for any wasm program.
+    pub(crate) const ROOT_DIRECTORY: &'static str = "/";
+    pub(crate) const ROOT_DIRECTORY_INODE: Inode = Inode(2);
+    pub(crate) const ROOT_DIRECTORY_FD: Fd = Fd(3);
 
     /// Creates a new, empty filesystem.
     ///
@@ -159,8 +165,8 @@ impl FileSystem {
 
         // Use inode 2 as the root
         // Install directory??
-        rst.install_dir(ROOT_DIRECTORY,&(2 as u64).into());
-        rst.install_fd(&Fd(3),&(2 as u64).into());
+        rst.install_dir(Self::ROOT_DIRECTORY,&Self::ROOT_DIRECTORY_INODE);
+        rst.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
         //TODO remove test stub
         rst.install_file("test.txt",&(42 as u64).into(), "test content".as_bytes());
         rst
@@ -251,24 +257,6 @@ impl FileSystem {
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // XXX: remove and replace with wasi-functionality
-    ////////////////////////////////////////////////////////////////////////////
-
-    pub(crate) fn file_exists<U>(&self, _fname: &U) -> bool
-    where
-        U: Into<String>,
-    {
-        unimplemented!()
-    }
-
-    pub(crate) fn write_file<U>(&mut self, _fname: &U, _data: Vec<u8>)
-    where
-        U: Into<String>,
-    {
-        unimplemented!()
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
     // Operations on the filesystem.
     ////////////////////////////////////////////////////////////////////////////
 
@@ -295,13 +283,13 @@ impl FileSystem {
         offset: FileSize,
         len: FileSize,
         adv: Advice,
-    ) -> ErrNo {
-        println!("call fd_advise on {:?}", fd);
+    ) -> FileSystemError<()> {
+        println!("call fd_advise on fd {:?}, offset {:?}, len {:?}, advice {:?}", fd, offset, len, adv);
         if let Some(entry) = self.file_table.get_mut(fd) {
             entry.advice.push((offset, len, adv));
-            return ErrNo::Success;
+            return Ok(());
         } else {
-            return ErrNo::BadF;
+            return Err(ErrNo::BadF);
         }
     }
 
@@ -315,15 +303,14 @@ impl FileSystem {
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
-    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        println!("call fd_fdstat_set_flags on {:?}", fd);
+    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> FileSystemError<()> {
+        println!("call fd_fdstat_set_flags on {:?} and flags {:?}", fd, flags);
         self.file_table
             .get_mut(fd)
             .map(|FileTableEntry { mut fd_stat, .. }| {
                 fd_stat.flags = flags;
-                ErrNo::Success
             })
-            .unwrap_or(ErrNo::BadF)
+            .ok_or(ErrNo::BadF)
     }
 
     /// Change the right associated with the file descriptor, `fd`.
@@ -332,16 +319,15 @@ impl FileSystem {
         fd: &Fd,
         rights_base: Rights,
         rights_inheriting: Rights,
-    ) -> ErrNo {
-        println!("call fd_fdstat_set_rights on {:?}", fd);
+    ) -> FileSystemError<()> {
+        println!("call fd_fdstat_set_rights on {:?} and right base {:?} and inheriting {:?}", fd,rights_base, rights_inheriting);
         self.file_table
             .get_mut(fd)
             .map(|FileTableEntry { mut fd_stat, .. }| {
                 fd_stat.rights_base = rights_base;
                 fd_stat.rights_inheriting = rights_inheriting;
-                ErrNo::Success
             })
-            .unwrap_or(ErrNo::BadF)
+            .ok_or(ErrNo::BadF)
     }
 
     /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
@@ -361,19 +347,16 @@ impl FileSystem {
 
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bypes are
     /// filled with ZERO.
-    pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
+    pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> FileSystemError<()> {
         println!("call fd_filestat_set_size on {:?}", fd);
-        let inode = match self.file_table.get(fd) {
-            Some(FileTableEntry { inode, .. }) => inode,
-            None => return ErrNo::BadF,
-        };
+        let inode = self.file_table.get(fd).map(|FileTableEntry { inode, .. }| inode.clone()).ok_or(ErrNo::BadF)?;
 
-        if let Some(inode) = self.inode_table.get_mut(inode) {
+        if let Some(inode) = self.inode_table.get_mut(&inode) {
             inode.file_stat.file_size = size;
             inode.raw_file_data.resize(size as usize, 0);
-            return ErrNo::Success;
+            return Ok(());
         } else {
-            return ErrNo::BadF;
+            return Err(ErrNo::BadF);
         }
     }
 
@@ -428,7 +411,7 @@ impl FileSystem {
         }
 
         let resource_type =  PreopenType::Dir {
-            name_len : ROOT_DIRECTORY.len() as u32
+            name_len : Self::ROOT_DIRECTORY.len() as u32
         };
 
         Ok(Prestat{
@@ -441,7 +424,7 @@ impl FileSystem {
         if fd != &(3 as u32).into() {
             return Err(ErrNo::BadF);
         }
-        Ok(ROOT_DIRECTORY.to_string())
+        Ok(Self::ROOT_DIRECTORY.to_string())
     }
 
     /// This is a rust-style base implementation for fd_pwrite_base.

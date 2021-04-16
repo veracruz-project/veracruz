@@ -13,7 +13,7 @@ use std::{time::Instant, vec::Vec, string::String, collections::HashMap};
 use std::convert::TryFrom;
 use crate::hcall::{
     common::{
-        pack_dirent, pack_fdstat, pack_filestat, pack_prestat, unpack_iovec_array,
+        pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
         WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
         WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
@@ -29,7 +29,7 @@ use crate::hcall::{
         WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
         WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
         WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
-        WASIWrapper,
+        WASIWrapper, MemoryHandler
     }
 };
 use lazy_static::lazy_static;
@@ -62,6 +62,44 @@ lazy_static! {
 const ENTRY_POINT_NAME: &'static str = "_start";
 /// The name of the WASM program's linear memory.
 const LINEAR_MEMORY_NAME: &'static str = "memory";
+
+
+/// Impl the MemoryHandler for Caller.
+/// This allows passing the Caller to WASIWrapper on any VFS call.
+impl<'a> MemoryHandler for Caller<'a> {
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo {
+        let memory = match self
+            .get_export(LINEAR_MEMORY_NAME)
+            .and_then(|export| export.into_memory()) {
+                Some(s) => s,
+                None => return ErrNo::NoMem,
+            };
+        let address = address as usize;
+        unsafe {
+            std::slice::from_raw_parts_mut(memory.data_ptr().add(address), buffer.len())
+                .copy_from_slice(buffer)
+        };
+        ErrNo::Success
+    }
+
+    fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo> {
+        let length = length as usize;
+        let memory = match self
+            .get_export(LINEAR_MEMORY_NAME)
+            .and_then(|export| export.into_memory()) {
+                Some(s) => s,
+                None => return Err(ErrNo::NoMem),
+            };
+        let mut bytes: Vec<u8> = vec![0; length];
+        unsafe {
+            bytes.copy_from_slice(std::slice::from_raw_parts(
+                memory.data_ptr().add(address as usize),
+                length,
+            ))
+        };
+        Ok(bytes)
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Checking function well-formedness.
@@ -206,7 +244,6 @@ impl WasmtimeRuntimeState {
                             Func::wrap(&store, |caller: Caller, fd: u32, address: u32| {
                                 Self::wasi_fd_filestat_get(caller, fd, address) as i32
                             }),
-
                         WASI_FD_READ_NAME => 
                             Func::wrap(&store, |caller: Caller, fd: u32, iovec_base: u32, iovec_len: u32, address: u32| {
                                 Self::wasi_fd_read(caller, fd, iovec_base, iovec_len, address) as i32
@@ -281,6 +318,7 @@ impl WasmtimeRuntimeState {
         }
     }
 
+    //TODO REMOVE but use MemoryHandler
     fn read_buffer(memory: Memory, address: u32, length: usize) -> Vec<u8> {
         let mut bytes: Vec<u8> = vec![0; length];
         unsafe {
@@ -292,6 +330,7 @@ impl WasmtimeRuntimeState {
         bytes
     }
 
+    //TODO REMOVE but use MemoryHandler
     fn write_buffer(memory: Memory, address: u32, buffer: &[u8]) {
         let address = address as usize;
         unsafe {
@@ -331,188 +370,71 @@ impl WasmtimeRuntimeState {
         vfs.fd_close(&fd.into())
     }
 
-    fn wasi_fd_write(caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32) -> ErrNo {
+    fn wasi_fd_write(mut caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32) -> ErrNo {
         println!("call wasi_fd_write: fd {:?} iovec_base {:?} iovec_nunmber {:?} address {:?}", fd,iovec_base,iovec_number,address);
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
 
-        let io_bytes = Self::read_buffer(memory.clone(), iovec_base, (iovec_number as usize) * 8);
-        let iovec_array = match unpack_iovec_array(&io_bytes){
-            Some(o) => o,
-            None => return ErrNo::Inval,
-        };
-        println!("iovec: {:?}",iovec_array);
-        let bufs = Self::read_iovec_scattered(memory.clone(), &iovec_array);
-
-        let mut size_written = 0;
-
-        for buf in bufs.iter() {
-            println!("write {:?} to fd {:?}", String::from_utf8(buf.clone()).unwrap(), fd);
-            size_written += match vfs.fd_write_base(&fd.into(), buf.clone()){
-                Ok(o) => o,
-                Err(e) => return e,
-            };
-        }
-        Self::write_buffer(memory, address, &u32::to_le_bytes(size_written));
-        ErrNo::Success
+        vfs.fd_write(&mut caller, fd, iovec_base, iovec_number, address)
     }
 
-    fn wasi_path_open(caller: Caller, fd: u32, dir_flags: u32, path_address: u32, path_length: u32, oflags : u32, fs_rights_base: u64, fs_rights_inheriting: u64, fd_flags: u32, address: u32) -> ErrNo {
+    fn wasi_path_open(mut caller: Caller, fd: u32, dir_flags: u32, path_address: u32, path_length: u32, oflags : u32, fs_rights_base: u64, fs_rights_inheriting: u64, fd_flags: u32, address: u32) -> ErrNo {
         println!("call wasi_path_open");
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
-        let path = match Self::read_cstring(memory.clone(), path_address, path_length as usize) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
-        let dir_flags = match LookupFlags::from_bits(dir_flags) {
-            Some(o) => o,
-            None => return ErrNo::Inval,
-        };
-        let oflags = match OpenFlags::from_bits(oflags as u16) {
-            Some(o) => o,
-            None => return ErrNo::Inval,
-        };
-        let fs_rights_base = match Rights::from_bits(fs_rights_base) {
-            Some(o) => o,
-            None => return ErrNo::Inval
-        };
-        let fs_rights_inheriting = match Rights::from_bits(fs_rights_inheriting) {
-            Some(o) => o,
-            None => return ErrNo::Inval,
-        };
-        let fd_flags = match FdFlags::from_bits(fd_flags as u16) {
-            Some(o) => o,
-            None => return ErrNo::Inval,
-        };
-        println!("path_open {}",path);
-        let result = match vfs.path_open(
-            &fd.into(),
+        vfs.path_open(
+            &mut caller,
+            fd,
             dir_flags,
-            path,
+            path_address,
+            path_length,
             oflags,
             fs_rights_base,
             fs_rights_inheriting,
             fd_flags,
-        ){
-            Ok(o) => o,
-            Err(e) => return e,
-        };
-        Self::write_buffer(memory.clone(), address, &u32::to_le_bytes(result.into()));
-        ErrNo::Success
+            address,
+        )
     }
 
-    fn wasi_fd_prestat_get(caller: Caller, fd: u32, address: u32) -> ErrNo {
+    fn wasi_fd_prestat_get(mut caller: Caller, fd: u32, address: u32) -> ErrNo {
         println!("call wasi_fd_prestat_get");
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
-
-        let result = match vfs.fd_prestat_get(&fd.into()) {
-            Ok(o) => o,
-            // Pipe back the result to the wasm program. 
-            // The wasm callee will iterate on file descriptor from Fd(3) 
-            // and only stop until hit a BadF. 
-            Err(e) => return e,
-        };
-        Self::write_buffer(memory, address, &pack_prestat(&result));
-        ErrNo::Success
+        vfs.fd_prestat_get(&mut caller, fd, address)
     }
 
-    fn wasi_fd_prestat_dir_name(caller: Caller, fd: u32, address: u32, size: u32) -> ErrNo {
+    fn wasi_fd_prestat_dir_name(mut caller: Caller, fd: u32, address: u32, size: u32) -> ErrNo {
         println!("call wasi_fd_prestat_dir_name");
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
 
-        let result = match vfs.fd_prestat_dir_name(&fd.into()) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
-
-        if result.len() > size as usize {
-            return ErrNo::NameTooLong;
-        }
-
-        Self::write_buffer(memory, address, &result.into_bytes());
-        ErrNo::Success
+        vfs.fd_prestat_dir_name(&mut caller, fd,address,size) 
     }
 
-    fn wasi_environ_get(caller: Caller, mut environ_address: u32, mut environ_buff_address: u32) -> ErrNo {
+    fn wasi_environ_get(mut caller: Caller, environ_address: u32, environ_buf_address: u32) -> ErrNo {
         println!("call wasi_environ_get");
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
-
-        for environ in vfs.environ_get() {
-            let length = environ.len() as u32;
-            Self::write_buffer(memory.clone(), environ_address, &environ);
-            Self::write_buffer(memory.clone(), environ_buff_address, &u32::to_le_bytes(length));
-
-            environ_address += length;
-            environ_buff_address += 4;
-        }
-        ErrNo::Success
+        vfs.environ_get(&mut caller, environ_address, environ_buf_address)
     }
 
-    fn wasi_environ_size_get(caller: Caller, environc_address: u32, environ_buff_size_address: u32) -> ErrNo {
+    fn wasi_environ_size_get(mut caller: Caller, environc_address: u32, environ_buf_size_address: u32) -> ErrNo {
         println!("call wasi_environ_size_get");
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
-        let (environc, environ_buff_size) = vfs.environ_sizes_get();
-
-        Self::write_buffer(memory.clone(),environc_address, &u32::to_le_bytes(environc));
-        Self::write_buffer(
-            memory.clone(),
-            environ_buff_size_address,
-            &u32::to_le_bytes(environ_buff_size),
-        );
-        ErrNo::Success
+        vfs.environ_sizes_get(&mut caller, environc_address, environ_buf_size_address)
     }
 
     fn wasi_fd_filestat_get(caller: Caller, fd: u32, address: u32) -> ErrNo {
@@ -535,43 +457,14 @@ impl WasmtimeRuntimeState {
         ErrNo::Success
     }
 
-    fn wasi_fd_read(caller: Caller, fd: u32, iovec_base: u32, iovec_number:u32, address: u32) -> ErrNo {
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
+    fn wasi_fd_read(mut caller: Caller, fd: u32, iovec_base: u32, iovec_count:u32, address: u32) -> ErrNo {
+        println!("call wasi_fd_read");
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy,
         };
 
-        let io_bytes = Self::read_buffer(memory.clone(), iovec_base, (iovec_number as usize) * 8);
-        let iovecs = match unpack_iovec_array(&io_bytes){
-            Some(o) => o,
-            None => return ErrNo::Inval,
-        };
-
-        println!("call wasi_fd_read on iovecs {:?}", iovecs);
-
-        let mut size_read = 0;
-
-        for iovec in iovecs.iter() {
-            let to_write = match vfs.fd_read_base(&fd.into(), iovec.len as usize){
-                Ok(o) => o,
-                Err(e) => return e,
-            };
-            println!("call wasi_fd_read on to_write {:?}", String::from_utf8(to_write.clone()).unwrap());
-            Self::write_buffer(memory.clone(),iovec.buf, &to_write);
-            size_read += to_write.len() as u32;
-        }
-
-        println!("call wasi_fd_read returned size {:?}", size_read);
-
-        Self::write_buffer(memory.clone(),address, &u32::to_le_bytes(size_read));
-
-        ErrNo::Success
+        vfs.fd_read(&mut caller, fd, iovec_base, iovec_count, address)
     }
 }
 

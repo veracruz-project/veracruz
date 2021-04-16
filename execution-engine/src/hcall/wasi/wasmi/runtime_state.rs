@@ -12,7 +12,7 @@
 use std::{convert::{TryInto, TryFrom}, string::{String, ToString}, vec::Vec, boxed::Box};
 use crate::hcall::{
     common::{
-        pack_dirent, pack_fdstat, pack_filestat, pack_prestat, unpack_iovec_array,
+        pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
         WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
         WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
@@ -28,7 +28,7 @@ use crate::hcall::{
         WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
         WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
         WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
-        WASIWrapper,
+        WASIWrapper, MemoryHandler,
     }
 };
 use platform_services::{getrandom, result};
@@ -59,6 +59,30 @@ impl HostError for FatalEngineError {}
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
+
+/// Impl the MemoryHandler for MemoryRef.
+/// This allows passing the MemoryRef to WASIWrapper on any VFS call.
+impl MemoryHandler for MemoryRef {
+    /// Writes a buffer of bytes, `buffer`, to the runtime state's memory at
+    /// address, `address`.  Success on returing ErrNo::Success, 
+    /// Fails with `ErrNo::NoMem` if no memory is registered in the runtime state.
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo {
+            if let Err(_e) = self.set(address, buffer) {
+                return ErrNo::NoMem;
+            }
+            ErrNo::Success
+    }
+
+    /// Read a buffer of bytes from the runtime state's memory at
+    /// address, `address`. Return the bytes or Err with ErrNo,
+    /// e.g. `Err(ErrNo::NoMem)` if no memory is registered in the runtime state.
+    fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo> {
+        self
+            .get(address, length as usize)
+            .map_err(|_e| ErrNo::Fault)
+            .map(|buf| buf.to_vec())
+    }
+}
 
 /// The WASMI host provisioning state: the `HostProvisioningState` with the
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
@@ -1252,6 +1276,15 @@ impl WASMIRuntimeState {
         self.memory.as_ref()
     }
 
+    #[inline]
+    /// Returns the ref to the wasm memory or the ErrNo if fails.
+    pub(crate) fn deref_memory(&self) -> Result<MemoryRef, FatalEngineError> {
+        match &self.memory {
+            Some(m) => Ok(m.clone()),
+            None => Err(FatalEngineError::NoMemoryRegistered),
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Provisioning and program execution-related material.
     ////////////////////////////////////////////////////////////////////////////
@@ -1316,11 +1349,7 @@ impl WASMIRuntimeState {
     // Common code for implementating the WASI functionality.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Writes a buffer of bytes, `buffer`, to the runtime state's memory at
-    /// address, `address`.  Fails with `Err(FatalEngineError::NoMemoryRegistered)`
-    /// if no memory is registered in the runtime state, or
-    /// `Err(FatalEngineError::MemoryWriteFailed)` if the value could not be written
-    /// to the address for some reason.
+    //TODO REMOVE but use MemoryHandler
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> Result<(), FatalEngineError> {
         if let Some(memory) = self.memory() {
             memory
@@ -1335,11 +1364,7 @@ impl WASMIRuntimeState {
         }
     }
 
-    /// Read a buffer of bytes from the runtime state's memory at
-    /// address, `address`.  Fails with `Err(FatalEngineError::NoMemoryRegistered)`
-    /// if no memory is registered in the runtime state, or
-    /// `Err(FatalEngineError::MemoryReadFailed)` if the value could not be read
-    /// from the address for some reason.
+    //TODO REMOVE but use MemoryHandler
     fn read_buffer(&self, address: u32, length: usize) -> Result<Vec<u8>, FatalEngineError> {
         if let Some(memory) = self.memory() {
             memory
@@ -1464,19 +1489,9 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let mut environ_address: u32 = args.nth(0);
-        let mut environ_buff_address: u32 = args.nth(1);
-
-        for environ in self.vfs.environ_get() {
-            let length = environ.len() as u32;
-            self.write_buffer(environ_address, &environ)?;
-            self.write_buffer(environ_buff_address, &u32::to_le_bytes(length))?;
-
-            environ_address += length;
-            environ_buff_address += 4;
-        }
-
-        Ok(ErrNo::Success)
+        let environ_address = args.nth::<u32>(0);
+        let environ_buf_address = args.nth::<u32>(1);
+        Ok(self.vfs.environ_get(&mut self.deref_memory()?, environ_address, environ_buf_address))
     }
 
     /// The implementation of the WASI `environ_sizes_get` function.
@@ -1488,18 +1503,9 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let (environc, environ_buff_size) = self.vfs.environ_sizes_get();
-
         let environc_address: u32 = args.nth(0);
-        let environ_buff_size_address: u32 = args.nth(1);
-
-        self.write_buffer(environc_address, &u32::to_le_bytes(environc))?;
-        self.write_buffer(
-            environ_buff_size_address,
-            &u32::to_le_bytes(environ_buff_size),
-        )?;
-
-        Ok(ErrNo::Success)
+        let environ_buf_size_address: u32 = args.nth(1);
+        Ok(self.vfs.environ_sizes_get(&mut self.deref_memory()?,environc_address, environ_buf_size_address))
     }
 
     /// The implementation of the WASI `clock_res_get` function.  This is not
@@ -1715,24 +1721,24 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let iovec_base: u32 = args.nth(1);
-        let iovec_length: u32 = args.nth(2);
-        let offset: FileSize = args.nth(3);
-        let address: u32 = args.nth(4);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let iovec_base: u32 = args.nth(1);
+        //let iovec_length: u32 = args.nth(2);
+        //let offset: FileSize = args.nth(3);
+        //let address: u32 = args.nth(4);
 
-        let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
-        let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
+        //let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
+        //let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
 
-        let mut size_written = 0;
+        //let mut size_written = 0;
 
-        for iovec in iovec_array.iter() {
-            let to_write = self.vfs.fd_pread_base(&fd, iovec.len as usize, &offset)?;
-            self.write_buffer(iovec.buf, &to_write)?;
-            size_written += iovec.len;
-        }
+        //for iovec in iovec_array.iter() {
+            //let to_write = self.vfs.fd_pread_base(&fd, iovec.len as usize, &offset)?;
+            //self.write_buffer(iovec.buf, &to_write)?;
+            //size_written += iovec.len;
+        //}
 
-        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
+        //self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
@@ -1746,22 +1752,10 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = match args.nth::<u32>(0).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(fd) => fd,
-        };
-        let address: u32 = args.nth(1);
-        println!("call wasi_fd_prestat_get on fd {:?} and address {:?}", fd, address);
+        let fd = args.nth::<u32>(0);
+        let address = args.nth::<u32>(1);
 
-        let result = match self.vfs.fd_prestat_get(&fd) {
-            Ok(o) => o,
-            // Pipe back the result to the wasm program. 
-            // The wasm callee will iterate on file descriptor from Fd(3) 
-            // and only stop until hit a BadF. 
-            Err(e) => return Ok(e),
-        };
-        self.write_buffer(address, &pack_prestat(&result))?;
-        Ok(ErrNo::Success)
+        Ok(self.vfs.fd_prestat_get(&mut self.deref_memory()?,fd,address)) 
     }
 
     /// The implementation of the WASI `fd_prestat_dir_name` function.
@@ -1773,54 +1767,43 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = match args.nth::<u32>(0).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(fd) => fd,
-        };
-        let address: u32 = args.nth(1);
-        let size: Size = args.nth(2);
-        println!("call wasi_fd_prestat_dir_name on fd {:?}, address {:?}, size {:?}", fd, address, size);
+        let fd = args.nth::<u32>(0);
+        let address = args.nth::<u32>(1);
+        let size = args.nth::<u32>(2);
+        Ok(self.vfs.fd_prestat_dir_name(&mut self.deref_memory()?,fd,address,size))
 
-        let result = self.vfs.fd_prestat_dir_name(&fd)?;
-
-        if result.len() > size as usize {
-            Ok(ErrNo::NameTooLong)
-        } else {
-            self.write_buffer(address, &result.into_bytes())?;
-            Ok(ErrNo::Success)
-        }
     }
 
     /// The implementation of the WASI `fd_pwrite` function.
     fn wasi_fd_pwrite(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_pwrite");
-        if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_PWRITE_NAME,
-            ));
-        }
+        //if args.len() != 5 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_FD_PWRITE_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let iovec_base = args.nth::<u32>(1);
-        let iovec_length = args.nth::<u32>(2);
-        let filesize: FileSize = match args.nth::<u64>(3).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(filesize) => filesize,
-        };
-        let address: u32 = args.nth(4);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let iovec_base = args.nth::<u32>(1);
+        //let iovec_length = args.nth::<u32>(2);
+        //let filesize: FileSize = match args.nth::<u64>(3).try_into() {
+            //Err(_err) => return Ok(ErrNo::Inval),
+            //Ok(filesize) => filesize,
+        //};
+        //let address: u32 = args.nth(4);
 
-        let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
-        let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
+        //let buffer = self.read_buffer(iovec_base, iovec_length as usize)?;
+        //let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
 
-        let scatters = self.read_iovec_scattered(&iovec_array)?;
+        //let scatters = self.read_iovec_scattered(&iovec_array)?;
 
-        let mut size_written = 0;
+        //let mut size_written = 0;
 
-        for to_write in scatters.iter().cloned() {
-            size_written += self.vfs.fd_pwrite_base(&fd, to_write, &filesize)?;
-        }
+        //for to_write in scatters.iter().cloned() {
+            //size_written += self.vfs.fd_pwrite_base(&fd, to_write, &filesize)?;
+        //}
 
-        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
+        //self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
@@ -1834,32 +1817,11 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        // The following two arguments correspond to the `iovec` input.
-        let iovec_base: u32 = args.nth(1);
-        let iovec_len: u32 = args.nth(2);
-        let address: u32 = args.nth(3);
-
-        println!("call wasi_fd_read on fd {:?} iovec_base {:?} len {:?} address {:?}", fd, iovec_base, iovec_len, address);
-
-        let buffer = self.read_buffer(iovec_base, iovec_len as usize * 8)?;
-        let iovecs = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
-
-        println!("call wasi_fd_read on invecs {:?}", iovecs);
-
-        let mut size_read = 0;
-
-        for iovec in iovecs.iter() {
-            let to_write = self.vfs.fd_read_base(&fd, iovec.len as usize)?;
-            self.write_buffer(iovec.buf, &to_write)?;
-            size_read += to_write.len() as u32;
-        }
-
-        println!("call wasi_fd_read returned size {:?}", size_read);
-
-        self.write_buffer(address, &u32::to_le_bytes(size_read))?;
-
-        Ok(ErrNo::Success)
+        let fd = args.nth::<u32>(0);
+        let iovec_base: u32 = args.nth::<u32>(1);
+        let iovec_len: u32 = args.nth::<u32>(2);
+        let address: u32 = args.nth::<u32>(3);
+        Ok(self.vfs.fd_read(&mut self.deref_memory()?,fd, iovec_base, iovec_len, address))
     }
 
     /// The implementation of the WASI `fd_readdir` function.
@@ -1989,27 +1951,12 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let iovec_base: u32 = args.nth::<u32>(1);
-        let iovec_number: u32 = args.nth::<u32>(2);
-        let address: u32 = args.nth::<u32>(3);
-        println!("wasi_fd_write para: fd {:?} iovec_base {:?} iovec_nunmber {:?} address {:?}", fd,iovec_base,iovec_number,address);
-
-        let buffer = self.read_buffer(iovec_base, (iovec_number as usize) * 8)?;
-        let iovec_array = unpack_iovec_array(&buffer).ok_or(ErrNo::Inval)?;
-
-        let bufs = self.read_iovec_scattered(&iovec_array)?;
-
-        let mut size_written = 0;
-
-        for buf in bufs.iter() {
-            println!("write {:?} to fd {:?}", String::from_utf8(buf.clone()).unwrap(), fd);
-            size_written += self.vfs.fd_write_base(&fd, buf.clone())?;
-        }
-
-        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
-
-        Ok(ErrNo::Success)
+        let fd = args.nth::<u32>(0);
+        let iovec_base = args.nth::<u32>(1);
+        let iovec_len = args.nth::<u32>(2);
+        let address = args.nth::<u32>(3);
+        println!("wasi_fd_write para: fd {:?} iovec_base {:?} iovec_len {:?} address {:?}", fd,iovec_base,iovec_len,address);
+        Ok(self.vfs.fd_write(&mut self.deref_memory()?,fd,iovec_base,iovec_len,address))
     }
 
     /// The implementation of the WASI `path_create_directory` function.
@@ -2092,48 +2039,27 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth::<u32>(0).into();
-
-        let dirflags = match args.nth::<u32>(1).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(dirflags) => dirflags,
-        };
+        let fd = args.nth::<u32>(0);
+        let dirflags = args.nth::<u32>(1);
         let path_address = args.nth::<u32>(2);
         let path_length = args.nth::<u32>(3);
-        let path = self.read_cstring(path_address, path_length as usize)?;
-
-        let oflags = match args.nth::<u16>(4).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(oflags) => oflags,
-        };
-        let fs_rights_base = match args.nth::<u64>(5).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(fs_rights_base) => fs_rights_base,
-        };
-        let fs_rights_inheriting = match args.nth::<u64>(6).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(fs_rights_inheriting) => fs_rights_inheriting,
-        };
-        let fd_flags = match args.nth::<u16>(7).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(fd_flags) => fd_flags,
-        };
-        let address: u32 = args.nth(8);
-
-        println!("path_open {}",path);
-        let result = self.vfs.path_open(
-            &fd,
+        let oflags = args.nth::<u32>(4);
+        let fs_rights_base = args.nth::<u64>(5);
+        let fs_rights_inheriting = args.nth::<u64>(6);
+        let fd_flags = args.nth::<u32>(7);
+        let address = args.nth::<u32>(8);
+        Ok(self.vfs.path_open(
+            &mut self.deref_memory()?,
+            fd,
             dirflags,
-            path,
+            path_address,
+            path_length,
             oflags,
             fs_rights_base,
             fs_rights_inheriting,
             fd_flags,
-        )?;
-
-        self.write_buffer(address, &u32::to_le_bytes(result.into()))?;
-
-        Ok(ErrNo::Success)
+            address,
+        ))
     }
 
     /// The implementation of the WASI `path_readlink` function.  This

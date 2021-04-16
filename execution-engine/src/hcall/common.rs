@@ -1,4 +1,10 @@
-//! Common code for any implementation of WASI.
+//! Common code for any implementation of WASI:
+//! - An interface for handling memory access.
+//! - An interface for executing a program.
+//! - A WASI Wrapper. it wraps the strictly type WASI-like API
+//! in the virtual file system. It convert wasm u32-based parameters to 
+//! properly typed parameters and rust-style error handling to 
+//! c-style returning code. 
 //!
 //! ## Authors
 //!
@@ -51,8 +57,6 @@ pub(crate) const BLOCK_INPUT_DIRECTORY_NAME: &str = "block";
 /// stream-oriented inputs will be stored and can be read by the WASM program.
 /// TODO REMOVE ?
 pub(crate) const STREAM_INPUT_DIRECTORY_NAME: &str = "stream";
-/// The root directory. It will be pre-opened for any wasm program
-pub(crate) const ROOT_DIRECTORY: &str = "/";
 
 /// Name of the WASI `args_get` function.
 pub(crate) const WASI_ARGS_GET_NAME: &str = "args_get";
@@ -196,48 +200,6 @@ pub(crate) fn pack_dirent(dirent: &DirEnt) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(dirent) }
 }
 
-//TODO CHANGE TYPE WITH RESULT
-/// Unpacks an `IoVec` structure from a series of bytes, starting at the offset,
-/// `offset`.  Returns `None` iff the structure cannot be unpacked, for example
-/// if `offset` lies too close to the end of `bytes`.
-fn unpack_iovec(bytes: &[u8]) -> Option<IoVec> {
-    println!("unpack_iovec : {:?}",bytes);
-    if bytes.len() != 8 {
-        return None;
-    }
-
-    let mut buf_bytes: [u8; 4] = Default::default();
-    let mut len_bytes: [u8; 4] = Default::default();
-    buf_bytes.copy_from_slice(&bytes[0..4]);
-    len_bytes.copy_from_slice(&bytes[4..8]);
-    let buf = u32::from_le_bytes(buf_bytes);
-    let len = u32::from_le_bytes(len_bytes);    
-
-    let rst = IoVec{
-        buf,
-        len,
-    };
-    println!("unpack_iovec rst {:?}",rst);
-    Some(rst)
-}
-
-//TODO CHANGE TYPE WITH RESULT
-/// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
-/// any `IoVec` fails, for any reason.
-pub(crate) fn unpack_iovec_array(bytes: &[u8]) -> Option<Vec<IoVec>> {
-    let mut offset = 0;
-    let mut iovecs = Vec::new();
-
-    for iovec_byte in bytes.chunks(8) {
-        iovecs.push(unpack_iovec(iovec_byte).unwrap());
-    }
-
-    println!("unpack_iovec_array rst {:?}",iovecs);
-
-    Some(iovecs)
-
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Provisioning errors.
 ////////////////////////////////////////////////////////////////////////////////
@@ -317,6 +279,59 @@ impl From<wasmi::Error> for HostProvisioningError {
     }
 }
 
+//TODO RUST DOC
+pub trait MemoryHandler {
+    //NOTE we purposely choose u32 here as the execution engine is likely received u32 as
+    //parameters
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo;
+    fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo>;
+    fn read_cstring(&self, address: u32, length: u32) -> Result<String, ErrNo> {
+        let bytes = self.read_buffer(address, length)?;
+        // TODO: erase the debug code
+        let rst = String::from_utf8(bytes).map_err(|_e| ErrNo::IlSeq)?;
+        println!("read_cstring: {}",rst);
+        Ok(rst)
+    }
+
+    /// Performs a scattered read from several locations, as specified by a list
+    /// of `IoVec` structures, `scatters`, from the runtime state's memory.
+    fn read_iovec_scattered(&self, scatters: &[IoVec]) -> Result<Vec<Vec<u8>>, ErrNo> {
+        // TODO: erase the debug code
+        println!("called read_iovec_scattered: {:?}",scatters);
+        let mut rst = Vec::new();
+        for IoVec{buf, len} in scatters.iter(){
+            rst.push(self.read_buffer(*buf, *len)?)
+        }
+        Ok(rst)
+    }
+
+    /// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
+    /// any `IoVec` fails, for any reason.
+    fn unpack_iovec_array(&self, iovec_ptr: u32, iovec_count: u32) -> Result<Vec<IoVec>, ErrNo> {
+        let iovec_bytes = self.read_buffer(iovec_ptr, iovec_count * 8)?;
+        let mut offset = 0;
+        let mut iovecs = Vec::new();
+
+        for bytes in iovec_bytes.chunks(8) {
+            if bytes.len() != 8 {
+                return Err(ErrNo::Inval);
+            }
+
+            let mut buf_bytes: [u8; 4] = Default::default();
+            let mut len_bytes: [u8; 4] = Default::default();
+            buf_bytes.copy_from_slice(&bytes[0..4]);
+            len_bytes.copy_from_slice(&bytes[4..8]);
+            let buf = u32::from_le_bytes(buf_bytes);
+            let len = u32::from_le_bytes(len_bytes);    
+
+            iovecs.push(IoVec{ buf, len });
+        }
+        // TODO: erase the debug code
+        println!("unpack_iovec_array rst {:?}",iovecs);
+        Ok(iovecs)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // The host runtime state.
 ////////////////////////////////////////////////////////////////////////////////
@@ -380,16 +395,16 @@ impl WASIWrapper {
     // The program's environment.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Pushes a new argument, `argument`, to the list of program arguments that
-    /// will be made available to the program.
-    #[inline]
-    pub(crate) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
-    where
-        U: Into<String>,
-    {
-        self.program_arguments.push(argument.into());
-        self
-    }
+    ///// Pushes a new argument, `argument`, to the list of program arguments that
+    ///// will be made available to the program.
+    //#[inline]
+    //pub(crate) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
+    //where
+        //U: Into<String>,
+    //{
+        //self.program_arguments.push(argument.into());
+        //self
+    //}
 
     /// Implementation of the WASI `args_sizes_get` function.
     pub(crate) fn args_sizes_get(&self) -> (Size, Size) {
@@ -425,7 +440,6 @@ impl WASIWrapper {
     /// already associated with a value (in which case the key-value pair are
     /// not registered in the environment), and `Some(state)`, for `state` a
     /// modified runtime state with the pair registered, otherwise.
-    #[inline]
     pub(super) fn register_environment_variable<U>(&mut self, key: U, value: U) -> Option<&mut Self>
     where
         U: Into<String>,
@@ -448,9 +462,9 @@ impl WASIWrapper {
     }
 
     /// Implementation of the WASI `environ_sizes_get` function.
-    pub(crate) fn environ_sizes_get(&self) -> (Size, Size) {
+    pub(crate) fn environ_sizes_get(&self,memory_ref: &mut impl MemoryHandler, address_for_counts: u32, address_for_buffer_size: u32) -> ErrNo {
         println!("environ_sizes_get is called");
-        let environc = self.environment_variables.len();
+        let environc = self.environment_variables.len() as u32;
         let mut environ_buf_size = 0usize;
 
         for (key, value) in self.environment_variables.iter() {
@@ -458,24 +472,38 @@ impl WASIWrapper {
             environ_buf_size += entry.as_bytes().len();
         }
 
-        (environc as Size, environ_buf_size as Size)
+        let rst = memory_ref.write_buffer(address_for_counts, &u32::to_le_bytes(environc));
+        if rst != ErrNo::Success {
+            return rst;
+        }
+        memory_ref.write_buffer(address_for_buffer_size, &u32::to_le_bytes(environ_buf_size as u32))
     }
 
     /// Implementation of the WASI `environ_get` function.
-    pub(crate) fn environ_get(&self) -> Vec<Vec<u8>> {
+    pub(crate) fn environ_get(&self, memory_ref: &mut impl MemoryHandler, mut address_for_result: u32, mut address_for_result_len: u32) -> ErrNo {
         println!("environ_get is called");
         let environc = self.environment_variables.len();
-        let mut buffer = Vec::new();
 
-        for (key, value) in self.environment_variables.iter() {
+        let buffer = self.environment_variables.iter().map(|(key,value)| {
             let environ = format!("{}={}\0", key, value);
-            let bytes = environ.into_bytes();
-            buffer.push(bytes);
+            environ.into_bytes()
+        }).collect::<Vec<_>>();
+
+        for environ in buffer {
+            let length = environ.len() as u32;
+            let rst_buf = memory_ref.write_buffer(address_for_result, &environ);
+            if rst_buf != ErrNo::Success {
+                return rst_buf;
+            }
+            let rst_len = memory_ref.write_buffer(address_for_result_len, &u32::to_le_bytes(length));
+            if rst_len != ErrNo::Success {
+                return rst_len;
+            }
+            address_for_result += length;
+            address_for_result_len += 4;
         }
 
-        buffer.reverse();
-
-        buffer
+        ErrNo::Success
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -498,17 +526,23 @@ impl WASIWrapper {
         len: FileSize,
         advice: Advice,
     ) -> ErrNo {
-        self.filesystem.fd_advise(fd, offset, len, advice)
+        if let Err(err) = self.filesystem.fd_advise(fd, offset, len, advice) {
+            return err;
+        }
+        return ErrNo::Success;
     }
 
     #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
-        self.filesystem.fd_fdstat_get(fd)
+        self.filesystem.fd_fdstat_get(fd) 
     }
 
     #[inline]
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        self.filesystem.fd_fdstat_set_flags(fd, flags)
+        if let Err(err) = self.filesystem.fd_fdstat_set_flags(fd, flags) {
+            return err;
+        }
+        return ErrNo::Success;
     }
 
     #[inline]
@@ -518,8 +552,11 @@ impl WASIWrapper {
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> ErrNo {
-        self.filesystem
-            .fd_fdstat_set_rights(fd, rights_base, rights_inheriting)
+        if let Err(err) = self.filesystem
+            .fd_fdstat_set_rights(fd, rights_base, rights_inheriting) {
+            return err;
+        }
+        return ErrNo::Success;
     }
 
     #[inline]
@@ -529,7 +566,10 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
-        self.filesystem.fd_filestat_set_size(fd, size)
+        if let Err(err) = self.filesystem.fd_filestat_set_size(fd, size) {
+            return err;
+        }
+        return ErrNo::Success;
     }
 
     #[inline]
@@ -543,13 +583,27 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
-        self.filesystem.fd_prestat_get(fd)
+    pub(crate) fn fd_prestat_get(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, address: u32) -> ErrNo {
+        let fd = Fd(fd);
+        match self.filesystem.fd_prestat_get(&fd.into()) { 
+            Ok(result) => memory_ref.write_buffer(address, &pack_prestat(&result)),
+            Err(err) => err
+        }
     }
 
     #[inline]
-    pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
-        self.filesystem.fd_prestat_dir_name(fd)
+    pub(crate) fn fd_prestat_dir_name(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, address: u32, size: u32) -> ErrNo {
+        let size = size as usize;
+        let result = match self.filesystem.fd_prestat_dir_name(&fd.into()) {
+            Ok(o) => o,
+            Err(e) => return e,
+        };
+
+        if result.len() > size as usize {
+            return ErrNo::NameTooLong;
+        }
+
+        memory_ref.write_buffer(address, &result.into_bytes())
     }
 
     #[inline]
@@ -563,8 +617,26 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_read_base(&mut self, fd: &Fd, len: usize) -> FileSystemError<Vec<u8>> {
-        self.filesystem.fd_read_base(fd, len)
+    pub(crate) fn fd_read(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, iovec_base: u32, iovec_count: u32, address: u32) -> ErrNo {
+
+        let iovecs = match memory_ref.unpack_iovec_array(iovec_base, iovec_count) {
+            Ok(o) => o,
+            Err(e) => return e,
+        };
+
+        let mut size_read = 0;
+        for iovec in iovecs.iter() {
+            let to_write = match self.filesystem.fd_read_base(&fd.into(), iovec.len as usize){
+                Ok(o) => o,
+                Err(e) => return e,
+            };
+            let rst = memory_ref.write_buffer(iovec.buf, &to_write);
+            if rst != ErrNo::Success {
+                return rst;
+            }
+            size_read += to_write.len() as u32;
+        }
+        memory_ref.write_buffer(address, &u32::to_le_bytes(size_read))
     }
 
     #[inline]
@@ -597,8 +669,25 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_write_base(&mut self, fd: &Fd, buf: Vec<u8>) -> FileSystemError<Size> {
-        self.filesystem.fd_write_base(fd, buf)
+    pub(crate) fn fd_write(&mut self, memory_ref: &mut MemoryHandler, fd: u32, iovec_base: u32, iovec_count: u32, address: u32) -> ErrNo {
+        let iovecs = match memory_ref.unpack_iovec_array(iovec_base, iovec_count) {
+            Ok(o) => o,
+            Err(e) => return e,
+        };
+        let bufs = match memory_ref.read_iovec_scattered(&iovecs) {
+            Ok(o) => o,
+            Err(e) => return e,
+        };
+
+        let mut size_written = 0;
+        for buf in bufs.iter() {
+            println!("write {:?} to fd {:?}", String::from_utf8(buf.clone()).unwrap(), fd);
+            size_written += match self.filesystem.fd_write_base(&fd.into(), buf.clone()) {
+                Ok(o) => o,
+                Err(e) => return e,
+            };
+        }
+        memory_ref.write_buffer(address, &u32::to_le_bytes(size_written))
     }
 
     #[inline]
@@ -619,23 +708,55 @@ impl WASIWrapper {
     #[inline]
     pub(crate) fn path_open(
         &mut self,
-        fd: &Fd,
-        dirflags: LookupFlags,
-        path: String,
-        oflags: OpenFlags,
-        fs_rights_base: Rights,
-        fs_rights_inheriting: Rights,
-        fdflags: FdFlags,
-    ) -> FileSystemError<Fd> {
-        self.filesystem.path_open(
-            fd,
-            dirflags,
+        memory_ref: &mut impl MemoryHandler,
+        fd: u32, 
+        dir_flags: u32,
+        path_address: u32,
+        path_length: u32,
+        oflags : u32,
+        fs_rights_base: u64,
+        fs_rights_inheriting: u64,
+        fd_flags: u32,
+        address: u32,
+    ) -> ErrNo {
+        let fd = Fd(fd);
+        let path = match memory_ref.read_cstring(path_address, path_length) {
+            Ok(o) => o,
+            Err(e) => return e,
+        };
+        let dir_flags = match LookupFlags::from_bits(dir_flags) {
+            Some(o) => o,
+            None => return ErrNo::Inval,
+        };
+        let oflags = match OpenFlags::from_bits(oflags as u16) {
+            Some(o) => o,
+            None => return ErrNo::Inval,
+        };
+        let fs_rights_base = match Rights::from_bits(fs_rights_base) {
+            Some(o) => o,
+            None => return ErrNo::Inval
+        };
+        let fs_rights_inheriting = match Rights::from_bits(fs_rights_inheriting) {
+            Some(o) => o,
+            None => return ErrNo::Inval,
+        };
+        let fd_flags = match FdFlags::from_bits(fd_flags as u16) {
+            Some(o) => o,
+            None => return ErrNo::Inval,
+        };
+
+        match self.filesystem.path_open(
+            &fd,
+            dir_flags,
             path,
             oflags,
             fs_rights_base,
             fs_rights_inheriting,
-            fdflags,
-        )
+            fd_flags,
+        ) {
+            Ok(result) => memory_ref.write_buffer(address, &u32::to_le_bytes(result.into())),
+            Err(err) => err,
+        }
     }
 
     #[inline]
@@ -886,6 +1007,7 @@ pub enum EngineReturnCode {
 // Trait implementations.
 ////////////////////////////////////////////////////////////////////////////////
 
+//TODO DO WE STILL NEED THIS???
 /// Pretty printing for `EngineReturnCode`.
 impl Display for EngineReturnCode {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
