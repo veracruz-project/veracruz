@@ -169,6 +169,8 @@ impl FileSystem {
         rst.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
         //TODO remove test stub
         rst.install_file("test.txt",&(42 as u64).into(), "test content".as_bytes());
+        rst.install_file("stderr",&(11 as u64).into(), "".as_bytes());
+        rst.install_fd(&Fd(2),&(11 as u64).into());
         rst
     }
     
@@ -447,6 +449,7 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?;
 
         if let Some(inode_impl) = self.inode_table.get_mut(inode) {
+            println!("call fd_pwrite_base before: {:?}",String::from_utf8(inode_impl.raw_file_data.clone()).unwrap());
             let remain_length = (inode_impl.file_stat.file_size - offset) as usize;
             let offset = offset as usize;
             if remain_length <= buf.len() {
@@ -637,6 +640,16 @@ impl FileSystem {
             self.inode_table.get_mut(&inode).map(|inode_impl|{
                 println!("call path_open trunc");
                 inode_impl.raw_file_data = Vec::new();
+                inode_impl.file_stat = FileStat{
+                    device: (0 as u64).into(),
+                    inode : inode.clone(),
+                    file_type: FileType::Directory,
+                    num_links: 0,
+                    file_size : 0 as u64,
+                    atime: Timestamp::from_nanos(0),
+                    mtime: Timestamp::from_nanos(0),
+                    ctime: Timestamp::from_nanos(0),
+                };
             });
         }
         let next_fd = self.next_fd();
