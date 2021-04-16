@@ -123,6 +123,8 @@ pub fn execute(
     vfs: Arc<Mutex<VFS>>,
     program_file_name: &str,
 ) -> Result<EngineReturnCode, FatalEngineError> {
+    // TODO MODIFY when `new` directly fill in a program this can simply the wasmi impl esp. option
+    // on memory and program module.
     let mut engine : Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(vfs)),
         ExecutionStrategy::JIT => 
