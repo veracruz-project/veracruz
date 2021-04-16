@@ -14,21 +14,7 @@ use crate::hcall::{
     common::{
         pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
-        WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
-        WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
-        WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
-        WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
-        WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME,
-        WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME,
-        WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME,
-        WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME,
-        WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
-        WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME, WASI_PATH_OPEN_NAME,
-        WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME, WASI_PATH_RENAME_NAME,
-        WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
-        WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
-        WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
-        WASIWrapper, MemoryHandler,
+        WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
 use platform_services::{getrandom, result};
@@ -48,6 +34,7 @@ use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
 use std::sync::{SgxMutex as Mutex, Arc};
 use crate::hcall::buffer::VFS;
+use num::FromPrimitive;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Veracruz host errors.
@@ -116,104 +103,6 @@ pub(crate) type WASIError = Result<ErrNo, FatalEngineError>;
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// The name of the WASM program's entry point.
-const ENTRY_POINT_NAME: &str = "_start";
-/// The name of the WASM program's linear memory.
-const LINEAR_MEMORY_NAME: &str = "memory";
-/// The name of the containing module for all WASI imports.
-const WASI_SNAPSHOT_MODULE_NAME: &str = "wasi_snapshot_preview1";
-
-/// Index of the WASI `args_get` function.
-const WASI_ARGS_GET_INDEX: usize = 0;
-/// Index of the WASI `args_get` function.
-const WASI_ARGS_SIZES_GET_INDEX: usize = 1;
-/// Index of the WASI `environ_get` function.
-const WASI_ENVIRON_GET_INDEX: usize = 2;
-/// Index of the WASI `environ_sizes_get` function.
-const WASI_ENVIRON_SIZES_GET_INDEX: usize = 3;
-/// Index of the WASI `clock_res_get` function.
-const WASI_CLOCK_RES_GET_INDEX: usize = 4;
-/// Index of the WASI `clock_time_get` function.
-const WASI_CLOCK_TIME_GET_INDEX: usize = 5;
-/// Index of the WASI `fd_advise` function.
-const WASI_FD_ADVISE_INDEX: usize = 6;
-/// Index of the WASI `fd_allocate` function.
-const WASI_FD_ALLOCATE_INDEX: usize = 7;
-/// Index of the WASI `fd_close` function.
-const WASI_FD_CLOSE_INDEX: usize = 8;
-/// Index of the WASI `fd_datasync` function.
-const WASI_FD_DATASYNC_INDEX: usize = 9;
-/// Index of the WASI `fd_fdstat_get` function.
-const WASI_FD_FDSTAT_GET_INDEX: usize = 10;
-/// Index of the WASI `fd_filestat_set_flags` function.
-const WASI_FD_FDSTAT_SET_FLAGS_INDEX: usize = 11;
-/// Index of the WASI `fd_filestat_set_rights` function.
-const WASI_FD_FDSTAT_SET_RIGHTS_INDEX: usize = 12;
-/// Index of the WASI `fd_filestat_get` function.
-const WASI_FD_FILESTAT_GET_INDEX: usize = 13;
-/// Index of the WASI `fd_filestat_set_size` function.
-const WASI_FD_FILESTAT_SET_SIZE_INDEX: usize = 14;
-/// Index of the WASI `fd_filestat_set_times` function.
-const WASI_FD_FILESTAT_SET_TIMES_INDEX: usize = 15;
-/// Index of the WASI `fd_pread` function.
-const WASI_FD_PREAD_INDEX: usize = 16;
-/// Index of the WASI `fd_prestat_get_name` function.
-const WASI_FD_PRESTAT_GET_INDEX: usize = 17;
-/// Index of the WASI `fd_prestat_dir_name` function.
-const WASI_FD_PRESTAT_DIR_NAME_INDEX: usize = 18;
-/// Index of the WASI `fd_pwrite` function.
-const WASI_FD_PWRITE_INDEX: usize = 19;
-/// Index of the WASI `fd_read` function.
-const WASI_FD_READ_INDEX: usize = 20;
-/// Index of the WASI `fd_readdir` function.
-const WASI_FD_READDIR_INDEX: usize = 21;
-/// Index of the WASI `fd_renumber` function.
-const WASI_FD_RENUMBER_INDEX: usize = 22;
-/// Index of the WASI `fd_seek` function.
-const WASI_FD_SEEK_INDEX: usize = 23;
-/// Index of the WASI `fd_sync` function.
-const WASI_FD_SYNC_INDEX: usize = 24;
-/// Index of the WASI `fd_tell` function.
-const WASI_FD_TELL_INDEX: usize = 25;
-/// Index of the WASI `fd_write` function.
-const WASI_FD_WRITE_INDEX: usize = 26;
-/// Index of the WASI `path_crate_directory` function.
-const WASI_PATH_CREATE_DIRECTORY_INDEX: usize = 27;
-/// Index of the WASI `path_filestat_get` function.
-const WASI_PATH_FILESTAT_GET_INDEX: usize = 28;
-/// Index of the WASI `path_filestat_set_times` function.
-const WASI_PATH_FILESTAT_SET_TIMES_INDEX: usize = 29;
-/// Index of the WASI `path_link` function.
-const WASI_PATH_LINK_INDEX: usize = 30;
-/// Index of the WASI `path_open` function.
-const WASI_PATH_OPEN_INDEX: usize = 31;
-/// Index of the WASI `path_readlink` function.
-const WASI_PATH_READLINK_INDEX: usize = 32;
-/// Index of the WASI `path_remove_directory` function.
-const WASI_PATH_REMOVE_DIRECTORY_INDEX: usize = 33;
-/// Index of the WASI `path_rename` function.
-const WASI_PATH_RENAME_INDEX: usize = 34;
-/// Index of the WASI `path_symlink` function.
-const WASI_PATH_SYMLINK_INDEX: usize = 35;
-/// Index of the WASI `path_unlink_file` function.
-const WASI_PATH_UNLINK_FILE_INDEX: usize = 36;
-/// Index of the WASI `poll_oneoff` function.
-const WASI_POLL_ONEOFF_INDEX: usize = 37;
-/// Index of the WASI `proc_exit` function.
-const WASI_PROC_EXIT_INDEX: usize = 38;
-/// Index of the WASI `proc_raise` function.
-const WASI_PROC_RAISE_INDEX: usize = 39;
-/// Index of the WASI `sched_yield` function.
-const WASI_SCHED_YIELD_INDEX: usize = 40;
-/// Index of the WASI `random_get` function.
-const WASI_RANDOM_GET_INDEX: usize = 41;
-/// Index of the WASI `sock_recv` function.
-const WASI_SOCK_RECV_INDEX: usize = 42;
-/// Index of the WASI `sock_send` function.
-const WASI_SOCK_SEND_INDEX: usize = 43;
-/// Index of the WASI `sock_shutdown` function.
-const WASI_SOCK_SHUTDOWN_INDEX: usize = 44;
 
 /// The representation type of the WASI `Advice` type.
 const REPRESENTATION_WASI_ADVICE: ValueType = ValueType::I32;
@@ -1008,54 +897,53 @@ fn check_sock_shutdown_signature(signature: &Signature) -> bool {
 
 /// Checks the function signature, `signature`, has the correct type for the
 /// host call coded by `index`.
-fn check_signature(index: usize, signature: &Signature) -> bool {
+fn check_signature(index: WASIAPIName, signature: &Signature) -> bool {
     match index {
-        WASI_ARGS_GET_INDEX => check_args_get_signature(signature),
-        WASI_ARGS_SIZES_GET_INDEX => check_args_sizes_get_signature(signature),
-        WASI_ENVIRON_GET_INDEX => check_environ_get_signature(signature),
-        WASI_ENVIRON_SIZES_GET_INDEX => check_environ_sizes_get_signature(signature),
-        WASI_CLOCK_RES_GET_INDEX => check_clock_res_get_signature(signature),
-        WASI_CLOCK_TIME_GET_INDEX => check_clock_time_get_signature(signature),
-        WASI_FD_ADVISE_INDEX => check_fd_advise_signature(signature),
-        WASI_FD_ALLOCATE_INDEX => check_fd_allocate_signature(signature),
-        WASI_FD_CLOSE_INDEX => check_fd_close_signature(signature),
-        WASI_FD_DATASYNC_INDEX => check_fd_datasync_signature(signature),
-        WASI_FD_FDSTAT_GET_INDEX => check_fd_fdstat_get_signature(signature),
-        WASI_FD_FDSTAT_SET_FLAGS_INDEX => check_fd_fdstat_set_flags_signature(signature),
-        WASI_FD_FDSTAT_SET_RIGHTS_INDEX => check_fd_fdstat_set_rights_signature(signature),
-        WASI_FD_FILESTAT_GET_INDEX => check_fd_filestat_get_signature(signature),
-        WASI_FD_FILESTAT_SET_SIZE_INDEX => check_fd_filestat_set_size_signature(signature),
-        WASI_FD_FILESTAT_SET_TIMES_INDEX => check_fd_filestat_set_times_signature(signature),
-        WASI_FD_PREAD_INDEX => check_fd_pread_signature(signature),
-        WASI_FD_PRESTAT_GET_INDEX => check_fd_prestat_get_signature(signature),
-        WASI_FD_PRESTAT_DIR_NAME_INDEX => check_fd_prestat_dir_name_signature(signature),
-        WASI_FD_PWRITE_INDEX => check_fd_pwrite_signature(signature),
-        WASI_FD_READ_INDEX => check_fd_read_signature(signature),
-        WASI_FD_READDIR_INDEX => check_fd_readdir_signature(signature),
-        WASI_FD_RENUMBER_INDEX => check_fd_renumber_signature(signature),
-        WASI_FD_SEEK_INDEX => check_fd_seek_signature(signature),
-        WASI_FD_SYNC_INDEX => check_fd_sync_signature(signature),
-        WASI_FD_TELL_INDEX => check_fd_tell_signature(signature),
-        WASI_FD_WRITE_INDEX => check_fd_write_signature(signature),
-        WASI_PATH_CREATE_DIRECTORY_INDEX => check_path_create_directory_signature(signature),
-        WASI_PATH_FILESTAT_GET_INDEX => check_path_filestat_get_signature(signature),
-        WASI_PATH_FILESTAT_SET_TIMES_INDEX => check_path_filestat_set_times_signature(signature),
-        WASI_PATH_LINK_INDEX => check_path_link_signature(signature),
-        WASI_PATH_OPEN_INDEX => check_path_open_signature(signature),
-        WASI_PATH_READLINK_INDEX => check_path_readlink_signature(signature),
-        WASI_PATH_REMOVE_DIRECTORY_INDEX => check_path_remove_directory_signature(signature),
-        WASI_PATH_RENAME_INDEX => check_path_rename_signature(signature),
-        WASI_PATH_SYMLINK_INDEX => check_path_symlink_signature(signature),
-        WASI_PATH_UNLINK_FILE_INDEX => check_path_unlink_file_signature(signature),
-        WASI_POLL_ONEOFF_INDEX => check_poll_oneoff_signature(signature),
-        WASI_PROC_EXIT_INDEX => check_proc_exit_signature(signature),
-        WASI_PROC_RAISE_INDEX => check_proc_raise_signature(signature),
-        WASI_SCHED_YIELD_INDEX => check_sched_yield_signature(signature),
-        WASI_RANDOM_GET_INDEX => check_random_get_signature(signature),
-        WASI_SOCK_RECV_INDEX => check_sock_recv_signature(signature),
-        WASI_SOCK_SEND_INDEX => check_sock_send_signature(signature),
-        WASI_SOCK_SHUTDOWN_INDEX => check_sock_shutdown_signature(signature),
-        _otherwise => false,
+        WASIAPIName::ARGS_GET => check_args_get_signature(signature),
+        WASIAPIName::ARGS_SIZES_GET => check_args_sizes_get_signature(signature),
+        WASIAPIName::ENVIRON_GET => check_environ_get_signature(signature),
+        WASIAPIName::ENVIRON_SIZES_GET => check_environ_sizes_get_signature(signature),
+        WASIAPIName::CLOCK_RES_GET => check_clock_res_get_signature(signature),
+        WASIAPIName::CLOCK_TIME_GET => check_clock_time_get_signature(signature),
+        WASIAPIName::FD_ADVISE => check_fd_advise_signature(signature),
+        WASIAPIName::FD_ALLOCATE => check_fd_allocate_signature(signature),
+        WASIAPIName::FD_CLOSE => check_fd_close_signature(signature),
+        WASIAPIName::FD_DATASYNC => check_fd_datasync_signature(signature),
+        WASIAPIName::FD_FDSTAT_GET => check_fd_fdstat_get_signature(signature),
+        WASIAPIName::FD_FDSTAT_SET_FLAGS => check_fd_fdstat_set_flags_signature(signature),
+        WASIAPIName::FD_FDSTAT_SET_RIGHTS => check_fd_fdstat_set_rights_signature(signature),
+        WASIAPIName::FD_FILESTAT_GET => check_fd_filestat_get_signature(signature),
+        WASIAPIName::FD_FILESTAT_SET_SIZE => check_fd_filestat_set_size_signature(signature),
+        WASIAPIName::FD_FILESTAT_SET_TIMES => check_fd_filestat_set_times_signature(signature),
+        WASIAPIName::FD_PREAD => check_fd_pread_signature(signature),
+        WASIAPIName::FD_PRESTAT_GET => check_fd_prestat_get_signature(signature),
+        WASIAPIName::FD_PRESTAT_DIR_NAME => check_fd_prestat_dir_name_signature(signature),
+        WASIAPIName::FD_PWRITE => check_fd_pwrite_signature(signature),
+        WASIAPIName::FD_READ => check_fd_read_signature(signature),
+        WASIAPIName::FD_READDIR => check_fd_readdir_signature(signature),
+        WASIAPIName::FD_RENUMBER => check_fd_renumber_signature(signature),
+        WASIAPIName::FD_SEEK => check_fd_seek_signature(signature),
+        WASIAPIName::FD_SYNC => check_fd_sync_signature(signature),
+        WASIAPIName::FD_TELL => check_fd_tell_signature(signature),
+        WASIAPIName::FD_WRITE => check_fd_write_signature(signature),
+        WASIAPIName::PATH_CREATE_DIRECTORY => check_path_create_directory_signature(signature),
+        WASIAPIName::PATH_FILESTAT_GET => check_path_filestat_get_signature(signature),
+        WASIAPIName::PATH_FILESTAT_SET_TIMES => check_path_filestat_set_times_signature(signature),
+        WASIAPIName::PATH_LINK => check_path_link_signature(signature),
+        WASIAPIName::PATH_OPEN => check_path_open_signature(signature),
+        WASIAPIName::PATH_READLINK => check_path_readlink_signature(signature),
+        WASIAPIName::PATH_REMOVE_DIRECTORY => check_path_remove_directory_signature(signature),
+        WASIAPIName::PATH_RENAME => check_path_rename_signature(signature),
+        WASIAPIName::PATH_SYMLINK => check_path_symlink_signature(signature),
+        WASIAPIName::PATH_UNLINK_FILE => check_path_unlink_file_signature(signature),
+        WASIAPIName::POLL_ONEOFF => check_poll_oneoff_signature(signature),
+        WASIAPIName::PROC_EXIT => check_proc_exit_signature(signature),
+        WASIAPIName::PROC_RAISE => check_proc_raise_signature(signature),
+        WASIAPIName::SCHED_YIELD => check_sched_yield_signature(signature),
+        WASIAPIName::RANDOM_GET => check_random_get_signature(signature),
+        WASIAPIName::SOCK_RECV => check_sock_recv_signature(signature),
+        WASIAPIName::SOCK_SEND => check_sock_send_signature(signature),
+        WASIAPIName::SOCK_SHUTDOWN => check_sock_shutdown_signature(signature),
     }
 }
 
@@ -1079,7 +967,7 @@ fn check_main_signature(signature: &Signature) -> EntrySignature {
 /// signature template.  If no entry is found returns
 /// `EntrySignature::NoEntryFound`.
 fn check_main(module: &ModuleInstance) -> EntrySignature {
-    match module.export_by_name(ENTRY_POINT_NAME) {
+    match module.export_by_name(WASIWrapper::ENTRY_POINT_NAME) {
         Some(ExternVal::Func(funcref)) => check_main_signature(&funcref.signature()),
         _otherwise => EntrySignature::NoEntryFound,
     }
@@ -1088,7 +976,7 @@ fn check_main(module: &ModuleInstance) -> EntrySignature {
 /// Finds the linear memory of the WASM module, `module`, and returns it,
 /// otherwise creating a fatal host error that will kill the Veracruz instance.
 fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, HostProvisioningError> {
-    match module.export_by_name(LINEAR_MEMORY_NAME) {
+    match module.export_by_name(WASIWrapper::LINEAR_MEMORY_NAME) {
         Some(ExternVal::Memory(memoryref)) => Ok(memoryref),
         _otherwise => Err(HostProvisioningError::NoMemoryRegistered),
     }
@@ -1102,61 +990,18 @@ impl ModuleImportResolver for WASMIRuntimeState {
     /// "Resolves" a H-call by translating from a H-call name, `field_name` to
     /// the corresponding H-call code, and dispatching appropriately.
     fn resolve_func(&self, field_name: &str, signature: &Signature) -> Result<FuncRef, Error> {
-        let index = match field_name {
-            //TODO FILLING VERYTHING 
-            WASI_ARGS_GET_NAME => WASI_ARGS_GET_INDEX,
-            WASI_ARGS_SIZES_GET_NAME => WASI_ARGS_SIZES_GET_INDEX,
-            WASI_ENVIRON_GET_NAME => WASI_ENVIRON_GET_INDEX,
-            WASI_ENVIRON_SIZES_GET_NAME => WASI_ENVIRON_SIZES_GET_INDEX,
-            WASI_CLOCK_RES_GET_NAME => WASI_CLOCK_RES_GET_INDEX,
-            WASI_CLOCK_TIME_GET_NAME => WASI_CLOCK_TIME_GET_INDEX,
-            WASI_FD_ADVISE_NAME => WASI_FD_ADVISE_INDEX,
-            WASI_FD_ALLOCATE_NAME => WASI_FD_ALLOCATE_INDEX,
-            WASI_FD_CLOSE_NAME => WASI_FD_CLOSE_INDEX,
-            WASI_FD_DATASYNC_NAME => WASI_FD_DATASYNC_INDEX,
-            WASI_FD_FDSTAT_GET_NAME => WASI_FD_FDSTAT_GET_INDEX,
-            WASI_FD_FDSTAT_SET_FLAGS_NAME => WASI_FD_FDSTAT_SET_FLAGS_INDEX,
-            WASI_FD_FDSTAT_SET_RIGHTS_NAME => WASI_FD_FDSTAT_SET_RIGHTS_INDEX,
-            WASI_FD_FILESTAT_GET_NAME => WASI_FD_FILESTAT_GET_INDEX,
-            WASI_FD_FILESTAT_SET_SIZE_NAME => WASI_FD_FILESTAT_SET_SIZE_INDEX,
-            WASI_FD_FILESTAT_SET_TIMES_NAME => WASI_FD_FILESTAT_SET_TIMES_INDEX,
-            WASI_FD_PREAD_NAME => WASI_FD_PREAD_INDEX,
-            WASI_FD_PRESTAT_GET_NAME => WASI_FD_PRESTAT_GET_INDEX,
-            WASI_FD_PRESTAT_DIR_NAME_NAME => WASI_FD_PRESTAT_DIR_NAME_INDEX,
-            WASI_FD_PWRITE_NAME => WASI_FD_PWRITE_INDEX,
-            WASI_FD_READ_NAME => WASI_FD_READ_INDEX,
-            WASI_FD_READDIR_NAME => WASI_FD_READDIR_INDEX,
-            WASI_FD_RENUMBER_NAME => WASI_FD_RENUMBER_INDEX,
-            WASI_FD_SEEK_NAME => WASI_FD_SEEK_INDEX,
-            WASI_FD_SYNC_NAME => WASI_FD_SYNC_INDEX,
-            WASI_FD_TELL_NAME => WASI_FD_TELL_INDEX,
-            WASI_FD_WRITE_NAME => WASI_FD_WRITE_INDEX,
-            WASI_PATH_CREATE_DIRECTORY_NAME => WASI_PATH_CREATE_DIRECTORY_INDEX,
-            WASI_PATH_FILESTAT_GET_NAME => WASI_PATH_FILESTAT_GET_INDEX,
-            WASI_PATH_FILESTAT_SET_TIMES_NAME => WASI_PATH_FILESTAT_SET_TIMES_INDEX,
-            WASI_PATH_LINK_NAME => WASI_PATH_LINK_INDEX,
-            WASI_PATH_OPEN_NAME => WASI_PATH_OPEN_INDEX,
-            WASI_PATH_READLINK_NAME => WASI_PATH_READLINK_INDEX,
-            WASI_PATH_REMOVE_DIRECTORY_NAME => WASI_PATH_REMOVE_DIRECTORY_INDEX,
-            WASI_PATH_RENAME_NAME => WASI_PATH_RENAME_INDEX,
-            WASI_PATH_SYMLINK_NAME => WASI_PATH_SYMLINK_INDEX,
-            WASI_PATH_UNLINK_FILE_NAME => WASI_PATH_UNLINK_FILE_INDEX,
-            WASI_PROC_EXIT_NAME => WASI_PROC_EXIT_INDEX,
-            otherwise => {
-                return Err(Error::Instantiation(format!(
-                    "Unknown function {} with signature: {:?}.",
-                    otherwise, signature
-                )));
-            }
-        };
+        let index = WASIAPIName::try_from(field_name).map_err(|e|Error::Instantiation(format!(
+                "Unknown function {} with signature: {:?}.",
+                field_name, signature
+        )))?;
 
-        if !check_signature(index, signature) {
+        if !check_signature(index.clone(), signature) {
             Err(Error::Instantiation(format!(
                 "Function {} has an unexpected type-signature: {:?}.",
                 field_name, signature
             )))
         } else {
-            Ok(FuncInstance::alloc_host(signature.clone(), index))
+            Ok(FuncInstance::alloc_host(signature.clone(), index as usize))
         }
     }
 
@@ -1191,53 +1036,58 @@ impl Externals for WASMIRuntimeState {
         index: usize,
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
-        let result = match index {
-            WASI_ARGS_GET_INDEX => self.wasi_args_get(args),
-            WASI_ARGS_SIZES_GET_INDEX => self.wasi_args_sizes_get(args),
-            WASI_ENVIRON_GET_INDEX => self.wasi_environ_get(args),
-            WASI_ENVIRON_SIZES_GET_INDEX => self.wasi_environ_sizes_get(args),
-            WASI_CLOCK_RES_GET_INDEX => self.wasi_clock_res_get(args),
-            WASI_CLOCK_TIME_GET_INDEX => self.wasi_clock_time_get(args),
-            WASI_FD_ADVISE_INDEX => self.wasi_fd_advise(args),
-            WASI_FD_ALLOCATE_INDEX => self.wasi_fd_allocate(args),
-            WASI_FD_CLOSE_INDEX => self.wasi_fd_close(args),
-            WASI_FD_DATASYNC_INDEX => self.wasi_fd_datasync(args),
-            WASI_FD_FDSTAT_GET_INDEX => self.wasi_fd_fdstat_get(args),
-            WASI_FD_FDSTAT_SET_FLAGS_INDEX => self.wasi_fd_fdstat_set_flags(args),
-            WASI_FD_FDSTAT_SET_RIGHTS_INDEX => self.wasi_fd_fdstat_set_rights(args),
-            WASI_FD_FILESTAT_GET_INDEX => self.wasi_fd_filestat_get(args),
-            WASI_FD_FILESTAT_SET_SIZE_INDEX => self.wasi_fd_filestat_set_size(args),
-            WASI_FD_FILESTAT_SET_TIMES_INDEX => self.wasi_fd_filestat_set_times(args),
-            WASI_FD_PREAD_INDEX => self.wasi_fd_pread(args),
-            WASI_FD_PRESTAT_GET_INDEX => self.wasi_fd_prestat_get(args),
-            WASI_FD_PRESTAT_DIR_NAME_INDEX => self.wasi_fd_prestat_dir_name(args),
-            WASI_FD_PWRITE_INDEX => self.wasi_fd_pwrite(args),
-            WASI_FD_READ_INDEX => self.wasi_fd_read(args),
-            WASI_FD_READDIR_INDEX => self.wasi_fd_readdir(args),
-            WASI_FD_RENUMBER_INDEX => self.wasi_fd_renumber(args),
-            WASI_FD_SEEK_INDEX => self.wasi_fd_seek(args),
-            WASI_FD_SYNC_INDEX => self.wasi_fd_sync(args),
-            WASI_FD_TELL_INDEX => self.wasi_fd_tell(args),
-            WASI_FD_WRITE_INDEX => self.wasi_fd_write(args),
-            WASI_PATH_CREATE_DIRECTORY_INDEX => self.wasi_path_create_directory(args),
-            WASI_PATH_FILESTAT_GET_INDEX => self.wasi_path_filestat_get(args),
-            WASI_PATH_FILESTAT_SET_TIMES_INDEX => self.wasi_path_filestat_set_times(args),
-            WASI_PATH_LINK_INDEX => self.wasi_path_link(args),
-            WASI_PATH_OPEN_INDEX => self.wasi_path_open(args),
-            WASI_PATH_READLINK_INDEX => self.wasi_path_readlink(args),
-            WASI_PATH_REMOVE_DIRECTORY_INDEX => self.wasi_path_remove_directory(args),
-            WASI_PATH_RENAME_INDEX => self.wasi_path_rename(args),
-            WASI_PATH_SYMLINK_INDEX => self.wasi_path_symlink(args),
-            WASI_PATH_UNLINK_FILE_INDEX => self.wasi_path_unlink_file(args),
-            WASI_POLL_ONEOFF_INDEX => self.wasi_poll_oneoff(args),
-            WASI_PROC_EXIT_INDEX => self.wasi_proc_exit(args),
-            WASI_PROC_RAISE_INDEX => self.wasi_proc_raise(args),
-            WASI_SCHED_YIELD_INDEX => self.wasi_sched_yield(args),
-            WASI_RANDOM_GET_INDEX => self.wasi_random_get(args),
-            WASI_SOCK_RECV_INDEX => self.wasi_sock_recv(args),
-            WASI_SOCK_SEND_INDEX => self.wasi_sock_send(args),
-            WASI_SOCK_SHUTDOWN_INDEX => self.wasi_sock_shutdown(args),
-            otherwise => return mk_host_trap(FatalEngineError::UnknownHostFunction { index: otherwise }),
+
+        let wasi_call_index = match WASIAPIName::from_u32(index as u32) {
+            Some(s) => s,
+            None => return mk_host_trap(FatalEngineError::UnknownHostFunction { index }),
+        };
+
+        let result = match wasi_call_index {
+            WASIAPIName::ARGS_GET => self.wasi_args_get(args),
+            WASIAPIName::ARGS_SIZES_GET => self.wasi_args_sizes_get(args),
+            WASIAPIName::ENVIRON_GET => self.wasi_environ_get(args),
+            WASIAPIName::ENVIRON_SIZES_GET => self.wasi_environ_sizes_get(args),
+            WASIAPIName::CLOCK_RES_GET => self.wasi_clock_res_get(args),
+            WASIAPIName::CLOCK_TIME_GET => self.wasi_clock_time_get(args),
+            WASIAPIName::FD_ADVISE => self.wasi_fd_advise(args),
+            WASIAPIName::FD_ALLOCATE => self.wasi_fd_allocate(args),
+            WASIAPIName::FD_CLOSE => self.wasi_fd_close(args),
+            WASIAPIName::FD_DATASYNC => self.wasi_fd_datasync(args),
+            WASIAPIName::FD_FDSTAT_GET => self.wasi_fd_fdstat_get(args),
+            WASIAPIName::FD_FDSTAT_SET_FLAGS => self.wasi_fd_fdstat_set_flags(args),
+            WASIAPIName::FD_FDSTAT_SET_RIGHTS => self.wasi_fd_fdstat_set_rights(args),
+            WASIAPIName::FD_FILESTAT_GET => self.wasi_fd_filestat_get(args),
+            WASIAPIName::FD_FILESTAT_SET_SIZE => self.wasi_fd_filestat_set_size(args),
+            WASIAPIName::FD_FILESTAT_SET_TIMES => self.wasi_fd_filestat_set_times(args),
+            WASIAPIName::FD_PREAD => self.wasi_fd_pread(args),
+            WASIAPIName::FD_PRESTAT_GET => self.wasi_fd_prestat_get(args),
+            WASIAPIName::FD_PRESTAT_DIR_NAME => self.wasi_fd_prestat_dir_name(args),
+            WASIAPIName::FD_PWRITE => self.wasi_fd_pwrite(args),
+            WASIAPIName::FD_READ => self.wasi_fd_read(args),
+            WASIAPIName::FD_READDIR => self.wasi_fd_readdir(args),
+            WASIAPIName::FD_RENUMBER => self.wasi_fd_renumber(args),
+            WASIAPIName::FD_SEEK => self.wasi_fd_seek(args),
+            WASIAPIName::FD_SYNC => self.wasi_fd_sync(args),
+            WASIAPIName::FD_TELL => self.wasi_fd_tell(args),
+            WASIAPIName::FD_WRITE => self.wasi_fd_write(args),
+            WASIAPIName::PATH_CREATE_DIRECTORY => self.wasi_path_create_directory(args),
+            WASIAPIName::PATH_FILESTAT_GET => self.wasi_path_filestat_get(args),
+            WASIAPIName::PATH_FILESTAT_SET_TIMES => self.wasi_path_filestat_set_times(args),
+            WASIAPIName::PATH_LINK => self.wasi_path_link(args),
+            WASIAPIName::PATH_OPEN => self.wasi_path_open(args),
+            WASIAPIName::PATH_READLINK => self.wasi_path_readlink(args),
+            WASIAPIName::PATH_REMOVE_DIRECTORY => self.wasi_path_remove_directory(args),
+            WASIAPIName::PATH_RENAME => self.wasi_path_rename(args),
+            WASIAPIName::PATH_SYMLINK => self.wasi_path_symlink(args),
+            WASIAPIName::PATH_UNLINK_FILE => self.wasi_path_unlink_file(args),
+            WASIAPIName::POLL_ONEOFF => self.wasi_poll_oneoff(args),
+            WASIAPIName::PROC_EXIT => self.wasi_proc_exit(args),
+            WASIAPIName::PROC_RAISE => self.wasi_proc_raise(args),
+            WASIAPIName::SCHED_YIELD => self.wasi_sched_yield(args),
+            WASIAPIName::RANDOM_GET => self.wasi_random_get(args),
+            WASIAPIName::SOCK_RECV => self.wasi_sock_recv(args),
+            WASIAPIName::SOCK_SEND => self.wasi_sock_send(args),
+            WASIAPIName::SOCK_SHUTDOWN => self.wasi_sock_shutdown(args),
         };
 
         match result {
@@ -1300,7 +1150,7 @@ impl WASMIRuntimeState {
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
         let module = Module::from_buffer(buffer)?;
-        let env_resolver = wasmi::ImportsBuilder::new().with_resolver("wasi_snapshot_preview1", self);
+        let env_resolver = wasmi::ImportsBuilder::new().with_resolver(WASIWrapper::WASI_SNAPSHOT_MODULE_NAME, self);
 
         let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
         if not_started_module_ref.has_start() {
@@ -1344,87 +1194,6 @@ impl WASMIRuntimeState {
         not_started.invoke_export(export_name, &program_arguments, self)
     }
 
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Common code for implementating the WASI functionality.
-    ////////////////////////////////////////////////////////////////////////////
-
-    //TODO REMOVE but use MemoryHandler
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> Result<(), FatalEngineError> {
-        if let Some(memory) = self.memory() {
-            memory
-                .set(address, buffer)
-                .map_err(|_e| FatalEngineError::MemoryWriteFailed {
-                    memory_address: address as usize,
-                    bytes_to_be_written: buffer.len(),
-                })
-                .map(|_r| ())
-        } else {
-            Err(FatalEngineError::NoMemoryRegistered)
-        }
-    }
-
-    //TODO REMOVE but use MemoryHandler
-    fn read_buffer(&self, address: u32, length: usize) -> Result<Vec<u8>, FatalEngineError> {
-        if let Some(memory) = self.memory() {
-            memory
-                .get(address, length)
-                .map_err(|_e| FatalEngineError::MemoryReadFailed {
-                    memory_address: address as usize,
-                    bytes_to_be_read: length,
-                })
-                .map(|buf| buf.to_vec())
-        } else {
-            Err(FatalEngineError::NoMemoryRegistered)
-        }
-    }
-
-    /// Reads a null-terminated C-style string from the runtime state's memory,
-    /// starting at base address `address`.  Fails with
-    /// `Err(FatalEngineError::NoMemoryRegistered)` if no memory is registered in
-    /// the runtime state, or `Err(FatalEngineError::MemoryReadFailed)` if the value
-    /// could not be read from the address for some reason (e.g. if the bytes
-    /// read are not valid UTF-8.)
-    ///
-    /// TODO: should this not be OsStr rather than a valid UTF-8 string?  Most
-    /// POSIX-style implementations allow arbitrary nonsense filenames/paths and
-    /// do not mandate valid UTF-8.  How "real" do we really want to be, here?
-    fn read_cstring(&self, address: u32, length: usize) -> Result<String, FatalEngineError> {
-        println!("read_cstring is called on {} with length {}",address, length);
-        let bytes = self.read_buffer(address, length)?;
-
-        // TODO: erase the debug code
-        let rst = String::from_utf8(bytes).map_err(|_e| FatalEngineError::MemoryReadFailed {
-            memory_address: address as usize,
-            bytes_to_be_read: length,
-        })?;
-        println!("read_cstring: {}",rst);
-        Ok(rst)
-    }
-
-    /// Performs a scattered read from several locations, as specified by a list
-    /// of `IoVec` structures, `scatters`, from the runtime state's memory.
-    /// Fails with `Err(FatalEngineError::NoMemoryRegistered)` if no memory is
-    /// registered in the runtime state, or
-    /// `Err(FatalEngineError::MemoryReadFailed)` if any scattered read could not be
-    /// performed, for some reason.
-    fn read_iovec_scattered(&self, scatters: &[IoVec]) -> Result<Vec<Vec<u8>>, FatalEngineError> {
-        println!("called read_iovec_scattered: {:?}",scatters);
-        if let Some(memory) = self.memory() {
-            let mut result = Vec::new();
-
-            for scatter in scatters.iter() {
-                let buffer = self.read_buffer(scatter.buf, scatter.len as usize)?;
-                println!("read {:?} for {:?} and result <{:?}>",scatter.buf,scatter.len,String::from_utf8(buffer.clone()).unwrap());
-                result.push(buffer);
-            }
-
-            Ok(result)
-        } else {
-            Err(FatalEngineError::NoMemoryRegistered)
-        }
-    }
-
     ////////////////////////////////////////////////////////////////////////////
     // The WASI host call implementations.
     ////////////////////////////////////////////////////////////////////////////
@@ -1441,21 +1210,21 @@ impl WASMIRuntimeState {
         println!("call wasi_args_get");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_ARGS_GET_NAME,
+                WASIAPIName::ARGS_GET,
             ));
         }
 
-        let mut argv_address: u32 = args.nth(0);
-        let mut argv_buff_address: u32 = args.nth(1);
+        //let mut argv_address: u32 = args.nth(0);
+        //let mut argv_buff_address: u32 = args.nth(1);
 
-        for argument in self.args_get() {
-            let length = argument.len() as u32;
-            self.write_buffer(argv_address, &argument)?;
-            self.write_buffer(argv_buff_address, &u32::to_le_bytes(length))?;
+        //for argument in self.args_get() {
+            //let length = argument.len() as u32;
+            //self.write_buffer(argv_address, &argument)?;
+            //self.write_buffer(argv_buff_address, &u32::to_le_bytes(length))?;
 
-            argv_address += length;
-            argv_buff_address += 4;
-        }
+            //argv_address += length;
+            //argv_buff_address += 4;
+        //}
 
         Ok(ErrNo::Success)
     }
@@ -1463,19 +1232,19 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `args_sizes_get` function.
     fn wasi_args_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_args_sizes_get");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_ARGS_SIZES_GET_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_ARGS_SIZES_GET_NAME,
+            //));
+        //}
 
-        let argc_address: u32 = args.nth(0);
-        let argv_buff_size_address: u32 = args.nth(1);
+        //let argc_address: u32 = args.nth(0);
+        //let argv_buff_size_address: u32 = args.nth(1);
 
-        let (argc, argv_buff_size) = self.vfs.args_sizes_get();
+        //let (argc, argv_buff_size) = self.vfs.args_sizes_get();
 
-        self.write_buffer(argc_address, &u32::to_le_bytes(argc))?;
-        self.write_buffer(argv_buff_size_address, &u32::to_le_bytes(argv_buff_size))?;
+        //self.write_buffer(argc_address, &u32::to_le_bytes(argc))?;
+        //self.write_buffer(argv_buff_size_address, &u32::to_le_bytes(argv_buff_size))?;
 
         Ok(ErrNo::Success)
     }
@@ -1485,7 +1254,7 @@ impl WASMIRuntimeState {
         println!("call wasi_environ_get");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_ENVIRON_GET_NAME,
+                WASIAPIName::ENVIRON_GET,
             ));
         }
 
@@ -1499,7 +1268,7 @@ impl WASMIRuntimeState {
         println!("call wasi_environ_sizes_get");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_ENVIRON_SIZES_GET_NAME,
+                WASIAPIName::ENVIRON_SIZES_GET,
             ));
         }
 
@@ -1513,15 +1282,15 @@ impl WASMIRuntimeState {
     /// `ErrNo::NoSys`.
     fn wasi_clock_res_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_clock_res_get");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_CLOCK_RES_GET_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_CLOCK_RES_GET_NAME,
+            //));
+        //}
 
-        let address: u32 = args.nth(1);
+        //let address: u32 = args.nth(1);
 
-        self.write_buffer(address, &i64::to_le_bytes(0i64))?;
+        //self.write_buffer(address, &i64::to_le_bytes(0i64))?;
 
         Ok(ErrNo::NoSys)
     }
@@ -1531,14 +1300,14 @@ impl WASMIRuntimeState {
     /// `ErrNo::NoSys`.
     fn wasi_clock_time_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_clock_time_get");
-        if args.len() != 3 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_CLOCK_TIME_GET_NAME,
-            ));
-        }
+        //if args.len() != 3 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_CLOCK_TIME_GET_NAME,
+            //));
+        //}
 
-        let address: u32 = args.nth(2);
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        //let address: u32 = args.nth(2);
+        //self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NoSys)
     }
@@ -1548,7 +1317,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_advise");
         if args.len() != 4 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_ADVISE_NAME,
+                WASIAPIName::FD_ADVISE,
             ));
         }
 
@@ -1569,7 +1338,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_allocate");
         if args.len() != 3 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_ALLOCATE_NAME,
+                WASIAPIName::FD_ALLOCATE,
             ));
         }
 
@@ -1581,7 +1350,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_close");
         if args.len() != 1 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_CLOSE_NAME,
+                WASIAPIName::FD_CLOSE,
             ));
         }
 
@@ -1599,7 +1368,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_datasync");
         if args.len() != 1 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_DATASYNC_NAME,
+                WASIAPIName::FD_DATASYNC,
             ));
         }
 
@@ -1609,18 +1378,18 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_fdstat_get` function.
     fn wasi_fd_fdstat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_fdstat_get");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_FDSTAT_GET_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_FD_FDSTAT_GET_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let address: u32 = args.nth(1);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let address: u32 = args.nth(1);
 
-        let result: FdStat = self.vfs.fd_fdstat_get(&fd)?;
+        //let result: FdStat = self.vfs.fd_fdstat_get(&fd)?;
 
-        self.write_buffer(address, &pack_fdstat(&result))?;
+        //self.write_buffer(address, &pack_fdstat(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1630,7 +1399,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_fdstat_set_flags");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_FDSTAT_SET_FLAGS_NAME,
+                WASIAPIName::FD_FDSTAT_SET_FLAGS,
             ));
         }
 
@@ -1648,7 +1417,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_fdstat_set_rights");
         if args.len() != 3 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_FDSTAT_SET_RIGHTS_NAME,
+                WASIAPIName::FD_FDSTAT_SET_RIGHTS,
             ));
         }
 
@@ -1668,18 +1437,18 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_filestat_get` function.
     fn wasi_fd_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_filestat_get");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_FILESTAT_GET_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_FD_FILESTAT_GET_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let address: u32 = args.nth(1);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let address: u32 = args.nth(1);
 
-        let result: FileStat = self.vfs.fd_filestat_get(&fd)?;
+        //let result: FileStat = self.vfs.fd_filestat_get(&fd)?;
 
-        self.write_buffer(address, &pack_filestat(&result))?;
+        //self.write_buffer(address, &pack_filestat(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1689,7 +1458,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_filestat_set_size");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_FILESTAT_SET_SIZE_NAME,
+                WASIAPIName::FD_FILESTAT_SET_SIZE,
             ));
         }
 
@@ -1705,7 +1474,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_filestat_set_times");
         if args.len() != 4 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_FILESTAT_SET_TIMES_NAME,
+                WASIAPIName::FD_FILESTAT_SET_TIMES,
             ));
         }
 
@@ -1717,7 +1486,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_pread");
         if args.len() != 5 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_PREAD_NAME,
+                WASIAPIName::FD_PREAD,
             ));
         }
 
@@ -1748,7 +1517,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_prestat_get");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_PRESTAT_GET_NAME,
+                WASIAPIName::FD_PRESTAT_GET,
             ));
         }
 
@@ -1763,7 +1532,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_prestat_dir_name");
         if args.len() != 3 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_PRESTAT_DIR_NAME_NAME,
+                WASIAPIName::FD_PRESTAT_DIR_NAME,
             ));
         }
 
@@ -1813,7 +1582,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_read");
         if args.len() != 4 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_READ_NAME,
+                WASIAPIName::FD_READ,
             ));
         }
 
@@ -1829,41 +1598,41 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_readdir(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_readdir");
-        if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_READDIR_NAME,
-            ));
-        }
+        //if args.len() != 5 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_FD_READDIR_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let dirent_base: u32 = args.nth::<u32>(1);
-        let dirent_length: u32 = args.nth::<u32>(2);
-        let cookie = match args.nth::<u32>(3).try_into() {
-            Err(_err) => return Ok(ErrNo::Inval),
-            Ok(cookie) => cookie,
-        };
-        let address: u32 = args.nth(4);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let dirent_base: u32 = args.nth::<u32>(1);
+        //let dirent_length: u32 = args.nth::<u32>(2);
+        //let cookie = match args.nth::<u32>(3).try_into() {
+            //Err(_err) => return Ok(ErrNo::Inval),
+            //Ok(cookie) => cookie,
+        //};
+        //let address: u32 = args.nth(4);
 
-        let dirents = self.vfs.fd_readdir(&fd, &cookie)?;
+        //let dirents = self.vfs.fd_readdir(&fd, &cookie)?;
 
-        let mut size_written = 0u32;
+        //let mut size_written = 0u32;
 
-        for dirent in dirents.iter() {
-            let packed = pack_dirent(dirent);
+        //for dirent in dirents.iter() {
+            //let packed = pack_dirent(dirent);
 
-            if (size_written as usize) <= (dirent_length as usize) - packed.len() {
-                self.write_buffer(dirent_base + size_written, &packed)?;
-                size_written += packed.len() as u32;
-            } else {
-                let diff = size_written - dirent_length;
-                let packed = &packed[0..diff as usize];
-                self.write_buffer(dirent_base + size_written, packed)?;
-                size_written += diff;
-                break;
-            }
-        }
+            //if (size_written as usize) <= (dirent_length as usize) - packed.len() {
+                //self.write_buffer(dirent_base + size_written, &packed)?;
+                //size_written += packed.len() as u32;
+            //} else {
+                //let diff = size_written - dirent_length;
+                //let packed = &packed[0..diff as usize];
+                //self.write_buffer(dirent_base + size_written, packed)?;
+                //size_written += diff;
+                //break;
+            //}
+        //}
 
-        self.write_buffer(address, &u32::to_le_bytes(size_written))?;
+        //self.write_buffer(address, &u32::to_le_bytes(size_written))?;
 
         Ok(ErrNo::Success)
     }
@@ -1873,7 +1642,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_renumber");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_RENUMBER_NAME,
+                WASIAPIName::FD_RENUMBER,
             ));
         }
 
@@ -1886,23 +1655,23 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_seek` function.
     fn wasi_fd_seek(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_seek");
-        if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_SEEK_NAME,
-            ));
-        }
+        //if args.len() != 4 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_FD_SEEK_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let offset: FileDelta = args.nth::<i64>(1);
-        let whence: Whence = match args.nth::<u8>(2).try_into() {
-            Ok(whence) => whence,
-            Err(_err) => return Ok(ErrNo::Inval),
-        };
-        let address: u32 = args.nth(3);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let offset: FileDelta = args.nth::<i64>(1);
+        //let whence: Whence = match args.nth::<u8>(2).try_into() {
+            //Ok(whence) => whence,
+            //Err(_err) => return Ok(ErrNo::Inval),
+        //};
+        //let address: u32 = args.nth(3);
 
-        let result = self.vfs.fd_seek(&fd, offset, whence)?;
+        //let result = self.vfs.fd_seek(&fd, offset, whence)?;
 
-        self.write_buffer(address, &u64::to_le_bytes(result))?;
+        //self.write_buffer(address, &u64::to_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1916,7 +1685,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_sync");
         if args.len() != 1 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_SEEK_NAME,
+                WASIAPIName::FD_SEEK,
             ));
         }
 
@@ -1926,18 +1695,18 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_tell` function.
     fn wasi_fd_tell(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_tell");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_TELL_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_FD_TELL_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let address: u32 = args.nth(1);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let address: u32 = args.nth(1);
 
-        let result = self.vfs.fd_tell(&fd)?.clone();
+        //let result = self.vfs.fd_tell(&fd)?.clone();
 
-        self.write_buffer(address, &u64::to_le_bytes(result))?;
+        //self.write_buffer(address, &u64::to_le_bytes(result))?;
 
         Ok(ErrNo::Success)
     }
@@ -1947,7 +1716,7 @@ impl WASMIRuntimeState {
         println!("call wasi_fd_write");
         if args.len() != 4 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_FD_WRITE_NAME,
+                WASIAPIName::FD_WRITE,
             ));
         }
 
@@ -1962,44 +1731,45 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `path_create_directory` function.
     fn wasi_path_create_directory(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_create_directory");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_CREATE_DIRECTORY_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_PATH_CREATE_DIRECTORY_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let path_address: u32 = args.nth::<u32>(1);
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let path_address: u32 = args.nth::<u32>(1);
 
-        //TODO: change !!!!!
-        let path = self.read_cstring(path_address,1)?;
+        ////TODO: change !!!!!
+        //let path = self.read_cstring(path_address,1)?;
 
-        Ok(self.vfs.path_create_directory(&fd, path))
+        //Ok(self.vfs.path_create_directory(&fd, path))
+        Ok(ErrNo::NotSup)
     }
 
     /// The implementation of the WASI `path_filestat_get` function.
     fn wasi_path_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_filestat_get");
-        if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_FILESTAT_GET_NAME,
-            ));
-        }
+        //if args.len() != 4 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_PATH_FILESTAT_GET_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let flags: LookupFlags = match args.nth::<u32>(1).try_into() {
-            Ok(flags) => flags,
-            Err(_err) => return Ok(ErrNo::Inval),
-        };
-        let path_address = args.nth::<u32>(2);
-        //TODO: change !!!!!
-        let path = self.read_cstring(path_address,1)?;
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let flags: LookupFlags = match args.nth::<u32>(1).try_into() {
+            //Ok(flags) => flags,
+            //Err(_err) => return Ok(ErrNo::Inval),
+        //};
+        //let path_address = args.nth::<u32>(2);
+        ////TODO: change !!!!!
+        //let path = self.read_cstring(path_address,1)?;
 
-        let address = args.nth::<u32>(3);
+        //let address = args.nth::<u32>(3);
 
-        let result = self.vfs.path_filestat_get(&fd, &flags, &path)?;
+        //let result = self.vfs.path_filestat_get(&fd, &flags, &path)?;
 
-        self.write_buffer(address, &pack_filestat(&result))?;
+        //self.write_buffer(address, &pack_filestat(&result))?;
 
         Ok(ErrNo::Success)
     }
@@ -2010,7 +1780,7 @@ impl WASMIRuntimeState {
         println!("call wasi_path_filestat_set_times");
         if args.len() != 6 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_FILESTAT_SET_TIMES_NAME,
+                WASIAPIName::PATH_FILESTAT_SET_TIMES,
             ));
         }
 
@@ -2023,7 +1793,7 @@ impl WASMIRuntimeState {
         println!("call wasi_path_link");
         if args.len() != 5 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_LINK_NAME,
+                WASIAPIName::PATH_LINK,
             ));
         }
 
@@ -2035,7 +1805,7 @@ impl WASMIRuntimeState {
         println!("call wasi_path_open");
         if args.len() != 9 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_OPEN_NAME,
+                WASIAPIName::PATH_OPEN,
             ));
         }
 
@@ -2070,7 +1840,7 @@ impl WASMIRuntimeState {
         println!("call wasi_path_readlink");
         if args.len() != 5 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_READLINK_NAME,
+                WASIAPIName::PATH_READLINK,
             ));
         }
 
@@ -2080,40 +1850,42 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `path_remove_directory` function.
     fn wasi_path_remove_directory(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_remove_directory");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_REMOVE_DIRECTORY_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_PATH_REMOVE_DIRECTORY_NAME,
+            //));
+        //}
 
-        let fd: Fd = args.nth::<u32>(0).into();
-        let path_address: u32 = args.nth::<u32>(1).into();
+        //let fd: Fd = args.nth::<u32>(0).into();
+        //let path_address: u32 = args.nth::<u32>(1).into();
 
-        //TODO: change !!!!!!!
-        let path = self.read_cstring(path_address,1)?;
+        ////TODO: change !!!!!!!
+        //let path = self.read_cstring(path_address,1)?;
 
-        Ok(self.vfs.path_remove_directory(&fd, &path))
+        //Ok(self.vfs.path_remove_directory(&fd, &path))
+        Ok(ErrNo::NotSup)
     }
 
     /// The implementation of the WASI `path_rename` function.
     fn wasi_path_rename(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_rename");
-        if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_RENAME_NAME,
-            ));
-        }
+        //if args.len() != 4 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_PATH_RENAME_NAME,
+            //));
+        //}
 
-        let old_fd: Fd = args.nth::<u32>(0).into();
-        let old_path_address: u32 = args.nth::<u32>(1);
-        let new_fd: Fd = args.nth::<u32>(2).into();
-        let new_path_address = args.nth::<u32>(3);
+        //let old_fd: Fd = args.nth::<u32>(0).into();
+        //let old_path_address: u32 = args.nth::<u32>(1);
+        //let new_fd: Fd = args.nth::<u32>(2).into();
+        //let new_path_address = args.nth::<u32>(3);
 
-        //TODO: change !!!!!!!
-        let old_path = self.read_cstring(old_path_address,1)?;
-        let new_path = self.read_cstring(new_path_address,1)?;
+        ////TODO: change !!!!!!!
+        //let old_path = self.read_cstring(old_path_address,1)?;
+        //let new_path = self.read_cstring(new_path_address,1)?;
 
-        Ok(self.vfs.path_rename(&old_fd, &old_path, &new_fd, new_path))
+        //Ok(self.vfs.path_rename(&old_fd, &old_path, &new_fd, new_path))
+        Ok(ErrNo::NotSup)
     }
 
     /// The implementation of the WASI `path_symlink` function.  This is not
@@ -2124,7 +1896,7 @@ impl WASMIRuntimeState {
         println!("call wasi_path_symlink");
         if args.len() != 3 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_SYMLINK_NAME,
+                WASIAPIName::PATH_SYMLINK,
             ));
         }
 
@@ -2139,7 +1911,7 @@ impl WASMIRuntimeState {
         println!("call wasi_path_unlink_file");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PATH_UNLINK_FILE_NAME,
+                WASIAPIName::PATH_UNLINK_FILE,
             ));
         }
 
@@ -2151,14 +1923,14 @@ impl WASMIRuntimeState {
     /// were registered and return `ErrNo::NotSup`.
     fn wasi_poll_oneoff(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_poll_oneoff");
-        if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_POLL_ONEOFF_NAME,
-            ));
-        }
+        //if args.len() != 4 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_POLL_ONEOFF_NAME,
+            //));
+        //}
 
-        let address: u32 = args.nth(3);
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        //let address: u32 = args.nth(3);
+        //self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NotSup)
     }
@@ -2170,7 +1942,7 @@ impl WASMIRuntimeState {
         println!("call wasi_proc_exit");
         if args.len() != 1 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PROC_EXIT_NAME,
+                WASIAPIName::PROC_EXIT,
             ));
         }
 
@@ -2188,7 +1960,7 @@ impl WASMIRuntimeState {
         println!("proc exit is called");
         if args.len() != 1 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_PROC_RAISE_NAME,
+                WASIAPIName::PROC_RAISE,
             ));
         }
 
@@ -2201,7 +1973,7 @@ impl WASMIRuntimeState {
         println!("call wasi_sched_yield");
         if args.len() != 0 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_SCHED_YIELD_NAME,
+                WASIAPIName::SCHED_YIELD,
             ));
         }
 
@@ -2216,23 +1988,25 @@ impl WASMIRuntimeState {
     /// generator fails for some reason.
     fn wasi_random_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_random_get");
-        if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_RANDOM_GET_NAME,
-            ));
-        }
+        //if args.len() != 2 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_RANDOM_GET_NAME,
+            //));
+        //}
 
-        let address: u32 = args.nth(0);
-        let size: u32 = args.nth(1);
-        let mut buffer = vec![0; size as usize];
+        //let address: u32 = args.nth(0);
+        //let size: u32 = args.nth(1);
+        //let mut buffer = vec![0; size as usize];
 
-        if let result::Result::Success = getrandom(&mut buffer) {
-            self.write_buffer(address, &buffer)?;
+        //if let result::Result::Success = getrandom(&mut buffer) {
+            //self.write_buffer(address, &buffer)?;
 
-            Ok(ErrNo::Success)
-        } else {
-            Ok(ErrNo::NoSys)
-        }
+            //Ok(ErrNo::Success)
+        //} else {
+            //Ok(ErrNo::NoSys)
+        //}
+
+        Ok(ErrNo::Success)
     }
 
     /// The implementation of the WASI `sock_send` function.  This is not
@@ -2240,14 +2014,14 @@ impl WASMIRuntimeState {
     /// `0` as the length of the transmission.
     fn wasi_sock_send(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sock_send");
-        if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_SOCK_SEND_NAME,
-            ));
-        }
+        //if args.len() != 5 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_SOCK_SEND_NAME,
+            //));
+        //}
 
-        let address = args.nth(4);
-        self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        //let address = args.nth(4);
+        //self.write_buffer(address, &u32::to_le_bytes(0u32))?;
 
         Ok(ErrNo::NotSup)
     }
@@ -2257,17 +2031,17 @@ impl WASMIRuntimeState {
     /// `0` as the length of the transmission.
     fn wasi_sock_recv(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sock_recv");
-        if args.len() != 6 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_SOCK_RECV_NAME,
-            ));
-        }
+        //if args.len() != 6 {
+            //return Err(FatalEngineError::bad_arguments_to_host_function(
+                //WASI_SOCK_RECV_NAME,
+            //));
+        //}
 
-        let datalen_address: u32 = args.nth(3);
-        let flags_address: u32 = args.nth(4);
+        //let datalen_address: u32 = args.nth(3);
+        //let flags_address: u32 = args.nth(4);
 
-        self.write_buffer(datalen_address, &u32::to_le_bytes(0u32))?;
-        self.write_buffer(flags_address, &u16::to_le_bytes(0u16))?;
+        //self.write_buffer(datalen_address, &u32::to_le_bytes(0u32))?;
+        //self.write_buffer(flags_address, &u16::to_le_bytes(0u16))?;
 
         Ok(ErrNo::NotSup)
     }
@@ -2278,7 +2052,7 @@ impl WASMIRuntimeState {
         println!("call wasi_sock_shutdown");
         if args.len() != 2 {
             return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASI_SOCK_SHUTDOWN_NAME,
+                WASIAPIName::SOCK_SHUTDOWN,
             ));
         }
 
@@ -2340,7 +2114,7 @@ impl ExecutionEngine for WASMIRuntimeState {
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());
 
-        match self.invoke_export(ENTRY_POINT_NAME) {
+        match self.invoke_export(WASIWrapper::ENTRY_POINT_NAME) {
             Ok(None) => {
                 // TODO ADD correct return
                 EngineReturnCode::try_from(0)

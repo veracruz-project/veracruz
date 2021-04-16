@@ -15,6 +15,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(non_camel_case_types)]
+
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use wasi_types::{
@@ -30,13 +32,11 @@ use std::{
     string::{String, ToString},
     vec::Vec,
 };
-use crate::hcall::buffer::VFSError;
+use crate::{hcall::buffer::{VFS, VFSError}, fs::{FileSystem, FileSystemError}};
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "sgx")]
 use std::sync::{Arc, SgxMutex as Mutex};
-use super::{fs::FileSystem, fs::FileSystemError};
-use crate::hcall::buffer::VFS;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
@@ -58,96 +58,110 @@ pub(crate) const BLOCK_INPUT_DIRECTORY_NAME: &str = "block";
 /// TODO REMOVE ?
 pub(crate) const STREAM_INPUT_DIRECTORY_NAME: &str = "stream";
 
-/// Name of the WASI `args_get` function.
-pub(crate) const WASI_ARGS_GET_NAME: &str = "args_get";
-/// Name of the WASI `args_get` function.
-pub(crate) const WASI_ARGS_SIZES_GET_NAME: &str = "args_sizes_get";
-/// Name of the WASI `environ_get` function.
-pub(crate) const WASI_ENVIRON_GET_NAME: &str = "environ_get";
-/// Name of the WASI `environ_sizes_get` function.
-pub(crate) const WASI_ENVIRON_SIZES_GET_NAME: &str = "environ_sizes_get";
-/// Name of the WASI `clock_res_get` function.
-pub(crate) const WASI_CLOCK_RES_GET_NAME: &str = "clock_res_get";
-/// Name of the WASI `clock_time_get` function.
-pub(crate) const WASI_CLOCK_TIME_GET_NAME: &str = "clock_time_get";
-/// Name of the WASI `fd_advise` function.
-pub(crate) const WASI_FD_ADVISE_NAME: &str = "fd_advise";
-/// Name of the WASI `fd_allocate` function.
-pub(crate) const WASI_FD_ALLOCATE_NAME: &str = "fd_allocate";
-/// Name of the WASI `fd_close` function.
-pub(crate) const WASI_FD_CLOSE_NAME: &str = "fd_close";
-/// Name of the WASI `fd_datasync` function.
-pub(crate) const WASI_FD_DATASYNC_NAME: &str = "fd_datasync";
-/// Name of the WASI `fd_fdstat_get` function.
-pub(crate) const WASI_FD_FDSTAT_GET_NAME: &str = "fd_fdstat_get";
-/// Name of the WASI `fd_filestat_set_flags` function.
-pub(crate) const WASI_FD_FDSTAT_SET_FLAGS_NAME: &str = "fd_fdstat_set_flags";
-/// Name of the WASI `fd_filestat_set_rights` function.
-pub(crate) const WASI_FD_FDSTAT_SET_RIGHTS_NAME: &str = "fd_fdstat_set_rights";
-/// Name of the WASI `fd_filestat_get` function.
-pub(crate) const WASI_FD_FILESTAT_GET_NAME: &str = "fd_filestat_get";
-/// Name of the WASI `fd_filestat_set_size` function.
-pub(crate) const WASI_FD_FILESTAT_SET_SIZE_NAME: &str = "fd_filestat_set_size";
-/// Name of the WASI `fd_filestat_set_times` function.
-pub(crate) const WASI_FD_FILESTAT_SET_TIMES_NAME: &str = "fd_filestat_set_times";
-/// Name of the WASI `fd_pread` function.
-pub(crate) const WASI_FD_PREAD_NAME: &str = "fd_pread";
-/// Name of the WASI `fd_prestat_get_name` function.
-pub(crate) const WASI_FD_PRESTAT_GET_NAME: &str = "fd_prestat_get";
-/// Name of the WASI `fd_prestat_dir_name` function.
-pub(crate) const WASI_FD_PRESTAT_DIR_NAME_NAME: &str = "fd_prestat_dir_name";
-/// Name of the WASI `fd_pwrite` function.
-pub(crate) const WASI_FD_PWRITE_NAME: &str = "fd_pwrite";
-/// Name of the WASI `fd_read` function.
-pub(crate) const WASI_FD_READ_NAME: &str = "fd_read";
-/// Name of the WASI `fd_readdir` function.
-pub(crate) const WASI_FD_READDIR_NAME: &str = "fd_readdir";
-/// Name of the WASI `fd_renumber` function.
-pub(crate) const WASI_FD_RENUMBER_NAME: &str = "fd_renumber";
-/// Name of the WASI `fd_seek` function.
-pub(crate) const WASI_FD_SEEK_NAME: &str = "fd_seek";
-/// Name of the WASI `fd_sync` function.
-pub(crate) const WASI_FD_SYNC_NAME: &str = "fd_sync";
-/// Name of the WASI `fd_tell` function.
-pub(crate) const WASI_FD_TELL_NAME: &str = "fd_tell";
-/// Name of the WASI `fd_write` function.
-pub(crate) const WASI_FD_WRITE_NAME: &str = "fd_write";
-/// Name of the WASI `path_crate_directory` function.
-pub(crate) const WASI_PATH_CREATE_DIRECTORY_NAME: &str = "path_create_directory";
-/// Name of the WASI `path_filestat_get` function.
-pub(crate) const WASI_PATH_FILESTAT_GET_NAME: &str = "path_filestat_get";
-/// Name of the WASI `path_filestat_set_times` function.
-pub(crate) const WASI_PATH_FILESTAT_SET_TIMES_NAME: &str = "path_filestat_set_times";
-/// Name of the WASI `path_link` function.
-pub(crate) const WASI_PATH_LINK_NAME: &str = "path_link";
-/// Name of the WASI `path_open` function.
-pub(crate) const WASI_PATH_OPEN_NAME: &str = "path_open";
-/// Name of the WASI `path_readlink` function.
-pub(crate) const WASI_PATH_READLINK_NAME: &str = "path_readlink";
-/// Name of the WASI `path_remove_directory` function.
-pub(crate) const WASI_PATH_REMOVE_DIRECTORY_NAME: &str = "path_remove_directory";
-/// Name of the WASI `path_rename` function.
-pub(crate) const WASI_PATH_RENAME_NAME: &str = "path_rename";
-/// Name of the WASI `path_symlink` function.
-pub(crate) const WASI_PATH_SYMLINK_NAME: &str = "path_symlink";
-/// Name of the WASI `path_unlink_file` function.
-pub(crate) const WASI_PATH_UNLINK_FILE_NAME: &str = "path_unlink_file";
-/// Name of the WASI `poll_oneoff` function.
-pub(crate) const WASI_POLL_ONEOFF_NAME: &str = "poll_oneoff";
-/// Name of the WASI `proc_exit` function.
-pub(crate) const WASI_PROC_EXIT_NAME: &str = "proc_exit";
-/// Name of the WASI `proc_raise` function.
-pub(crate) const WASI_PROC_RAISE_NAME: &str = "proc_raise";
-/// Name of the WASI `sched_yield` function.
-pub(crate) const WASI_SCHED_YIELD_NAME: &str = "sched_yield";
-/// Name of the WASI `random_get` function.
-pub(crate) const WASI_RANDOM_GET_NAME: &str = "random_get";
-/// Name of the WASI `sock_recv` function.
-pub(crate) const WASI_SOCK_RECV_NAME: &str = "sock_recv";
-/// Name of the WASI `sock_send` function.
-pub(crate) const WASI_SOCK_SEND_NAME: &str = "sock_send";
-/// Name of the WASI `sock_shutdown` function.
-pub(crate) const WASI_SOCK_SHUTDOWN_NAME: &str = "sock_shutdown";
+/// List of WASI API.
+#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize)]
+pub enum WASIAPIName {
+    ARGS_GET = 1,
+    ARGS_SIZES_GET,
+    ENVIRON_GET,
+    ENVIRON_SIZES_GET,
+    CLOCK_RES_GET,
+    CLOCK_TIME_GET,
+    FD_ADVISE,
+    FD_ALLOCATE,
+    FD_CLOSE,
+    FD_DATASYNC,
+    FD_FDSTAT_GET,
+    FD_FDSTAT_SET_FLAGS,
+    FD_FDSTAT_SET_RIGHTS,
+    FD_FILESTAT_GET,
+    FD_FILESTAT_SET_SIZE,
+    FD_FILESTAT_SET_TIMES,
+    FD_PREAD,
+    FD_PRESTAT_GET,
+    FD_PRESTAT_DIR_NAME,
+    FD_PWRITE,
+    FD_READ,
+    FD_READDIR,
+    FD_RENUMBER,
+    FD_SEEK,
+    FD_SYNC,
+    FD_TELL,
+    FD_WRITE,
+    PATH_CREATE_DIRECTORY,
+    PATH_FILESTAT_GET,
+    PATH_FILESTAT_SET_TIMES,
+    PATH_LINK,
+    PATH_OPEN,
+    PATH_READLINK,
+    PATH_REMOVE_DIRECTORY,
+    PATH_RENAME,
+    PATH_SYMLINK,
+    PATH_UNLINK_FILE,
+    POLL_ONEOFF,
+    PROC_EXIT,
+    PROC_RAISE,
+    SCHED_YIELD,
+    RANDOM_GET,
+    SOCK_RECV,
+    SOCK_SEND,
+    SOCK_SHUTDOWN,
+}
+
+impl TryFrom<&str> for WASIAPIName {
+    type Error = ();
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let rst = match s {
+            "args_get" => WASIAPIName::ARGS_GET,
+            "args_sizes_get" => WASIAPIName::ARGS_SIZES_GET,
+            "environ_get" => WASIAPIName::ENVIRON_GET,
+            "environ_sizes_get" => WASIAPIName::ENVIRON_SIZES_GET,
+            "clock_res_get" => WASIAPIName::CLOCK_RES_GET,
+            "clock_time_get" => WASIAPIName::CLOCK_TIME_GET,
+            "fd_advise" => WASIAPIName::FD_ADVISE,
+            "fd_allocate" => WASIAPIName::FD_ALLOCATE,
+            "fd_close" => WASIAPIName::FD_CLOSE,
+            "fd_datasync" => WASIAPIName::FD_DATASYNC,
+            "fd_fdstat_get" => WASIAPIName::FD_FDSTAT_GET,
+            "fd_fdstat_set_flags" => WASIAPIName::FD_FDSTAT_SET_FLAGS,
+            "fd_fdstat_set_rights" => WASIAPIName::FD_FDSTAT_SET_RIGHTS,
+            "fd_filestat_get" => WASIAPIName::FD_FILESTAT_GET,
+            "fd_filestat_set_size" => WASIAPIName::FD_FILESTAT_SET_SIZE,
+            "fd_filestat_set_times" => WASIAPIName::FD_FILESTAT_SET_TIMES,
+            "fd_pread" => WASIAPIName::FD_PREAD,
+            "fd_prestat_get" => WASIAPIName::FD_PRESTAT_GET,
+            "fd_prestat_dir_name" => WASIAPIName::FD_PRESTAT_DIR_NAME,
+            "fd_pwrite" => WASIAPIName::FD_PWRITE,
+            "fd_read" => WASIAPIName::FD_READ,
+            "fd_readdir" => WASIAPIName::FD_READDIR,
+            "fd_renumber" => WASIAPIName::FD_RENUMBER,
+            "fd_seek" => WASIAPIName::FD_SEEK,
+            "fd_sync" => WASIAPIName::FD_SYNC,
+            "fd_tell" => WASIAPIName::FD_TELL,
+            "fd_write" => WASIAPIName::FD_WRITE,
+            "path_create_directory" => WASIAPIName::PATH_CREATE_DIRECTORY,
+            "path_filestat_get" => WASIAPIName::PATH_FILESTAT_GET,
+            "path_filestat_set_times" => WASIAPIName::PATH_FILESTAT_SET_TIMES,
+            "path_link" => WASIAPIName::PATH_LINK,
+            "path_open" => WASIAPIName::PATH_OPEN,
+            "path_readlink" => WASIAPIName::PATH_READLINK,
+            "path_remove_directory" => WASIAPIName::PATH_REMOVE_DIRECTORY,
+            "path_rename" => WASIAPIName::PATH_RENAME,
+            "path_symlink" => WASIAPIName::PATH_SYMLINK,
+            "path_unlink_file" => WASIAPIName::PATH_UNLINK_FILE,
+            "poll_oneoff" => WASIAPIName::POLL_ONEOFF,
+            "proc_exit" => WASIAPIName::PROC_EXIT,
+            "proc_raise" => WASIAPIName::PROC_RAISE,
+            "sched_yield" => WASIAPIName::SCHED_YIELD,
+            "random_get" => WASIAPIName::RANDOM_GET,
+            "sock_recv" => WASIAPIName::SOCK_RECV,
+            "sock_send" => WASIAPIName::SOCK_SEND,
+            "sock_shutdown" => WASIAPIName::SOCK_SHUTDOWN,
+            _otherwise => return Err(()),
+        };
+        Ok(rst)
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellanea that doesn't fit elsewhere.
@@ -285,6 +299,13 @@ pub trait MemoryHandler {
     //parameters
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo;
     fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo>;
+
+    /// Reads a null-terminated C-style string from the runtime state's memory,
+    /// starting at base address `address`.  If it fails, return ErrNo.
+    ///
+    /// TODO: should this not be OsStr rather than a valid UTF-8 string?  Most
+    /// POSIX-style implementations allow arbitrary nonsense filenames/paths and
+    /// do not mandate valid UTF-8.  How "real" do we really want to be, here?
     fn read_cstring(&self, address: u32, length: u32) -> Result<String, ErrNo> {
         let bytes = self.read_buffer(address, length)?;
         // TODO: erase the debug code
@@ -353,6 +374,14 @@ pub struct WASIWrapper {
 }
 
 impl WASIWrapper {
+
+    /// The name of the WASM program's entry point.
+    pub(crate) const ENTRY_POINT_NAME: &'static str = "_start";
+    /// The name of the WASM program's linear memory.
+    pub(crate) const LINEAR_MEMORY_NAME: &'static str = "memory";
+    /// The name of the containing module for all WASI imports.
+    pub(crate) const WASI_SNAPSHOT_MODULE_NAME: &'static str = "wasi_snapshot_preview1";
+
     ////////////////////////////////////////////////////////////////////////////
     // Creating and modifying runtime states.
     ////////////////////////////////////////////////////////////////////////////
@@ -394,17 +423,6 @@ impl WASIWrapper {
     ////////////////////////////////////////////////////////////////////////////
     // The program's environment.
     ////////////////////////////////////////////////////////////////////////////
-
-    ///// Pushes a new argument, `argument`, to the list of program arguments that
-    ///// will be made available to the program.
-    //#[inline]
-    //pub(crate) fn push_program_argument<U>(&mut self, argument: U) -> &mut Self
-    //where
-        //U: Into<String>,
-    //{
-        //self.program_arguments.push(argument.into());
-        //self
-    //}
 
     /// Implementation of the WASI `args_sizes_get` function.
     pub(crate) fn args_sizes_get(&self) -> (Size, Size) {
@@ -669,7 +687,7 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_write(&mut self, memory_ref: &mut MemoryHandler, fd: u32, iovec_base: u32, iovec_count: u32, address: u32) -> ErrNo {
+    pub(crate) fn fd_write(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, iovec_base: u32, iovec_count: u32, address: u32) -> ErrNo {
         let iovecs = match memory_ref.unpack_iovec_array(iovec_base, iovec_count) {
             Ok(o) => o,
             Err(e) => return e,
@@ -805,12 +823,12 @@ pub enum FatalEngineError {
     /// programming error in the source that originated the WASM programming if
     /// `libveracruz` was not used.
     #[error(
-        display = "FatalEngineError: Bad arguments passed to host function '{}'.",
+        display = "FatalEngineError: Bad arguments passed to host function '{:?}'.",
         function_name
     )]
     BadArgumentsToHostFunction {
         /// The name of the host function that was being invoked.
-        function_name: String,
+        function_name: WASIAPIName,
     },
     /// The WASM program tried to invoke an unknown H-call on the Veracruz host.
     #[error(display = "FatalEngineError: Unknown H-call invoked: '{}'.", index)]
@@ -915,12 +933,10 @@ impl FatalEngineError {
 
     /// Constructs a `FatalEngineError::BadArgumentsToHostFunction` out of anything
     /// that can be converted into a string.
-    pub fn bad_arguments_to_host_function<T>(fname: T) -> Self
-    where
-        T: Into<String>,
+    pub fn bad_arguments_to_host_function(fname: WASIAPIName) -> Self
     {
         FatalEngineError::BadArgumentsToHostFunction {
-            function_name: fname.into(),
+            function_name: fname,
         }
     }
 }
@@ -956,6 +972,7 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
+    /// TODO TODO: change to ErrNo !?
     fn invoke_entry_point(&mut self, file_name: &str)
         -> Result<EngineReturnCode, FatalEngineError>;
 }
