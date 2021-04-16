@@ -2,6 +2,7 @@
 
 import json
 import hashlib
+import base64
 
 def main(in_json, out_h, out_c):
     with open(in_json) as f:
@@ -26,11 +27,27 @@ def main(in_json, out_h, out_c):
         f.writeln()
         f.writeln('#include <stdint.h>')
         f.writeln()
-        f.writeln('extern uint8_t _veracruz_policy_raw[];')
-        f.writeln()
+        f.writeln('// general policy things')
         f.writeln('#define VERACRUZ_POLICY_HASH "%(hash)s"',
             hash=policy_hash)
+        f.writeln('extern uint8_t _veracruz_policy_raw[];')
         f.writeln('#define VERACRUZ_POLICY_RAW _veracruz_policy_raw')
+        f.writeln()
+        f.writeln('// various hashes')
+        # TODO choose between platforms?
+        f.writeln('extern uint8_t _runtime_manager_hash[%(size)d];',
+            size=len(policy['mexico_city_hash_sgx'])/2)
+        f.writeln('#define RUNTIME_MANAGER_HASH _runtime_manager_hash')
+        f.writeln()
+        f.writeln('// server info')
+        f.writeln('#define VERACRUZ_SERVER_HOST "%(host)s"',
+            host=policy['sinaloa_url'].split(':')[0])
+        f.writeln('#define VERACRUZ_SERVER_PORT %(port)s',
+            port=policy['sinaloa_url'].split(':')[1])
+        f.writeln('#define PROXY_ATTESTATION_SERVER_HOST "%(host)s"',
+            host=policy['proxy_attestation_server_url'].split(':')[0])
+        f.writeln('#define PROXY_ATTESTATION_SERVER_PORT %(port)s',
+            port=policy['proxy_attestation_server_url'].split(':')[1])
         f.writeln()
         f.writeln('#endif')
 
@@ -54,6 +71,14 @@ def main(in_json, out_h, out_c):
             f.writeln('    %(raw)s',
                 raw=' '.join('0x%02x,' % ord(x)
                     for x in policy_raw[i : min(i+8, len(policy_raw))]))
+        f.writeln('};')
+        f.writeln()
+        f.writeln('uint8_t _runtime_manager_hash[] = {')
+        runtime_manager_hash = policy['mexico_city_hash_sgx']
+        for i in range(0, len(runtime_manager_hash)//2, 8):
+            f.writeln('    %(hash)s',
+                hash=' '.join('0x%02x,' % int(runtime_manager_hash[2*j:2*j+2], 16)
+                    for j in range(i, min(i+8, len(runtime_manager_hash)//2))))
         f.writeln('};')
 
 if __name__ == "__main__":

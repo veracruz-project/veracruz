@@ -26,6 +26,8 @@
 #include "nanopb/pb_decode.h"
 #include "transport_protocol.pb.h"
 
+#include "policy.h"
+
 // TODO log?
 //#include <logging/log.h>
 //LOG_MODULE_REGISTER(http, CONFIG_FOO_LOG_LEVEL);
@@ -70,26 +72,9 @@
 
 //// HTTP stuff ////
 
-// TODO use generated policy.h
-#ifndef VERACRUZ_SERVER_HOST
-#define VERACRUZ_SERVER_HOST "172.17.0.2"
-#endif
-
-#ifndef VERACRUZ_SERVER_PORT
-#define VERACRUZ_SERVER_PORT 3017
-#endif
-
 // TODO common prefix for veracruz client functions?
-#ifndef VERACRUZ_TIMEOUT
-#define VERACRUZ_TIMEOUT 3000
-#endif
-
-#ifndef PROXY_ATTESTATION_SERVER_HOST
-#define PROXY_ATTESTATION_SERVER_HOST "172.17.0.2"
-#endif
-
-#ifndef PROXY_ATTESTATION_SERVER_PORT
-#define PROXY_ATTESTATION_SERVER_PORT 3010
+#ifndef HTTP_TIMEOUT
+#define HTTP_TIMEOUT 3000
 #endif
 
 struct http_get_state {
@@ -184,7 +169,7 @@ ssize_t http_get(
         .recv_buf_len = pbuf_len,
     };
 
-    int err = http_client_req(sock, &req, VERACRUZ_TIMEOUT, &state);
+    int err = http_client_req(sock, &req, HTTP_TIMEOUT, &state);
     if (err < 0) {
         printf("http req failed (%d)\n", err);
         free(pbuf);
@@ -260,7 +245,7 @@ ssize_t http_post(
         .recv_buf_len = pbuf_len,
     };
 
-    int err = http_client_req(sock, &req, VERACRUZ_TIMEOUT, &state);
+    int err = http_client_req(sock, &req, HTTP_TIMEOUT, &state);
     if (err < 0) {
         printf("http req failed (%d)\n", err);
         free(pbuf);
@@ -441,6 +426,13 @@ void xxd(const void *pbuf, size_t len) {
     }
 }
 
+void hex(const void *pbuf, size_t len) {
+    const uint8_t *buf = pbuf;
+    for (int i = 0; i < len; i++) {
+        printf("%02x", buf[i]);
+    }
+}
+
 void main(void)
 {
     // get random challenge
@@ -537,7 +529,7 @@ void main(void)
     }
     
     printf("attest: PAT decoded response:\n");
-    xxd(buffer, res);
+    xxd(buffer, verif_len);
 
     if (verif_len < 131) {
         printf("pat response too small\n");
@@ -560,12 +552,30 @@ void main(void)
         qemu_exit();
     }
 
-    // TODO check these against policy
-    printf("enclave hash:\n");
-    xxd(&buffer[47], 32);
-    printf("enclave cert hash:\n");
-    xxd(&buffer[86], 32);
+    // check that enclave hash matches policy
+    if (memcmp(&buffer[47], RUNTIME_MANAGER_HASH, sizeof(RUNTIME_MANAGER_HASH)) != 0) {
+        printf("enclave hash mismatch\n");
+        printf("expected: ");
+        for (int i = 0; i < sizeof(RUNTIME_MANAGER_HASH); i++) {
+            printf("%02x", RUNTIME_MANAGER_HASH[i]);
+        }
+        printf("\n");
+        printf("recieved: ");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", buffer[8+i]);
+        }
+        printf("\n");
+        qemu_exit();
+    }
+
+    // recieved values
     printf("enclave name: %.*s\n", 7, &buffer[124]);
+    printf("enclave hash: ");
+    hex(&buffer[47], 32);
+    printf("\n");
+    printf("enclave cert hash: ");
+    hex(&buffer[86], 32);
+    printf("\n");
 
 //
 //    for (int i = 0; i < res; i++) {
