@@ -15,21 +15,7 @@ use crate::hcall::{
     common::{
         pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
-        WASI_ARGS_GET_NAME, WASI_ARGS_SIZES_GET_NAME, WASI_CLOCK_RES_GET_NAME,
-        WASI_CLOCK_TIME_GET_NAME, WASI_ENVIRON_GET_NAME, WASI_ENVIRON_SIZES_GET_NAME,
-        WASI_FD_ADVISE_NAME, WASI_FD_ALLOCATE_NAME, WASI_FD_CLOSE_NAME, WASI_FD_DATASYNC_NAME,
-        WASI_FD_FDSTAT_GET_NAME, WASI_FD_FDSTAT_SET_FLAGS_NAME, WASI_FD_FDSTAT_SET_RIGHTS_NAME,
-        WASI_FD_FILESTAT_GET_NAME, WASI_FD_FILESTAT_SET_SIZE_NAME, WASI_FD_FILESTAT_SET_TIMES_NAME,
-        WASI_FD_PREAD_NAME, WASI_FD_PRESTAT_DIR_NAME_NAME, WASI_FD_PRESTAT_GET_NAME,
-        WASI_FD_PWRITE_NAME, WASI_FD_READDIR_NAME, WASI_FD_READ_NAME, WASI_FD_RENUMBER_NAME,
-        WASI_FD_SEEK_NAME, WASI_FD_SYNC_NAME, WASI_FD_TELL_NAME, WASI_FD_WRITE_NAME,
-        WASI_PATH_CREATE_DIRECTORY_NAME, WASI_PATH_FILESTAT_GET_NAME,
-        WASI_PATH_FILESTAT_SET_TIMES_NAME, WASI_PATH_LINK_NAME, WASI_PATH_OPEN_NAME,
-        WASI_PATH_READLINK_NAME, WASI_PATH_REMOVE_DIRECTORY_NAME, WASI_PATH_RENAME_NAME,
-        WASI_PATH_SYMLINK_NAME, WASI_PATH_UNLINK_FILE_NAME, WASI_POLL_ONEOFF_NAME,
-        WASI_PROC_EXIT_NAME, WASI_PROC_RAISE_NAME, WASI_RANDOM_GET_NAME, WASI_SCHED_YIELD_NAME,
-        WASI_SOCK_RECV_NAME, WASI_SOCK_SEND_NAME, WASI_SOCK_SHUTDOWN_NAME,
-        WASIWrapper, MemoryHandler
+        WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
 use lazy_static::lazy_static;
@@ -45,6 +31,7 @@ use wasi_types::{
     Advice, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, IoVec, LookupFlags, Rights,
     Size, Whence, OpenFlags,
 };
+use std::str::FromStr;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
@@ -58,18 +45,12 @@ lazy_static! {
     static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
 }
 
- /// The name of the WASM program's entry point.
-const ENTRY_POINT_NAME: &'static str = "_start";
-/// The name of the WASM program's linear memory.
-const LINEAR_MEMORY_NAME: &'static str = "memory";
-
-
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WASIWrapper on any VFS call.
 impl<'a> MemoryHandler for Caller<'a> {
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo {
         let memory = match self
-            .get_export(LINEAR_MEMORY_NAME)
+            .get_export(WASIWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory()) {
                 Some(s) => s,
                 None => return ErrNo::NoMem,
@@ -85,7 +66,7 @@ impl<'a> MemoryHandler for Caller<'a> {
     fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo> {
         let length = length as usize;
         let memory = match self
-            .get_export(LINEAR_MEMORY_NAME)
+            .get_export(WASIWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory()) {
                 Some(s) => s,
                 None => return Err(ErrNo::NoMem),
@@ -203,48 +184,50 @@ impl WasmtimeRuntimeState {
                 let mut exports: Vec<Extern> = Vec::new();
 
                 for import in module.imports() {
-                    if import.module() != "wasi_snapshot_preview1" {
+                    if import.module() != WASIWrapper::WASI_SNAPSHOT_MODULE_NAME {
                         return Err(Trap::new(format!("Veracruz programs support only the Veracruz host interface.  Unrecognised module import '{}'.", import.name())));
                     }
 
-                    let host_call_body = match import.name() {
-                        WASI_PROC_EXIT_NAME => 
+                    let host_call_body = match WASIAPIName::try_from(import.name())
+                        .map_err(|_|{ Trap::new(format!("Veracruz programs support only the Veracruz host interface.  Unrecognised host call: '{}'.", import.name()))
+                    })? {
+                        WASIAPIName::PROC_EXIT => 
                             Func::wrap(&store, |caller: Caller, exit_code: u32| {
                                 Self::wasi_proc_exit(caller, exit_code);
                             }),
-                        WASI_FD_CLOSE_NAME => 
+                        WASIAPIName::FD_CLOSE => 
                             Func::wrap(&store, |caller: Caller, fd: u32| {
                                 Self::wasi_fd_close(caller, fd) as i32
                             }),
-                        WASI_FD_WRITE_NAME => 
+                        WASIAPIName::FD_WRITE => 
                             Func::wrap(&store, |caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32| {
                                 Self::wasi_fd_write(caller, fd, iovec_base, iovec_number, address) as i32
                             }),
-                        WASI_PATH_OPEN_NAME => 
+                        WASIAPIName::PATH_OPEN => 
                             Func::wrap(&store, |caller: Caller, fd: u32, dir_flags: u32, path_address: u32, path_length: u32, oflags : u32, fs_rights_base: u64, fs_rights_inheriting: u64, fd_flags: u32, address: u32| {
                                 Self::wasi_path_open(caller, fd, dir_flags, path_address, path_length, oflags, fs_rights_base, fs_rights_inheriting, fd_flags, address) as i32
                             }),
-                        WASI_FD_PRESTAT_GET_NAME =>
+                        WASIAPIName::FD_PRESTAT_GET =>
                             Func::wrap(&store, |caller: Caller, fd: u32, address: u32| {
                                 Self::wasi_fd_prestat_get(caller, fd, address) as i32
                             }),
-                        WASI_FD_PRESTAT_DIR_NAME_NAME =>
+                        WASIAPIName::FD_PRESTAT_DIR_NAME =>
                             Func::wrap(&store, |caller: Caller, fd: u32, address: u32, size:u32| {
                                 Self::wasi_fd_prestat_dir_name(caller, fd, address, size) as i32
                             }),
-                        WASI_ENVIRON_GET_NAME => 
+                        WASIAPIName::ENVIRON_GET => 
                             Func::wrap(&store, |caller: Caller, address: u32, buf_address: u32| {
                                 Self::wasi_environ_get(caller, address, buf_address) as i32
                             }),
-                        WASI_ENVIRON_SIZES_GET_NAME => 
+                        WASIAPIName::ENVIRON_SIZES_GET => 
                             Func::wrap(&store, |caller: Caller, address: u32, bufsize_address: u32| {
                                 Self::wasi_environ_size_get(caller, address, bufsize_address) as i32
                             }),
-                        WASI_FD_FILESTAT_GET_NAME => 
+                        WASIAPIName::FD_FILESTAT_GET => 
                             Func::wrap(&store, |caller: Caller, fd: u32, address: u32| {
                                 Self::wasi_fd_filestat_get(caller, fd, address) as i32
                             }),
-                        WASI_FD_READ_NAME => 
+                        WASIAPIName::FD_READ => 
                             Func::wrap(&store, |caller: Caller, fd: u32, iovec_base: u32, iovec_len: u32, address: u32| {
                                 Self::wasi_fd_read(caller, fd, iovec_base, iovec_len, address) as i32
                             }),
@@ -260,7 +243,7 @@ impl WasmtimeRuntimeState {
                         // TODO: FILL IN THE FUNCTION CALL
                         // TODO: FILL IN THE FUNCTION CALL
                         // TODO: FILL IN THE FUNCTION CALL
-                        otherwise => return Err(Trap::new(format!("Veracruz programs support only the Veracruz host interface.  Unrecognised host call: '{}'.", otherwise)))
+                        otherwise => return Err(Trap::new(format!("Veracruz programs support only the Veracruz host interface")))
                     };
 
                     exports.push(Extern::Func(host_call_body))
@@ -274,7 +257,7 @@ impl WasmtimeRuntimeState {
                 })?;
 
                 //let export = instance.get_export(ENTRY_POINT_NAME).ok_or(Trap::new("No export with name '{}' in WASM program."))?; 
-                let export = instance.get_export(ENTRY_POINT_NAME).expect("No export with name '{}' in WASM program."); 
+                let export = instance.get_export(WASIWrapper::ENTRY_POINT_NAME).expect("No export with name '{}' in WASM program."); 
                 match check_main(&export.ty()) {
                     EntrySignature::ArgvAndArgc => {
                         let main =
@@ -310,49 +293,12 @@ impl WasmtimeRuntimeState {
                     EntrySignature::NoEntryFound => {
                         return Err(Trap::new(format!(
                             "Entry point '{}' has a missing or incorrect type signature.",
-                            ENTRY_POINT_NAME
+                            WASIWrapper::ENTRY_POINT_NAME
                         )))
                     }
                 }
             }
         }
-    }
-
-    //TODO REMOVE but use MemoryHandler
-    fn read_buffer(memory: Memory, address: u32, length: usize) -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![0; length];
-        unsafe {
-            bytes.copy_from_slice(std::slice::from_raw_parts(
-                memory.data_ptr().add(address as usize),
-                length,
-            ))
-        };
-        bytes
-    }
-
-    //TODO REMOVE but use MemoryHandler
-    fn write_buffer(memory: Memory, address: u32, buffer: &[u8]) {
-        let address = address as usize;
-        unsafe {
-            std::slice::from_raw_parts_mut(memory.data_ptr().add(address), buffer.len())
-                .copy_from_slice(buffer)
-        };
-    }
-
-    fn read_cstring(memory: Memory, address: u32, length: usize) -> Result<String, ErrNo> {
-        let bytes = Self::read_buffer(memory, address, length);
-
-        // TODO: erase the debug code
-        let rst = String::from_utf8(bytes).map_err(|_e| ErrNo::IlSeq)?;
-        println!("read_cstring: {}",rst);
-        Ok(rst)
-    }
-
-    fn read_iovec_scattered(memory: Memory, scatters: &[IoVec]) -> Vec<Vec<u8>> {
-        println!("called read_iovec_scattered: {:?}",scatters);
-        scatters.iter().map(|IoVec{buf, len}|{
-            Self::read_buffer(memory.clone(), *buf, *len as usize)
-        }).collect()
     }
 
     // TODO the return type??
@@ -438,22 +384,22 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_fd_filestat_get(caller: Caller, fd: u32, address: u32) -> ErrNo {
-        let memory = match caller
-            .get_export(LINEAR_MEMORY_NAME)
-            .and_then(|export| export.into_memory()) {
-                Some(s) => s,
-                None => return ErrNo::NoMem,
-            };
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-        let result = match vfs.fd_filestat_get(&fd.into()){
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        //let memory = match caller
+            //.get_export(LINEAR_MEMORY_NAME)
+            //.and_then(|export| export.into_memory()) {
+                //Some(s) => s,
+                //None => return ErrNo::NoMem,
+            //};
+        //let mut vfs = match VFS_INSTANCE.lock() {
+            //Ok(v) => v,
+            //Err(_) => return ErrNo::Busy,
+        //};
+        //let result = match vfs.fd_filestat_get(&fd.into()){
+            //Ok(o) => o,
+            //Err(e) => return e,
+        //};
 
-        Self::write_buffer(memory, address, &pack_filestat(&result));
+        //Self::write_buffer(memory, address, &pack_filestat(&result));
         ErrNo::Success
     }
 
