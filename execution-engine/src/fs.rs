@@ -29,7 +29,7 @@ use wasi_types::{
 /// code.  The return code `ErrNo::Success` is implicit if `Ok(result)` is ever
 /// returned from a filesystem function.  The result `Err(ErrNo::Success)`
 /// should never be returned.
-pub(crate) type FileSystemError<T> = Result<T, ErrNo>;
+pub type FileSystemError<T> = Result<T, ErrNo>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INodes.
@@ -145,10 +145,14 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////////
     // Creating filesystems.
     ////////////////////////////////////////////////////////////////////////////
-    /// The root directory name, inode, and fd. It will be pre-opened for any wasm program.
-    pub(crate) const ROOT_DIRECTORY: &'static str = "/";
-    pub(crate) const ROOT_DIRECTORY_INODE: Inode = Inode(2);
-    pub(crate) const ROOT_DIRECTORY_FD: Fd = Fd(3);
+    /// The root directory name. It will be pre-opened for any wasm program.
+    pub const ROOT_DIRECTORY: &'static str = "/";
+    /// The root directory inode. It will be pre-opened for any wasm program.
+    pub const ROOT_DIRECTORY_INODE: Inode = Inode(2);
+    /// The root directory file descriptor. It will be pre-opened for any wasm program.
+    pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
+    /// The default initial rights on a newly created file.
+    pub const DEFAULT_RIGHTS: Rights = Rights::from_bits_truncate(Rights::FD_DATASYNC.bits() | Rights::FD_SEEK.bits() | Rights::FD_FDSTAT_SET_FLAGS.bits() | Rights::FD_SYNC.bits() | Rights::FD_TELL.bits() | Rights::FD_WRITE.bits() | Rights::FD_ADVISE.bits() | Rights::FD_ALLOCATE.bits() | Rights::PATH_CREATE_DIRECTORY.bits() | Rights::PATH_CREATE_FILE.bits() | Rights::PATH_LINK_SOURCE.bits() | Rights::PATH_LINK_TARGET.bits() | Rights::PATH_OPEN.bits() | Rights::PATH_READLINK.bits() | Rights::PATH_RENAME_SOURCE.bits() | Rights::PATH_RENAME_TARGET.bits() | Rights::PATH_FILESTAT_GET.bits() | Rights::FD_FILESTAT_SET_SIZE.bits() | Rights::FD_FILESTAT_SET_TIMES.bits() | Rights::PATH_SYMLINK.bits() | Rights::PATH_REMOVE_DIRECTORY.bits() | Rights::PATH_UNLINK_FILE.bits() | Rights::POLL_FD_READWRITE.bits());
 
     /// Creates a new, empty filesystem.
     ///
@@ -156,7 +160,7 @@ impl FileSystem {
     /// similar.  Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let mut rst = Self {
             file_table: HashMap::new(),
             path_table: HashMap::new(),
@@ -269,9 +273,9 @@ impl FileSystem {
     ///    case there are no changes to the underlying filesystem.
     /// 2. `ErrNo::Success` if `fd` is a current file-descriptor.  In this case,
     ///    the file-descriptor is closed and no longer a valid file-descriptor.
-    pub(crate) fn fd_close(&mut self, fd: &Fd) -> FileSystemError<()> {
+    pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
         println!("call fd_close on {:?}", fd);
-        self.file_table.remove(fd).ok_or(ErrNo::BadF);
+        self.file_table.remove(&fd).ok_or(ErrNo::BadF);
         Ok(())
     }
 
@@ -393,12 +397,12 @@ impl FileSystem {
                      ..
                  }| {
                     let (_, to_read) = buffer.split_at(offset);
-                    println!("call fd_pread_base on content {:?}",String::from_utf8(to_read.to_vec()).unwrap());
+                    println!("call fd_pread_base on content {:?}",to_read);
                     let segment = vec![buffer_len, to_read.len()];
                     let read_length = segment.iter().min().unwrap_or(&0);
                     println!("call fd_pread_base on read_length {:?}",read_length);
                     let (rst, _) = to_read.split_at(*read_length);
-                    println!("call fd_pread_base result {:?}",String::from_utf8(rst.to_vec()).unwrap());
+                    println!("call fd_pread_base result {:?}",rst);
                     rst.to_vec()
                 },
             )
@@ -441,7 +445,7 @@ impl FileSystem {
         mut buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemError<Size> {
-        println!("call fd_pwrite_base on fd {:?}, offset {:?} and buf {:?}", fd, offset, String::from_utf8(buf.clone()).unwrap());
+        println!("call fd_pwrite_base on fd {:?}, offset {:?} and buf {:?}", fd, offset, buf);
         let inode = self
             .file_table
             .get(fd)
@@ -449,7 +453,7 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?;
 
         if let Some(inode_impl) = self.inode_table.get_mut(inode) {
-            println!("call fd_pwrite_base before: {:?}",String::from_utf8(inode_impl.raw_file_data.clone()).unwrap());
+            println!("call fd_pwrite_base before: {:?}",inode_impl.raw_file_data);
             let remain_length = (inode_impl.file_stat.file_size - offset) as usize;
             let offset = offset as usize;
             if remain_length <= buf.len() {
@@ -460,7 +464,7 @@ impl FileSystem {
             let rst = buf.len();
             inode_impl.raw_file_data[offset..(offset + rst)].copy_from_slice(&buf);
             inode_impl.file_stat.file_size = inode_impl.raw_file_data.len() as u64;
-            println!("call fd_pwrite_base result: {:?}",String::from_utf8(inode_impl.raw_file_data.clone()).unwrap());
+            println!("call fd_pwrite_base result: {:?}",inode_impl.raw_file_data);
             return Ok(rst as Size);
         } else {
             return Err(ErrNo::BadF);
@@ -514,8 +518,10 @@ impl FileSystem {
     ) -> FileSystemError<FileSize> {
         println!("call fd_seek on fd {:?}, offset {:?} and whence {:?}", fd, offset, whence);
         let (inode, cur_file_offset) = match self.file_table.get(fd) {
-            // Use temporary variable `o` to reduce the ambiguity with the function parameter `offset`.
             Some(FileTableEntry {
+                // Use temporary variable `o` 
+                // to reduce the ambiguity with 
+                // the function parameter `offset`.
                 inode, offset: o, ..
             }) => (inode, o),
             None => return Err(ErrNo::BadF),
@@ -564,9 +570,9 @@ impl FileSystem {
     }
 
     /// Returns the current offset associated with the file descriptor.
-    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<&FileSize> {
+    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<FileSize> {
         if let Some(entry) = self.file_table.get(fd) {
-            Ok(&entry.offset)
+            Ok(entry.offset.clone())
         } else {
             Err(ErrNo::BadF)
         }
@@ -610,20 +616,20 @@ impl FileSystem {
         // The parent fd for searching
         fd: &Fd,
         _dirflags: LookupFlags,
-        path: String,
+        path: &str,
         oflags: OpenFlags,
         rights_base: Rights,
         rights_inheriting: Rights,
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
         // ONLY allow search on the root for now.
-        if *fd != (3 as u32).into() {
+        if *fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
 
-        println!("call path_open on {:?} with flag {}", path, oflags.bits());
+        println!("call path_open on {:?} with open_flag {}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}", path, oflags.bits(), rights_base, rights_inheriting, flags);
         // TODO IMPL oflags logic
-        let inode = match self.path_table.get(&path){
+        let inode = match self.path_table.get(path){
             Some(i) => i.clone(),
             None => {
                 println!("call path_open create");
@@ -631,7 +637,7 @@ impl FileSystem {
                     return Err(ErrNo::NoEnt);
                 }
                 let new_inode = self.next_inode();
-                self.install_file(&path, &new_inode, &vec![]);
+                self.install_file(path, &new_inode, &vec![]);
                 new_inode
             }
         };
@@ -691,5 +697,47 @@ impl FileSystem {
         _new_path: String,
     ) -> ErrNo {
         unimplemented!()
+    }
+
+    //TODO how to pass right??
+    pub fn write_file_by_filename(
+        &mut self,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), ErrNo> {
+        println!("write_file_by_filename: {}", file_name);
+        let fd = self.path_open(
+            &FileSystem::ROOT_DIRECTORY_FD,
+            LookupFlags::SYMLINK_FOLLOW,
+            file_name,
+            OpenFlags::CREATE,
+            FileSystem::DEFAULT_RIGHTS,
+            FileSystem::DEFAULT_RIGHTS,
+            FdFlags::empty(),
+        )?;
+        self.fd_write_base(&fd,data.to_vec())?;
+        self.fd_close(fd)?;
+        Ok(())
+    }
+
+    //TODO how to pass right??
+    pub fn read_file_by_filename(
+        &mut self,
+        file_name: &str,
+    ) -> Result<Vec<u8>, ErrNo> {
+        println!("read_file_by_filename: {}", file_name);
+        let fd = self.path_open(
+            &FileSystem::ROOT_DIRECTORY_FD,
+            LookupFlags::SYMLINK_FOLLOW,
+            file_name,
+            OpenFlags::CREATE,
+            FileSystem::DEFAULT_RIGHTS,
+            FileSystem::DEFAULT_RIGHTS,
+            FdFlags::empty(),
+        )?;
+        let file_stat = self.fd_filestat_get(&fd)?;
+        let rst = self.fd_read_base(&fd,file_stat.file_size as usize)?;
+        self.fd_close(fd)?;
+        Ok(rst)
     }
 }

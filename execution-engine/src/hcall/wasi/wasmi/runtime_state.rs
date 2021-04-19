@@ -10,8 +10,9 @@
 //! and copyright information.
 
 use std::{convert::{TryInto, TryFrom}, string::{String, ToString}, vec::Vec, boxed::Box};
-use crate::hcall::{
-    common::{
+use crate::{
+    fs::FileSystem,
+    hcall::common::{
         pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
         WASIWrapper, MemoryHandler, WASIAPIName
@@ -33,7 +34,6 @@ use veracruz_utils::policy::principal::Principal;
 use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
 use std::sync::{SgxMutex as Mutex, Arc};
-use crate::hcall::buffer::VFS;
 use num::FromPrimitive;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1103,10 +1103,10 @@ impl WASMIRuntimeState {
 
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
-        vfs : Arc<Mutex<VFS>>,
+        filesystem : Arc<Mutex<FileSystem>>,
     ) -> Self {
         Self {
-            vfs : WASIWrapper::new(vfs),
+            vfs : WASIWrapper::new(filesystem),
             program: Principal::NoCap,
             program_module: None,
             memory: None,
@@ -1354,9 +1354,9 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let fd: Fd = args.nth::<u32>(0).into();
+        let fd = args.nth::<u32>(0);
 
-        Ok(self.vfs.fd_close(&fd))
+        Ok(self.vfs.fd_close(fd))
     }
 
     /// The implementation of the WASI `fd_datasync` function.  This is not
@@ -2058,32 +2058,6 @@ impl WASMIRuntimeState {
 
         Ok(ErrNo::NotSup)
     }
-
-
-    //TODO REMOVE REMOVE REMOVE REMOVE REMOVE
-    /// ExecutionEngine wrapper of append_file implementation in WASMIRuntimeState.
-    #[inline]
-    fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.append_file_base(client_id,file_name,data)
-    }
-
-    /// ExecutionEngine wrapper of write_file implementation in WASMIRuntimeState.
-    #[inline]
-    fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.write_file_base(client_id,file_name,data)
-    }
-
-    /// ExecutionEngine wrapper of read_file implementation in WASMIRuntimeState.
-    #[inline]
-    fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        self.vfs.read_file_base(client_id,file_name)
-    }
-
-    #[inline]
-    fn count_file(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        self.vfs.count_file_base(prefix)
-    }
-    //TODO REMOVE REMOVE REMOVE REMOVE REMOVE
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2110,7 +2084,8 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
-        let program = self.read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+        //TODO change error type
+        let program = self.vfs.read_file_by_filename(file_name)?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());
 

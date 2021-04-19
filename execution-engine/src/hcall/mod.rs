@@ -12,5 +12,3 @@
 pub mod buffer;
 pub mod common;
 pub mod wasi;
-//TODO REMOVE
-pub mod buffer;

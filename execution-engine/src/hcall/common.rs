@@ -32,7 +32,7 @@ use std::{
     string::{String, ToString},
     vec::Vec,
 };
-use crate::{hcall::buffer::{VFS, VFSError}, fs::{FileSystem, FileSystemError}};
+use crate::fs::{FileSystem, FileSystemError};
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "sgx")]
@@ -252,11 +252,6 @@ pub enum HostProvisioningError {
         display = "ProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
     )]
     HostProvisioningStateNotInitialized,
-    /// TODO doc 
-    #[error(
-        display = "HostProvisioningError: VFS Error {}.", _0
-    )]
-    VFSError(#[error(source)]VFSError),
     #[error(
         display = "HostProvisioningError: File {} cannot be found.", _0
     )]
@@ -360,10 +355,10 @@ pub trait MemoryHandler {
 /// A wrapper on VFS for WASI, which provides common API used by wasm execution engine.
 #[derive(Clone)]
 pub struct WASIWrapper {
-    // TODO REMOVE REMOVE
-    vfs : Arc<Mutex<VFS>>,
+    //// TODO REMOVE REMOVE
+    //vfs : Arc<Mutex<VFS>>,
     /// The synthetic filesystem associated with this machine.
-    filesystem: FileSystem,
+    filesystem: Arc<Mutex<FileSystem>>,
     /// The environment variables that have been passed to this program from the
     /// global policy file.  These are stored as a key-value mapping from
     /// variable name to value.
@@ -388,37 +383,14 @@ impl WASIWrapper {
     
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
-        vfs : Arc<Mutex<VFS>>,
+        filesystem: Arc<Mutex<FileSystem>>,
     ) -> Self {
         Self { 
-            vfs,
-            filesystem : FileSystem::new(),
+            filesystem,
             environment_variables : Vec::new(),
             program_arguments : Vec::new(),
         }
     }
-
-
-    // TODO REMOVE REMOVE
-    pub(crate) fn write_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.write(client_id,file_name,data)?;
-        Ok(())
-    }
-
-    pub(crate) fn append_file_base(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.append(client_id,file_name,data)?;
-        Ok(())
-    }
-
-    pub(crate) fn read_file_base(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        Ok(self.vfs.lock()?.read(client_id,file_name)?)
-    }
-
-    pub(crate) fn count_file_base(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
-        Ok(self.vfs.lock()?.count(prefix)?)
-    }
-
-    // TODO REMOVE REMOVE
 
     ////////////////////////////////////////////////////////////////////////////
     // The program's environment.
@@ -529,8 +501,12 @@ impl WASIWrapper {
     ////////////////////////////////////////////////////////////////////////////
 
     #[inline]
-    pub(crate) fn fd_close(&mut self, fd: &Fd) -> ErrNo {
-        match self.filesystem.fd_close(fd) {
+    pub(crate) fn fd_close(&mut self, fd: u32) -> ErrNo {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        match fs.fd_close(fd.into()) {
             Ok(_) => ErrNo::Success,
             Err(e) => e,
         }
@@ -544,7 +520,11 @@ impl WASIWrapper {
         len: FileSize,
         advice: Advice,
     ) -> ErrNo {
-        if let Err(err) = self.filesystem.fd_advise(fd, offset, len, advice) {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        if let Err(err) = fs.fd_advise(fd, offset, len, advice) {
             return err;
         }
         return ErrNo::Success;
@@ -552,12 +532,20 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
-        self.filesystem.fd_fdstat_get(fd) 
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_fdstat_get(fd) 
     }
 
     #[inline]
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        if let Err(err) = self.filesystem.fd_fdstat_set_flags(fd, flags) {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        if let Err(err) = fs.fd_fdstat_set_flags(fd, flags) {
             return err;
         }
         return ErrNo::Success;
@@ -570,7 +558,11 @@ impl WASIWrapper {
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> ErrNo {
-        if let Err(err) = self.filesystem
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        if let Err(err) = fs
             .fd_fdstat_set_rights(fd, rights_base, rights_inheriting) {
             return err;
         }
@@ -579,12 +571,20 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
-        self.filesystem.fd_filestat_get(fd)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_filestat_get(fd)
     }
 
     #[inline]
     pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
-        if let Err(err) = self.filesystem.fd_filestat_set_size(fd, size) {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        if let Err(err) = fs.fd_filestat_set_size(fd, size) {
             return err;
         }
         return ErrNo::Success;
@@ -597,13 +597,21 @@ impl WASIWrapper {
         len: usize,
         offset: &FileSize,
     ) -> FileSystemError<Vec<u8>> {
-        self.filesystem.fd_pread_base(fd, len, offset)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_pread_base(fd, len, offset)
     }
 
     #[inline]
     pub(crate) fn fd_prestat_get(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, address: u32) -> ErrNo {
         let fd = Fd(fd);
-        match self.filesystem.fd_prestat_get(&fd.into()) { 
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        match fs.fd_prestat_get(&fd.into()) { 
             Ok(result) => memory_ref.write_buffer(address, &pack_prestat(&result)),
             Err(err) => err
         }
@@ -612,7 +620,11 @@ impl WASIWrapper {
     #[inline]
     pub(crate) fn fd_prestat_dir_name(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, address: u32, size: u32) -> ErrNo {
         let size = size as usize;
-        let result = match self.filesystem.fd_prestat_dir_name(&fd.into()) {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        let result = match fs.fd_prestat_dir_name(&fd.into()) {
             Ok(o) => o,
             Err(e) => return e,
         };
@@ -631,7 +643,11 @@ impl WASIWrapper {
         buf: Vec<u8>,
         offset: &FileSize,
     ) -> FileSystemError<Size> {
-        self.filesystem.fd_pwrite_base(fd, buf, *offset)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_pwrite_base(fd, buf, *offset)
     }
 
     #[inline]
@@ -644,7 +660,11 @@ impl WASIWrapper {
 
         let mut size_read = 0;
         for iovec in iovecs.iter() {
-            let to_write = match self.filesystem.fd_read_base(&fd.into(), iovec.len as usize){
+            let mut fs = match self.filesystem.lock() {
+                Ok(o) => o,
+                Err(_) => return ErrNo::Busy,
+            };
+            let to_write = match fs.fd_read_base(&fd.into(), iovec.len as usize){
                 Ok(o) => o,
                 Err(e) => return e,
             };
@@ -663,12 +683,20 @@ impl WASIWrapper {
         fd: &Fd,
         cookie: &DirCookie,
     ) -> FileSystemError<Vec<DirEnt>> {
-        self.filesystem.fd_readdir(fd, cookie)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_readdir(fd, cookie)
     }
 
     #[inline]
     pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
-        self.filesystem.fd_renumber(old_fd, new_fd)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        fs.fd_renumber(old_fd, new_fd)
     }
 
     #[inline]
@@ -678,12 +706,20 @@ impl WASIWrapper {
         offset: FileDelta,
         whence: Whence,
     ) -> FileSystemError<FileSize> {
-        self.filesystem.fd_seek(fd, offset, whence)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_seek(fd, offset, whence)
     }
 
     #[inline]
-    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<&FileSize> {
-        self.filesystem.fd_tell(fd)
+    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<FileSize> {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.fd_tell(fd)
     }
 
     #[inline]
@@ -700,7 +736,11 @@ impl WASIWrapper {
         let mut size_written = 0;
         for buf in bufs.iter() {
             println!("write {:?} to fd {:?}", String::from_utf8(buf.clone()).unwrap(), fd);
-            size_written += match self.filesystem.fd_write_base(&fd.into(), buf.clone()) {
+            let mut fs = match self.filesystem.lock() {
+                Ok(o) => o,
+                Err(_) => return ErrNo::Busy,
+            };
+            size_written += match fs.fd_write_base(&fd.into(), buf.clone()) {
                 Ok(o) => o,
                 Err(e) => return e,
             };
@@ -710,7 +750,11 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn path_create_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
-        self.filesystem.path_create_directory(fd, path)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        fs.path_create_directory(fd, path)
     }
 
     #[inline]
@@ -720,7 +764,11 @@ impl WASIWrapper {
         flags: &LookupFlags,
         path: &String,
     ) -> FileSystemError<FileStat> {
-        self.filesystem.path_filestat_get(fd, flags, path)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.path_filestat_get(fd, flags, path)
     }
 
     #[inline]
@@ -762,11 +810,15 @@ impl WASIWrapper {
             Some(o) => o,
             None => return ErrNo::Inval,
         };
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
 
-        match self.filesystem.path_open(
+        match fs.path_open(
             &fd,
             dir_flags,
-            path,
+            &path,
             oflags,
             fs_rights_base,
             fs_rights_inheriting,
@@ -779,7 +831,11 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: &String) -> ErrNo {
-        self.filesystem.path_remove_directory(fd, path)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        fs.path_remove_directory(fd, path)
     }
 
     #[inline]
@@ -790,8 +846,19 @@ impl WASIWrapper {
         new_fd: &Fd,
         new_path: String,
     ) -> ErrNo {
-        self.filesystem
-            .path_rename(old_fd, old_path, new_fd, new_path)
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        };
+        fs.path_rename(old_fd, old_path, new_fd, new_path)
+    }
+
+    pub(crate) fn read_file_by_filename(&mut self, file_name : &str) -> Result<Vec<u8>,ErrNo> {
+        let mut fs = match self.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => panic!(),
+        };
+        fs.read_file_by_filename(file_name)
     }
 }
 
@@ -879,6 +946,9 @@ pub enum FatalEngineError {
     /// Wrapper for direct error message.
     #[error(display = "FatalEngineError: WASM program returns code other than i32.")]
     ReturnedCodeError,
+    /// A lock could not be obtained for some reason.
+    #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
+    FailedToObtainLock(String),
     /// Wrapper for WASI Trap.
     #[error(display = "FatalEngineError: WASMIError: Trap: {:?}.", _0)]
     WASMITrapError(#[source(error)] wasmi::Trap),
@@ -892,9 +962,6 @@ pub enum FatalEngineError {
         file_name
     )]
     ProgramCannotFound { file_name: String },
-    /// Wrapper for Virtual FS Error.
-    #[error(display = "FatalVeracruzHostError: VFS Error: {:?}.", _0)]
-    VFSError(#[error(source)] VFSError),
     #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
     WASIError(#[source(error)] wasi_types::ErrNo),
     /// Wrapper for direct error message.
@@ -906,6 +973,13 @@ pub enum FatalEngineError {
     /// information.
     #[error(display = "FatalEngineError: Unknown error.")]
     Generic,
+}
+
+// Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
+impl<T> From<std::sync::PoisonError<T>> for FatalEngineError {
+    fn from(error: std::sync::PoisonError<T>) -> Self {
+        FatalEngineError::FailedToObtainLock(format!("{:?}", error))
+    }
 }
 
 impl From<String> for FatalEngineError {
