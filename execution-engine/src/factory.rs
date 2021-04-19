@@ -38,100 +38,35 @@ use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
 use crate::hcall::wasi::wasmtime::runtime_state::WasmtimeRuntimeState;
-use crate::hcall::{
-    buffer::VFS,
-    common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
-    wasi::wasmi::runtime_state::WASMIRuntimeState,
+use crate::{
+    fs::FileSystem,
+    hcall::{
+        common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
+        wasi::wasmi::runtime_state::WASMIRuntimeState,
+    }
 };
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
     sync::Arc,
 };
-
-
-/// The following type captures the execution strategy which is being requested,
-/// for the WASM program, from ExecutionEngine.
-#[derive(Debug)]
-pub enum ExecutionStrategy {
-    /// An interpretation execution strategy should be used, running the WASM
-    /// program on top of the *WASMI* execution engine.
-    Interpretation,
-    /// A JITting execution strategy should be used, running the WASM program
-    /// on top of the *Wasmtime* execution engine.
-    JIT,
-}
-
-/// Selects an ExecutionEngine implementation based on a stated preference for
-/// execution strategy, passing the lists of client IDs of clients that can
-/// provision data and request platform shutdown straight to the relevant
-/// execution engine.
-///
-/// NB: wasmtime is only supported when feature=std is set at the moment,
-/// hence the branching around the body of this function.  When we get
-/// it compiled for SGX and TZ, then this will disappear.
-#[deprecated]
-pub fn single_threaded_execution_engine(
-    strategy: &ExecutionStrategy,
-    vfs: Arc<Mutex<VFS>>,
-) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
-    let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
-        ExecutionStrategy::Interpretation => {
-            Some(Box::new(WASMIRuntimeState::new(vfs)))
-        }
-        ExecutionStrategy::JIT => {
-            #[cfg(feature = "std")]
-            {
-                Some(Box::new(WasmtimeRuntimeState::new(vfs)))
-            }
-            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-            None
-        }
-    };
-    Ok(instance)
-}
-
-/// Selects an ExecutionEngine implementation based on a stated preference for
-/// execution strategy, passing the lists of client IDs of clients that can
-/// provision data and request platform shutdown straight to the relevant
-/// execution engine.
-///
-/// NB: wasmtime is only supported when feature=std is set at the moment,
-/// hence the branching around the body of this function.  When we get
-/// it compiled for SGX and TZ, then this will disappear.
-#[deprecated]
-pub fn multi_threaded_execution_engine(
-    strategy: &ExecutionStrategy,
-    vfs: Arc<Mutex<VFS>>,
-) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
-    let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
-        ExecutionStrategy::Interpretation => {
-            Some(Box::new(WASMIRuntimeState::new(vfs)))
-        }
-        ExecutionStrategy::JIT => {
-            #[cfg(feature = "std")]
-            { Some(Box::new(WasmtimeRuntimeState::new(vfs))) }
-            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-            None
-        }
-    };
-    Ok(instance)
-}
+use veracruz_utils::policy::principal::ExecutionStrategy;
 
 pub fn execute(
     strategy: &ExecutionStrategy,
-    vfs: Arc<Mutex<VFS>>,
+    // TODO REMOVE
+    filesystem: Arc<Mutex<FileSystem>>,
     program_file_name: &str,
 ) -> Result<EngineReturnCode, FatalEngineError> {
     // TODO MODIFY when `new` directly fill in a program this can simply the wasmi impl esp. option
     // on memory and program module.
     let mut engine : Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(vfs)),
+        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem)),
         ExecutionStrategy::JIT => 
         {
             #[cfg(feature = "std")]
             {
-                Box::new(WasmtimeRuntimeState::new(vfs))
+                Box::new(WasmtimeRuntimeState::new(filesystem))
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             {
@@ -140,17 +75,4 @@ pub fn execute(
         }
     };
     engine.invoke_entry_point(&program_file_name)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Trait implementations
-////////////////////////////////////////////////////////////////////////////////
-
-impl Display for ExecutionStrategy {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match self {
-            ExecutionStrategy::Interpretation => write!(f, "Interpretation"),
-            ExecutionStrategy::JIT => write!(f, "JIT"),
-        }
-    }
 }

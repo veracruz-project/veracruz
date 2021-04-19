@@ -31,8 +31,8 @@ pub enum RuntimeManagerError {
     FatalHostError(#[error(source)] execution_engine::hcall::common::FatalEngineError),
     #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
     HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
-    #[error(display = "RuntimeManager: VFS Error: {:?}.", _0)]
-    VFSError(#[error(source)] execution_engine::hcall::buffer::VFSError),
+    #[error(display = "RuntimeManager: FileSystem Error: {:?}.", _0)]
+    FileSystemError(#[error(source)] wasi_types::ErrNo),
     #[error(display = "RuntimeManager: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
     #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]

@@ -15,6 +15,8 @@ use optee_utee::trace_println;
 use sgx_types::sgx_status_t;
 #[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::Mutex;
+#[cfg(feature = "sgx")]
+use std::{ffi::CString, sync::SgxMutex as Mutex};
 use std::{
     collections::HashMap,
     string::String,
@@ -24,16 +26,16 @@ use std::{
     },
     vec::Vec,
 };
-#[cfg(feature = "sgx")]
-use std::{ffi::CString, sync::SgxMutex as Mutex};
-
 use lazy_static::lazy_static;
-
-use execution_engine::{factory::execute, hcall::buffer::VFS, hcall::common::EngineReturnCode};
-
+use execution_engine::{fs::FileSystem, factory::execute, hcall::common::EngineReturnCode};
 use veracruz_utils::policy::{
     policy::Policy,
     principal::{ExecutionStrategy, FileOperation, Principal},
+};
+use wasi_types::{
+    Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
+    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
+    PreopenType
 };
 
 pub mod error;
@@ -87,7 +89,7 @@ pub(crate) struct ProtocolState {
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
     /// The ref to the VFS.
-    vfs: Arc<Mutex<VFS>>,
+    vfs: Arc<Mutex<FileSystem>>,
 }
 
 impl ProtocolState {
@@ -102,7 +104,7 @@ impl ProtocolState {
 
         let capability_table = global_policy.get_capability_table();
         let program_digests = global_policy.get_program_digests()?;
-        let vfs = Arc::new(Mutex::new(VFS::new(&capability_table, &program_digests)));
+        let vfs = Arc::new(Mutex::new(FileSystem::new()));
 
         Ok(ProtocolState {
             global_policy,
@@ -144,7 +146,11 @@ impl ProtocolState {
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
-        Ok(self.vfs.lock()?.write(client_id, file_name, data)?)
+        self.vfs.lock()?.write_file_by_filename(
+            file_name,
+            data,
+        )?;
+        Ok(())
     }
 
     /// Check if a client has capability to write to a file, and then append it with new `data`.
@@ -154,8 +160,8 @@ impl ProtocolState {
         file_name: &str,
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
-        self.is_modified = true;
-        Ok(self.vfs.lock()?.append(client_id, file_name, data)?)
+        //TODO !
+        Ok(())
     }
 
     /// Check if a client has capability to read from a file, if so, return the content in bytes.
@@ -164,7 +170,13 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        Ok(self.vfs.lock()?.read(client_id, file_name)?)
+        let rst = self.vfs.lock()?.read_file_by_filename(
+            file_name,
+        )?;
+        if rst.len() == 0 {
+            return Ok(None);
+        }
+        Ok(Some(rst))
     }
 
     /// Requests shutdown on behalf of a client, as identified by their client
@@ -180,12 +192,7 @@ impl ProtocolState {
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
     pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
-        let execution_strategy = match self.global_policy.execution_strategy() {
-            ExecutionStrategy::Interpretation => {
-                execution_engine::factory::ExecutionStrategy::Interpretation
-            }
-            ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
-        };
+        let execution_strategy = self.global_policy.execution_strategy();
         let return_code = execute(&execution_strategy, self.vfs.clone(), file_name)?;
 
         let response = if return_code == EngineReturnCode::Success {

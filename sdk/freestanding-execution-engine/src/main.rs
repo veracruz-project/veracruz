@@ -37,11 +37,11 @@ use std::{
 };
 
 use execution_engine::{
-    factory::{single_threaded_execution_engine, ExecutionStrategy},
-    hcall::{buffer::VFS, common::{EngineReturnCode, ExecutionEngine}},
+    factory::execute,
+    hcall::common::{EngineReturnCode, ExecutionEngine},
+    fs::FileSystem,
 };
-use veracruz_utils::policy::principal::Principal;
-
+use veracruz_utils::policy::principal::{ExecutionStrategy, Principal};
 use clap::{App, Arg};
 use log::*;
 
@@ -359,7 +359,7 @@ fn read_configuration_file(fname: &str) -> Configuration {
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
-fn load_data_sources(cmdline: &CommandLineOptions, vfs : Arc<Mutex<VFS>>) {
+fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) {
     for (id, file_path) in cmdline.data_sources.iter().enumerate() {
         info!("Loading data source '{}' with id {} for reading.", file_path, id);
 
@@ -383,16 +383,16 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs : Arc<Mutex<VFS>>) {
 
         // XXX: may panic! if u64 and usize have differing bitwidths...
         let id = u64::try_from(id).unwrap();
-        let file_name = format!("input-{}",id);
-        vfs.lock().unwrap().write(&Principal::InternalSuperUser, &file_name,&buffer).unwrap();
+        let file_name = format!("input-{}", id);
+        vfs.lock()
+            .unwrap()
+            .write_file_by_filename(&file_name, &buffer)
+            .unwrap();
 
         info!(
             "Loading '{}' as file_name '{}' into vfs.",
             file_path, file_name
         );
-        //let file_name = format!("{}/{}", INPUT_DATA_SOURCE_DIRECTORY_ROOT, id);
-
-        //rets.push(InputFile::new(file_name, buffer))
     }
 }
 
@@ -410,121 +410,20 @@ fn main() {
 
     info!("Command line read successfully.");
 
-    let vfs = Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())));
+    let mut vfs = Arc::new(Mutex::new(FileSystem::new()));
     let (prog_file_name, program) = load_file(&cmdline.binary);
-    vfs.lock().expect("Failed to lock the vfs").write(&Principal::InternalSuperUser,&prog_file_name,&program).expect(&format!("Failed to write to file {}", prog_file_name));
-    
+    vfs.lock()
+        .expect("Failed to lock the vfs")
+        .write_file_by_filename(&prog_file_name, &program)
+        .expect(&format!("Failed to write to file {}", prog_file_name));
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    load_data_sources(&cmdline,vfs.clone());
-
+    load_data_sources(&cmdline, vfs.clone());
     info!("Data sources loaded.");
 
-    //let module = read_program_file(&cmdline.binary);
-
-    //info!("WASM module loaded.");
-
-    //let expected_data_sources = usize::try_from(config.data_source_count)
-        //.expect("The bitwidth of Rust type 'usize' is not 64 bits on this platform.");
-
-    //let mut provisioning_state: Box<dyn Chihuahua + 'static> = match single_threaded_chihuahua(
-        //&cmdline.execution_strategy,
-        //expected_data_sources,
-        //0usize,
-        //Vec::new(),
-    //) {
-        //Some(sigma) => sigma,
-        //None => {
-            //error!("No execution engine is available.");
-            //exit(-1);
-        //}
-    //};
-
-    //info!(
-        //"Machine state before loading program: {:?}",
-        //provisioning_state.lifecycle_state()
-    //);
-
-    //if let Err(error) = provisioning_state.load_program(&module) {
-        //eprintln!("Failed to register program.  Error '{}' returned.", error);
-        //exit(-1);
-    //}
-
-    //info!("WASM program loaded.");
-
-    //let sources = load_data_sources(&cmdline);
-
-    //info!(
-        //"Machine state after loading program: {:?}",
-        //provisioning_state.lifecycle_state()
-    //);
-
-    //for source in sources {
-        //if let Err(err) =
-            //provisioning_state.add_data_source(source.file_name().clone(), source.buffer().clone())
-        //{
-            //eprintln!("Failed to register data source.  Error '{}' produced.", err);
-            //exit(-1);
-        //}
-    //}
-
-    //info!("Data sources loaded.");
-    //info!(
-        //"Machine state after loading data sources: {:?}",
-        //provisioning_state.lifecycle_state()
-    //);
     info!("Invoking main.");
 
     let start = Instant::now();
 
-    match single_threaded_execution_engine(&cmdline.execution_strategy, vfs.clone())
-          .expect("Failed to instantiate the execution engine due to error")
-          .expect("Failed to instantiate the execution engine due to engine is not supported")
-          .invoke_entry_point(&prog_file_name) {
-        Ok(EngineReturnCode::Success) => {
-            if cmdline.time_computation {
-                info!("WASM program finished execution in '{:?}.", start.elapsed());
-            }
-            info!("WASM program executed successfully.");
-            info!("Result {:?}.",vfs.lock().expect("Failed to lock the vfs").read(&Principal::InternalSuperUser, "output").expect("Failed to read the file output"));
-        }
-        Ok(err_code) => {
-            println!(
-                "Veracruz program returned error code '{:?}'.",
-                err_code
-            );
-            if cmdline.time_computation {
-                println!("WASM program finished execution in '{:?}.", start.elapsed());
-            }
-            //if err_code == 0 {
-                //println!("WASM program executed successfully.");
-
-                //match provisioning_state.result_filename() {
-                    //None => println!("Program produced no result data."),
-                    //Some(result) => {
-                        //println!("Retrieving result from {}.", result);
-                        //// XXX: todo
-                    //}
-                //}
-            //} else {
-                //let pretty = ErrorCode::try_from(err_code)
-                    //.map(|e| format!("{}", e))
-                    //.unwrap_or_else(|_| "<unknown error code>".to_string());
-                //println!(
-                    //"Veracruz program returned error code '{}' (return code = {}).",
-                    //pretty, err_code
-                //);
-                //if cmdline.time_computation {
-                    //println!("WASM program finished execution in '{:?}.", start.elapsed());
-                //}
-            //}
-        }
-        Err(error) => {
-            eprintln!("Veracruz program returned unexpected result '{:?}'.", error);
-            if cmdline.time_computation {
-                println!("WASM program finished execution in '{:?}.", start.elapsed());
-            }
-            exit(-1)
-        }
-    }
+    execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name).expect(&format!("failed to execute {}", prog_file_name));
 }

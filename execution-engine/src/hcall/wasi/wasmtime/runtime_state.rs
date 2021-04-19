@@ -11,8 +11,9 @@
 
 use std::{time::Instant, vec::Vec, string::String, collections::HashMap};
 use std::convert::TryFrom;
-use crate::hcall::{
-    common::{
+use crate::{
+    fs::FileSystem,
+    hcall::common::{
         pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
         WASIWrapper, MemoryHandler, WASIAPIName
@@ -24,7 +25,6 @@ use std::sync::{Mutex, Arc};
 #[cfg(feature = "sgx")]
 use std::sync::{SgxMutex as Mutex, Arc};
 use veracruz_utils::policy::principal::Principal;
-use crate::hcall::buffer::VFS;
 use byteorder::{ByteOrder, LittleEndian};
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Trap, ValType, Memory};
 use wasi_types::{
@@ -40,7 +40,7 @@ use std::str::FromStr;
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())))));
+    static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(FileSystem::new()))));
     // The initial value has NO use.
     static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
 }
@@ -121,10 +121,10 @@ pub struct WasmtimeRuntimeState{ }
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
-        vfs : Arc<Mutex<VFS>>,
+        filesystem : Arc<Mutex<FileSystem>>,
     ) -> Self {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock().unwrap() = WASIWrapper::new(vfs);
+        *VFS_INSTANCE.lock().unwrap() = WASIWrapper::new(filesystem);
         Self{}
     }
 
@@ -133,24 +133,28 @@ impl WasmtimeRuntimeState {
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn append_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.append_file_base(client_id,file_name, data)
+        Ok(())
+        //VFS_INSTANCE.lock()?.append_file_base(client_id,file_name, data)
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn write_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        VFS_INSTANCE.lock()?.write_file_base(client_id,file_name, data)
+        Ok(())
+        //VFS_INSTANCE.lock()?.write_file_base(client_id,file_name, data)
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
     fn read_file(client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        VFS_INSTANCE.lock()?.read_file_base(client_id,file_name)
+        Ok(None)
+        //VFS_INSTANCE.lock()?.read_file_base(client_id,file_name)
     }
 
     #[inline]
     fn count_file(prefix: &str) -> Result<u64, HostProvisioningError> {
-        VFS_INSTANCE.lock()?.count_file_base(prefix)
+        Ok(0)
+        //VFS_INSTANCE.lock()?.count_file_base(prefix)
     }
     //TODO REMOVE REMOVE
 
@@ -313,7 +317,7 @@ impl WasmtimeRuntimeState {
             Err(_) => return ErrNo::Busy,
         };
 
-        vfs.fd_close(&fd.into())
+        vfs.fd_close(fd)
     }
 
     fn wasi_fd_write(mut caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32) -> ErrNo {
@@ -424,7 +428,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
 
         //TODO check the permission XXX TODO XXX
-        let program = Self::read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+        let program = VFS_INSTANCE.lock()?.read_file_by_filename(file_name)?;
 
         Self::invoke_entry_point_base(file_name, program.to_vec())
             .map_err(|e| {
