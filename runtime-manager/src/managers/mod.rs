@@ -50,6 +50,7 @@ lazy_static! {
         Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
+    static ref CERT_CHAIN: Mutex<Option<Vec<Vec<u8>>>> = Mutex::new(None);
 }
 
 const OUTPUT_FILE: &'static str = "output";
@@ -263,6 +264,23 @@ impl ProtocolState {
     #[inline]
     fn is_modified(&self) -> bool {
         self.is_modified
+    }
+}
+
+pub fn load_cert_chain(chain: Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> {
+    println!("runtime-manager::managers::load_cert_chain has received the following certificates:");
+    for this_cert in chain.iter() {
+        println!("Cert: {:02x?}", this_cert);
+    }
+    let mut cert_chain_guard = CERT_CHAIN.lock().unwrap();
+    match &*cert_chain_guard {
+        Some(_) => {
+            return Err(RuntimeManagerError::CertChainPopulated);
+        },
+        None => {
+            *cert_chain_guard = Some(chain);
+            return Ok(());
+        },
     }
 }
 

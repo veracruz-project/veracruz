@@ -56,6 +56,8 @@ extern "C" {
         cert: *mut u8,
         cert_buf_size: usize,
         cert_size: &mut usize,
+        cert_lengths: *mut u32,
+        cert_lengths_size: usize,
     ) -> sgx_status_t;
 
     pub fn debug_and_error_output_ocall(
@@ -101,9 +103,9 @@ pub extern "C" fn init_session_manager_enc(
     };
 
     debug_message(format!("init_session_manager_enc performing local attestation with cert"));
-    let cert = local_attestation_get_cert_enc(&csr);
+    let certs = local_attestation_get_cert_enc(&csr).unwrap();
 
-    // TODO: Seomthing with cert, probably add it to managers::session_manager
+    managers::load_cert_chain(certs).unwrap();
 
     return sgx_status_t::SGX_SUCCESS;
 }
@@ -243,7 +245,7 @@ pub extern "C" fn psa_attestation_get_token_enc(
 #[cfg(feature = "sgx")]
 fn local_attestation_get_cert_enc(
     csr: &std::vec::Vec<u8>,
-) -> Result<std::vec::Vec<u8>, RuntimeManagerError> {
+) -> Result<std::vec::Vec<std::vec::Vec<u8>>, RuntimeManagerError> {
     let mut dh_msg1: SgxDhMsg1 = SgxDhMsg1::default();
 
     let mut responder = SgxDhResponder::init_session();
@@ -290,8 +292,21 @@ fn local_attestation_get_cert_enc(
 
     let enclave_name: std::string::String = managers::session_manager::get_enclave_name()?;
 
-    let mut cert: std::vec::Vec<u8> = std::vec::Vec::with_capacity(2048);
-    let mut cert_size: usize = 0;
+    // It's diffucult/annoying to pass 2d rust Vecs to C. Instead, we will create
+    // a 1D array to contain all of the certifcates, one after the other
+    let mut cert_array: std::vec::Vec<u8> = std::vec::Vec::with_capacity(3 * 2048);
+    // Upon return, will contain the complete size of the `cert_array`
+    let mut cert_array_size: usize = 0;
+    // The certificate_lengths vec, which on return will contain the lengths of
+    // each of the certificates. This will allow us to break `cert_array` on
+    // the certificate boundaries.
+    let mut certificate_lengths: std::vec::Vec<u32> = std::vec::Vec::new();
+    //vec!(0, 0, 0);
+    certificate_lengths.push(0);
+    certificate_lengths.push(0);
+    certificate_lengths.push(0);
+
+    println!("with Vec");
     let ocall_status = unsafe {
         finish_local_attest_ca_ocall(
             &mut ocall_ret,
@@ -299,21 +314,41 @@ fn local_attestation_get_cert_enc(
             csr.as_ptr() as *const u8,
             csr.len(),
             sgx_root_enclave_session_id,
-            cert.as_mut_ptr() as *mut u8,
-            cert.capacity(),
-            &mut cert_size,
+            cert_array.as_mut_ptr() as *mut u8,
+            cert_array.capacity(),
+            &mut cert_array_size,
+            certificate_lengths.as_mut_ptr() as *mut u32,
+            certificate_lengths.len() * 4,
         )
     };
+    // need to check both return values. the status and the ret
     if ocall_status != sgx_status_t::SGX_SUCCESS {
+        println!("ocall_status is poop:{:?}", ocall_status);
         return Err(RuntimeManagerError::SGXError(ocall_status));
     }
     if ocall_ret != sgx_status_t::SGX_SUCCESS {
+        println!("ocall_ret is poop:{:?}", ocall_ret);
         return Err(RuntimeManagerError::SGXError(ocall_ret));
     }
 
-    unsafe { cert.set_len(cert_size) };
+    // Set the length of cert_array according to what the ocall told us
+    unsafe { cert_array.set_len(cert_array_size) };
 
-    return Ok(cert);
+    // create the 2D vec of bytes to contain the certificates
+    let mut certs: std::vec::Vec< std::vec::Vec<u8> > = std::vec::Vec::new();
+
+
+    let mut aggregate_length: usize = 0;
+    // break the `cert_array` up according to the values in `certificate_lengths`
+    // and place them in `certs`
+    for this_length in certificate_lengths.iter() {
+        let mut this_cert: std::vec::Vec<u8> = std::vec::Vec::new();
+        this_cert.clone_from_slice(&cert_array[aggregate_length..(aggregate_length + *this_length as usize)]);
+        certs.push(this_cert);
+        aggregate_length += *this_length as usize;
+    }
+
+    return Ok(certs);
 }
 
 #[no_mangle]

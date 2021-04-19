@@ -934,7 +934,10 @@ pub mod veracruz_server_sgx {
         cert: *mut u8,
         cert_buf_size: u64,
         cert_size: &mut u64,
+        cert_lengths: *mut u32,
+        cert_lengths_size: u64,
     ) -> sgx_status_t {
+        println!("veracruz_server::veracruz_server_sgx::finish_local_attest_ca_ocall started");
         let sgx_root_enclave = SGX_ROOT_ENCLAVE.lock().unwrap();
         match &*sgx_root_enclave {
             Some(sgx_root_enclave) => {
@@ -953,6 +956,8 @@ pub mod veracruz_server_sgx {
                         cert,
                         cert_buf_size,
                         cert_size,
+                        cert_lengths,
+                        cert_lengths_size,
                     )
                 };
                 if (ret != 0) || (result != 0) {
