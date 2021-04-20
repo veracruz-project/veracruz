@@ -24,26 +24,24 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use libveracruz::{data_description::write_result, host, return_code};
-
 ////////////////////////////////////////////////////////////////////////////////
 // Reading inputs.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
-/// values.
-fn read_inputs() -> Result<Vec<f64>, i32> {
-    if host::input_count() != 1 {
-        return return_code::fail_data_source_count();
-    } else {
-        let input = host::read_input(0).unwrap();
+///// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
+///// values.
+//fn read_inputs() -> Result<Vec<f64>, i32> {
+    //if host::input_count() != 1 {
+        //return return_code::fail_data_source_count();
+    //} else {
+        //let input = host::read_input(0).unwrap();
 
-        match pinecone::from_bytes(&input) {
-            Err(_err) => return_code::fail_bad_input(),
-            Ok(s) => Ok(s),
-        }
-    }
-}
+        //match pinecone::from_bytes(&input) {
+            //Err(_err) => return_code::fail_bad_input(),
+            //Ok(s) => Ok(s),
+        //}
+    //}
+//}
 
 ////////////////////////////////////////////////////////////////////////////////
 // The computation.
@@ -167,9 +165,10 @@ fn dec_approx(data: &[f64], norm: f64) -> Vec<f64> {
 
 /// Entry point: reads the vector of floats, processes them, and writes back a new vector of
 /// floats as output.
-fn main() -> return_code::Veracruz {
-    let dataset = read_inputs()?;
-    let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
-        computation(dataset.as_slice());
-    write_result::<Vec<f64>>(decisions_wma_approx)
+//fn main() -> return_code::Veracruz {
+fn main() {
+    //let dataset = read_inputs()?;
+    //let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
+        //computation(dataset.as_slice());
+    //write_result::<Vec<f64>>(decisions_wma_approx)
 }

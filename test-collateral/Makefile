@@ -45,7 +45,8 @@ POLICY_FILES ?= get_random_policy.json \
  				idash2017_logistic_regression_policy.json \
 				moving_average_convergence_divergence.json \
  				private_set_intersection_sum.json \
- 				number-stream-accumulation.json
+ 				number-stream-accumulation.json \
+ 				basic_file_read_write.json 
 
 WASM_PROG_FILES = random-source.wasm \
 				  linear-regression.wasm \
@@ -55,7 +56,8 @@ WASM_PROG_FILES = random-source.wasm \
 				  idash2017-logistic-regression.wasm \
 				  moving-average-convergence-divergence.wasm \
 				  private-set-intersection-sum.wasm \
- 				  number-stream-accumulation.wasm
+ 				  number-stream-accumulation.wasm \
+                  read-file.wasm
 
 DATA_FILES = linear-regression.dat \
  			 hello-world-1.dat \
@@ -227,8 +229,15 @@ number-stream-accumulation.json: pgen css.bin program_client_cert.pem data_clien
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0)
 
+basic_file_read_write.json: pgen css.bin client_rsa_cert.pem read-file.wasm 
+	./pgen --certificate client_rsa_cert.pem --capability "input.txt: w, output.txt : r, read-file.wasm : wx" \
+		--binary read-file.wasm --capability "input.txt: r, output.txt : w" \
+        --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
+		--enclave-debug-mode true --execution-strategy Interpretation \
+		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0)
+
 .SECONDEXPANSION:
-$(WASM_PROG_FILES) : %.wasm: ../sdk/rust-language-support/examples/%/target/wasm32-arm-veracruz/release/$$@
+$(WASM_PROG_FILES) : %.wasm: ../sdk/rust-language-support/examples/%/target/wasm32-wasi/release/$$@
 	cp $< $@
 
 $(DATA_FILES) : %.dat: ../sdk/datasets/%.dat 

@@ -172,7 +172,7 @@ impl FileSystem {
         rst.install_dir(Self::ROOT_DIRECTORY,&Self::ROOT_DIRECTORY_INODE);
         rst.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
         //TODO remove test stub
-        rst.install_file("test.txt",&(42 as u64).into(), "test content".as_bytes());
+        rst.install_file("input.txt",&(42 as u64).into(), "test content".as_bytes());
         rst.install_file("stderr",&(11 as u64).into(), "".as_bytes());
         rst.install_fd(&Fd(2),&(11 as u64).into());
         rst
@@ -397,12 +397,12 @@ impl FileSystem {
                      ..
                  }| {
                     let (_, to_read) = buffer.split_at(offset);
-                    println!("call fd_pread_base on content {:?}",to_read);
+                    println!("call fd_pread_base on content {:?}",to_read.len());
                     let segment = vec![buffer_len, to_read.len()];
                     let read_length = segment.iter().min().unwrap_or(&0);
                     println!("call fd_pread_base on read_length {:?}",read_length);
                     let (rst, _) = to_read.split_at(*read_length);
-                    println!("call fd_pread_base result {:?}",rst);
+                    println!("call fd_pread_base result {:?}",rst.len());
                     rst.to_vec()
                 },
             )
@@ -445,7 +445,7 @@ impl FileSystem {
         mut buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemError<Size> {
-        println!("call fd_pwrite_base on fd {:?}, offset {:?} and buf {:?}", fd, offset, buf);
+        println!("call fd_pwrite_base on fd {:?}, offset {:?} and buf {:?}", fd, offset, buf.len());
         let inode = self
             .file_table
             .get(fd)
@@ -453,7 +453,7 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?;
 
         if let Some(inode_impl) = self.inode_table.get_mut(inode) {
-            println!("call fd_pwrite_base before: {:?}",inode_impl.raw_file_data);
+            println!("call fd_pwrite_base before: {:?}",inode_impl.raw_file_data.len());
             let remain_length = (inode_impl.file_stat.file_size - offset) as usize;
             let offset = offset as usize;
             if remain_length <= buf.len() {
@@ -464,7 +464,7 @@ impl FileSystem {
             let rst = buf.len();
             inode_impl.raw_file_data[offset..(offset + rst)].copy_from_slice(&buf);
             inode_impl.file_stat.file_size = inode_impl.raw_file_data.len() as u64;
-            println!("call fd_pwrite_base result: {:?}",inode_impl.raw_file_data);
+            println!("call fd_pwrite_base result: {:?}",inode_impl.raw_file_data.len());
             return Ok(rst as Size);
         } else {
             return Err(ErrNo::BadF);
@@ -641,6 +641,7 @@ impl FileSystem {
                 new_inode
             }
         };
+        println!("call path_open find the inode {:?}", inode);
 
         if oflags.contains(OpenFlags::TRUNC) {
             self.inode_table.get_mut(&inode).map(|inode_impl|{

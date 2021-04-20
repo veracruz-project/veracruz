@@ -25,7 +25,8 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   nop \
 		   private-set-intersection-sum \
 		   string-edit-distance \
- 		   number-stream-accumulation
+ 		   number-stream-accumulation \
+		   read-file
 RUST_EXAMPLE_DIR = rust-language-support/examples/
 # Navigate to the actual wasm programs.
 RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
@@ -67,7 +68,7 @@ wasm-checker:
 .SECONDEXPANSION:
 $(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUST_EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env wasm-checker
 	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@)))
-	./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
+	#./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
 
 freestanding-execution-engine: env
 	$(MAKE) -C freestanding-execution-engine/

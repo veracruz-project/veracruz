@@ -25,31 +25,26 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![no_std]
-extern crate alloc;
-extern crate veracruz_rt;
-
-use alloc::vec::Vec;
-use libveracruz::{data_description::write_result, host, return_code};
+use std::vec::Vec;
 use serde::Serialize;
 
-/// Reads the single input dataset, which is assumed to be a Bincode-encoded
-/// vector of 64-bit float pairs.  Fails with
-/// `return_code::ErrorCode::DataSourceCount` if there is not exactly one input,
-/// and fails with `return_code::ErrorCode::BadInput` if the input cannot be
-/// decoded from `pinecone` into a Rust vector of floating-point pairs.
-fn read_input() -> Result<Vec<(f64, f64)>, i32> {
-    if host::input_count() != 1 {
-        return return_code::fail_invariant_failed();
-    } else {
-        let dataset: Vec<u8> = host::read_input(0).unwrap();
+///// Reads the single input dataset, which is assumed to be a Bincode-encoded
+///// vector of 64-bit float pairs.  Fails with
+///// `return_code::ErrorCode::DataSourceCount` if there is not exactly one input,
+///// and fails with `return_code::ErrorCode::BadInput` if the input cannot be
+///// decoded from `pinecone` into a Rust vector of floating-point pairs.
+//fn read_input() -> Result<Vec<(f64, f64)>, i32> {
+    //if host::input_count() != 1 {
+        //return return_code::fail_invariant_failed();
+    //} else {
+        //let dataset: Vec<u8> = host::read_input(0).unwrap();
 
-        match pinecone::from_bytes(&dataset) {
-            Err(_err) => return_code::fail_bad_input(),
-            Ok(dataset) => Ok(dataset),
-        }
-    }
-}
+        //match pinecone::from_bytes(&dataset) {
+            //Err(_err) => return_code::fail_bad_input(),
+            //Ok(dataset) => Ok(dataset),
+        //}
+    //}
+//}
 
 /// The result of a linear regression is a line which is encoded as a gradient
 /// and intercept.
@@ -101,8 +96,9 @@ fn linear_regression(data: &[(f64, f64)]) -> LinearRegression {
 /// be a Rust vector of pairs of `f64` values.  Writes back a Bincode-encoded
 /// `LinearRegression` struct as output.  Whoever receives the result is assumed
 /// to know how to decode the result.
-fn main() -> return_code::Veracruz {
-    let data = read_input()?;
-    let result = linear_regression(&data);
-    write_result::<LinearRegression>(result)
+//fn main() -> return_code::Veracruz {
+fn main() {
+    //let data = read_input()?;
+    //let result = linear_regression(&data);
+    //write_result::<LinearRegression>(result)
 }

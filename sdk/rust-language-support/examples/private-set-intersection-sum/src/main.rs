@@ -15,7 +15,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use libveracruz::{data_description::write_result, host, return_code};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -44,19 +43,19 @@ struct Input {
     sample: Sample,
 }
 
-/// Reads exactly one input, which is assumed to be a Pinecone-encoded `Input`
-/// struct, as above.
-fn read_inputs() -> Result<Input, i32> {
-    if host::input_count() != 1 {
-        return_code::fail_data_source_count()
-    } else {
-        let input = host::read_input(0).unwrap();
-        Ok(match pinecone::from_bytes(input.as_slice()) {
-            Err(_err) => return return_code::fail_bad_input(),
-            Ok(s) => s,
-        })
-    }
-}
+///// Reads exactly one input, which is assumed to be a Pinecone-encoded `Input`
+///// struct, as above.
+//fn read_inputs() -> Result<Input, i32> {
+    //if host::input_count() != 1 {
+        //return_code::fail_data_source_count()
+    //} else {
+        //let input = host::read_input(0).unwrap();
+        //Ok(match pinecone::from_bytes(input.as_slice()) {
+            //Err(_err) => return return_code::fail_bad_input(),
+            //Ok(s) => s,
+        //})
+    //}
+//}
 
 /// Computes the set intersection-sum, returning the number of elements the sample and input
 /// dataset have in common, along with the total value of the sum of values associated with each
@@ -74,8 +73,9 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 
 /// The program entry point: reads exactly one input, decodes it and computes the set
 /// intersection-sum before re-encoding it into Pinecone and returning.
-fn main() -> return_code::Veracruz {
-    let data = read_inputs()?;
-    let result = set_intersection_sum(data.data, data.sample);
-    write_result::<(usize, u64)>(result)
+//fn main() -> return_code::Veracruz {
+fn main() {
+    //let data = read_inputs()?;
+    //let result = set_intersection_sum(data.data, data.sample);
+    //write_result::<(usize, u64)>(result)
 }

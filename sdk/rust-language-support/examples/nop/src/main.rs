@@ -17,9 +17,8 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use libveracruz::return_code;
-
 /// Entry point: immediately returns success.
-fn main() -> return_code::Veracruz {
-    return_code::success()
+//fn main() -> return_code::Veracruz {
+fn main() {
+    //return_code::success()
 }

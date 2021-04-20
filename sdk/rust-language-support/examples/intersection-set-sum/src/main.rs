@@ -27,14 +27,9 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![no_std]
-extern crate alloc;
-extern crate veracruz_rt;
+use std::string::String;
+use std::vec::Vec;
 
-use alloc::string::String;
-use alloc::vec::Vec;
-
-use libveracruz::{data_description::write_result, host, return_code};
 use serde::Deserialize;
 
 /// The advertising platform provides a Rust vec filled with `AdvertisementViewer` structs.  These
@@ -63,30 +58,30 @@ struct Customer {
     total_spend: f64,
 }
 
-/// Reads two input sources from the Veracruz host: the first input source is assumed to be a vector
-/// of `AdvertisementViewer` structs, whilst the second is assumed to be a vector of `Customer`
-/// structs.  Fails with [`return_code::ErrorCode::BadInput`] if the number of inputs provided is
-/// not equal to 2, or if the inputs cannot be deserialized from Bincode.
-fn read_inputs() -> Result<(Vec<AdvertisementViewer>, Vec<Customer>), i32> {
-    if host::input_count() != 2 {
-        return_code::fail_data_source_count()
-    } else {
-        /* Unwrap is safe here, as we know both inputs exist. */
-        let adverts = host::read_input(0).unwrap();
-        let customs = host::read_input(1).unwrap();
+///// Reads two input sources from the Veracruz host: the first input source is assumed to be a vector
+///// of `AdvertisementViewer` structs, whilst the second is assumed to be a vector of `Customer`
+///// structs.  Fails with [`return_code::ErrorCode::BadInput`] if the number of inputs provided is
+///// not equal to 2, or if the inputs cannot be deserialized from Bincode.
+//fn read_inputs() -> Result<(Vec<AdvertisementViewer>, Vec<Customer>), i32> {
+    //if host::input_count() != 2 {
+        //return_code::fail_data_source_count()
+    //} else {
+        //[> Unwrap is safe here, as we know both inputs exist. <]
+        //let adverts = host::read_input(0).unwrap();
+        //let customs = host::read_input(1).unwrap();
 
-        let adverts = match pinecone::from_bytes(&adverts) {
-            Err(_err) => return return_code::fail_bad_input(),
-            Ok(adverts) => adverts,
-        };
-        let customs = match pinecone::from_bytes(&customs) {
-            Err(_err) => return return_code::fail_bad_input(),
-            Ok(customs) => customs,
-        };
+        //let adverts = match pinecone::from_bytes(&adverts) {
+            //Err(_err) => return return_code::fail_bad_input(),
+            //Ok(adverts) => adverts,
+        //};
+        //let customs = match pinecone::from_bytes(&customs) {
+            //Err(_err) => return return_code::fail_bad_input(),
+            //Ok(customs) => customs,
+        //};
 
-        Ok((adverts, customs))
-    }
-}
+        //Ok((adverts, customs))
+    //}
+//}
 
 /// Computes the intersection set-sum of the input data: finds all customers/advertisement viewers
 /// in the respective datasets with the same ID and sums up these points of commonality's total
@@ -110,8 +105,9 @@ fn intersection_set_sum(vs: &[AdvertisementViewer], cs: &[Customer]) -> f64 {
 /// not exactly two inputs, or if either input cannot be deserialized from Bincode, and fails with
 /// [`return_code::ErrorCode::InvariantFailed`] if the result cannot be serialized to Bincode, or if
 /// more than one result is written.
-fn main() -> return_code::Veracruz {
-    let (adverts, customs) = read_inputs()?;
-    let total = intersection_set_sum(&adverts, &customs);
-    write_result::<f64>(total)
+//fn main() -> return_code::Veracruz {
+fn main() {
+    //let (adverts, customs) = read_inputs()?;
+    //let total = intersection_set_sum(&adverts, &customs);
+    //write_result::<f64>(total)
 }

@@ -25,7 +25,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for licensing and copyright
 //! information.
 
-use libveracruz::{data_description::write_result, host, return_code};
 use rusty_machine::{
     learning::{logistic_reg::LogisticRegressor, SupModel},
     linalg::{Matrix, Vector},
@@ -167,64 +166,64 @@ fn flatten(ds: &[Dataset]) -> Dataset {
     result
 }
 
-/// Deserializes a Vector of `u8` values into a `Dataset`.  Fails with
-/// `return_code::ErrorCode::BadInput` if the bytes cannot be decoded from
-/// `pinecone` into a `Dataset` value, or if the dataset is not self-consistent
-/// with respect to the dimensions of each of its points.
-fn read_dataset(input: &[u8]) -> Result<Dataset, i32> {
-    match pinecone::from_bytes::<Dataset>(input) {
-        Err(_err) => return_code::fail_bad_input(),
-        Ok(data) => {
-            if data.self_consistent() {
-                Ok(data)
-            } else {
-                return_code::fail_bad_input()
-            }
-        }
-    }
-}
+///// Deserializes a Vector of `u8` values into a `Dataset`.  Fails with
+///// `return_code::ErrorCode::BadInput` if the bytes cannot be decoded from
+///// `pinecone` into a `Dataset` value, or if the dataset is not self-consistent
+///// with respect to the dimensions of each of its points.
+//fn read_dataset(input: &[u8]) -> Result<Dataset, i32> {
+    //match pinecone::from_bytes::<Dataset>(input) {
+        //Err(_err) => return_code::fail_bad_input(),
+        //Ok(data) => {
+            //if data.self_consistent() {
+                //Ok(data)
+            //} else {
+                //return_code::fail_bad_input()
+            //}
+        //}
+    //}
+//}
 
-/// Deserializes all inputs into `Dataset` values, returning a vector of
-/// datasets, one corresponding to each input source.  Fails with
-/// `return_code::ErrorCode::BadInput` if the datasets do not share the same
-/// dimensionality, or if the deserialization of any of the datasets fails for
-/// any reason.
-fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
-    let mut result = Vec::new();
-    let mut dimension: Option<usize> = None;
+///// Deserializes all inputs into `Dataset` values, returning a vector of
+///// datasets, one corresponding to each input source.  Fails with
+///// `return_code::ErrorCode::BadInput` if the datasets do not share the same
+///// dimensionality, or if the deserialization of any of the datasets fails for
+///// any reason.
+//fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
+    //let mut result = Vec::new();
+    //let mut dimension: Option<usize> = None;
 
-    for i in input.into_iter() {
-        let dataset = read_dataset(&i)?;
+    //for i in input.into_iter() {
+        //let dataset = read_dataset(&i)?;
 
-        if dataset.empty() {
-            continue;
-        }
+        //if dataset.empty() {
+            //continue;
+        //}
 
-        match dimension {
-            None => dimension = Some(dataset.dimension().unwrap()),
-            Some(dim) => {
-                // Unwrap is safe as we have checked that the dataset is not empty.
-                if dataset.dimension().unwrap() != dim {
-                    return return_code::fail_bad_input();
-                } else {
-                    result.push(dataset);
-                }
-            }
-        }
-    }
+        //match dimension {
+            //None => dimension = Some(dataset.dimension().unwrap()),
+            //Some(dim) => {
+                //// Unwrap is safe as we have checked that the dataset is not empty.
+                //if dataset.dimension().unwrap() != dim {
+                    //return return_code::fail_bad_input();
+                //} else {
+                    //result.push(dataset);
+                //}
+            //}
+        //}
+    //}
 
-    Ok(result)
-}
+    //Ok(result)
+//}
 
-/// Reads all input datasets, producing a single, compound dataset containing
-/// them all appended together.  Fails with `return_code::ErrorCode::BadInput`
-/// if the deserialization of any dataset fails for any reason, or if the
-/// datasets have differing dimensionalities.
-fn read_input() -> Result<Dataset, i32> {
-    let input = host::read_all_inputs();
-    let datas = read_all_datasets(&input)?;
-    Ok(flatten(&datas))
-}
+///// Reads all input datasets, producing a single, compound dataset containing
+///// them all appended together.  Fails with `return_code::ErrorCode::BadInput`
+///// if the deserialization of any dataset fails for any reason, or if the
+///// datasets have differing dimensionalities.
+//fn read_input() -> Result<Dataset, i32> {
+    //let input = host::read_all_inputs();
+    //let datas = read_all_datasets(&input)?;
+    //Ok(flatten(&datas))
+//}
 
 /// Splits the dataset into a matrix of points-to-classify and a vector of
 /// classifications for those points.
@@ -252,8 +251,9 @@ fn train(dataset: &Dataset) -> Vec<f64> {
 /// source, concatenates them together into a single compound dataset, then
 /// trains a logistic regressor on this new dataset.  Input and output are
 /// assumed to be encoded by `pinecone`.
-fn main() -> return_code::Veracruz {
-    let dataset = read_input()?;
-    let model = train(&dataset);
-    write_result::<Vec<f64>>(model)
+//fn main() -> return_code::Veracruz {
+fn main() {
+    //let dataset = read_input()?;
+    //let model = train(&dataset);
+    //write_result::<Vec<f64>>(model)
 }

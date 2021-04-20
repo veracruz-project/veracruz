@@ -8,9 +8,7 @@ description = "Logistic regression example, using the Rust rusty-machine ML libr
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
 pinecone = "*"
-libveracruz = { path = "../../libveracruz" }
 rusty-machine = "0.5.4"
 serde = { version = "1.0.3", features = ["derive"] }
 

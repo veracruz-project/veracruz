@@ -10,7 +10,6 @@ description = "Computes the sum of two values and an initial value if there is n
 [dependencies]
 pinecone = "0.2"
 serde = "1.0"
-libveracruz = {path = "../../libveracruz"}
 
 [profile.release]
 codegen-units = 1

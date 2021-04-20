@@ -73,12 +73,15 @@ mod tests {
         "../test-collateral/private_set_intersection_sum.json";
     const NUMBER_STREAM_ACCUMULATION_POLICY: &'static str =
         "../test-collateral/number-stream-accumulation.json";
+    const BASIC_FILE_READ_WRITE_POLICY: &'static str =
+        "../test-collateral/basic_file_read_write.json";
     const CLIENT_CERT: &'static str = "../test-collateral/client_rsa_cert.pem";
     const CLIENT_KEY: &'static str = "../test-collateral/client_rsa_key.pem";
     const UNAUTHORIZED_CERT: &'static str = "../test-collateral/data_client_cert.pem";
     const UNAUTHORIZED_KEY: &'static str = "../test-collateral/data_client_key.pem";
     // Programs
     const RANDOM_SOURCE_WASM: &'static str = "../test-collateral/random-source.wasm";
+    const READ_FILE_WASM: &'static str = "../test-collateral/read-file.wasm";
     const LINEAR_REGRESSION_WASM: &'static str = "../test-collateral/linear-regression.wasm";
     const STRING_EDIT_DISTANCE_WASM: &'static str = "../test-collateral/string-edit-distance.wasm";
     const CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM: &'static str =
@@ -291,6 +294,23 @@ mod tests {
             client_key_filename,
             cert_hash.as_ref().to_vec(),
         );
+    }
+
+    #[test]
+    /// Integration test:
+    /// computation: echoing
+    /// data sources: a single input under filename `input.txt`.
+    fn test_phase2_basic_file_read_write_no_attestation() {
+        let result = test_template::<Vec<u8>>(
+            BASIC_FILE_READ_WRITE_POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            Some(READ_FILE_WASM),
+            &[],
+            &[],
+            false,
+        );
+        assert!(result.is_ok(), "error:{:?}", result);
     }
 
     #[test]
