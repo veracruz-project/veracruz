@@ -19,28 +19,27 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-#![no_std]
-extern crate alloc;
-extern crate veracruz_rt;
+//#![no_std]
+//extern crate alloc;
+//extern crate veracruz_rt;
 
-use alloc::{vec, vec::Vec};
-use libveracruz::{data_description::write_result, host, return_code};
+//use alloc::{vec, vec::Vec};
 
-/// Generates a four-element long random vector of `u8` values.  Fails if the
-/// random source is unavailable or experiences an error.
-fn generate_random_vector() -> Result<Vec<u8>, i32> {
-    let mut buffer: Vec<u8> = vec![0; 4];
-    match host::getrandom(&mut buffer) {
-        host::HCallReturnCode::ErrorServiceUnavailable => return_code::fail_service_unavailable(),
-        host::HCallReturnCode::Success(_) => Ok(buffer),
-        _otherwise => return_code::fail_generic(),
-    }
-}
+///// Generates a four-element long random vector of `u8` values.  Fails if the
+///// random source is unavailable or experiences an error.
+//fn generate_random_vector() -> Result<Vec<u8>, i32> {
+    //let mut buffer: Vec<u8> = vec![0; 4];
+    //match host::getrandom(&mut buffer) {
+        //host::HCallReturnCode::ErrorServiceUnavailable => return_code::fail_service_unavailable(),
+        //host::HCallReturnCode::Success(_) => Ok(buffer),
+        //_otherwise => return_code::fail_generic(),
+    //}
+//}
 
 /// Entry point: generates a four-element long random vector of `u8` values and
 /// writes this back as the result.
-fn main() -> return_code::Veracruz {
-    let result = generate_random_vector()?;
-    write_result::<Vec<u8>>(result)?;
-    Ok(())
+fn main() {
+    //let result = generate_random_vector()?;
+    //write_result::<Vec<u8>>(result)?;
+    //Ok(())
 }

@@ -10,7 +10,6 @@ description = "Computes the intersection of two input sets."
 [dependencies]
 pinecone = "*"
 serde = { version = "1.0.3", features = ["derive"] }
-libveracruz = {path = "../../libveracruz"}
 
 [profile.release]
 codegen-units = 1

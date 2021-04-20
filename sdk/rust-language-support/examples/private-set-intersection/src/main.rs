@@ -15,7 +15,6 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use libveracruz::{data_description::write_result, host, return_code};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -32,23 +31,23 @@ struct Person {
     grade: u8,
 }
 
-/// Reads all inputs: each input is assumed to be a Bincode-encoded `HashSet<Person>`.  Function
-/// returns a `Vec` of all hash-sets, one from each input provider.  Fails with
-/// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
-fn read_inputs() -> Result<Vec<HashSet<Person>>, i32> {
-    let inputs = host::read_all_inputs();
+///// Reads all inputs: each input is assumed to be a Bincode-encoded `HashSet<Person>`.  Function
+///// returns a `Vec` of all hash-sets, one from each input provider.  Fails with
+///// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
+//fn read_inputs() -> Result<Vec<HashSet<Person>>, i32> {
+    //let inputs = host::read_all_inputs();
 
-    let mut result: Vec<HashSet<Person>> = Vec::new();
+    //let mut result: Vec<HashSet<Person>> = Vec::new();
 
-    for i in inputs.into_iter() {
-        match pinecone::from_bytes(&i) {
-            Err(_err) => return return_code::fail_bad_input(),
-            Ok(hsmap) => result.push(hsmap),
-        }
-    }
+    //for i in inputs.into_iter() {
+        //match pinecone::from_bytes(&i) {
+            //Err(_err) => return return_code::fail_bad_input(),
+            //Ok(hsmap) => result.push(hsmap),
+        //}
+    //}
 
-    Ok(result)
-}
+    //Ok(result)
+//}
 
 /// Intersects a list of HashSets together.
 ///
@@ -73,8 +72,9 @@ fn set_intersection(sets: &[HashSet<Person>]) -> HashSet<Person> {
 /// Entry point.  Reads an unbounded number of `HashSet<Person>` inputs and finds their
 /// intersection, returning the result (again, a `HashSet<Person>`).  Assumes inputs and output are
 /// encoded as Bincode.
-fn main() -> Result<(), i32> {
-    let inputs = read_inputs()?;
-    let result = set_intersection(&inputs);
-    write_result::<HashSet<Person>>(result)
+//fn main() -> Result<(), i32> {
+fn main() {
+    //let inputs = read_inputs()?;
+    //let result = set_intersection(&inputs);
+    //write_result::<HashSet<Person>>(result)
 }

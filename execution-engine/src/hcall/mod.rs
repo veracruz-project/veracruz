@@ -9,6 +9,5 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub mod buffer;
 pub mod common;
 pub mod wasi;

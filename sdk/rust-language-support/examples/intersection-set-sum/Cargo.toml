@@ -8,10 +8,8 @@ description = "Computes the sum of values associated with keys k_i in set A wher
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libveracruz = {path = "../../libveracruz"}
 pinecone = "*"
 serde = { version = "1.0.3", default-features = false, features = ["derive"] }
-veracruz-rt = {path = "../../veracruz-rt" }
 
 [profile.release]
 codegen-units = 1

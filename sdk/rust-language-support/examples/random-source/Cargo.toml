@@ -8,12 +8,10 @@ description = "Samples random data from the trusted Veracruz runtime.  Used to t
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libveracruz = {path = "../../libveracruz"}
 pinecone = "*"
-veracruz-rt = {path = "../../veracruz-rt"}
 
 [profile.release]
 codegen-units = 1
-#lto = true
+lto = true
 opt-level = 3
 
