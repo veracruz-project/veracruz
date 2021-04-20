@@ -59,15 +59,10 @@
 use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use std::{
-    string::{String, ToString},
-    fmt::{Formatter, Display, Error},
     convert::TryFrom,
+    fmt::{Display, Error, Formatter},
+    string::{String, ToString},
 };
-use crate::hcall::buffer::VFSError;
-#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
-use std::sync::Mutex;
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The H-Call API
@@ -139,13 +134,9 @@ pub enum HostProvisioningError {
         display = "HostProvisioningError: Failed to sort the incoming data or incoming stream (this is a potential bug)."
     )]
     CannotSortDataOrStream,
-    #[error(
-        display = "HostProvisioningError: VFS Error {}.", _0
-    )]
-    VFSError(#[error(source)]VFSError),
-    #[error(
-        display = "HostProvisioningError: File {} cannot be found.", _0
-    )]
+    #[error(display = "HostProvisioningError: VFS Error {}.", _0)]
+    VFSError(#[error(source)] crate::hcall::buffer::VFSError),
+    #[error(display = "HostProvisioningError: File {} cannot be found.", _0)]
     FileNotFound(String),
 }
 
@@ -253,13 +244,14 @@ pub enum FatalEngineError {
     WASMIError(#[source(error)] wasmi::Error),
     /// Program cannot be found in VFS, when any principal (programs or participants) try to access
     /// the `file_name`.
-    #[error(display = "FatalVeracruzHostError: Program {} cannot be found.", file_name)]
-    ProgramCannotFound{
-        file_name : String,
-    },
+    #[error(
+        display = "FatalVeracruzHostError: Program {} cannot be found.",
+        file_name
+    )]
+    ProgramCannotFound { file_name: String },
     /// Wrapper for Virtual FS Error.
     #[error(display = "FatalVeracruzHostError: VFS Error: {:?}.", _0)]
-    VFSError(#[error(source)] VFSError),
+    VFSError(#[error(source)] crate::hcall::buffer::VFSError),
     /// Wrapper for direct error message.
     #[error(display = "FatalVeracruzHostError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
@@ -314,7 +306,8 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError>;
+    fn invoke_entry_point(&mut self, file_name: &str)
+        -> Result<EngineReturnCode, FatalEngineError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

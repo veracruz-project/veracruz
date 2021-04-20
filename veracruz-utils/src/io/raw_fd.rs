@@ -12,11 +12,11 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use byteorder::{ByteOrder, LittleEndian};
 use super::error::SocketError;
+use byteorder::{ByteOrder, LittleEndian};
 use nix::{
     errno::Errno::EINTR,
-    sys::socket::{recv, send, MsgFlags}
+    sys::socket::{recv, send, MsgFlags},
 };
 use std::{os::unix::io::RawFd, vec::Vec};
 

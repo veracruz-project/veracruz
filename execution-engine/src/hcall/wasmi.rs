@@ -9,33 +9,29 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{boxed::Box, string::ToString, vec::Vec, convert::TryFrom};
+use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
 
 use platform_services::{getrandom, result};
 
 use wasmi::{
-    Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
+    Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef, HostError,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
-    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
-    HostError, TrapKind
+    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, TrapKind, ValueType,
 };
 
-use crate::hcall::{
-    common::{
-        ExecutionEngine, EntrySignature, EngineReturnCode,
-        HostProvisioningError, FatalEngineError, HCALL_GETRANDOM_NAME,
-        HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
-        HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
-        HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
-        HCALL_WRITE_OUTPUT_NAME,
-    },
-};
-use veracruz_utils::policy::principal::Principal;
-#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
-use std::sync::{Mutex, Arc};
-#[cfg(feature = "sgx")]
-use std::sync::{SgxMutex as Mutex, Arc};
 use crate::hcall::buffer::VFS;
+use crate::hcall::common::{
+    EngineReturnCode, EntrySignature, ExecutionEngine, FatalEngineError, HostProvisioningError,
+    HCALL_GETRANDOM_NAME, HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME,
+    HCALL_INPUT_SIZE_NAME, HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME,
+    HCALL_READ_PREVIOUS_RESULT_NAME, HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME,
+    HCALL_STREAM_SIZE_NAME, HCALL_WRITE_OUTPUT_NAME,
+};
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+use std::sync::{Arc, Mutex};
+#[cfg(feature = "sgx")]
+use std::sync::{Arc, SgxMutex as Mutex};
+use veracruz_utils::policy::principal::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
@@ -63,8 +59,8 @@ pub(crate) type HCallError = Result<EngineReturnCode, FatalEngineError>;
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
 /// `MemoryRef` type.
 pub(crate) struct WasmiHostProvisioningState {
-    /// The VFS installed to this execution 
-    vfs : Arc<Mutex<VFS>>,
+    /// The VFS installed to this execution
+    vfs: Arc<Mutex<VFS>>,
     /// A reference to the WASM program module that will actually execute on
     /// the input data sources.
     program_module: Option<ModuleRef>,
@@ -383,9 +379,11 @@ impl Externals for WasmiHostProvisioningState {
             HCALL_PREVIOUS_RESULT_SIZE_CODE => self.previous_result_size(args),
             HCALL_HAS_PREVIOUS_RESULT_CODE => self.has_previous_result(args),
             HCALL_READ_PREVIOUS_RESULT_CODE => self.previous_result(args),
-            otherwise => return mk_host_trap(FatalEngineError::UnknownHostFunction { index: otherwise }),
+            otherwise => {
+                return mk_host_trap(FatalEngineError::UnknownHostFunction { index: otherwise })
+            }
         };
-        match result { 
+        match result {
             Ok(return_code) => mk_error_code(return_code),
             Err(host_trap) => mk_host_trap(host_trap),
         }
@@ -395,11 +393,8 @@ impl Externals for WasmiHostProvisioningState {
 /// Functionality of the `WasmiHostProvisioningState` type that relies on it
 /// satisfying the `Externals` and `ModuleImportResolver` constraints.
 impl WasmiHostProvisioningState {
-
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(
-        vfs : Arc<Mutex<VFS>>,
-    ) -> Self {
+    pub fn new(vfs: Arc<Mutex<VFS>>) -> Self {
         Self {
             vfs,
             program: Principal::NoCap,
@@ -459,18 +454,16 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => {
-                match memory.get(address, size as usize) {
-                    Err(_err) => Err(FatalEngineError::MemoryReadFailed {
-                        memory_address: address as usize,
-                        bytes_to_be_read: size as usize,
-                    }),
-                    Ok(bytes) => {
-                        self.write_file(&self.program.clone(),"output",&bytes)?;
-                        Ok(EngineReturnCode::Success)
-                    }
+            Some(memory) => match memory.get(address, size as usize) {
+                Err(_err) => Err(FatalEngineError::MemoryReadFailed {
+                    memory_address: address as usize,
+                    bytes_to_be_read: size as usize,
+                }),
+                Ok(bytes) => {
+                    self.write_file(&self.program.clone(), "output", &bytes)?;
+                    Ok(EngineReturnCode::Success)
                 }
-            }
+            },
         }
     }
 
@@ -483,7 +476,7 @@ impl WasmiHostProvisioningState {
         }
 
         let address: u32 = args.nth(0);
-        let result : u32 = self.count_file("input")? as u32;
+        let result: u32 = self.count_file("input")? as u32;
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
@@ -513,9 +506,11 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => 
-            {
-                let result = self.read_file(&self.program,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
+            Some(memory) => {
+                let result = self
+                    .read_file(&self.program, &format!("input-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?
+                    .len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if memory.set(address, &result).is_err() {
@@ -526,7 +521,7 @@ impl WasmiHostProvisioningState {
                 }
 
                 Ok(EngineReturnCode::Success)
-            },
+            }
         }
     }
 
@@ -544,9 +539,10 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => 
-            {
-                let data = self.read_file(&self.program,&format!("input-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
+            Some(memory) => {
+                let data = self
+                    .read_file(&self.program, &format!("input-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?;
                 if data.len() > size as usize {
                     return Ok(EngineReturnCode::DataSourceSize);
                 }
@@ -558,8 +554,7 @@ impl WasmiHostProvisioningState {
                 }
 
                 Ok(EngineReturnCode::Success)
-
-            },
+            }
         }
     }
 
@@ -602,9 +597,11 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => 
-            {
-                let result = self.read_file(&self.program,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?.len() as u32;
+            Some(memory) => {
+                let result = self
+                    .read_file(&self.program, &format!("stream-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?
+                    .len() as u32;
                 let result: Vec<u8> = result.to_le_bytes().to_vec();
 
                 if memory.set(address, &result).is_err() {
@@ -615,7 +612,7 @@ impl WasmiHostProvisioningState {
                 }
 
                 Ok(EngineReturnCode::Success)
-            },
+            }
         }
     }
 
@@ -631,12 +628,12 @@ impl WasmiHostProvisioningState {
         let address: u32 = args.nth(1);
         let size: u32 = args.nth(2);
 
-
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) =>
-            {
-                let data = self.read_file(&self.program,&format!("stream-{}",index))?.ok_or(format!("File input-{} cannot be found",index))?;
+            Some(memory) => {
+                let data = self
+                    .read_file(&self.program, &format!("stream-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?;
                 if data.len() > size as usize {
                     return Ok(EngineReturnCode::DataSourceSize);
                 }
@@ -648,7 +645,7 @@ impl WasmiHostProvisioningState {
                 }
 
                 Ok(EngineReturnCode::Success)
-            },
+            }
         }
     }
 
@@ -664,9 +661,10 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => 
-            {
-                let result = self.read_file(&self.program,"output")?.unwrap_or(Vec::new());
+            Some(memory) => {
+                let result = self
+                    .read_file(&self.program, "output")?
+                    .unwrap_or(Vec::new());
                 let result: Vec<u8> = result.len().to_le_bytes().to_vec();
                 if memory.set(address, &result).is_err() {
                     return Err(FatalEngineError::MemoryWriteFailed {
@@ -692,9 +690,10 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => 
-            {
-                let previous_result = self.read_file(&self.program,"output")?.unwrap_or(Vec::new());
+            Some(memory) => {
+                let previous_result = self
+                    .read_file(&self.program, "output")?
+                    .unwrap_or(Vec::new());
 
                 if previous_result.len() > size as usize {
                     return Ok(EngineReturnCode::PreviousResultSize);
@@ -723,9 +722,8 @@ impl WasmiHostProvisioningState {
 
         match self.get_memory() {
             None => Err(FatalEngineError::NoMemoryRegistered),
-            Some(memory) => 
-            {
-                let previous_result = self.read_file(&self.program,"output")?;
+            Some(memory) => {
+                let previous_result = self.read_file(&self.program, "output")?;
                 let flag: u32 = match previous_result {
                     Some(_) => 1,
                     None => 0,
@@ -804,22 +802,36 @@ impl WasmiHostProvisioningState {
 
     /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.append(client_id,file_name,data)?;
+    fn append_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.append(client_id, file_name, data)?;
         Ok(())
     }
 
     /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        self.vfs.lock()?.write(client_id,file_name,data)?;
+    fn write_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.write(client_id, file_name, data)?;
         Ok(())
     }
 
     /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
     #[inline]
-    fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        Ok(self.vfs.lock()?.read(client_id,file_name)?)
+    fn read_file(
+        &self,
+        client_id: &Principal,
+        file_name: &str,
+    ) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        Ok(self.vfs.lock()?.read(client_id, file_name)?)
     }
 
     #[inline]
@@ -831,7 +843,6 @@ impl WasmiHostProvisioningState {
 /// The `WasmiHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmiHostProvisioningState {
-
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
@@ -847,25 +858,21 @@ impl ExecutionEngine for WasmiHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> 
-    {
-        let program = self.read_file(&Principal::InternalSuperUser,file_name)?.ok_or(format!("Program file {} cannot be found.",file_name))?;
+    fn invoke_entry_point(
+        &mut self,
+        file_name: &str,
+    ) -> Result<EngineReturnCode, FatalEngineError> {
+        let program = self
+            .read_file(&Principal::InternalSuperUser, file_name)?
+            .ok_or(format!("Program file {} cannot be found.", file_name))?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());
 
         match self.invoke_export(ENTRY_POINT_NAME) {
-            Ok(Some(RuntimeValue::I32(return_code))) => {
-                EngineReturnCode::try_from(return_code)
-            }
-            Ok(_) => {
-                Err(FatalEngineError::ReturnedCodeError)
-            }
-            Err(Error::Trap(trap)) => {
-                Err(FatalEngineError::WASMITrapError(trap))
-            }
-            Err(err) => {
-                Err(FatalEngineError::WASMIError(err))
-            }
+            Ok(Some(RuntimeValue::I32(return_code))) => EngineReturnCode::try_from(return_code),
+            Ok(_) => Err(FatalEngineError::ReturnedCodeError),
+            Err(Error::Trap(trap)) => Err(FatalEngineError::WASMITrapError(trap)),
+            Err(err) => Err(FatalEngineError::WASMIError(err)),
         }
     }
 }

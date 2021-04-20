@@ -34,15 +34,18 @@ use crate::{
     policy::{
         error::PolicyError,
         expiry::Timepoint,
-        principal::{ExecutionStrategy, Identity, Program, CapabilityTable, FileCapability, Principal, FileOperation},
+        principal::{
+            CapabilityTable, ExecutionStrategy, FileCapability, FileOperation, Identity, Principal,
+            Program,
+        },
     },
 };
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
+    collections::{HashMap, HashSet},
     string::{String, ToString},
     vec::Vec,
-    collections::{HashMap, HashSet},
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +62,7 @@ pub struct Policy {
     /// The identities of every principal involved in a computation.
     identities: Vec<Identity<String>>,
     /// The candidate programs that can be loaded in the execution engine.
-    programs : Vec<Program>,
+    programs: Vec<Program>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -91,7 +94,7 @@ impl Policy {
     /// well-formedness checks pass.
     pub fn new(
         identities: Vec<Identity<String>>,
-        programs : Vec<Program>,
+        programs: Vec<Program>,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
@@ -226,9 +229,7 @@ impl Policy {
 
             // check IDs of all the participants
             if client_ids.contains(identity.id()) {
-                return Err(PolicyError::DuplicatedClientIDError(
-                    *identity.id() as u64
-                ));
+                return Err(PolicyError::DuplicatedClientIDError(*identity.id() as u64));
             }
             client_ids.push(*identity.id());
         }
@@ -238,9 +239,7 @@ impl Policy {
         {
             let policy_ciphersuite = rustls::CipherSuite::lookup_value(self.ciphersuite())
                 .map_err(|_| {
-                    PolicyError::TLSInvalidCyphersuiteError(
-                        self.get_ciphersuite().to_string(),
-                    )
+                    PolicyError::TLSInvalidCyphersuiteError(self.get_ciphersuite().to_string())
                 })?;
             if !rustls::ALL_CIPHERSUITES
                 .iter()
@@ -281,9 +280,7 @@ impl Policy {
                 return Ok(*identity.id() as u64);
             }
         }
-        Err(PolicyError::InvalidClientCertificateError(
-            cert.to_string(),
-        ))
+        Err(PolicyError::InvalidClientCertificateError(cert.to_string()))
     }
 
     /// Return the CapabilityTable in this policy. It contains capabilities related to all
@@ -294,27 +291,31 @@ impl Policy {
             let id = identity.id();
             let file_permissions = identity.file_permissions();
             let capabilities_table = Self::to_capabilities(&file_permissions);
-            table.insert(Principal::Participant(*id as u64),capabilities_table);
+            table.insert(Principal::Participant(*id as u64), capabilities_table);
         }
         for program in &self.programs {
             let program_file_name = program.program_file_name();
             let file_permissions = program.file_permissions();
             let capabilities_table = Self::to_capabilities(&file_permissions);
-            table.insert(Principal::Program(program_file_name.to_string()),capabilities_table);
+            table.insert(
+                Principal::Program(program_file_name.to_string()),
+                capabilities_table,
+            );
         }
         table
     }
 
     /// Convert a vec of FileCapability to a Hashmap from filenames to sets of allowed FileOperation.
-    fn to_capabilities(file_permissions : &[FileCapability]) -> HashMap<String, HashSet<FileOperation>> {
+    fn to_capabilities(
+        file_permissions: &[FileCapability],
+    ) -> HashMap<String, HashSet<FileOperation>> {
         let mut capabilities_table = HashMap::new();
         for permission in file_permissions {
-            let (file_name,capabilities) = permission.to_capability_entry();
-            capabilities_table.insert(file_name,capabilities);
+            let (file_name, capabilities) = permission.to_capability_entry();
+            capabilities_table.insert(file_name, capabilities);
         }
-        capabilities_table 
+        capabilities_table
     }
-
 
     /// Return the program digest table, mapping program filenames to their expected digests.
     pub fn get_program_digests(&self) -> Result<HashMap<String, Vec<u8>>, PolicyError> {
@@ -322,7 +323,11 @@ impl Policy {
         for program in &self.programs {
             let program_file_name = program.program_file_name();
             let pi_hash = program.pi_hash();
-            table.insert(program_file_name.to_string(),hex::decode(pi_hash).map_err(|_e|PolicyError::HexDecodeError(program_file_name.to_string()))?);
+            table.insert(
+                program_file_name.to_string(),
+                hex::decode(pi_hash)
+                    .map_err(|_e| PolicyError::HexDecodeError(program_file_name.to_string()))?,
+            );
         }
         Ok(table)
     }
@@ -333,14 +338,17 @@ impl Policy {
         for program in &self.programs {
             let program_file_name = program.program_file_name();
             let file_permissions = program.file_permissions();
-            table.insert(program_file_name.to_string(),Self::get_required_inputs(&file_permissions));
+            table.insert(
+                program_file_name.to_string(),
+                Self::get_required_inputs(&file_permissions),
+            );
         }
         Ok(table)
     }
 
     /// Extract the input filenames from a vec of FileCapability. If a prorgam has permission to
     /// read, it is considered as an input file.
-    fn get_required_inputs(cap : &[FileCapability])-> Vec<String> {
+    fn get_required_inputs(cap: &[FileCapability]) -> Vec<String> {
         let mut rst = cap.iter().fold(Vec::new(), |mut acc, x| {
             if x.read() {
                 acc.push(x.file_name().to_string());

@@ -40,7 +40,6 @@ pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError
 }
 
 pub fn new_session() -> Result<u32, RuntimeManagerError> {
-    
     let local_session_id = super::SESSION_COUNTER.fetch_add(1, Ordering::SeqCst);
 
     let session = match &*super::MY_SESSION_MANAGER.lock()? {
@@ -89,7 +88,7 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), RuntimeManage
         // The incoming buffer is not full, so we cannot parse a complete protobuf
         // message.  We need to wait longer for this to arrive.
         None => Ok(()),
-        Some(response) => Ok(this_session.return_data(&response)?)
+        Some(response) => Ok(this_session.return_data(&response)?),
     }
 }
 

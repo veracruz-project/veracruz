@@ -17,7 +17,10 @@ use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
     DifferentParameter, DifferentParameters, ErrorKind, ParamType, Parameters, Result, Session,
 };
-use std::{convert::{TryFrom, TryInto}, io::Write};
+use std::{
+    convert::{TryFrom, TryInto},
+    io::Write,
+};
 use veracruz_utils::platform::tz::runtime_manager_opcode::RuntimeManagerOpcode;
 
 fn print_error_and_return(message: String) -> ErrorKind {
@@ -80,16 +83,24 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 ))
             })?;
             crate::managers::session_manager::init_session_manager(&input_str).map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command Initialize {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command Initialize {:?}",
+                    e
+                ))
             })?;
         }
         RuntimeManagerOpcode::GetEnclaveCertSize => {
-            debug_message("runtime_manager_trustzone::invoke_command GetEnclaveCertSize".to_string());
+            debug_message(
+                "runtime_manager_trustzone::invoke_command GetEnclaveCertSize".to_string(),
+            );
             let mut values = unsafe {
                 params.0.as_value().map_err(|e| print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveCertSize failed to get param.0 as value {:?}",e)))?
             };
             let cert = managers::session_manager::get_enclave_cert_pem().map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveCertSize {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command GetEnclaveCertSize {:?}",
+                    e
+                ))
             })?;
             values.set_a(cert.len() as u32);
         }
@@ -104,7 +115,10 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 })?
             };
             let cert = managers::session_manager::get_enclave_cert_pem().map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveCert {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command GetEnclaveCert {:?}",
+                    e
+                ))
             })?;
             p0.buffer().write(&cert).map_err(|e| {
                 print_error_and_return(format!(
@@ -114,12 +128,17 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             })?;
         }
         RuntimeManagerOpcode::GetEnclaveNameSize => {
-            debug_message("runtime_manager_trustzone::invoke_command GetEnclaveNameSize".to_string());
+            debug_message(
+                "runtime_manager_trustzone::invoke_command GetEnclaveNameSize".to_string(),
+            );
             let mut values = unsafe {
                 params.0.as_value().map_err(|e| print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveNameSize failed to get param.0 as value {:?}",e)))?
             };
             let name = managers::session_manager::get_enclave_name().map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveNameSize {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command GetEnclaveNameSize {:?}",
+                    e
+                ))
             })?;
             values.set_a(name.len() as u32);
         }
@@ -134,7 +153,10 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 })?
             };
             let name = managers::session_manager::get_enclave_name().map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveName {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command GetEnclaveName {:?}",
+                    e
+                ))
             })?;
             p0.buffer().write(&name.as_bytes()).map_err(|e| {
                 print_error_and_return(format!(
@@ -154,7 +176,10 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 })?
             };
             let local_session_id = managers::session_manager::new_session().map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command NewTLSSession {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command NewTLSSession {:?}",
+                    e
+                ))
             })?;
             values.set_a(local_session_id);
         }
@@ -170,7 +195,10 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             };
             let session_id = values.a();
             managers::session_manager::close_session(session_id).map_err(|e| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command CloseTLSSession {:?}", e))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command CloseTLSSession {:?}",
+                    e
+                ))
             })?;
         }
         RuntimeManagerOpcode::GetTLSDataNeeded => {
@@ -216,7 +244,10 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 "runtime_manager_trustzone::invoke_command SendTLSData calling session_manager::send_data".to_string(),
             );
             managers::session_manager::send_data(session_id, &input_buffer).map_err(|err| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command SendTLSData {:?}", err))
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command SendTLSData {:?}",
+                    err
+                ))
             })?;
         }
         RuntimeManagerOpcode::GetTLSData => {
@@ -258,9 +289,12 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 })?
             };
 
-            let (active_bool, output_data) =
-                managers::session_manager::get_data(session_id).map_err(|e| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetTLSData {:?}", e))
+            let (active_bool, output_data) = managers::session_manager::get_data(session_id)
+                .map_err(|e| {
+                    print_error_and_return(format!(
+                        "runtime_manager_trustzone::invoke_command GetTLSData {:?}",
+                        e
+                    ))
                 })?;
 
             p1.buffer().write(&output_data).map_err(|e| {
@@ -277,7 +311,9 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             // p1 - device_id output
             // p2 - token output
             // p3 - pubkey output
-            debug_message("runtime_manager_trustzone::invoke_command GetPSAAttestationToken".to_string());
+            debug_message(
+                "runtime_manager_trustzone::invoke_command GetPSAAttestationToken".to_string(),
+            );
 
             let mut challenge = unsafe {
                 let mut memref = params.0.as_memref().map_err(|err| {

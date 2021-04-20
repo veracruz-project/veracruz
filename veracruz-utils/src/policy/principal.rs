@@ -12,9 +12,13 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use serde::{Deserialize, Serialize};
 use super::error::PolicyError;
-use std::{string::{String, ToString}, vec::Vec, collections::{HashMap, HashSet}};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    string::{String, ToString},
+    vec::Vec,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.
@@ -29,8 +33,8 @@ pub enum FileOperation {
     Execute,
 }
 
-/// The Principal of Capability in Veracruz. 
-#[derive(Clone,Hash,PartialEq,Eq,Debug, Serialize, Deserialize)]
+/// The Principal of Capability in Veracruz.
+#[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Principal {
     /// The Maximum Capability. It is used in some internal functions.
     InternalSuperUser,
@@ -42,21 +46,20 @@ pub enum Principal {
     NoCap,
 }
 
-
 /// THe Capability Table, contains the allowed operations of a Principal on a file
-pub type CapabilityTable = HashMap<Principal,HashMap<String, HashSet<FileOperation>>>;
+pub type CapabilityTable = HashMap<Principal, HashMap<String, HashSet<FileOperation>>>;
 
 /// Defines the capabilities on a file.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FileCapability {
-    /// The file name 
-    file_name : String,
+    /// The file name
+    file_name: String,
     /// Read permission
-    read : bool,
+    read: bool,
     /// Write permission
-    write : bool,
+    write: bool,
     /// Execute permission
-    execute : bool,
+    execute: bool,
 }
 
 impl FileCapability {
@@ -97,12 +100,11 @@ impl FileCapability {
 
     /// Extract file name and its associated FileOperations from a FileCapability entry.
     pub fn to_capability_entry(&self) -> (String, HashSet<FileOperation>) {
-
         let FileCapability {
-                    file_name,
-                    read,
-                    write,
-                    execute,
+            file_name,
+            read,
+            write,
+            execute,
         } = self;
 
         let mut capabilities = HashSet::new();
@@ -125,27 +127,32 @@ impl FileCapability {
 /// Defines a program that can be loaded into execution engine.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Program {
-    /// The file name 
-    program_file_name : String,
+    /// The file name
+    program_file_name: String,
     /// The program ID
     id: u32,
     /// The hash of the program which will be provisioned into Veracruz by the
     /// program provider.
-    pi_hash : String,
+    pi_hash: String,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_permissions : Vec<FileCapability>,
+    file_permissions: Vec<FileCapability>,
 }
 
 impl Program {
     /// Creates a veracruz program.
     #[inline]
-    pub fn new<T>(program_file_name: String, id: T, pi_hash: String, file_permissions : Vec<FileCapability>) -> Self 
+    pub fn new<T>(
+        program_file_name: String,
+        id: T,
+        pi_hash: String,
+        file_permissions: Vec<FileCapability>,
+    ) -> Self
     where
-        T : Into<u32>
+        T: Into<u32>,
     {
         Self {
             program_file_name,
-            id : id.into(),
+            id: id.into(),
             pi_hash,
             file_permissions,
         }
@@ -212,25 +219,25 @@ pub struct Identity<U> {
     id: u32,
     /// The file capabilities that specifies this principal's ability to read,
     /// write and execute files.
-    file_permissions : Vec<FileCapability>,
+    file_permissions: Vec<FileCapability>,
 }
 
 impl<U> Identity<U> {
     /// Creates a new identity from a certificate, and identifier.  Initially,
     /// we keep the set of roles empty.
     #[inline]
-    pub fn new<T>(certificate: U, id: T, file_permissions : Vec<FileCapability>) -> Self 
+    pub fn new<T>(certificate: U, id: T, file_permissions: Vec<FileCapability>) -> Self
     where
         T: Into<u32>,
     {
         Self {
             certificate,
-            id : id.into(),
+            id: id.into(),
             file_permissions,
         }
     }
 
-    /// Return the file permission in associated to this client (identity). 
+    /// Return the file permission in associated to this client (identity).
     pub fn file_permissions(&self) -> &Vec<FileCapability> {
         &self.file_permissions
     }

@@ -9,8 +9,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use serde::{Deserialize, Serialize};
 use super::error::PolicyError;
+use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Expiry timepoints.
@@ -46,13 +46,7 @@ impl Timepoint {
     ///
     /// Fails if the fields do not conform with the formatting expectations of
     /// ISO-8601.
-    pub fn new<T,U>(
-        year: T,
-        month: U,
-        day: U,
-        hour: U,
-        minute: U,
-    ) -> Result<Self, PolicyError>
+    pub fn new<T, U>(year: T, month: U, day: U, hour: U, minute: U) -> Result<Self, PolicyError>
     where
         T: Into<u32>,
         U: Into<u8>,

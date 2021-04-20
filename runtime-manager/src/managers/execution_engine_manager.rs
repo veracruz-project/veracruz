@@ -10,20 +10,16 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use super::{
-    RuntimeManagerError, ProtocolState,
-    ProvisioningResult,
-};
-use transport_protocol::transport_protocol::{
-    RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
-};
+use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
 use lazy_static::lazy_static;
 #[cfg(any(feature = "tz", feature = "nitro"))]
-
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
 use std::{collections::HashMap, result::Result, vec::Vec};
+use transport_protocol::transport_protocol::{
+    RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
+};
 use veracruz_utils::policy::principal::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,15 +47,20 @@ fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
 /// particular type of message.
 #[deprecated]
 fn response_not_ready() -> super::ProvisioningResult {
-    let rst = transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_NOT_READY as i32, None)?;
+    let rst = transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::FAILED_NOT_READY as i32,
+        None,
+    )?;
     Ok(Some(rst))
 }
 
 /// Encodes an error code indicating that somebody sent an invalid or malformed
 /// protocol request.
 fn response_invalid_request() -> super::ProvisioningResult {
-    let rst =
-        transport_protocol::serialize_result(transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST as i32, None)?;
+    let rst = transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST as i32,
+        None,
+    )?;
     Ok(Some(rst))
 }
 
@@ -70,7 +71,10 @@ fn response_invalid_request() -> super::ProvisioningResult {
 /// Returns the SHA-256 digest of the provisioned program.  Fails if no hash has
 /// yet been computed.
 #[deprecated]
-fn dispatch_on_pi_hash(_ : transport_protocol::RequestPiHash, _protocol_state: &ProtocolState) -> ProvisioningResult {
+fn dispatch_on_pi_hash(
+    _: transport_protocol::RequestPiHash,
+    _protocol_state: &ProtocolState,
+) -> ProvisioningResult {
     let response = transport_protocol::serialize_pi_hash(b"deprecated")?;
     Ok(Some(response))
 }
@@ -86,20 +90,23 @@ fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult
 /// state can be queried unconditionally (though it may change between the query
 /// being serviced and being received back/being acted upon...)
 #[deprecated]
-fn dispatch_on_request_state(_ : &ProtocolState) -> ProvisioningResult {
-    let response =
-        transport_protocol::serialize_machine_state(u8::from(0))?;
+fn dispatch_on_request_state(_: &ProtocolState) -> ProvisioningResult {
+    let response = transport_protocol::serialize_machine_state(u8::from(0))?;
     Ok(Some(response))
 }
 
 /// Returns the result of a computation, computing the result first.
-fn dispatch_on_result(transport_protocol::RequestResult{ file_name, .. } : transport_protocol::RequestResult, protocol_state: &mut ProtocolState, client_id: u64,) -> ProvisioningResult {
+fn dispatch_on_result(
+    transport_protocol::RequestResult { file_name, .. }: transport_protocol::RequestResult,
+    protocol_state: &mut ProtocolState,
+    client_id: u64,
+) -> ProvisioningResult {
     if !protocol_state.is_modified() {
-        let result = protocol_state.read_file(&Principal::Participant(client_id),"output")?;
+        let result = protocol_state.read_file(&Principal::Participant(client_id), "output")?;
         let response = response_success(result);
         return Ok(Some(response));
     }
-    protocol_state.execute(&file_name,client_id)
+    protocol_state.execute(&file_name, client_id)
 }
 
 /// Provisions a program into the VFS.  Fails if the client has no permission.
@@ -109,11 +116,16 @@ fn dispatch_on_result(transport_protocol::RequestResult{ file_name, .. } : trans
 /// which seems benign.  Should this change?
 fn dispatch_on_program(
     protocol_state: &mut ProtocolState,
-    transport_protocol::Program { file_name, code, .. }: transport_protocol::Program,
+    transport_protocol::Program {
+        file_name, code, ..
+    }: transport_protocol::Program,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(&Principal::Participant(client_id),&file_name,&code)?; 
-    let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
+    protocol_state.write_file(&Principal::Participant(client_id), &file_name, &code)?;
+    let response = transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::SUCCESS as i32,
+        None,
+    )?;
     Ok(Some(response))
 }
 
@@ -125,8 +137,15 @@ fn dispatch_on_data(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(&Principal::Participant(client_id),file_name.as_str(),data.as_slice())?; 
-    let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
+    protocol_state.write_file(
+        &Principal::Participant(client_id),
+        file_name.as_str(),
+        data.as_slice(),
+    )?;
+    let response = transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::SUCCESS as i32,
+        None,
+    )?;
     Ok(Some(response))
 }
 
@@ -138,17 +157,22 @@ fn dispatch_on_stream(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(&Principal::Participant(client_id),file_name.as_str(),data.as_slice())?;
-    let response = transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, None)?;
+    protocol_state.write_file(
+        &Principal::Participant(client_id),
+        file_name.as_str(),
+        data.as_slice(),
+    )?;
+    let response = transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::SUCCESS as i32,
+        None,
+    )?;
     Ok(Some(response))
 }
 
 /// Signals the next round of computation.
 /// The next result request is guaranteed to execute the
 /// program before reading the result from the VFS.
-fn dispatch_on_next_round(
-    protocol_state: &mut ProtocolState,
-) -> ProvisioningResult {
+fn dispatch_on_next_round(protocol_state: &mut ProtocolState) -> ProvisioningResult {
     protocol_state.reload()?;
     Ok(Some(response_success(None)))
 }
@@ -160,10 +184,7 @@ fn dispatch_on_next_round(
 /// operation? There's no guarantee of a timely shutdown, so it doesn't really
 /// guarantee better security, but if a client detects something's wrong, they
 /// may want the ability.
-fn dispatch_on_request(
-    client_id: u64,
-    request: MESSAGE,
-) -> ProvisioningResult {
+fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
     let mut protocol_state_guard = super::PROTOCOL_STATE.lock()?;
     let protocol_state = protocol_state_guard
         .as_mut()
@@ -172,9 +193,13 @@ fn dispatch_on_request(
     match request {
         MESSAGE::data(data) => dispatch_on_data(protocol_state, data, client_id),
         MESSAGE::program(prog) => dispatch_on_program(protocol_state, prog, client_id),
-        MESSAGE::request_pi_hash(pi_hash_request) => dispatch_on_pi_hash(pi_hash_request, protocol_state),
+        MESSAGE::request_pi_hash(pi_hash_request) => {
+            dispatch_on_pi_hash(pi_hash_request, protocol_state)
+        }
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
-        MESSAGE::request_result(result_request) => dispatch_on_result(result_request,protocol_state,client_id),
+        MESSAGE::request_result(result_request) => {
+            dispatch_on_result(result_request, protocol_state, client_id)
+        }
         MESSAGE::request_state(_) => dispatch_on_request_state(protocol_state),
         MESSAGE::request_shutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
@@ -223,7 +248,8 @@ fn parse_incoming_buffer(
     //
     // TODO: It would be nice to check the error, and then determine if this might
     // be the case or if it is hopeless and we could just error out.
-    match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer) {
+    match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer)
+    {
         Err(_) => Ok(None),
         Ok(parsed) => {
             incoming_buffer_hash.remove(&tls_session_id);

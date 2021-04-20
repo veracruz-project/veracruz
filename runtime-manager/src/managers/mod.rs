@@ -29,17 +29,16 @@ use std::{ffi::CString, sync::SgxMutex as Mutex};
 
 use lazy_static::lazy_static;
 
-use execution_engine::{
-    factory::execute,
-    hcall::common::EngineReturnCode,
-    hcall::buffer::VFS,
+use execution_engine::{factory::execute, hcall::buffer::VFS, hcall::common::EngineReturnCode};
+
+use veracruz_utils::policy::{
+    policy::Policy,
+    principal::{ExecutionStrategy, FileOperation, Principal},
 };
 
-use veracruz_utils::policy::{policy::Policy, principal::{ExecutionStrategy, Principal, FileOperation}};
-
-pub mod session_manager;
-pub mod execution_engine_manager;
 pub mod error;
+pub mod execution_engine_manager;
+pub mod session_manager;
 pub use error::RuntimeManagerError;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -47,21 +46,23 @@ pub use error::RuntimeManagerError;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> = Mutex::new(None);
+    static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> =
+        Mutex::new(None);
     static ref SESSION_COUNTER: AtomicU32 = AtomicU32::new(1);
-    static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> = Mutex::new(HashMap::new());
+    static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> =
+        Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
-const OUTPUT_FILE : &'static str = "output";
+const OUTPUT_FILE: &'static str = "output";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// `None` means that the incoming buffer is not full,
-/// so we cannot parse a complete protobuf message. 
+/// so we cannot parse a complete protobuf message.
 /// We need to wait longer for this to arrive.
 type ProvisioningResponse = Option<Vec<u8>>;
 
@@ -76,7 +77,7 @@ pub(crate) struct ProtocolState {
     /// It decides if it is necessary to run a program when result retriever requests reading
     /// result.
     /// TODO: more defined tracking, e.g. flag per available program in the policy?
-    is_modified : bool,
+    is_modified: bool,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
     global_policy: Policy,
@@ -86,7 +87,7 @@ pub(crate) struct ProtocolState {
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
     /// The ref to the VFS.
-    vfs : Arc<Mutex<VFS>>,
+    vfs: Arc<Mutex<VFS>>,
 }
 
 impl ProtocolState {
@@ -101,14 +102,14 @@ impl ProtocolState {
 
         let capability_table = global_policy.get_capability_table();
         let program_digests = global_policy.get_program_digests()?;
-        let vfs = Arc::new(Mutex::new(VFS::new(&capability_table,&program_digests)));
+        let vfs = Arc::new(Mutex::new(VFS::new(&capability_table, &program_digests)));
 
         Ok(ProtocolState {
             global_policy,
             global_policy_hash,
             expected_shutdown_sources,
             vfs,
-            is_modified: true
+            is_modified: true,
         })
     }
 
@@ -136,19 +137,33 @@ impl ProtocolState {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
-    pub(crate) fn write_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
+    pub(crate) fn write_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
         Ok(self.vfs.lock()?.write(client_id, file_name, data)?)
     }
 
     /// Check if a client has capability to write to a file, and then append it with new `data`.
-    pub(crate) fn append_file(&mut self, client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), RuntimeManagerError> {
+    pub(crate) fn append_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
         Ok(self.vfs.lock()?.append(client_id, file_name, data)?)
     }
 
     /// Check if a client has capability to read from a file, if so, return the content in bytes.
-    pub(crate) fn read_file(&self, client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
+    pub(crate) fn read_file(
+        &self,
+        client_id: &Principal,
+        file_name: &str,
+    ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
         Ok(self.vfs.lock()?.read(client_id, file_name)?)
     }
 
@@ -162,7 +177,7 @@ impl ProtocolState {
         self.expected_shutdown_sources.retain(|v| v != &client_id);
         Ok(self.expected_shutdown_sources.is_empty())
     }
-    
+
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
     pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = match self.global_policy.execution_strategy() {
@@ -171,14 +186,10 @@ impl ProtocolState {
             }
             ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
         };
-        let return_code = execute(
-            &execution_strategy,
-            self.vfs.clone(),
-            file_name,
-        )?;
-        
+        let return_code = execute(&execution_strategy, self.vfs.clone(), file_name)?;
+
         let response = if return_code == EngineReturnCode::Success {
-            let result = self.read_file(&Principal::Participant(client_id),OUTPUT_FILE)?;
+            let result = self.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
             Self::response_success(result)
         } else {
             Self::response_error_code_returned(return_code)
@@ -190,8 +201,11 @@ impl ProtocolState {
 
     #[inline]
     fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
-        transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
-            .unwrap_or_else(|err| panic!(err))
+        transport_protocol::serialize_result(
+            transport_protocol::ResponseStatus::SUCCESS as i32,
+            result,
+        )
+        .unwrap_or_else(|err| panic!(err))
     }
 
     #[inline]

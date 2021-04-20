@@ -15,7 +15,6 @@
 mod tests {
     use actix_rt::System;
     use base64;
-    use transport_protocol;
     use curl::easy::{Easy, List};
     use env_logger;
     use lazy_static::lazy_static;
@@ -24,19 +23,21 @@ mod tests {
     use rand::Rng;
     use ring;
     use serde::Deserialize;
+    use transport_protocol;
     use veracruz_server::veracruz_server::*;
+    #[cfg(feature = "nitro")]
+    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
     #[cfg(feature = "sgx")]
     use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
     #[cfg(feature = "tz")]
     use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
-    #[cfg(feature = "nitro")]
-    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
 
     use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
     #[cfg(feature = "nitro")]
     use regex::Regex;
 
+    use proxy_attestation_server;
     use std::{
         collections::HashMap,
         collections::HashSet,
@@ -52,7 +53,6 @@ mod tests {
     };
     #[cfg(feature = "sgx")]
     use stringreader;
-    use proxy_attestation_server;
 
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "../test-collateral/one_data_source_policy.json";
@@ -90,8 +90,7 @@ mod tests {
     const MACD_WASM: &'static str = "../test-collateral/moving-average-convergence-divergence.wasm";
     const INTERSECTION_SET_SUM_WASM: &'static str =
         "../test-collateral/private-set-intersection-sum.wasm";
-    const NUMBER_STREM_WASM: &'static str = 
-        "../test-collateral/number-stream-accumulation.wasm";
+    const NUMBER_STREM_WASM: &'static str = "../test-collateral/number-stream-accumulation.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "../test-collateral/linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str =
@@ -124,15 +123,19 @@ mod tests {
     pub fn setup(proxy_attestation_server_url: String) -> u32 {
         #[allow(unused_assignments)]
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
-	
+
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                #[cfg(feature="debug")]
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, true).unwrap();
-                #[cfg(not(feature="debug"))]
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+                #[cfg(feature = "debug")]
+                let server =
+                    proxy_attestation_server::server::server(proxy_attestation_server_url, true)
+                        .unwrap();
+                #[cfg(not(feature = "debug"))]
+                let server =
+                    proxy_attestation_server::server::server(proxy_attestation_server_url, false)
+                        .unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -241,8 +244,11 @@ mod tests {
         let test_target_platform: Platform = Platform::TrustZone;
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        let enclave_cert_hash_ret =
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &mut veracruz_server);
+        let enclave_cert_hash_ret = attestation_flow(
+            &policy.proxy_attestation_server_url(),
+            &runtime_manager_hash,
+            &mut veracruz_server,
+        );
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -531,7 +537,10 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(PERSON_SET_INTERSECTION_WASM),
-            &[("input-0", PERSON_SET_1_DATA), ("input-1", PERSON_SET_2_DATA)],
+            &[
+                ("input-0", PERSON_SET_1_DATA),
+                ("input-1", PERSON_SET_2_DATA),
+            ],
             &[],
             true,
         );
@@ -551,10 +560,7 @@ mod tests {
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
             &[("input-0", SINGLE_F64_DATA)],
-            &[
-                ("stream-0", VEC_F64_1_DATA),
-                ("stream-1", VEC_F64_2_DATA),
-            ],
+            &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
             true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -584,10 +590,7 @@ mod tests {
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
             &[],
-            &[
-                ("stream-0", VEC_F64_1_DATA),
-                ("stream-1", VEC_F64_2_DATA),
-            ],
+            &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
             true,
         );
         assert!(result.is_err(), "An error should occur");
@@ -773,7 +776,11 @@ mod tests {
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &mut veracruz_server)?
+            attestation_flow(
+                &policy.proxy_attestation_server_url(),
+                &runtime_manager_hash,
+                &mut veracruz_server,
+            )?
         } else {
             let enclave_cert = enclave_self_signed_cert(&mut veracruz_server)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
@@ -798,10 +805,12 @@ mod tests {
         let time_server_boot = Instant::now();
         CONTINUE_FLAG_HASH.lock()?.insert(ticket, true);
         let server_loop_handle = thread::spawn(move || {
-            server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(|e| {
-                CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
-                e
-            })
+            server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(
+                |e| {
+                    CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
+                    e
+                },
+            )
         });
         info!(
             "             Booting Veracruz server time (μs): {}.",
@@ -835,8 +844,7 @@ mod tests {
             );
 
             //TODO: change to the actually remote filename
-            let program_file_name = 
-            if let Some(path) = program_path.as_ref() {
+            let program_file_name = if let Some(path) = program_path.as_ref() {
                 Path::new(path).file_name().unwrap().to_str().unwrap()
             } else {
                 "no_program"
@@ -986,7 +994,10 @@ mod tests {
                             time_stream.elapsed().as_micros()
                         );
                     }
-                    info!("### Step 8.  Result retrievers request program {}.", program_file_name);
+                    info!(
+                        "### Step 8.  Result retrievers request program {}.",
+                        program_file_name
+                    );
                     let time_result_hash = Instant::now();
                     check_policy_hash(
                         &policy_hash,
@@ -1009,11 +1020,13 @@ mod tests {
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
+                        &transport_protocol::serialize_request_result(program_file_name)?
+                            .as_slice(),
                     )
                     .and_then(|response| {
                         // decode the result
-                        let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                        let response =
+                            transport_protocol::parse_runtime_manager_response(&response)?;
                         let response = transport_protocol::parse_result(&response)?;
                         response.ok_or(VeracruzServerError::MissingFieldError(
                             "Result retrievers response",
@@ -1025,11 +1038,13 @@ mod tests {
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
+                        &transport_protocol::serialize_request_result(program_file_name)?
+                            .as_slice(),
                     )
                     .and_then(|response| {
                         // decode the result
-                        let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                        let response =
+                            transport_protocol::parse_runtime_manager_response(&response)?;
                         let response = transport_protocol::parse_result(&response)?;
                         response.ok_or(VeracruzServerError::MissingFieldError(
                             "Result retrievers response",
@@ -1046,7 +1061,10 @@ mod tests {
                 info!("------------ Stream-Result-Next End  ------------");
             } else {
                 info!("### Step 7.  NOT in streaming mode.");
-                info!("### Step 8.  Result retrievers request program {}.", program_file_name);
+                info!(
+                    "### Step 8.  Result retrievers request program {}.",
+                    program_file_name
+                );
                 let time_result_hash = Instant::now();
                 check_policy_hash(
                     &policy_hash,
@@ -1062,7 +1080,7 @@ mod tests {
                 );
                 let time_result = Instant::now();
                 info!("             Result retrievers request result.");
-                    // NOTE: Fetch result twice on purpose.
+                // NOTE: Fetch result twice on purpose.
                 let _response = client_tls_send(
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1199,27 +1217,30 @@ mod tests {
     }
 
     /// Auxiliary function: read policy file
-    fn read_policy(
-        fname: &str,
-    ) -> Result<(Policy, String, String), VeracruzServerError> {
+    fn read_policy(fname: &str) -> Result<(Policy, String, String), VeracruzServerError> {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
         // Since we need to run the root enclave on another system for nitro enclaves
         // we can't use localhost for the URL of the proxy attestation server (like we do in
-	// the policy files. so we need to replace it with the private IP of the current instance
+        // the policy files. so we need to replace it with the private IP of the current instance
         #[cfg(feature = "nitro")]
         {
-            let ip_string = local_ipaddress::get()
-            .expect("Failed to get local ip address");
+            let ip_string = local_ipaddress::get().expect("Failed to get local ip address");
             let ip_address = format!("\"proxy_attestation_server_url\": \"{:}:3010\"", ip_string);
-            let re = Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let re =
+                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
             let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
-            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
+            let policy_hash =
+                ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
             let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
             let policy = Policy::from_json(policy_json_cow.as_ref())?;
-            Ok((policy, policy_json_cow.as_ref().to_string(), policy_hash_str))
+            Ok((
+                policy,
+                policy_json_cow.as_ref().to_string(),
+                policy_hash_str,
+            ))
         }
         #[cfg(not(feature = "nitro"))]
         {
@@ -1261,7 +1282,10 @@ mod tests {
 
         program_file.read_to_end(&mut program_text)?;
 
-        let serialized_program_text = transport_protocol::serialize_program(&program_text, Path::new(filename).file_name().unwrap().to_str().unwrap() )?;
+        let serialized_program_text = transport_protocol::serialize_program(
+            &program_text,
+            Path::new(filename).file_name().unwrap().to_str().unwrap(),
+        )?;
         client_tls_send(
             client_tls_tx,
             client_tls_rx,
@@ -1365,11 +1389,9 @@ mod tests {
         rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ticket: u32,
     ) -> Result<(), VeracruzServerError> {
-        while *CONTINUE_FLAG_HASH
-            .lock()?
-            .get(&ticket)
-            .ok_or(VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
-        {
+        while *CONTINUE_FLAG_HASH.lock()?.get(&ticket).ok_or(
+            VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"),
+        )? {
             let received = rx.try_recv();
             let (session_id, received_buffer) = received.unwrap_or_else(|_| (0, Vec::new()));
 
@@ -1387,7 +1409,9 @@ mod tests {
                 }
             }
         }
-        Err(VeracruzServerError::DirectStrError("No message arrives server"))
+        Err(VeracruzServerError::DirectStrError(
+            "No message arrives server",
+        ))
     }
 
     fn client_tls_send(
@@ -1406,11 +1430,9 @@ mod tests {
 
         tx.send((session_id, output))?;
 
-        while *CONTINUE_FLAG_HASH
-            .lock()?
-            .get(&ticket)
-            .ok_or(VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
-        {
+        while *CONTINUE_FLAG_HASH.lock()?.get(&ticket).ok_or(
+            VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"),
+        )? {
             let received = rx.try_recv();
 
             if received.is_ok() && (!session.is_handshaking() || session.wants_read()) {
@@ -1524,14 +1546,20 @@ mod tests {
         veracruz_server: &mut dyn veracruz_server::VeracruzServer,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
-        info!("veracruz-server-test/attestation_flow: challenge:{:?}", challenge);
-        let serialized_pagt = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
+        info!(
+            "veracruz-server-test/attestation_flow: challenge:{:?}",
+            challenge
+        );
+        let serialized_pagt =
+            transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let pagt_ret = veracruz_server.plaintext_data(serialized_pagt)?;
-        let received_bytes =
-            pagt_ret.ok_or(VeracruzServerError::MissingFieldError("attestation_flow pagt_ret"))?;
+        let received_bytes = pagt_ret.ok_or(VeracruzServerError::MissingFieldError(
+            "attestation_flow pagt_ret",
+        ))?;
 
         let encoded_token = base64::encode(&received_bytes);
-        let complete_proxy_attestation_server_url = format!("{:}/VerifyPAT", proxy_attestation_server_url);
+        let complete_proxy_attestation_server_url =
+            format!("{:}/VerifyPAT", proxy_attestation_server_url);
         let received_buffer = post_buffer(&complete_proxy_attestation_server_url, &encoded_token)?;
 
         let received_payload = base64::decode(&received_buffer)?;

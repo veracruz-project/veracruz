@@ -59,7 +59,7 @@ pub enum PolicyError {
     EmptyRoleError(u64),
     #[error(display = "PolicyError: Policy is missing a field: {:?}", _0)]
     MissingPolicyFieldError(String),
-    #[error(display = "VeracruzUtil: Policy has no program file: {:?}.",_0)]
+    #[error(display = "VeracruzUtil: Policy has no program file: {:?}.", _0)]
     NoProgramFileError(String),
 }
 

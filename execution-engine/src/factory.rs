@@ -38,7 +38,11 @@ use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
-use crate::hcall::{common::{ExecutionEngine, FatalEngineError, EngineReturnCode}, wasmi, buffer::VFS};
+use crate::hcall::{
+    buffer::VFS,
+    common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
+    wasmi,
+};
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
@@ -66,14 +70,13 @@ pub enum ExecutionStrategy {
 #[deprecated]
 pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    vfs : Arc<Mutex<VFS>>,
+    vfs: Arc<Mutex<VFS>>,
 ) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
-    let instance : Option<Box<dyn ExecutionEngine>> = match strategy {
+    let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
         ExecutionStrategy::Interpretation => {
             Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
         }
-        ExecutionStrategy::JIT => 
-        {
+        ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
             {
                 Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
@@ -96,16 +99,17 @@ pub fn single_threaded_execution_engine(
 #[deprecated]
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    vfs : Arc<Mutex<VFS>>,
-) -> Result<Option<Box<dyn ExecutionEngine>>,FatalEngineError> {
-    let instance : Option<Box<dyn ExecutionEngine>> = match strategy {
+    vfs: Arc<Mutex<VFS>>,
+) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
+    let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
         ExecutionStrategy::Interpretation => {
             Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
         }
-        ExecutionStrategy::JIT => 
-        {
+        ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
-            { Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?)) }
+            {
+                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
+            }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             None
         }
@@ -115,15 +119,12 @@ pub fn multi_threaded_execution_engine(
 
 pub fn execute(
     strategy: &ExecutionStrategy,
-    vfs : Arc<Mutex<VFS>>,
-    program_file_name: &str
+    vfs: Arc<Mutex<VFS>>,
+    program_file_name: &str,
 ) -> Result<EngineReturnCode, FatalEngineError> {
-    let mut engine : Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => {
-            Box::new(wasmi::WasmiHostProvisioningState::new(vfs))
-        }
-        ExecutionStrategy::JIT => 
-        {
+    let mut engine: Box<dyn ExecutionEngine> = match strategy {
+        ExecutionStrategy::Interpretation => Box::new(wasmi::WasmiHostProvisioningState::new(vfs)),
+        ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
             {
                 Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?)

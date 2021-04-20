@@ -10,7 +10,12 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "tz")]
-use std::{env, fs::File, io::Write, path::{Path, PathBuf}};
+use std::{
+    env,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 #[cfg(feature = "tz")]
 use uuid::Uuid;
 
@@ -18,7 +23,8 @@ fn main() -> std::io::Result<()> {
     #[cfg(feature = "tz")]
     {
         let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-        let runtime_manager_uuid: &str = &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
+        let runtime_manager_uuid: &str =
+            &std::fs::read_to_string("../runtime-manager-uuid.txt").unwrap();
 
         let mut buffer = File::create(out.join("user_ta_header.rs"))?;
         buffer.write_all(include_bytes!("ta_static.rs"))?;
