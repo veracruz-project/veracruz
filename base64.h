@@ -17,12 +17,12 @@ ssize_t base64_encode(
         const uint8_t *in, size_t in_len,
         char *out, size_t out_len);
 
-//compute size after decoding
-size_t base64_decode_size(const char *in);
+// compute size after decoding
+size_t base64_decode_size(const char *in, size_t in_len);
 
 // decode base64
 ssize_t base64_decode(
-        const char *in,
+        const char *in, size_t in_len,
         char *out, size_t out_len);
 
 #endif

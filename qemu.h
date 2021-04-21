@@ -14,6 +14,8 @@ static inline void qemu_exit(void) {
         "ldr r1, =#0x20026 \n\t"
         "bkpt #0xab \n\t"
     );
+
+    __builtin_unreachable();
 }
 
 #endif

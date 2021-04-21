@@ -32,36 +32,46 @@ ssize_t base64_encode(
     }
     out[e_len] = '\0';
 
-    for (size_t i=0, j=0; i < in_len; i += 3, j += 4) {
-        size_t v = in[i];
-        v = i+1 < e_len ? (v << 8 | in[i+1]) : (v << 8);
-        v = i+2 < e_len ? (v << 8 | in[i+2]) : (v << 8);
+    for (size_t i = 0, j = 0; i < in_len; i += 3, j += 4) {
+        size_t v = in[in_len-i-3];
+        v = in_len-i-3+1 < e_len ? (v << 8 | in[in_len-i-3+1]) : (v << 8);
+        v = in_len-i-3+2 < e_len ? (v << 8 | in[in_len-i-3+2]) : (v << 8);
 
-        out[j]   = BASE64_ENCODE[(v >> 18) & 0x3f];
-        out[j+1] = BASE64_ENCODE[(v >> 12) & 0x3f];
+        out[e_len-j-4]   = BASE64_ENCODE[(v >> 18) & 0x3f];
+        out[e_len-j-4+1] = BASE64_ENCODE[(v >> 12) & 0x3f];
 
-        if (i+1 < in_len) {
-            out[j+2] = BASE64_ENCODE[(v >> 6) & 0x3f];
+        if (in_len-i-3+1 < in_len) {
+            out[e_len-j-4+2] = BASE64_ENCODE[(v >> 6) & 0x3f];
         } else {
-            out[j+2] = '=';
+            out[e_len-j-4+2] = '=';
         }
 
-        if (i+2 < in_len) {
-            out[j+3] = BASE64_ENCODE[v & 0x3f];
+        if (in_len-i-3+2 < in_len) {
+            out[e_len-j-4+3] = BASE64_ENCODE[v & 0x3f];
         } else {
-            out[j+3] = '=';
+            out[e_len-j-4+3] = '=';
         }
     }
 
     return e_len;
 }
 
-// compute size after decoding
-size_t base64_decode_size(const char *in) {
-    size_t in_len = strlen(in);
+static size_t strnlen(const char *s, size_t s_len) {
+    for (size_t i = 0; i < s_len; i++) {
+        if (s[i] == '\0') {
+            return i;
+        }
+    }
 
-    size_t x = 3*(in_len/4);
-    for (size_t i = 0; i < in_len && in[in_len-i-1] == '='; i++) {
+    return s_len;
+}
+
+// compute size after decoding
+size_t base64_decode_size(const char *in, size_t in_len) {
+    size_t e_len = strnlen(in, in_len);
+
+    size_t x = 3*(e_len/4);
+    for (size_t i = 0; i < e_len && in[e_len-i-1] == '='; i++) {
         x -= 1;
     }
 
@@ -92,25 +102,25 @@ static bool base64_isvalid(char c) {
 
 // decode base64
 ssize_t base64_decode(
-        const char *in,
+        const char *in, size_t in_len,
         char *out, size_t out_len) {
-    size_t in_len = strlen(in);
-    if (in_len % 4 != 0) {
+    size_t e_len = strnlen(in, in_len);
+    if (e_len % 4 != 0) {
         return -EINVAL;
     }
 
-    size_t d_len = base64_decode_size(in);
+    size_t d_len = base64_decode_size(in, in_len);
     if (d_len > out_len) {
         return -EOVERFLOW;
     }
 
-    for (size_t i = 0; i < in_len; i++) {
+    for (size_t i = 0; i < e_len; i++) {
         if (!base64_isvalid(in[i])) {
             return -EILSEQ;
         }
     }
 
-    for (size_t i=0, j=0; i < in_len; i += 4, j += 3) {
+    for (size_t i = 0, j = 0; i < e_len; i += 4, j += 3) {
         size_t v = BASE64_DECODE[in[i]-43];
         v = (v << 6) | BASE64_DECODE[in[i+1]-43];
         v = in[i+2] == '=' ? (v << 6) : ((v << 6) | BASE64_DECODE[in[i+2]-43]);

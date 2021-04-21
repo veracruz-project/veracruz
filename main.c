@@ -54,21 +54,18 @@ void main(void) {
     pb_encode(&request_stream, &Tp_RuntimeManagerRequest_msg, &request);
 
     // convert base64
-    // TODO if base64 was reversed this could operate in-place
-    char request_b64_buf[256];
-    ssize_t request_b64_len = base64_encode(
+    ssize_t request_len = base64_encode(
             request_buf, request_stream.bytes_written, 
-            request_b64_buf, sizeof(request_b64_buf));
-    if (request_b64_len < 0) {
-        printf("base64_encode failed (%d)\n", request_b64_len);
+            request_buf, sizeof(request_buf));
+    if (request_len < 0) {
+        printf("base64_encode failed (%d)\n", request_len);
         qemu_exit();
     }
 
     printf("request:\n");
-    xxd(request_b64_buf, request_b64_len);
+    xxd(request_buf, request_len);
 
     // POST challenge
-    // TODO get from policy.h
     printf("connecting to %s:%d...\n",
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT);
@@ -76,8 +73,8 @@ void main(void) {
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT,
             "/sinaloa",
-            request_b64_buf,
-            request_b64_len,
+            request_buf,
+            request_len,
             buffer,
             sizeof(buffer));
     if (pat_len < 0) {
@@ -99,8 +96,8 @@ void main(void) {
             "/VerifyPAT",
             buffer,
             pat_len,
-            buffer2,
-            sizeof(buffer2));
+            buffer,
+            sizeof(buffer));
     if (res < 0) {
         printf("http_post failed (%d)\n", res);
         qemu_exit();
@@ -108,11 +105,10 @@ void main(void) {
 
     printf("http_post -> %d\n", res);
     printf("attest: PAT response:\n");
-    xxd(buffer2, res);
+    xxd(buffer, res);
 
-    // back to buffer1, TODO in-place base64?
-    // TODO use strnlen...
-    ssize_t verif_len = base64_decode(buffer2, buffer, sizeof(buffer));
+    // decode base64
+    ssize_t verif_len = base64_decode(buffer, sizeof(buffer), buffer, sizeof(buffer));
     if (verif_len < 0) {
         printf("base64_decode failed (%d)\n", verif_len);
         qemu_exit();
