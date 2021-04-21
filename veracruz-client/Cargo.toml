@@ -22,7 +22,7 @@ transport-protocol = { path = "../transport-protocol" }
 base64 = "0.10.1"
 rand = "0.7.0"
 x509-parser="0.6.0"
-curl = "0.4.22"
+curl = "=0.4.35"
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 hex = "=0.4.2"
 percent-encoding = "2.1.0"
