@@ -16,7 +16,7 @@ err-derive = "0.2"
 base64 = "0.10.1"
 transport-protocol = { path = "../transport-protocol"}
 stringreader = "0.1"
-curl = "0.4"
+curl = "=0.4.35"
 clap = "2.33"
 local_ipaddress = "0.1.3"
 

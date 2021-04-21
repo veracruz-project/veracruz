@@ -26,7 +26,7 @@ rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "ver
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 transport-protocol = { path = "../transport-protocol" }
 protobuf = "2.6"
-curl = "0.4.22"
+curl = "=0.4.35"
 untrusted = "0.6.2"
 base64 = "0.10.1"
 stringreader = "0.1.1"
