@@ -78,6 +78,8 @@ pub struct Policy {
     runtime_manager_hash_tz: Option<String>,
     /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
     runtime_manager_hash_nitro: Option<String>,
+    /// The hash of the Veracruz trusted runtime for Linux.
+    runtime_manager_hash_linux: Option<String>,
     /// The URL of the proxy attestation service.
     proxy_attestation_server_url: String,
     /// The debug configuration flag.  This dictates whether the WASM program
@@ -101,6 +103,7 @@ impl Policy {
         runtime_manager_hash_sgx: Option<String>,
         runtime_manager_hash_tz: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
+        runtime_manager_hash_linux: Option<String>,
         proxy_attestation_server_url: String,
         debug: bool,
         execution_strategy: ExecutionStrategy,
@@ -114,6 +117,7 @@ impl Policy {
             runtime_manager_hash_sgx,
             runtime_manager_hash_tz,
             runtime_manager_hash_nitro,
+            runtime_manager_hash_linux,
             proxy_attestation_server_url,
             debug,
             execution_strategy,
@@ -185,6 +189,14 @@ impl Policy {
                 None => {
                     return Err(PolicyError::MissingPolicyFieldError(
                         "runtime_manager_hash_nitro".to_string(),
+                    ))
+                }
+            },
+            Platform::Linux => match &self.runtime_manager_hash_linux {
+                Some(hash) => hash,
+                None => {
+                    return Err(PolicyError::MissingPolicyFieldError(
+                        "runtime_manager_hash_linux".to_string()
                     ))
                 }
             },
@@ -261,6 +273,7 @@ impl Policy {
     /// Returns the identity of any principal in the computation who is capable
     /// of requesting a shutdown of the computation.  At the moment, only the
     /// principals who can request the result can also request shutdown.
+    #[inline]
     pub fn expected_shutdown_list(&self) -> Vec<u64> {
         self.identities()
             .iter()

@@ -25,6 +25,8 @@ pub enum Platform {
     TrustZone,
     /// The enclave is running under AWS Nitro enclaves.
     Nitro,
+    /// The enclave is actually a plain Linux process.
+    Linux,
     /// The mock platform for unit testing (client unit tests, at the moment).
     Mock,
 }

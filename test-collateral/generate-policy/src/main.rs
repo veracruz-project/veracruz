@@ -26,7 +26,6 @@ use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
     policy::Policy,
-    error::PolicyError,
     expiry::Timepoint,
     principal::{ExecutionStrategy, Identity, Program, FileCapability}
 };
@@ -577,7 +576,7 @@ fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
 }
 
 /// Serializes the identities of all principals in the Veracruz computation into
-/// a vec of VeracruzProgram.
+/// a vector of `Program` entries.
 fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
     info!("Serializing programs.");
     
@@ -623,11 +622,15 @@ fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
     ).expect("Failed to instantiate a timepoint")
 }
 
+/// Serializes a vector of string representations into a vector of `FileCapability`
+/// values.  Fails with a runtime error if any of the input strings cannot be parsed.
 #[inline]
 fn serialize_capability(cap_string : &[String]) -> Vec<FileCapability> {
     cap_string.iter().map(|c| serialize_capability_entry(c.as_str())).collect()
 }
 
+/// Serializes a string representation of a capability into a `FileCapability`
+/// value.  Fails with a runtime error if this parsing is unsuccessful.
 fn serialize_capability_entry(cap_string : &str) -> FileCapability {
     let mut split = cap_string.split(':'); 
     let file_name = split.next().expect(&format!("Failed to parse {}, empty string", cap_string));
@@ -638,6 +641,8 @@ fn serialize_capability_entry(cap_string : &str) -> FileCapability {
     FileCapability::new(file_name.trim().to_string(),read,write,execute)
 }
 
+/// Serializes a string into an `ExecutionStrategy`.  Fails with a runtime error if
+/// the string is neither "Interpretation" nor "JIT".
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
     if strategy == "Interpretation"
     { 
@@ -658,6 +663,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
     let sgx_hash = compute_sgx_enclave_hash(arguments);
+    
     let policy = Policy::new(
         serialize_identities(arguments),
         serialize_binaries(arguments),
@@ -665,13 +671,15 @@ fn serialize_json(arguments: &Arguments) -> Value {
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
         sgx_hash.clone(),
-        // TODO should be tz_hash
+        // TODO: should be tz_hash
+        sgx_hash.clone(),
+        // TODO: should be linux_hash
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
         format!("{}", &arguments.proxy_attestation_server_ip.as_ref().expect(&format!("Failed to get the proxy attestation server ip"))),
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
-    ).expect("Failed to instantiate a (struct) policy");
+    ).expect("Failed to instantiate the Veracruz policy");
 
     json!(policy)
 }
