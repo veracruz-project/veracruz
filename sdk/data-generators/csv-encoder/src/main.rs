@@ -101,7 +101,7 @@ use toml::*;
 ////////////////////////////////////////////////////////////////////////////////
 
 const APPLICATION_NAME: &str = "csv-encoder";
-const AUTHORS: &str = "The Veracruz Team.  Arm Research.";
+const AUTHORS: &str = "The Veracruz Development Team.";
 const VERSION: &str = "0.2.0";
 const ABOUT: &str = "csv-encoder: encodes selected columns of a CSV file using pinecone.";
 

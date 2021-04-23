@@ -17,14 +17,14 @@ use std::{error::Error, fs::File, io::prelude::*};
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for moving average convergence divergence algorithm")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Generate a vector of f64. In `generate` mode, it generates random data. In `external` mode, it reads the first [SIZE] numbers from an external data source.") 
         // Command for generate random data
         .subcommand(
             App::new("generate")
                .about("Generate random data.")
                .version("pre-alpha")
-               .author("The Veracruz Development Team, Arm Research")
+               .author("The Veracruz Development Team")
                .arg(
                    Arg::with_name("file_prefix")
                        .short("f")
@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             App::new("external")
                .about("Read from an external input file.")
                .version("pre-alpha")
-               .author("The Veracruz Development Team, Arm Research")
+               .author("The Veracruz Development Team")
                .arg(
                    Arg::with_name("input_file")
                        .short("i")

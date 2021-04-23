@@ -15,7 +15,7 @@ use std::{error::Error, fs::read_to_string, fs::File, io::prelude::*};
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for string")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Convert the [INPUT] txt file to pinecone.")
         .arg(
             Arg::with_name("input_file")

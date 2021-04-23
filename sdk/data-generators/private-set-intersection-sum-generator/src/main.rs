@@ -31,7 +31,7 @@ struct Input {
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for privaite set intersection sum")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Generate a vector of private data comprising 128-bit identifiers and private values,  Vec<((u64, u64), u32)>, and a vector of sample comprising identifiers, Vec<(u64, u64)>. Identifiers are represented by two u64, because pinecone does not support u128.") 
         .arg(
             Arg::with_name("directory")
