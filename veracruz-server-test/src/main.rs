@@ -15,7 +15,6 @@
 mod tests {
     use actix_rt::System;
     use base64;
-    use transport_protocol;
     use curl::easy::{Easy, List};
     use env_logger;
     use lazy_static::lazy_static;
@@ -24,19 +23,21 @@ mod tests {
     use rand::Rng;
     use ring;
     use serde::Deserialize;
+    use transport_protocol;
     use veracruz_server::veracruz_server::*;
+    #[cfg(feature = "nitro")]
+    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
     #[cfg(feature = "sgx")]
     use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
     #[cfg(feature = "tz")]
     use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
-    #[cfg(feature = "nitro")]
-    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
 
     use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
     #[cfg(feature = "nitro")]
     use regex::Regex;
 
+    use proxy_attestation_server;
     use std::{
         collections::HashMap,
         collections::HashSet,
@@ -52,16 +53,7 @@ mod tests {
     };
     #[cfg(feature = "sgx")]
     use stringreader;
-    use proxy_attestation_server;
 
-    // Constants corresponding to the `execution_engine::hcall::MachineState` enum which is
-    // encoded as a `u8` value when servicing an enclave state request.  Included here
-    // to avoid adding `execution_engine` as a direct dependency of this crate.
-    const ENCLAVE_STATE_INITIAL: u8 = 0;
-    const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
-    const ENCLAVE_STATE_STREAM_SOURCE_SLOADING: u8 = 2;
-    const ENCLAVE_STATE_READY_TO_EXECUTE: u8 = 3;
-    const ENCLAVE_STATE_FINISHED_EXECUTING: u8 = 4;
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "../test-collateral/one_data_source_policy.json";
     const GET_RANDOM_POLICY: &'static str = "../test-collateral/get_random_policy.json";
@@ -98,8 +90,7 @@ mod tests {
     const MACD_WASM: &'static str = "../test-collateral/moving-average-convergence-divergence.wasm";
     const INTERSECTION_SET_SUM_WASM: &'static str =
         "../test-collateral/private-set-intersection-sum.wasm";
-    const NUMBER_STREM_WASM: &'static str = 
-        "../test-collateral/number-stream-accumulation.wasm";
+    const NUMBER_STREM_WASM: &'static str = "../test-collateral/number-stream-accumulation.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "../test-collateral/linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str =
@@ -132,16 +123,19 @@ mod tests {
     pub fn setup(proxy_attestation_server_url: String) -> u32 {
         #[allow(unused_assignments)]
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
-	
+
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
-            std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                #[cfg(feature="debug")]
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, true).unwrap();
-                #[cfg(not(feature="debug"))]
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+                #[cfg(feature = "debug")]
+                let server =
+                    proxy_attestation_server::server::server(proxy_attestation_server_url, true)
+                        .unwrap();
+                #[cfg(not(feature = "debug"))]
+                let server =
+                    proxy_attestation_server::server::server(proxy_attestation_server_url, false)
+                        .unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -250,8 +244,11 @@ mod tests {
         let test_target_platform: Platform = Platform::TrustZone;
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        let enclave_cert_hash_ret =
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &mut veracruz_server);
+        let enclave_cert_hash_ret = attestation_flow(
+            &policy.proxy_attestation_server_url(),
+            &runtime_manager_hash,
+            &mut veracruz_server,
+        );
         assert!(enclave_cert_hash_ret.is_ok())
     }
 
@@ -397,7 +394,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(RANDOM_SOURCE_WASM),
-            &[(0, LINEAR_REGRESSION_DATA)],
+            &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
             false,
         );
@@ -425,7 +422,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
-            &[(0, LINEAR_REGRESSION_DATA)],
+            &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
             false,
         );
@@ -468,8 +465,8 @@ mod tests {
             Some(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
             &[
                 // message sends out in the reversed order
-                (1, INTERSECTION_SET_SUM_CUSTOMER_DATA),
-                (0, INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                ("input-1", INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                ("input-0", INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
             ],
             &[],
             false,
@@ -488,7 +485,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(STRING_EDIT_DISTANCE_WASM),
-            &[(0, STRING_1_DATA), (1, STRING_2_DATA)],
+            &[("input-0", STRING_1_DATA), ("input-1", STRING_2_DATA)],
             &[],
             false,
         );
@@ -509,7 +506,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(LINEAR_REGRESSION_WASM),
-            &[(0, LINEAR_REGRESSION_DATA)],
+            &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
             true,
         );
@@ -540,7 +537,10 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(PERSON_SET_INTERSECTION_WASM),
-            &[(0, PERSON_SET_1_DATA), (1, PERSON_SET_2_DATA)],
+            &[
+                ("input-0", PERSON_SET_1_DATA),
+                ("input-1", PERSON_SET_2_DATA),
+            ],
             &[],
             true,
         );
@@ -559,11 +559,8 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
-            &[(0, SINGLE_F64_DATA)],
-            &[
-                (0, VEC_F64_1_DATA),
-                (1, VEC_F64_2_DATA),
-            ],
+            &[("input-0", SINGLE_F64_DATA)],
+            &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
             true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -577,8 +574,8 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
-            &[(0, SINGLE_F64_DATA)],
-            &[(0, VEC_F64_1_DATA)],
+            &[("input-0", SINGLE_F64_DATA)],
+            &[("stream-0", VEC_F64_1_DATA)],
             true,
         );
         assert!(result.is_err(), "An error should occur");
@@ -593,10 +590,7 @@ mod tests {
             CLIENT_KEY,
             Some(NUMBER_STREM_WASM),
             &[],
-            &[
-                (0, VEC_F64_1_DATA),
-                (1, VEC_F64_2_DATA),
-            ],
+            &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
             true,
         );
         assert!(result.is_err(), "An error should occur");
@@ -612,9 +606,9 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[],
             &[
-                (0, VEC_F64_1_DATA),
-                (1, VEC_F64_2_DATA),
-                (2, VEC_F64_1_DATA),
+                ("stream-0", VEC_F64_1_DATA),
+                ("stream-1", VEC_F64_2_DATA),
+                ("stream-2", VEC_F64_1_DATA),
             ],
             true,
         );
@@ -635,7 +629,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(LOGISTICS_REGRESSION_WASM),
-                &[(0, data_path)],
+                &[("input-0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -660,7 +654,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(MACD_WASM),
-                &[(0, data_path)],
+                &[("input-0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -690,7 +684,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(MACD_DATA_PATH),
-                &[(0, data_path)],
+                &[("input-0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -715,7 +709,7 @@ mod tests {
                 CLIENT_CERT,
                 CLIENT_KEY,
                 Some(INTERSECTION_SET_SUM_WASM),
-                &[(0, data_path)],
+                &[("input-0", data_path)],
                 &[],
                 // turn on attestation
                 true,
@@ -737,8 +731,8 @@ mod tests {
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
-        data_id_paths: &[(u64, &str)],
-        stream_id_paths: &[(u64, &str)],
+        data_id_paths: &[(&str, &str)],
+        stream_id_paths: &[(&str, &str)],
         // if there is an attestation
         attestation_flag: bool,
     ) -> Result<(), VeracruzServerError> {
@@ -782,7 +776,11 @@ mod tests {
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
         let enclave_cert_hash = if attestation_flag {
-            attestation_flow(&policy.proxy_attestation_server_url(), &runtime_manager_hash, &mut veracruz_server)?
+            attestation_flow(
+                &policy.proxy_attestation_server_url(),
+                &runtime_manager_hash,
+                &mut veracruz_server,
+            )?
         } else {
             let enclave_cert = enclave_self_signed_cert(&mut veracruz_server)?;
             ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
@@ -807,10 +805,12 @@ mod tests {
         let time_server_boot = Instant::now();
         CONTINUE_FLAG_HASH.lock()?.insert(ticket, true);
         let server_loop_handle = thread::spawn(move || {
-            server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(|e| {
-                CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
-                e
-            })
+            server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(
+                |e| {
+                    CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
+                    e
+                },
+            )
         });
         info!(
             "             Booting Veracruz server time (μs): {}.",
@@ -826,33 +826,32 @@ mod tests {
         // Each element contains the package id (u64) and the path to the data
         let data_id_paths: Vec<_> = data_id_paths
             .iter()
-            .map(|(number, path)| (number.clone(), path.to_string()))
+            .map(|(number, path)| (number.to_string(), path.to_string()))
             .collect();
         let stream_id_paths: Vec<_> = stream_id_paths
             .iter()
-            .map(|(number, path)| (number.clone(), path.to_string()))
+            .map(|(number, path)| (number.to_string(), path.to_string()))
             .collect();
 
         // This is a closure, containing instructions from clients.
         // A sperate thread is spawn and direcly call this closure.
         // However if an Error pop up, the thread set the CONTINUE_FLAG to false,
         // hence stopping the server thread.
-        let client_body = move || {
+        let mut client_body = move || {
             info!(
                 "### Step 4.  Client provisions program at {:?}.",
                 program_path
             );
+
+            //TODO: change to the actually remote filename
+            let program_file_name = if let Some(path) = program_path.as_ref() {
+                Path::new(path).file_name().unwrap().to_str().unwrap()
+            } else {
+                "no_program"
+            };
             // if there is a program provided
-            if let Some(path) = program_path {
+            if let Some(path) = program_path.as_ref() {
                 let time_provosion_data = Instant::now();
-                check_enclave_state(
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    ENCLAVE_STATE_INITIAL,
-                )?;
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -862,7 +861,7 @@ mod tests {
                     &client_tls_rx,
                 )?;
                 let response = provision_program(
-                    path.as_str(),
+                    path,
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -877,49 +876,15 @@ mod tests {
                     "             Provisioning program time (μs): {}.",
                     time_provosion_data.elapsed().as_micros()
                 );
-                info!("### Step 5.  Program provider requests program hash.");
-                let time_hash = Instant::now();
-                let _response = request_program_hash(
-                    policy.pi_hash().as_str(),
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
-                info!(
-                    "             Client received installed program hash data: {:?}",
-                    transport_protocol::parse_runtime_manager_response(&response)
-                );
-                info!(
-                    "             Program provider hash response time (μs): {}.",
-                    time_hash.elapsed().as_micros()
-                );
             }
 
             info!("### Step 6.  Data providers provision secret data.");
-            for (package_id, data_path) in data_id_paths.iter() {
+            for (remote_file_name, data_path) in data_id_paths.iter() {
                 info!(
                     "             Data providers provision secret data #{}.",
-                    package_id
+                    remote_file_name
                 );
                 let time_data_hash = Instant::now();
-                check_enclave_state(
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    ENCLAVE_STATE_DATA_SOURCES_LOADING,
-                )?;
-                let _response = request_program_hash(
-                    policy.pi_hash().as_str(),
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -940,7 +905,7 @@ mod tests {
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
-                    *package_id,
+                    remote_file_name,
                 )?;
                 info!(
                     "             Client received acknowledgement after sending data: {:?},",
@@ -958,8 +923,8 @@ mod tests {
                 let mut id_vec = Vec::new();
                 let mut stream_data_vec = Vec::new();
 
-                for (package_id, data_path) in stream_id_paths.iter() {
-                    id_vec.push(*package_id);
+                for (remote_file_name, data_path) in stream_id_paths.iter() {
+                    id_vec.push(remote_file_name);
                     let data = {
                         let mut data_file = std::fs::File::open(data_path)?;
                         let mut data_buffer = std::vec::Vec::new();
@@ -992,24 +957,8 @@ mod tests {
                     };
                     info!("------------ Streaming Round # {} ------------", count);
                     count += 1;
-                    for (package_id, data) in next_round_data.iter() {
+                    for (remote_file_name, data) in next_round_data.iter() {
                         let time_stream_hash = Instant::now();
-                        check_enclave_state(
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &client_tls_tx,
-                            &client_tls_rx,
-                            ENCLAVE_STATE_STREAM_SOURCE_SLOADING,
-                        )?;
-                        let _response = request_program_hash(
-                            policy.pi_hash().as_str(),
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &client_tls_tx,
-                            &client_tls_rx,
-                        )?;
                         check_policy_hash(
                             &policy_hash,
                             client_session_id,
@@ -1024,7 +973,7 @@ mod tests {
                         );
                         info!(
                             "             Stream provider provision secret data #{}.",
-                            package_id
+                            remote_file_name
                         );
                         let time_stream = Instant::now();
                         let response = provision_stream(
@@ -1034,7 +983,7 @@ mod tests {
                             ticket,
                             &client_tls_tx,
                             &client_tls_rx,
-                            *package_id,
+                            remote_file_name,
                         )?;
                         info!(
                             "             Stream provider received acknowledgement after sending stream data: {:?},",
@@ -1045,24 +994,11 @@ mod tests {
                             time_stream.elapsed().as_micros()
                         );
                     }
-                    info!("### Step 8.  Result retrievers request program.");
+                    info!(
+                        "### Step 8.  Result retrievers request program {}.",
+                        program_file_name
+                    );
                     let time_result_hash = Instant::now();
-                    check_enclave_state(
-                        client_session_id,
-                        &mut client_session,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                        ENCLAVE_STATE_READY_TO_EXECUTE,
-                    )?;
-                    let _response = request_program_hash(
-                        policy.pi_hash().as_str(),
-                        client_session_id,
-                        &mut client_session,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                    )?;
                     check_policy_hash(
                         &policy_hash,
                         client_session_id,
@@ -1077,17 +1013,38 @@ mod tests {
                     );
                     let time_result = Instant::now();
                     info!("             Result retrievers request result.");
+                    // NOTE: Fetch result twice on purpose.
+                    client_tls_send(
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &transport_protocol::serialize_request_result(program_file_name)?
+                            .as_slice(),
+                    )
+                    .and_then(|response| {
+                        // decode the result
+                        let response =
+                            transport_protocol::parse_runtime_manager_response(&response)?;
+                        let response = transport_protocol::parse_result(&response)?;
+                        response.ok_or(VeracruzServerError::MissingFieldError(
+                            "Result retrievers response",
+                        ))
+                    })?;
                     let response = client_tls_send(
                         &client_tls_tx,
                         &client_tls_rx,
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        &transport_protocol::serialize_request_result()?.as_slice(),
+                        &transport_protocol::serialize_request_result(program_file_name)?
+                            .as_slice(),
                     )
                     .and_then(|response| {
                         // decode the result
-                        let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                        let response =
+                            transport_protocol::parse_runtime_manager_response(&response)?;
                         let response = transport_protocol::parse_result(&response)?;
                         response.ok_or(VeracruzServerError::MissingFieldError(
                             "Result retrievers response",
@@ -1100,40 +1057,15 @@ mod tests {
                     info!("### Step 9.  Client decodes the result.");
                     let result: T = pinecone::from_bytes(&response.as_slice())?;
                     info!("             Client received result: {:?},", result);
-                    // there are more streaming data, requesting next round
-                    if stream_data_vec.iter().map(|d| !d.is_empty()).all(|d| d) {
-                        info!("             Client request next round");
-                        let _response = client_tls_send(
-                            &client_tls_tx,
-                            &client_tls_rx,
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &transport_protocol::serialize_request_next_round()?.as_slice(),
-                        )?;
-                    }
                 }
                 info!("------------ Stream-Result-Next End  ------------");
             } else {
                 info!("### Step 7.  NOT in streaming mode.");
-                info!("### Step 8.  Result retrievers request program.");
+                info!(
+                    "### Step 8.  Result retrievers request program {}.",
+                    program_file_name
+                );
                 let time_result_hash = Instant::now();
-                check_enclave_state(
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    ENCLAVE_STATE_READY_TO_EXECUTE,
-                )?;
-                let _response = request_program_hash(
-                    policy.pi_hash().as_str(),
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -1148,13 +1080,35 @@ mod tests {
                 );
                 let time_result = Instant::now();
                 info!("             Result retrievers request result.");
+                // NOTE: Fetch result twice on purpose.
+                let _response = client_tls_send(
+                    &client_tls_tx,
+                    &client_tls_rx,
+                    client_session_id,
+                    &mut client_session,
+                    ticket,
+                    &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
+                )
+                .and_then(|response| {
+                    // decode the result
+                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                    let response = transport_protocol::parse_result(&response)?;
+                    response.ok_or(VeracruzServerError::MissingFieldError(
+                        "Result retrievers response",
+                    ))
+                })?;
+                info!(
+                    "             Computation result time (μs): {}.",
+                    time_result.elapsed().as_micros()
+                );
+
                 let response = client_tls_send(
                     &client_tls_tx,
                     &client_tls_rx,
                     client_session_id,
                     &mut client_session,
                     ticket,
-                    &transport_protocol::serialize_request_result()?.as_slice(),
+                    &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
                 )
                 .and_then(|response| {
                     // decode the result
@@ -1176,14 +1130,6 @@ mod tests {
 
             info!("### Step 10. Client shuts down Veracruz.");
             let time_shutdown = Instant::now();
-            check_enclave_state(
-                client_session_id,
-                &mut client_session,
-                ticket,
-                &client_tls_tx,
-                &client_tls_rx,
-                ENCLAVE_STATE_FINISHED_EXECUTING,
-            )?;
             let response = client_tls_send(
                 &client_tls_tx,
                 &client_tls_rx,
@@ -1271,27 +1217,30 @@ mod tests {
     }
 
     /// Auxiliary function: read policy file
-    fn read_policy(
-        fname: &str,
-    ) -> Result<(Policy, String, String), VeracruzServerError> {
+    fn read_policy(fname: &str) -> Result<(Policy, String, String), VeracruzServerError> {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
         // Since we need to run the root enclave on another system for nitro enclaves
         // we can't use localhost for the URL of the proxy attestation server (like we do in
-	// the policy files. so we need to replace it with the private IP of the current instance
+        // the policy files. so we need to replace it with the private IP of the current instance
         #[cfg(feature = "nitro")]
         {
-            let ip_string = local_ipaddress::get()
-            .expect("Failed to get local ip address");
+            let ip_string = local_ipaddress::get().expect("Failed to get local ip address");
             let ip_address = format!("\"proxy_attestation_server_url\": \"{:}:3010\"", ip_string);
-            let re = Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let re =
+                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
             let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
-            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
+            let policy_hash =
+                ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
             let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
             let policy = Policy::from_json(policy_json_cow.as_ref())?;
-            Ok((policy, policy_json_cow.as_ref().to_string(), policy_hash_str))
+            Ok((
+                policy,
+                policy_json_cow.as_ref().to_string(),
+                policy_hash_str,
+            ))
         }
         #[cfg(not(feature = "nitro"))]
         {
@@ -1333,7 +1282,10 @@ mod tests {
 
         program_file.read_to_end(&mut program_text)?;
 
-        let serialized_program_text = transport_protocol::serialize_program(&program_text)?;
+        let serialized_program_text = transport_protocol::serialize_program(
+            &program_text,
+            Path::new(filename).file_name().unwrap().to_str().unwrap(),
+        )?;
         client_tls_send(
             client_tls_tx,
             client_tls_rx,
@@ -1381,65 +1333,6 @@ mod tests {
         }
     }
 
-    fn request_program_hash(
-        expected_program_hash: &str,
-        client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<bool, VeracruzServerError> {
-        let serialized_pi_hash_request = transport_protocol::serialize_request_pi_hash()?;
-        let data = client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_session,
-            ticket,
-            &serialized_pi_hash_request[..],
-        )?;
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&data)?;
-        let status = parsed_response.get_status();
-        match status {
-            transport_protocol::ResponseStatus::SUCCESS => {
-                let received_hash = hex::encode(&parsed_response.get_pi_hash().data);
-                if received_hash == expected_program_hash {
-                    info!("             request_pi_hash compare succeeded");
-                    return Ok(true);
-                } else {
-                    return Err(VeracruzServerError::MismatchError {
-                        variable: "request_pi_hash",
-                        received: received_hash.as_bytes().to_vec(),
-                        expected: expected_program_hash.as_bytes().to_vec(),
-                    });
-                }
-            }
-            _ => Err(VeracruzServerError::ResponseError(
-                "request_program_hash parse_runtime_manager_response",
-                status,
-            )),
-        }
-    }
-
-    fn request_enclave_state(
-        client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
-
-        client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_session,
-            ticket,
-            serialized_enclave_state_request.as_slice(),
-        )
-    }
-
     fn provision_data(
         filename: &str,
         client_session_id: u32,
@@ -1447,7 +1340,7 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        package_id: u64,
+        remote_file_name: &str,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
         let data = {
@@ -1456,7 +1349,7 @@ mod tests {
             data_file.read_to_end(&mut data_buffer)?;
             data_buffer
         };
-        let serialized_data = transport_protocol::serialize_program_data(&data, package_id as u32)?;
+        let serialized_data = transport_protocol::serialize_program_data(&data, remote_file_name)?;
 
         client_tls_send(
             client_tls_tx,
@@ -1475,10 +1368,10 @@ mod tests {
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        package_id: u64,
+        remote_file_name: &str,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
-        let serialized_stream = transport_protocol::serialize_stream(data, package_id as u32)?;
+        let serialized_stream = transport_protocol::serialize_stream(data, remote_file_name)?;
 
         client_tls_send(
             client_tls_tx,
@@ -1490,50 +1383,15 @@ mod tests {
         )
     }
 
-    fn check_enclave_state(
-        client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        expecting: u8,
-    ) -> Result<(), VeracruzServerError> {
-        let encoded_state = request_enclave_state(
-            client_session_id,
-            client_session,
-            ticket,
-            client_tls_tx,
-            client_tls_rx,
-        )?;
-        let parsed = transport_protocol::parse_runtime_manager_response(&encoded_state)?;
-
-        if parsed.has_state() {
-            let state = parsed.get_state().get_state().to_vec();
-            if state == vec![expecting] {
-                Ok(())
-            } else {
-                Err(VeracruzServerError::MismatchError {
-                    variable: "parsed.get_state().get_state().to_vec()",
-                    received: state,
-                    expected: vec![expecting],
-                })
-            }
-        } else {
-            Err(VeracruzServerError::MissingFieldError("enclave state in response"))
-        }
-    }
-
     fn server_tls_loop(
         veracruz_server: &mut dyn veracruz_server::VeracruzServer,
         tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
         rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
         ticket: u32,
     ) -> Result<(), VeracruzServerError> {
-        while *CONTINUE_FLAG_HASH
-            .lock()?
-            .get(&ticket)
-            .ok_or(VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
-        {
+        while *CONTINUE_FLAG_HASH.lock()?.get(&ticket).ok_or(
+            VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"),
+        )? {
             let received = rx.try_recv();
             let (session_id, received_buffer) = received.unwrap_or_else(|_| (0, Vec::new()));
 
@@ -1551,7 +1409,9 @@ mod tests {
                 }
             }
         }
-        Err(VeracruzServerError::DirectStrError("No message arrives server"))
+        Err(VeracruzServerError::DirectStrError(
+            "No message arrives server",
+        ))
     }
 
     fn client_tls_send(
@@ -1570,11 +1430,9 @@ mod tests {
 
         tx.send((session_id, output))?;
 
-        while *CONTINUE_FLAG_HASH
-            .lock()?
-            .get(&ticket)
-            .ok_or(VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"))?
-        {
+        while *CONTINUE_FLAG_HASH.lock()?.get(&ticket).ok_or(
+            VeracruzServerError::MissingFieldError("CONTINUE_FLAG_HASH ticket"),
+        )? {
             let received = rx.try_recv();
 
             if received.is_ok() && (!session.is_handshaking() || session.wants_read()) {
@@ -1688,14 +1546,20 @@ mod tests {
         veracruz_server: &mut dyn veracruz_server::VeracruzServer,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         let challenge = rand::thread_rng().gen::<[u8; 32]>();
-        info!("veracruz-server-test/attestation_flow: challenge:{:?}", challenge);
-        let serialized_pagt = transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
+        info!(
+            "veracruz-server-test/attestation_flow: challenge:{:?}",
+            challenge
+        );
+        let serialized_pagt =
+            transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
         let pagt_ret = veracruz_server.plaintext_data(serialized_pagt)?;
-        let received_bytes =
-            pagt_ret.ok_or(VeracruzServerError::MissingFieldError("attestation_flow pagt_ret"))?;
+        let received_bytes = pagt_ret.ok_or(VeracruzServerError::MissingFieldError(
+            "attestation_flow pagt_ret",
+        ))?;
 
         let encoded_token = base64::encode(&received_bytes);
-        let complete_proxy_attestation_server_url = format!("{:}/VerifyPAT", proxy_attestation_server_url);
+        let complete_proxy_attestation_server_url =
+            format!("{:}/VerifyPAT", proxy_attestation_server_url);
         let received_buffer = post_buffer(&complete_proxy_attestation_server_url, &encoded_token)?;
 
         let received_payload = base64::decode(&received_buffer)?;

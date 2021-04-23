@@ -12,28 +12,175 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use serde::{Deserialize, Serialize};
 use super::error::PolicyError;
-use std::{string::String, vec::Vec};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    string::{String, ToString},
+    vec::Vec,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
-// Roles.
+// File operation and capabilities.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Defines the role (or mix of roles) that a principal can take on in any
-/// Veracruz computation.
+/// List of file operations
+/// TODO: line up  wasi operations eps. the `Right` defined in wasi.
+#[derive(Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FileOperation {
+    Read,
+    Write,
+    Execute,
+}
+
+/// The Principal of Capability in Veracruz.
+#[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum Principal {
+    /// The Maximum Capability. It is used in some internal functions.
+    InternalSuperUser,
+    /// Participant of Veracruz indentified by ID
+    Participant(u64),
+    /// Program in Veracruz, indentified by the program file name.
+    Program(String),
+    /// No Capability, the bottom Capability. It is used in some Initialization.
+    NoCap,
+}
+
+/// THe Capability Table, contains the allowed operations of a Principal on a file
+pub type CapabilityTable = HashMap<Principal, HashMap<String, HashSet<FileOperation>>>;
+
+/// Defines the capabilities on a file.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Role {
-    /// The principal is responsible for supplying the program to execute.
-    ProgramProvider,
-    /// The principal is responsible for providing an input data set to the
-    /// computation.
-    DataProvider,
-    /// The principal is capable of retrieving the result of the computation.
-    ResultReader,
-    /// The principal is responsible for providing an input stream package set to the
-    /// computation.
-    StreamProvider,
+pub struct FileCapability {
+    /// The file name
+    file_name: String,
+    /// Read permission
+    read: bool,
+    /// Write permission
+    write: bool,
+    /// Execute permission
+    execute: bool,
+}
+
+impl FileCapability {
+    /// Creates a new file permission.
+    #[inline]
+    pub fn new(file_name: String, read: bool, write: bool, execute: bool) -> Self {
+        Self {
+            file_name,
+            read,
+            write,
+            execute,
+        }
+    }
+
+    /// Returns the file_name.
+    #[inline]
+    pub fn file_name(&self) -> &str {
+        self.file_name.as_str()
+    }
+
+    /// If it is allowed to read.
+    #[inline]
+    pub fn read(&self) -> bool {
+        self.read
+    }
+
+    /// If it is allowed to write.
+    #[inline]
+    pub fn write(&self) -> bool {
+        self.write
+    }
+
+    /// If it is allowed to execute.
+    #[inline]
+    pub fn execute(&self) -> bool {
+        self.execute
+    }
+
+    /// Extract file name and its associated FileOperations from a FileCapability entry.
+    pub fn to_capability_entry(&self) -> (String, HashSet<FileOperation>) {
+        let FileCapability {
+            file_name,
+            read,
+            write,
+            execute,
+        } = self;
+
+        let mut capabilities = HashSet::new();
+        if *read {
+            capabilities.insert(FileOperation::Read);
+        }
+        if *write {
+            capabilities.insert(FileOperation::Write);
+        }
+        if *execute {
+            capabilities.insert(FileOperation::Execute);
+        }
+        (file_name.to_string(), capabilities)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Program permission
+////////////////////////////////////////////////////////////////////////////////
+/// Defines a program that can be loaded into execution engine.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Program {
+    /// The file name
+    program_file_name: String,
+    /// The program ID
+    id: u32,
+    /// The hash of the program which will be provisioned into Veracruz by the
+    /// program provider.
+    pi_hash: String,
+    /// The file permission that specifies the program's ability to read, write and execute files.
+    file_permissions: Vec<FileCapability>,
+}
+
+impl Program {
+    /// Creates a veracruz program.
+    #[inline]
+    pub fn new<T>(
+        program_file_name: String,
+        id: T,
+        pi_hash: String,
+        file_permissions: Vec<FileCapability>,
+    ) -> Self
+    where
+        T: Into<u32>,
+    {
+        Self {
+            program_file_name,
+            id: id.into(),
+            pi_hash,
+            file_permissions,
+        }
+    }
+
+    /// Return the program file name.
+    #[inline]
+    pub fn program_file_name(&self) -> &str {
+        self.program_file_name.as_str()
+    }
+
+    /// Return the program id.
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Return the program hash.
+    #[inline]
+    pub fn pi_hash(&self) -> &str {
+        self.pi_hash.as_str()
+    }
+
+    /// Return file permissions associated to the program.
+    #[inline]
+    pub fn file_permissions(&self) -> &Vec<FileCapability> {
+        &self.file_permissions
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -70,49 +217,29 @@ pub struct Identity<U> {
     /// The ID associated with this identity.
     /// TODO: what is this?  Explain it properly.
     id: u32,
-    /// The mixture of roles that the principal behind this identity has taken
-    /// on for the Veracruz computation.
-    roles: Vec<Role>,
+    /// The file capabilities that specifies this principal's ability to read,
+    /// write and execute files.
+    file_permissions: Vec<FileCapability>,
 }
 
 impl<U> Identity<U> {
     /// Creates a new identity from a certificate, and identifier.  Initially,
     /// we keep the set of roles empty.
     #[inline]
-    pub fn new<T>(certificate: U, id: T) -> Self
+    pub fn new<T>(certificate: U, id: T, file_permissions: Vec<FileCapability>) -> Self
     where
         T: Into<u32>,
     {
         Self {
             certificate,
             id: id.into(),
-            roles: Vec::new(),
+            file_permissions,
         }
     }
 
-    /// Adds a new role to the principal's set of assigned roles.
-    #[inline]
-    pub fn add_role(&mut self, role: Role) -> &mut Self {
-        self.roles.push(role);
-        self
-    }
-
-    /// Adds multiple new roles to the principal's set of assigned roles,
-    /// reading them from an iterator.
-    pub fn add_roles<T>(&mut self, roles: T) -> &mut Self
-    where
-        T: IntoIterator<Item = Role>,
-    {
-        for role in roles {
-            self.add_role(role);
-        }
-        self
-    }
-
-    /// Returns `true` iff the principal has the role, `role`.
-    #[inline]
-    pub fn has_role(&self, role: &Role) -> bool {
-        self.roles.iter().any(|r| r == role)
+    /// Return the file permission in associated to this client (identity).
+    pub fn file_permissions(&self) -> &Vec<FileCapability> {
+        &self.file_permissions
     }
 
     /// Returns the certificate associated with this identity.
@@ -125,12 +252,6 @@ impl<U> Identity<U> {
     #[inline]
     pub fn id(&self) -> &u32 {
         &self.id
-    }
-
-    /// Returns the mixture of roles associated with this identity.
-    #[inline]
-    pub fn roles(&self) -> &Vec<Role> {
-        &self.roles
     }
 }
 

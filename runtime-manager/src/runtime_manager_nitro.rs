@@ -19,7 +19,8 @@ use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::RawFd;
 use veracruz_utils::{
-    receive_buffer, send_buffer, vsocket, RuntimeManagerMessage, NitroRootEnclaveMessage, NitroStatus,
+    receive_buffer, send_buffer, vsocket, NitroRootEnclaveMessage, NitroStatus,
+    RuntimeManagerMessage,
 };
 
 use crate::managers;
@@ -116,17 +117,19 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
             }
             RuntimeManagerMessage::SendTLSData(session_id, tls_data) => {
                 println!("runtime_manager_nitro::main SendTLSData");
-                let return_message = match managers::session_manager::send_data(session_id, &tls_data)
-                {
-                    Ok(_) => RuntimeManagerMessage::Status(NitroStatus::Success),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
-                };
+                let return_message =
+                    match managers::session_manager::send_data(session_id, &tls_data) {
+                        Ok(_) => RuntimeManagerMessage::Status(NitroStatus::Success),
+                        Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    };
                 return_message
             }
             RuntimeManagerMessage::GetTLSData(session_id) => {
                 println!("runtime_manager_nitro::main GetTLSData");
                 let return_message = match managers::session_manager::get_data(session_id) {
-                    Ok((active, output_data)) => RuntimeManagerMessage::TLSData(output_data, active),
+                    Ok((active, output_data)) => {
+                        RuntimeManagerMessage::TLSData(output_data, active)
+                    }
                     Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
                 };
                 return_message
@@ -151,7 +154,8 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
             "runtime_manager_nitro::main calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
-        send_buffer(fd, &return_buffer).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
+        send_buffer(fd, &return_buffer)
+            .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     }
 }
 
@@ -164,7 +168,9 @@ fn initialize(policy_json: &str) -> Result<RuntimeManagerMessage, RuntimeManager
 }
 
 /// Handler for the RuntimeManagerMessage::GetPSAAttestationToken message
-fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+fn get_psa_attestation_token(
+    challenge: &[u8],
+) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
     println!("runtime_manager_nitro::get_psa_attestation_token started");
     println!(
         "nc_nitro::get_psa_attestation_token received challenge:{:?}",
@@ -217,15 +223,18 @@ fn get_psa_attestation_token(challenge: &[u8]) -> Result<RuntimeManagerMessage, 
         .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     let received_buffer = receive_buffer(vsocksocket.as_raw_fd())
         .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-    let received_message: NitroRootEnclaveMessage =
-        bincode::deserialize(&received_buffer).map_err(|err| RuntimeManagerError::BincodeError(err))?;
+    let received_message: NitroRootEnclaveMessage = bincode::deserialize(&received_buffer)
+        .map_err(|err| RuntimeManagerError::BincodeError(err))?;
 
     let (psa_token, pubkey, device_id) = match received_message {
         NitroRootEnclaveMessage::PSAToken(token, pubkey, d_id) => (token, pubkey, d_id),
         _ => return Err(RuntimeManagerError::WrongMessageTypeError(received_message)),
     };
-    let psa_token_message: RuntimeManagerMessage =
-        RuntimeManagerMessage::PSAAttestationToken(psa_token, pubkey, device_id.try_into().unwrap());
+    let psa_token_message: RuntimeManagerMessage = RuntimeManagerMessage::PSAAttestationToken(
+        psa_token,
+        pubkey,
+        device_id.try_into().unwrap(),
+    );
 
     return Ok(psa_token_message);
 }

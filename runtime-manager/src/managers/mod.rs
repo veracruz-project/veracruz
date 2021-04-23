@@ -29,17 +29,16 @@ use std::{ffi::CString, sync::SgxMutex as Mutex};
 
 use lazy_static::lazy_static;
 
-use execution_engine::{
-    factory::multi_threaded_execution_engine,
-    hcall::common::{ExecutionEngine, DataSourceMetadata, LifecycleState},
+use execution_engine::{factory::execute, hcall::buffer::VFS, hcall::common::EngineReturnCode};
+
+use veracruz_utils::policy::{
+    policy::Policy,
+    principal::{ExecutionStrategy, FileOperation, Principal},
 };
 
-use veracruz_utils::{policy::{policy::Policy, principal::ExecutionStrategy}};
-
-pub mod session_manager;
-pub mod buffer;
-pub mod execution_engine_manager;
 pub mod error;
+pub mod execution_engine_manager;
+pub mod session_manager;
 pub use error::RuntimeManagerError;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -47,40 +46,25 @@ pub use error::RuntimeManagerError;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> = Mutex::new(None);
+    static ref MY_SESSION_MANAGER: Mutex<Option<::session_manager::SessionContext>> =
+        Mutex::new(None);
     static ref SESSION_COUNTER: AtomicU32 = AtomicU32::new(1);
-    static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> = Mutex::new(HashMap::new());
+    static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> =
+        Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
+
+const OUTPUT_FILE: &'static str = "output";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The possible responses to a provisioning step: either a protocol error (i.e.
-/// somebody did something out of turn, they didn't have permission to do
-/// something, or similar), we need to wait for more data to complete an action,
-/// or success.
-pub enum ProvisioningResponse {
-    /// Signals a message has arrived too soon, and the enclave's state machine
-    /// is in the incorrect state to process this message.
-    ProtocolError {
-        /// The server response.
-        response: Vec<u8>,
-    },
-    /// The incoming buffer is not full, so we cannot parse a complete protobuf
-    /// message.  We need to wait longer for this to arrive.
-    WaitForMoreData,
-    /// Provisioning succeeded, in which case an optional response was
-    /// generated.  In the case of waiting for more data (e.g. when the incoming
-    /// buffer does not contain enough data to parse a correct protobuf message)
-    /// this response will be empty.
-    Success {
-        /// The server response.
-        response: Vec<u8>,
-    },
-}
+/// `None` means that the incoming buffer is not full,
+/// so we cannot parse a complete protobuf message.
+/// We need to wait longer for this to arrive.
+type ProvisioningResponse = Option<Vec<u8>>;
 
 /// Result type of provisioning functions.
 pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
@@ -88,16 +72,22 @@ pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 /// The configuration details for the ongoing provisioning of secrets into the
 /// Veracruz platform, containing information that must be persisted across the
 /// different rounds of the provisioning process and the fixed global policy.
-struct ProtocolState {
-    /// The Veracruz host provisioning state, which captures "transient" state
-    /// of the provisioning process and updates its internal lifecycle state
-    /// appropriately as more and more clients provision their secrets.
-    host_state: Arc<Mutex<dyn ExecutionEngine>>,
+pub(crate) struct ProtocolState {
+    /// This flag indicates if new data or program is arrived since last execution.
+    /// It decides if it is necessary to run a program when result retriever requests reading
+    /// result.
+    /// TODO: more defined tracking, e.g. flag per available program in the policy?
+    is_modified: bool,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
     global_policy: Policy,
     /// A hex-encoding of the raw JSON global policy.
     global_policy_hash: String,
+    /// The list of clients (their IDs) that can request shutdown of the
+    /// Veracruz platform.
+    expected_shutdown_sources: Vec<u64>,
+    /// The ref to the VFS.
+    vfs: Arc<Mutex<VFS>>,
 }
 
 impl ProtocolState {
@@ -108,34 +98,26 @@ impl ProtocolState {
         global_policy: Policy,
         global_policy_hash: String,
     ) -> Result<Self, RuntimeManagerError> {
-        let expected_data_sources = global_policy.data_provision_order();
-        let expected_stream_sources = global_policy.stream_provision_order();
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let execution_strategy = match global_policy.execution_strategy() {
-            ExecutionStrategy::Interpretation => {
-                execution_engine::factory::ExecutionStrategy::Interpretation
-            }
-            ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
-        };
-
-        let host_state = multi_threaded_execution_engine(
-            &execution_strategy,
-            &expected_data_sources,
-            &expected_stream_sources,
-            expected_shutdown_sources
-                .iter()
-                .map(|e| *e as u64)
-                .collect::<Vec<u64>>()
-                .as_slice(),
-        )
-        .ok_or(RuntimeManagerError::InvalidExecutionStrategyError)?;
+        let capability_table = global_policy.get_capability_table();
+        let program_digests = global_policy.get_program_digests()?;
+        let vfs = Arc::new(Mutex::new(VFS::new(&capability_table, &program_digests)));
 
         Ok(ProtocolState {
-            host_state,
             global_policy,
             global_policy_hash,
+            expected_shutdown_sources,
+            vfs,
+            is_modified: true,
         })
+    }
+
+    /// Force re-execute the program even if there is no new data coming from participants.
+    #[inline]
+    pub fn reload(&mut self) -> Result<(), RuntimeManagerError> {
+        self.is_modified = true;
+        Ok(())
     }
 
     /// Returns the global policy associated with the protocol state.
@@ -154,108 +136,90 @@ impl ProtocolState {
     // The ExecutionEngine facade.
     ////////////////////////////////////////////////////////////////////////////
 
-    /* The following re-implements a subset of the ExecutionEngine API for
-     * `ProtocolState` by just calling through to the underlying
-     * `Arc<Mutex<dyn ExecutionEngine>>` object.  All lock-handling code is therefore
-     * hidden from the user.
-     */
-
-    /// Loads a raw WASM program from a buffer of received or parsed bytes.
-    /// Will fail if the lifecycle state is not in `LifecycleState::Initial` or
-    /// if the buffer cannot be parsed.  On success bumps the lifecycle state to
-    /// `LifecycleState::ReadyToExecute` in cases where no data sources are
-    /// expected (i.e. we are a pure delegate) or
-    /// `LifecycleState::DataSourcesLoading` in cases where we are expecting
-    /// data to be provisioned.
-    pub(crate) fn load_program(&self, buffer: &[u8]) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.load_program(buffer)?)
-    }
-
-    /// Provisions a new data source, described using a `DataSourceMetadata`
-    /// frame into the host state.  Will fail if the lifecycle state is not
-    /// `LifecycleState::DataSourcesLoading`.  Will bump the lifecycle state to
-    /// `LifecycleState::StreamSourcesLoading` when the call represents the last
-    /// data source to be loaded,
-    /// `LifecycleState::ReadyToExecute` if no stream data is required,
-    /// or maintains the current lifecycle state.
-    pub(crate) fn add_new_data_source(
-        &self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.add_new_data_source(metadata)?)
-    }
-
-    /// Provisions a new stream source, described using a `DataSourceMetadata`
-    /// frame into the host state.  Will fail if the lifecycle state is not
-    /// `LifecycleState::StreamSourcesLoading`.  Will bump the lifecycle state to
-    /// `LifecycleState::ReadyToExecute` when the call represents the last
-    /// data source to be loaded, or maintains the current lifecycle state.
-    pub(crate) fn add_new_stream_source(
-        &self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.add_new_stream_source(metadata)?)
-    }
-
-    /// Invokes the entry point of the provisioned WASM program.  Will fail if
-    /// the current lifecycle state is not `LifecycleState::ReadyToExecute` or
-    /// if the WASM program fails at runtime.  On success, bumps the lifecycle
-    /// state to `LifecycleState::FinishedExecuting` and returns the error code
-    /// returned by the WASM program entry point as an `i32` value.
-    pub(crate) fn invoke_entry_point(&self) -> Result<i32, RuntimeManagerError> {
-        Ok(self.host_state.lock()?.invoke_entry_point()?)
-    }
-
-    /// Returns the current lifecycle state that the host provisioning state is
-    /// in.
-    pub(crate) fn get_lifecycle_state(&self) -> Result<LifecycleState, RuntimeManagerError> {
-        Ok(self.host_state.lock()?.get_lifecycle_state().clone())
-    }
-
-    /// Returns a result of a WASM computation that has executed on the host
-    /// provisioning state.  Returns `None` iff no such result has been
-    /// registered.
-    pub(crate) fn get_result(&self) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        Ok(self.host_state.lock()?.get_result().map(|o| o.clone()))
-    }
-
-    /// Sets the `previous_result` field.
-    pub(crate) fn set_previous_result(
+    /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
+    pub(crate) fn write_file(
         &mut self,
-        result: &Option<Vec<u8>>,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
-        self.host_state.lock()?.set_previous_result(result);
-        Ok(())
+        self.is_modified = true;
+        Ok(self.vfs.lock()?.write(client_id, file_name, data)?)
     }
 
-    /// Returns an SHA-256 digest of the bytes loaded into the host provisioning
-    /// state.  Returns `None` iff no such program has yet been loaded.
-    pub(crate) fn get_program_digest(&self) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        Ok(self
-            .host_state
-            .lock()?
-            .get_program_digest()
-            .map(|o| o.clone()))
+    /// Check if a client has capability to write to a file, and then append it with new `data`.
+    pub(crate) fn append_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), RuntimeManagerError> {
+        self.is_modified = true;
+        Ok(self.vfs.lock()?.append(client_id, file_name, data)?)
     }
 
-    /// Moves the host provisioning state's lifecycle state into
-    /// `LifecycleState::Error`, a state which it cannot ever escape,
-    /// effectively invalidating it.
-    pub(crate) fn invalidate(&self) -> Result<(), RuntimeManagerError> {
-        Ok(self.host_state.lock()?.invalidate())
+    /// Check if a client has capability to read from a file, if so, return the content in bytes.
+    pub(crate) fn read_file(
+        &self,
+        client_id: &Principal,
+        file_name: &str,
+    ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
+        Ok(self.vfs.lock()?.read(client_id, file_name)?)
     }
 
     /// Requests shutdown on behalf of a client, as identified by their client
     /// ID, and then checks if this request was sufficient to reach a threshold
     /// of requests wherein the platform can finally shutdown.
     pub(crate) fn request_and_check_shutdown(
-        &self,
+        &mut self,
         client_id: u64,
     ) -> Result<bool, RuntimeManagerError> {
-        Ok(self
-            .host_state
-            .lock()?
-            .request_and_check_shutdown(client_id))
+        self.expected_shutdown_sources.retain(|v| v != &client_id);
+        Ok(self.expected_shutdown_sources.is_empty())
+    }
+
+    /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
+    pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
+        let execution_strategy = match self.global_policy.execution_strategy() {
+            ExecutionStrategy::Interpretation => {
+                execution_engine::factory::ExecutionStrategy::Interpretation
+            }
+            ExecutionStrategy::JIT => execution_engine::factory::ExecutionStrategy::JIT,
+        };
+        let return_code = execute(&execution_strategy, self.vfs.clone(), file_name)?;
+
+        let response = if return_code == EngineReturnCode::Success {
+            let result = self.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
+            Self::response_success(result)
+        } else {
+            Self::response_error_code_returned(return_code)
+        };
+
+        self.is_modified = false;
+        Ok(Some(response))
+    }
+
+    #[inline]
+    fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
+        transport_protocol::serialize_result(
+            transport_protocol::ResponseStatus::SUCCESS as i32,
+            result,
+        )
+        .unwrap_or_else(|err| panic!(err))
+    }
+
+    #[inline]
+    fn response_error_code_returned(error_code: EngineReturnCode) -> std::vec::Vec<u8> {
+        transport_protocol::serialize_result(
+            transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
+            Some(i32::from(error_code).to_le_bytes().to_vec()),
+        )
+        .unwrap_or_else(|err| panic!(err))
+    }
+
+    #[inline]
+    fn is_modified(&self) -> bool {
+        self.is_modified
     }
 }
 

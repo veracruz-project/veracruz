@@ -38,8 +38,11 @@ use std::sync::SgxMutex as Mutex;
 
 #[cfg(feature = "std")]
 use crate::hcall::wasmtime;
-use crate::hcall::{common::ExecutionEngine, wasmi};
-
+use crate::hcall::{
+    buffer::VFS,
+    common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
+    wasmi,
+};
 use std::{
     boxed::Box,
     fmt::{Display, Error, Formatter},
@@ -64,50 +67,25 @@ pub enum ExecutionStrategy {
 /// NB: wasmtime is only supported when feature=std is set at the moment,
 /// hence the branching around the body of this function.  When we get
 /// it compiled for SGX and TZ, then this will disappear.
+#[deprecated]
 pub fn single_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    expected_data_sources: &[u64],
-    expected_stream_sources: &[u64],
-    expected_shutdown_sources: &[u64],
-) -> Option<Box<dyn ExecutionEngine + 'static>> {
-    #[cfg(feature = "std")]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
-
-                Some(Box::new(state))
-            }
-            ExecutionStrategy::JIT => {
-                wasmtime::initialize(
-                    expected_data_sources,
-                    expected_stream_sources,
-                    expected_shutdown_sources,
-                );
-
-                Some(Box::new(wasmtime::DummyWasmtimeHostProvisioningState::new()))
-            }
+    vfs: Arc<Mutex<VFS>>,
+) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
+    let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
+        ExecutionStrategy::Interpretation => {
+            Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
         }
-    }
-    #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
-
-                Some(Box::new(state))
+        ExecutionStrategy::JIT => {
+            #[cfg(feature = "std")]
+            {
+                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
             }
-            ExecutionStrategy::JIT => None,
+            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
+            None
         }
-    }
+    };
+    Ok(instance)
 }
 
 /// Selects an ExecutionEngine implementation based on a stated preference for
@@ -118,52 +96,46 @@ pub fn single_threaded_execution_engine(
 /// NB: wasmtime is only supported when feature=std is set at the moment,
 /// hence the branching around the body of this function.  When we get
 /// it compiled for SGX and TZ, then this will disappear.
+#[deprecated]
 pub fn multi_threaded_execution_engine(
     strategy: &ExecutionStrategy,
-    expected_data_sources: &[u64],
-    expected_stream_sources: &[u64],
-    expected_shutdown_sources: &[u64],
-) -> Option<Arc<Mutex<dyn ExecutionEngine + 'static>>> {
-    #[cfg(feature = "std")]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
-
-                Some(Arc::new(Mutex::new(state)))
+    vfs: Arc<Mutex<VFS>>,
+) -> Result<Option<Box<dyn ExecutionEngine>>, FatalEngineError> {
+    let instance: Option<Box<dyn ExecutionEngine>> = match strategy {
+        ExecutionStrategy::Interpretation => {
+            Some(Box::new(wasmi::WasmiHostProvisioningState::new(vfs)))
+        }
+        ExecutionStrategy::JIT => {
+            #[cfg(feature = "std")]
+            {
+                Some(Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?))
             }
-            ExecutionStrategy::JIT => {
-                wasmtime::initialize(
-                    expected_data_sources,
-                    expected_stream_sources,
-                    expected_shutdown_sources,
-                );
+            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
+            None
+        }
+    };
+    Ok(instance)
+}
 
-                Some(Arc::new(Mutex::new(
-                    wasmtime::DummyWasmtimeHostProvisioningState::new(),
-                )))
+pub fn execute(
+    strategy: &ExecutionStrategy,
+    vfs: Arc<Mutex<VFS>>,
+    program_file_name: &str,
+) -> Result<EngineReturnCode, FatalEngineError> {
+    let mut engine: Box<dyn ExecutionEngine> = match strategy {
+        ExecutionStrategy::Interpretation => Box::new(wasmi::WasmiHostProvisioningState::new(vfs)),
+        ExecutionStrategy::JIT => {
+            #[cfg(feature = "std")]
+            {
+                Box::new(wasmtime::WasmtimeHostProvisioningState::new(vfs)?)
+            }
+            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
+            {
+                return Err(FatalEngineError::EngineIsNotReady);
             }
         }
-    }
-    #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-    {
-        match strategy {
-            ExecutionStrategy::Interpretation => {
-                let mut state = wasmi::WasmiHostProvisioningState::new();
-                state
-                    .set_expected_data_sources(expected_data_sources)
-                    .set_expected_stream_sources(expected_stream_sources)
-                    .set_expected_shutdown_sources(expected_shutdown_sources);
-
-                Some(Arc::new(Mutex::new(state)))
-            }
-            ExecutionStrategy::JIT => None,
-        }
-    }
+    };
+    engine.invoke_entry_point(&program_file_name)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

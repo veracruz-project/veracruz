@@ -16,9 +16,9 @@ use libveracruz::{data_description::write_result, host, return_code};
 
 fn main() -> return_code::Veracruz {
     let init_value = read_init_value()?;
-    let last_result = read_last_result()?;
+    let last_result = read_last_result()?.unwrap_or(0.0);
     let (stream1, stream2) = read_stream()?;
-    write_result::<f64>(last_result.unwrap_or(init_value) + stream1 + stream2)
+    write_result::<f64>(init_value + stream1 + stream2 + last_result)
 }
 
 fn read_init_value() -> Result<f64, i32> {
@@ -48,7 +48,7 @@ fn read_last_result() -> Result<Option<f64>, i32> {
 }
 
 fn read_stream() -> Result<(f64, f64), i32> {
-    if host::stream_count() < 2 {
+    if host::stream_count() != 2 {
         return return_code::fail_data_source_count();
     } else {
         let stream1 = host::read_stream(0).unwrap();

@@ -13,5 +13,7 @@ clap = "2.33.3"
 data-encoding = "2.3.2"
 env_logger = "0.8.2"
 log = "0.4.14"
-ring = "0.17.0-alpha.8"
-serde_json = "1.0.62"
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
+veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
+serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", features = ["std"] }

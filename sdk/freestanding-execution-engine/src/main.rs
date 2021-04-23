@@ -26,12 +26,22 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{boxed::Box, convert::TryFrom, fmt, fs::File, io::Read, process::exit, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    vec::Vec,
+    path::Path,
+    sync::Mutex,
+    convert::TryFrom,
+    fmt, fs::File, io::Read, process::exit, time::Instant
+};
 
 use execution_engine::{
     factory::{single_threaded_execution_engine, ExecutionStrategy},
-    hcall::common::{ExecutionEngine, DataSourceMetadata},
+    hcall::buffer::VFS,
+    hcall::common::EngineReturnCode,
 };
+use veracruz_utils::policy::principal::Principal;
 
 use clap::{App, Arg};
 use log::*;
@@ -88,64 +98,6 @@ pub enum ErrorCode {
     NotImplemented,
     /// The required platform service is not available on this platform.
     ServiceUnavailable,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Trait implementations.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Potentially-failing conversion from `i32` values.
-impl TryFrom<i32> for ErrorCode {
-    type Error = ();
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == -1 {
-            Ok(ErrorCode::Generic)
-        } else if value == -2 {
-            Ok(ErrorCode::DataSourceCount)
-        } else if value == -3 {
-            Ok(ErrorCode::DataSourceSize)
-        } else if value == -4 {
-            Ok(ErrorCode::BadInput)
-        } else if value == -5 {
-            Ok(ErrorCode::InvariantFailed)
-        } else if value == -6 {
-            Ok(ErrorCode::NotImplemented)
-        } else if value == -7 {
-            Ok(ErrorCode::ServiceUnavailable)
-        } else {
-            Err(())
-        }
-    }
-}
-
-/// Non-failing conversion to `i32` values.
-impl Into<i32> for ErrorCode {
-    fn into(self) -> i32 {
-        match self {
-            ErrorCode::Generic => -1,
-            ErrorCode::DataSourceCount => -2,
-            ErrorCode::DataSourceSize => -3,
-            ErrorCode::BadInput => -4,
-            ErrorCode::InvariantFailed => -5,
-            ErrorCode::NotImplemented => -6,
-            ErrorCode::ServiceUnavailable => -7,
-        }
-    }
-}
-
-impl fmt::Display for ErrorCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            ErrorCode::Generic => write!(f, "Generic"),
-            ErrorCode::DataSourceCount => write!(f, "DataSourceCount"),
-            ErrorCode::DataSourceSize => write!(f, "DataSourceSize"),
-            ErrorCode::BadInput => write!(f, "BadInput"),
-            ErrorCode::InvariantFailed => write!(f, "InvariantFailed"),
-            ErrorCode::NotImplemented => write!(f, "NotImplemented"),
-            ErrorCode::ServiceUnavailable => write!(f, "ServiceUnavailable"),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -345,13 +297,13 @@ fn parse_command_line(config: &Configuration) -> CommandLineOptions {
 /// Reads a WASM file from disk (actually, will read any file, but we only need
 /// it for WASM here) and return a collection of bytes corresponding to that
 /// file.  Will abort the program if anything goes wrong.
-fn read_program_file(fname: &str) -> Vec<u8> {
-    info!("Opening file '{}' for reading.", fname);
+fn load_file(file_path: &str) -> (String, Vec<u8>) {
+    info!("Opening file '{}' for reading.", file_path);
 
-    let mut file = File::open(fname).unwrap_or_else(|err| {
+    let mut file = File::open(file_path).unwrap_or_else(|err| {
         eprintln!(
             "Cannot open WASM binary '{}'.  Error '{}' returned.",
-            fname, err
+            file_path, err
         );
         exit(-1)
     });
@@ -361,12 +313,12 @@ fn read_program_file(fname: &str) -> Vec<u8> {
     file.read_to_end(&mut contents).unwrap_or_else(|err| {
         eprintln!(
             "Cannot read WASM binary '{}' to completion.  Error '{}' returned.",
-            fname, err
+            file_path, err
         );
         exit(-1);
     });
 
-    contents
+    (Path::new(file_path).file_name().expect(&format!("Failed to extract file name from path {}", file_path)).to_str().expect(&format!("Failed to convert the filename in path {}", file_path)).to_string(), contents)
 }
 
 /// Reads a static TOML configuration file from a fixed location on disk,
@@ -414,20 +366,19 @@ fn read_configuration_file(fname: &str) -> Configuration {
     }
 }
 
+
 /// Loads the specified data sources, as provided on the command line, for
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
-fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
-    let mut rets = Vec::new();
+fn load_data_sources(cmdline: &CommandLineOptions, vfs : Arc<Mutex<VFS>>) {
+    for (id, file_path) in cmdline.data_sources.iter().enumerate() {
+        info!("Loading data source '{}' with id {} for reading.", file_path, id);
 
-    for (id, fname) in cmdline.data_sources.iter().enumerate() {
-        info!("Loading data source '{}' for reading.", fname);
-
-        let mut file = File::open(fname).unwrap_or_else(|err| {
+        let mut file = File::open(file_path).unwrap_or_else(|err| {
             eprintln!(
                 "Could not open data source '{}'.  Error '{}' returned.",
-                fname, err
+                file_path, err
             );
             exit(-1)
         });
@@ -437,22 +388,18 @@ fn load_data_sources(cmdline: &CommandLineOptions) -> Vec<DataSourceMetadata> {
         file.read_to_end(&mut buffer).unwrap_or_else(|err| {
             error!(
                 "Could not read data source '{}'.  Error '{}' returned.",
-                fname, err
+                file_path, err
             );
             exit(-1)
         });
 
         // XXX: may panic! if u64 and usize have differing bitwidths...
         let id = u64::try_from(id).unwrap();
+        let file_name = format!("input-{}",id);
+        vfs.lock().unwrap().write(&Principal::InternalSuperUser, &file_name,&buffer).unwrap();
 
-        let frame = DataSourceMetadata::new(&buffer, id, 0);
-
-        info!("Pushing '{}' as data source number '{}'.", fname, id);
-
-        rets.push(frame)
+        info!("Loading '{}' as file_name '{}' into vfs.", file_path, file_name);
     }
-
-    rets
 }
 
 /// Entry: reads the static configuration and the command line parameters,
@@ -469,82 +416,38 @@ fn main() {
 
     info!("Command line read successfully.");
 
-    let module = read_program_file(&cmdline.binary);
+    let vfs = Arc::new(Mutex::new(VFS::new(&HashMap::new(),&HashMap::new())));
+    let (prog_file_name, program) = load_file(&cmdline.binary);
+    vfs.lock().expect("Failed to lock the vfs").write(&Principal::InternalSuperUser,&prog_file_name,&program).expect(&format!("Failed to write to file {}", prog_file_name));
+    
+    info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    info!("WASM module loaded.");
-
-    let expected_data_sources: Vec<u64> = (0..config.data_source_count as u64).collect();
-    let mut provisioning_state: Box<dyn ExecutionEngine + 'static> =
-        single_threaded_execution_engine(&cmdline.execution_strategy, &expected_data_sources,&[], &[])
-            .unwrap();
-
-    provisioning_state.set_expected_data_sources(&expected_data_sources);
-
-    info!(
-        "Machine state before loading program: {:?}",
-        provisioning_state.get_lifecycle_state()
-    );
-
-    if let Err(error) = provisioning_state.load_program(&module) {
-        eprintln!("Failed to register program.  Error '{}' returned.", error);
-        exit(-1);
-    }
-
-    info!("WASM program loaded.");
-
-    let sources = load_data_sources(&cmdline);
-
-    info!(
-        "Machine state after loading program: {:?}",
-        provisioning_state.get_lifecycle_state()
-    );
-
-    for source in sources {
-        if let Err(err) = provisioning_state.add_new_data_source(source) {
-            eprintln!("Failed to register data source.  Error '{}' produced.", err);
-            exit(-1);
-        }
-    }
+    load_data_sources(&cmdline,vfs.clone());
 
     info!("Data sources loaded.");
-    info!(
-        "Machine state after loading data sources: {:?}",
-        provisioning_state.get_lifecycle_state()
-    );
+
     info!("Invoking main.");
 
     let start = Instant::now();
 
-    match provisioning_state.invoke_entry_point() {
+    match single_threaded_execution_engine(&cmdline.execution_strategy, vfs.clone())
+          .expect("Failed to instantiate the execution engine due to error")
+          .expect("Failed to instantiate the execution engine due to engine is not supported")
+          .invoke_entry_point(&prog_file_name) {
+        Ok(EngineReturnCode::Success) => {
+            if cmdline.time_computation {
+                info!("WASM program finished execution in '{:?}.", start.elapsed());
+            }
+            info!("WASM program executed successfully.");
+            info!("Result {:?}.",vfs.lock().expect("Failed to lock the vfs").read(&Principal::InternalSuperUser, "output").expect("Failed to read the file output"));
+        }
         Ok(err_code) => {
+            println!(
+                "Veracruz program returned error code '{:?}'.",
+                err_code
+            );
             if cmdline.time_computation {
                 println!("WASM program finished execution in '{:?}.", start.elapsed());
-            }
-
-            if err_code == 0 {
-                println!("WASM program executed successfully.");
-
-                match provisioning_state.get_result() {
-                    None => println!("Program produced no result data."),
-                    Some(result) => {
-                        println!(
-                            "Program produced '{}' bytes of result data: '{:?}'.",
-                            result.len(),
-                            result
-                        );
-                    }
-                }
-            } else {
-                let pretty = ErrorCode::try_from(err_code)
-                    .map(|e| format!("{}", e))
-                    .unwrap_or_else(|_| "<unknown error code>".to_string());
-                println!(
-                    "Veracruz program returned error code '{}' (return code = {}).",
-                    pretty, err_code
-                );
-                if cmdline.time_computation {
-                    println!("WASM program finished execution in '{:?}.", start.elapsed());
-                }
             }
         }
         Err(error) => {

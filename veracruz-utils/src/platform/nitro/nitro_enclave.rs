@@ -16,7 +16,7 @@ use nix::{
         sockopt::{ReuseAddr, ReusePort},
         AddressFamily, Shutdown, SockAddr, SockFlag, SockType,
     },
-    unistd::close
+    unistd::close,
 };
 use serde_json::Value;
 use std::{os::unix::io::AsRawFd, process::Command, thread::JoinHandle};

@@ -27,12 +27,12 @@ pub enum RuntimeManagerError {
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "RuntimeManager: VeracruzUtilError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
-    #[error(display = "RuntimeManager: FatalHostError: {:?}.", _0)]
-    FatalHostError(#[error(source)] execution_engine::hcall::common::FatalHostError),
+    #[error(display = "RuntimeManager: FatalEngineError: {:?}.", _0)]
+    FatalHostError(#[error(source)] execution_engine::hcall::common::FatalEngineError),
     #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
     HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
-    #[error(display = "RuntimeManager: RuntimeManagerBufferError: {:?}.", _0)]
-    RuntimeManagerBufferError(#[error(source)] crate::managers::buffer::RuntimeManagerBufferError),
+    #[error(display = "RuntimeManager: VFS Error: {:?}.", _0)]
+    VFSError(#[error(source)] execution_engine::hcall::buffer::VFSError),
     #[error(display = "RuntimeManager: Failed to obtain lock {:?}.", _0)]
     LockError(std::string::String),
     #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]
@@ -40,6 +40,8 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "sgx")]
     #[error(display = "RuntimeManager: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
+    #[error(display = "RuntimeManager: ParseIntError: {:?}", _0)]
+    ParseIntError(#[error(source)] core::num::ParseIntError),
     #[error(display = "RuntimeManager: {} failed with error code {:?}.", _0, _1)]
     UnsafeCallError(&'static str, u32),
     #[error(display = "RuntimeManager: Received no data.")]

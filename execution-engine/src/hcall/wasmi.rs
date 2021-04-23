@@ -9,39 +9,66 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{boxed::Box, string::ToString, vec::Vec};
+use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
 
 use platform_services::{getrandom, result};
 
 use wasmi::{
-    Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef,
+    Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef, HostError,
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
-    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
+    RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, TrapKind, ValueType,
 };
 
-use crate::{
-    error::{
-        common::VeracruzError,
-        wasmi::{mk_error_code, mk_host_trap},
-    },
-    hcall::common::{
-        sha_256_digest, ExecutionEngine, DataSourceMetadata, EntrySignature, FatalHostError, HCallError,
-        HostProvisioningError, HostProvisioningState, LifecycleState, HCALL_GETRANDOM_NAME,
-        HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME, HCALL_INPUT_SIZE_NAME,
-        HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME, HCALL_READ_PREVIOUS_RESULT_NAME,
-        HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME, HCALL_STREAM_SIZE_NAME,
-        HCALL_WRITE_OUTPUT_NAME,
-    },
+use crate::hcall::buffer::VFS;
+use crate::hcall::common::{
+    EngineReturnCode, EntrySignature, ExecutionEngine, FatalEngineError, HostProvisioningError,
+    HCALL_GETRANDOM_NAME, HCALL_HAS_PREVIOUS_RESULT_NAME, HCALL_INPUT_COUNT_NAME,
+    HCALL_INPUT_SIZE_NAME, HCALL_PREVIOUS_RESULT_SIZE_NAME, HCALL_READ_INPUT_NAME,
+    HCALL_READ_PREVIOUS_RESULT_NAME, HCALL_READ_STREAM_NAME, HCALL_STREAM_COUNT_NAME,
+    HCALL_STREAM_SIZE_NAME, HCALL_WRITE_OUTPUT_NAME,
 };
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+use std::sync::{Arc, Mutex};
+#[cfg(feature = "sgx")]
+use std::sync::{Arc, SgxMutex as Mutex};
+use veracruz_utils::policy::principal::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The WASMI host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
 
+#[typetag::serde]
+impl HostError for FatalEngineError {}
+
+/// The return type for H-Call implementations.
+///
+/// From *the viewpoint of the host* a H-call can either fail spectacularly
+/// with a runtime trap, in which case `Err(err)` is returned, with `err`
+/// detailing what went wrong, and the Veracruz host thereafter terminating
+/// or otherwise entering an error state, or succeeds with `Ok(())`.
+///
+/// From *the viewpoint of the WASM program* a H-call can either fail
+/// spectacularly, as above, in which case WASM program execution is aborted
+/// with the WASM program itself not being able to do anything about this,
+/// succeeds with the desired effect and a success error code returned, or
+/// fails with a recoverable error in which case the error code details what
+/// went wrong and what can be done to fix it.
+pub(crate) type HCallError = Result<EngineReturnCode, FatalEngineError>;
+
 /// The WASMI host provisioning state: the `HostProvisioningState` with the
 /// Module and Memory type-variables specialised to WASMI's `ModuleRef` and
 /// `MemoryRef` type.
-pub(crate) type WasmiHostProvisioningState = HostProvisioningState<ModuleRef, MemoryRef>;
+pub(crate) struct WasmiHostProvisioningState {
+    /// The VFS installed to this execution
+    vfs: Arc<Mutex<VFS>>,
+    /// A reference to the WASM program module that will actually execute on
+    /// the input data sources.
+    program_module: Option<ModuleRef>,
+    /// A reference to the WASM program's linear memory (or "heap").
+    memory: Option<MemoryRef>,
+    /// Ref to the program that is executed
+    program: Principal,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -256,10 +283,10 @@ fn check_main(module: &ModuleInstance) -> EntrySignature {
 
 /// Finds the linear memory of the WASM module, `module`, and returns it,
 /// otherwise creating a fatal host error that will kill the Veracruz instance.
-fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, FatalHostError> {
+fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, HostProvisioningError> {
     match module.export_by_name(LINEAR_MEMORY_NAME) {
         Some(ExternVal::Memory(memoryref)) => Ok(memoryref),
-        _otherwise => Err(FatalHostError::NoMemoryRegistered),
+        _otherwise => Err(HostProvisioningError::NoMemoryRegistered),
     }
 }
 
@@ -340,52 +367,25 @@ impl Externals for WasmiHostProvisioningState {
         index: usize,
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
-        match index {
-            HCALL_WRITE_OUTPUT_CODE => match self.write_output(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_INPUT_COUNT_CODE => match self.input_count(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_INPUT_SIZE_CODE => match self.input_size(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_READ_INPUT_CODE => match self.read_input(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_GETRANDOM_CODE => match self.get_random(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_STREAM_COUNT_CODE => match self.stream_count(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_STREAM_SIZE_CODE => match self.stream_size(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_READ_STREAM_CODE => match self.read_stream(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_PREVIOUS_RESULT_SIZE_CODE => match self.previous_result_size(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_HAS_PREVIOUS_RESULT_CODE => match self.has_previous_result(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            HCALL_READ_PREVIOUS_RESULT_CODE => match self.previous_result(args) {
-                Ok(return_code) => mk_error_code(return_code),
-                Err(host_trap) => mk_host_trap(host_trap),
-            },
-            otherwise => mk_host_trap(FatalHostError::UnknownHostFunction { index: otherwise }),
+        let result = match index {
+            HCALL_WRITE_OUTPUT_CODE => self.write_output(args),
+            HCALL_INPUT_COUNT_CODE => self.input_count(args),
+            HCALL_INPUT_SIZE_CODE => self.input_size(args),
+            HCALL_READ_INPUT_CODE => self.read_input(args),
+            HCALL_GETRANDOM_CODE => self.get_random(args),
+            HCALL_STREAM_COUNT_CODE => self.stream_count(args),
+            HCALL_STREAM_SIZE_CODE => self.stream_size(args),
+            HCALL_READ_STREAM_CODE => self.read_stream(args),
+            HCALL_PREVIOUS_RESULT_SIZE_CODE => self.previous_result_size(args),
+            HCALL_HAS_PREVIOUS_RESULT_CODE => self.has_previous_result(args),
+            HCALL_READ_PREVIOUS_RESULT_CODE => self.previous_result(args),
+            otherwise => {
+                return mk_host_trap(FatalEngineError::UnknownHostFunction { index: otherwise })
+            }
+        };
+        match result {
+            Ok(return_code) => mk_error_code(return_code),
+            Err(host_trap) => mk_host_trap(host_trap),
         }
     }
 }
@@ -393,6 +393,28 @@ impl Externals for WasmiHostProvisioningState {
 /// Functionality of the `WasmiHostProvisioningState` type that relies on it
 /// satisfying the `Externals` and `ModuleImportResolver` constraints.
 impl WasmiHostProvisioningState {
+    /// Creates a new initial `HostProvisioningState`.
+    pub fn new(vfs: Arc<Mutex<VFS>>) -> Self {
+        Self {
+            vfs,
+            program: Principal::NoCap,
+            program_module: None,
+            memory: None,
+        }
+    }
+
+    /// Returns an optional reference to the WASM program module.
+    #[inline]
+    pub(crate) fn get_program(&self) -> Option<&ModuleRef> {
+        self.program_module.as_ref()
+    }
+
+    /// Returns an optional reference to the WASM program's heap.
+    #[inline]
+    pub(crate) fn get_memory(&self) -> Option<&MemoryRef> {
+        self.memory.as_ref()
+    }
+
     /// Loads a compiled program into the host state.  Tries to parse `buffer`
     /// to obtain a WASM `Module` struct.  Returns an appropriate error if this
     /// fails.
@@ -403,62 +425,26 @@ impl WasmiHostProvisioningState {
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        if self.get_lifecycle_state() == &LifecycleState::Initial {
-            if let Ok(module) = Module::from_buffer(buffer) {
-                let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
+        let module = Module::from_buffer(buffer)?;
+        let env_resolver = wasmi::ImportsBuilder::new().with_resolver("env", self);
 
-                if let Ok(not_started_module_ref) = ModuleInstance::new(&module, &env_resolver) {
-                    if not_started_module_ref.has_start() {
-                        self.set_error();
-                        return Err(HostProvisioningError::InvalidWASMModule);
-                    }
-
-                    let module_ref = not_started_module_ref.assert_no_start();
-
-                    if let Ok(linear_memory) = get_module_memory(&module_ref) {
-                        // Everything has now gone well, so register the module,
-                        // linear memory, and the program digest, then work out
-                        // which state we should be in.
-
-                        self.set_program_module(module_ref);
-                        self.set_memory(linear_memory);
-                        self.set_program_digest(&sha_256_digest(buffer));
-
-                        if self.get_expected_data_source_count() == 0 {
-                            if self.get_expected_stream_source_count() == 0 {
-                                self.set_ready_to_execute();
-                            } else {
-                                self.set_stream_sources_loading();
-                            }
-                        } else {
-                            self.set_data_sources_loading();
-                        }
-                        return Ok(());
-                    }
-
-                    self.set_error();
-                    return Err(HostProvisioningError::NoLinearMemoryFound);
-                }
-
-                self.set_error();
-                Err(HostProvisioningError::ModuleInstantiationFailure)
-            } else {
-                self.set_error();
-                Err(HostProvisioningError::InvalidWASMModule)
-            }
-        } else {
-            self.set_error();
-            Err(HostProvisioningError::InvalidLifeCycleState {
-                expected: vec![LifecycleState::Initial],
-                found: self.get_lifecycle_state().clone(),
-            })
+        let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
+        if not_started_module_ref.has_start() {
+            return Err(HostProvisioningError::InvalidWASMModule);
         }
+
+        let module_ref = not_started_module_ref.assert_no_start();
+
+        let linear_memory = get_module_memory(&module_ref)?;
+        self.program_module = Some(module_ref);
+        self.memory = Some(linear_memory);
+        Ok(())
     }
 
     /// The WASMI implementation of `__veracruz_hcall_write_output()`.
     fn write_output(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 2 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_GETRANDOM_NAME.to_string(),
             });
         }
@@ -467,52 +453,42 @@ impl WasmiHostProvisioningState {
         let size: u32 = args.nth(1);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => {
-                match memory.get(address, size as usize) {
-                    Err(_err) => Err(FatalHostError::MemoryReadFailed {
-                        memory_address: address as usize,
-                        bytes_to_be_read: size as usize,
-                    }),
-                    Ok(bytes) => {
-                        /* If a result is already written, signal this to the WASM
-                         * program and do not register a new result.  Otherwise,
-                         * register the result and signal success.
-                         */
-                        if self.is_result_registered() {
-                            Ok(VeracruzError::ResultAlreadyWritten)
-                        } else {
-                            self.set_result(&bytes);
-                            Ok(VeracruzError::Success)
-                        }
-                    }
+            None => Err(FatalEngineError::NoMemoryRegistered),
+            Some(memory) => match memory.get(address, size as usize) {
+                Err(_err) => Err(FatalEngineError::MemoryReadFailed {
+                    memory_address: address as usize,
+                    bytes_to_be_read: size as usize,
+                }),
+                Ok(bytes) => {
+                    self.write_file(&self.program.clone(), "output", &bytes)?;
+                    Ok(EngineReturnCode::Success)
                 }
-            }
+            },
         }
     }
 
     /// The WASMI implementation of `__veracruz_hcall_input_count()`.
     fn input_count(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 1 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_INPUT_COUNT_NAME.to_string(),
             });
         }
 
         let address: u32 = args.nth(0);
-        let result = self.get_current_data_source_count() as u32;
+        let result: u32 = self.count_file("input")? as u32;
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
+            None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
                 if let Err(_) = memory.set_value(address, result) {
-                    return Err(FatalHostError::MemoryWriteFailed {
+                    return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: std::mem::size_of::<u32>(),
                     });
                 }
 
-                Ok(VeracruzError::Success)
+                Ok(EngineReturnCode::Success)
             }
         }
     }
@@ -520,7 +496,7 @@ impl WasmiHostProvisioningState {
     /// The WASMI implementation of `__veracruz_hcall_input_size()`.
     fn input_size(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 2 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_INPUT_SIZE_NAME.to_string(),
             });
         }
@@ -529,30 +505,30 @@ impl WasmiHostProvisioningState {
         let address: u32 = args.nth(1);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_data_source(index as usize) {
-                None => return Ok(VeracruzError::BadInput),
-                Some(frame) => {
-                    let result = frame.get_data().len() as u32;
-                    let result: Vec<u8> = result.to_le_bytes().to_vec();
+            None => Err(FatalEngineError::NoMemoryRegistered),
+            Some(memory) => {
+                let result = self
+                    .read_file(&self.program, &format!("input-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?
+                    .len() as u32;
+                let result: Vec<u8> = result.to_le_bytes().to_vec();
 
-                    if let Err(_) = memory.set(address, &result) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: result.len() as usize,
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+                if memory.set(address, &result).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: result.len() as usize,
+                    });
                 }
-            },
+
+                Ok(EngineReturnCode::Success)
+            }
         }
     }
 
     /// The WASMI implementation of `__veracruz_hcall_read_input()`.
     fn read_input(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 3 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_READ_INPUT_NAME.to_string(),
             });
         }
@@ -562,51 +538,48 @@ impl WasmiHostProvisioningState {
         let size: u32 = args.nth(2);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_data_source(index as usize) {
-                None => return Ok(VeracruzError::BadInput),
-                Some(frame) => {
-                    let data = frame.get_data();
-
-                    if data.len() > size as usize {
-                        return Ok(VeracruzError::DataSourceSize);
-                    }
-
-                    if let Err(_) = memory.set(address, data) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: data.len(),
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+            None => Err(FatalEngineError::NoMemoryRegistered),
+            Some(memory) => {
+                let data = self
+                    .read_file(&self.program, &format!("input-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?;
+                if data.len() > size as usize {
+                    return Ok(EngineReturnCode::DataSourceSize);
                 }
-            },
+                if memory.set(address, &data).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: data.len(),
+                    });
+                }
+
+                Ok(EngineReturnCode::Success)
+            }
         }
     }
 
     /// The WASMI implementation of `__veracruz_hcall_stream_count()`.
     fn stream_count(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 1 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_STREAM_COUNT_NAME.to_string(),
             });
         }
 
         let address: u32 = args.nth(0);
-        let result = self.get_current_stream_source_count() as u32;
+        let result = self.count_file("stream")? as u32;
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
+            None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
-                if let Err(_) = memory.set_value(address, result) {
-                    return Err(FatalHostError::MemoryWriteFailed {
+                if memory.set_value(address, result).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: std::mem::size_of::<u32>(),
                     });
                 }
 
-                Ok(VeracruzError::Success)
+                Ok(EngineReturnCode::Success)
             }
         }
     }
@@ -614,7 +587,7 @@ impl WasmiHostProvisioningState {
     /// The WASMI implementation of `__veracruz_hcall_stream_size()`.
     fn stream_size(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 2 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_STREAM_SIZE_NAME.to_string(),
             });
         }
@@ -623,30 +596,30 @@ impl WasmiHostProvisioningState {
         let address: u32 = args.nth(1);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_stream_source(index as usize) {
-                None => return Ok(VeracruzError::BadStream),
-                Some(frame) => {
-                    let result = frame.get_data().len() as u32;
-                    let result: Vec<u8> = result.to_le_bytes().to_vec();
+            None => Err(FatalEngineError::NoMemoryRegistered),
+            Some(memory) => {
+                let result = self
+                    .read_file(&self.program, &format!("stream-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?
+                    .len() as u32;
+                let result: Vec<u8> = result.to_le_bytes().to_vec();
 
-                    if let Err(_) = memory.set(address, &result) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: result.len() as usize,
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+                if memory.set(address, &result).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: result.len(),
+                    });
                 }
-            },
+
+                Ok(EngineReturnCode::Success)
+            }
         }
     }
 
     /// The WASMI implementation of `__veracruz_hcall_stream_input()`.
     fn read_stream(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 3 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_READ_STREAM_NAME.to_string(),
             });
         }
@@ -656,33 +629,30 @@ impl WasmiHostProvisioningState {
         let size: u32 = args.nth(2);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
-            Some(memory) => match self.get_current_stream_source(index as usize) {
-                None => return Ok(VeracruzError::BadStream),
-                Some(frame) => {
-                    let data = frame.get_data();
-
-                    if data.len() > size as usize {
-                        return Ok(VeracruzError::StreamSourceSize);
-                    }
-
-                    if let Err(_) = memory.set(address, data) {
-                        return Err(FatalHostError::MemoryWriteFailed {
-                            memory_address: address as usize,
-                            bytes_to_be_written: data.len(),
-                        });
-                    }
-
-                    Ok(VeracruzError::Success)
+            None => Err(FatalEngineError::NoMemoryRegistered),
+            Some(memory) => {
+                let data = self
+                    .read_file(&self.program, &format!("stream-{}", index))?
+                    .ok_or(format!("File input-{} cannot be found", index))?;
+                if data.len() > size as usize {
+                    return Ok(EngineReturnCode::DataSourceSize);
                 }
-            },
+                if memory.set(address, &data).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
+                        memory_address: address as usize,
+                        bytes_to_be_written: data.len(),
+                    });
+                }
+
+                Ok(EngineReturnCode::Success)
+            }
         }
     }
 
     /// The WASMI implementation of the `__veracruz_hcall_previous_result_size()`.
     fn previous_result_size(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 1 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_PREVIOUS_RESULT_SIZE_NAME.to_string(),
             });
         }
@@ -690,21 +660,19 @@ impl WasmiHostProvisioningState {
         let address: u32 = args.nth(0);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
+            None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
-                let previous_result = self
-                    .get_previous_result()
-                    .map(|e| e.clone())
-                    .unwrap_or(vec![]);
-                let result: Vec<u8> = previous_result.len().to_le_bytes().to_vec();
-
-                if let Err(_) = memory.set(address, &result) {
-                    return Err(FatalHostError::MemoryWriteFailed {
+                let result = self
+                    .read_file(&self.program, "output")?
+                    .unwrap_or(Vec::new());
+                let result: Vec<u8> = result.len().to_le_bytes().to_vec();
+                if memory.set(address, &result).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
-                        bytes_to_be_written: result.len() as usize,
+                        bytes_to_be_written: result.len(),
                     });
                 }
-                Ok(VeracruzError::Success)
+                Ok(EngineReturnCode::Success)
             }
         }
     }
@@ -712,7 +680,7 @@ impl WasmiHostProvisioningState {
     /// The WASMI implementation of the `__veracruz_hcall_read_previous_result()`.
     fn previous_result(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 2 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_READ_PREVIOUS_RESULT_NAME.to_string(),
             });
         }
@@ -721,24 +689,23 @@ impl WasmiHostProvisioningState {
         let size: u32 = args.nth(1);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
+            None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
                 let previous_result = self
-                    .get_previous_result()
-                    .map(|e| e.clone())
-                    .unwrap_or(vec![]);
+                    .read_file(&self.program, "output")?
+                    .unwrap_or(Vec::new());
 
                 if previous_result.len() > size as usize {
-                    return Ok(VeracruzError::PreviousResultSize);
+                    return Ok(EngineReturnCode::PreviousResultSize);
                 }
 
-                if let Err(_) = memory.set(address, &previous_result) {
-                    return Err(FatalHostError::MemoryWriteFailed {
+                if memory.set(address, &previous_result).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
                         bytes_to_be_written: previous_result.len(),
                     });
                 }
-                Ok(VeracruzError::Success)
+                Ok(EngineReturnCode::Success)
             }
         }
     }
@@ -746,7 +713,7 @@ impl WasmiHostProvisioningState {
     /// The WASMI implementation of the `__veracruz_hcall_has_previous_result()`.
     fn has_previous_result(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 1 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_HAS_PREVIOUS_RESULT_NAME.to_string(),
             });
         }
@@ -754,22 +721,22 @@ impl WasmiHostProvisioningState {
         let address: u32 = args.nth(0);
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
+            None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => {
-                let previous_result = self.get_previous_result();
+                let previous_result = self.read_file(&self.program, "output")?;
                 let flag: u32 = match previous_result {
                     Some(_) => 1,
                     None => 0,
                 };
                 let result: Vec<u8> = flag.to_le_bytes().to_vec();
 
-                if let Err(_) = memory.set(address, &result) {
-                    return Err(FatalHostError::MemoryWriteFailed {
+                if memory.set(address, &result).is_err() {
+                    return Err(FatalEngineError::MemoryWriteFailed {
                         memory_address: address as usize,
-                        bytes_to_be_written: result.len() as usize,
+                        bytes_to_be_written: result.len(),
                     });
                 }
-                Ok(VeracruzError::Success)
+                Ok(EngineReturnCode::Success)
             }
         }
     }
@@ -777,7 +744,7 @@ impl WasmiHostProvisioningState {
     /// The WASMI implementation of `__veracruz_hcall_getrandom()`.
     fn get_random(&mut self, args: RuntimeArgs) -> HCallError {
         if args.len() != 2 {
-            return Err(FatalHostError::BadArgumentsToHostFunction {
+            return Err(FatalEngineError::BadArgumentsToHostFunction {
                 function_name: HCALL_GETRANDOM_NAME.to_string(),
             });
         }
@@ -787,20 +754,20 @@ impl WasmiHostProvisioningState {
         let mut buffer = vec![0; size as usize];
 
         match self.get_memory() {
-            None => Err(FatalHostError::NoMemoryRegistered),
+            None => Err(FatalEngineError::NoMemoryRegistered),
             Some(memory) => match getrandom(&mut buffer) {
                 result::Result::Success => {
-                    if let Err(_) = memory.set(address, &buffer) {
-                        return Err(FatalHostError::MemoryWriteFailed {
+                    if memory.set(address, &buffer).is_err() {
+                        return Err(FatalEngineError::MemoryWriteFailed {
                             memory_address: address as usize,
                             bytes_to_be_written: size as usize,
                         });
                     }
 
-                    Ok(VeracruzError::Success)
+                    Ok(EngineReturnCode::Success)
                 }
-                result::Result::Unavailable => Ok(VeracruzError::ServiceUnavailable),
-                result::Result::UnknownError => Ok(VeracruzError::Generic),
+                result::Result::Unavailable => Ok(EngineReturnCode::ServiceUnavailable),
+                result::Result::UnknownError => Ok(EngineReturnCode::Generic),
             },
         }
     }
@@ -815,12 +782,12 @@ impl WasmiHostProvisioningState {
         let (not_started, program_arguments) = match self.get_program().cloned() {
             None => {
                 return Err(Error::Host(Box::new(
-                    FatalHostError::NoProgramModuleRegistered,
+                    FatalEngineError::NoProgramModuleRegistered,
                 )))
             }
             Some(not_started) => match check_main(&not_started) {
                 EntrySignature::NoEntryFound => {
-                    return Err(Error::Host(Box::new(FatalHostError::NoProgramEntryPoint)))
+                    return Err(Error::Host(Box::new(FatalEngineError::NoProgramEntryPoint)))
                 }
                 EntrySignature::ArgvAndArgc => (
                     not_started,
@@ -833,6 +800,49 @@ impl WasmiHostProvisioningState {
         not_started.invoke_export(export_name, &program_arguments, self)
     }
 
+    /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn append_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.append(client_id, file_name, data)?;
+        Ok(())
+    }
+
+    /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn write_file(
+        &mut self,
+        client_id: &Principal,
+        file_name: &str,
+        data: &[u8],
+    ) -> Result<(), HostProvisioningError> {
+        self.vfs.lock()?.write(client_id, file_name, data)?;
+        Ok(())
+    }
+
+    /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
+    #[inline]
+    fn read_file(
+        &self,
+        client_id: &Principal,
+        file_name: &str,
+    ) -> Result<Option<Vec<u8>>, HostProvisioningError> {
+        Ok(self.vfs.lock()?.read(client_id, file_name)?)
+    }
+
+    #[inline]
+    fn count_file(&self, prefix: &str) -> Result<u64, HostProvisioningError> {
+        Ok(self.vfs.lock()?.count(prefix)?)
+    }
+}
+
+/// The `WasmiHostProvisioningState` implements everything needed to create a
+/// compliant instance of `ExecutionEngine`.
+impl ExecutionEngine for WasmiHostProvisioningState {
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
@@ -848,173 +858,38 @@ impl WasmiHostProvisioningState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
-        if self.get_lifecycle_state() == &LifecycleState::ReadyToExecute {
-            match self.invoke_export(ENTRY_POINT_NAME) {
-                Ok(Some(RuntimeValue::I32(return_code))) => {
-                    self.set_finished_executing();
-                    Ok(return_code)
-                }
-                Ok(_) => {
-                    self.set_error();
-                    Err(FatalHostError::ReturnedCodeError)
-                }
-                Err(Error::Trap(trap)) => {
-                    self.set_error();
-                    Err(FatalHostError::WASMITrapError(trap))
-                }
-                Err(err) => {
-                    self.set_error();
-                    Err(FatalHostError::WASMIError(err))
-                }
-            }
-        } else {
-            Err(FatalHostError::EngineIsNotReady)
+    fn invoke_entry_point(
+        &mut self,
+        file_name: &str,
+    ) -> Result<EngineReturnCode, FatalEngineError> {
+        let program = self
+            .read_file(&Principal::InternalSuperUser, file_name)?
+            .ok_or(format!("Program file {} cannot be found.", file_name))?;
+        self.load_program(program.as_slice())?;
+        self.program = Principal::Program(file_name.to_string());
+
+        match self.invoke_export(ENTRY_POINT_NAME) {
+            Ok(Some(RuntimeValue::I32(return_code))) => EngineReturnCode::try_from(return_code),
+            Ok(_) => Err(FatalEngineError::ReturnedCodeError),
+            Err(Error::Trap(trap)) => Err(FatalEngineError::WASMITrapError(trap)),
+            Err(err) => Err(FatalEngineError::WASMIError(err)),
         }
     }
 }
 
-/// The `WasmiHostProvisioningState` implements everything needed to create a
-/// compliant instance of `ExecutionEngine`.
-impl ExecutionEngine for WasmiHostProvisioningState {
-    /// ExecutionEngine wrapper of load_program implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
-        self.load_program(buffer)
-    }
+////////////////////////////////////////////////////////////////////////////////
+// Utility functions.
+////////////////////////////////////////////////////////////////////////////////
 
-    /// ExecutionEngine wrapper of add_new_data_source implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn add_new_data_source(
-        &mut self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), HostProvisioningError> {
-        self.add_new_data_source(metadata)
-    }
+/// Utility function which simplifies building a serialized Veracruz error code
+/// to be passed back to the running WASM program executing on the WASMI engine.
+#[inline]
+pub(crate) fn mk_error_code<T>(e: EngineReturnCode) -> Result<Option<RuntimeValue>, T> {
+    Ok(Some(RuntimeValue::I32(e.into())))
+}
 
-    /// ExecutionEngine wrapper of add_new_stream_source implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn add_new_stream_source(
-        &mut self,
-        metadata: DataSourceMetadata,
-    ) -> Result<(), HostProvisioningError> {
-        self.add_new_stream_source(metadata)
-    }
-
-    /// ExecutionEngine wrapper of invoke_entry_point implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn invoke_entry_point(&mut self) -> Result<i32, FatalHostError> {
-        self.invoke_entry_point()
-    }
-
-    /// ExecutionEngine wrapper of is_program_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_program_registered(&self) -> bool {
-        self.is_program_registered()
-    }
-
-    /// ExecutionEngine wrapper of is_result_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_result_registered(&self) -> bool {
-        self.is_result_registered()
-    }
-
-    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_memory_registered(&self) -> bool {
-        self.is_memory_registered()
-    }
-
-    /// ExecutionEngine wrapper of is_memory_registered implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn is_able_to_shutdown(&self) -> bool {
-        self.is_able_to_shutdown()
-    }
-
-    /// ExecutionEngine wrapper of get_lifecycle_state implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_lifecycle_state(&self) -> LifecycleState {
-        self.get_lifecycle_state().clone()
-    }
-
-    /// ExecutionEngine wrapper of get_current_data_source_count implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_current_data_source_count(&self) -> usize {
-        self.get_current_data_source_count().clone()
-    }
-
-    /// ExecutionEngine wrapper of get_expected_data_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_expected_data_sources(&self) -> Vec<u64> {
-        self.get_expected_data_sources().clone()
-    }
-
-    /// ExecutionEngine wrapper of get_expected_shutdown_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_expected_shutdown_sources(&self) -> Vec<u64> {
-        self.get_expected_shutdown_sources().clone()
-    }
-
-    /// ExecutionEngine wrapper of get_current_stream_source_count implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_current_stream_source_count(&self) -> usize {
-        self.get_current_stream_source_count().clone()
-    }
-
-    /// ExecutionEngine wrapper of get_expected_stream_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_expected_stream_sources(&self) -> Vec<u64> {
-        self.get_expected_stream_sources().clone()
-    }
-
-    /// ExecutionEngine wrapper of set_previous_result implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_previous_result(&mut self, result: &Option<Vec<u8>>) {
-        self.set_previous_result(result);
-    }
-
-    /// ExecutionEngine wrapper of get_result implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_result(&self) -> Option<Vec<u8>> {
-        self.get_result().map(|r| r.clone())
-    }
-
-    /// ExecutionEngine wrapper of get_program_digest implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn get_program_digest(&self) -> Option<Vec<u8>> {
-        self.get_program_digest().map(|d| d.clone())
-    }
-
-    /// ExecutionEngine wrapper of set_expected_data_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_expected_data_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        self.set_expected_data_sources(sources);
-        self
-    }
-
-    /// ExecutionEngine wrapper of set_expected_stream_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_expected_stream_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        self.set_expected_stream_sources(sources);
-        self
-    }
-
-    /// ExecutionEngine wrapper of set_expected_shutdown_sources implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn set_expected_shutdown_sources(&mut self, sources: &[u64]) -> &mut dyn ExecutionEngine {
-        self.set_expected_stream_sources(sources);
-        self
-    }
-
-    /// Invaildate this wasmi instanace.
-    #[inline]
-    fn invalidate(&mut self) {
-        self.set_error();
-    }
-
-    /// ExecutionEngine wrapper of request_shutdown implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn request_shutdown(&mut self, client_id: u64) {
-        self.request_shutdown(client_id);
-    }
+/// Utility function which simplifies building a Veracruz host trap.
+#[inline]
+pub(crate) fn mk_host_trap<T>(trap: FatalEngineError) -> Result<T, Trap> {
+    Err(Trap::new(TrapKind::Host(Box::new(trap))))
 }

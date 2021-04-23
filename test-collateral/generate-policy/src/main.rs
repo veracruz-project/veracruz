@@ -23,7 +23,13 @@ use clap::{App, Arg};
 use data_encoding::HEXLOWER;
 use log::{error, info};
 use ring::digest::{digest, SHA256};
-use serde_json::{json, to_string_pretty, Value, Value::String as JsonString};
+use serde_json::{json, to_string_pretty, Value};
+use veracruz_utils::policy::{
+    policy::Policy,
+    error::PolicyError,
+    expiry::Timepoint,
+    principal::{ExecutionStrategy, Identity, Program, FileCapability}
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
@@ -96,15 +102,16 @@ const DEFAULT_EXECUTION_STRATEGY: &'static str = "Interpretation";
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A structure collating all of the arguments passed to the executable.
+#[derive(Debug)]
 struct Arguments {
     /// The filenames of cryptographic certificates associated to each principal
     /// in the computation.
     certificates: Vec<PathBuf>,
-    /// The roles associated to each principal in the computation.  Note that
-    /// length of the two vectors, `certificates` and `roles`, must match as
-    /// each certificate has an accompanying set of roles to form a compound
-    /// "identity".
-    roles: Vec<Vec<String>>,
+    /// The capabilities associated to each principal and program in the computation.
+    /// Note that the length of this vector MUST match the total length of `certificates` and `program_binary` 
+    /// as each principal and program has an accompanying capability table.
+    certificate_capabilities: Vec<Vec<String>>,
+    binary_capabilities: Vec<Vec<String>>,
     /// The socket address (IP and port) of the Veracruz server instance.
     veracruz_server_ip: Option<SocketAddr>,
     /// The socket address (IP and port) of the Veracruz proxy attestation instance.
@@ -123,12 +130,8 @@ struct Arguments {
     /// default value.  Past command-line parsing, any value of `None` in this
     /// field is an internal invariant failure.
     certificate_expiry: Option<DateTime<FixedOffset>>,
-    /// The data provisioning order.
-    data_provisioning_order: Vec<i32>,
-    /// The streaming provisioning order.
-    streaming_provisioning_order: Vec<i32>,
     /// The filename of the WASM program.
-    program_binary: PathBuf,
+    program_binaries: Vec<PathBuf>,
     /// Whether the enclave will be started in debug mode, with reduced
     /// protections against snooping and interference, and with the ability to
     /// write to the host's `stdout`.
@@ -146,16 +149,15 @@ impl Arguments {
     pub fn new() -> Self {
         Arguments {
             certificates: Vec::new(),
-            roles: Vec::new(),
+            certificate_capabilities: Vec::new(),
+            binary_capabilities: Vec::new(),
             veracruz_server_ip: None,
             proxy_attestation_server_ip: None,
             css_file: None,
             pcr0_file: None,
             output_policy_file: PathBuf::new(),
             certificate_expiry: None,
-            data_provisioning_order: Vec::new(),
-            streaming_provisioning_order: Vec::new(),
-            program_binary: PathBuf::new(),
+            program_binaries: Vec::new(),
             enclave_debug_mode: false,
             execution_strategy: String::new(),
         }
@@ -172,14 +174,24 @@ fn check_execution_strategy(strategy: &str) {
     }
 }
 
-/// Checks that all strings appearing in all vectors in the `roles` argument are
-/// valid Veracruz roles: "ResultReceiver", "DataProvider", or "ProgramProvider".
-fn check_roles(roles: &[Vec<String>]) {
-    if !roles.iter().all(|v| {
+/// Checks that all strings appearing in all vectors in the `capabilities` argument are
+/// valid Veracruz capabilities: of the form "[FILE_NAME]:[rwx]".
+fn check_capability(capabilities: &[Vec<String>]) {
+    if !capabilities.iter().all(|v| {
         v.iter()
-            .all(|s| s == "ResultReader" || s == "DataProvider" || s == "ProgramProvider")
+            .all(|s| {
+                let mut split = s.split(':'); 
+                //skip the filename
+                split.next();
+                let cap_check = match split.next() {
+                    None => false,
+                    Some(cap) => cap.chars().all(|c| c == 'r' || c == 'w' || c == 'x'),
+                };
+                //The length must be 2 hence it must be none.
+                cap_check || split.next().is_none() 
+            })
     }) {
-        abort_with("Could not parse the role command line arguments.");
+        abort_with("Could not parse the capability command line arguments.");
     }
 }
 
@@ -203,13 +215,13 @@ fn parse_command_line() -> Arguments {
                 .multiple(true),
         )
         .arg(
-            Arg::with_name("role")
-                .short("r")
-                .long("roles")
-                .value_name("ROLES")
-                .help("The set of roles of a computation participant, comma separated.")
+            Arg::with_name("capability")
+                .short("p")
+                .long("capability")
+                .value_name("CAPABILITIES")
+                .help("The capability table of a client or a program of the form 'output:rw,input-0:w,prorgam.wasm:x' where each entry is separated by ','")
                 .required(true)
-                .multiple(true)
+                .multiple(true),
         )
         .arg(
             Arg::with_name("veracruz-server-ip")
@@ -264,28 +276,13 @@ as an RFC-2822 formatted timepoint.",
                 .required(true),
         )
         .arg(
-            Arg::with_name("data-provision-order")
-                .short("p")
-                .long("data-provision-order")
-                .value_name("ORDER")
-                .help("Specifies the data provisioning order.")
-                .required(false)
-        )
-        .arg(
-            Arg::with_name("stream-provision-order")
-                .short("a")
-                .long("stream-provision-order")
-                .value_name("ORDER")
-                .help("Specifies the streaming provisioning order.")
-                .required(false)
-        )
-        .arg(
             Arg::with_name("binary")
                 .short("w")
                 .long("binary")
                 .value_name("FILE")
                 .help("Specifies the filename of the WASM binary to use for the computation.")
-                .required(true),
+                .required(true)
+                .multiple(true),
         )
         .arg(
             Arg::with_name("debug")
@@ -322,20 +319,28 @@ binary.",
         abort_with("No certificates were passed as command line parameters.");
     }
 
-    if let Some(roles) = matches.values_of("role") {
-        let roles = roles
+    if let Some(binaries) = matches.values_of("binary") {
+        arguments.program_binaries = binaries.map(|b| PathBuf::from(b)).collect();
+    } else {
+        abort_with("No program binary filename passed as an argument.");
+    }
+
+    if let Some(capabilities) = matches.values_of("capability") {
+        let mut capabilities = capabilities
             .map(|s| s.split(",").map(|s| String::from(s)).collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
-        check_roles(&roles);
+        check_capability(&capabilities);
 
-        arguments.roles = roles;
+        if arguments.certificates.len() + arguments.program_binaries.len() != capabilities.len() {
+            abort_with("The number of capabilities attributes differ from the total number of certificate and binary attributes.");
+        }
+        let binary_capabilities = capabilities.split_off(arguments.certificates.len());
+
+        arguments.certificate_capabilities = capabilities;
+        arguments.binary_capabilities = binary_capabilities;
     } else {
-        abort_with("No roles were passed as command line parameters.");
-    }
-
-    if arguments.certificates.len() != arguments.roles.len() {
-        abort_with("The number of certificates and role attributes differ.");
+        abort_with("No capabilities were passed as command line parameters.");
     }
 
     if let Some(url) = matches.value_of("veracruz-server-ip") {
@@ -389,40 +394,6 @@ binary.",
         abort_with("No certificate lifetime passed as an argument.");
     }
 
-    if let Some(data_provisioning_order) = matches.value_of("data-provision-order") {
-        let mut items = Vec::new();
-
-        for item in data_provisioning_order.split(",") {
-            if let Ok(i) = i32::from_str(item) {
-                items.push(i);
-            } else {
-                abort_with("Could not parse data provisioning order argument.");
-            }
-        }
-
-        arguments.data_provisioning_order = items;
-    }
-
-    if let Some(streaming_provisioning_order) = matches.value_of("stream-provision-order") {
-        let mut items = Vec::new();
-
-        for item in streaming_provisioning_order.split(",") {
-            if let Ok(i) = i32::from_str(item) {
-                items.push(i);
-            } else {
-                abort_with("Could not parse streaming provisioning order argument.");
-            }
-        }
-
-        arguments.streaming_provisioning_order = items;
-    }
-
-    if let Some(binary) = matches.value_of("binary") {
-        arguments.program_binary = PathBuf::from(binary);
-    } else {
-        abort_with("No program binary filename passed as an argument.");
-    }
-
     if let Some(debug) = matches.value_of("debug") {
         if let Ok(debug) = bool::from_str(debug) {
             arguments.enclave_debug_mode = debug;
@@ -460,8 +431,8 @@ command-line parameter.",
 
 /// Executes the hashing program on the WASM binary, returning the computed
 /// SHA256 hash as a string.
-fn compute_program_hash(arguments: &Arguments) -> String {
-    if let Ok(mut file) = File::open(&arguments.program_binary) {
+fn compute_program_hash(argument: &PathBuf) -> String {
+    if let Ok(mut file) = File::open(argument) {
         let mut buffer = vec![];
 
         file.read_to_end(&mut buffer).expect("Failed to read file.");
@@ -568,18 +539,18 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 }
 
 /// Serializes the identities of all principals in the Veracruz computation into
-/// a JSON value.
-fn serialize_identities(arguments: &Arguments) -> Value {
+/// a vec of VeracruzIdentity<String>.
+fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
     info!("Serializing identities of computation Principals.");
     
-    assert_eq!(&arguments.certificates.len(), &arguments.roles.len());
+    assert_eq!(arguments.certificates.len(), arguments.certificate_capabilities.len());
+    
+    let mut values = Vec::new();
 
-    let mut values = vec![];
-
-    for (id, (cert, roles)) in arguments
+    for (id, (cert, capability)) in arguments
         .certificates
         .iter()
-        .zip(&arguments.roles)
+        .zip(&arguments.certificate_capabilities)
         .enumerate()
     {
         if let Ok(mut file) = File::open(cert) {
@@ -588,42 +559,94 @@ fn serialize_identities(arguments: &Arguments) -> Value {
             file.read_to_string(&mut content)
                 .expect("Failed to read file.");
 
-            content = content.replace("\n", "");
-            content = content.replace("-----BEGIN CERTIFICATE-----", "-----BEGIN CERTIFICATE-----\n");
-            content = content.replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
+            let certificates = content.replace("\n", "")
+                                 .replace("-----BEGIN CERTIFICATE-----", "-----BEGIN CERTIFICATE-----\n")
+                                 .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
+            let file_permissions = serialize_capability(capability);
 
-            let json = json!({
-                "certificate": content,
-                "id": id,
-                "roles": roles,
-            });
-
-            values.push(json);
+            values.push(Identity::new(
+                certificates,
+                id as u32,
+                file_permissions,
+            ));
         } else {
             abort_with("Could not open certificate file.");
         }
     }
+    values
+}
 
-    json!(values)
+/// Serializes the identities of all principals in the Veracruz computation into
+/// a vec of VeracruzProgram.
+fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
+    info!("Serializing programs.");
+    
+    assert_eq!(arguments.program_binaries.len(), arguments.binary_capabilities.len());
+    
+    let mut values = Vec::new();
+
+    for (id, (program_file_name, capability)) in arguments
+        .program_binaries
+        .iter()
+        .zip(&arguments.binary_capabilities)
+        .enumerate()
+    {
+        let pi_hash = compute_program_hash(program_file_name);
+        let file_permissions = serialize_capability(capability);
+
+        values.push(Program::new(
+            program_file_name.to_str().expect(&format!("Failed to convert {:?} to str",program_file_name)).trim().to_string(),
+            id as u32,
+            pi_hash,
+            file_permissions,
+        ));
+    }
+    values
 }
 
 /// Serializes the enclave server certificate expiry timepoint to a JSON value,
 /// computing the time when the certificate will expire as a point relative to
 /// the current time.
-fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
+fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
     info!("Serializing enclave certificate expiry timepoint.");
     
-    let expiry = arguments
+    let timepoint = arguments
         .certificate_expiry
         .expect("Internal invariant failed: certificate lifetime is missing.");
 
-    json!({
-        "year": expiry.year(),
-        "month": expiry.month(),
-        "day": expiry.day(),
-        "hour": expiry.hour(),
-        "minute": expiry.minute()
-    })
+    Timepoint::new(
+        timepoint.year() as u32,
+        timepoint.month() as u8,
+        timepoint.day() as u8,
+        timepoint.hour() as u8,
+        timepoint.minute() as u8,
+    ).expect("Failed to instantiate a timepoint")
+}
+
+#[inline]
+fn serialize_capability(cap_string : &[String]) -> Vec<FileCapability> {
+    cap_string.iter().map(|c| serialize_capability_entry(c.as_str())).collect()
+}
+
+fn serialize_capability_entry(cap_string : &str) -> FileCapability {
+    let mut split = cap_string.split(':'); 
+    let file_name = split.next().expect(&format!("Failed to parse {}, empty string", cap_string));
+    let cap = split.next().expect(&format!("Failed to parse {}, contain no `:`", cap_string)); 
+    let read = if cap.contains("r") {true} else {false};
+    let write = if cap.contains("w") {true} else {false};
+    let execute = if cap.contains("x") {true} else {false};
+    FileCapability::new(file_name.trim().to_string(),read,write,execute)
+}
+
+fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
+    if strategy == "Interpretation"
+    { 
+        return ExecutionStrategy::Interpretation 
+    } else if strategy == "JIT" {
+        return ExecutionStrategy::JIT
+    } else {
+        abort_with("Could not parse execution strategy argument.");
+    }
 }
 
 /// Serializes the Veracruz policy file as a JSON value.
@@ -634,28 +657,23 @@ fn serialize_enclave_certificate_expiry(arguments: &Arguments) -> Value {
 fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
-    let mut base_json = json!({
-        "identities": serialize_identities(arguments),
-        "veracruz_server_url": format!("{}", &arguments.veracruz_server_ip.as_ref().unwrap()),
-        "enclave_cert_expiry": serialize_enclave_certificate_expiry(arguments),
-        "ciphersuite": POLICY_CIPHERSUITE,
-        "proxy_attestation_server_url": format!("{}", &arguments.proxy_attestation_server_ip.as_ref().unwrap()),
-        "data_provision_order": json!(&arguments.data_provisioning_order),
-        "streaming_order": json!(&arguments.streaming_provisioning_order),
-        "pi_hash": compute_program_hash(arguments),
-        "debug": &arguments.enclave_debug_mode,
-        "execution_strategy": &arguments.execution_strategy});
+    let sgx_hash = compute_sgx_enclave_hash(arguments);
+    let policy = Policy::new(
+        serialize_identities(arguments),
+        serialize_binaries(arguments),
+        format!("{}", &arguments.veracruz_server_ip.as_ref().expect(&format!("Failed to get the veracruz server ip"))),
+        serialize_enclave_certificate_timepoint(arguments),
+        POLICY_CIPHERSUITE.to_string(),
+        sgx_hash.clone(),
+        // TODO should be tz_hash
+        sgx_hash.clone(),
+        compute_nitro_enclave_hash(arguments),
+        format!("{}", &arguments.proxy_attestation_server_ip.as_ref().expect(&format!("Failed to get the proxy attestation server ip"))),
+        arguments.enclave_debug_mode,
+        serialize_execution_strategy(&arguments.execution_strategy),
+    ).expect("Failed to instantiate a (struct) policy");
 
-    if let Some(sgx_hash) = compute_sgx_enclave_hash(arguments) {
-        base_json["runtime_manager_hash_sgx"] = JsonString(sgx_hash.clone());
-        base_json["runtime_manager_hash_tz"] = JsonString(sgx_hash);
-    }
-
-    if let Some(nitro_hash) = compute_nitro_enclave_hash(arguments) {
-        base_json["runtime_manager_hash_nitro"] = JsonString(nitro_hash);
-    }
-
-    base_json
+    json!(policy)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

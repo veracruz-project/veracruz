@@ -55,7 +55,10 @@ extern "C" {
 
 #[no_mangle]
 #[cfg(feature = "sgx")]
-pub extern "C" fn init_session_manager_enc(policy_buf: *const u8, policy_buf_size: usize) -> sgx_status_t {
+pub extern "C" fn init_session_manager_enc(
+    policy_buf: *const u8,
+    policy_buf_size: usize,
+) -> sgx_status_t {
     if policy_buf_size == 0 && policy_buf.is_null() {
         return sgx_status_t::SGX_ERROR_UNEXPECTED;
     }
@@ -72,7 +75,10 @@ pub extern "C" fn init_session_manager_enc(policy_buf: *const u8, policy_buf_siz
     if ret.is_ok() {
         sgx_status_t::SGX_SUCCESS
     } else {
-        println!("runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
+        println!(
+            "runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}",
+            ret
+        );
         sgx_status_t::SGX_ERROR_UNEXPECTED
     }
 }
