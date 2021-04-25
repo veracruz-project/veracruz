@@ -8,6 +8,9 @@
 #include <random/rand32.h>
 #include <kernel.h>
 
+#include <mbedtls/ssl.h>
+#include <mbedtls/debug.h>
+
 #include "nanopb/pb.h"
 #include "nanopb/pb_encode.h"
 #include "nanopb/pb_decode.h"
@@ -17,9 +20,19 @@
 #include "xxd.h"
 #include "base64.h"
 #include "http.h"
+#include "qemu.h"
 
 
-int vc_attest(void) {
+//// attestation ////
+int vc_attest(
+        char *enclave_name, size_t enclave_name_len,
+        uint8_t *enclave_cert_hash, size_t *enclave_cert_hash_len) {
+    // check buffer sizes here, with the current Veracruz implementation
+    // these are fixed sizes
+    if (enclave_name_len < 7+1 || *enclave_cert_hash_len < 32) {
+        return -EINVAL;
+    }
+
     // get random challenge
     // TODO Zephyr notes this is not cryptographically secure, is that an
     // issue? This will be an area to explore
@@ -153,13 +166,253 @@ int vc_attest(void) {
     }
 
     // recieved values
-    printf("enclave name: %.*s\n", 7, &response_buf[124]);
+    // TODO why verify_iat response not a protobuf?
+    memcpy(enclave_name, &response_buf[124], 7);
+    enclave_name[7] = '\0';
+    memcpy(enclave_cert_hash, &response_buf[86], 32);
+    *enclave_cert_hash_len = 32;
+
+    printf("enclave name: %s\n", enclave_name);
     printf("enclave hash: ");
     hex(&response_buf[47], 32);
     printf("\n");
     printf("enclave cert hash: ");
-    hex(&response_buf[86], 32);
+    hex(enclave_cert_hash, *enclave_cert_hash_len);
     printf("\n");
 
     return 0;
 }
+
+
+//// Veracruz session handling ////
+static void mbedtls_debug(void *ctx, int level,
+        const char *file, int line,
+        const char *str) {
+    const char *basename = file;
+    for (int i = 0; file[i]; i++) {
+        if (file[i] == '/') {
+            basename = &file[i+1];
+        }
+    }
+
+    printf("%s:%d %s", basename, line, str);
+}
+
+static int vc_rawrng(void *p,
+        uint8_t *buf, size_t len) {
+    // TODO use cryptographically secure rng?
+    sys_rand_get(buf, len);
+    return 0;
+}
+
+static ssize_t vc_rawsend(void *p,
+        const uint8_t *buf, size_t len) {
+    vc_t *vc = p;
+    // encode with base64 + id (0)
+    ssize_t data_len = 0;
+    ssize_t res = snprintf(vc->send_buf, VC_SEND_BUFFER_SIZE,
+            "%d ", vc->session_id);
+    if (res < 0) {
+        printf("formatting failed (%d)\n", res);
+        return res;
+    }
+    data_len += res;
+    // TODO change base64 encode order?
+    res = base64_encode(
+        buf, len,
+        &vc->send_buf[data_len], VC_SEND_BUFFER_SIZE-data_len);
+    if (res < 0) {
+        printf("base64_encode failed (%d)\n", res);
+        return res;
+    }
+    data_len += res;
+
+    // send data over HTTP POST
+    printf("sending to %s:%d:\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT);
+    xxd(vc->send_buf, data_len);
+    ssize_t recv_len = http_post(
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT,
+            "/mexico_city",
+            vc->send_buf,
+            data_len,
+            vc->recv_buf,
+            VC_RECV_BUFFER_SIZE);
+    if (recv_len < 0) {
+        printf("http_post failed (%d)\n", recv_len);
+        return recv_len;
+    }
+
+    printf("http_post -> %d\n", recv_len);
+    printf("ssl session: recv:\n");
+    xxd(vc->recv_buf, recv_len);
+
+    // we have a bit of parsing to do, first decode session id
+    const uint8_t *parsing = vc->recv_buf;
+    vc->session_id = strtol(parsing, (char **)&parsing, 10);
+    if (parsing == vc->recv_buf) {
+        printf("failed to parse session id\n");
+        return -EILSEQ;
+    }
+    // skip space
+    parsing += 1;
+    printf("session id: %d\n", vc->session_id);
+
+    // parse out base64 blobs, shuffling to front of our buffer
+    uint8_t *parsed = vc->recv_buf;
+    while (parsing < &vc->recv_buf[recv_len]) {
+        int i = 0;
+        while (parsing[i] && parsing[i] != ' ') {
+            i += 1;
+        }
+
+        res = base64_decode(
+                parsing, i,
+                parsed, &vc->recv_buf[recv_len]-parsed);
+        if (res < 0) {
+            printf("base64_decode failed (%d)\n", res);
+            return res;
+        }
+
+        parsing += i;
+        parsed += res;
+
+        // skip space
+        if (parsing[0] == ' ') {
+            parsing += 1;
+        }
+    }
+
+    vc->recv_pos = vc->recv_buf;
+    vc->recv_len = parsed - vc->recv_buf;
+
+    printf("ssl session: parsed:\n");
+    xxd(vc->recv_pos, vc->recv_len);
+
+    // done!
+    return len;
+}
+
+static ssize_t vc_rawrecv(void *p,
+        uint8_t *buf, size_t len,
+        uint32_t timeout) {
+    vc_t *vc = p;
+
+    size_t diff = (len < vc->recv_len) ? len : vc->recv_len;
+    memcpy(buf, vc->recv_pos, diff);
+    vc->recv_pos += diff;
+    vc->recv_len -= diff;
+    return diff;
+}
+
+int vc_connect(vc_t *vc,
+        // TODO need enclave name?
+        const char *enclave_name,
+        const uint8_t *enclave_cert_hash, size_t enclave_cert_hash_len) {
+    // some setup
+    vc->session_id = 0;
+    vc->recv_len = 0;
+
+    // allocate buffers
+    vc->send_buf = malloc(VC_SEND_BUFFER_SIZE);
+    if (!vc->send_buf) {
+        return -ENOMEM;
+    }
+
+    vc->recv_buf = malloc(VC_RECV_BUFFER_SIZE);
+    if (!vc->recv_buf) {
+        free(vc->send_buf);
+        return -ENOMEM;
+    }
+
+    // setup SSL connection
+    mbedtls_ssl_init(&vc->session);
+    mbedtls_ssl_config_init(&vc->session_cfg);
+
+    int err = mbedtls_ssl_config_defaults(&vc->session_cfg,
+            MBEDTLS_SSL_IS_CLIENT,
+            MBEDTLS_SSL_TRANSPORT_STREAM,
+            MBEDTLS_SSL_PRESET_DEFAULT);
+    if (err) {
+        printf("failed to configure SSL (%d)\n", err);
+        mbedtls_ssl_config_free(&vc->session_cfg);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
+
+    // TODO fix this, is as is just for testing
+    mbedtls_ssl_conf_authmode(&vc->session_cfg, MBEDTLS_SSL_VERIFY_NONE);
+
+    mbedtls_ssl_conf_rng(&vc->session_cfg, vc_rawrng, NULL);
+
+    // TODO depend on policy.h generation? this is from policy.json
+    vc->session_ciphersuites[0] = MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256;
+    vc->session_ciphersuites[1] = 0;
+    mbedtls_ssl_conf_ciphersuites(&vc->session_cfg, vc->session_ciphersuites);
+
+    // TODO remove debugging? hide behind logging?
+    mbedtls_debug_set_threshold(4);
+    mbedtls_ssl_conf_dbg(&vc->session_cfg, mbedtls_debug, vc);
+
+    err = mbedtls_ssl_setup(&vc->session, &vc->session_cfg);
+    if (err) {
+        printf("failed to setup SSL session (%d)\n", err);
+        mbedtls_ssl_config_free(&vc->session_cfg);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
+
+    // setup blocking IO functions
+    mbedtls_ssl_set_bio(&vc->session,
+            vc,
+            vc_rawsend,
+            NULL, // no non-blocking recv
+            vc_rawrecv);
+
+    // perform SSL handshake
+    err = mbedtls_ssl_handshake(&vc->session);
+    if (err) {
+        printf("SSL handshake failed (%d)\n", err);
+        mbedtls_ssl_free(&vc->session);
+        mbedtls_ssl_config_free(&vc->session_cfg);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
+
+    return 0;
+}
+
+int vc_close(vc_t *vc) {
+    mbedtls_ssl_free(&vc->session);
+    mbedtls_ssl_config_free(&vc->session_cfg);
+    free(vc->recv_buf);
+    free(vc->send_buf);
+    return 0;
+}
+
+int vc_attest_and_connect(vc_t *vc) {
+    char enclave_name[7+1];
+    uint8_t enclave_cert_hash[32];
+    size_t enclave_cert_hash_len = 32;
+    int err = vc_attest(
+            enclave_name, 7+1,
+            enclave_cert_hash, &enclave_cert_hash_len);
+    if (err) {
+        return err;
+    }
+
+    err = vc_connect(vc,
+            enclave_name, 
+            enclave_cert_hash, enclave_cert_hash_len);
+    if (err) {
+        return err;
+    }
+
+    return 0;
+}
+
