@@ -148,23 +148,24 @@ int vc_attest(
         return -EBADE;
     }
 
-    // check that enclave hash matches policy
-    if (memcmp(&response_buf[47], RUNTIME_MANAGER_HASH,
-            sizeof(RUNTIME_MANAGER_HASH)) != 0) {
-        printf("enclave hash mismatch\n");
-        printf("expected: ");
-        for (int i = 0; i < sizeof(RUNTIME_MANAGER_HASH); i++) {
-            printf("%02x", RUNTIME_MANAGER_HASH[i]);
-        }
-        printf("\n");
-        printf("recieved: ");
-        for (int i = 0; i < 32; i++) {
-            printf("%02x", response_buf[8+i]);
-        }
-        printf("\n");
-        return -EBADE;
-    }
-
+// TODO OOOOOOOOOO
+//    // check that enclave hash matches policy
+//    if (memcmp(&response_buf[47], RUNTIME_MANAGER_HASH,
+//            sizeof(RUNTIME_MANAGER_HASH)) != 0) {
+//        printf("enclave hash mismatch\n");
+//        printf("expected: ");
+//        for (int i = 0; i < sizeof(RUNTIME_MANAGER_HASH); i++) {
+//            printf("%02x", RUNTIME_MANAGER_HASH[i]);
+//        }
+//        printf("\n");
+//        printf("recieved: ");
+//        for (int i = 0; i < 32; i++) {
+//            printf("%02x", response_buf[8+i]);
+//        }
+//        printf("\n");
+//        return -EBADE;
+//    }
+//
     // recieved values
     // TODO why verify_iat response not a protobuf?
     memcpy(enclave_name, &response_buf[124], 7);
@@ -208,6 +209,11 @@ static int vc_rawrng(void *p,
 static ssize_t vc_rawsend(void *p,
         const uint8_t *buf, size_t len) {
     vc_t *vc = p;
+
+    if (vc->recv_len != 0) {
+        printf("data left!?!?!?!? %d\n", vc->recv_len);
+    }
+
     // encode with base64 + id (0)
     ssize_t data_len = 0;
     ssize_t res = snprintf(vc->send_buf, VC_SEND_BUFFER_SIZE,
@@ -217,7 +223,6 @@ static ssize_t vc_rawsend(void *p,
         return res;
     }
     data_len += res;
-    // TODO change base64 encode order?
     res = base64_encode(
         buf, len,
         &vc->send_buf[data_len], VC_SEND_BUFFER_SIZE-data_len);
@@ -246,6 +251,12 @@ static ssize_t vc_rawsend(void *p,
     }
 
     printf("http_post -> %d\n", recv_len);
+
+    if (recv_len == 0) {
+        // done, recieved nothing
+        return len;
+    }
+
     printf("ssl session: recv:\n");
     xxd(vc->recv_buf, recv_len);
 
@@ -300,6 +311,13 @@ static ssize_t vc_rawrecv(void *p,
         uint32_t timeout) {
     vc_t *vc = p;
 
+    if (vc->recv_len == 0) {
+        // no data available? since we communicate over POSTs,
+        // we'll never have data available
+        printf("recv timeout\n");
+        return MBEDTLS_ERR_SSL_TIMEOUT;
+    }
+
     size_t diff = (len < vc->recv_len) ? len : vc->recv_len;
     memcpy(buf, vc->recv_pos, diff);
     vc->recv_pos += diff;
@@ -315,6 +333,14 @@ int vc_connect(vc_t *vc,
     vc->session_id = 0;
     vc->recv_len = 0;
 
+    // check that requested ciphersuite is available, this can fail if
+    // the ciphersuite isn't enabled in mbedtls's configuration
+    if (mbedtls_ssl_ciphersuite_from_id(CIPHERSUITE) == NULL) {
+        printf("required ciphersuite unavailable, "
+                "is mbedtls configured correctly?\n");
+        return -ENOSYS;
+    }
+
     // allocate buffers
     vc->send_buf = malloc(VC_SEND_BUFFER_SIZE);
     if (!vc->send_buf) {
@@ -327,17 +353,42 @@ int vc_connect(vc_t *vc,
         return -ENOMEM;
     }
 
+    // parse client cert/key
+    mbedtls_x509_crt_init(&vc->client_cert);
+    int err = mbedtls_x509_crt_parse_der(&vc->client_cert,
+            CLIENT_CERT_DER, sizeof(CLIENT_CERT_DER));
+    if (err) {
+        printf("failed to parse client cert (%d)\n", err);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
+
+    mbedtls_pk_init(&vc->client_key);
+    err = mbedtls_pk_parse_key(&vc->client_key,
+            CLIENT_KEY_DER, sizeof(CLIENT_KEY_DER),
+            NULL, 0);
+    if (err) {
+        printf("failed to parse client key (%d)\n", err);
+        mbedtls_x509_crt_free(&vc->client_cert);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
+
     // setup SSL connection
     mbedtls_ssl_init(&vc->session);
     mbedtls_ssl_config_init(&vc->session_cfg);
 
-    int err = mbedtls_ssl_config_defaults(&vc->session_cfg,
+    err = mbedtls_ssl_config_defaults(&vc->session_cfg,
             MBEDTLS_SSL_IS_CLIENT,
             MBEDTLS_SSL_TRANSPORT_STREAM,
             MBEDTLS_SSL_PRESET_DEFAULT);
     if (err) {
         printf("failed to configure SSL (%d)\n", err);
         mbedtls_ssl_config_free(&vc->session_cfg);
+        mbedtls_pk_free(&vc->client_key);
+        mbedtls_x509_crt_free(&vc->client_cert);
         free(vc->recv_buf);
         free(vc->send_buf);
         return err;
@@ -348,10 +399,19 @@ int vc_connect(vc_t *vc,
 
     mbedtls_ssl_conf_rng(&vc->session_cfg, vc_rawrng, NULL);
 
-    // TODO depend on policy.h generation? this is from policy.json
-    vc->session_ciphersuites[0] = MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256;
-    vc->session_ciphersuites[1] = 0;
-    mbedtls_ssl_conf_ciphersuites(&vc->session_cfg, vc->session_ciphersuites);
+    mbedtls_ssl_conf_ciphersuites(&vc->session_cfg, CIPHERSUITES);
+
+    err = mbedtls_ssl_conf_own_cert(&vc->session_cfg,
+            &vc->client_cert, &vc->client_key);
+    if (err) {
+        printf("failed to setup SSL session (%d)\n", err);
+        mbedtls_ssl_config_free(&vc->session_cfg);
+        mbedtls_pk_free(&vc->client_key);
+        mbedtls_x509_crt_free(&vc->client_cert);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
 
     // TODO remove debugging? hide behind logging?
     mbedtls_debug_set_threshold(4);
@@ -361,6 +421,8 @@ int vc_connect(vc_t *vc,
     if (err) {
         printf("failed to setup SSL session (%d)\n", err);
         mbedtls_ssl_config_free(&vc->session_cfg);
+        mbedtls_pk_free(&vc->client_key);
+        mbedtls_x509_crt_free(&vc->client_cert);
         free(vc->recv_buf);
         free(vc->send_buf);
         return err;
@@ -379,6 +441,8 @@ int vc_connect(vc_t *vc,
         printf("SSL handshake failed (%d)\n", err);
         mbedtls_ssl_free(&vc->session);
         mbedtls_ssl_config_free(&vc->session_cfg);
+        mbedtls_pk_free(&vc->client_key);
+        mbedtls_x509_crt_free(&vc->client_cert);
         free(vc->recv_buf);
         free(vc->send_buf);
         return err;
@@ -390,6 +454,8 @@ int vc_connect(vc_t *vc,
 int vc_close(vc_t *vc) {
     mbedtls_ssl_free(&vc->session);
     mbedtls_ssl_config_free(&vc->session_cfg);
+    mbedtls_pk_free(&vc->client_key);
+    mbedtls_x509_crt_free(&vc->client_cert);
     free(vc->recv_buf);
     free(vc->send_buf);
     return 0;

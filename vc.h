@@ -17,7 +17,7 @@
 #include <mbedtls/ssl.h>
 
 #ifndef VC_SEND_BUFFER_SIZE
-#define VC_SEND_BUFFER_SIZE 1024
+#define VC_SEND_BUFFER_SIZE (4*1024)
 #endif
 
 #ifndef VC_RECV_BUFFER_SIZE
@@ -34,9 +34,11 @@ typedef struct vc {
     // TLS state
     mbedtls_ssl_context session;
     mbedtls_ssl_config session_cfg;
-    int session_ciphersuites[2];
 
-    // buffers for shuffling tls data
+    mbedtls_x509_crt client_cert;
+    mbedtls_pk_context client_key;
+
+    // buffers for shuffling TLS data around
     uint8_t *send_buf;
     uint8_t *recv_buf;
 } vc_t;
@@ -64,7 +66,7 @@ int vc_attest(
 //
 // Note, this assumes the enclave has already been attested, you likely want
 // to use vc_attest_and_connect, which ensures the enclave is attested when
-// we connect
+// the connection is established 
 int vc_connect(vc_t *vc,
         const char *enclave_name,
         const uint8_t *enclave_cert_hash, size_t enclave_cert_hash_len);

@@ -2,10 +2,10 @@
   "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
   "debug": false,
   "enclave_cert_expiry": {
-    "day": 17,
-    "hour": 12,
-    "minute": 23,
-    "month": 6,
+    "day": 4,
+    "hour": 9,
+    "minute": 58,
+    "month": 8,
     "year": 2021
   },
   "execution_strategy": "Interpretation",
@@ -104,7 +104,7 @@
       ],
       "id": 0,
       "pi_hash": "a6f4a34c3dbee07d002e32f5647ed196a27613ac614be279da9ca5ef014722de",
-      "program_file_name": "example-binary.wasm"
+      "program_file_name": "example/example-binary.wasm"
     }
   ],
   "proxy_attestation_server_url": "172.17.0.2:3010",

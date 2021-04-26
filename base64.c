@@ -7,14 +7,18 @@
 #include <kernel.h>
 #include <string.h>
 
+// convenience functions
+static inline uint32_t base64_aligndown(uint32_t a, uint32_t alignment) {
+    return a - (a % alignment);
+}
+
+static inline uint32_t base64_alignup(uint32_t a, uint32_t alignment) {
+    return base64_aligndown(a + alignment-1, alignment);
+}
+
 // compute size after encoding
 size_t base64_encode_size(size_t in_len) {
-    size_t x = in_len;
-    if (in_len % 3 != 0) {
-        x += 3 - (in_len % 3);
-    }
-
-    return 4*(x/3);
+    return 4*(base64_alignup(in_len, 3) / 3);
 }
 
 static const char BASE64_ENCODE[] = (
@@ -32,21 +36,22 @@ ssize_t base64_encode(
     }
     out[e_len] = '\0';
 
+    size_t rin_len = base64_alignup(in_len, 3);
     for (size_t i = 0, j = 0; i < in_len; i += 3, j += 4) {
-        size_t v = in[in_len-i-3];
-        v = in_len-i-3+1 < e_len ? (v << 8 | in[in_len-i-3+1]) : (v << 8);
-        v = in_len-i-3+2 < e_len ? (v << 8 | in[in_len-i-3+2]) : (v << 8);
+        size_t v = in[rin_len-i-3];
+        v = rin_len-i-3+1 < e_len ? (v << 8 | in[rin_len-i-3+1]) : (v << 8);
+        v = rin_len-i-3+2 < e_len ? (v << 8 | in[rin_len-i-3+2]) : (v << 8);
 
         out[e_len-j-4]   = BASE64_ENCODE[(v >> 18) & 0x3f];
         out[e_len-j-4+1] = BASE64_ENCODE[(v >> 12) & 0x3f];
 
-        if (in_len-i-3+1 < in_len) {
+        if (rin_len-i-3+1 < in_len) {
             out[e_len-j-4+2] = BASE64_ENCODE[(v >> 6) & 0x3f];
         } else {
             out[e_len-j-4+2] = '=';
         }
 
-        if (in_len-i-3+2 < in_len) {
+        if (rin_len-i-3+2 < in_len) {
             out[e_len-j-4+3] = BASE64_ENCODE[v & 0x3f];
         } else {
             out[e_len-j-4+3] = '=';

@@ -44,8 +44,13 @@ update:
 
 # TODO move these into west?
 # Generate policy.h/c
-policy.h policy.c: policy.json policy_to_header.py
-	./policy_to_header.py $< policy.h policy.c
+policy.h policy.c: policy_to_header.py
+policy.h policy.c: policy.json client_cert.pem client_key.pem
+	$(strip ./policy_to_header.py $< \
+		--identity=$(word 2,$^) \
+		--key=$(word 3,$^) \
+		--header=policy.h \
+		--source=policy.c)
 
 # Generate transport_protocol.pb.h/c
 transport_protocol.pb.h transport_protocol.pb.c: \

@@ -22,7 +22,7 @@ void xxd(const void *pbuf, size_t len) {
 
         printf(" ");
 
-        for (int j = 0; j < 16 && i+j < len; j++) {
+        for (int j = 0; j < 16; j++) {
             if (i+j < len) {
                 if (buf[i+j] >= ' ' && buf[i+j] <= '~') {
                     printf("%c", buf[i+j]);
