@@ -17,7 +17,7 @@
 #include <mbedtls/ssl.h>
 
 #ifndef VC_SEND_BUFFER_SIZE
-#define VC_SEND_BUFFER_SIZE (4*1024)
+#define VC_SEND_BUFFER_SIZE (2*1024)
 #endif
 
 #ifndef VC_RECV_BUFFER_SIZE
