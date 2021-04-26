@@ -17,3 +17,4 @@ ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracru
 veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
 serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", features = ["std"] }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz", features = ['std'] }

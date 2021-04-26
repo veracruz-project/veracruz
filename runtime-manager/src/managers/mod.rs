@@ -30,7 +30,7 @@ use lazy_static::lazy_static;
 use execution_engine::{fs::FileSystem, factory::execute, hcall::common::EngineReturnCode};
 use veracruz_utils::policy::{
     policy::Policy,
-    principal::{ExecutionStrategy, FileOperation, Principal},
+    principal::{ExecutionStrategy, Principal},
 };
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
@@ -102,8 +102,8 @@ impl ProtocolState {
     ) -> Result<Self, RuntimeManagerError> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let capability_table = global_policy.get_capability_table();
-        let program_digests = global_policy.get_program_digests()?;
+        //let right_table = global_policy.get_capability_table();
+        //let program_digests = global_policy.get_program_digests()?;
         let vfs = Arc::new(Mutex::new(FileSystem::new()));
 
         Ok(ProtocolState {

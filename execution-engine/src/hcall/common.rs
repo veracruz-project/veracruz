@@ -23,7 +23,7 @@ use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, LookupFlags,
     OpenFlags, Prestat, Rights, Size, Whence, IoVec, DirEnt
 };
-use veracruz_utils::policy::principal::{Principal, FileOperation};
+use veracruz_utils::policy::principal::Principal;
 use std::{
     convert::TryFrom,
     fmt::{Display, Error, Formatter},
@@ -262,13 +262,6 @@ pub enum HostProvisioningError {
     )]
     PrincipalNotFound(Principal),
     #[error(
-        display = "HostProvisioningError: Client {:?} is disallowed to {:?}.",client_id,operation
-    )]
-    CapabilityDenial {
-        client_id: Principal,
-        operation : FileOperation,
-    },
-    #[error(
         display = "ProvisioningError: The global policy ascribes two inputs the same filename {}.",
         _0
     )]
@@ -325,7 +318,6 @@ pub trait MemoryHandler {
     /// any `IoVec` fails, for any reason.
     fn unpack_iovec_array(&self, iovec_ptr: u32, iovec_count: u32) -> Result<Vec<IoVec>, ErrNo> {
         let iovec_bytes = self.read_buffer(iovec_ptr, iovec_count * 8)?;
-        let mut offset = 0;
         let mut iovecs = Vec::new();
 
         for bytes in iovec_bytes.chunks(8) {
@@ -355,8 +347,6 @@ pub trait MemoryHandler {
 /// A wrapper on VFS for WASI, which provides common API used by wasm execution engine.
 #[derive(Clone)]
 pub struct WASIWrapper {
-    //// TODO REMOVE REMOVE
-    //vfs : Arc<Mutex<VFS>>,
     /// The synthetic filesystem associated with this machine.
     filesystem: Arc<Mutex<FileSystem>>,
     /// The environment variables that have been passed to this program from the
@@ -472,7 +462,6 @@ impl WASIWrapper {
     /// Implementation of the WASI `environ_get` function.
     pub(crate) fn environ_get(&self, memory_ref: &mut impl MemoryHandler, mut address_for_result: u32, mut address_for_result_len: u32) -> ErrNo {
         println!("environ_get is called");
-        let environc = self.environment_variables.len();
 
         let buffer = self.environment_variables.iter().map(|(key,value)| {
             let environ = format!("{}={}\0", key, value);

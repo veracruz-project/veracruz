@@ -28,8 +28,9 @@ use veracruz_utils::policy::{
     policy::Policy,
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, Identity, Program, FileCapability}
+    principal::{ExecutionStrategy, Identity, Program, FileRights},
 };
+use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
@@ -175,7 +176,7 @@ fn check_execution_strategy(strategy: &str) {
 }
 
 /// Checks that all strings appearing in all vectors in the `capabilities` argument are
-/// valid Veracruz capabilities: of the form "[FILE_NAME]:[rwx]".
+/// valid Veracruz capabilities: of the form "[FILE_NAME]:[Right_number]".
 fn check_capability(capabilities: &[Vec<String>]) {
     if !capabilities.iter().all(|v| {
         v.iter()
@@ -185,7 +186,7 @@ fn check_capability(capabilities: &[Vec<String>]) {
                 split.next();
                 let cap_check = match split.next() {
                     None => false,
-                    Some(cap) => cap.chars().all(|c| c == 'r' || c == 'w' || c == 'x'),
+                    Some(cap) => cap.parse::<u64>().is_ok(),
                 };
                 //The length must be 2 hence it must be none.
                 cap_check || split.next().is_none() 
@@ -624,18 +625,24 @@ fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
 }
 
 #[inline]
-fn serialize_capability(cap_string : &[String]) -> Vec<FileCapability> {
+fn serialize_capability(cap_string : &[String]) -> Vec<FileRights> {
     cap_string.iter().map(|c| serialize_capability_entry(c.as_str())).collect()
 }
 
-fn serialize_capability_entry(cap_string : &str) -> FileCapability {
+fn serialize_capability_entry(cap_string : &str) -> FileRights {
     let mut split = cap_string.split(':'); 
     let file_name = split.next().expect(&format!("Failed to parse {}, empty string", cap_string));
-    let cap = split.next().expect(&format!("Failed to parse {}, contain no `:`", cap_string)); 
-    let read = if cap.contains("r") {true} else {false};
-    let write = if cap.contains("w") {true} else {false};
-    let execute = if cap.contains("x") {true} else {false};
-    FileCapability::new(file_name.trim().to_string(),read,write,execute)
+    let string_number = split
+                .next()
+                .expect(&format!("Failed to parse `{}`, contain no `:`", cap_string));
+    let number = string_number
+                .trim()
+                .parse::<u32>()
+                .expect(&format!("Failed to parse {}, not a u64", string_number));
+    // check if this is a valid number
+    let _cap = Rights::from_bits(number as u64)
+                .expect(&format!("Failed to parse {}, not a u64 representing WASI Right", number));
+    FileRights::new(file_name.trim().to_string(),number)
 }
 
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {

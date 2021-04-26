@@ -35,7 +35,7 @@ use crate::{
         error::PolicyError,
         expiry::Timepoint,
         principal::{
-            CapabilityTable, ExecutionStrategy, FileCapability, FileOperation, Identity, Principal,
+            RightTable, ExecutionStrategy, Identity, Principal,
             Program,
         },
     },
@@ -43,10 +43,11 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     string::{String, ToString},
     vec::Vec,
 };
+use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Veracruz policies, proper.
@@ -285,40 +286,24 @@ impl Policy {
 
     /// Return the CapabilityTable in this policy. It contains capabilities related to all
     /// participants and programs.
-    pub fn get_capability_table(&self) -> CapabilityTable {
+    pub fn get_rights_table(&self) -> RightTable {
         let mut table = HashMap::new();
         for identity in self.identities() {
-            let id = identity.id();
-            let file_permissions = identity.file_permissions();
-            let capabilities_table = Self::to_capabilities(&file_permissions);
-            table.insert(Principal::Participant(*id as u64), capabilities_table);
+            let id = Principal::Participant(*identity.id() as u64);
+            let right_map = identity.file_rights_map();
+            table.insert(id, right_map);
         }
         for program in &self.programs {
             let program_file_name = program.program_file_name();
-            let file_permissions = program.file_permissions();
-            let capabilities_table = Self::to_capabilities(&file_permissions);
-            table.insert(
-                Principal::Program(program_file_name.to_string()),
-                capabilities_table,
-            );
+            let id = Principal::Program(program_file_name.to_string());
+            let right_map = program.file_rights_map();
+            table.insert(id, right_map);
         }
         table
     }
 
-    /// Convert a vec of FileCapability to a Hashmap from filenames to sets of allowed FileOperation.
-    fn to_capabilities(
-        file_permissions: &[FileCapability],
-    ) -> HashMap<String, HashSet<FileOperation>> {
-        let mut capabilities_table = HashMap::new();
-        for permission in file_permissions {
-            let (file_name, capabilities) = permission.to_capability_entry();
-            capabilities_table.insert(file_name, capabilities);
-        }
-        capabilities_table
-    }
-
     /// Return the program digest table, mapping program filenames to their expected digests.
-    pub fn get_program_digests(&self) -> Result<HashMap<String, Vec<u8>>, PolicyError> {
+    pub fn get_digest_table(&self) -> Result<HashMap<String, Vec<u8>>, PolicyError> {
         let mut table = HashMap::new();
         for program in &self.programs {
             let program_file_name = program.program_file_name();
@@ -337,21 +322,21 @@ impl Policy {
         let mut table = HashMap::new();
         for program in &self.programs {
             let program_file_name = program.program_file_name();
-            let file_permissions = program.file_permissions();
+            let file_rights_map = program.file_rights_map();
             table.insert(
                 program_file_name.to_string(),
-                Self::get_required_inputs(&file_permissions),
+                Self::get_required_inputs(&file_rights_map),
             );
         }
         Ok(table)
     }
 
-    /// Extract the input filenames from a vec of FileCapability. If a prorgam has permission to
-    /// read, it is considered as an input file.
-    fn get_required_inputs(cap: &[FileCapability]) -> Vec<String> {
-        let mut rst = cap.iter().fold(Vec::new(), |mut acc, x| {
-            if x.read() {
-                acc.push(x.file_name().to_string());
+    /// Extract the input filenames from a right_map. If a prorgam has rights call 
+    /// fd_read and path_open, it is considered as an input file.
+    fn get_required_inputs(right_map: &HashMap<String, Rights>) -> Vec<String> {
+        let mut rst = right_map.iter().fold(Vec::new(), |mut acc, (file_name, right)| {
+            if right.contains(Rights::FD_READ | Rights::PATH_OPEN) {
+                acc.push(file_name.to_string());
             }
             acc
         });
