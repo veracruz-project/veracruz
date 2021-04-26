@@ -15,23 +15,15 @@
 use super::error::PolicyError;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     string::{String, ToString},
     vec::Vec,
 };
+use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// List of file operations
-/// TODO: line up  wasi operations eps. the `Right` defined in wasi.
-#[derive(Clone, Hash, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FileOperation {
-    Read,
-    Write,
-    Execute,
-}
 
 /// The Principal of Capability in Veracruz.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -46,31 +38,26 @@ pub enum Principal {
     NoCap,
 }
 
-/// THe Capability Table, contains the allowed operations of a Principal on a file
-pub type CapabilityTable = HashMap<Principal, HashMap<String, HashSet<FileOperation>>>;
+/// The Right Table, contains the `Right`, i.e.
+/// the allowed operations of a Principal on a file
+pub type RightTable = HashMap<Principal, HashMap<String, Rights>>;
 
-/// Defines the capabilities on a file.
+/// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct FileCapability {
+pub struct FileRights {
     /// The file name
     file_name: String,
-    /// Read permission
-    read: bool,
-    /// Write permission
-    write: bool,
-    /// Execute permission
-    execute: bool,
+    /// The associated right, when someone open the file
+    rights : u32,
 }
 
-impl FileCapability {
+impl FileRights {
     /// Creates a new file permission.
     #[inline]
-    pub fn new(file_name: String, read: bool, write: bool, execute: bool) -> Self {
+    pub fn new(file_name: String, rights: u32) -> Self {
         Self {
             file_name,
-            read,
-            write,
-            execute,
+            rights,
         }
     }
 
@@ -80,49 +67,23 @@ impl FileCapability {
         self.file_name.as_str()
     }
 
-    /// If it is allowed to read.
+    /// Returns the rights.
     #[inline]
-    pub fn read(&self) -> bool {
-        self.read
+    pub fn rights(&self) -> &u32 {
+        &self.rights
     }
 
-    /// If it is allowed to write.
-    #[inline]
-    pub fn write(&self) -> bool {
-        self.write
-    }
-
-    /// If it is allowed to execute.
-    #[inline]
-    pub fn execute(&self) -> bool {
-        self.execute
-    }
-
-    /// Extract file name and its associated FileOperations from a FileCapability entry.
-    pub fn to_capability_entry(&self) -> (String, HashSet<FileOperation>) {
-        let FileCapability {
-            file_name,
-            read,
-            write,
-            execute,
-        } = self;
-
-        let mut capabilities = HashSet::new();
-        if *read {
-            capabilities.insert(FileOperation::Read);
-        }
-        if *write {
-            capabilities.insert(FileOperation::Write);
-        }
-        if *execute {
-            capabilities.insert(FileOperation::Execute);
-        }
-        (file_name.to_string(), capabilities)
+    /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
+    pub fn to_right_map(file_right_vec: &[FileRights]) -> HashMap<String, Rights> {
+        file_right_vec.iter().fold(HashMap::new(), |mut acc, FileRights{file_name, rights}| {
+            acc.insert(file_name.to_string(), Rights::from_bits_truncate(*rights as u64));
+            acc
+        })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Program permission
+// Program 
 ////////////////////////////////////////////////////////////////////////////////
 /// Defines a program that can be loaded into execution engine.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -135,7 +96,7 @@ pub struct Program {
     /// program provider.
     pi_hash: String,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_permissions: Vec<FileCapability>,
+    file_rights: Vec<FileRights>,
 }
 
 impl Program {
@@ -145,7 +106,7 @@ impl Program {
         program_file_name: String,
         id: T,
         pi_hash: String,
-        file_permissions: Vec<FileCapability>,
+        file_rights: Vec<FileRights>,
     ) -> Self
     where
         T: Into<u32>,
@@ -154,7 +115,7 @@ impl Program {
             program_file_name,
             id: id.into(),
             pi_hash,
-            file_permissions,
+            file_rights,
         }
     }
 
@@ -176,10 +137,10 @@ impl Program {
         self.pi_hash.as_str()
     }
 
-    /// Return file permissions associated to the program.
+    /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_permissions(&self) -> &Vec<FileCapability> {
-        &self.file_permissions
+    pub fn file_rights_map(&self) -> HashMap<String, Rights> {
+        FileRights::to_right_map(&self.file_rights)
     }
 }
 
@@ -219,27 +180,34 @@ pub struct Identity<U> {
     id: u32,
     /// The file capabilities that specifies this principal's ability to read,
     /// write and execute files.
-    file_permissions: Vec<FileCapability>,
+    file_rights: Vec<FileRights>,
 }
 
 impl<U> Identity<U> {
     /// Creates a new identity from a certificate, and identifier.  Initially,
     /// we keep the set of roles empty.
     #[inline]
-    pub fn new<T>(certificate: U, id: T, file_permissions: Vec<FileCapability>) -> Self
+    pub fn new<T>(certificate: U, id: T, file_rights: Vec<FileRights>) -> Self
     where
         T: Into<u32>,
     {
         Self {
             certificate,
             id: id.into(),
-            file_permissions,
+            file_rights,
         }
     }
 
-    /// Return the file permission in associated to this client (identity).
-    pub fn file_permissions(&self) -> &Vec<FileCapability> {
-        &self.file_permissions
+    /// Return file rights map associated to the program.
+    #[inline]
+    pub fn file_rights(&self) -> &Vec<FileRights> {
+        &self.file_rights
+    }
+
+    /// Return file rights map associated to the program.
+    #[inline]
+    pub fn file_rights_map(&self) -> HashMap<String, Rights> {
+        FileRights::to_right_map(&self.file_rights)
     }
 
     /// Returns the certificate associated with this identity.

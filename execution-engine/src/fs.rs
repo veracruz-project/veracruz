@@ -20,6 +20,7 @@ use wasi_types::{
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
     PreopenType
 };
+use veracruz_utils::policy::principal::{RightTable, Principal};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -139,6 +140,9 @@ pub struct FileSystem {
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
     inode_table: HashMap<Inode, InodeImpl>,
+    /// The CapabilityTable for participants and program. It will be used in, e.g.
+    /// `path_open` function, to contrain the `Right` of file descriptors.
+    right_table: RightTable,
 }
 
 impl FileSystem {
@@ -165,6 +169,7 @@ impl FileSystem {
             file_table: HashMap::new(),
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
+            right_table : HashMap::new(),
         };
 
         // Use inode 2 as the root
@@ -740,5 +745,23 @@ impl FileSystem {
         let rst = self.fd_read_base(&fd,file_stat.file_size as usize)?;
         self.fd_close(fd)?;
         Ok(rst)
+    }
+
+
+    /// Compute the digest of a `buffer`
+    fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
+        ring::digest::digest(&ring::digest::SHA256, buffer)
+            .as_ref()
+            .to_vec()
+    }
+
+    /// Get the maximum right associated to the principal on the file
+    fn get_right(&self, principal: &Principal, file_name : &str) -> FileSystemError<Rights> {
+        self.right_table
+            .get(principal)
+            .ok_or(ErrNo::Access)?
+            .get(file_name)
+            .map(|r| r.clone())
+            .ok_or(ErrNo::Access)
     }
 }

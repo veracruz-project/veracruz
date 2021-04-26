@@ -47,14 +47,12 @@ use crate::{
 };
 use std::{
     boxed::Box,
-    fmt::{Display, Error, Formatter},
     sync::Arc,
 };
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
 pub fn execute(
     strategy: &ExecutionStrategy,
-    // TODO REMOVE
     filesystem: Arc<Mutex<FileSystem>>,
     program_file_name: &str,
 ) -> Result<EngineReturnCode, FatalEngineError> {
