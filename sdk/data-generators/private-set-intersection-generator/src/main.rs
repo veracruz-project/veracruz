@@ -63,7 +63,7 @@ fn extract_columns(entries: &Vec<csv::StringRecord>) -> Result<HashSet<Person>, 
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for private set intersection")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Convert the [INPUT] csv file to pinecone. Each entry in the file comprises name (String), employee_id (String), age (u8), and grade (u8).") 
         .arg(
             Arg::with_name("input_file")

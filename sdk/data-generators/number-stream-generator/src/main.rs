@@ -28,7 +28,7 @@ use std::{error::Error, fs::File, io::prelude::*};
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for streaming number")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Generate an initial f64 encoded by pinecone and then 2 vectors of streaming data, each of which contains [SIZE] numbers of f64 encoded individually by pinecone.") 
        .arg(
            Arg::with_name("file_prefix")

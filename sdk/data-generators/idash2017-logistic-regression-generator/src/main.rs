@@ -17,7 +17,7 @@ use std::{error::Error, fs::File, io::prelude::*};
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for logistic regression")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Generate datasets for logistic regression. Each dataset contains a training set with the configuration and a testing set. In `generate` mode, it generates random raw data and then datasets. In `external` mode, it generates datasets from an external data source.")
         // common configuration for all subcommand
         .arg(
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             App::new("generate")
                .about("Generate random raw data and shuffle it into [FOLD] datasets. Each dataset contains pinecone encode of a training set with the configuration and a testing set.")
                .version("pre-alpha")
-               .author("The Veracruz Development Team, Arm Research")
+               .author("The Veracruz Development Team")
                .arg(
                    Arg::with_name("file_prefix")
                        .short("f")
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             App::new("external")
                .about("Generate [FOLD] dataset from external resource. Each dataset contains pinecone encode of a training set with the configuration and a testing set.")
                .version("pre-alpha")
-               .author("The Veracruz Development Team, Arm Research")
+               .author("The Veracruz Development Team")
                .arg(
                    Arg::with_name("input_file")
                        .short("i")
