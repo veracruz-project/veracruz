@@ -1,4 +1,4 @@
-# Authors: Veracruz Team, Arm Research
+# Authors: The Veracruz Development Team
 # CI for Veracruz project.
 # Please use a runner on a machine with SGX enable and add the following configuration:
 # privileged = true

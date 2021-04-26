@@ -16,7 +16,7 @@ use std::{error::Error, fs::File, io::prelude::*};
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for intersection set sum")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Generate customer and advertisement-viewer. The former contains a vector of customer identifiers and private values, of the type Vec<(String, f64)>. The latter contains a vector of customer identifiers, of the type Vec<String>. Both are encoded by pinecone.")
         .arg(
             Arg::with_name("file_prefix")

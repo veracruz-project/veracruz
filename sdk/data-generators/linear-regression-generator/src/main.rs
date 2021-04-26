@@ -17,7 +17,7 @@ use std::{env, error::Error, fs::File, io::prelude::*};
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for linear regression")
         .version("pre-alpha")
-        .author("The Veracruz Development Team, Arm Research")
+        .author("The Veracruz Development Team")
         .about("Generate a vec of points, Vec<(f64,f64)>, and encode it by pinecone.")
         .arg(
             Arg::with_name("file_name")

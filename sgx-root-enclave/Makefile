@@ -1,11 +1,14 @@
-#@file  Makefile
-# @author Derek Miller, Arm Research.
-# @date   June 2019.
+# Makefile for the SGX root enclave.
 #
-# @section LICENSE
+# AUTHORS
 #
-# Copyright (c) Arm Limited, 2019.  All rights reserved.
+# The Veracruz Development Team.
 #
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSE.markdown` file in the Veracruz root directory for
+# copyright and licensing information.
+
 OUT_DIR?=.
 FINAL_DIR?=.
 Signed_RustEnclave_RootName = sgx_root_enclave.signed.so
