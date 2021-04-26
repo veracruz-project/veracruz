@@ -148,24 +148,23 @@ int vc_attest(
         return -EBADE;
     }
 
-// TODO OOOOOOOOOO
-//    // check that enclave hash matches policy
-//    if (memcmp(&response_buf[47], RUNTIME_MANAGER_HASH,
-//            sizeof(RUNTIME_MANAGER_HASH)) != 0) {
-//        printf("enclave hash mismatch\n");
-//        printf("expected: ");
-//        for (int i = 0; i < sizeof(RUNTIME_MANAGER_HASH); i++) {
-//            printf("%02x", RUNTIME_MANAGER_HASH[i]);
-//        }
-//        printf("\n");
-//        printf("recieved: ");
-//        for (int i = 0; i < 32; i++) {
-//            printf("%02x", response_buf[8+i]);
-//        }
-//        printf("\n");
-//        return -EBADE;
-//    }
-//
+    // check that enclave hash matches policy
+    if (memcmp(&response_buf[47], RUNTIME_MANAGER_HASH,
+            sizeof(RUNTIME_MANAGER_HASH)) != 0) {
+        printf("enclave hash mismatch\n");
+        printf("expected: ");
+        for (int i = 0; i < sizeof(RUNTIME_MANAGER_HASH); i++) {
+            printf("%02x", RUNTIME_MANAGER_HASH[i]);
+        }
+        printf("\n");
+        printf("recieved: ");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", response_buf[8+i]);
+        }
+        printf("\n");
+        return -EBADE;
+    }
+
     // recieved values
     // TODO why verify_iat response not a protobuf?
     memcpy(enclave_name, &response_buf[124], 7);
