@@ -127,6 +127,7 @@ impl FileTableEntry {
 
 /// The filesystem proper, which collects together various tables and bits of
 /// meta-data.
+/// TODO: ref vs concrete parameter in wasi api !?
 #[derive(Clone)]
 pub struct FileSystem {
     /// A table of file descriptor table entries.  This is indexed by file
@@ -140,9 +141,12 @@ pub struct FileSystem {
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
     inode_table: HashMap<Inode, InodeImpl>,
-    /// The CapabilityTable for participants and program. It will be used in, e.g.
-    /// `path_open` function, to contrain the `Right` of file descriptors.
+    /// The Right table for Principal, including participants and programs. 
+    /// It will be used in, e.g.  `path_open` function, 
+    /// to constrain the `Right` of file descriptors.
     right_table: RightTable,
+    /// Digest table. Certain files must match the digest before writting to the filesystem.
+    digest_table: HashMap<String, String>
 }
 
 impl FileSystem {
@@ -156,7 +160,7 @@ impl FileSystem {
     /// The root directory file descriptor. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
-    pub const DEFAULT_RIGHTS: Rights = Rights::from_bits_truncate(Rights::FD_DATASYNC.bits() | Rights::FD_SEEK.bits() | Rights::FD_FDSTAT_SET_FLAGS.bits() | Rights::FD_SYNC.bits() | Rights::FD_TELL.bits() | Rights::FD_WRITE.bits() | Rights::FD_ADVISE.bits() | Rights::FD_ALLOCATE.bits() | Rights::PATH_CREATE_DIRECTORY.bits() | Rights::PATH_CREATE_FILE.bits() | Rights::PATH_LINK_SOURCE.bits() | Rights::PATH_LINK_TARGET.bits() | Rights::PATH_OPEN.bits() | Rights::PATH_READLINK.bits() | Rights::PATH_RENAME_SOURCE.bits() | Rights::PATH_RENAME_TARGET.bits() | Rights::PATH_FILESTAT_GET.bits() | Rights::FD_FILESTAT_SET_SIZE.bits() | Rights::FD_FILESTAT_SET_TIMES.bits() | Rights::PATH_SYMLINK.bits() | Rights::PATH_REMOVE_DIRECTORY.bits() | Rights::PATH_UNLINK_FILE.bits() | Rights::POLL_FD_READWRITE.bits());
+    pub const DEFAULT_RIGHTS: Rights = Rights::from_bits_truncate(Rights::FD_DATASYNC.bits() | Rights::FD_READ.bits() | Rights::FD_SEEK.bits() | Rights::FD_FDSTAT_SET_FLAGS.bits() | Rights::FD_SYNC.bits() | Rights::FD_TELL.bits() | Rights::FD_WRITE.bits() | Rights::FD_ADVISE.bits() | Rights::FD_ALLOCATE.bits() | Rights::PATH_CREATE_DIRECTORY.bits() | Rights::PATH_CREATE_FILE.bits() | Rights::PATH_LINK_SOURCE.bits() | Rights::PATH_LINK_TARGET.bits() | Rights::PATH_OPEN.bits() | Rights::PATH_READLINK.bits() | Rights::PATH_RENAME_SOURCE.bits() | Rights::PATH_RENAME_TARGET.bits() | Rights::PATH_FILESTAT_GET.bits() | Rights::FD_FILESTAT_SET_SIZE.bits() | Rights::FD_FILESTAT_SET_TIMES.bits() | Rights::PATH_SYMLINK.bits() | Rights::PATH_REMOVE_DIRECTORY.bits() | Rights::PATH_UNLINK_FILE.bits() | Rights::POLL_FD_READWRITE.bits());
 
     /// Creates a new, empty filesystem.
     ///
@@ -164,23 +168,27 @@ impl FileSystem {
     /// similar.  Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
-    pub fn new() -> Self {
+    pub fn new(right_table : RightTable) -> Self {
         let mut rst = Self {
             file_table: HashMap::new(),
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
-            right_table : HashMap::new(),
+            right_table,
+            digest_table: HashMap::new(),
         };
+        rst.init()
+    }
 
+    fn init(mut self) -> Self {
         // Use inode 2 as the root
         // Install directory??
-        rst.install_dir(Self::ROOT_DIRECTORY,&Self::ROOT_DIRECTORY_INODE);
-        rst.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
+        self.install_dir(Self::ROOT_DIRECTORY,&Self::ROOT_DIRECTORY_INODE);
+        self.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
         //TODO remove test stub
-        rst.install_file("input.txt",&(42 as u64).into(), "test content".as_bytes());
-        rst.install_file("stderr",&(11 as u64).into(), "".as_bytes());
-        rst.install_fd(&Fd(2),&(11 as u64).into());
-        rst
+        self.install_file("input.txt",&(42 as u64).into(), "test content".as_bytes());
+        self.install_file("stderr",&(11 as u64).into(), "".as_bytes());
+        self.install_fd(&Fd(2),&(11 as u64).into());
+        self
     }
     
     fn install_dir(&mut self, path : &str, inode : &Inode) {
@@ -613,11 +621,12 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)
     }
 
-    /// Open a file or directory.
+    /// Open a file or directory on behalf of the principal `principal`.
     /// TODO: It provides the minimum functionality of opening a file.
     ///       Finish the rest functionality required the WASI spec.
     pub(crate) fn path_open(
         &mut self,
+        principal : &Principal,
         // The parent fd for searching
         fd: &Fd,
         _dirflags: LookupFlags,
@@ -627,12 +636,26 @@ impl FileSystem {
         rights_inheriting: Rights,
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
+        println!("call path_open, on behalf of {:?}, on fd {:?}, on dir {:?} with open_flag {}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
+            fd, principal, path, oflags.bits(), rights_base, rights_inheriting, flags);
+        // Read the right related to the principal.
+        let principal_right = if *principal != Principal::InternalSuperUser {
+            self.get_right(&principal, path)?
+        } else {
+            Rights::all()
+        };
+        // Check the right of the program on path_open
+        if !principal_right.contains(Rights::PATH_OPEN) {
+            return Err(ErrNo::Access);
+        }
+        let rights_base = rights_base & principal_right;
+        let rights_inheriting = rights_inheriting & principal_right;
+        println!("call path_open, the right {:?} and inheriting right {:?}",
+            rights_base, rights_inheriting);
         // ONLY allow search on the root for now.
         if *fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
-
-        println!("call path_open on {:?} with open_flag {}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}", path, oflags.bits(), rights_base, rights_inheriting, flags);
         // TODO IMPL oflags logic
         let inode = match self.path_table.get(path){
             Some(i) => i.clone(),
@@ -705,14 +728,15 @@ impl FileSystem {
         unimplemented!()
     }
 
-    //TODO how to pass right??
     pub fn write_file_by_filename(
         &mut self,
+        principal: &Principal,
         file_name: &str,
         data: &[u8],
     ) -> Result<(), ErrNo> {
         println!("write_file_by_filename: {}", file_name);
         let fd = self.path_open(
+            principal,
             &FileSystem::ROOT_DIRECTORY_FD,
             LookupFlags::SYMLINK_FOLLOW,
             file_name,
@@ -721,26 +745,43 @@ impl FileSystem {
             FileSystem::DEFAULT_RIGHTS,
             FdFlags::empty(),
         )?;
+        if !self.file_table
+            .get(&fd)
+            .ok_or(ErrNo::BadF)?
+            .fd_stat
+            .rights_base
+            .contains(Rights::FD_WRITE | Rights::FD_SEEK) {
+                return Err(ErrNo::Access);
+        }
         self.fd_write_base(&fd,data.to_vec())?;
         self.fd_close(fd)?;
         Ok(())
     }
 
-    //TODO how to pass right??
     pub fn read_file_by_filename(
         &mut self,
+        principal: &Principal,
         file_name: &str,
     ) -> Result<Vec<u8>, ErrNo> {
         println!("read_file_by_filename: {}", file_name);
         let fd = self.path_open(
+            principal,
             &FileSystem::ROOT_DIRECTORY_FD,
             LookupFlags::SYMLINK_FOLLOW,
             file_name,
-            OpenFlags::CREATE,
+            OpenFlags::empty(),
             FileSystem::DEFAULT_RIGHTS,
             FileSystem::DEFAULT_RIGHTS,
             FdFlags::empty(),
         )?;
+        if !self.file_table
+            .get(&fd)
+            .ok_or(ErrNo::BadF)?
+            .fd_stat
+            .rights_base
+            .contains(Rights::FD_READ | Rights::FD_SEEK) {
+                return Err(ErrNo::Access);
+        }
         let file_stat = self.fd_filestat_get(&fd)?;
         let rst = self.fd_read_base(&fd,file_stat.file_size as usize)?;
         self.fd_close(fd)?;

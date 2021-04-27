@@ -1104,9 +1104,10 @@ impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
         filesystem : Arc<Mutex<FileSystem>>,
+        program_name: &str,
     ) -> Self {
         Self {
-            vfs : WASIWrapper::new(filesystem),
+            vfs : WASIWrapper::new(filesystem, Principal::Program(program_name.to_string())),
             program: Principal::NoCap,
             program_module: None,
             memory: None,
