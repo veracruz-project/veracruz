@@ -39,8 +39,8 @@ ssize_t base64_encode(
     size_t rin_len = base64_alignup(in_len, 3);
     for (size_t i = 0, j = 0; i < in_len; i += 3, j += 4) {
         size_t v = in[rin_len-i-3];
-        v = rin_len-i-3+1 < e_len ? (v << 8 | in[rin_len-i-3+1]) : (v << 8);
-        v = rin_len-i-3+2 < e_len ? (v << 8 | in[rin_len-i-3+2]) : (v << 8);
+        v = rin_len-i-3+1 < in_len ? (v << 8 | in[rin_len-i-3+1]) : (v << 8);
+        v = rin_len-i-3+2 < in_len ? (v << 8 | in[rin_len-i-3+2]) : (v << 8);
 
         out[e_len-j-4]   = BASE64_ENCODE[(v >> 18) & 0x3f];
         out[e_len-j-4+1] = BASE64_ENCODE[(v >> 12) & 0x3f];
