@@ -356,6 +356,8 @@ pub struct WASIWrapper {
     /// The array of program arguments that have been passed to this program,
     /// again from the global policy file.
     program_arguments: Vec<String>,
+    /// The principal that accesses the filesystem. This information is used in path_open.
+    principal: Principal,
 }
 
 impl WASIWrapper {
@@ -374,11 +376,13 @@ impl WASIWrapper {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
         filesystem: Arc<Mutex<FileSystem>>,
+        principal: Principal,
     ) -> Self {
         Self { 
             filesystem,
             environment_variables : Vec::new(),
             program_arguments : Vec::new(),
+            principal,
         }
     }
 
@@ -805,6 +809,7 @@ impl WASIWrapper {
         };
 
         match fs.path_open(
+            &self.principal,
             &fd,
             dir_flags,
             &path,
@@ -842,12 +847,13 @@ impl WASIWrapper {
         fs.path_rename(old_fd, old_path, new_fd, new_path)
     }
 
+    /// An internal function for the execution engine to directly read the file.
     pub(crate) fn read_file_by_filename(&mut self, file_name : &str) -> Result<Vec<u8>,ErrNo> {
         let mut fs = match self.filesystem.lock() {
             Ok(o) => o,
             Err(_) => panic!(),
         };
-        fs.read_file_by_filename(file_name)
+        fs.read_file_by_filename(&Principal::InternalSuperUser, file_name)
     }
 }
 

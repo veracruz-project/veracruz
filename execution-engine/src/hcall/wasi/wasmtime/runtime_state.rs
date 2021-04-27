@@ -40,7 +40,7 @@ use std::str::FromStr;
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(FileSystem::new()))));
+    static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new()))), Principal::NoCap));
     // The initial value has NO use.
     static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
 }
@@ -122,9 +122,10 @@ impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
         filesystem : Arc<Mutex<FileSystem>>,
+        program_name: &str,
     ) -> Self {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock().unwrap() = WASIWrapper::new(filesystem);
+        *VFS_INSTANCE.lock().unwrap() = WASIWrapper::new(filesystem, Principal::Program(program_name.to_string()));
         Self{}
     }
 

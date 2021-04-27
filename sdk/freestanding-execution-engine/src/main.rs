@@ -41,6 +41,7 @@ use execution_engine::{
     hcall::common::{EngineReturnCode, ExecutionEngine},
     fs::FileSystem,
 };
+use wasi_types::Rights;
 use veracruz_utils::policy::principal::{ExecutionStrategy, Principal};
 use clap::{App, Arg};
 use log::*;
@@ -386,7 +387,7 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) 
         let file_name = format!("input-{}", id);
         vfs.lock()
             .unwrap()
-            .write_file_by_filename(&file_name, &buffer)
+            .write_file_by_filename(&Principal::InternalSuperUser, &file_name, &buffer)
             .unwrap();
 
         info!(
@@ -410,11 +411,20 @@ fn main() {
 
     info!("Command line read successfully.");
 
-    let mut vfs = Arc::new(Mutex::new(FileSystem::new()));
     let (prog_file_name, program) = load_file(&cmdline.binary);
+
+    let mut right_table = HashMap::new();
+    let mut file_table = HashMap::new();
+    let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK;
+    let write_right = Rights::PATH_OPEN | Rights::FD_WRITE | Rights::FD_SEEK;
+    file_table.insert("input.txt".to_string(), read_right);
+    file_table.insert("output.txt".to_string(), write_right);
+    right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
+
+    let mut vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
     vfs.lock()
         .expect("Failed to lock the vfs")
-        .write_file_by_filename(&prog_file_name, &program)
+        .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program)
         .expect(&format!("Failed to write to file {}", prog_file_name));
     info!("WASM program {} loaded into VFS.", prog_file_name);
 

@@ -102,9 +102,9 @@ impl ProtocolState {
     ) -> Result<Self, RuntimeManagerError> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        //let right_table = global_policy.get_capability_table();
+        let right_table = global_policy.get_rights_table();
         //let program_digests = global_policy.get_program_digests()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new()));
+        let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
 
         Ok(ProtocolState {
             global_policy,
@@ -147,6 +147,7 @@ impl ProtocolState {
     ) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
         self.vfs.lock()?.write_file_by_filename(
+            client_id,
             file_name,
             data,
         )?;
@@ -171,6 +172,7 @@ impl ProtocolState {
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
         let rst = self.vfs.lock()?.read_file_by_filename(
+            client_id,
             file_name,
         )?;
         if rst.len() == 0 {

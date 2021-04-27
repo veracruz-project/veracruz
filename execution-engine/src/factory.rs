@@ -54,17 +54,17 @@ use veracruz_utils::policy::principal::ExecutionStrategy;
 pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: Arc<Mutex<FileSystem>>,
-    program_file_name: &str,
+    program_name: &str,
 ) -> Result<EngineReturnCode, FatalEngineError> {
     // TODO MODIFY when `new` directly fill in a program this can simply the wasmi impl esp. option
     // on memory and program module.
     let mut engine : Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem)),
+        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, program_name)),
         ExecutionStrategy::JIT => 
         {
             #[cfg(feature = "std")]
             {
-                Box::new(WasmtimeRuntimeState::new(filesystem))
+                Box::new(WasmtimeRuntimeState::new(filesystem, program_name))
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             {
@@ -72,5 +72,5 @@ pub fn execute(
             }
         }
     };
-    engine.invoke_entry_point(&program_file_name)
+    engine.invoke_entry_point(&program_name)
 }
