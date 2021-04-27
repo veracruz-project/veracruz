@@ -27,6 +27,10 @@ The Veracruz team welcome new collaborators and contributions!
 We maintain a list of open issues, ideas for new features, and possible improvements that can be made to Veracruz in our issue tracker, but also welcome ideas for new features and improvements from contributors, too.
 Many issues in our issue tracker are marked as being suitable for new contributors to the project.
 
+Veracruz maintains a public Slack channel for discussion about the project under the Confidential Compute Consortium's workspace.
+You can access this channel [here](https://join.slack.com/t/confidentialcomputing/shared_invite/zt-nckyewk3-WoMUPIrPdxXCCXrjCnFApw).
+Anybody and everybody is welcome to join to meet the team and discuss the project!
+
 We also have a weekly open Zoom meeting that you are welcome to join which is held every Thursday, 15:00 (BST) / 10:00 (CDT), and last for an hour.
 You can join with [this](https://armltd.zoom.us/j/95458320669?pwd=Uks2OFJ5TjROZURCdjlGKzJOTDI3UT09&from=addon) link.
 Come along and meet the team, find out what everybody is working on, and discuss ideas for improving Veracruz!
