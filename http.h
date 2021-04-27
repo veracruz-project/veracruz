@@ -6,12 +6,17 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #ifndef HTTP_H
 #define HTTP_H
 
 #ifndef HTTP_TIMEOUT
-#define HTTP_TIMEOUT 3000
+#define HTTP_TIMEOUT 10000
+#endif
+
+#ifndef HTTP_RETRIES
+#define HTTP_RETRIES 3
 #endif
 
 // HTTP GET operation

@@ -192,6 +192,11 @@ ssize_t http_post(
     // done, close
     free(pbuf);
     close(sock);
+
+    // There is some sort of overrun in the network stack, sleeping here
+    // briefly avoids issues
+    k_sleep(Z_TIMEOUT_MS(100));
+    
     return state.pos;
 }
 

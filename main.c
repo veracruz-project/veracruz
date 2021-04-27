@@ -9,7 +9,6 @@
 #include <kernel.h>
 
 #include "xxd.h"
-#include "qemu.h"
 #include "vc.h"
 
 // Veracruz client
@@ -21,16 +20,24 @@ void main(void) {
     int err = vc_attest_and_connect(&vc);
     if (err) {
         printf("vc_attest_and_connect failed (%d)\n", err);
-        qemu_exit();
+        exit(1);
     }
     printf("connected!\n");
+
+    // send some data
+    err = vc_send_data(&vc, "input-0", "hello world!", sizeof("hello world!"));
+    if (err) {
+        printf("vc_send_data failed (%d)\n", err);
+        exit(1);
+    }
+    printf("sent data!\n");
 
     err = vc_close(&vc);
     if (err) {
         printf("vc_close failed (%d)\n", err);
-        qemu_exit();
+        exit(1);
     }
     printf("closed!\n");
     
-    qemu_exit();
+    exit(0);
 }

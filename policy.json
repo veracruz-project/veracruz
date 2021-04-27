@@ -2,9 +2,9 @@
   "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
   "debug": false,
   "enclave_cert_expiry": {
-    "day": 4,
-    "hour": 9,
-    "minute": 58,
+    "day": 5,
+    "hour": 4,
+    "minute": 29,
     "month": 8,
     "year": 2021
   },

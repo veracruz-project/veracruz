@@ -71,4 +71,12 @@ int vc_connect(vc_t *vc,
         const char *enclave_name,
         const uint8_t *enclave_cert_hash, size_t enclave_cert_hash_len);
 
+// Send data to a Veracruz instance
+int vc_send_data(vc_t *vc,
+        const char *name,
+        const uint8_t *data,
+        size_t data_len);
+
+
+
 #endif

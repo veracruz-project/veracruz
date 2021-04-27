@@ -20,7 +20,6 @@
 #include "xxd.h"
 #include "base64.h"
 #include "http.h"
-#include "qemu.h"
 
 
 //// attestation ////
@@ -45,8 +44,8 @@ int vc_attest(
     printf("\n");
 
     // construct attestation token request
-    Tp_RuntimeManagerRequest request = {
-        .which_message_oneof = Tp_RuntimeManagerRequest_request_proxy_psa_attestation_token_tag
+    Tp_MexicoCityRequest request = {
+        .which_message_oneof = Tp_MexicoCityRequest_request_proxy_psa_attestation_token_tag
     };
     memcpy(request.message_oneof.request_proxy_psa_attestation_token.challenge,
             challenge, sizeof(challenge));
@@ -57,7 +56,12 @@ int vc_attest(
     uint8_t request_buf[256];
     pb_ostream_t request_stream = pb_ostream_from_buffer(
             request_buf, sizeof(request_buf));
-    pb_encode(&request_stream, &Tp_RuntimeManagerRequest_msg, &request);
+    bool success = pb_encode(&request_stream, &Tp_MexicoCityRequest_msg, &request);
+    if (!success) {
+        // TODO we can reduce code size by removing these error messages
+        printf("pb_encode failed (%s)\n", request_stream.errmsg);
+        return -EILSEQ;
+    }
 
     // convert base64
     ssize_t request_len = base64_encode(
@@ -259,6 +263,9 @@ static ssize_t vc_rawsend(void *p,
     printf("ssl session: recv:\n");
     xxd(vc->recv_buf, recv_len);
 
+    // null terminate to make parsing a bit easier
+    vc->recv_buf[recv_len] = '\0';
+
     // we have a bit of parsing to do, first decode session id
     const uint8_t *parsing = vc->recv_buf;
     vc->session_id = strtol(parsing, (char **)&parsing, 10);
@@ -437,7 +444,7 @@ int vc_connect(vc_t *vc,
     // perform SSL handshake
     err = mbedtls_ssl_handshake(&vc->session);
     if (err) {
-        printf("SSL handshake failed (%d)\n", err);
+        printf("mbedtls_ssl_handshake failed (%d)\n", err);
         mbedtls_ssl_free(&vc->session);
         mbedtls_ssl_config_free(&vc->session_cfg);
         mbedtls_pk_free(&vc->client_key);
@@ -447,6 +454,7 @@ int vc_connect(vc_t *vc,
         return err;
     }
 
+    // success!
     return 0;
 }
 
@@ -480,4 +488,107 @@ int vc_attest_and_connect(vc_t *vc) {
 
     return 0;
 }
+
+// helper for encoding dynamic-length bytes/strings
+struct bytes {
+    const void *buf;
+    size_t len;
+};
+
+static bool vc_encode_bytes(
+        pb_ostream_t *stream,
+        const pb_field_iter_t *field,
+        void *const *arg) {
+    if (!pb_encode_tag_for_field(stream, field))
+        return false;
+
+    struct bytes *b = *arg;
+    return pb_encode_string(stream, b->buf, b->len);
+}
+
+int vc_send_data(vc_t *vc,
+        const char *name,
+        const uint8_t *data,
+        size_t data_len) {
+    // construct data protobuf
+    Tp_MexicoCityRequest send_data = {
+        .which_message_oneof = Tp_MexicoCityRequest_data_tag,
+        .message_oneof.data.file_name.funcs.encode = vc_encode_bytes,
+        .message_oneof.data.file_name.arg = &(struct bytes){
+            .buf = name,
+            .len = strlen(name),
+        },
+        .message_oneof.data.data.funcs.encode = vc_encode_bytes,
+        .message_oneof.data.data.arg = &(struct bytes){
+            .buf = data,
+            .len = data_len,
+        },
+    };
+
+    // figure out how much of a buffer to allocate, this needs to hold our
+    // sent data + the response, response is fairly small and honestly could
+    // be smaller
+    size_t encoded_size = 0;
+    pb_get_encoded_size(&encoded_size, &Tp_MexicoCityRequest_msg, &send_data);
+    size_t proto_len = (32 > encoded_size) ? 32 : encoded_size;
+    // heh
+    uint8_t *proto_buf = malloc(proto_len);
+
+    // encode
+    pb_ostream_t proto_stream = pb_ostream_from_buffer(
+            proto_buf, proto_len);
+    bool success = pb_encode(&proto_stream, &Tp_MexicoCityRequest_msg, &send_data);
+    if (!success) {
+        // TODO we can reduce code size by removing these error messages
+        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    // TODO log? can we incrementally log?
+    printf("send_data: %s:\n", name);
+    xxd(proto_buf, proto_stream.bytes_written);
+
+    // send to Veracruz
+    int res = mbedtls_ssl_write(&vc->session,
+            proto_buf, proto_stream.bytes_written);
+    if (res < 0) {
+        printf("mbedtls_ssl_write failed (%d)\n", res);
+        free(proto_buf);
+        return res;
+    }
+
+    // get Veracruz's response
+    res = mbedtls_ssl_read(&vc->session, proto_buf, proto_len);
+    if (res < 0) {
+        printf("mbedtls_ssl_read failed (%d)\n", res);
+        free(proto_buf);
+        return res;
+    }
+
+    printf("send_data: response:\n");
+    xxd(proto_buf, res);
+
+    // parse
+    Tp_MexicoCityResponse response;
+    pb_istream_t resp_stream = pb_istream_from_buffer(
+            proto_buf, res);
+    success = pb_decode(&resp_stream, &Tp_MexicoCityResponse_msg, &response);
+    if (!success) {
+        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    free(proto_buf);
+
+    // did server send success?
+    if (response.status != Tp_ResponseStatus_SUCCESS) {
+        printf("send_data successfully failed! (%d)\n", response.status);
+        return -EACCES;
+    }
+
+    return 0;
+}
+
 

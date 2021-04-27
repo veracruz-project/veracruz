@@ -61,15 +61,15 @@ ssize_t base64_encode(
     return e_len;
 }
 
-static size_t strnlen(const char *s, size_t s_len) {
-    for (size_t i = 0; i < s_len; i++) {
-        if (s[i] == '\0') {
-            return i;
-        }
-    }
-
-    return s_len;
-}
+//static size_t strnlen(const char *s, size_t s_len) {
+//    for (size_t i = 0; i < s_len; i++) {
+//        if (s[i] == '\0') {
+//            return i;
+//        }
+//    }
+//
+//    return s_len;
+//}
 
 // compute size after decoding
 size_t base64_decode_size(const char *in, size_t in_len) {
