@@ -1,0 +1,17 @@
+[package]
+name = "audio-event-triangulation"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Triangulation via audio events"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libveracruz = {path = "../../libveracruz"}
+
+[profile.release]
+opt-level = 3
+#lto = true
+codegen-units = 1
+
