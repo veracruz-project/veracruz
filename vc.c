@@ -54,6 +54,7 @@ int vc_attest(
     // TODO this could be smaller, but instead could we tie protobuf encoding
     // directly into our GET function?
     uint8_t request_buf[256];
+    memset(request_buf, 0, sizeof(request_buf));
     pb_ostream_t request_stream = pb_ostream_from_buffer(
             request_buf, sizeof(request_buf));
     bool success = pb_encode(&request_stream, &Tp_MexicoCityRequest_msg, &request);
@@ -80,6 +81,7 @@ int vc_attest(
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT);
     uint8_t pat_buf[1024];
+    memset(pat_buf, 0, sizeof(pat_buf));
     ssize_t pat_len = http_post(
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT,
@@ -102,6 +104,9 @@ int vc_attest(
             PROXY_ATTESTATION_SERVER_HOST,
             PROXY_ATTESTATION_SERVER_PORT);
     uint8_t response_buf[256];
+    // TODO we shouldn't need to zero this, but we do, fix?
+    // TODO the issue is base64 decoding with no null-terminator
+    memset(response_buf, 0, sizeof(response_buf));
     ssize_t response_len = http_post(
             PROXY_ATTESTATION_SERVER_HOST,
             PROXY_ATTESTATION_SERVER_PORT,

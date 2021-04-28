@@ -2,9 +2,9 @@
   "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
   "debug": false,
   "enclave_cert_expiry": {
-    "day": 5,
-    "hour": 4,
-    "minute": 29,
+    "day": 6,
+    "hour": 6,
+    "minute": 6,
     "month": 8,
     "year": 2021
   },
@@ -103,8 +103,8 @@
         }
       ],
       "id": 0,
-      "pi_hash": "a6f4a34c3dbee07d002e32f5647ed196a27613ac614be279da9ca5ef014722de",
-      "program_file_name": "example/example-binary.wasm"
+      "pi_hash": "f8bf203d0d9eba706da3ba62174b40b4c7c6bebed2d42675bd47abbd76190ab3",
+      "program_file_name": "sdk/rust-language-support/examples/audio-event-triangulation/target/wasm32-arm-veracruz/release/audio-event-triangulation.wasm"
     }
   ],
   "proxy_attestation_server_url": "172.17.0.2:3010",

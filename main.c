@@ -5,17 +5,91 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <kernel.h>
 
 #include "xxd.h"
 #include "vc.h"
+#include "clap.h"
+
+// display audio samples in terminal
+void dump_samples(const int16_t *samples, size_t len,
+        size_t width, size_t height) {
+    int32_t global_min = 0;
+    int32_t global_max = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (samples[i] < global_min) {
+            global_min = samples[i];
+        }
+        if (samples[i] > global_max) {
+            global_max = samples[i];
+        }
+    }
+
+    size_t slice = len / width;
+    for (size_t y = 0; y < height/2; y++) {
+        for (size_t x = 0; x < width; x++) {
+            int32_t min = 0;
+            int32_t max = 0;
+            for (size_t i = 0; i < slice; i++) {
+                if (samples[x*slice+i] < min) {
+                    min = samples[x*slice+i];
+                }
+                if (samples[x*slice+i] > max) {
+                    max = samples[x*slice+i];
+                }
+            }
+
+            min = (height*(min-global_min)) / (global_max-global_min);
+            max = (height*(max-global_min)) / (global_max-global_min);
+
+            if (2*y >= min && 2*y <= max && 2*y+1 >= min && 2*y+1 <= max) {
+                printf(":");
+            } else if (2*y >= min && 2*y <= max) {
+                printf("'");
+            } else if (2*y+1 >= min && 2*y+1 <= max) {
+                printf(".");
+            } else {
+                printf(" ");
+            }
+        }
+        printf("\n");
+    }
+}
+
+void dump_gps(int32_t y, int32_t x) {
+    int32_t absy = y >= 0 ? y : -y; 
+    int32_t absx = x >= 0 ? x : -x; 
+    printf("%d°%02d′%02d.%02d″%c %d°%02d′%02d.%02d″%c",
+        absy / (1024*1024),
+        (absy / (1024*1024/60)) % 60,
+        (absy / (1024*1024/60/60)) % 60,
+        (absy / (1024*1024/60/60/100)) % 100,
+        y >= 0 ? 'N' : 'S',
+        absx / (1024*1024),
+        (absx / (1024*1024/60)) % 60,
+        (absx / (1024*1024/60/60)) % 60,
+        (absx / (1024*1024/60/60/100)) % 100,
+        y >= 0 ? 'E' : 'W');
+}
+
 
 // Veracruz client
 vc_t vc;
 
 // entry point
 void main(void) {
+    // show audio event
+    printf("peak detected, current window:\n");
+    dump_samples(CLAP_SAMPLES, sizeof(CLAP_SAMPLES)/sizeof(int16_t), 76, 2*8);
+
+    // other metadata
+    printf("location: ");
+    dump_gps(CLAP_LOCATION_Y, CLAP_LOCATION_X);
+    printf("\n");
+    printf("timestamp: %u\n", CLAP_TIMESTAMP);
+
     // Attest and connect to the Veracruz enclave
     int err = vc_attest_and_connect(&vc);
     if (err) {
@@ -24,8 +98,27 @@ void main(void) {
     }
     printf("connected!\n");
 
+    // package metadata + window
+    uint8_t *data = malloc(3*4 + sizeof(CLAP_SAMPLES));
+    data[ 0] = (uint8_t)(CLAP_TIMESTAMP >>  0);
+    data[ 1] = (uint8_t)(CLAP_TIMESTAMP >>  8);
+    data[ 2] = (uint8_t)(CLAP_TIMESTAMP >> 16);
+    data[ 3] = (uint8_t)(CLAP_TIMESTAMP >> 24);
+    data[ 4] = (uint8_t)((uint32_t)CLAP_LOCATION_Y >>  0);
+    data[ 5] = (uint8_t)((uint32_t)CLAP_LOCATION_Y >>  8);
+    data[ 6] = (uint8_t)((uint32_t)CLAP_LOCATION_Y >> 16);
+    data[ 7] = (uint8_t)((uint32_t)CLAP_LOCATION_Y >> 24);
+    data[ 8] = (uint8_t)((uint32_t)CLAP_LOCATION_X >>  0);
+    data[ 9] = (uint8_t)((uint32_t)CLAP_LOCATION_X >>  8);
+    data[10] = (uint8_t)((uint32_t)CLAP_LOCATION_X >> 16);
+    data[11] = (uint8_t)((uint32_t)CLAP_LOCATION_X >> 24);
+    for (int i = 0; i < sizeof(CLAP_SAMPLES)/sizeof(int16_t); i++) {
+        data[12+i*2 + 0] = (uint8_t)((uint32_t)CLAP_SAMPLES[i] >> 0);
+        data[12+i*2 + 1] = (uint8_t)((uint32_t)CLAP_SAMPLES[i] >> 8);
+    }
+
     // send some data
-    err = vc_send_data(&vc, "input-0", "hello world!", sizeof("hello world!"));
+    err = vc_send_data(&vc, CLAP_DATA_NAME, data, 3*4 + sizeof(CLAP_SAMPLES));
     if (err) {
         printf("vc_send_data failed (%d)\n", err);
         exit(1);
@@ -38,6 +131,16 @@ void main(void) {
         exit(1);
     }
     printf("closed!\n");
+
+    // show audio event
+    printf("peak detected, current window:\n");
+    dump_samples(CLAP_SAMPLES, sizeof(CLAP_SAMPLES)/sizeof(int16_t), 76, 2*8);
+
+    // other metadata
+    printf("location: ");
+    dump_gps(CLAP_LOCATION_Y, CLAP_LOCATION_X);
+    printf("\n");
+    printf("timestamp: %u\n", CLAP_TIMESTAMP);
     
     exit(0);
 }

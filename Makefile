@@ -6,6 +6,11 @@ DOCKER_ROOT ?= $(abspath $(firstword $(MAKEFILE_LIST))/..)
 
 ELF_PATH ?= /zephyr-workspace/$(TARGET)/build/zephyr/zephyr.elf
 
+CLAP ?= 1
+CLIENT_CERT ?= client_cert.pem
+CLIENT_KEY ?= client_key.pem
+POLICY ?= policy.json
+
 ## QEMU configuration
 #QEMU ?= /opt/zephyr-sdk-0.11.4/sysroots/x86_64-pokysdk-linux/usr/bin/qemu-system-arm
 #QEMU_FLAGS += -cpu cortex-m3
@@ -51,12 +56,21 @@ update:
 # TODO move these into west?
 # Generate policy.h/c
 policy.h policy.c: policy_to_header.py
-policy.h policy.c: policy.json client_cert.pem client_key.pem
+policy.h policy.c: $(POLICY) $(CLIENT_CERT) $(CLIENT_KEY)
 	$(strip ./policy_to_header.py $< \
 		--identity=$(word 2,$^) \
 		--key=$(word 3,$^) \
 		--header=policy.h \
 		--source=policy.c)
+
+clap.h clap.c: claps.wav claps_to_header.py
+	$(strip ./claps_to_header.py $< \
+		-b 100 \
+		-B 30 \
+		-A 170 \
+		-c $(CLAP) \
+		--header=clap.h \
+		--source=clap.c)
 
 # Generate transport_protocol.pb.h/c
 transport_protocol.pb.h transport_protocol.pb.c: \
@@ -73,23 +87,25 @@ transport_protocol.pb.h transport_protocol.pb.c: \
 .DEFAULT_GOAL :=
 .PHONY: build
 build: policy.h policy.c
+build: clap.h clap.c
 build: transport_protocol.pb.h transport_protocol.pb.c
 build:
-	west build -p auto -b native_posix
+	west build -b native_posix
 
 .PHONY: clean
 clean:
+	rm -rf clap.h clap.c
 	rm -rf policy.h policy.c
 	rm -rf transport_protocol.pb.h transport_protocol.pb.c
 	rm -rf build
 
 .PHONY: rom_report
 rom_report: build
-	west build -t rom_report
+	west build -t rom_report -b qemu_cortex_m3
 
 .PHONY: ram
 ram_report: build
-	west build -t ram_report
+	west build -t ram_report -b qemu_cortex_m3
 
 ## QEMU
 #.PHONY: run
