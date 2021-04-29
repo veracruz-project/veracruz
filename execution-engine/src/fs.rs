@@ -145,8 +145,6 @@ pub struct FileSystem {
     /// It will be used in, e.g.  `path_open` function, 
     /// to constrain the `Right` of file descriptors.
     right_table: RightTable,
-    /// Digest table. Certain files must match the digest before writting to the filesystem.
-    digest_table: HashMap<String, String>
 }
 
 impl FileSystem {
@@ -174,7 +172,6 @@ impl FileSystem {
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
             right_table,
-            digest_table: HashMap::new(),
         };
         rst.init()
     }
@@ -728,11 +725,13 @@ impl FileSystem {
         unimplemented!()
     }
 
+    /// TODO: DOC
     pub fn write_file_by_filename(
         &mut self,
         principal: &Principal,
         file_name: &str,
         data: &[u8],
+        is_append: bool,
     ) -> Result<(), ErrNo> {
         println!("write_file_by_filename: {}", file_name);
         let fd = self.path_open(
@@ -740,7 +739,7 @@ impl FileSystem {
             &FileSystem::ROOT_DIRECTORY_FD,
             LookupFlags::SYMLINK_FOLLOW,
             file_name,
-            OpenFlags::CREATE,
+            OpenFlags::CREATE | if !is_append {OpenFlags::TRUNC} else {OpenFlags::empty()},
             FileSystem::DEFAULT_RIGHTS,
             FileSystem::DEFAULT_RIGHTS,
             FdFlags::empty(),
@@ -753,11 +752,13 @@ impl FileSystem {
             .contains(Rights::FD_WRITE | Rights::FD_SEEK) {
                 return Err(ErrNo::Access);
         }
+        if is_append { self.fd_seek(&fd, 0, Whence::End); }
         self.fd_write_base(&fd,data.to_vec())?;
         self.fd_close(fd)?;
         Ok(())
     }
 
+    /// TODO: DOC
     pub fn read_file_by_filename(
         &mut self,
         principal: &Principal,
@@ -786,14 +787,6 @@ impl FileSystem {
         let rst = self.fd_read_base(&fd,file_stat.file_size as usize)?;
         self.fd_close(fd)?;
         Ok(rst)
-    }
-
-
-    /// Compute the digest of a `buffer`
-    fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
-        ring::digest::digest(&ring::digest::SHA256, buffer)
-            .as_ref()
-            .to_vec()
     }
 
     /// Get the maximum right associated to the principal on the file

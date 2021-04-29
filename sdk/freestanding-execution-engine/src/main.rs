@@ -387,7 +387,7 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) 
         let file_name = format!("input-{}", id);
         vfs.lock()
             .unwrap()
-            .write_file_by_filename(&Principal::InternalSuperUser, &file_name, &buffer)
+            .write_file_by_filename(&Principal::InternalSuperUser, &file_name, &buffer, false)
             .unwrap();
 
         info!(
@@ -424,7 +424,12 @@ fn main() {
     let mut vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
     vfs.lock()
         .expect("Failed to lock the vfs")
-        .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program)
+        .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
+        .expect(&format!("Failed to write to file {}", prog_file_name));
+    // Call twice on purpose
+    vfs.lock()
+        .expect("Failed to lock the vfs")
+        .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
         .expect(&format!("Failed to write to file {}", prog_file_name));
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
