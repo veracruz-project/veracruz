@@ -10,6 +10,7 @@ CLAP ?= 1
 CLIENT_CERT ?= client_cert.pem
 CLIENT_KEY ?= client_key.pem
 POLICY ?= policy.json
+DELAY ?= 0
 
 ## QEMU configuration
 #QEMU ?= /opt/zephyr-sdk-0.11.4/sysroots/x86_64-pokysdk-linux/usr/bin/qemu-system-arm
@@ -69,6 +70,7 @@ clap.h clap.c: claps.wav claps_to_header.py
 		-B 30 \
 		-A 170 \
 		-c $(CLAP) \
+		--delay $(DELAY) \
 		--header=clap.h \
 		--source=clap.c)
 
@@ -120,7 +122,7 @@ ram_report: build
 #debug-after: build
 #	$(QEMU) -gdb tcp::1234 $(QEMU_FLAGS) & sleep 2 ; $(GDB) $(ELF_PATH) -ex 'target remote localhost:1234'
 
-run: build
+run:
 	/zephyr-workspace/mini-durango/build/zephyr/zephyr.exe
 
 # Network tracing

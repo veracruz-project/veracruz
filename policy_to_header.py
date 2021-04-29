@@ -28,6 +28,7 @@ def main(args):
         with open(args.identity) as f:
             identity_pem = f.read()
             identity_der = pem_to_der(identity_pem)
+            identity_hash = hashlib.sha256(identity_der).hexdigest()
 
         # sanity check that identity is in policy
         assert any(
@@ -94,6 +95,9 @@ def main(args):
                 f.writeln('extern const uint8_t _CLIENT_CERT_DER[%(len)d];',
                     len=len(identity_der))
                 f.writeln('#define CLIENT_CERT_DER _CLIENT_CERT_DER')
+                # TODO these should be raw bytes
+                f.writeln('#define CLIENT_CERT_HASH "%(hash)s"',
+                    hash=identity_hash)
             if args.key:
                 f.writeln('extern const uint8_t _CLIENT_KEY_DER[%(len)d];',
                     len=len(key_der))

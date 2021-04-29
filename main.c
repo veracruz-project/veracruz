@@ -12,6 +12,7 @@
 #include "xxd.h"
 #include "vc.h"
 #include "clap.h"
+#include "policy.h"
 
 // display audio samples in terminal
 void dump_samples(const int16_t *samples, size_t len,
@@ -61,7 +62,7 @@ void dump_samples(const int16_t *samples, size_t len,
 void dump_gps(int32_t y, int32_t x) {
     int32_t absy = y >= 0 ? y : -y; 
     int32_t absx = x >= 0 ? x : -x; 
-    printf("%d°%02d′%02d.%02d″%c %d°%02d′%02d.%02d″%c",
+    printf("%d°%02d'%02d.%02d\"%c %d°%02d'%02d.%02d\"%c",
         absy / (1024*1024),
         (absy / (1024*1024/60)) % 60,
         (absy / (1024*1024/60/60)) % 60,
@@ -80,15 +81,20 @@ vc_t vc;
 
 // entry point
 void main(void) {
+    printf("\033[0;32msystem started\033[m\n");
+    printf("listening for audio...\n");
+    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
+
     // show audio event
-    printf("peak detected, current window:\n");
+    printf("\033[1;33mpeak detected, current window:\033[m\n");
     dump_samples(CLAP_SAMPLES, sizeof(CLAP_SAMPLES)/sizeof(int16_t), 76, 2*8);
 
     // other metadata
-    printf("location: ");
+    printf("\033[1;33mlocation:\033[m ");
     dump_gps(CLAP_LOCATION_Y, CLAP_LOCATION_X);
     printf("\n");
-    printf("timestamp: %u\n", CLAP_TIMESTAMP);
+    printf("\033[1;33mtimestamp:\033[m %u\n", CLAP_TIMESTAMP);
+    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
 
     // Attest and connect to the Veracruz enclave
     int err = vc_attest_and_connect(&vc);
@@ -96,7 +102,7 @@ void main(void) {
         printf("vc_attest_and_connect failed (%d)\n", err);
         exit(1);
     }
-    printf("connected!\n");
+    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
 
     // package metadata + window
     uint8_t *data = malloc(3*4 + sizeof(CLAP_SAMPLES));
@@ -123,24 +129,16 @@ void main(void) {
         printf("vc_send_data failed (%d)\n", err);
         exit(1);
     }
-    printf("sent data!\n");
 
+    printf("disconnecting\n");
     err = vc_close(&vc);
     if (err) {
         printf("vc_close failed (%d)\n", err);
         exit(1);
     }
-    printf("closed!\n");
 
-    // show audio event
-    printf("peak detected, current window:\n");
-    dump_samples(CLAP_SAMPLES, sizeof(CLAP_SAMPLES)/sizeof(int16_t), 76, 2*8);
-
-    // other metadata
-    printf("location: ");
-    dump_gps(CLAP_LOCATION_Y, CLAP_LOCATION_X);
-    printf("\n");
-    printf("timestamp: %u\n", CLAP_TIMESTAMP);
-    
+    printf("\033[32mdone!\033[m audio uploaded to enclave{%s:%d}\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT);
     exit(0);
 }

@@ -20,12 +20,17 @@
 #include "xxd.h"
 #include "base64.h"
 #include "http.h"
+#include "clap.h"
 
 
 //// attestation ////
 int vc_attest(
         char *enclave_name, size_t enclave_name_len,
         uint8_t *enclave_cert_hash, size_t *enclave_cert_hash_len) {
+    printf("attesting %s:%d\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT);
+
     // check buffer sizes here, with the current Veracruz implementation
     // these are fixed sizes
     if (enclave_name_len < 7+1 || *enclave_cert_hash_len < 32) {
@@ -39,7 +44,9 @@ int vc_attest(
     sys_rand_get(challenge, sizeof(challenge));
 
     // TODO log? can we incrementally log?
-    printf("attest: challenge: ");
+    // TODO VERACRUZ_POLICY_HASH should be raw bytes
+    printf("policy: %s\n", VERACRUZ_POLICY_HASH);
+    printf("challenge: ");
     hex(challenge, sizeof(challenge));
     printf("\n");
 
@@ -73,15 +80,16 @@ int vc_attest(
         return request_len;
     }
 
-    printf("request:\n");
-    xxd(request_buf, request_len);
+//    printf("request:\n");
+//    xxd(request_buf, request_len);
 
     // POST challenge
-    printf("connecting to %s:%d...\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
+//    printf("connecting to %s:%d...\n",
+//            VERACRUZ_SERVER_HOST,
+//            VERACRUZ_SERVER_PORT);
     uint8_t pat_buf[1024];
     memset(pat_buf, 0, sizeof(pat_buf));
+    printf("veracruz_server -> POST /veracruz_server, %d bytes\n", request_len);
     ssize_t pat_len = http_post(
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT,
@@ -94,19 +102,22 @@ int vc_attest(
         printf("http_post failed (%d)\n", pat_len);
         return pat_len;
     }
-
-    printf("http_post -> %d\n", pat_len);
-    printf("attest: challenge response:\n");
-    xxd(pat_buf, pat_len);
+    printf("veracruz_server <- 200 OK, %d bytes\n", pat_len);
+//    printf("attest: challenge response:\n");
+//    xxd(pat_buf, pat_len);
 
     // forward to proxy attestation server
-    printf("connecting to %s:%d...\n",
+//    printf("connecting to %s:%d...\n",
+//            PROXY_ATTESTATION_SERVER_HOST,
+//            PROXY_ATTESTATION_SERVER_PORT);
+    printf("forwarding challenge response to %s:%d\n",
             PROXY_ATTESTATION_SERVER_HOST,
             PROXY_ATTESTATION_SERVER_PORT);
     uint8_t response_buf[256];
     // TODO we shouldn't need to zero this, but we do, fix?
     // TODO the issue is base64 decoding with no null-terminator
     memset(response_buf, 0, sizeof(response_buf));
+    printf("proxy_attestation_server -> POST /VerifyPAT, %d bytes\n", pat_len);
     ssize_t response_len = http_post(
             PROXY_ATTESTATION_SERVER_HOST,
             PROXY_ATTESTATION_SERVER_PORT,
@@ -119,10 +130,11 @@ int vc_attest(
         printf("http_post failed (%d)\n", response_len);
         return response_len;
     }
+    printf("proxy_attestation_server <- 200 OK, %d bytes\n", response_len);
 
-    printf("http_post -> %d\n", response_len);
-    printf("attest: PAT response:\n");
-    xxd(response_buf, response_len);
+//    printf("http_post -> %d\n", response_len);
+//    printf("attest: PAT response:\n");
+//    xxd(response_buf, response_len);
 
     // decode base64
     ssize_t verif_len = base64_decode(
@@ -133,8 +145,8 @@ int vc_attest(
         return verif_len;
     }
     
-    printf("attest: PAT decoded response:\n");
-    xxd(response_buf, verif_len);
+//    printf("attest: PAT decoded response:\n");
+//    xxd(response_buf, verif_len);
 
     if (verif_len < 131) {
         printf("pat response too small\n");
@@ -181,14 +193,18 @@ int vc_attest(
     memcpy(enclave_cert_hash, &response_buf[86], 32);
     *enclave_cert_hash_len = 32;
 
-    printf("enclave name: %s\n", enclave_name);
-    printf("enclave hash: ");
+    printf("\033[32msuccessfully attested %s:%d\033[m\n",
+        VERACRUZ_SERVER_HOST,
+        VERACRUZ_SERVER_PORT);
+    printf("\033[32menclave name:\033[m %s\n", enclave_name);
+    printf("\033[32menclave hash:\033[m ");
     hex(&response_buf[47], 32);
     printf("\n");
-    printf("enclave cert hash: ");
+    printf("\033[32menclave cert hash:\033[m ");
     hex(enclave_cert_hash, *enclave_cert_hash_len);
     printf("\n");
 
+    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;
 }
 
@@ -197,14 +213,19 @@ int vc_attest(
 static void mbedtls_debug(void *ctx, int level,
         const char *file, int line,
         const char *str) {
-    const char *basename = file;
-    for (int i = 0; file[i]; i++) {
-        if (file[i] == '/') {
-            basename = &file[i+1];
-        }
+    if (level <= 1) {
+        printf("%s", str);
     }
 
-    printf("%s:%d %s", basename, line, str);
+    //k_sleep(Z_TIMEOUT_MS(1));
+//    const char *basename = file;
+//    for (int i = 0; file[i]; i++) {
+//        if (file[i] == '/') {
+//            basename = &file[i+1];
+//        }
+//    }
+//
+//    printf("%s:%d %s", basename, line, str);
 }
 
 static int vc_rawrng(void *p,
@@ -241,10 +262,11 @@ static ssize_t vc_rawsend(void *p,
     data_len += res;
 
     // send data over HTTP POST
-    printf("sending to %s:%d:\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
-    xxd(vc->send_buf, data_len);
+//    printf("sending to %s:%d:\n",
+//            VERACRUZ_SERVER_HOST,
+//            VERACRUZ_SERVER_PORT);
+//    xxd(vc->send_buf, data_len);
+    printf("veracruz_server -> POST /runtime_manager, %d bytes\n", data_len);
     ssize_t recv_len = http_post(
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT,
@@ -257,22 +279,24 @@ static ssize_t vc_rawsend(void *p,
         printf("http_post failed (%d)\n", recv_len);
         return recv_len;
     }
+    printf("veracruz_server <- 200 OK, %d bytes\n", recv_len);
 
-    printf("http_post -> %d\n", recv_len);
+    //printf("http_post -> %d\n", recv_len);
 
     if (recv_len == 0) {
         // done, recieved nothing
         return len;
     }
 
-    printf("ssl session: recv:\n");
-    xxd(vc->recv_buf, recv_len);
+//    printf("ssl session: recv:\n");
+//    xxd(vc->recv_buf, recv_len);
 
     // null terminate to make parsing a bit easier
     vc->recv_buf[recv_len] = '\0';
 
     // we have a bit of parsing to do, first decode session id
     const uint8_t *parsing = vc->recv_buf;
+    bool session_id_was_zero = vc->session_id == 0;
     vc->session_id = strtol(parsing, (char **)&parsing, 10);
     if (parsing == vc->recv_buf) {
         printf("failed to parse session id\n");
@@ -280,7 +304,9 @@ static ssize_t vc_rawsend(void *p,
     }
     // skip space
     parsing += 1;
-    printf("session id: %d\n", vc->session_id);
+    if (session_id_was_zero) {
+        printf("\033[32mestablished session id:\033[m %d\n", vc->session_id);
+    }
 
     // parse out base64 blobs, shuffling to front of our buffer
     uint8_t *parsed = vc->recv_buf;
@@ -310,8 +336,8 @@ static ssize_t vc_rawsend(void *p,
     vc->recv_pos = vc->recv_buf;
     vc->recv_len = parsed - vc->recv_buf;
 
-    printf("ssl session: parsed:\n");
-    xxd(vc->recv_pos, vc->recv_len);
+//    printf("ssl session: parsed:\n");
+//    xxd(vc->recv_pos, vc->recv_len);
 
     // done!
     return len;
@@ -447,6 +473,13 @@ int vc_connect(vc_t *vc,
             vc_rawrecv);
 
     // perform SSL handshake
+    printf("beginning TLS handshake with enclave{%s:%d}\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT);
+    printf("enclave cert hash: "); 
+    hex(enclave_cert_hash, enclave_cert_hash_len);
+    printf("\n");
+    printf("client cert hash: %s\n", CLIENT_CERT_HASH);
     err = mbedtls_ssl_handshake(&vc->session);
     if (err) {
         printf("mbedtls_ssl_handshake failed (%d)\n", err);
@@ -460,6 +493,10 @@ int vc_connect(vc_t *vc,
     }
 
     // success!
+    printf("\033[32mestablished TLS session with enclave{%s:%d}\033[m\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT);
+    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;
 }
 
@@ -515,6 +552,10 @@ int vc_send_data(vc_t *vc,
         const char *name,
         const uint8_t *data,
         size_t data_len) {
+    printf("sending data to enclave{%s:%d}/%s, %d bytes\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT,
+            name, data_len);
     // construct data protobuf
     Tp_MexicoCityRequest send_data = {
         .which_message_oneof = Tp_MexicoCityRequest_data_tag,
@@ -551,8 +592,8 @@ int vc_send_data(vc_t *vc,
     }
 
     // TODO log? can we incrementally log?
-    printf("send_data: %s:\n", name);
-    xxd(proto_buf, proto_stream.bytes_written);
+//    printf("send_data: %s:\n", name);
+//    xxd(proto_buf, proto_stream.bytes_written);
 
     // send to Veracruz
     int res = mbedtls_ssl_write(&vc->session,
@@ -571,8 +612,8 @@ int vc_send_data(vc_t *vc,
         return res;
     }
 
-    printf("send_data: response:\n");
-    xxd(proto_buf, res);
+//    printf("send_data: response:\n");
+//    xxd(proto_buf, res);
 
     // parse
     Tp_MexicoCityResponse response;
@@ -593,6 +634,15 @@ int vc_send_data(vc_t *vc,
         return -EACCES;
     }
 
+    printf("enclave{%s:%d} responded with success\n",
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT);
+    printf("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m\n",
+            data_len,
+            VERACRUZ_SERVER_HOST,
+            VERACRUZ_SERVER_PORT,
+            name);
+    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;
 }
 

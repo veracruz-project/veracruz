@@ -26,7 +26,7 @@ static void http_get_cb(
 //            "should handle this\n", state);
 //    }
 
-    printf("rsp = %s (%d bytes)\n", rsp->http_status, rsp->data_len);
+//    printf("rsp = %s (%d bytes)\n", rsp->http_status, rsp->data_len);
 
     struct http_get_state *state = udata;
     uint8_t *start = (rsp->body_start) ? rsp->body_start : rsp->recv_buf;

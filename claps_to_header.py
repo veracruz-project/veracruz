@@ -135,6 +135,10 @@ def main(args):
             f.writeln('#define CLAP_DATA_NAME "input-%(clap)d"',
                 clap=args.clap)
             f.writeln()
+            f.writeln('// delay used for demos')
+            f.writeln('#define DELAY %(delay)d',
+                delay=args.delay)
+            f.writeln()
             f.writeln('#endif')
 
     if args.source:
@@ -178,6 +182,8 @@ if __name__ == "__main__":
         help='Samples after peaks')
     parser.add_argument('-d', '--debug', action='store_true',
         help='Show found claps')
+    parser.add_argument('--delay', type=int, default='0',
+        help='Delay (used for demos)')
     parser.add_argument('--header',
         help='Output header file (.h)')
     parser.add_argument('--source',
