@@ -8,7 +8,7 @@ import time
 def dump_gps(location):
     absy = abs(location[0])
     absx = abs(location[1])
-    return '%d°%02d′%02d.%02d″%c %d°%02d′%02d.%02d″%c' % (
+    return '%d°%02d\'%02d.%02d"%c %d°%02d\'%02d.%02d"%c' % (
         absy / (1024*1024),
         (absy / (1024*1024/60)) % 60,
         (absy / (1024*1024/60/60)) % 60,
