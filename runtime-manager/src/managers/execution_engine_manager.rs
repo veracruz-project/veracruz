@@ -157,7 +157,7 @@ fn dispatch_on_stream(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(
+    protocol_state.append_file(
         &Principal::Participant(client_id),
         file_name.as_str(),
         data.as_slice(),

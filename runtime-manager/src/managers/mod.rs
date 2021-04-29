@@ -90,6 +90,8 @@ pub(crate) struct ProtocolState {
     expected_shutdown_sources: Vec<u64>,
     /// The ref to the VFS.
     vfs: Arc<Mutex<FileSystem>>,
+    /// Digest table. Certain files must match the digest before writting to the filesystem.
+    digest_table: HashMap<String, Vec<u8>>,
 }
 
 impl ProtocolState {
@@ -103,7 +105,7 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let right_table = global_policy.get_rights_table();
-        //let program_digests = global_policy.get_program_digests()?;
+        let digest_table = global_policy.get_digest_table()?;
         let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
 
         Ok(ProtocolState {
@@ -111,6 +113,7 @@ impl ProtocolState {
             global_policy_hash,
             expected_shutdown_sources,
             vfs,
+            digest_table,
             is_modified: true,
         })
     }
@@ -145,23 +148,57 @@ impl ProtocolState {
         file_name: &str,
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
+
+        // Check the digest, if necessary
+        if let Some(digest) = self.digest_table.get(file_name) {
+            let incoming_digest = Self::sha_256_digest(data);
+            if incoming_digest.len() != digest.len() {
+                return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
+            }
+            for (lhs, rhs) in digest.iter().zip(incoming_digest.iter()) {
+                if lhs != rhs {
+                    return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
+                }
+            }
+        }
+        // Set the modified flag 
         self.is_modified = true;
         self.vfs.lock()?.write_file_by_filename(
             client_id,
             file_name,
             data,
+            false,
         )?;
         Ok(())
     }
 
-    /// Check if a client has capability to write to a file, and then append it with new `data`.
+    /// Compute the digest of a `buffer`
+    fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
+        ring::digest::digest(&ring::digest::SHA256, buffer)
+            .as_ref()
+            .to_vec()
+    }
+
+    /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
     pub(crate) fn append_file(
         &mut self,
         client_id: &Principal,
         file_name: &str,
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
-        //TODO !
+        // If a file must match a digest, e.g. a program, 
+        // it is not permitted to append the file.
+        if self.digest_table.contains_key(file_name) {
+            return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
+        }
+        self.is_modified = true;
+        self.vfs.lock()?.write_file_by_filename(
+            client_id,
+            file_name,
+            data,
+            // set the append flag to true
+            true,
+        )?;
         Ok(())
     }
 
