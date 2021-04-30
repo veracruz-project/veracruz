@@ -1,6 +1,6 @@
 //! A synthetic filesystem.
 //!
-//! This virtual file system(VFS) for Veracruz runtime and execution engine.
+//! This virtual file system(VFS) for Veracruz runtime and axecution engine.
 //! The VFS adopts most WASI API with *strict typing* and *Rust-style error handling*. 
 //! The Veracruz runtime will use this VFS directly, while any execution engine 
 //! can wrap all methods here to match the WASI API.
@@ -21,6 +21,7 @@ use wasi_types::{
     PreopenType
 };
 use veracruz_utils::policy::principal::{RightTable, Principal};
+use platform_services::{getrandom, result};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -181,8 +182,6 @@ impl FileSystem {
         // Install directory??
         self.install_dir(Self::ROOT_DIRECTORY,&Self::ROOT_DIRECTORY_INODE);
         self.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
-        //TODO remove test stub
-        self.install_file("input.txt",&(42 as u64).into(), "test content".as_bytes());
         self.install_file("stderr",&(11 as u64).into(), "".as_bytes());
         self.install_fd(&Fd(2),&(11 as u64).into());
         self
@@ -285,7 +284,7 @@ impl FileSystem {
     ///    the file-descriptor is closed and no longer a valid file-descriptor.
     pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
         println!("call fd_close on {:?}", fd);
-        self.file_table.remove(&fd).ok_or(ErrNo::BadF);
+        self.file_table.remove(&fd).ok_or(ErrNo::BadF)?;
         Ok(())
     }
 
@@ -725,6 +724,18 @@ impl FileSystem {
         unimplemented!()
     }
 
+    pub(crate) fn random_get(&mut self, buf_len: Size) -> FileSystemError<Vec<u8>> {
+        let mut buf = vec![0; buf_len as usize];
+       if let result::Result::Success = getrandom(&mut buf) {
+            Ok(buf)
+        } else {
+            Err(ErrNo::NoSys)
+        }
+    }
+}
+
+/// Public interface for the filesystem. It will be used by the veracruz runtime.
+impl FileSystem {
     /// TODO: DOC
     pub fn write_file_by_filename(
         &mut self,
@@ -752,7 +763,7 @@ impl FileSystem {
             .contains(Rights::FD_WRITE | Rights::FD_SEEK) {
                 return Err(ErrNo::Access);
         }
-        if is_append { self.fd_seek(&fd, 0, Whence::End); }
+        if is_append { self.fd_seek(&fd, 0, Whence::End)?; }
         self.fd_write_base(&fd,data.to_vec())?;
         self.fd_close(fd)?;
         Ok(())

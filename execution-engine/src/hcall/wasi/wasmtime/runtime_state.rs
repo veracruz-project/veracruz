@@ -14,7 +14,6 @@ use std::convert::TryFrom;
 use crate::{
     fs::FileSystem,
     hcall::common::{
-        pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
         WASIWrapper, MemoryHandler, WASIAPIName
     }
@@ -43,6 +42,18 @@ lazy_static! {
     static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new()))), Principal::NoCap));
     // The initial value has NO use.
     static ref CUR_PROGRAM: Mutex<Principal> = Mutex::new(Principal::NoCap);
+}
+
+/// A macro for lock the global VFS and store the result in the variable, 
+/// which will be captured by `$vfs` in the macro.
+/// If the locks fails, it returns Busy error code.
+macro_rules! lock_vfs {
+    () => {
+        match VFS_INSTANCE.lock() {
+            Ok(v) => v,
+            Err(_) => return ErrNo::Busy as u32,
+        }
+    }
 }
 
 /// Impl the MemoryHandler for Caller.
@@ -129,37 +140,6 @@ impl WasmtimeRuntimeState {
         Self{}
     }
 
-
-    //TODO REMOVE REMOVE
-    /// ExecutionEngine wrapper of append_file implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn append_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        Ok(())
-        //VFS_INSTANCE.lock()?.append_file_base(client_id,file_name, data)
-    }
-
-    /// ExecutionEngine wrapper of write_file implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn write_file(client_id: &Principal, file_name: &str, data: &[u8]) -> Result<(), HostProvisioningError> {
-        Ok(())
-        //VFS_INSTANCE.lock()?.write_file_base(client_id,file_name, data)
-    }
-
-    /// ExecutionEngine wrapper of read_file implementation in WasmiHostProvisioningState.
-    #[inline]
-    fn read_file(client_id: &Principal, file_name: &str) -> Result<Option<Vec<u8>>, HostProvisioningError> {
-        Ok(None)
-        //VFS_INSTANCE.lock()?.read_file_base(client_id,file_name)
-    }
-
-    #[inline]
-    fn count_file(prefix: &str) -> Result<u64, HostProvisioningError> {
-        Ok(0)
-        //VFS_INSTANCE.lock()?.count_file_base(prefix)
-    }
-    //TODO REMOVE REMOVE
-
-
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
@@ -196,46 +176,17 @@ impl WasmtimeRuntimeState {
                     let host_call_body = match WASIAPIName::try_from(import.name())
                         .map_err(|_|{ Trap::new(format!("Veracruz programs support only the Veracruz host interface.  Unrecognised host call: '{}'.", import.name()))
                     })? {
-                        WASIAPIName::PROC_EXIT => 
-                            Func::wrap(&store, |caller: Caller, exit_code: u32| {
-                                Self::wasi_proc_exit(caller, exit_code);
-                            }),
-                        WASIAPIName::FD_CLOSE => 
-                            Func::wrap(&store, |caller: Caller, fd: u32| {
-                                Self::wasi_fd_close(caller, fd) as i32
-                            }),
-                        WASIAPIName::FD_WRITE => 
-                            Func::wrap(&store, |caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32| {
-                                Self::wasi_fd_write(caller, fd, iovec_base, iovec_number, address) as i32
-                            }),
-                        WASIAPIName::PATH_OPEN => 
-                            Func::wrap(&store, |caller: Caller, fd: u32, dir_flags: u32, path_address: u32, path_length: u32, oflags : u32, fs_rights_base: u64, fs_rights_inheriting: u64, fd_flags: u32, address: u32| {
-                                Self::wasi_path_open(caller, fd, dir_flags, path_address, path_length, oflags, fs_rights_base, fs_rights_inheriting, fd_flags, address) as i32
-                            }),
-                        WASIAPIName::FD_PRESTAT_GET =>
-                            Func::wrap(&store, |caller: Caller, fd: u32, address: u32| {
-                                Self::wasi_fd_prestat_get(caller, fd, address) as i32
-                            }),
-                        WASIAPIName::FD_PRESTAT_DIR_NAME =>
-                            Func::wrap(&store, |caller: Caller, fd: u32, address: u32, size:u32| {
-                                Self::wasi_fd_prestat_dir_name(caller, fd, address, size) as i32
-                            }),
-                        WASIAPIName::ENVIRON_GET => 
-                            Func::wrap(&store, |caller: Caller, address: u32, buf_address: u32| {
-                                Self::wasi_environ_get(caller, address, buf_address) as i32
-                            }),
-                        WASIAPIName::ENVIRON_SIZES_GET => 
-                            Func::wrap(&store, |caller: Caller, address: u32, bufsize_address: u32| {
-                                Self::wasi_environ_size_get(caller, address, bufsize_address) as i32
-                            }),
-                        WASIAPIName::FD_FILESTAT_GET => 
-                            Func::wrap(&store, |caller: Caller, fd: u32, address: u32| {
-                                Self::wasi_fd_filestat_get(caller, fd, address) as i32
-                            }),
-                        WASIAPIName::FD_READ => 
-                            Func::wrap(&store, |caller: Caller, fd: u32, iovec_base: u32, iovec_len: u32, address: u32| {
-                                Self::wasi_fd_read(caller, fd, iovec_base, iovec_len, address) as i32
-                            }),
+                        WASIAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
+                        WASIAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
+                        WASIAPIName::FD_WRITE => Func::wrap(&store, Self::wasi_fd_write),
+                        WASIAPIName::PATH_OPEN => Func::wrap(&store, Self::wasi_path_open),
+                        WASIAPIName::FD_PRESTAT_GET => Func::wrap(&store, Self::wasi_fd_prestat_get),
+                        WASIAPIName::FD_PRESTAT_DIR_NAME => Func::wrap(&store, Self::wasi_fd_prestat_dir_name),
+                        WASIAPIName::ENVIRON_GET => Func::wrap(&store, Self::wasi_environ_get),
+                        WASIAPIName::ENVIRON_SIZES_GET => Func::wrap(&store, Self::wasi_environ_size_get),
+                        WASIAPIName::FD_FILESTAT_GET => Func::wrap(&store, Self::wasi_fd_filestat_get),
+                        WASIAPIName::FD_READ => Func::wrap(&store, Self::wasi_fd_read),
+                        WASIAPIName::RANDOM_GET => Func::wrap(&store, Self::wasi_random_get),
                         // TODO: FILL IN THE FUNCTION CALL
                         // TODO: FILL IN THE FUNCTION CALL
                         // TODO: FILL IN THE FUNCTION CALL
@@ -307,36 +258,25 @@ impl WasmtimeRuntimeState {
     }
 
     // TODO the return type??
-    fn wasi_proc_exit(_caller: Caller, _exit_code: u32) -> WasmtimeResult {
-        Ok(i32::from(EngineReturnCode::Success))
+    fn wasi_proc_exit(_caller: Caller, _exit_code: u32) {
+        //TODO store the exit code somewhere
     }
 
-    fn wasi_fd_close(_caller: Caller, fd: u32) -> ErrNo {
+    fn wasi_fd_close(_caller: Caller, fd: u32) -> u32 {
         println!("call wasi_fd_close");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-
-        vfs.fd_close(fd)
+        let mut vfs = lock_vfs!();
+        vfs.fd_close(fd) as u32
     }
 
-    fn wasi_fd_write(mut caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32) -> ErrNo {
+    fn wasi_fd_write(mut caller: Caller, fd: u32, iovec_base: u32, iovec_number: u32, address: u32) -> u32 {
         println!("call wasi_fd_write: fd {:?} iovec_base {:?} iovec_nunmber {:?} address {:?}", fd,iovec_base,iovec_number,address);
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-
-        vfs.fd_write(&mut caller, fd, iovec_base, iovec_number, address)
+        let mut vfs = lock_vfs!();
+        vfs.fd_write(&mut caller, fd, iovec_base, iovec_number, address) as u32
     }
 
-    fn wasi_path_open(mut caller: Caller, fd: u32, dir_flags: u32, path_address: u32, path_length: u32, oflags : u32, fs_rights_base: u64, fs_rights_inheriting: u64, fd_flags: u32, address: u32) -> ErrNo {
+    fn wasi_path_open(mut caller: Caller, fd: u32, dir_flags: u32, path_address: u32, path_length: u32, oflags : u32, fs_rights_base: u64, fs_rights_inheriting: u64, fd_flags: u32, address: u32) -> u32 {
         println!("call wasi_path_open");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut vfs = lock_vfs!();
         vfs.path_open(
             &mut caller,
             fd,
@@ -348,47 +288,34 @@ impl WasmtimeRuntimeState {
             fs_rights_inheriting,
             fd_flags,
             address,
-        )
+        ) as u32
     }
 
-    fn wasi_fd_prestat_get(mut caller: Caller, fd: u32, address: u32) -> ErrNo {
+    fn wasi_fd_prestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
         println!("call wasi_fd_prestat_get");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-        vfs.fd_prestat_get(&mut caller, fd, address)
+        let mut vfs = lock_vfs!();
+        vfs.fd_prestat_get(&mut caller, fd, address) as u32
     }
 
-    fn wasi_fd_prestat_dir_name(mut caller: Caller, fd: u32, address: u32, size: u32) -> ErrNo {
+    fn wasi_fd_prestat_dir_name(mut caller: Caller, fd: u32, address: u32, size: u32) -> u32 {
         println!("call wasi_fd_prestat_dir_name");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-
-        vfs.fd_prestat_dir_name(&mut caller, fd,address,size) 
+        let mut vfs = lock_vfs!();
+        vfs.fd_prestat_dir_name(&mut caller, fd,address,size) as u32
     }
 
-    fn wasi_environ_get(mut caller: Caller, environ_address: u32, environ_buf_address: u32) -> ErrNo {
+    fn wasi_environ_get(mut caller: Caller, environ_address: u32, environ_buf_address: u32) -> u32 {
         println!("call wasi_environ_get");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-        vfs.environ_get(&mut caller, environ_address, environ_buf_address)
+        let mut vfs = lock_vfs!(); 
+        vfs.environ_get(&mut caller, environ_address, environ_buf_address) as u32
     }
 
-    fn wasi_environ_size_get(mut caller: Caller, environc_address: u32, environ_buf_size_address: u32) -> ErrNo {
+    fn wasi_environ_size_get(mut caller: Caller, environc_address: u32, environ_buf_size_address: u32) -> u32 {
         println!("call wasi_environ_size_get");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
-        vfs.environ_sizes_get(&mut caller, environc_address, environ_buf_size_address)
+        let mut vfs = lock_vfs!();
+        vfs.environ_sizes_get(&mut caller, environc_address, environ_buf_size_address) as u32
     }
 
-    fn wasi_fd_filestat_get(caller: Caller, fd: u32, address: u32) -> ErrNo {
+    fn wasi_fd_filestat_get(caller: Caller, fd: u32, address: u32) -> u32 {
         //let memory = match caller
             //.get_export(LINEAR_MEMORY_NAME)
             //.and_then(|export| export.into_memory()) {
@@ -405,17 +332,19 @@ impl WasmtimeRuntimeState {
         //};
 
         //Self::write_buffer(memory, address, &pack_filestat(&result));
-        ErrNo::Success
+        ErrNo::Success as u32
     }
 
-    fn wasi_fd_read(mut caller: Caller, fd: u32, iovec_base: u32, iovec_count:u32, address: u32) -> ErrNo {
+    fn wasi_fd_read(mut caller: Caller, fd: u32, iovec_base: u32, iovec_count:u32, address: u32) -> u32 {
         println!("call wasi_fd_read");
-        let mut vfs = match VFS_INSTANCE.lock() {
-            Ok(v) => v,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut vfs = lock_vfs!();
+        vfs.fd_read(&mut caller, fd, iovec_base, iovec_count, address) as u32
+    }
 
-        vfs.fd_read(&mut caller, fd, iovec_base, iovec_count, address)
+    fn wasi_random_get(mut caller: Caller, address: u32, length: u32) -> u32 {
+        println!("call wasi_random_get");
+        let mut vfs = lock_vfs!();
+        vfs.random_get(&mut caller, address, length) as u32
     }
 }
 
