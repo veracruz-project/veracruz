@@ -235,7 +235,7 @@ impl ProtocolState {
         let execution_strategy = self.global_policy.execution_strategy();
         let return_code = execute(&execution_strategy, self.vfs.clone(), file_name)?;
 
-        let response = if return_code == EngineReturnCode::Success {
+        let response = if return_code == ErrNo::Success {
             let result = self.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
             Self::response_success(result)
         } else {
@@ -256,10 +256,10 @@ impl ProtocolState {
     }
 
     #[inline]
-    fn response_error_code_returned(error_code: EngineReturnCode) -> std::vec::Vec<u8> {
+    fn response_error_code_returned(error_code: ErrNo) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(
             transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
-            Some(i32::from(error_code).to_le_bytes().to_vec()),
+            Some(i32::from(error_code as u16).to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!(err))
     }

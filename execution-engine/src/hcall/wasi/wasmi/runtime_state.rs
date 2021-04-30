@@ -81,6 +81,8 @@ pub(crate) struct WASMIRuntimeState {
     memory: Option<MemoryRef>,
     /// Ref to the program that is executed
     program: Principal,
+    /// the return code
+    return_code: Option<u32>,
 }
 pub(crate) type WASIError = Result<ErrNo, FatalEngineError>;
 
@@ -954,7 +956,7 @@ fn check_main_signature(signature: &Signature) -> EntrySignature {
 
     if params == [] && return_type == None {
         EntrySignature::NoParameters
-    } else if params == [ValueType::I32, ValueType::I32] && return_type == Some(ValueType::I32) {
+    } else if params == [ValueType::I32, ValueType::I32] && return_type == None {
         EntrySignature::ArgvAndArgc
     } else {
         EntrySignature::NoEntryFound
@@ -1109,6 +1111,7 @@ impl WASMIRuntimeState {
             program: Principal::NoCap,
             program_module: None,
             memory: None,
+            return_code: None,
         }
         //NOTE: cannot find a way to immediately call the load_program here,
         // therefore we might eliminate the Option program_module and memory.
@@ -1656,25 +1659,18 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_seek` function.
     fn wasi_fd_seek(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_seek");
-        //if args.len() != 4 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_FD_SEEK_NAME,
-            //));
-        //}
+        if args.len() != 4 {
+            return Err(FatalEngineError::bad_arguments_to_host_function(
+                WASIAPIName::FD_SEEK,
+            ));
+        }
 
-        //let fd: Fd = args.nth::<u32>(0).into();
-        //let offset: FileDelta = args.nth::<i64>(1);
-        //let whence: Whence = match args.nth::<u8>(2).try_into() {
-            //Ok(whence) => whence,
-            //Err(_err) => return Ok(ErrNo::Inval),
-        //};
-        //let address: u32 = args.nth(3);
+        let fd = args.nth::<u32>(0);
+        let offset = args.nth::<i64>(1);
+        let whence = args.nth::<u8>(2);
+        let address = args.nth::<u32>(3);
 
-        //let result = self.vfs.fd_seek(&fd, offset, whence)?;
-
-        //self.write_buffer(address, &u64::to_le_bytes(result))?;
-
-        Ok(ErrNo::Success)
+        Ok(self.vfs.fd_seek(&mut self.deref_memory()?, fd, offset, whence, address))
     }
 
     /// The implementation of the WASI `fd_sync` function.  This is not
@@ -1947,11 +1943,13 @@ impl WASMIRuntimeState {
             ));
         }
 
-        let exit_code: i32 = args.nth(0);
+        let exit_code: u32 = args.nth(0);
+        println!("call wasi_proc_exit with: {}",exit_code);
+        self.return_code = Some(exit_code);
 
         // NB: this gets routed to the runtime, not the calling WASM program,
         // for handling.
-        Err(FatalEngineError::EarlyExit(exit_code))
+        Ok(ErrNo::Success)
     }
 
     /// The implementation of the WASI `proc_raise` function.  This is not
@@ -2072,27 +2070,31 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<EngineReturnCode, FatalEngineError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<ErrNo, FatalEngineError> {
         //TODO change error type
         let program = self.vfs.read_file_by_filename(file_name)?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());
 
-        match self.invoke_export(WASIWrapper::ENTRY_POINT_NAME) {
+        let return_code = match self.invoke_export(WASIWrapper::ENTRY_POINT_NAME) {
             Ok(None) => {
-                // TODO ADD correct return
-                EngineReturnCode::try_from(0)
+                Ok(self.return_code.unwrap_or(0))
             }
             Ok(Some(_)) => {
                 Err(FatalEngineError::ReturnedCodeError)
             }
             Err(Error::Trap(trap)) => {
-                Err(FatalEngineError::WASMITrapError(trap))
+                // NOTE: Surpress the trap, if the `proc_exit` is called.
+                //       In this case, the error code is self.return_code.
+                self.return_code.ok_or(FatalEngineError::WASMITrapError(trap))
             }
             Err(err) => {
                 Err(FatalEngineError::WASMIError(err))
             }
-        }
+        }?;
+
+        let return_code = u16::try_from(return_code).map_err(|_|FatalEngineError::ReturnedCodeError)?;
+        Ok(ErrNo::try_from(return_code).map_err(|_|FatalEngineError::ReturnedCodeError)?)
     }
 }
 

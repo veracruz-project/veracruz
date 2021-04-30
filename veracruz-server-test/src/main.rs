@@ -128,6 +128,8 @@ mod tests {
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
 
         SETUP.call_once(|| {
+            std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
+            env_logger::init();
             info!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
@@ -306,7 +308,7 @@ mod tests {
             CLIENT_CERT,
             CLIENT_KEY,
             Some(READ_FILE_WASM),
-            &[],
+            &[("input.txt", STRING_1_DATA)],
             &[],
             false,
         );
@@ -574,7 +576,7 @@ mod tests {
     /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
     /// A standard one data source and two stream sources scenario with attestation.
     fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
-        let result = test_template::<f64>(
+        let result = test_template::<(u64, f64)>(
             NUMBER_STREAM_ACCUMULATION_POLICY,
             CLIENT_CERT,
             CLIENT_KEY,

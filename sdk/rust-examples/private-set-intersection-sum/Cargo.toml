@@ -1,0 +1,18 @@
+[package]
+name = "private-set-intersection-sum"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Computes the sum of values associated with keys k_i appearing in set A where k_i also appears in set B."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pinecone = "*"
+serde = { version = "1.0.3", features = ["derive"] }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3

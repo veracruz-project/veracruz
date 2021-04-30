@@ -260,14 +260,14 @@ number-stream-accumulation.json: pgen css.bin program_client_cert.pem data_clien
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0)
 
 basic_file_read_write.json: pgen css.bin client_rsa_cert.pem read-file.wasm 
-	./pgen --certificate client_rsa_cert.pem --capability "input.txt: $(WRITE_RIGHT), output.txt : $(READ_RIGHT), read-file.wasm : $(WRITE_RIGHT)" \
-		--binary read-file.wasm --capability "input.txt: $(READ_RIGHT), output.txt : $(WRITE_RIGHT)" \
+	./pgen --certificate client_rsa_cert.pem --capability "input.txt: $(WRITE_RIGHT), output : $(READ_RIGHT), read-file.wasm : $(WRITE_RIGHT)" \
+		--binary read-file.wasm --capability "input.txt: $(READ_RIGHT), output : $(WRITE_RIGHT)" \
         --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0)
 
 .SECONDEXPANSION:
-$(WASM_PROG_FILES) : %.wasm: ../sdk/rust-language-support/examples/%/target/wasm32-wasi/release/$$@
+$(WASM_PROG_FILES) : %.wasm: ../sdk/rust-examples/%/target/wasm32-wasi/release/$$@
 	cp $< $@
 
 $(DATA_FILES) : %.dat: ../sdk/datasets/%.dat 

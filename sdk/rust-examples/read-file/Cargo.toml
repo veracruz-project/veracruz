@@ -1,0 +1,17 @@
+[package]
+name = "read-file"
+version = "0.1.0"
+authors = ["Shale Xiong <shale.xiong@arm.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pinecone = "*"
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+
