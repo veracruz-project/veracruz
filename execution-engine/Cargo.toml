@@ -31,6 +31,7 @@ wast = "=35.0.0"
 num-traits = {version = "0.2", default-features=false}
 num-derive = {version = "0.3", default-features=false} 
 num = {version = "0.4", default-features=false}
+anyhow = {version = "1.0", default-features = false}
 
 [lib]
 name = "execution_engine"

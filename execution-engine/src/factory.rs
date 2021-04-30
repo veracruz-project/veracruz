@@ -55,7 +55,7 @@ pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: Arc<Mutex<FileSystem>>,
     program_name: &str,
-) -> Result<EngineReturnCode, FatalEngineError> {
+) -> Result<wasi_types::ErrNo, FatalEngineError> {
     // TODO MODIFY when `new` directly fill in a program this can simply the wasmi impl esp. option
     // on memory and program module.
     let mut engine : Box<dyn ExecutionEngine> = match strategy {

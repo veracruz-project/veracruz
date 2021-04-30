@@ -640,16 +640,23 @@ impl WASIWrapper {
     #[inline]
     pub(crate) fn fd_seek(
         &mut self,
-        fd: &Fd,
-        offset: FileDelta,
-        whence: Whence,
+        memory_ref: &mut impl MemoryHandler,
+        fd: u32,
+        offset: i64,
+        whence: u8,
+        address: u32,
     ) -> ErrNo {
+        let whence = match Whence::try_from(whence) {
+            Ok(o) => o,
+            Err(e) => return ErrNo::Inval,
+        };
         let mut fs = lock_vfs!(self);
-        match fs.fd_seek(fd, offset, whence) {
-            // TODO fill
-            Ok(o) => ErrNo::Success,
-            Err(e) => e,
-        }
+        let new_offset = match fs.fd_seek(&fd.into(), offset, whence) {
+            Ok(o) => o,
+            Err(e) => return e,
+        };
+        println!("new_offset {:?} to fd {:?}", new_offset, fd);
+        memory_ref.write_buffer(address, &u64::to_le_bytes(new_offset))
     }
 
     #[inline]
@@ -816,6 +823,10 @@ impl WASIWrapper {
 /// about what is going on inside the enclave.
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum FatalEngineError {
+    /// The WASM module supplied by the program supplier was invalid and could
+    /// not be parsed.
+    #[error(display = "FatalEngineError: Invalid WASM program (e.g. failed to parse it).")]
+    InvalidWASMModule,
     /// The WASM program called `proc_exit`, or similar, to signal an early exit
     /// from the program, returning a specific error code.
     #[error(
@@ -884,7 +895,7 @@ pub enum FatalEngineError {
     #[error(display = "FatalEngineError: Execution engine is not ready.")]
     EngineIsNotReady,
     /// Wrapper for direct error message.
-    #[error(display = "FatalEngineError: WASM program returns code other than i32.")]
+    #[error(display = "FatalEngineError: WASM program returns code other than wasi ErrNo.")]
     ReturnedCodeError,
     /// A lock could not be obtained for some reason.
     #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
@@ -902,8 +913,15 @@ pub enum FatalEngineError {
         file_name
     )]
     ProgramCannotFound { file_name: String },
+    //TODO CHANGE should be general
     #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
     WASIError(#[source(error)] wasi_types::ErrNo),
+    /// anyhow Error Wrapper.
+    #[error(display = "FatalEngineError: anyhow Error {:?}.", _0)]
+    AnyhowError(String),
+    /// Wasmtime trap.
+    #[error(display = "FatalEngineError: anyhow Error {:?}.", _0)]
+    WasmtimeTrapError(String),
     /// Wrapper for direct error message.
     #[error(display = "FatalEngineError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
@@ -931,6 +949,19 @@ impl From<String> for FatalEngineError {
 impl From<&str> for FatalEngineError {
     fn from(err: &str) -> Self {
         FatalEngineError::DirectErrorMessage(err.to_string())
+    }
+}
+
+impl From<anyhow::Error> for FatalEngineError {
+    fn from(error: anyhow::Error) -> Self {
+        FatalEngineError::AnyhowError(format!("{:?}", error))
+    }
+}
+
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+impl From<wasmtime::Trap> for FatalEngineError {
+    fn from(error: wasmtime::Trap) -> Self {
+        FatalEngineError::WasmtimeTrapError(format!("{:?}", error))
     }
 }
 
@@ -988,7 +1019,7 @@ pub trait ExecutionEngine: Send {
     /// returned by the WASM program entry point as an `i32` value.
     /// TODO TODO: change to ErrNo !?
     fn invoke_entry_point(&mut self, file_name: &str)
-        -> Result<EngineReturnCode, FatalEngineError>;
+        -> Result<ErrNo, FatalEngineError>;
 }
 
 
@@ -1006,102 +1037,8 @@ pub enum EngineReturnCode {
     /// Generic failure: no more-specific information about the cause of the
     /// error can be given.
     Generic,
-    /// The H-call failed because an index was passed that exceeded the number
-    /// of data sources.
-    DataSourceCount,
-    /// The H-call failed because it was passed a buffer whose size did not
-    /// match the size of the data source.
-    DataSourceSize,
     /// The H-call failed because it was passed bad inputs.
     BadInput,
-    /// The H-call failed because an index was passed that exceeded the number
-    /// of stream sources.
-    StreamSourceCount,
-    /// The H-call failed because it was passed a buffer whose size did not
-    /// match the size of the stream source.
-    StreamSourceSize,
-    /// The H-call failed because it was passed bad streams.
-    BadStream,
-    /// The H-call failed because it was passed a buffer whose size did not
-    /// match the size of the previous result.
-    PreviousResultSize,
     /// An internal invariant was violated (i.e. we are morally "panicking").
     InvariantFailed,
-    /// The H-call failed because a result had already previously been written.
-    ResultAlreadyWritten,
-    /// The H-call failed because the platform service backing it is not
-    /// available on this platform.
-    ServiceUnavailable,
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Trait implementations.
-////////////////////////////////////////////////////////////////////////////////
-
-//TODO DO WE STILL NEED THIS???
-/// Pretty printing for `EngineReturnCode`.
-impl Display for EngineReturnCode {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match self {
-            EngineReturnCode::Success => write!(f, "Success"),
-            EngineReturnCode::Generic => write!(f, "Generic"),
-            EngineReturnCode::DataSourceSize => write!(f, "DataSourceSize"),
-            EngineReturnCode::DataSourceCount => write!(f, "DataSourceCount"),
-            EngineReturnCode::BadInput => write!(f, "BadInput"),
-            EngineReturnCode::InvariantFailed => write!(f, "InvariantFailed"),
-            EngineReturnCode::ResultAlreadyWritten => write!(f, "ResultAlreadyWritten"),
-            EngineReturnCode::ServiceUnavailable => write!(f, "ServiceUnavailable"),
-            EngineReturnCode::StreamSourceSize => write!(f, "StreamSourceSize"),
-            EngineReturnCode::StreamSourceCount => write!(f, "StreamSourceCount"),
-            EngineReturnCode::BadStream => write!(f, "BadStream"),
-            EngineReturnCode::PreviousResultSize => write!(f, "PreviousResultSize"),
-        }
-    }
-}
-
-/// Serializes a `EngineReturnCode` to an `i32` value.
-///
-/// The Veracruz host passes error codes back to the WASM value encoded as an
-/// `i32` value.  These are deserialized by the WASM program.
-impl From<EngineReturnCode> for i32 {
-    fn from(error: EngineReturnCode) -> i32 {
-        match error {
-            EngineReturnCode::Success => 0,
-            EngineReturnCode::Generic => -1,
-            EngineReturnCode::DataSourceCount => -2,
-            EngineReturnCode::DataSourceSize => -3,
-            EngineReturnCode::BadInput => -4,
-            EngineReturnCode::InvariantFailed => -5,
-            EngineReturnCode::ResultAlreadyWritten => -6,
-            EngineReturnCode::ServiceUnavailable => -7,
-            EngineReturnCode::StreamSourceCount => -8,
-            EngineReturnCode::StreamSourceSize => -9,
-            EngineReturnCode::BadStream => -10,
-            EngineReturnCode::PreviousResultSize => -11,
-        }
-    }
-}
-
-/// Deserializes a `EngineReturnCode` from an `i32` value.
-impl TryFrom<i32> for EngineReturnCode {
-    type Error = FatalEngineError;
-
-    fn try_from(i: i32) -> Result<Self, Self::Error> {
-        match i {
-            0 => Ok(EngineReturnCode::Success),
-            -1 => Ok(EngineReturnCode::Generic),
-            -2 => Ok(EngineReturnCode::DataSourceCount),
-            -3 => Ok(EngineReturnCode::DataSourceSize),
-            -4 => Ok(EngineReturnCode::BadInput),
-            -5 => Ok(EngineReturnCode::InvariantFailed),
-            -6 => Ok(EngineReturnCode::ResultAlreadyWritten),
-            -7 => Ok(EngineReturnCode::ServiceUnavailable),
-            -8 => Ok(EngineReturnCode::StreamSourceCount),
-            -9 => Ok(EngineReturnCode::StreamSourceSize),
-            -10 => Ok(EngineReturnCode::BadStream),
-            -11 => Ok(EngineReturnCode::PreviousResultSize),
-            _otherwise => Err(FatalEngineError::ReturnedCodeError),
-        }
-    }
-}
-

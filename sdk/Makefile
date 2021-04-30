@@ -27,7 +27,7 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   string-edit-distance \
  		   number-stream-accumulation \
 		   read-file
-RUST_EXAMPLE_DIR = rust-language-support/examples/
+RUST_EXAMPLE_DIR = rust-examples/
 # Navigate to the actual wasm programs.
 RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
 # All dataset filenames
@@ -88,6 +88,7 @@ $(RELATIVE_DATA):
 	$(MAKE) -C $(dir $<)
 
 env:
+	rustup target add wasm32-wasi
 	rustup component add rust-src rust-std
 
 fmt:
