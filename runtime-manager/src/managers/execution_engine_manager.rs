@@ -10,7 +10,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
+use super::{ProtocolState, ProvisioningResult, RuntimeManagerError, OUTPUT_FILE};
 use lazy_static::lazy_static;
 #[cfg(any(feature = "tz", feature = "nitro"))]
 use std::sync::Mutex;
@@ -102,7 +102,7 @@ fn dispatch_on_result(
     client_id: u64,
 ) -> ProvisioningResult {
     if !protocol_state.is_modified() {
-        let result = protocol_state.read_file(&Principal::Participant(client_id), "output")?;
+        let result = protocol_state.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
         let response = response_success(result);
         return Ok(Some(response));
     }

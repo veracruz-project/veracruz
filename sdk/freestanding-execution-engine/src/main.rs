@@ -2,9 +2,6 @@
 //!
 //! ## About
 //!
-//! Reads a TOML configuration file at `./config/execution-engine.toml` to ascertain
-//! static configuration options for computation.
-//!
 //! The WASM binary to execute, and any data sources being passed to the binary,
 //! are passed with the `--binary` and `--data` flags, respectively.  A
 //! runtime error is raised if the number of input data sources does not match
@@ -32,13 +29,11 @@ use std::{
     vec::Vec,
     path::Path,
     sync::Mutex,
-    convert::TryFrom,
-    fmt, fs::File, io::Read, process::exit, time::Instant
+    fs::File, io::Read, process::exit, time::Instant
 };
 
 use execution_engine::{
     factory::execute,
-    hcall::common::{EngineReturnCode, ExecutionEngine},
     fs::FileSystem,
 };
 use wasi_types::Rights;
@@ -61,80 +56,10 @@ const APPLICATION_NAME: &'static str = "freestanding-execution-engine";
 /// The authors list.
 const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in \
                                the Veracruz root directory for detailed authorship information.";
-/// The path to the static TOML configuration file that configures
-/// freestanding-execution-engine.
-const CONFIGURATION_FILE: &'static str = "config/execution-engine.toml";
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
-
-/// The root directory where the various input data sources are stored in the
-/// runtime's synthetic filesystem.
-const INPUT_DATA_SOURCE_DIRECTORY_ROOT: &'static str = "/vcrz/in/";
-
-/// Name of the field in the TOML file detailing the number of data sources to
-/// be expected.
-const TOML_DATA_SOURCE_COUNT: &'static str = "data-source-count";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Error codes.
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Return codes returned from the Veracruz entry point, signalling to the
-/// Veracruz runtime whether the computation was successful, or not.  (Strictly
-/// speaking, the entry point is assumed to return a `Result<(), i32>` value.)
-#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum ErrorCode {
-    /// Generic, or underspecified, failure
-    Generic,
-    /// Failure related to the number of data sources, e.g. an invalid index
-    DataSourceCount,
-    /// Failure related to the size of data sources, e.g. a buffer size issue
-    DataSourceSize,
-    /// Failure related to parameters passed to a function, e.g. passing a
-    /// negative value where an unsigned value is expected, or similar
-    BadInput,
-    /// An internal invariant was violated (i.e. we are morally `panicking').
-    InvariantFailed,
-    /// The required functionality is not yet implemented.
-    NotImplemented,
-    /// The required platform service is not available on this platform.
-    ServiceUnavailable,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Configuration files, and parsing.
-////////////////////////////////////////////////////////////////////////////////
-
-/// The static configuration, which in this case fulfills a similar role to the
-/// Veracruz policy file.
-struct Configuration {
-    /// The number of data sources expected.
-    data_source_count: u32,
-}
-
-/// Pretty-printing for `Configuration` types.
-impl fmt::Display for Configuration {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(f, "{{ data-source-count: {} }}", self.data_source_count)
-    }
-}
-
-/// Reads a `u32` value from the field, `field`, of TOML field, `value`.
-/// Defaults to returning `0` if the proposed field is not a field of the TOML
-/// file.
-fn toml_read_u32(val: &toml::Value, field: &str) -> u32 {
-    if let toml::Value::Integer(n) = val[field] {
-        let value = u32::try_from(n).unwrap_or_else(|_| 0);
-        info!("Read '{}' from field '{}' in TOML file.", value, field);
-        value
-    } else {
-        info!(
-            "No field '{}' in TOML file.  Returning '0' as default.",
-            field
-        );
-        0
-    }
-}
+/// Application version number.
+const OUTPUT_FILE: &'static str = "output";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -146,9 +71,6 @@ struct CommandLineOptions {
     data_sources: Vec<String>,
     /// The filename passed as the WASM program to be executed.
     binary: String,
-    /// Whether the computation should be timed or not, i.e. should we print
-    /// performance statistics for the computation?
-    time_computation: bool,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
 }
@@ -156,7 +78,7 @@ struct CommandLineOptions {
 /// Parses the command line options, building a `CommandLineOptions` struct out
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
-fn parse_command_line(config: &Configuration) -> CommandLineOptions {
+fn parse_command_line() -> CommandLineOptions {
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -167,8 +89,7 @@ fn parse_command_line(config: &Configuration) -> CommandLineOptions {
                 .long("data")
                 .value_name("FILES")
                 .help("Space-separated paths to the data source files on disk.")
-                .number_of_values(config.data_source_count.into())
-                .required(config.data_source_count > 0),
+                .multiple(true),
         )
         .arg(
             Arg::with_name("program")
@@ -180,14 +101,6 @@ fn parse_command_line(config: &Configuration) -> CommandLineOptions {
                 .required(true),
         )
         .arg(
-            Arg::with_name("time")
-                .short("t")
-                .long("time")
-                .help("Displays performance statistics when set (defaults to false).")
-                .required(false)
-                .multiple(false),
-        )
-        .arg(
             Arg::with_name("execution-strategy")
                 .short("x")
                 .long("execution-strategy")
@@ -197,29 +110,21 @@ fn parse_command_line(config: &Configuration) -> CommandLineOptions {
                      interpretation).",
                 )
                 .required(false)
-                .multiple(false),
+                .multiple(false)
+                .default_value("interp"),
         )
         .get_matches();
 
     info!("Parsed command line.");
 
-    let execution_strategy: ExecutionStrategy;
-    let binary_path: String;
-    let mut time: bool = false;
-    let mut data_sources_path: Vec<String> = Vec::new();
-
-    if matches.is_present("time") {
-        info!("Performance statistics will be collected.");
-        time = true
-    }
-
+    let execution_strategy = 
     if let Some(strategy) = matches.value_of("execution-strategy") {
         if strategy == "interp" {
             info!("Selecting interpretation as the execution strategy.");
-            execution_strategy = ExecutionStrategy::Interpretation;
+            ExecutionStrategy::Interpretation
         } else if strategy == "jit" {
             info!("Selecting JITting as the execution strategy.");
-            execution_strategy = ExecutionStrategy::JIT;
+            ExecutionStrategy::JIT
         } else {
             eprintln!("Expecting 'interp' or 'jit' as selectable execution strategies");
             eprintln!(
@@ -229,61 +134,35 @@ fn parse_command_line(config: &Configuration) -> CommandLineOptions {
             exit(-1)
         }
     } else {
-        info!("Defaulting to 'interp' (WASM interpretation) as the execution strategy");
-        execution_strategy = ExecutionStrategy::Interpretation;
-    }
+        info!("Default 'interp' value is not loaded correctly");
+        exit(-1)
+    };
 
-    if let Some(binary) = matches.value_of("program") {
+    let binary = 
+        if let Some(binary) = matches.value_of("program") {
         info!("Using '{}' as our WASM executable.", binary);
-        binary_path = binary.to_string();
+        binary.to_string()
     } else {
         eprintln!("No binary file provided.");
         eprintln!("Please select a WASM file to execute using the '--binary' flag.");
         exit(-1)
-    }
-
+    };
+    let data_sources = 
     if let Some(data) = matches.values_of("data") {
         let data_sources: Vec<String> = data.map(|e| e.to_string()).collect();
-
-        if data_sources.len() != config.data_source_count as usize {
-            eprintln!(
-                "Static configuration file states '{}' data sources are expected, but given '{}'.",
-                config.data_source_count,
-                data_sources.len()
-            );
-            eprintln!(
-                "Please make sure the number of data sources passed with the '--data' flag is \
-                 correct."
-            );
-            exit(-1)
-        }
-
         info!(
             "Selected {} data sources as input to computation.",
             data_sources.len()
         );
-        data_sources_path = data_sources;
+        data_sources
     } else {
-        if config.data_source_count == 0 {
-            info!("No data source provided, but configuration indicates this is fine.");
-        } else {
-            println!(
-                "Static configuration file states '{}' data sources are expected, but given '0'.",
-                config.data_source_count
-            );
-            println!(
-                "Please make sure the number of data sources passed with the '--data' flag is \
-                 correct."
-            );
-            exit(-1)
-        }
-    }
+        Vec::new()
+    };
 
     CommandLineOptions {
-        data_sources: data_sources_path,
-        binary: binary_path,
-        execution_strategy: execution_strategy,
-        time_computation: time,
+        data_sources,
+        binary,
+        execution_strategy,
     }
 }
 
@@ -314,48 +193,6 @@ fn load_file(file_path: &str) -> (String, Vec<u8>) {
     (Path::new(file_path).file_name().expect(&format!("Failed to extract file name from path {}", file_path)).to_str().expect(&format!("Failed to convert the filename in path {}", file_path)).to_string(), contents)
 }
 
-/// Reads a static TOML configuration file from a fixed location on disk,
-/// returning a `Configuration` struct.  Will abort the program if anything
-/// goes wrong.
-fn read_configuration_file(fname: &str) -> Configuration {
-    info!("Opening configuration file '{}' for reading.", fname);
-
-    let mut file = File::open(fname).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot open configuration file '{}'.  Error '{}' returned.",
-            fname, err
-        );
-        exit(-1)
-    });
-
-    let mut contents = String::new();
-
-    file.read_to_string(&mut contents).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot read configuration file '{}'.  Error '{}' returned.",
-            fname, err
-        );
-        exit(-1)
-    });
-
-    info!("Configuration file '{}' read.  Parsing TOML.", fname);
-
-    let toml = toml::from_str(&contents).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot parse TOML from file '{}'.  Error '{}' returned.",
-            fname, err
-        );
-        exit(-1)
-    });
-
-    info!("TOML file parsed successfully.");
-
-    let data_source_count = toml_read_u32(&toml, TOML_DATA_SOURCE_COUNT);
-
-    Configuration { data_source_count }
-}
-
-
 /// Loads the specified data sources, as provided on the command line, for
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
@@ -382,18 +219,18 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) 
             exit(-1)
         });
 
-        // XXX: may panic! if u64 and usize have differing bitwidths...
-        let id = u64::try_from(id).unwrap();
-        let file_name = format!("input-{}", id);
         vfs.lock()
-            .unwrap()
-            .write_file_by_filename(&Principal::InternalSuperUser, &file_name, &buffer, false)
-            .unwrap();
+            .expect("Failed to lock vfs")
+            .write_file_by_filename(&Principal::InternalSuperUser, &file_path, &buffer, false)
+            .unwrap_or_else(|err| {
+                eprintln!(
+                    "Could not write data source '{}'.  Error '{}' returned.",
+                    file_path, err
+                );
+                exit(-1)
+            });
 
-        info!(
-            "Loading '{}' as file_name '{}' into vfs.",
-            file_path, file_name
-        );
+        info!( "Loading '{}' into vfs.", file_path);
     }
 }
 
@@ -402,13 +239,7 @@ fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) 
 /// invoking the entry point.
 fn main() {
     env_logger::init();
-
-    let config = read_configuration_file(CONFIGURATION_FILE);
-
-    info!("Working with machine configuration: '{}'.", config);
-
-    let cmdline = parse_command_line(&config);
-
+    let cmdline = parse_command_line();
     info!("Command line read successfully.");
 
     let (prog_file_name, program) = load_file(&cmdline.binary);
@@ -417,16 +248,23 @@ fn main() {
     let mut file_table = HashMap::new();
     let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK;
     let write_right = Rights::PATH_OPEN | Rights::FD_WRITE | Rights::FD_SEEK;
-    file_table.insert("input.txt".to_string(), read_right);
+
+    // Manually create the Right table for the VFS.
+    for file_path in cmdline.data_sources.iter() {
+        file_table.insert(file_path.to_string(), read_right);
+    }
+    file_table.insert(OUTPUT_FILE.to_string(), write_right);
+    // TODO remove
     file_table.insert("output.txt".to_string(), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let mut vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
+    // Write the program twice on purpose, 
+    // to check if `write_file_by_filename` overwrite the file correctly.
     vfs.lock()
         .expect("Failed to lock the vfs")
         .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
         .expect(&format!("Failed to write to file {}", prog_file_name));
-    // Call twice on purpose
     vfs.lock()
         .expect("Failed to lock the vfs")
         .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
@@ -437,8 +275,7 @@ fn main() {
     info!("Data sources loaded.");
 
     info!("Invoking main.");
-
-    let start = Instant::now();
-
+    let main_time = Instant::now();
     execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name).expect(&format!("failed to execute {}", prog_file_name));
+    info!("time: {} micro seconds", main_time.elapsed().as_micros())
 }

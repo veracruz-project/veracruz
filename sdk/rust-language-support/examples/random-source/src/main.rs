@@ -19,12 +19,8 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-//#![no_std]
-//extern crate alloc;
-//extern crate veracruz_rt;
-
-//use alloc::{vec, vec::Vec};
-
+use std::fs;
+use rand::Rng;
 ///// Generates a four-element long random vector of `u8` values.  Fails if the
 ///// random source is unavailable or experiences an error.
 //fn generate_random_vector() -> Result<Vec<u8>, i32> {
@@ -39,7 +35,11 @@
 /// Entry point: generates a four-element long random vector of `u8` values and
 /// writes this back as the result.
 fn main() {
-    //let result = generate_random_vector()?;
-    //write_result::<Vec<u8>>(result)?;
-    //Ok(())
+    let output = "/output";
+    let bytes = rand::thread_rng().gen::<[u8; 32]>();
+    let rst = match pinecone::to_vec(&bytes) {
+        Err(_err) => panic!(),
+        Ok(s) => s,
+    };
+    fs::write(output, rst).unwrap();
 }

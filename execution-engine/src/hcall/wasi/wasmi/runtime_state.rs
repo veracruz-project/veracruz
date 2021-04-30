@@ -9,16 +9,14 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{convert::{TryInto, TryFrom}, string::{String, ToString}, vec::Vec, boxed::Box};
+use std::{convert::{TryInto, TryFrom}, string::ToString, vec::Vec, boxed::Box};
 use crate::{
     fs::FileSystem,
     hcall::common::{
-        pack_dirent, pack_fdstat, pack_filestat, pack_prestat,
         ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
         WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
-use platform_services::{getrandom, result};
 use wasi_types::{
     Advice, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, IoVec, LookupFlags, Rights,
     Size, Whence,
@@ -1112,6 +1110,8 @@ impl WASMIRuntimeState {
             program_module: None,
             memory: None,
         }
+        //NOTE: cannot find a way to immediately call the load_program here,
+        // therefore we might eliminate the Option program_module and memory.
     }
 
     /// Returns an optional reference to the WASM program module.
@@ -1989,25 +1989,16 @@ impl WASMIRuntimeState {
     /// generator fails for some reason.
     fn wasi_random_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_random_get");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_RANDOM_GET_NAME,
-            //));
-        //}
+        if args.len() != 2 {
+            return Err(FatalEngineError::bad_arguments_to_host_function(
+                WASIAPIName::RANDOM_GET,
+            ));
+        }
 
-        //let address: u32 = args.nth(0);
-        //let size: u32 = args.nth(1);
-        //let mut buffer = vec![0; size as usize];
+        let address: u32 = args.nth(0);
+        let size: u32 = args.nth(1);
 
-        //if let result::Result::Success = getrandom(&mut buffer) {
-            //self.write_buffer(address, &buffer)?;
-
-            //Ok(ErrNo::Success)
-        //} else {
-            //Ok(ErrNo::NoSys)
-        //}
-
-        Ok(ErrNo::Success)
+        Ok(self.vfs.random_get( &mut self.deref_memory()?, address, size))
     }
 
     /// The implementation of the WASI `sock_send` function.  This is not
@@ -2015,14 +2006,11 @@ impl WASMIRuntimeState {
     /// `0` as the length of the transmission.
     fn wasi_sock_send(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sock_send");
-        //if args.len() != 5 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_SOCK_SEND_NAME,
-            //));
-        //}
-
-        //let address = args.nth(4);
-        //self.write_buffer(address, &u32::to_le_bytes(0u32))?;
+        if args.len() != 5 {
+            return Err(FatalEngineError::bad_arguments_to_host_function(
+                WASIAPIName::SOCK_SEND,
+            ));
+        }
 
         Ok(ErrNo::NotSup)
     }

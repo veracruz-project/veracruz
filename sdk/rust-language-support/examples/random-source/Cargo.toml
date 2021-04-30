@@ -9,6 +9,7 @@ description = "Samples random data from the trusted Veracruz runtime.  Used to t
 
 [dependencies]
 pinecone = "*"
+rand = "0.8.0"
 
 [profile.release]
 codegen-units = 1

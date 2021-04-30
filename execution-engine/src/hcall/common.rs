@@ -21,7 +21,7 @@ use err_derive::Error;
 use serde::{Deserialize, Serialize};
 use wasi_types::{
     Advice, DirCookie, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, LookupFlags,
-    OpenFlags, Prestat, Rights, Size, Whence, IoVec, DirEnt
+    OpenFlags, Prestat, Rights, Size, Whence, IoVec, DirEnt, Pointer
 };
 use veracruz_utils::policy::principal::Principal;
 use std::{
@@ -32,7 +32,7 @@ use std::{
     string::{String, ToString},
     vec::Vec,
 };
-use crate::fs::{FileSystem, FileSystemError};
+use crate::fs::FileSystem;
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "sgx")]
@@ -41,22 +41,6 @@ use std::sync::{Arc, SgxMutex as Mutex};
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// The directory in the synthetic filesystem where all inputs will be stored.
-/// TODO REMOVE ?
-pub(crate) const INPUT_DIRECTORY: &str = "/vcrz/in/";
-/// The directory in the synthetic filesystem where the WASM program will write
-/// its outputs.
-/// TODO REMOVE ?
-pub(crate) const OUTPUT_DIRECTORY: &str = "/vcrz/out";
-/// The directory, under `INPUT_DIRECTORY`, in the synthetic filesystem where
-/// block-oriented inputs will be stored and can be read by the WASM program.
-/// TODO REMOVE ?
-pub(crate) const BLOCK_INPUT_DIRECTORY_NAME: &str = "block";
-/// The directory, under `INPUT_DIRECTORY`, in the synthetic filesystem where
-/// stream-oriented inputs will be stored and can be read by the WASM program.
-/// TODO REMOVE ?
-pub(crate) const STREAM_INPUT_DIRECTORY_NAME: &str = "stream";
 
 /// List of WASI API.
 #[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize)]
@@ -360,6 +344,19 @@ pub struct WASIWrapper {
     principal: Principal,
 }
 
+/// A macro for lock the VFS in WASIWrapper and store the result in the variable, 
+/// which will be captured by `$vfs` in the macro.
+/// It is assumed that `self` is a WASIWrapper.
+/// If the locks fails, it returns Busy error code.
+macro_rules! lock_vfs {
+    ($vfs:ident) => {
+        match $vfs.filesystem.lock() {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Busy,
+        }
+    }
+}
+
 impl WASIWrapper {
 
     /// The name of the WASM program's entry point.
@@ -495,10 +492,7 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn fd_close(&mut self, fd: u32) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         match fs.fd_close(fd.into()) {
             Ok(_) => ErrNo::Success,
             Err(e) => e,
@@ -513,10 +507,7 @@ impl WASIWrapper {
         len: FileSize,
         advice: Advice,
     ) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         if let Err(err) = fs.fd_advise(fd, offset, len, advice) {
             return err;
         }
@@ -524,20 +515,18 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_fdstat_get(fd) 
+    pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.fd_fdstat_get(fd)  {
+            //TODO fill in
+            Ok(o) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         if let Err(err) = fs.fd_fdstat_set_flags(fd, flags) {
             return err;
         }
@@ -551,10 +540,7 @@ impl WASIWrapper {
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         if let Err(err) = fs
             .fd_fdstat_set_rights(fd, rights_base, rights_inheriting) {
             return err;
@@ -563,20 +549,18 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_filestat_get(fd)
+    pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.fd_filestat_get(fd)  {
+            //TODO fill in
+            Ok(o) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]
     pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         if let Err(err) = fs.fd_filestat_set_size(fd, size) {
             return err;
         }
@@ -584,26 +568,9 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_pread_base(
-        &mut self,
-        fd: &Fd,
-        len: usize,
-        offset: &FileSize,
-    ) -> FileSystemError<Vec<u8>> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_pread_base(fd, len, offset)
-    }
-
-    #[inline]
     pub(crate) fn fd_prestat_get(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, address: u32) -> ErrNo {
         let fd = Fd(fd);
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         match fs.fd_prestat_get(&fd.into()) { 
             Ok(result) => memory_ref.write_buffer(address, &pack_prestat(&result)),
             Err(err) => err
@@ -613,10 +580,7 @@ impl WASIWrapper {
     #[inline]
     pub(crate) fn fd_prestat_dir_name(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, address: u32, size: u32) -> ErrNo {
         let size = size as usize;
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         let result = match fs.fd_prestat_dir_name(&fd.into()) {
             Ok(o) => o,
             Err(e) => return e,
@@ -630,20 +594,6 @@ impl WASIWrapper {
     }
 
     #[inline]
-    pub(crate) fn fd_pwrite_base(
-        &mut self,
-        fd: &Fd,
-        buf: Vec<u8>,
-        offset: &FileSize,
-    ) -> FileSystemError<Size> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_pwrite_base(fd, buf, *offset)
-    }
-
-    #[inline]
     pub(crate) fn fd_read(&mut self, memory_ref: &mut impl MemoryHandler, fd: u32, iovec_base: u32, iovec_count: u32, address: u32) -> ErrNo {
 
         let iovecs = match memory_ref.unpack_iovec_array(iovec_base, iovec_count) {
@@ -653,10 +603,7 @@ impl WASIWrapper {
 
         let mut size_read = 0;
         for iovec in iovecs.iter() {
-            let mut fs = match self.filesystem.lock() {
-                Ok(o) => o,
-                Err(_) => return ErrNo::Busy,
-            };
+            let mut fs = lock_vfs!(self);
             let to_write = match fs.fd_read_base(&fd.into(), iovec.len as usize){
                 Ok(o) => o,
                 Err(e) => return e,
@@ -675,20 +622,18 @@ impl WASIWrapper {
         &mut self,
         fd: &Fd,
         cookie: &DirCookie,
-    ) -> FileSystemError<Vec<DirEnt>> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_readdir(fd, cookie)
+    ) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.fd_readdir(fd, cookie) {
+            // TODO fill
+            Ok(o) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]
     pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         fs.fd_renumber(old_fd, new_fd)
     }
 
@@ -698,21 +643,23 @@ impl WASIWrapper {
         fd: &Fd,
         offset: FileDelta,
         whence: Whence,
-    ) -> FileSystemError<FileSize> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_seek(fd, offset, whence)
+    ) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.fd_seek(fd, offset, whence) {
+            // TODO fill
+            Ok(o) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]
-    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<FileSize> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.fd_tell(fd)
+    pub(crate) fn fd_tell(&self, fd: &Fd) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.fd_tell(fd) {
+            // TODO fill
+            Ok(o) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]
@@ -728,11 +675,8 @@ impl WASIWrapper {
 
         let mut size_written = 0;
         for buf in bufs.iter() {
-            println!("write {:?} to fd {:?}", String::from_utf8(buf.clone()).unwrap(), fd);
-            let mut fs = match self.filesystem.lock() {
-                Ok(o) => o,
-                Err(_) => return ErrNo::Busy,
-            };
+            println!("write {:?} to fd {:?}", buf, fd);
+            let mut fs = lock_vfs!(self);
             size_written += match fs.fd_write_base(&fd.into(), buf.clone()) {
                 Ok(o) => o,
                 Err(e) => return e,
@@ -743,10 +687,7 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn path_create_directory(&mut self, fd: &Fd, path: String) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         fs.path_create_directory(fd, path)
     }
 
@@ -756,12 +697,13 @@ impl WASIWrapper {
         fd: &Fd,
         flags: &LookupFlags,
         path: &String,
-    ) -> FileSystemError<FileStat> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
-        fs.path_filestat_get(fd, flags, path)
+    ) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.path_filestat_get(fd, flags, path) {
+            // TODO fill
+            Ok(o) => ErrNo::Success,
+            Err(e) => e,
+        }
     }
 
     #[inline]
@@ -803,10 +745,7 @@ impl WASIWrapper {
             Some(o) => o,
             None => return ErrNo::Inval,
         };
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
 
         match fs.path_open(
             &self.principal,
@@ -825,10 +764,7 @@ impl WASIWrapper {
 
     #[inline]
     pub(crate) fn path_remove_directory(&mut self, fd: &Fd, path: &String) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         fs.path_remove_directory(fd, path)
     }
 
@@ -840,19 +776,28 @@ impl WASIWrapper {
         new_fd: &Fd,
         new_path: String,
     ) -> ErrNo {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Busy,
-        };
+        let mut fs = lock_vfs!(self);
         fs.path_rename(old_fd, old_path, new_fd, new_path)
     }
 
+    #[inline]
+    pub(crate) fn random_get(
+        &mut self,
+        memory_ref: &mut impl MemoryHandler,
+        buf_ptr: u32,
+        length: u32,
+    ) -> ErrNo {
+        let mut fs = lock_vfs!(self);
+        match fs.random_get(length) {
+            Ok(result) => memory_ref.write_buffer(buf_ptr, &result),
+            Err(err) => err,
+        }
+    }
+
     /// An internal function for the execution engine to directly read the file.
+    #[inline]
     pub(crate) fn read_file_by_filename(&mut self, file_name : &str) -> Result<Vec<u8>,ErrNo> {
-        let mut fs = match self.filesystem.lock() {
-            Ok(o) => o,
-            Err(_) => panic!(),
-        };
+        let mut fs = self.filesystem.lock().map_err(|_|ErrNo::Busy)?;
         fs.read_file_by_filename(&Principal::InternalSuperUser, file_name)
     }
 }
