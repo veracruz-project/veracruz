@@ -41,7 +41,7 @@ use crate::hcall::wasi::wasmtime::runtime_state::WasmtimeRuntimeState;
 use crate::{
     fs::FileSystem,
     hcall::{
-        common::{EngineReturnCode, ExecutionEngine, FatalEngineError},
+        common::{ExecutionEngine, FatalEngineError},
         wasi::wasmi::runtime_state::WASMIRuntimeState,
     }
 };

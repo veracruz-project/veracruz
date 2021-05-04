@@ -27,16 +27,12 @@ use std::{
     vec::Vec,
 };
 use lazy_static::lazy_static;
-use execution_engine::{fs::FileSystem, factory::execute, hcall::common::EngineReturnCode};
+use execution_engine::{fs::FileSystem, factory::execute};
 use veracruz_utils::policy::{
     policy::Policy,
-    principal::{ExecutionStrategy, Principal},
+    principal::Principal,
 };
-use wasi_types::{
-    Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
-    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
-    PreopenType
-};
+use wasi_types::ErrNo;
 
 pub mod error;
 pub mod execution_engine_manager;

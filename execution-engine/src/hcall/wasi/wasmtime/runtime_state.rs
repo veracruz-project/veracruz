@@ -14,7 +14,7 @@ use std::convert::TryFrom;
 use crate::{
     fs::FileSystem,
     hcall::common::{
-        ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
+        ExecutionEngine, EntrySignature, FatalEngineError,
         WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
@@ -344,9 +344,13 @@ impl WasmtimeRuntimeState {
         vfs.random_get(&mut caller, address, length) as u32
     }
 
-    fn wasi_fd_seek(mut caller: Caller, fd: u32, offset: i64, whence: u8, address: u32) {
+    fn wasi_fd_seek(mut caller: Caller, fd: u32, offset: i64, whence: u32, address: u32) -> u32 {
         println!("call wasi_fd_seek");
         let mut vfs = lock_vfs!();
+        let whence = match u8::try_from(whence) {
+            Ok(o) => o,
+            Err(_) => return ErrNo::Inval as u32,
+        };
         vfs.fd_seek(&mut caller, fd, offset, whence, address) as u32
     }
 }

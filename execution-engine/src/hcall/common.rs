@@ -198,73 +198,6 @@ pub(crate) fn pack_dirent(dirent: &DirEnt) -> Vec<u8> {
     unsafe { pack_sized_as_bytes(dirent) }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Provisioning errors.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Errors that can occur during host provisioning.  These are errors that may
-/// be reported back to principals in the Veracruz computation over the Veracruz
-/// wire protocols, for example if somebody tries to provision data when that is
-/// not expected, or similar.  Some may be recoverable errors, some may be fatal
-/// errors due to programming bugs.
-#[derive(Debug, Error, Serialize, Deserialize)]
-pub enum HostProvisioningError {
-    /// The WASM module supplied by the program supplier was invalid and could
-    /// not be parsed.
-    #[error(display = "ProvisioningError: Invalid WASM program (e.g. failed to parse it).")]
-    InvalidWASMModule,
-    /// No linear memory/heap could be identified in the WASM module.
-    #[error(
-        display = "ProvisioningError: No linear memory could be found in the supplied WASM module."
-    )]
-    NoLinearMemoryFound,
-    /// No wasm memory registered in the execution engine
-    #[error(display = "HostProvisioningError: No WASM memory registered.")]
-    NoMemoryRegistered,
-    /// The program module could not be properly instantiated by the WASM engine
-    /// for some reason.
-    #[error(display = "ProvisioningError: Failed to instantiate the WASM module.")]
-    ModuleInstantiationFailure,
-    /// A lock could not be obtained for some reason.
-    #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
-    FailedToObtainLock(String),
-    #[error(display = "HostProvisioningError: Wasmi Error: {}.", _0)]
-    WasmiError(String),
-    /// The host provisioning state has not been initialized.  This should never
-    /// happen and is a bug.
-    #[error(
-        display = "ProvisioningError: Uninitialized host provisioning state (this is a potential bug)."
-    )]
-    HostProvisioningStateNotInitialized,
-    #[error(
-        display = "HostProvisioningError: File {} cannot be found.", _0
-    )]
-    FileNotFound(String),
-    /// TODO doc
-    #[error(
-        display = "HostProvisioningError: Principal or program {:?} cannot be found.",_0
-    )]
-    PrincipalNotFound(Principal),
-    #[error(
-        display = "ProvisioningError: The global policy ascribes two inputs the same filename {}.",
-        _0
-    )]
-    InputNameClash(String),
-}
-
-// Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
-impl<T> From<std::sync::PoisonError<T>> for HostProvisioningError {
-    fn from(error: std::sync::PoisonError<T>) -> Self {
-        HostProvisioningError::FailedToObtainLock(format!("{:?}", error))
-    }
-}
-
-impl From<wasmi::Error> for HostProvisioningError {
-    fn from(error: wasmi::Error) -> Self {
-        HostProvisioningError::WasmiError(format!("{:?}", error))
-    }
-}
-
 //TODO RUST DOC
 pub trait MemoryHandler {
     //NOTE we purposely choose u32 here as the execution engine is likely received u32 as
@@ -827,13 +760,7 @@ pub enum FatalEngineError {
     /// not be parsed.
     #[error(display = "FatalEngineError: Invalid WASM program (e.g. failed to parse it).")]
     InvalidWASMModule,
-    /// The WASM program called `proc_exit`, or similar, to signal an early exit
-    /// from the program, returning a specific error code.
-    #[error(
-        display = "FatalEngineError: Early exit requested by program, error code returned: '{}'.",
-        _0
-    )]
-    EarlyExit(i32),
+    //TODO REMOVE THIS ???
     /// The Veracruz host was passed bad arguments by the WASM program running
     /// on the platform.  This should never happen if the WASM program uses
     /// `libveracruz` as the platform should ensure H-Calls are always
@@ -848,37 +775,12 @@ pub enum FatalEngineError {
         /// The name of the host function that was being invoked.
         function_name: WASIAPIName,
     },
+    //TODO CHANGE TYPE
     /// The WASM program tried to invoke an unknown H-call on the Veracruz host.
     #[error(display = "FatalEngineError: Unknown H-call invoked: '{}'.", index)]
     UnknownHostFunction {
         /// The host call index of the unknown function that was invoked.
         index: usize,
-    },
-    /// The host failed to read a range of bytes, starting at a base address,
-    /// from the running WASM program's linear memory.
-    #[error(
-        display = "FatalEngineError: Failed to read {} byte(s) from WASM memory at address {}.",
-        bytes_to_be_read,
-        memory_address
-    )]
-    MemoryReadFailed {
-        /// The base memory address that was being read.
-        memory_address: usize,
-        /// The number of bytes that were being read.
-        bytes_to_be_read: usize,
-    },
-    /// The host failed to write a range of bytes, starting from a base address,
-    /// to the running WASM program's linear memory.
-    #[error(
-        display = "FatalEngineError: Failed to write {} byte(s) to WASM memory at address {}.",
-        bytes_to_be_written,
-        memory_address
-    )]
-    MemoryWriteFailed {
-        /// The base memory address that was being written.
-        memory_address: usize,
-        /// The number of bytes that were being written.
-        bytes_to_be_written: usize,
     },
     /// No linear memory was registered: this is a programming error (a bug)
     /// that should be fixed.
@@ -906,13 +808,6 @@ pub enum FatalEngineError {
     /// Wrapper for WASI Error other than Trap.
     #[error(display = "FatalEngineError: WASMIError {:?}.", _0)]
     WASMIError(#[source(error)] wasmi::Error),
-    /// Program cannot be found in VFS, when any principal (programs or participants) try to access
-    /// the `file_name`.
-    #[error(
-        display = "FatalVeracruzHostError: Program {} cannot be found.",
-        file_name
-    )]
-    ProgramCannotFound { file_name: String },
     //TODO CHANGE should be general
     #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
     WASIError(#[source(error)] wasi_types::ErrNo),
@@ -920,20 +815,18 @@ pub enum FatalEngineError {
     #[error(display = "FatalEngineError: anyhow Error {:?}.", _0)]
     AnyhowError(String),
     /// Wasmtime trap.
-    #[error(display = "FatalEngineError: anyhow Error {:?}.", _0)]
+    #[error(display = "FatalEngineError: Wasmtime Trap Error {:?}.", _0)]
     WasmtimeTrapError(String),
     /// Wrapper for direct error message.
     #[error(display = "FatalEngineError: Error message {:?}.", _0)]
     DirectErrorMessage(String),
-    #[error(display = "FatalVeracruzHostError: provisioning error {:?}.", _0)]
-    ProvisionError(#[error(source)] HostProvisioningError),
     /// Something unknown or unexpected went wrong, and there's no more detailed
     /// information.
     #[error(display = "FatalEngineError: Unknown error.")]
     Generic,
 }
 
-// Convertion from any error raised by any mutex of type <T> to HostProvisioningError.
+// Convertion from any error raised by any mutex of type <T> to FatalEngineError.
 impl<T> From<std::sync::PoisonError<T>> for FatalEngineError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         FatalEngineError::FailedToObtainLock(format!("{:?}", error))
@@ -958,7 +851,7 @@ impl From<anyhow::Error> for FatalEngineError {
     }
 }
 
-#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+#[cfg(any(feature = "std", feature = "nitro"))]
 impl From<wasmtime::Trap> for FatalEngineError {
     fn from(error: wasmtime::Trap) -> Self {
         FatalEngineError::WasmtimeTrapError(format!("{:?}", error))
@@ -1017,28 +910,5 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    /// TODO TODO: change to ErrNo !?
-    fn invoke_entry_point(&mut self, file_name: &str)
-        -> Result<ErrNo, FatalEngineError>;
-}
-
-
-/// These are return codes that the host passes back to the Veracruz WASM program
-/// when something goes wrong with a host-call.  Any error is assumed to be
-/// recoverable by the WASM program, if it cares to, and are distinct from execution engine
-/// errors which are akin to kernel panics and are always fatal.
-///
-/// Note that both the host and any Veracruz program need to agree on how these
-/// errors are encoded.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EngineReturnCode {
-    /// The H-call completed successfully.
-    Success,
-    /// Generic failure: no more-specific information about the cause of the
-    /// error can be given.
-    Generic,
-    /// The H-call failed because it was passed bad inputs.
-    BadInput,
-    /// An internal invariant was violated (i.e. we are morally "panicking").
-    InvariantFailed,
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<ErrNo, FatalEngineError>;
 }
