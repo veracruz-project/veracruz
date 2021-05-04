@@ -29,8 +29,6 @@ pub enum RuntimeManagerError {
     VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
     #[error(display = "RuntimeManager: FatalEngineError: {:?}.", _0)]
     FatalHostError(#[error(source)] execution_engine::hcall::common::FatalEngineError),
-    #[error(display = "RuntimeManager: HostProvisioningError: {:?}.", _0)]
-    HostProvisioningError(#[error(source)] execution_engine::hcall::common::HostProvisioningError),
     #[error(display = "RuntimeManager: FileSystem Error: {:?}.", _0)]
     FileSystemError(#[error(source)] wasi_types::ErrNo),
     #[error(display = "RuntimeManager: Failed to obtain lock {:?}.", _0)]

@@ -13,7 +13,7 @@ use std::{convert::{TryInto, TryFrom}, string::ToString, vec::Vec, boxed::Box};
 use crate::{
     fs::FileSystem,
     hcall::common::{
-        ExecutionEngine, EntrySignature, HostProvisioningError, FatalEngineError, EngineReturnCode,
+        ExecutionEngine, EntrySignature, FatalEngineError,
         WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
@@ -975,10 +975,10 @@ fn check_main(module: &ModuleInstance) -> EntrySignature {
 
 /// Finds the linear memory of the WASM module, `module`, and returns it,
 /// otherwise creating a fatal host error that will kill the Veracruz instance.
-fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, HostProvisioningError> {
+fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, FatalEngineError> {
     match module.export_by_name(WASIWrapper::LINEAR_MEMORY_NAME) {
         Some(ExternVal::Memory(memoryref)) => Ok(memoryref),
-        _otherwise => Err(HostProvisioningError::NoMemoryRegistered),
+        _otherwise => Err(FatalEngineError::NoMemoryRegistered),
     }
 }
 
@@ -1152,13 +1152,13 @@ impl WASMIRuntimeState {
     /// the state `LifecycleState::DataSourcesLoading` or
     /// `LifecycleState::ReadyToExecute` on success, depending on how many
     /// sources of input data are expected.
-    fn load_program(&mut self, buffer: &[u8]) -> Result<(), HostProvisioningError> {
+    fn load_program(&mut self, buffer: &[u8]) -> Result<(), FatalEngineError> {
         let module = Module::from_buffer(buffer)?;
         let env_resolver = wasmi::ImportsBuilder::new().with_resolver(WASIWrapper::WASI_SNAPSHOT_MODULE_NAME, self);
 
         let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
         if not_started_module_ref.has_start() {
-            return Err(HostProvisioningError::InvalidWASMModule);
+            return Err(FatalEngineError::InvalidWASMModule);
         }
 
         let module_ref = not_started_module_ref.assert_no_start();
