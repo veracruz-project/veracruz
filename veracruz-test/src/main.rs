@@ -302,28 +302,37 @@ mod tests {
 
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
+            info!("### program provider start.");
             let mut client =
                 veracruz_client::VeracruzClient::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
                                       &policy_json,
                                       &target_platform)?;
             let program_path = LINEAR_REGRESSION_WASM;
             let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
+            info!("### program provider read binary.");
             let program_data = read_binary_file(&program_path)?;
+            info!("### program provider send binary.");
             client.send_program(program_filename,&program_data)?;
+            info!("### program provider request shutdown.");
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
         };
         let data_provider_handle = async {
-            task::sleep(std::time::Duration::from_millis(11000)).await;
+            task::sleep(std::time::Duration::from_millis(15000)).await;
+            info!("### data provider start.");
             let mut client =
                 veracruz_client::VeracruzClient::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json, &target_platform)?;
 
             let data_filename = LINEAR_REGRESSION_DATA;
+            info!("### data provider read input.");
             let data = read_binary_file(&data_filename)?;
+            info!("### data provider send input.");
             client.send_data("input-0",&data)?;
             let program_path = LINEAR_REGRESSION_WASM;
             let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
+            info!("### data provider read result.");
             client.get_results(program_filename)?;
+            info!("### data provider request shutdown.");
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
         };
