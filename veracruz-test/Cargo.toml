@@ -21,8 +21,8 @@ proxy-attestation-server = { path = "../proxy-attestation-server"}
 transport-protocol = { path = "../transport-protocol"}
 hex = "=0.4.2"
 ring = "0.16.5"
-actix-rt = "1.0.0"
-actix-web = "2.0.0"
+actix-rt = "1"
+actix-web = "3"
 futures = "0.3"
 async-std = "1"
 pinecone = "0.2"
