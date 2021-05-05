@@ -775,13 +775,9 @@ pub enum FatalEngineError {
         /// The name of the host function that was being invoked.
         function_name: WASIAPIName,
     },
-    //TODO CHANGE TYPE
     /// The WASM program tried to invoke an unknown H-call on the Veracruz host.
-    #[error(display = "FatalEngineError: Unknown H-call invoked: '{}'.", index)]
-    UnknownHostFunction {
-        /// The host call index of the unknown function that was invoked.
-        index: usize,
-    },
+    #[error(display = "FatalEngineError: Unknown Host call invoked: '{:?}'.", _0)]
+    UnknownHostFunction(HostFunctionIndexOrName),
     /// No linear memory was registered: this is a programming error (a bug)
     /// that should be fixed.
     #[error(display = "FatalEngineError: No WASM memory registered.")]
@@ -799,7 +795,7 @@ pub enum FatalEngineError {
     /// Wrapper for direct error message.
     #[error(display = "FatalEngineError: WASM program returns code other than wasi ErrNo.")]
     ReturnedCodeError,
-    /// A lock could not be obtained for some reason.
+    /// A lock could not be obtained for some reason, wrappiing the failure information as String.
     #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
     FailedToObtainLock(String),
     /// Wrapper for WASI Trap.
@@ -808,7 +804,6 @@ pub enum FatalEngineError {
     /// Wrapper for WASI Error other than Trap.
     #[error(display = "FatalEngineError: WASMIError {:?}.", _0)]
     WASMIError(#[source(error)] wasmi::Error),
-    //TODO CHANGE should be general
     #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
     WASIError(#[source(error)] wasi_types::ErrNo),
     /// anyhow Error Wrapper.
@@ -824,6 +819,12 @@ pub enum FatalEngineError {
     /// information.
     #[error(display = "FatalEngineError: Unknown error.")]
     Generic,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum HostFunctionIndexOrName {
+    Index(usize),
+    Name(String),
 }
 
 // Convertion from any error raised by any mutex of type <T> to FatalEngineError.
@@ -858,24 +859,9 @@ impl From<wasmtime::Trap> for FatalEngineError {
     }
 }
 
-impl FatalEngineError {
-    /// Constructs a `FatalEngineError::DirectErrorMessage` out of anything that can
-    /// be converted into a string.
-    #[inline]
-    pub fn direct_error_message<T>(message: T) -> Self
-    where
-        T: Into<String>,
-    {
-        FatalEngineError::DirectErrorMessage(message.into())
-    }
-
-    /// Constructs a `FatalEngineError::BadArgumentsToHostFunction` out of anything
-    /// that can be converted into a string.
-    pub fn bad_arguments_to_host_function(fname: WASIAPIName) -> Self
-    {
-        FatalEngineError::BadArgumentsToHostFunction {
-            function_name: fname,
-        }
+impl From<WASIAPIName> for FatalEngineError {
+    fn from(error: WASIAPIName) -> Self {
+        FatalEngineError::BadArgumentsToHostFunction{function_name: error}
     }
 }
 
