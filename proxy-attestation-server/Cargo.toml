@@ -44,9 +44,9 @@ psa-attestation = { path = "../psa-attestation" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 futures = "0.3"
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
-actix-web = "3"
-actix-rt = "1"
-actix-http = "2"
+actix-web = "3.3.2"
+actix-rt = "1.1.1"
+actix-http = "2.2.0"
 async-std = "1.5"
 # Force the version on async-io. This solves a dependency issue on socket2.
 async-io = "=1.3.1"
