@@ -13,7 +13,7 @@ use std::{convert::{TryInto, TryFrom}, string::ToString, vec::Vec, boxed::Box};
 use crate::{
     fs::FileSystem,
     hcall::common::{
-        ExecutionEngine, EntrySignature, FatalEngineError,
+        ExecutionEngine, EntrySignature, FatalEngineError, HostFunctionIndexOrName,
         WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
@@ -1039,7 +1039,7 @@ impl Externals for WASMIRuntimeState {
 
         let wasi_call_index = match WASIAPIName::from_u32(index as u32) {
             Some(s) => s,
-            None => return mk_host_trap(FatalEngineError::UnknownHostFunction { index }),
+            None => return mk_host_trap(FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Index(index))),
         };
 
         let result = match wasi_call_index {
@@ -1213,9 +1213,7 @@ impl WASMIRuntimeState {
     fn wasi_args_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_args_get");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::ARGS_GET,
-            ));
+            return Err(WASIAPIName::ARGS_GET.into());
         }
 
         //let mut argv_address: u32 = args.nth(0);
@@ -1236,11 +1234,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `args_sizes_get` function.
     fn wasi_args_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_args_sizes_get");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_ARGS_SIZES_GET_NAME,
-            //));
-        //}
+        if args.len() != 2 {
+            return Err(WASIAPIName::ARGS_SIZES_GET.into());
+        }
 
         //let argc_address: u32 = args.nth(0);
         //let argv_buff_size_address: u32 = args.nth(1);
@@ -1257,9 +1253,7 @@ impl WASMIRuntimeState {
     fn wasi_environ_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_environ_get");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::ENVIRON_GET,
-            ));
+            return Err(WASIAPIName::ENVIRON_GET.into());
         }
 
         let environ_address = args.nth::<u32>(0);
@@ -1271,9 +1265,7 @@ impl WASMIRuntimeState {
     fn wasi_environ_sizes_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_environ_sizes_get");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::ENVIRON_SIZES_GET,
-            ));
+            return Err(WASIAPIName::ENVIRON_SIZES_GET.into());
         }
 
         let environc_address: u32 = args.nth(0);
@@ -1286,16 +1278,9 @@ impl WASMIRuntimeState {
     /// `ErrNo::NoSys`.
     fn wasi_clock_res_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_clock_res_get");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_CLOCK_RES_GET_NAME,
-            //));
-        //}
-
-        //let address: u32 = args.nth(1);
-
-        //self.write_buffer(address, &i64::to_le_bytes(0i64))?;
-
+        if args.len() != 2 {
+            return Err(WASIAPIName::CLOCK_RES_GET.into());
+        }
         Ok(ErrNo::NoSys)
     }
 
@@ -1304,15 +1289,9 @@ impl WASMIRuntimeState {
     /// `ErrNo::NoSys`.
     fn wasi_clock_time_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_clock_time_get");
-        //if args.len() != 3 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_CLOCK_TIME_GET_NAME,
-            //));
-        //}
-
-        //let address: u32 = args.nth(2);
-        //self.write_buffer(address, &u32::to_le_bytes(0u32))?;
-
+        if args.len() != 3 {
+            return Err(WASIAPIName::CLOCK_TIME_GET.into());
+        }
         Ok(ErrNo::NoSys)
     }
 
@@ -1320,9 +1299,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_advise(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_advise");
         if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_ADVISE,
-            ));
+            return Err(WASIAPIName::FD_ADVISE.into());
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1341,9 +1318,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_allocate(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_allocate");
         if args.len() != 3 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_ALLOCATE,
-            ));
+            return Err(WASIAPIName::FD_ALLOCATE.into());
         }
 
         Ok(ErrNo::NoSys)
@@ -1353,9 +1328,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_close(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_close");
         if args.len() != 1 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_CLOSE,
-            ));
+            return Err(WASIAPIName::FD_CLOSE.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1364,29 +1337,25 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_datasync` function.  This is not
-    /// supported by Veracruz and we simply return `ErrNo::NotSup`.
+    /// supported by Veracruz and we simply return `ErrNo::NoSys`.
     ///
     /// TODO: consider whether this should just return `ErrNo::Success`,
     /// instead.
     fn wasi_fd_datasync(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_datasync");
         if args.len() != 1 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_DATASYNC,
-            ));
+            return Err(WASIAPIName::FD_DATASYNC.into());
         }
 
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `fd_fdstat_get` function.
     fn wasi_fd_fdstat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_fdstat_get");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_FD_FDSTAT_GET_NAME,
-            //));
-        //}
+        if args.len() != 2 {
+            return Err(WASIAPIName::FD_FDSTAT_GET.into());
+        }
 
         //let fd: Fd = args.nth::<u32>(0).into();
         //let address: u32 = args.nth(1);
@@ -1402,9 +1371,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_fdstat_set_flags(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_fdstat_set_flags");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_FDSTAT_SET_FLAGS,
-            ));
+            return Err(WASIAPIName::FD_FDSTAT_SET_FLAGS.into());
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1420,9 +1387,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_fdstat_set_rights(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_fdstat_set_rights");
         if args.len() != 3 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_FDSTAT_SET_RIGHTS,
-            ));
+            return Err(WASIAPIName::FD_FDSTAT_SET_RIGHTS.into());
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1441,11 +1406,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_filestat_get` function.
     fn wasi_fd_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_filestat_get");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_FD_FILESTAT_GET_NAME,
-            //));
-        //}
+        if args.len() != 2 {
+            return Err(WASIAPIName::FD_FILESTAT_GET.into());
+        }
 
         //let fd: Fd = args.nth::<u32>(0).into();
         //let address: u32 = args.nth(1);
@@ -1461,9 +1424,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_filestat_set_size(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_filestat_set_size");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_FILESTAT_SET_SIZE,
-            ));
+            return Err(WASIAPIName::FD_FILESTAT_SET_SIZE.into());
         }
 
         let fd: Fd = args.nth::<u32>(0).into();
@@ -1473,25 +1434,20 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_filestat_set_times` function.  This
-    /// is not supported by Veracruz and we simply return `ErrNo::NotSup`.
+    /// is not supported by Veracruz and we simply return `ErrNo::NoSys`.
     fn wasi_fd_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_filestat_set_times");
         if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_FILESTAT_SET_TIMES,
-            ));
+            return Err(WASIAPIName::FD_FILESTAT_SET_TIMES.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `fd_pread` function.
     fn wasi_fd_pread(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_pread");
         if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_PREAD,
-            ));
+            return Err(WASIAPIName::FD_PREAD.into());
         }
 
         //let fd: Fd = args.nth::<u32>(0).into();
@@ -1520,9 +1476,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_prestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_prestat_get");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_PRESTAT_GET,
-            ));
+            return Err(WASIAPIName::FD_PRESTAT_GET.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1535,9 +1489,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_prestat_dir_name(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_prestat_dir_name");
         if args.len() != 3 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_PRESTAT_DIR_NAME,
-            ));
+            return Err(WASIAPIName::FD_PRESTAT_DIR_NAME.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1550,11 +1502,9 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `fd_pwrite` function.
     fn wasi_fd_pwrite(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_pwrite");
-        //if args.len() != 5 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_FD_PWRITE_NAME,
-            //));
-        //}
+        if args.len() != 5 {
+            return Err(WASIAPIName::FD_PWRITE.into());
+        }
 
         //let fd: Fd = args.nth::<u32>(0).into();
         //let iovec_base = args.nth::<u32>(1);
@@ -1585,9 +1535,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_read(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_read");
         if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_READ,
-            ));
+            return Err(WASIAPIName::FD_READ.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1602,11 +1550,9 @@ impl WASMIRuntimeState {
     /// TODO: complete this.
     fn wasi_fd_readdir(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_readdir");
-        //if args.len() != 5 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_FD_READDIR_NAME,
-            //));
-        //}
+        if args.len() != 5 {
+            return Err(WASIAPIName::FD_READDIR.into());
+        }
 
         //let fd: Fd = args.nth::<u32>(0).into();
         //let dirent_base: u32 = args.nth::<u32>(1);
@@ -1645,9 +1591,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_renumber(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_renumber");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_RENUMBER,
-            ));
+            return Err(WASIAPIName::FD_RENUMBER.into());
         }
 
         let old_fd: Fd = args.nth::<u32>(0).into();
@@ -1660,9 +1604,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_seek(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_seek");
         if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_SEEK,
-            ));
+            return Err(WASIAPIName::FD_SEEK.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1674,29 +1616,25 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `fd_sync` function.  This is not
-    /// supported by Veracruz.  We simply return `ErrNo::NotSup`.
+    /// supported by Veracruz.  We simply return `ErrNo::NoSys`.
     ///
     /// TODO: consider whether this should just return `ErrNo::Success`,
     /// instead.
     fn wasi_fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_sync");
         if args.len() != 1 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_SEEK,
-            ));
+            return Err(WASIAPIName::FD_SEEK.into());
         }
 
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `fd_tell` function.
     fn wasi_fd_tell(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_tell");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_FD_TELL_NAME,
-            //));
-        //}
+        if args.len() != 2 {
+            return Err(WASIAPIName::FD_TELL.into());
+        }
 
         //let fd: Fd = args.nth::<u32>(0).into();
         //let address: u32 = args.nth(1);
@@ -1712,9 +1650,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_write(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_fd_write");
         if args.len() != 4 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::FD_WRITE,
-            ));
+            return Err(WASIAPIName::FD_WRITE.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1728,30 +1664,18 @@ impl WASMIRuntimeState {
     /// The implementation of the WASI `path_create_directory` function.
     fn wasi_path_create_directory(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_create_directory");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_PATH_CREATE_DIRECTORY_NAME,
-            //));
-        //}
-
-        //let fd: Fd = args.nth::<u32>(0).into();
-        //let path_address: u32 = args.nth::<u32>(1);
-
-        ////TODO: change !!!!!
-        //let path = self.read_cstring(path_address,1)?;
-
-        //Ok(self.vfs.path_create_directory(&fd, path))
-        Ok(ErrNo::NotSup)
+        if args.len() != 2 {
+            return Err(WASIAPIName::PATH_CREATE_DIRECTORY.into());
+        }
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_filestat_get` function.
     fn wasi_path_filestat_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_filestat_get");
-        //if args.len() != 4 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_PATH_FILESTAT_GET_NAME,
-            //));
-        //}
+        if args.len() != 4 {
+            return Err(WASIAPIName::PATH_FILESTAT_GET.into());
+        }
 
         //let fd: Fd = args.nth::<u32>(0).into();
         //let flags: LookupFlags = match args.nth::<u32>(1).try_into() {
@@ -1772,38 +1696,30 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_filestat_set_times` function.  This
-    /// is not supported by Veracruz.  We simply return `ErrNo::NotSup`.
+    /// is not supported by Veracruz.  We simply return `ErrNo::NoSys`.
     fn wasi_path_filestat_set_times(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_filestat_set_times");
         if args.len() != 6 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PATH_FILESTAT_SET_TIMES,
-            ));
+            return Err(WASIAPIName::PATH_FILESTAT_SET_TIMES.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_readlink` function.  This
-    /// is not supported by Veracruz.  We simply return `ErrNo::NotSup`.
+    /// is not supported by Veracruz.  We simply return `ErrNo::NoSys`.
     fn wasi_path_link(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_link");
         if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PATH_LINK,
-            ));
+            return Err(WASIAPIName::PATH_LINK.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_open` function.
     fn wasi_path_open(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_open");
         if args.len() != 9 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PATH_OPEN,
-            ));
+            return Err(WASIAPIName::PATH_OPEN.into());
         }
 
         let fd = args.nth::<u32>(0);
@@ -1830,47 +1746,32 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `path_readlink` function.  This
-    /// is not supported by Veracruz.  We simply return `ErrNo::NotSup`.
+    /// is not supported by Veracruz.  We simply return `ErrNo::NoSys`.
     ///
     /// TODO: re-assess whether we want to support this.
     fn wasi_path_readlink(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_readlink");
         if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PATH_READLINK,
-            ));
+            return Err(WASIAPIName::PATH_READLINK.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_remove_directory` function.
     fn wasi_path_remove_directory(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_remove_directory");
-        //if args.len() != 2 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_PATH_REMOVE_DIRECTORY_NAME,
-            //));
-        //}
-
-        //let fd: Fd = args.nth::<u32>(0).into();
-        //let path_address: u32 = args.nth::<u32>(1).into();
-
-        ////TODO: change !!!!!!!
-        //let path = self.read_cstring(path_address,1)?;
-
-        //Ok(self.vfs.path_remove_directory(&fd, &path))
-        Ok(ErrNo::NotSup)
+        if args.len() != 2 {
+            return Err(WASIAPIName::PATH_REMOVE_DIRECTORY.into());
+        }
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_rename` function.
     fn wasi_path_rename(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_rename");
-        //if args.len() != 4 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_PATH_RENAME_NAME,
-            //));
-        //}
+        if args.len() != 4 {
+            return Err(WASIAPIName::PATH_RENAME.into());
+        }
 
         //let old_fd: Fd = args.nth::<u32>(0).into();
         //let old_path_address: u32 = args.nth::<u32>(1);
@@ -1882,54 +1783,42 @@ impl WASMIRuntimeState {
         //let new_path = self.read_cstring(new_path_address,1)?;
 
         //Ok(self.vfs.path_rename(&old_fd, &old_path, &new_fd, new_path))
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_symlink` function.  This is not
-    /// supported by Veracruz.  We simply return `ErrNo::NotSup`.
+    /// supported by Veracruz.  We simply return `ErrNo::NoSys`.
     ///
     /// TODO: re-assess whether we want to support this.
     fn wasi_path_symlink(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_symlink");
         if args.len() != 3 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PATH_SYMLINK,
-            ));
+            return Err(WASIAPIName::PATH_SYMLINK.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `path_unlink_file` function.  This is not
-    /// supported by Veracruz.  We simply return `ErrNo::NotSup`.
+    /// supported by Veracruz.  We simply return `ErrNo::NoSys`.
     ///
     /// TODO: re-assess whether we want to support this.
     fn wasi_path_unlink_file(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_path_unlink_file");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PATH_UNLINK_FILE,
-            ));
+            return Err(WASIAPIName::PATH_UNLINK_FILE.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `poll_oneoff` function.  This is not
     /// supported by Veracruz.  We write `0` as the number of subscriptions that
-    /// were registered and return `ErrNo::NotSup`.
+    /// were registered and return `ErrNo::NoSys`.
     fn wasi_poll_oneoff(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_poll_oneoff");
-        //if args.len() != 4 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_POLL_ONEOFF_NAME,
-            //));
-        //}
-
-        //let address: u32 = args.nth(3);
-        //self.write_buffer(address, &u32::to_le_bytes(0u32))?;
-
-        Ok(ErrNo::NotSup)
+        if args.len() != 4 {
+            return Err(WASIAPIName::POLL_ONEOFF.into());
+        }
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `proc_raise` function.  This halts
@@ -1938,9 +1827,7 @@ impl WASMIRuntimeState {
     fn wasi_proc_exit(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_proc_exit");
         if args.len() != 1 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PROC_EXIT,
-            ));
+            return Err(WASIAPIName::PROC_EXIT.into());
         }
 
         let exit_code: u32 = args.nth(0);
@@ -1954,29 +1841,23 @@ impl WASMIRuntimeState {
 
     /// The implementation of the WASI `proc_raise` function.  This is not
     /// supported by Veracruz and implemented as a no-op, simply returning
-    /// `ErrNo::NotSup`.
+    /// `ErrNo::NoSys`.
     fn wasi_proc_raise(&mut self, args: RuntimeArgs) -> WASIError {
         println!("proc exit is called");
         if args.len() != 1 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::PROC_RAISE,
-            ));
+            return Err(WASIAPIName::PROC_RAISE.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `sched_yield` function.  This is
-    /// not supported by Veracruz and simply returns `ErrNo::NotSup`.
+    /// not supported by Veracruz and simply returns `ErrNo::NoSys`.
     fn wasi_sched_yield(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sched_yield");
         if args.len() != 0 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::SCHED_YIELD,
-            ));
+            return Err(WASIAPIName::SCHED_YIELD.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `random_get` function, which calls
@@ -1988,11 +1869,8 @@ impl WASMIRuntimeState {
     fn wasi_random_get(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_random_get");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::RANDOM_GET,
-            ));
+            return Err(WASIAPIName::RANDOM_GET.into());
         }
-
         let address: u32 = args.nth(0);
         let size: u32 = args.nth(1);
 
@@ -2000,50 +1878,35 @@ impl WASMIRuntimeState {
     }
 
     /// The implementation of the WASI `sock_send` function.  This is not
-    /// supported by Veracruz and returns `ErrNo::NotSup`, writing back
+    /// supported by Veracruz and returns `ErrNo::NoSys`, writing back
     /// `0` as the length of the transmission.
     fn wasi_sock_send(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sock_send");
         if args.len() != 5 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::SOCK_SEND,
-            ));
+            return Err(WASIAPIName::SOCK_SEND.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `sock_recv` function.  This is not
-    /// supported by Veracruz and returns `ErrNo::NotSup`, writing back
+    /// supported by Veracruz and returns `ErrNo::NoSys`, writing back
     /// `0` as the length of the transmission.
     fn wasi_sock_recv(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sock_recv");
-        //if args.len() != 6 {
-            //return Err(FatalEngineError::bad_arguments_to_host_function(
-                //WASI_SOCK_RECV_NAME,
-            //));
-        //}
-
-        //let datalen_address: u32 = args.nth(3);
-        //let flags_address: u32 = args.nth(4);
-
-        //self.write_buffer(datalen_address, &u32::to_le_bytes(0u32))?;
-        //self.write_buffer(flags_address, &u16::to_le_bytes(0u16))?;
-
-        Ok(ErrNo::NotSup)
+        if args.len() != 6 {
+            return Err(WASIAPIName::SOCK_RECV.into());
+        }
+        Ok(ErrNo::NoSys)
     }
 
     /// The implementation of the WASI `sock_shutdown` function.  This is
-    /// not supported by Veracruz and simply returns `ErrNo::NotSup`.
+    /// not supported by Veracruz and simply returns `ErrNo::NoSys`.
     fn wasi_sock_shutdown(&mut self, args: RuntimeArgs) -> WASIError {
         println!("call wasi_sock_shutdown");
         if args.len() != 2 {
-            return Err(FatalEngineError::bad_arguments_to_host_function(
-                WASIAPIName::SOCK_SHUTDOWN,
-            ));
+            return Err(WASIAPIName::SOCK_SHUTDOWN.into());
         }
-
-        Ok(ErrNo::NotSup)
+        Ok(ErrNo::NoSys)
     }
 }
 

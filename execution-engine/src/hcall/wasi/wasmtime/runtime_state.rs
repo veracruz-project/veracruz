@@ -14,7 +14,7 @@ use std::convert::TryFrom;
 use crate::{
     fs::FileSystem,
     hcall::common::{
-        ExecutionEngine, EntrySignature, FatalEngineError,
+        ExecutionEngine, EntrySignature, FatalEngineError, HostFunctionIndexOrName, 
         WASIWrapper, MemoryHandler, WASIAPIName
     }
 };
@@ -173,7 +173,7 @@ impl WasmtimeRuntimeState {
 
             let host_call_body = match WASIAPIName::try_from(import.name())
                 // TODO CHANGE THE ERROR TYPE
-                .map_err(|e|{ FatalEngineError::UnknownHostFunction{index : 0} 
+                .map_err(|e|{ FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(import.name().to_string())) 
             })? {
                 WASIAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
                 WASIAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
