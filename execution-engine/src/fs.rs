@@ -14,11 +14,11 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{collections::HashMap, convert::{TryInto, TryFrom}, string::ToString, string::String, vec::Vec};
+use std::{collections::HashMap, convert::TryInto, string::ToString, string::String, vec::Vec};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
-    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
-    PreopenType
+    LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Timestamp, FileType,
+    PreopenType, SetTimeFlags, ClockId, Event, Subscription, SdFlags, SiFlags, RiFlags, RoFlags
 };
 use veracruz_utils::policy::principal::{RightTable, Principal};
 use platform_services::{getrandom, result};
@@ -48,35 +48,6 @@ struct InodeImpl {
     raw_file_data: Vec<u8>,
 }
 
-impl InodeImpl {
-    /// Returns `true` iff the size of the inode's raw data buffer matches the
-    /// length stored in the file stat structure.
-    ///
-    /// TODO: may panic if `usize` and `u64` bitwidths are different!  This
-    /// should probably be checked using a static assertion somewhere
-    /// once-and-for-all to make sure Veracruz is used only on platforms where
-    /// `sizeof::<usize>()` returns `8`, as this assumption is baked-in to the
-    /// Veracruz source code in a few different places.
-    #[inline]
-    pub(crate) fn valid(&self) -> bool {
-        self.raw_file_data.len()
-            == usize::try_from(self.file_stat.file_size)
-                .expect("The bitwidth of the Rust `usize` type is not 64-bits.")
-    }
-
-    /// Returns the file stat structure associated with this inode.
-    #[inline]
-    pub(crate) fn file_stat(&self) -> &FileStat {
-        &self.file_stat
-    }
-
-    /// Returns the raw file data associated with this inode.
-    #[inline]
-    pub(crate) fn raw_file_data(&self) -> &Vec<u8> {
-        &self.raw_file_data
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // File-table entries.
 ////////////////////////////////////////////////////////////////////////////////
@@ -93,33 +64,6 @@ struct FileTableEntry {
     offset: FileSize,
     /// Advice on how regions of the file are to be used.
     advice: Vec<(FileSize, FileSize, Advice)>,
-}
-
-impl FileTableEntry {
-    /// Returns the inode associated with the file table entry.
-    #[inline]
-    pub fn inode(&self) -> &Inode {
-        &self.inode
-    }
-
-    /// Returns the FD stat structure associated with the file table entry.
-    #[inline]
-    pub fn fd_stat(&self) -> &FdStat {
-        &self.fd_stat
-    }
-
-    /// Returns the current file (seek) offset associated with the file table
-    /// entry.
-    #[inline]
-    pub fn offset(&self) -> &FileSize {
-        &self.offset
-    }
-
-    /// Returns the regions of advice applied to this file.
-    #[inline]
-    pub fn advice(&self) -> &Vec<(FileSize, FileSize, Advice)> {
-        &self.advice
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -184,15 +128,16 @@ impl FileSystem {
     /// Install all the pre open fd, including the stdin, stdout, stderr and root.
     fn install_prestat(&mut self, dir_paths: &[&str]) {
         // Pre open the stdin stdout and stderr.
-        self.install_file("stderr",&(0 as u64).into(), "".as_bytes());
-        self.install_fd(&Fd(0),&(0 as u64).into(), &Rights::FD_READ, &Rights::FD_READ);
-        self.install_file("stdin",&(1 as u64).into(), "".as_bytes());
-        self.install_fd(&Fd(1),&(1 as u64).into(), &Rights::FD_READ, &Rights::FD_READ);
-        self.install_file("stderr",&(2 as u64).into(), "".as_bytes());
-        self.install_fd(&Fd(2),&(2 as u64).into(), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_file("stderr",Inode(0), "".as_bytes());
+        self.install_fd(Fd(0),Inode(0), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_file("stdin",Inode(1), "".as_bytes());
+        self.install_fd(Fd(1),Inode(1), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_file("stderr",Inode(2), "".as_bytes());
+        self.install_fd(Fd(2),Inode(2), &Rights::FD_READ, &Rights::FD_READ);
 
-        self.install_dir(Self::ROOT_DIRECTORY, &Self::ROOT_DIRECTORY_INODE);
-        self.install_fd(&Self::ROOT_DIRECTORY_FD, &Self::ROOT_DIRECTORY_INODE, &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
+        // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
+        self.install_dir(Self::ROOT_DIRECTORY, Self::ROOT_DIRECTORY_INODE);
+        self.install_fd(Self::ROOT_DIRECTORY_FD, Self::ROOT_DIRECTORY_INODE, &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
         self.prestat_table.insert(Self::ROOT_DIRECTORY_FD, Self::ROOT_DIRECTORY.to_string());
 
         // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
@@ -200,19 +145,19 @@ impl FileSystem {
         for (index, path) in dir_paths.iter().enumerate() {
             let index = index as u32;
             let new_fd = Fd(index + root_fd_number + 1);
-            self.install_dir(path,&Self::ROOT_DIRECTORY_INODE);
-            self.install_fd(&new_fd,&Self::ROOT_DIRECTORY_INODE, &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
+            self.install_dir(path,Self::ROOT_DIRECTORY_INODE);
+            self.install_fd(new_fd,Self::ROOT_DIRECTORY_INODE, &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
             self.prestat_table.insert(new_fd, path.to_string());
         }
     }
     
-    fn install_dir(&mut self, path : &str, inode : &Inode) {
+    fn install_dir(&mut self, path : &str, inode : Inode) {
         let file_stat = FileStat{
-            device: (0 as u64).into(),
+            device: (0u64).into(),
             inode : inode.clone(),
             file_type: FileType::Directory,
             num_links: 0,
-            file_size : 0 as u64,
+            file_size : 0u64,
             atime: Timestamp::from_nanos(0),
             mtime: Timestamp::from_nanos(0),
             ctime: Timestamp::from_nanos(0),
@@ -226,10 +171,10 @@ impl FileSystem {
         self.path_table.insert(path.to_string(),inode.clone());
     }
 
-    fn install_file(&mut self, path : &str, inode : &Inode, raw_file_data : &[u8]) {
+    fn install_file(&mut self, path : &str, inode : Inode, raw_file_data : &[u8]) {
         let file_size = raw_file_data.len();
         let file_stat = FileStat{
-            device: (0 as u64).into(),
+            device: 0u64.into(),
             inode : inode.clone(),
             file_type: FileType::RegularFile,
             num_links: 0,
@@ -246,7 +191,7 @@ impl FileSystem {
         self.path_table.insert(path.to_string(),inode.clone());
     }
 
-    fn install_fd(&mut self, fd : &Fd, inode : &Inode, rights_base : &Rights, rights_inheriting : &Rights) {
+    fn install_fd(&mut self, fd : Fd, inode : Inode, rights_base : &Rights, rights_inheriting : &Rights) {
 
         let fd_stat = FdStat {
             file_type : FileType::RegularFile,
@@ -276,20 +221,21 @@ impl FileSystem {
         Ok(u64::from_le_bytes(result))
     }
 
-    fn next_fd(&self) -> FileSystemError<Fd> {
+    /// Pick a new fd randomly.
+    fn new_fd(&self) -> FileSystemError<Fd> {
         loop {
-            let next_fd = Fd(self.random_u32()?);
-            if !self.file_table.contains_key(&next_fd) {
-                return Ok(next_fd);
+            let new_fd = self.random_u32()?.into();
+            if !self.file_table.contains_key(&new_fd) {
+                return Ok(new_fd);
             }
         }
     }
 
-    fn next_inode(&self) -> FileSystemError<Inode> {
+    fn new_inode(&self) -> FileSystemError<Inode> {
         loop {
-            let next_inode = Inode(self.random_u64()?);
-            if !self.inode_table.contains_key(&next_inode) {
-                return Ok(next_inode);
+            let new_inode = Inode(self.random_u64()?);
+            if !self.inode_table.contains_key(&new_inode) {
+                return Ok(new_inode);
             }
         }
     }
@@ -299,12 +245,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Implements the `fd_close` operation on the filesystem, which closes a
-    /// file descriptor.  Returns:
-    ///
-    /// 1. `ErrNo::BadF` if `fd` is not a current file-descriptor.  In this
-    ///    case there are no changes to the underlying filesystem.
-    /// 2. `ErrNo::Success` if `fd` is a current file-descriptor.  In this case,
-    ///    the file-descriptor is closed and no longer a valid file-descriptor.
+    /// file descriptor.  Returns `ErrNo::BadF`, if `fd` is not a current file-descriptor. 
     pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
         println!("call fd_close on {:?}", fd);
         self.file_table.remove(&fd).ok_or(ErrNo::BadF)?;
@@ -317,13 +258,13 @@ impl FileSystem {
     /// streaming).
     pub(crate) fn fd_advise(
         &mut self,
-        fd: &Fd,
+        fd: Fd,
         offset: FileSize,
         len: FileSize,
         adv: Advice,
     ) -> FileSystemError<()> {
         println!("call fd_advise on fd {:?}, offset {:?}, len {:?}, advice {:?}", fd, offset, len, adv);
-        if let Some(entry) = self.file_table.get_mut(fd) {
+        if let Some(entry) = self.file_table.get_mut(&fd) {
             entry.advice.push((offset, len, adv));
             return Ok(());
         } else {
@@ -332,19 +273,19 @@ impl FileSystem {
     }
 
     /// Return a copy of the status of the file descriptor, `fd`.
-    pub(crate) fn fd_fdstat_get(&self, fd: &Fd) -> FileSystemError<FdStat> {
+    pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemError<FdStat> {
         println!("call fd_fdstat_get on {:?}", fd);
         self.file_table
-            .get(fd)
+            .get(&fd)
             .map(|FileTableEntry { fd_stat, .. }| fd_stat.clone())
             .ok_or(ErrNo::BadF)
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
-    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: &Fd, flags: FdFlags) -> FileSystemError<()> {
+    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemError<()> {
         println!("call fd_fdstat_set_flags on {:?} and flags {:?}", fd, flags);
         self.file_table
-            .get_mut(fd)
+            .get_mut(&fd)
             .map(|FileTableEntry { mut fd_stat, .. }| {
                 fd_stat.flags = flags;
             })
@@ -354,13 +295,13 @@ impl FileSystem {
     /// Change the right associated with the file descriptor, `fd`.
     pub(crate) fn fd_fdstat_set_rights(
         &mut self,
-        fd: &Fd,
+        fd: Fd,
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> FileSystemError<()> {
         println!("call fd_fdstat_set_rights on {:?} and right base {:?} and inheriting {:?}", fd,rights_base, rights_inheriting);
         self.file_table
-            .get_mut(fd)
+            .get_mut(&fd)
             .map(|FileTableEntry { mut fd_stat, .. }| {
                 fd_stat.rights_base = rights_base;
                 fd_stat.rights_inheriting = rights_inheriting;
@@ -369,33 +310,48 @@ impl FileSystem {
     }
 
     /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
-    pub(crate) fn fd_filestat_get(&self, fd: &Fd) -> FileSystemError<FileStat> {
+    pub(crate) fn fd_filestat_get(&self, fd: Fd) -> FileSystemError<FileStat> {
         println!("call fd_filestat_get on {:?}", fd);
         let inode = self
             .file_table
-            .get(fd)
-            .map(|fte| fte.inode())
+            .get(&fd)
+            .map(|fte| fte.inode)
             .ok_or(ErrNo::BadF)?;
 
         self.inode_table
-            .get(inode)
+            .get(&inode)
             .map(|InodeImpl { file_stat, .. }| file_stat.clone())
             .ok_or(ErrNo::BadF)
     }
 
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bypes are
     /// filled with ZERO.
-    pub(crate) fn fd_filestat_set_size(&mut self, fd: &Fd, size: FileSize) -> FileSystemError<()> {
-        println!("call fd_filestat_set_size on {:?}", fd);
-        let inode = self.file_table.get(fd).map(|FileTableEntry { inode, .. }| inode.clone()).ok_or(ErrNo::BadF)?;
+    pub(crate) fn fd_filestat_set_size(&mut self, fd: Fd, size: FileSize) -> FileSystemError<()> {
+        println!("call fd_filestat_set_size on {:?} with size {:?}", fd, size);
+        let inode = self.file_table.get(&fd).map(|FileTableEntry { inode, .. }| inode.clone()).ok_or(ErrNo::BadF)?;
 
-        if let Some(inode) = self.inode_table.get_mut(&inode) {
-            inode.file_stat.file_size = size;
-            inode.raw_file_data.resize(size as usize, 0);
-            return Ok(());
-        } else {
-            return Err(ErrNo::BadF);
+        let inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
+        inode_impl.file_stat.file_size = size;
+        inode_impl.raw_file_data.resize(size as usize, 0);
+        Ok(())
+    }
+
+    /// Change the time of the open file pointed by the file descriptor, `fd`. 
+    pub(crate) fn fd_filestat_set_times(&mut self, fd: Fd, atime: Timestamp, mtime: Timestamp, fst_flags: SetTimeFlags) -> FileSystemError<()> {
+        println!("call fd_filestat_set_times on {:?}", fd);
+        let inode = self.file_table.get(&fd).map(|FileTableEntry { inode, .. }| inode.clone()).ok_or(ErrNo::BadF)?;
+
+        let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
+        if fst_flags.contains(SetTimeFlags::ATIME) {
+            inode_impl.file_stat.atime = atime;
+        } else if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
+            return Err(ErrNo::NoSys)
+        } else if fst_flags.contains(SetTimeFlags::MTIME) {
+            inode_impl.file_stat.mtime = mtime;
+        } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
+            return Err(ErrNo::NoSys)
         }
+        Ok(())
     }
 
     /// This is a rust-style base implementation for fd_pread.
@@ -406,20 +362,20 @@ impl FileSystem {
     /// how a particular execution engine handles the memory.
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM.
-    pub(crate) fn fd_pread_base(
+    pub(crate) fn fd_pread(
         &mut self,
-        fd: &Fd,
+        fd: Fd,
         buffer_len: usize,
-        offset: &FileSize,
+        offset: FileSize,
     ) -> FileSystemError<Vec<u8>> {
-        println!("call fd_pread_base on fd {:?} buffer_len {:?} and offset {:?}", fd, buffer_len, offset);
+        println!("call fd_pread on fd {:?} buffer_len {:?} and offset {:?}", fd, buffer_len, offset);
         let inode = self
             .file_table
-            .get(fd)
+            .get(&fd)
             .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
         // NOTE: It should be safe to convert a u64 to usize.
-        let offset = *offset as usize;
+        let offset = offset as usize;
 
         self.inode_table
             .get(inode)
@@ -429,118 +385,117 @@ impl FileSystem {
                      ..
                  }| {
                     let (_, to_read) = buffer.split_at(offset);
-                    println!("call fd_pread_base on content {:?}",to_read.len());
+                    println!("call fd_pread on content {:?}",to_read.len());
                     let segment = vec![buffer_len, to_read.len()];
                     let read_length = segment.iter().min().unwrap_or(&0);
-                    println!("call fd_pread_base on read_length {:?}",read_length);
+                    println!("call fd_pread on read_length {:?}",read_length);
                     let (rst, _) = to_read.split_at(*read_length);
-                    println!("call fd_pread_base result {:?}",rst.len());
+                    println!("call fd_pread result {:?}",rst.len());
                     rst.to_vec()
                 },
             )
             .ok_or(ErrNo::BadF)
     }
 
-    pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
+    pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemError<Prestat> {
         println!("call fd_prestat_get on {:?}",fd);
-        let path = self.prestat_table.get(fd).ok_or(ErrNo::BadF)?;
+        let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         let resource_type = PreopenType::Dir {
             name_len : path.len() as u32
         };
         Ok(Prestat{resource_type})
     }
 
-    pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
+    pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemError<String> {
         println!("call fd_prestat_dir_name on {:?}",fd);
-        let path = self.prestat_table.get(fd).ok_or(ErrNo::BadF)?;
+        let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         Ok(path.to_string())
     }
 
-    /// This is a rust-style base implementation for fd_pwrite_base.
+    /// This is a rust-style base implementation for fd_pwrite.
     /// The actual WASI spec, requires that `ciovec` is of type Vec<IoVec>.
     /// However, the implementation of WASI spec of fd_pread depends on
     /// how a particular execution engine handles the memory.
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM.
-    pub(crate) fn fd_pwrite_base(
+    pub(crate) fn fd_pwrite(
         &mut self,
-        fd: &Fd,
-        mut buf: Vec<u8>,
+        fd: Fd,
+        buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemError<Size> {
-        println!("call fd_pwrite_base on fd {:?}, offset {:?} and buf {:?}", fd, offset, buf.len());
+        println!("call fd_pwrite on fd {:?}, offset {:?} and buf {:?}", fd, offset, buf.len());
         let inode = self
             .file_table
-            .get(fd)
+            .get(&fd)
             .map(|FileTableEntry { inode, .. }| inode)
             .ok_or(ErrNo::BadF)?;
 
         if let Some(inode_impl) = self.inode_table.get_mut(inode) {
-            println!("call fd_pwrite_base before: {:?}",inode_impl.raw_file_data.len());
+            println!("call fd_pwrite before: {:?}",inode_impl.raw_file_data.len());
             let remain_length = (inode_impl.file_stat.file_size - offset) as usize;
             let offset = offset as usize;
             if remain_length <= buf.len() {
-                println!("call fd_pwrite_base grows length");
+                println!("call fd_pwrite grows length");
                 let mut grow_vec = vec![0; buf.len() - remain_length];
                 inode_impl.raw_file_data.append(&mut grow_vec);
             }
             let rst = buf.len();
             inode_impl.raw_file_data[offset..(offset + rst)].copy_from_slice(&buf);
             inode_impl.file_stat.file_size = inode_impl.raw_file_data.len() as u64;
-            println!("call fd_pwrite_base result: {:?}",inode_impl.raw_file_data.len());
+            println!("call fd_pwrite result: {:?}",inode_impl.raw_file_data.len());
             return Ok(rst as Size);
         } else {
             return Err(ErrNo::BadF);
         }
     }
 
-    pub(crate) fn fd_read_base(&mut self, fd: &Fd, len: usize) -> FileSystemError<Vec<u8>> {
-        println!("call fd_read_base on {:?}", fd);
-        let offset = if let Some(entry) = self.file_table.get(fd) {
+    pub(crate) fn fd_read(&mut self, fd: Fd, len: usize) -> FileSystemError<Vec<u8>> {
+        println!("call fd_read on {:?}", fd);
+        let offset = if let Some(entry) = self.file_table.get(&fd) {
             entry.offset
         } else {
             return Err(ErrNo::BadF);
         };
-        println!("call fd_read_base current offset {:?}", offset);
+        println!("call fd_read current offset {:?}", offset);
 
-        let rst = self.fd_pread_base(fd, len, &offset)?;
+        let rst = self.fd_pread(fd, len, offset)?;
         self.fd_seek(fd, rst.len() as i64, Whence::Current)?;
         Ok(rst)
     }
 
     pub(crate) fn fd_readdir(
         &mut self,
-        fd: &Fd,
-        _cookie: &DirCookie,
+        fd: Fd,
+        _cookie: DirCookie,
     ) -> FileSystemError<Vec<DirEnt>> {
         println!("call fd_readdir on {:?}", fd);
-        unimplemented!()
+        Err(ErrNo::NoSys)
     }
 
     /// Atomically renumbers the `old_fd` to the `new_fd`.  Note that as
     /// Chihuahua is single-threaded this is atomic from the WASM program's
     /// point of view.
-    pub(crate) fn fd_renumber(&mut self, old_fd: &Fd, new_fd: Fd) -> ErrNo {
-        println!("call fd_renumber on {:?}", old_fd);
-        if let Some(entry) = self.file_table.get(old_fd) {
-            if self.file_table.get(&new_fd).is_none() {
-                let entry = entry.clone();
-                self.file_table.insert(new_fd, entry);
-                self.file_table.remove(old_fd);
-                return ErrNo::Success;
-            }
+    pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemError<()> {
+        println!("call fd_renumber on {:?} to a new fd {:?}", old_fd, new_fd);
+        let entry = self.file_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
+        if self.file_table.get(&new_fd).is_none() {
+            self.file_table.insert(new_fd, entry);
+            self.file_table.remove(&old_fd);
+            Ok(())
+        } else {
+            Err(ErrNo::BadF)
         }
-        ErrNo::BadF
     }
 
     pub(crate) fn fd_seek(
         &mut self,
-        fd: &Fd,
+        fd: Fd,
         offset: FileDelta,
         whence: Whence,
     ) -> FileSystemError<FileSize> {
         println!("call fd_seek on fd {:?}, offset {:?} and whence {:?}", fd, offset, whence);
-        let (inode, cur_file_offset) = match self.file_table.get(fd) {
+        let (inode, cur_file_offset) = match self.file_table.get(&fd) {
             Some(FileTableEntry {
                 // Use temporary variable `o` 
                 // to reduce the ambiguity with 
@@ -583,7 +538,7 @@ impl FileSystem {
         println!("call fd_seek on new offset {:?}", new_offset);
 
         // Update the offset
-        if let Some(entry) = self.file_table.get_mut(fd) {
+        if let Some(entry) = self.file_table.get_mut(&fd) {
             entry.offset = new_offset;
         } else {
             return Err(ErrNo::BadF);
@@ -593,43 +548,67 @@ impl FileSystem {
     }
 
     /// Returns the current offset associated with the file descriptor.
-    pub(crate) fn fd_tell(&self, fd: &Fd) -> FileSystemError<FileSize> {
-        if let Some(entry) = self.file_table.get(fd) {
+    pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemError<FileSize> {
+        if let Some(entry) = self.file_table.get(&fd) {
             Ok(entry.offset.clone())
         } else {
             Err(ErrNo::BadF)
         }
     }
 
-    pub(crate) fn fd_write_base(&mut self, fd: &Fd, buf: Vec<u8>) -> FileSystemError<Size> {
-        println!("call fd_write_base on {:?}", fd);
-        let offset = if let Some(entry) = self.file_table.get(fd) {
+    pub(crate) fn fd_write(&mut self, fd: Fd, buf: Vec<u8>) -> FileSystemError<Size> {
+        println!("call fd_write on {:?}", fd);
+        let offset = if let Some(entry) = self.file_table.get(&fd) {
             entry.offset
         } else {
             return Err(ErrNo::BadF);
         };
 
-        let rst = self.fd_pwrite_base(fd, buf, offset)?;
+        let rst = self.fd_pwrite(fd, buf, offset)?;
         self.fd_seek(fd, rst as i64, Whence::Current)?;
         Ok(rst)
     }
 
-    pub(crate) fn path_create_directory(&mut self, _fd: &Fd, _path: String) -> ErrNo {
-        unimplemented!()
+    pub(crate) fn path_create_directory(&mut self, _fd: Fd, _path: String) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
     }
 
     pub(crate) fn path_filestat_get(
         &mut self,
-        _fd: &Fd,
-        _flags: &LookupFlags,
-        path: &String,
+        _fd: Fd,
+        _flags: LookupFlags,
+        path: String,
     ) -> FileSystemError<FileStat> {
-        let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?.clone();
+        let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?.clone();
         self.inode_table
             .get(&inode)
             .map(|InodeImpl { file_stat, .. }| file_stat.clone())
             .ok_or(ErrNo::BadF)
     }
+    
+    pub(crate) fn path_filestat_set_times(
+        &mut self,
+        _fd: Fd,
+        _flags: LookupFlags,
+        path: String,
+        atime: Timestamp,
+        mtime: Timestamp,
+        fst_flags: SetTimeFlags,
+    ) -> FileSystemError<()> {
+        let inode = self.path_table.get(&path).ok_or(ErrNo::NoEnt)?;
+        let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
+        if fst_flags.contains(SetTimeFlags::ATIME) {
+            inode_impl.file_stat.atime = atime;
+        } else if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
+            return Err(ErrNo::NoSys)
+        } else if fst_flags.contains(SetTimeFlags::MTIME) {
+            inode_impl.file_stat.mtime = mtime;
+        } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
+            return Err(ErrNo::NoSys)
+        }
+        Ok(())
+    }
+
 
     /// Open a file or directory on behalf of the principal `principal`.
     /// TODO: It provides the minimum functionality of opening a file.
@@ -638,7 +617,7 @@ impl FileSystem {
         &mut self,
         principal : &Principal,
         // The parent fd for searching
-        fd: &Fd,
+        fd: Fd,
         _dirflags: LookupFlags,
         path: &str,
         oflags: OpenFlags,
@@ -663,7 +642,7 @@ impl FileSystem {
         println!("call path_open, the right {:?} and inheriting right {:?}",
             rights_base, rights_inheriting);
         // ONLY allow search on the root for now.
-        if *fd != Self::ROOT_DIRECTORY_FD {
+        if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
         // TODO IMPL oflags logic
@@ -674,8 +653,8 @@ impl FileSystem {
                 if !oflags.contains(OpenFlags::CREATE) {
                     return Err(ErrNo::NoEnt);
                 }
-                let new_inode = self.next_inode()?;
-                self.install_file(path, &new_inode, &vec![]);
+                let new_inode = self.new_inode()?;
+                self.install_file(path, new_inode, &vec![]);
                 new_inode
             }
         };
@@ -686,18 +665,18 @@ impl FileSystem {
                 println!("call path_open trunc");
                 inode_impl.raw_file_data = Vec::new();
                 inode_impl.file_stat = FileStat{
-                    device: (0 as u64).into(),
+                    device: 0u64.into(),
                     inode : inode.clone(),
                     file_type: FileType::Directory,
                     num_links: 0,
-                    file_size : 0 as u64,
+                    file_size : 0u64,
                     atime: Timestamp::from_nanos(0),
                     mtime: Timestamp::from_nanos(0),
                     ctime: Timestamp::from_nanos(0),
                 };
             });
         }
-        let next_fd = self.next_fd()?;
+        let new_fd = self.new_fd()?;
         let (file_type, file_size) = self
             .inode_table
             .get(&inode)
@@ -712,7 +691,7 @@ impl FileSystem {
             rights_inheriting,
         };
         self.file_table.insert(
-            next_fd,
+            new_fd,
             FileTableEntry {
                 inode,
                 fd_stat,
@@ -720,22 +699,26 @@ impl FileSystem {
                 advice: vec![(0, file_size, Advice::Normal)],
             },
         );
-        println!("new fd {:?} created for {:?}.",next_fd, path);
-        Ok(next_fd)
+        println!("new fd {:?} created for {:?}.",new_fd, path);
+        Ok(new_fd)
     }
 
-    pub(crate) fn path_remove_directory(&mut self, _fd: &Fd, _path: &String) -> ErrNo {
-        unimplemented!()
+    pub(crate) fn path_readlink(&mut self, _fd: Fd, _path: String) -> FileSystemError<Vec<u8>> {
+        Err(ErrNo::NoSys)
+    }
+
+    pub(crate) fn path_remove_directory(&mut self, _fd: Fd, _path: String) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
     }
 
     pub(crate) fn path_rename(
         &mut self,
-        _old_fd: &Fd,
-        _old_path: &String,
-        _new_fd: &Fd,
+        _old_fd: Fd,
+        _old_path: String,
+        _new_fd: Fd,
         _new_path: String,
-    ) -> ErrNo {
-        unimplemented!()
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
     }
 
     pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemError<Vec<u8>> {
@@ -745,6 +728,118 @@ impl FileSystem {
         } else {
             Err(ErrNo::NoSys)
         }
+    }
+
+    #[inline]
+    pub(crate) fn clock_res_get(
+        &mut self,
+        _clock_id: ClockId,
+    ) -> FileSystemError<Timestamp> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn clock_time_get(
+        &mut self,
+        _clock_id: ClockId,
+        _precision: Timestamp,
+    ) -> FileSystemError<Timestamp> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn fd_allocate(
+        &mut self,
+        _fd : Fd,
+        _offset: FileSize,
+        _len: FileSize,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn fd_datasync(
+        &mut self,
+        _fd: Fd,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn fd_sync(
+        &mut self,
+        _fd: Fd,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn path_link(
+        &mut self,
+        _old_fd: Fd,
+        _old_flag: LookupFlags,
+        _old_path: String,
+        _new_fd: Fd,
+        _new_path: String,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn path_symlink(
+        &mut self,
+        _old_path: String,
+        _fd: Fd,
+        _new_path: String,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn path_unlink_file(
+        &mut self,
+        _fd: Fd,
+        _path: String,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn poll_oneoff(
+        &mut self,
+        _subscriptions: Vec<Subscription>,
+        _events: Vec<Event>,
+    ) -> FileSystemError<Size> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn sock_recv(
+        &mut self,
+        _socket: Fd,
+        _buffer_len: usize,
+        _ri_flag: RiFlags,
+    ) -> FileSystemError<(Vec<u8>, RoFlags)> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn sock_send(
+        &mut self,
+        _socket: Fd,
+        _buf: Vec<u8>,
+        _si_flags: SiFlags,
+    ) -> FileSystemError<Size> {
+        Err(ErrNo::NoSys)
+    }
+
+    #[inline]
+    pub(crate) fn sock_shutdown(
+        &mut self,
+        _socket: Fd,
+        _flags: SdFlags,
+    ) -> FileSystemError<()> {
+        Err(ErrNo::NoSys)
     }
 }
 
@@ -761,7 +856,7 @@ impl FileSystem {
         println!("write_file_by_filename: {}", file_name);
         let fd = self.path_open(
             principal,
-            &FileSystem::ROOT_DIRECTORY_FD,
+            FileSystem::ROOT_DIRECTORY_FD,
             LookupFlags::SYMLINK_FOLLOW,
             file_name,
             OpenFlags::CREATE | if !is_append {OpenFlags::TRUNC} else {OpenFlags::empty()},
@@ -777,8 +872,8 @@ impl FileSystem {
             .contains(Rights::FD_WRITE | Rights::FD_SEEK) {
                 return Err(ErrNo::Access);
         }
-        if is_append { self.fd_seek(&fd, 0, Whence::End)?; }
-        self.fd_write_base(&fd,data.to_vec())?;
+        if is_append { self.fd_seek(fd, 0, Whence::End)?; }
+        self.fd_write(fd,data.to_vec())?;
         self.fd_close(fd)?;
         Ok(())
     }
@@ -792,7 +887,7 @@ impl FileSystem {
         println!("read_file_by_filename: {}", file_name);
         let fd = self.path_open(
             principal,
-            &FileSystem::ROOT_DIRECTORY_FD,
+            FileSystem::ROOT_DIRECTORY_FD,
             LookupFlags::SYMLINK_FOLLOW,
             file_name,
             OpenFlags::empty(),
@@ -808,8 +903,8 @@ impl FileSystem {
             .contains(Rights::FD_READ | Rights::FD_SEEK) {
                 return Err(ErrNo::Access);
         }
-        let file_stat = self.fd_filestat_get(&fd)?;
-        let rst = self.fd_read_base(&fd,file_stat.file_size as usize)?;
+        let file_stat = self.fd_filestat_get(fd)?;
+        let rst = self.fd_read(fd,file_stat.file_size as usize)?;
         self.fd_close(fd)?;
         Ok(rst)
     }

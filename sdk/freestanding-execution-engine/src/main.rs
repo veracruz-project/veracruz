@@ -29,9 +29,11 @@ use std::{
     vec::Vec,
     path::Path,
     sync::Mutex,
-    fs::File, io::Read, process::exit, time::Instant
+    fs::File, 
+    io::Read,
+    time::Instant,
+    error::Error,
 };
-
 use execution_engine::{
     factory::execute,
     fs::FileSystem,
@@ -78,7 +80,7 @@ struct CommandLineOptions {
 /// Parses the command line options, building a `CommandLineOptions` struct out
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
-fn parse_command_line() -> CommandLineOptions {
+fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> { 
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -126,16 +128,10 @@ fn parse_command_line() -> CommandLineOptions {
             info!("Selecting JITting as the execution strategy.");
             ExecutionStrategy::JIT
         } else {
-            eprintln!("Expecting 'interp' or 'jit' as selectable execution strategies");
-            eprintln!(
-                "Found '{}' instead passed through '---execution-strategy' flag.",
-                strategy
-            );
-            exit(-1)
+            return Err(format!("Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",strategy).into());
         }
     } else {
-        info!("Default 'interp' value is not loaded correctly");
-        exit(-1)
+        return Err("Default 'interp' value is not loaded correctly".into());
     };
 
     let binary = 
@@ -143,9 +139,7 @@ fn parse_command_line() -> CommandLineOptions {
         info!("Using '{}' as our WASM executable.", binary);
         binary.to_string()
     } else {
-        eprintln!("No binary file provided.");
-        eprintln!("Please select a WASM file to execute using the '--binary' flag.");
-        exit(-1)
+        return Err("No binary file provided.".into());
     };
     let data_sources = 
     if let Some(data) = matches.values_of("data") {
@@ -159,90 +153,61 @@ fn parse_command_line() -> CommandLineOptions {
         Vec::new()
     };
 
-    CommandLineOptions {
+    Ok(CommandLineOptions {
         data_sources,
         binary,
         execution_strategy,
-    }
+    })
 }
 
 /// Reads a WASM file from disk (actually, will read any file, but we only need
 /// it for WASM here) and return a collection of bytes corresponding to that
 /// file.  Will abort the program if anything goes wrong.
-fn load_file(file_path: &str) -> (String, Vec<u8>) {
+fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
     info!("Opening file '{}' for reading.", file_path);
 
-    let mut file = File::open(file_path).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot open WASM binary '{}'.  Error '{}' returned.",
-            file_path, err
-        );
-        exit(-1)
-    });
-
+    let mut file = File::open(file_path)?;
     let mut contents = Vec::new();
 
-    file.read_to_end(&mut contents).unwrap_or_else(|err| {
-        eprintln!(
-            "Cannot read WASM binary '{}' to completion.  Error '{}' returned.",
-            file_path, err
-        );
-        exit(-1);
-    });
+    file.read_to_end(&mut contents)?;
 
-    (Path::new(file_path).file_name().expect(&format!("Failed to extract file name from path {}", file_path)).to_str().expect(&format!("Failed to convert the filename in path {}", file_path)).to_string(), contents)
+    Ok((Path::new(file_path)
+            .file_name()
+            .ok_or(format!("Failed to obtain file name on {}",file_path))?
+            .to_str()
+            .ok_or(format!("Failed to convert file name to string on {}",file_path))?
+            .to_string(), contents))
 }
 
 /// Loads the specified data sources, as provided on the command line, for
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
-fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) {
+fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) -> Result<(), Box<dyn Error>> {
     for (id, file_path) in cmdline.data_sources.iter().enumerate() {
         info!("Loading data source '{}' with id {} for reading.", file_path, id);
-
-        let mut file = File::open(file_path).unwrap_or_else(|err| {
-            eprintln!(
-                "Could not open data source '{}'.  Error '{}' returned.",
-                file_path, err
-            );
-            exit(-1)
-        });
-
+        let mut file = File::open(file_path)?;
         let mut buffer = Vec::new();
-
-        file.read_to_end(&mut buffer).unwrap_or_else(|err| {
-            error!(
-                "Could not read data source '{}'.  Error '{}' returned.",
-                file_path, err
-            );
-            exit(-1)
-        });
+        file.read_to_end(&mut buffer)?;
 
         vfs.lock()
-            .expect("Failed to lock vfs")
-            .write_file_by_filename(&Principal::InternalSuperUser, &file_path, &buffer, false)
-            .unwrap_or_else(|err| {
-                eprintln!(
-                    "Could not write data source '{}'.  Error '{}' returned.",
-                    file_path, err
-                );
-                exit(-1)
-            });
+            .map_err(|e|format!("Failed to lock vfs, error: {:?}",e))?
+            .write_file_by_filename(&Principal::InternalSuperUser, &file_path, &buffer, false)?;
 
         info!( "Loading '{}' into vfs.", file_path);
     }
+    Ok(())
 }
 
 /// Entry: reads the static configuration and the command line parameters,
 /// parsing both and then starts provisioning the Veracruz host state, before
 /// invoking the entry point.
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let cmdline = parse_command_line();
+    let cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
-    let (prog_file_name, program) = load_file(&cmdline.binary);
+    let (prog_file_name, program) = load_file(&cmdline.binary)?;
 
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
@@ -262,20 +227,22 @@ fn main() {
     // Write the program twice on purpose, 
     // to check if `write_file_by_filename` overwrite the file correctly.
     vfs.lock()
-        .expect("Failed to lock the vfs")
+        .map_err(|e|format!("Failed to lock vfs, error: {:?}",e))?
         .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
         .expect(&format!("Failed to write to file {}", prog_file_name));
     vfs.lock()
-        .expect("Failed to lock the vfs")
+        .map_err(|e|format!("Failed to lock vfs, error: {:?}",e))?
         .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
         .expect(&format!("Failed to write to file {}", prog_file_name));
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    load_data_sources(&cmdline, vfs.clone());
+    load_data_sources(&cmdline, vfs.clone())?;
     info!("Data sources loaded.");
 
     info!("Invoking main.");
     let main_time = Instant::now();
-    execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name).expect(&format!("failed to execute {}", prog_file_name));
-    info!("time: {} micro seconds", main_time.elapsed().as_micros())
+    let return_code = execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name)?;
+    info!("return code: {:?}", return_code);
+    info!("time: {} micro seconds", main_time.elapsed().as_micros());
+    Ok(())
 }
