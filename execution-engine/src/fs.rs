@@ -14,7 +14,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{collections::HashMap, convert::TryFrom, string::ToString, string::String, vec::Vec};
+use std::{collections::HashMap, convert::{TryInto, TryFrom}, string::ToString, string::String, vec::Vec};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat, Inode,
     LookupFlags, OpenFlags, Prestat, Rights, Size, Whence, Device, Timestamp, FileType,
@@ -146,6 +146,8 @@ pub struct FileSystem {
     /// It will be used in, e.g.  `path_open` function, 
     /// to constrain the `Right` of file descriptors.
     right_table: RightTable,
+    /// Preopen FD table. Mapping the FD to dir name.
+    prestat_table: HashMap<Fd, String>,
 }
 
 impl FileSystem {
@@ -173,18 +175,35 @@ impl FileSystem {
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
             right_table,
+            prestat_table: HashMap::new(),
         };
-        rst.init()
+        rst.install_prestat(&vec!["/temp/"]);
+        rst
     }
 
-    fn init(mut self) -> Self {
-        // Use inode 2 as the root
-        // Install directory??
-        self.install_dir(Self::ROOT_DIRECTORY,&Self::ROOT_DIRECTORY_INODE);
-        self.install_fd(&Self::ROOT_DIRECTORY_FD,&Self::ROOT_DIRECTORY_INODE);
-        self.install_file("stderr",&(11 as u64).into(), "".as_bytes());
-        self.install_fd(&Fd(2),&(11 as u64).into());
-        self
+    /// Install all the pre open fd, including the stdin, stdout, stderr and root.
+    fn install_prestat(&mut self, dir_paths: &[&str]) {
+        // Pre open the stdin stdout and stderr.
+        self.install_file("stderr",&(0 as u64).into(), "".as_bytes());
+        self.install_fd(&Fd(0),&(0 as u64).into(), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_file("stdin",&(1 as u64).into(), "".as_bytes());
+        self.install_fd(&Fd(1),&(1 as u64).into(), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_file("stderr",&(2 as u64).into(), "".as_bytes());
+        self.install_fd(&Fd(2),&(2 as u64).into(), &Rights::FD_READ, &Rights::FD_READ);
+
+        self.install_dir(Self::ROOT_DIRECTORY, &Self::ROOT_DIRECTORY_INODE);
+        self.install_fd(&Self::ROOT_DIRECTORY_FD, &Self::ROOT_DIRECTORY_INODE, &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
+        self.prestat_table.insert(Self::ROOT_DIRECTORY_FD, Self::ROOT_DIRECTORY.to_string());
+
+        // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
+        let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
+        for (index, path) in dir_paths.iter().enumerate() {
+            let index = index as u32;
+            let new_fd = Fd(index + root_fd_number + 1);
+            self.install_dir(path,&Self::ROOT_DIRECTORY_INODE);
+            self.install_fd(&new_fd,&Self::ROOT_DIRECTORY_INODE, &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
+            self.prestat_table.insert(new_fd, path.to_string());
+        }
     }
     
     fn install_dir(&mut self, path : &str, inode : &Inode) {
@@ -227,14 +246,14 @@ impl FileSystem {
         self.path_table.insert(path.to_string(),inode.clone());
     }
 
-    fn install_fd(&mut self, fd : &Fd, inode : &Inode) {
+    fn install_fd(&mut self, fd : &Fd, inode : &Inode, rights_base : &Rights, rights_inheriting : &Rights) {
 
         let fd_stat = FdStat {
             file_type : FileType::RegularFile,
             flags : FdFlags::APPEND,
             //TODO add the corresponding right.
-            rights_base : Rights::FD_READ,
-            rights_inheriting : Rights::FD_READ,
+            rights_base : rights_base.clone(),
+            rights_inheriting : rights_inheriting.clone(),
         };
 
         let fd_entry = FileTableEntry {
@@ -247,28 +266,32 @@ impl FileSystem {
         self.file_table.insert(fd.clone(),fd_entry);
     }
 
-    fn next_fd(&self) -> Fd {
-        // TODO: It is an insecure implementation of choosing a new FD.
-        //       The new FD should be choisen randomly.
-        // NOTE: the FD 0,1 and 2 are reserved to in out err.
-        self
-        .file_table
-        .keys()
-        .max()
-        .map(|Fd(fd_num)| Fd(fd_num + 1))
-        .unwrap_or(Fd(4))
+    fn random_u32(&self) -> FileSystemError<u32> {
+        let result: [u8; 4] = self.random_get(4)?.as_slice().try_into().map_err(|_| ErrNo::Inval)?;
+        Ok(u32::from_le_bytes(result))
     }
 
-    fn next_inode(&self) -> Inode {
-        // TODO: It is an insecure implementation of choosing a new Inode.
-        //       The new Inode should be choisen randomly.
-        // NOTE: the Inode 2 is reserved to the root.
-        self
-        .inode_table
-        .keys()
-        .max()
-        .map(|Inode(inode_num)| Inode(inode_num + 1))
-        .unwrap_or(Inode(3))
+    fn random_u64(&self) -> FileSystemError<u64> {
+        let result: [u8; 8] = self.random_get(8)?.as_slice().try_into().map_err(|_| ErrNo::Inval)?;
+        Ok(u64::from_le_bytes(result))
+    }
+
+    fn next_fd(&self) -> FileSystemError<Fd> {
+        loop {
+            let next_fd = Fd(self.random_u32()?);
+            if !self.file_table.contains_key(&next_fd) {
+                return Ok(next_fd);
+            }
+        }
+    }
+
+    fn next_inode(&self) -> FileSystemError<Inode> {
+        loop {
+            let next_inode = Inode(self.random_u64()?);
+            if !self.inode_table.contains_key(&next_inode) {
+                return Ok(next_inode);
+            }
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -420,26 +443,17 @@ impl FileSystem {
 
     pub(crate) fn fd_prestat_get(&mut self, fd: &Fd) -> FileSystemError<Prestat> {
         println!("call fd_prestat_get on {:?}",fd);
-        // Only support ONE preopen on Fd(3)
-        if fd != &(3 as u32).into() {
-            return Err(ErrNo::BadF);
-        }
-
-        let resource_type =  PreopenType::Dir {
-            name_len : Self::ROOT_DIRECTORY.len() as u32
+        let path = self.prestat_table.get(fd).ok_or(ErrNo::BadF)?;
+        let resource_type = PreopenType::Dir {
+            name_len : path.len() as u32
         };
-
-        Ok(Prestat{
-            resource_type 
-        })
+        Ok(Prestat{resource_type})
     }
 
     pub(crate) fn fd_prestat_dir_name(&mut self, fd: &Fd) -> FileSystemError<String> {
-        // Only support ONE preopen on Fd(3)
-        if fd != &(3 as u32).into() {
-            return Err(ErrNo::BadF);
-        }
-        Ok(Self::ROOT_DIRECTORY.to_string())
+        println!("call fd_prestat_dir_name on {:?}",fd);
+        let path = self.prestat_table.get(fd).ok_or(ErrNo::BadF)?;
+        Ok(path.to_string())
     }
 
     /// This is a rust-style base implementation for fd_pwrite_base.
@@ -660,7 +674,7 @@ impl FileSystem {
                 if !oflags.contains(OpenFlags::CREATE) {
                     return Err(ErrNo::NoEnt);
                 }
-                let new_inode = self.next_inode();
+                let new_inode = self.next_inode()?;
                 self.install_file(path, &new_inode, &vec![]);
                 new_inode
             }
@@ -683,7 +697,7 @@ impl FileSystem {
                 };
             });
         }
-        let next_fd = self.next_fd();
+        let next_fd = self.next_fd()?;
         let (file_type, file_size) = self
             .inode_table
             .get(&inode)
@@ -724,7 +738,7 @@ impl FileSystem {
         unimplemented!()
     }
 
-    pub(crate) fn random_get(&mut self, buf_len: Size) -> FileSystemError<Vec<u8>> {
+    pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemError<Vec<u8>> {
         let mut buf = vec![0; buf_len as usize];
        if let result::Result::Success = getrandom(&mut buf) {
             Ok(buf)
