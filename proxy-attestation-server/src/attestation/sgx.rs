@@ -497,13 +497,13 @@ pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
         let certificate_signing_request = openssl::x509::X509Req::from_der(&csr)?;
         let cert = convert_csr_to_certificate(&certificate_signing_request).unwrap();
 
-        let root_cert_pem = {
-            let mut f = std::fs::File::open("/work/veracruz/proxy-attestation-server/CACert.pem").unwrap();
+        let root_cert_der = {
+            let mut f = std::fs::File::open("/work/veracruz/proxy-attestation-server/CACert.der").unwrap();
             let mut buffer: Vec<u8> = Vec::new();
             f.read_to_end(&mut buffer).unwrap();
             buffer
         };
-        let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_pem()?, &root_cert_pem)?;
+        let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
         
         let response_b64 = base64::encode(&response_bytes);
 
@@ -523,15 +523,16 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
     let public_key = csr.public_key().unwrap();
     let public_key_vec = public_key.public_key_to_der().unwrap();
     let verify_result = csr.verify(&public_key).unwrap();
-    
+
     if verify_result {
         println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR passed");
     } else {
-        // TODO: Make sure we fail on this
         println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR failed");
+        // TODO actually return this
+        //return Err(ProxyAttestationServerError::CsrVerifyError);
     }
     let mut cert_builder = openssl::x509::X509Builder::new().unwrap();
-    cert_builder.set_version(csr.version()).unwrap();
+    cert_builder.set_version(2).unwrap();
     let now = {
         openssl::asn1::Asn1Time::days_from_now(0).unwrap()
     };
@@ -543,7 +544,7 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
     cert_builder.set_not_after(&expiry).unwrap();
 
     let serial_number = {
-        let sn_bignum = openssl::bn::BigNum::from_u32(1).unwrap();
+        let sn_bignum = openssl::bn::BigNum::from_u32(23).unwrap();
         openssl::asn1::Asn1Integer::from_bn(&sn_bignum).unwrap()
     };
     cert_builder.set_serial_number(&serial_number).unwrap();
@@ -551,9 +552,11 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
     let issuer_name = {
         let mut issuer_name_builder = openssl::x509::X509NameBuilder::new().unwrap();
         issuer_name_builder.append_entry_by_text("C", "US").unwrap();
-        issuer_name_builder.append_entry_by_text("ST", "TX").unwrap();
-        issuer_name_builder.append_entry_by_text("O", "Proxies R Us").unwrap();
-        issuer_name_builder.append_entry_by_text("CN", "Veracruz Proxy Attestation Server").unwrap();
+        issuer_name_builder.append_entry_by_text("ST", "Texas").unwrap();
+        issuer_name_builder.append_entry_by_text("L", "Austin").unwrap();
+        issuer_name_builder.append_entry_by_text("O", "Veracruz").unwrap();
+        issuer_name_builder.append_entry_by_text("OU", "Proxy").unwrap();
+        issuer_name_builder.append_entry_by_text("CN", "VeracruzProxyServer").unwrap();
         issuer_name_builder.build()
     };
     cert_builder.set_issuer_name(&issuer_name).unwrap();
@@ -561,12 +564,21 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
     cert_builder.set_subject_name(csr.subject_name()).unwrap();
     cert_builder.set_pubkey(&csr.public_key().unwrap()).unwrap();
 
+    let mut alt_name_extension = openssl::x509::extension::SubjectAlternativeName::new();
+    alt_name_extension.dns("RootEnclave.dev");
+    let built_extension = alt_name_extension.build(&cert_builder.x509v3_context(None, None)).unwrap();
+    cert_builder.append_extension(built_extension).unwrap();
+
+    let mut constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build().unwrap();
+    cert_builder.append_extension(constraints_extension).unwrap();
+
     let key_pem = {
         let mut f = std::fs::File::open("/work/veracruz/proxy-attestation-server/CAKey.pem").unwrap();
         let mut buffer: Vec<u8> = Vec::new();
         f.read_to_end(&mut buffer).unwrap();
         buffer
     };
+
     let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem).unwrap();
     cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256()).unwrap();
     Ok(cert_builder.build())

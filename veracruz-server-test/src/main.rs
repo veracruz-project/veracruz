@@ -22,6 +22,8 @@ mod tests {
     use rand;
     use rand::Rng;
     use ring;
+    use rustls::internal::msgs::codec::Codec;
+
     use serde::Deserialize;
     use transport_protocol;
     use veracruz_server::veracruz_server::*;
@@ -206,12 +208,6 @@ mod tests {
     }
 
     /// Auxiliary function: self signed certificate for enclave
-    fn enclave_self_signed_cert(
-        veracruz_server: &mut VeracruzServerEnclave,
-    ) -> Result<rustls::Certificate, VeracruzServerError> {
-        let enclave_cert_vec = veracruz_server.get_enclave_cert()?;
-        Ok(rustls::Certificate(enclave_cert_vec))
-    }
 
     #[test]
     /// Load the Veracruz server and generate the self-signed certificate
@@ -220,8 +216,7 @@ mod tests {
         iterate_over_policy("../test-collateral/", |policy_json| {
             let policy = Policy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
-            let result = VeracruzServerEnclave::new(&policy_json)
-                .and_then(|mut veracruz_server| enclave_self_signed_cert(&mut veracruz_server));
+            let result = VeracruzServerEnclave::new(&policy_json);
             assert!(result.is_ok(), "error:{:?}", result);
         });
     }
@@ -234,22 +229,7 @@ mod tests {
 
         let ret = VeracruzServerEnclave::new(&policy_json);
 
-        let mut veracruz_server = ret.unwrap();
-
-        #[cfg(feature = "nitro")]
-        let test_target_platform: Platform = Platform::Nitro;
-        #[cfg(feature = "sgx")]
-        let test_target_platform: Platform = Platform::SGX;
-        #[cfg(feature = "tz")]
-        let test_target_platform: Platform = Platform::TrustZone;
-
-        let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        let enclave_cert_hash_ret = attestation_flow(
-            &policy.proxy_attestation_server_url(),
-            &runtime_manager_hash,
-            &mut veracruz_server,
-        );
-        assert!(enclave_cert_hash_ret.is_ok())
+        let veracruz_server = ret.unwrap();
     }
 
     #[test]
@@ -278,18 +258,15 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (mut veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
-        let enclave_cert = enclave_self_signed_cert(&mut veracruz_server).unwrap();
+        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
 
         let client_cert_filename = "../test-collateral/never_used_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
-        let cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
 
         let mut _client_session = create_client_test_session(
             &mut veracruz_server,
             client_cert_filename,
             client_key_filename,
-            cert_hash.as_ref().to_vec(),
         );
     }
 
@@ -323,7 +300,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -338,7 +314,6 @@ mod tests {
             None,
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -353,7 +328,6 @@ mod tests {
             Some(STRING_EDIT_DISTANCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -368,7 +342,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -383,7 +356,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -398,7 +370,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -413,7 +384,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -441,7 +411,6 @@ mod tests {
             Some(LINEAR_REGRESSION_WASM),
             &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -456,7 +425,6 @@ mod tests {
             Some(LINEAR_REGRESSION_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -486,7 +454,6 @@ mod tests {
                 ("input-0", INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
             ],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -504,7 +471,6 @@ mod tests {
             Some(STRING_EDIT_DISTANCE_WASM),
             &[("input-0", STRING_1_DATA), ("input-1", STRING_2_DATA)],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -525,7 +491,6 @@ mod tests {
             Some(LINEAR_REGRESSION_WASM),
             &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
-            true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -559,7 +524,6 @@ mod tests {
                 ("input-1", PERSON_SET_2_DATA),
             ],
             &[],
-            true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -627,7 +591,6 @@ mod tests {
                 ("stream-1", VEC_F64_2_DATA),
                 ("stream-2", VEC_F64_1_DATA),
             ],
-            true,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -648,8 +611,6 @@ mod tests {
                 Some(LOGISTICS_REGRESSION_WASM),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -673,8 +634,6 @@ mod tests {
                 Some(MACD_WASM),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -703,8 +662,6 @@ mod tests {
                 Some(MACD_DATA_PATH),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -728,8 +685,6 @@ mod tests {
                 Some(INTERSECTION_SET_SUM_WASM),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -750,8 +705,6 @@ mod tests {
         // Each element contains the package id (u64) and the path to the data
         data_id_paths: &[(&str, &str)],
         stream_id_paths: &[(&str, &str)],
-        // if there is an attestation
-        attestation_flag: bool,
     ) -> Result<(), VeracruzServerError> {
         info!("### Step 0.  Initialise test configuration.");
         // initialise the pipe
@@ -792,18 +745,6 @@ mod tests {
         let test_target_platform: Platform = Platform::TrustZone;
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        let enclave_cert_hash = if attestation_flag {
-            attestation_flow(
-                &policy.proxy_attestation_server_url(),
-                &runtime_manager_hash,
-                &mut veracruz_server,
-            )?
-        } else {
-            let enclave_cert = enclave_self_signed_cert(&mut veracruz_server)?;
-            ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
-                .as_ref()
-                .to_vec()
-        };
 
         info!("             Enclave generated a self-signed certificate:");
 
@@ -811,7 +752,6 @@ mod tests {
             &mut veracruz_server,
             client_cert_path,
             client_key_path,
-            enclave_cert_hash,
         )?;
         info!(
             "             Initialasation time (μs): {}.",
@@ -1457,24 +1397,25 @@ mod tests {
         veracruz_server: &mut dyn veracruz_server::VeracruzServer,
         client_cert_filename: &str,
         client_key_filename: &str,
-        cert_hash: Vec<u8>,
     ) -> Result<rustls::ClientSession, VeracruzServerError> {
         let client_cert = read_cert_file(client_cert_filename)?;
 
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
-        let mut client_config = rustls::ClientConfig::new_self_signed();
+        let proxy_service_cert = {
+            let mut data = std::fs::read("../proxy-attestation-server/CACert.pem").unwrap();
+            let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
+            certs[0].clone()
+        };
+        let mut client_config = rustls::ClientConfig::new();
         let mut client_cert_vec = std::vec::Vec::new();
         client_cert_vec.push(client_cert);
         client_config.set_single_client_cert(client_cert_vec, client_priv_key);
         client_config
             .root_store
-            .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+            .add(&proxy_service_cert).unwrap();
 
-        client_config.pinned_cert_hashes.push(cert_hash);
-
-        let enclave_name = veracruz_server.get_enclave_name()?;
-        let dns_name = webpki::DNSNameRef::try_from_ascii_str(enclave_name.as_str())?;
+        let dns_name = webpki::DNSNameRef::try_from_ascii_str("ComputeEnclave.dev")?;
         Ok(rustls::ClientSession::new(
             &std::sync::Arc::new(client_config),
             dns_name,

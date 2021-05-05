@@ -36,7 +36,6 @@ lazy_static! {
     static ref DEVICE_ID: std::sync::SgxMutex<Option<i32>> = std::sync::SgxMutex::new(None);
     static ref INITIATOR_HASH: std::sync::SgxMutex<HashMap<u64, SgxDhInitiator>> =
         std::sync::SgxMutex::new(HashMap::new());
-    static ref KEYHANDLE: std::sync::SgxMutex<Option<u16>> = std::sync::SgxMutex::new(None);
     static ref PRIVATE_KEY: std::sync::SgxMutex<Option<std::vec::Vec<u8>>> = std::sync::SgxMutex::new(None);
     static ref CERT_CHAIN: std::sync::SgxMutex<Option<(std::vec::Vec<u8>, std::vec::Vec<u8>)>> = std::sync::SgxMutex::new(None);
 }
@@ -136,25 +135,7 @@ pub extern "C" fn sgx_get_pubkey_report(
     report_data.d[0..pubkey_challenge_size].copy_from_slice(&pubkey_challenge_vec);
 
     let private_key = {
-        // let rng = SystemRandom::new();
-        // ECDSA prime256r1 generation.
         let pkcs8_bytes = get_private_key().unwrap();
-        // let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
-        //     &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-        //     &rng,
-        // )
-        // .expect("Error generating PKCS-8");
-        // {
-        //     let mut private_key_guard = PRIVATE_KEY.lock().unwrap();
-        //     match &*private_key_guard {
-        //         Some(_) => {
-        //             panic!("Unhandled. PRIVATE_KEY is not None.");
-        //         }
-        //         None => {
-        //             *private_key_guard = Some(pkcs8_bytes.as_ref().to_vec().clone());
-        //         }
-        //     }
-        // }
         pkcs8_bytes[38..70].to_vec()
     };
     let mut key_handle: u16 = 0;
@@ -179,18 +160,6 @@ pub extern "C" fn sgx_get_pubkey_report(
     assert!(ret == 0);
     unsafe { public_key.set_len(public_key_size as usize) };
 
-    // save the key handle
-    {
-        let mut key_handle_option = KEYHANDLE.lock().unwrap();
-        match &*key_handle_option {
-            Some(_) => {
-                panic!("Unhandled case. Need to implement");
-            }
-            None => {
-                *key_handle_option = Some(key_handle);
-            }
-        }
-    }
     // // place the hash of the public key in the report
     let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, public_key.as_ref());
     report_data.d[pubkey_challenge_size..48].copy_from_slice(pubkey_hash.as_ref());
@@ -225,48 +194,16 @@ pub extern "C" fn sgx_get_collateral_report(
     // place the challenge in the report
     report_data.d[0..pubkey_challenge_size].copy_from_slice(&pubkey_challenge_vec);
 
-    let (private_key_bytes, private_key_ring) = {
-        let rng = SystemRandom::new();
-        // ECDSA prime256r1 generation.
-        let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
-            //&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-            &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
-            &rng,
-        )
-        .expect("Error generating PKCS-8");
-        println!("sgx-root-enclave::sgx_get_collateral_report ALL OF THE PRIVATE KEY BYTES:{:02x?}", pkcs8_bytes.as_ref());
-        //(pkcs8_bytes.as_ref()[38..70].to_vec(), EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING, pkcs8_bytes.as_ref()).unwrap())
-        (pkcs8_bytes.as_ref()[38..70].to_vec(), EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap())
+    let private_key_ring = {
+        let private_key_vec = get_private_key().unwrap();
+        EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec).unwrap()
     };
-    //let public_key = private_key_ring.public_key();
-    let mut key_handle: u16 = 0;
-    let status = unsafe {
-        psa_initial_attest_load_key(
-            private_key_bytes.as_ptr(),
-            private_key_bytes.len() as u64,
-            &mut key_handle,
-        )
-    };
-    assert!(status == 0);
 
-    // save the key handle
-    {
-        let mut key_handle_option = KEYHANDLE.lock().unwrap();
-        match &*key_handle_option {
-            Some(_) => {
-                panic!("Unhandled case. Need to implement");
-            }
-            None => {
-                *key_handle_option = Some(key_handle);
-            }
-        }
-    }
 
     let mut proto_collateral = transport_protocol::SgxCollateral::new();
     let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, private_key_ring.public_key().as_ref());
 
     // generate the certificate signing request
-    println!("sgx-root-enclave::sgx_get_collateral_report calling generate_csr");
     let csr_vec = csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &private_key_ring).unwrap();
 
     proto_collateral.set_pubkey_hash(pubkey_hash.as_ref().to_vec());
@@ -355,111 +292,18 @@ pub enum SgxRootEnclave {
     CsrToCertFail = 0x04,
 }
 
-#[no_mangle]
-pub extern "C" fn finish_local_attest_enc(
-    dh_msg3_raw: &mut sgx_dh_msg3_t,
-    challenge: *const u8,
-    challenge_size: usize,
-    enclave_cert_hash: *const u8,
-    enclave_cert_hash_size: usize,
-    enclave_name: *const i8,
-    enclave_name_size: usize,
-    sgx_root_enclave_session_id: u64,
-    token: *mut u8,
-    token_buf_size: usize,
-    token_size: *mut usize,
-    p_pubkey: *mut u8,
-    pubkey_buf_size: usize,
-    p_pubkey_size: *mut usize,
-    p_device_id: &mut i32,
-) -> SgxRootEnclave {
-    let dh_msg3_raw_len =
-        mem::size_of::<sgx_dh_msg3_t>() as u32 + dh_msg3_raw.msg3_body.additional_prop_length;
-    let dh_msg3 = unsafe { SgxDhMsg3::from_raw_dh_msg3_t(dh_msg3_raw, dh_msg3_raw_len) };
-    assert!(!dh_msg3.is_none());
-    if dh_msg3.is_none() {
-        return SgxRootEnclave::Msg3RawError;
-    }
-    let dh_msg3 = dh_msg3.unwrap();
-    {
-        let mut initiator_hash = INITIATOR_HASH.lock().unwrap();
-        let mut initiator = initiator_hash.remove(&sgx_root_enclave_session_id).unwrap();
-        //.unwrap("Failed to get entry. Something is wrong");
-        let mut dh_aek: sgx_key_128bit_t = sgx_key_128bit_t::default(); // Session Key, we won't use this
-
-        let mut responder_identity = sgx_dh_session_enclave_identity_t::default();
-        let status = initiator.proc_msg3(&dh_msg3, &mut dh_aek, &mut responder_identity);
-        if status.is_err() {
-            return SgxRootEnclave::ProcMsg3Error;
-        }
-        // TODO: Decide what/how we are going to put in the PSA Attestation token
-        // cpu_svn? attributes?
-        // mr_enclave definitely
-        // mr_signer? isv_prod_id? isv_svn?
-        let received_veracruz_hash = responder_identity.mr_enclave;
-
-        let status = unsafe {
-            psa_initial_attest_get_token(
-                received_veracruz_hash.m.as_ptr() as *const u8,
-                received_veracruz_hash.m.len() as u64,
-                enclave_cert_hash,
-                enclave_cert_hash_size as u64,
-                enclave_name,
-                enclave_name_size as u64,
-                challenge,
-                challenge_size as u64,
-                token,
-                token_buf_size as u64,
-                token_size as *mut u64,
-            )
-        };
-        assert!(status == 0);
-
-        {
-            let key_handle_option = KEYHANDLE.lock().unwrap();
-            match &*key_handle_option {
-                Some(key_handle) => {
-                    let ret = unsafe {
-                        t_cose_sign1_get_verification_pubkey(
-                            *key_handle,
-                            p_pubkey,
-                            pubkey_buf_size as u64,
-                            p_pubkey_size as *mut u64,
-                        )
-                    };
-                    assert!(ret == 0);
-                }
-                None => {
-                    panic!("Unhandled case. Need to implement");
-                }
-            }
-        }
-        *p_device_id = {
-            let device_id_wrapper = DEVICE_ID.lock().expect("Failed to get lock on DEVICE_ID");
-            device_id_wrapper.unwrap()
-        };
-    }
-
-    SgxRootEnclave::Success
-}
-
-const CSR_BODY_LOCATION: (usize, usize) = (4, 216);
-const CSR_PUBKEY_LOCATION: (usize, usize) = (123 + 26, 214);
+const CSR_BODY_LOCATION: (usize, usize) = (4, 4 + 218);
+const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
 
 fn verify_csr(csr: &[u8]) -> Result<bool, std::string::String> {
     let pubkey_bytes = &csr[CSR_PUBKEY_LOCATION.0..CSR_PUBKEY_LOCATION.1];
     let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_ASN1, pubkey_bytes);
-    println!("sgx_root_enclave::verify_csr public_key:{:02x?}", pubkey_bytes);
     let csr_body = &csr[CSR_BODY_LOCATION.0..CSR_BODY_LOCATION.1];
-    println!("sgx-root-enclave::verify_csr calculating signature over body:{:02x?}", csr_body);
-    let csr_signature = &csr[231..];
-    println!("sgx-root-enclave::verify_csr signature:{:02x?}", csr_signature);
+    let csr_signature = &csr[237..];
     let verify_result = public_key.verify(&csr_body, &csr_signature);
     if verify_result.is_err() {
-        println!("verify_result is fail:{:?}", verify_result);
         return Err(format!("verify_csr failed:{:?}", verify_result));
     } else {
-        println!("Verify_result is success:{:?}", verify_result);
         return Ok(true);
     }
 }
@@ -518,15 +362,6 @@ pub extern "C" fn finish_local_attest_ca_enc(
     //generate cert from csr, signed by PRIVATE_KEY
     let private_key = {
         let private_key_vec = get_private_key().unwrap();
-        // let mut private_key_guard = PRIVATE_KEY.lock().unwrap();
-        // let pkcs8_bytes = match &*private_key_guard {
-        //     Some(bytes) => {
-        //         bytes.clone()
-        //     }
-        //     None => {
-        //         panic!("Unhandled. PRIVATE_KEY is None.");
-        //     }
-        // };
         EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec).unwrap()
     };
     let mut compute_enclave_cert = match csr::convert_csr_to_cert(&csr_slice, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &private_key) {
@@ -547,40 +382,32 @@ pub extern "C" fn finish_local_attest_ca_enc(
             },
         }
     };
-    // if compute_enclave_cert.len() > cert_buf_size {
-    //     assert!(false);
-    // } else {
-    //     let cert_buf_slice = unsafe { std::slice::from_raw_parts_mut(p_cert_buf, cert.len()) };
-    //     cert_buf_slice.clone_from_slice(&compute_enclave_cert);
-    //     unsafe { *p_cert_size = compute_enclave_cert.len() };
-    // }
-    println!("cert_buf_size:{:?}, compute_enclave_cert.len:{:?}, root_enclave_cert.len:{:?}, root_cert.len:{:?}", cert_buf_size, compute_enclave_cert.len(), root_enclave_cert.len(), root_cert.len());
+
     if cert_buf_size < (compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) {
         assert!(false);
     }
     let mut cert_buf_slice = unsafe { std::slice::from_raw_parts_mut(p_cert_buf, compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) };
     unsafe { *p_cert_size = compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len() };
-    let cert_lengths_slice = unsafe { std::slice::from_raw_parts_mut(cert_lengths, cert_lengths_size) };
+    let cert_lengths_slice = unsafe { std::slice::from_raw_parts_mut(cert_lengths, cert_lengths_size/std::mem::size_of::<u32>()) };
 
     // create a buffer to aggregate the certificates
     let mut temp_cert_buf: std::vec::Vec<u8> = std::vec::Vec::new();
+    let mut temp_cert_lengths: std::vec::Vec<u32> = std::vec::Vec::new();
     // add the compute_enclave_cert to the return buffer
-    println!("sgx_root_enclave::finish_local_attest_ca_enc compute_enclave_cert:{:02x?}", compute_enclave_cert);
+    temp_cert_lengths.push(compute_enclave_cert.len() as u32);
     temp_cert_buf.append(&mut compute_enclave_cert);
-    cert_lengths_slice[0] = compute_enclave_cert.len() as u32;
 
     // add the root_enclave cert to the temp buffer
-    println!("sgx_root_enclave::finish_local_attest_ca_enc root_enclave_cert:{:02x?}", root_enclave_cert);
+    temp_cert_lengths.push(root_enclave_cert.len() as u32);
     temp_cert_buf.append(&mut root_enclave_cert);
-    cert_lengths_slice[1] = root_enclave_cert.len() as u32;
 
     // add the root cert to the temp buffer
-    println!("sgx_root_enclave::finish_local_attest_ca_enc root_cert:{:02x?}", root_cert);
+    temp_cert_lengths.push(root_cert.len() as u32);
     temp_cert_buf.append(&mut root_cert);
-    cert_lengths_slice[2] = root_cert.len() as u32;
 
     // Copy the temporary certificate buffer contents to the destination buffer
     cert_buf_slice.clone_from_slice(&temp_cert_buf);
+    cert_lengths_slice.clone_from_slice(&temp_cert_lengths);
 
     return SgxRootEnclave::Success;
 }

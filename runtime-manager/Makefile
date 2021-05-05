@@ -14,7 +14,7 @@ FINAL_DIR?=.
 
 .PHONY: all sgx trustzone clean deprecated nitro
 
-all: deprecated sgx
+all: deprecated
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"

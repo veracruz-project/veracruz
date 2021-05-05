@@ -78,6 +78,8 @@ pub enum ProxyAttestationServerError {
     CborError(String),
     #[error(display = "ProxyAttestationServer: Mutex error {}.", _0)]
     MutexError(String),
+    #[error(display = "ProxyAttestationServer: CSR Verify failed")]
+    CsrVerifyError,
 }
 
 #[cfg(feature = "sgx")]

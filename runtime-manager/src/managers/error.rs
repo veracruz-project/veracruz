@@ -76,8 +76,6 @@ pub enum RuntimeManagerError {
     DataWrongSizeForField(std::string::String, usize, usize),
     #[error(display = "RuntimeManager: RingKeyRejected error:{:?}", _0)]
     RingKeyRejected(ring::error::KeyRejected),
-    #[error(display = "RuntimeManager: CertChain already populated error")]
-    CertChainPopulated,
 }
 
 impl<T> From<PoisonError<T>> for RuntimeManagerError {
