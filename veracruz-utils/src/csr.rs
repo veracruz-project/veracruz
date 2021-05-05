@@ -86,7 +86,7 @@ pub const ROOT_ENCLAVE_CSR_TEMPLATE: CsrTemplate = CsrTemplate {
     ],
     public_key_location: (104, 104 + 65),
     signature_location: (186, 186 + 69),
-    signature_range: (4, 171),
+    signature_range: (3, 171),
     overall_length_field_location: (2, 4),
     overall_length_initial_value: 185 - 2, //183-3,
     signature_length_field_location: (184, 185),

@@ -524,12 +524,9 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
     let public_key_vec = public_key.public_key_to_der().unwrap();
     let verify_result = csr.verify(&public_key).unwrap();
 
-    if verify_result {
-        println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR passed");
-    } else {
+    if !verify_result {
         println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR failed");
-        // TODO actually return this
-        //return Err(ProxyAttestationServerError::CsrVerifyError);
+        return Err(ProxyAttestationServerError::CsrVerifyError);
     }
     let mut cert_builder = openssl::x509::X509Builder::new().unwrap();
     cert_builder.set_version(2).unwrap();
