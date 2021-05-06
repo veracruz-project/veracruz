@@ -1,0 +1,3 @@
+all: example.cpp RoutingKit/Makefile_wasm
+	$(MAKE) -C RoutingKit -f Makefile_wasm
+	em++ example.cpp -fexceptions -O0 -s WASM=1 -s NO_DISABLE_EXCEPTION_CATCHING -lroutingkit -lz -o example.html -I RoutingKit/include -L RoutingKit/lib
