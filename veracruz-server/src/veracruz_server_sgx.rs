@@ -463,7 +463,7 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    impl<A> VeracruzServer<A> for VeracruzServerSGX {
+    impl<A> VeracruzServer for VeracruzServerSGX {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError<A>> {
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 

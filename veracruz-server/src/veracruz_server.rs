@@ -190,7 +190,7 @@ impl<A> From<sgx_types::sgx_status_t> for VeracruzServerError<A> {
     }
 }
 
-impl<A> error::ResponseError for VeracruzServerError<A> {
+impl<A: std::fmt::Debug + std::fmt::Display> error::ResponseError for VeracruzServerError<A> where A: std::fmt::Display {
     fn error_response(&self) -> HttpResponse {
         ResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
     }
