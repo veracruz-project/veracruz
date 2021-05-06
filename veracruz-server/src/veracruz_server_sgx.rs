@@ -377,41 +377,6 @@ pub mod veracruz_server_sgx {
             msg3: &sgx_ra_msg3_t,
             msg3_quote: &sgx_quote_t,
             msg3_sig: &Vec<u8>,
-            pubkey_quote: &sgx_quote_t,
-            pubkey_quote_sig: &Vec<u8>,
-            device_id: i32,
-        ) -> Result<(), VeracruzServerError> {
-            let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens(
-                *attestation_context,
-                msg3,
-                msg3_quote,
-                msg3_sig,
-                pubkey_quote,
-                pubkey_quote_sig,
-                device_id,
-            )?;
-            let encoded_tokens = base64::encode(&serialized_tokens);
-            let url = format!("{:}/SGX/Msg3", url_base);
-
-            let received_body = crate::post_buffer(&url, &encoded_tokens)?;
-            if received_body == "All's well that ends well" {
-                Ok(())
-            } else {
-                Err(VeracruzServerError::MismatchError {
-                    variable: "msg3 received_body",
-                    expected: "All's well that ends well".as_bytes().to_vec(),
-                    received: received_body.as_bytes().to_vec(),
-                })
-            }
-        }
-
-        fn send_msg3a(
-            &self,
-            url_base: &str,
-            attestation_context: &sgx_ra_context_t,
-            msg3: &sgx_ra_msg3_t,
-            msg3_quote: &sgx_quote_t,
-            msg3_sig: &Vec<u8>,
             collateral_quote: &sgx_quote_t,
             collateral_quote_sig: &Vec<u8>,
             device_id: i32,
@@ -430,7 +395,7 @@ pub mod veracruz_server_sgx {
                 device_id,
             )?;
             let encoded_tokens = base64::encode(&serialized_tokens);
-            let url = format!("{:}/SGX2/Msg3", url_base);
+            let url = format!("{:}/SGX/Msg3", url_base);
 
             let received_body = crate::post_buffer(&url, &encoded_tokens)?;
             let received_bytes = base64::decode(&received_body).unwrap();
@@ -515,7 +480,7 @@ pub mod veracruz_server_sgx {
             let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_quote_sig, pubkey_hash, csr) =
                 attestation_challenge(&sgx_root_enclave, &challenge, &ra_context, &msg2)
                     .expect("Attestation challenge failed");
-            let (root_cert, enclave_cert) = self.send_msg3a(
+            let (root_cert, enclave_cert) = self.send_msg3(
                 proxy_attestation_server_url,
                 &ra_context,
                 &msg3,
@@ -601,7 +566,7 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
                 unreachable!("Unimplemented");
         }
 

@@ -347,7 +347,7 @@ pub extern "C" fn finish_local_attest_ca_enc(
 
     match verify_csr(&csr_slice) {
         Ok(status) => match status {
-            true => println!("CSR verified successfully"),
+            true => (), // Do nothing
             false => {
                 println!("CSR Did not verify successfully");
                 return SgxRootEnclave::CsrVerifyFail;

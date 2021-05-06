@@ -207,159 +207,6 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             println!("proxy-attestation-server::attestation::sgx::msg3 parse_proxy_attestation_server_request failed:{:?}", err);
             err
         })?;
-    if !parsed.has_sgx_attestation_tokens() {
-        println!("received data is incorrect. TODO: Handle this");
-        return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
-    }
-    let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_sig, device_id) =
-        transport_protocol::parse_attestation_tokens(&parsed)
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
-            err
-        })?;
-    {
-        let attestation_context = {
-            let ac_hash = ATTESTATION_CONTEXT.lock()
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
-                    err
-                })?;
-            let context = ac_hash
-                .get(&device_id)
-                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
-                    err
-                })?;
-            (*context).clone()
-        };
-
-        let expected_enclave_hash = {
-            let connection = crate::orm::establish_connection()
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
-                    err
-                })?;
-            crate::orm::get_firmware_version_hash(
-                &connection,
-                &"sgx".to_string(),
-                &attestation_context.firmware_version,
-            )
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 get_firmware_version_hash failed:{:?}", err);
-                err
-            })?
-            .ok_or(ProxyAttestationServerError::MissingFieldError("firmware version"))
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
-                err
-            })?
-        };
-
-        let msg3_epid_pseudonym = authenticate_msg3(
-            &attestation_context
-                .msg1
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg1"))
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
-                    err
-                })?,
-            &attestation_context
-                .msg2
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg2"))
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
-                    err
-                })?,
-            &msg3,
-            &msg3_quote,
-            &msg3_sig,
-            &attestation_context
-                .smk
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.smk"))
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
-                    err
-                })?,
-            &attestation_context
-                .vk
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.vk"))
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
-                    err
-                })?,
-            &expected_enclave_hash,
-        )?;
-
-        let (pubkey_epid_pseudonym, pubkey_hash, enclave_name) = authenticate_pubkey_quote(
-            &attestation_context
-                .pubkey_challenge
-                .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
-                .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
-                    err
-                })?,
-            &pubkey_quote,
-            &pubkey_sig,
-        )?;
-
-        if pubkey_epid_pseudonym != msg3_epid_pseudonym {
-            // We cannot verify that msg3 and pubkey_quote came from the same SGX system
-            return Err(ProxyAttestationServerError::MismatchError {
-                variable: "msg3 and pubkey_quote",
-                expected: pubkey_epid_pseudonym.into_bytes(),
-                received: msg3_epid_pseudonym.into_bytes(),
-            });
-        }
-
-        // check that the enclave that generated pubkey_quote has the same firmware as the enclave that
-        // generated msg3
-        if msg3_quote.report_body.mr_enclave.m != pubkey_quote.report_body.mr_enclave.m {
-            // TODO: Even if this is true, does this eman that they are from the same enclave?
-            // Or could they be different enclaves running the same firmware?
-            // What is the consequence if they are?
-            println!("msg3 and pubkey_quote came from different enclaves");
-            return Err(ProxyAttestationServerError::MismatchError {
-                variable: "function msg3 msg3_quote.report_body.mr_enclave.m",
-                expected: pubkey_quote.report_body.mr_enclave.m.to_vec(),
-                received: msg3_quote.report_body.mr_enclave.m.to_vec(),
-            });
-        }
-
-        let connection = crate::orm::establish_connection()
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
-                err
-            })?;
-        crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
-                err
-            })?;
-
-        
-    }
-
-    // clean up the Attestation Context by removing this context
-    {
-        let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
-        ac_hash.remove(&device_id);
-    }
-    Ok("All's well that ends well".to_string())
-}
-
-pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
-    let received_bytes = base64::decode(&body_string)
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::msg3 base64 decode ov body_string failed:{:?}", err);
-            err
-        })?;
-
-    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::msg3 parse_proxy_attestation_server_request failed:{:?}", err);
-            err
-        })?;
     if !parsed.has_sgx_attestation_tokens2() {
         println!("received data is incorrect. TODO: Handle this");
         return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
@@ -445,7 +292,7 @@ pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
             &expected_enclave_hash,
         )?;
 
-        let (pubkey_epid_pseudonym, collateral_hash, enclave_name) = authenticate_pubkey_quote(
+        let (pubkey_epid_pseudonym, _collateral_hash, enclave_name) = authenticate_pubkey_quote(
             &attestation_context
                 .pubkey_challenge
                 .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
@@ -521,7 +368,6 @@ pub fn msg3a(body_string: String) -> ProxyAttestationServerResponder {
 fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
     // first, verify the signature on the CSR
     let public_key = csr.public_key().unwrap();
-    let public_key_vec = public_key.public_key_to_der().unwrap();
     let verify_result = csr.verify(&public_key).unwrap();
 
     if !verify_result {
@@ -566,7 +412,7 @@ fn convert_csr_to_certificate(csr: &openssl::x509::X509Req) -> Result<openssl::x
     let built_extension = alt_name_extension.build(&cert_builder.x509v3_context(None, None)).unwrap();
     cert_builder.append_extension(built_extension).unwrap();
 
-    let mut constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build().unwrap();
+    let constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build().unwrap();
     cert_builder.append_extension(constraints_extension).unwrap();
 
     let key_pem = {
