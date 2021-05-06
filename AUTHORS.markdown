@@ -1,7 +1,7 @@
-Veracruz originated in the Distributed Systems and Security Research
-Group at Arm Research, and was originally designed and written by the
-*Veracruz Development Team*:
+Veracruz originated in the Systems (formerly Security) Research Group at Arm Research,
+and is designed and written by the *Veracruz Development Team*:
 
+- Mathias Brossard (mathias.brossard@arm.com)
 - Basma El Gaabouri (basma.elgaabouri@arm.com)
 - Christopher Haster (christopher.haster@arm.com)
 - Derek Miller (derek.miller@arm.com)
