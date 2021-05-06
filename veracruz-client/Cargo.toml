@@ -40,11 +40,11 @@ sgx_ucrypto = { branch="veracruz", git = 'https://github.com/veracruz-project/in
 sgx_types = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }  
 
 [dev-dependencies]
-actix-web = "2.0.0"
+actix-web = "3.3.2"
 futures = "0.3"
-actix-rt = "1.0.0"
-actix-session = "0.3.0"
-actix-http = "1.0.1"
+actix-rt = "1.1.1"
+actix-session = "0.4.1"
+actix-http = "2.2.0"
 
 [patch.crates-io]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
