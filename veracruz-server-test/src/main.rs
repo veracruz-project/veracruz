@@ -128,8 +128,6 @@ mod tests {
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
 
         SETUP.call_once(|| {
-            std::env::set_var("RUST_LOG", "info,actix_server=debug,actix_web=debug");
-            env_logger::init();
             info!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
