@@ -113,8 +113,7 @@ message SgxAttestationTokens {
 }
 
 message SgxCollateral {
-  bytes pubkey_hash = 1;
-  bytes csr = 2;
+  bytes csr = 1;
 }
 
 message SgxAttestationTokens2 {

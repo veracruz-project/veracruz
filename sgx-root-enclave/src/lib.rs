@@ -89,12 +89,15 @@ pub extern "C" fn init_remote_attestation_enc(
             &mut context as *mut sgx_ra_context_t,
         )
     };
+    if ret != sgx_status_t::SGX_SUCCESS {
+        return ret;
+    }
 
     unsafe {
         *p_context = context;
     }
 
-    ret
+    return ret;
 }
 
 /// Retrieve or generate the private key as a Vec<u8>
@@ -115,61 +118,6 @@ fn get_private_key() -> Result<std::vec::Vec<u8>, std::string::String> {
         }
     };
     return Ok(pkcs8_bytes);
-    //EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap()
-}
-
-#[no_mangle]
-pub extern "C" fn sgx_get_pubkey_report(
-    p_pubkey_challenge: *const u8,
-    pubkey_challenge_size: usize,
-    p_target_info: *const sgx_target_info_t,
-    report: *mut sgx_types::sgx_report_t,
-) -> sgx_status_t {
-    let pubkey_challenge_vec =
-        unsafe { std::slice::from_raw_parts(p_pubkey_challenge, pubkey_challenge_size) };
-    let mut report_data = sgx_types::sgx_report_data_t::default();
-
-    let enclave_name = "TODOCRP".to_string();
-
-    // place the challenge in the report
-    report_data.d[0..pubkey_challenge_size].copy_from_slice(&pubkey_challenge_vec);
-
-    let private_key = {
-        let pkcs8_bytes = get_private_key().unwrap();
-        pkcs8_bytes[38..70].to_vec()
-    };
-    let mut key_handle: u16 = 0;
-    let status = unsafe {
-        psa_initial_attest_load_key(
-            private_key.as_ptr(),
-            private_key.len() as u64,
-            &mut key_handle,
-        )
-    };
-    assert!(status == 0);
-    let mut public_key = std::vec::Vec::with_capacity(128); // TODO: Don't do this
-    let mut public_key_size: u64 = 0;
-    let ret = unsafe {
-        t_cose_sign1_get_verification_pubkey(
-            key_handle,
-            public_key.as_mut_ptr() as *mut u8,
-            public_key.capacity() as u64,
-            &mut public_key_size as *mut u64,
-        )
-    };
-    assert!(ret == 0);
-    unsafe { public_key.set_len(public_key_size as usize) };
-
-    // // place the hash of the public key in the report
-    let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, public_key.as_ref());
-    report_data.d[pubkey_challenge_size..48].copy_from_slice(pubkey_hash.as_ref());
-
-    // place the enclave name in the report
-    report_data.d[48..55].copy_from_slice(enclave_name.as_bytes());
-    let ret = unsafe { sgx_create_report(p_target_info, &report_data, report) };
-    assert!(ret == sgx_types::sgx_status_t::SGX_SUCCESS);
-
-    sgx_status_t::SGX_SUCCESS
 }
 
 #[no_mangle]
@@ -178,9 +126,6 @@ pub extern "C" fn sgx_get_collateral_report(
     pubkey_challenge_size: usize,
     p_target_info: *const sgx_target_info_t,
     report: *mut sgx_types::sgx_report_t,
-    pubkey_hash_buffer: *mut u8,
-    pubkey_hash_buf_size: usize,
-    p_pubkey_hash_size: *mut usize,
     csr_buffer: *mut u8,
     csr_buf_size: usize,
     p_csr_size: *mut usize,
@@ -188,8 +133,6 @@ pub extern "C" fn sgx_get_collateral_report(
     let pubkey_challenge_vec =
         unsafe { std::slice::from_raw_parts(p_pubkey_challenge, pubkey_challenge_size) };
     let mut report_data = sgx_types::sgx_report_data_t::default();
-
-    let enclave_name = "TODOCRP".to_string();
 
     // place the challenge in the report
     report_data.d[0..pubkey_challenge_size].copy_from_slice(&pubkey_challenge_vec);
@@ -201,32 +144,19 @@ pub extern "C" fn sgx_get_collateral_report(
 
 
     let mut proto_collateral = transport_protocol::SgxCollateral::new();
-    let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, private_key_ring.public_key().as_ref());
 
     // generate the certificate signing request
     let csr_vec = csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &private_key_ring).unwrap();
 
-    proto_collateral.set_pubkey_hash(pubkey_hash.as_ref().to_vec());
     proto_collateral.set_csr(csr_vec.clone());
     let collateral = transport_protocol::serialize_sgx_collateral(&proto_collateral).unwrap();
     // // place the hash of the collateral in the report
-    let collateral_hash = ring::digest::digest(&ring::digest::SHA256, collateral.as_ref());
+    let collateral_hash = ring::digest::digest(&ring::digest::SHA256, &csr_vec);
     report_data.d[pubkey_challenge_size..48].copy_from_slice(collateral_hash.as_ref());
 
-    // place the enclave name in the report
-    report_data.d[48..55].copy_from_slice(enclave_name.as_bytes());
     let ret = unsafe { sgx_create_report(p_target_info, &report_data, report) };
     assert!(ret == sgx_types::sgx_status_t::SGX_SUCCESS);
 
-    // place the pubkey hash where it needs to be
-    if pubkey_hash.as_ref().len() > pubkey_hash_buf_size {
-        assert!(false); // something, something, bad here
-    } else {
-        let pubkey_hash_buf_slice =
-            unsafe { std::slice::from_raw_parts_mut(pubkey_hash_buffer, pubkey_hash.as_ref().len()) };
-        pubkey_hash_buf_slice.clone_from_slice(&pubkey_hash.as_ref());
-        unsafe { *p_pubkey_hash_size = pubkey_hash.as_ref().len() };
-    }
     // place the csr where it needs to be
     if csr_vec.len() > csr_buf_size {
         assert!(false);

@@ -211,7 +211,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         println!("received data is incorrect. TODO: Handle this");
         return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
     }
-    let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_sig, pubkey_hash, csr, device_id) =
+    let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_sig, csr, device_id) =
         transport_protocol::parse_attestation_tokens2(&parsed)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg3a parse_attestation_tokens2 failed:{:?}", err);
@@ -292,7 +292,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             &expected_enclave_hash,
         )?;
 
-        let (pubkey_epid_pseudonym, _collateral_hash, enclave_name) = authenticate_pubkey_quote(
+        let (pubkey_epid_pseudonym, collateral_hash) = authenticate_pubkey_quote(
             &attestation_context
                 .pubkey_challenge
                 .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
@@ -304,7 +304,16 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             &collateral_sig,
         )?;
 
-        //TODO: Check collateral_hash against a hash of the collateral
+        let calculated_collateral_hash = ring::digest::digest(&ring::digest::SHA256, &csr);
+        if calculated_collateral_hash.as_ref().to_vec() != collateral_hash {
+            // Something has changed the csr that came along with the token. This is bad.
+            return Err(ProxyAttestationServerError::MismatchError {
+                variable: "collateral_hash",
+                expected: collateral_hash,
+                received: calculated_collateral_hash.as_ref().to_vec(),
+            });
+        }
+
 
         if pubkey_epid_pseudonym != msg3_epid_pseudonym {
             // We cannot verify that msg3 and pubkey_quote came from the same SGX system
@@ -329,17 +338,6 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             });
         }
 
-        let connection = crate::orm::establish_connection()
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
-                err
-            })?;
-        crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
-                err
-            })?;
-        
         // All's good. Generate a Certificate from the CSR...
         let certificate_signing_request = openssl::x509::X509Req::from_der(&csr)?;
         let cert = convert_csr_to_certificate(&certificate_signing_request).unwrap();
@@ -783,7 +781,7 @@ fn authenticate_pubkey_quote(
     pubkey_challenge: &[u8; 16],
     pubkey_quote: &sgx_quote_t,
     pubkey_sig: &Vec<u8>,
-) -> Result<(String, Vec<u8>, String), ProxyAttestationServerError> {
+) -> Result<(String, Vec<u8>), ProxyAttestationServerError> {
     // verify the challge value value that is internal to the pubkey quote
     if *pubkey_challenge != pubkey_quote.report_body.report_data.d[0..16] {
         return Err(ProxyAttestationServerError::MismatchError {
@@ -794,13 +792,11 @@ fn authenticate_pubkey_quote(
     }
     // extract the pubkey hash value that is internal to the pubkey quote
     let pubkey_hash = &pubkey_quote.report_body.report_data.d[16..48];
-    let enclave_name_vec = &pubkey_quote.report_body.report_data.d[48..55];
-    let enclave_name = std::str::from_utf8(enclave_name_vec)?;
+
     // verify the pubkey quote with the attestation server
     let pubkey_epid_pseudonym = ias_verify_attestation_evidence(&pubkey_quote, &pubkey_sig)?;
     Ok((
         pubkey_epid_pseudonym,
         pubkey_hash.to_vec(),
-        enclave_name.to_string(),
     ))
 }

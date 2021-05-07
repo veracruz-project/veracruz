@@ -636,7 +636,6 @@ pub fn parse_attestation_tokens2(
         std::vec::Vec<u8>,        // msg3_sig
         sgx_types::sgx_quote_t,   // collateral_quote
         std::vec::Vec<u8>,        // collateral_sig
-        std::vec::Vec<u8>,        // pubkey_hash
         std::vec::Vec<u8>,        // csr
         i32,                      // device_id
     ),
@@ -656,7 +655,6 @@ pub fn parse_attestation_tokens2(
     };
 
     let collateral = attest_tokens.get_collateral();
-    let pubkey_hash = collateral.get_pubkey_hash();
     let csr = collateral.get_csr();
 
     Ok((
@@ -665,7 +663,6 @@ pub fn parse_attestation_tokens2(
         msg3_sig,
         collateral_quote,
         collateral_sig,
-        pubkey_hash.to_vec(),
         csr.to_vec(),
         device_id,
     ))
@@ -679,7 +676,6 @@ pub fn serialize_sgx_attestation_tokens2(
     msg3_sig: &std::vec::Vec<u8>,
     collateral_quote: &sgx_types::sgx_quote_t,
     collateral_sig: &std::vec::Vec<u8>,
-    pubkey_hash: &std::vec::Vec<u8>,
     csr: &std::vec::Vec<u8>,
     device_id: i32,
 ) -> TransportProtocolResult {
@@ -720,7 +716,6 @@ pub fn serialize_sgx_attestation_tokens2(
     attestation_tokens.set_collateral_sig(collateral_sig.to_vec());
 
     let mut collateral = transport_protocol::SgxCollateral::new();
-    collateral.set_pubkey_hash(pubkey_hash.to_vec());
     collateral.set_csr(csr.to_vec());
 
     attestation_tokens.set_collateral(collateral);

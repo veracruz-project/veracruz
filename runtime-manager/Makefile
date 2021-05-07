@@ -44,7 +44,7 @@ css-sgx.bin: $(Signed_RustEnclave_Name)
 COMMON_Src = src/managers/*.rs
 
 ############# Files generated from the EDL File ###############
-EDL_Files := runtime_manager_t.c runtime_manager_t.h runtime_manager_u.c runtime_manager_u.h
+EDL_Files := $(OUT_DIR)/runtime_manager_t.c $(OUT_DIR)/runtime_manager_t.h $(OUT_DIR)/runtime_manager_u.c $(OUT_DIR)/runtime_manager_u.h
 
 SGX_SDK ?= /work/sgxsdk
 
@@ -57,6 +57,10 @@ RUST_SGX_SDK_PATH = ../third-party/rust-sgx-sdk
 $(EDL_Files): $(SGX_EDGER8R) runtime_manager.edl
 	$(SGX_EDGER8R) --use-prefix --trusted runtime_manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
 	$(SGX_EDGER8R) --use-prefix --untrusted runtime_manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
+	cp -u runtime_manager_t.c $(OUT_DIR)
+	cp -u runtime_manager_u.c $(OUT_DIR)
+	cp -u runtime_manager_u.h $(OUT_DIR)
+	cp -u runtime_manager_t.h $(OUT_DIR)
 	@echo $(INFO_COLOR) "GEN => $(EDL_Files)" $(RESET_COLOR)
 
 SGX_COMMON_CFLAGS += -O0 -g
@@ -64,7 +68,7 @@ CUSTOM_EDL_PATH :=$(RUST_SGX_SDK_PATH)/edl
 RuntimeManager_Include_Paths := -I ./src -I$(SGX_SDK)/include -I$(CUSTOM_EDL_PATH)
 RuntimeManager_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(RuntimeManager_Include_Paths)
 $(OUT_DIR)/runtime_manager_u.o: $(EDL_Files)
-	@$(CC) $(RuntimeManager_C_Flags) -c ./runtime_manager_u.c -o $@
+	@$(CC) $(RuntimeManager_C_Flags) -c $(OUT_DIR)/runtime_manager_u.c -o $@
 	@echo $(INFO_COLOR) "CC => $<" $(RESET_COLOR)
 
 CUSTOM_COMMON_PATH := $(RUST_SGX_SDK_PATH)/common

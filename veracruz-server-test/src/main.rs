@@ -22,7 +22,6 @@ mod tests {
     use rand;
     use rand::Rng;
     use ring;
-    use rustls::internal::msgs::codec::Codec;
 
     use serde::Deserialize;
     use transport_protocol;
@@ -227,7 +226,7 @@ mod tests {
 
         let ret = VeracruzServerEnclave::new(&policy_json);
 
-        let veracruz_server = ret.unwrap();
+        let _veracruz_server = ret.unwrap();
     }
 
     #[test]
@@ -256,13 +255,12 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (mut veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
+        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
 
         let client_cert_filename = "../test-collateral/never_used_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
 
         let mut _client_session = create_client_test_session(
-            &mut veracruz_server,
             client_cert_filename,
             client_key_filename,
         );
@@ -740,11 +738,11 @@ mod tests {
         let test_target_platform: Platform = Platform::TrustZone;
 
         let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
+        //TODO Check the runtime manager hash against the contents of the certificate extension
 
         info!("             Enclave generated a self-signed certificate:");
 
         let mut client_session = create_client_test_session(
-            &mut veracruz_server,
             client_cert_path,
             client_key_path,
         )?;
@@ -1184,7 +1182,7 @@ mod tests {
     fn init_veracruz_server_and_tls_session(
         policy_json: &str,
     ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
-        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
 
         let one_tenth_sec = std::time::Duration::from_millis(100);
         std::thread::sleep(one_tenth_sec); // wait for the client to start
@@ -1389,7 +1387,6 @@ mod tests {
     }
 
     fn create_client_test_session(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
         client_cert_filename: &str,
         client_key_filename: &str,
     ) -> Result<rustls::ClientSession, VeracruzServerError> {
@@ -1415,113 +1412,6 @@ mod tests {
             &std::sync::Arc::new(client_config),
             dns_name,
         ))
-    }
-
-    fn post_buffer(url: &str, data: &str) -> Result<String, VeracruzServerError> {
-        let mut data_reader = stringreader::StringReader::new(&data);
-        let mut curl_request = Easy::new();
-        curl_request.url(url)?;
-
-        let mut headers = List::new();
-        headers.append("Content-Type: application/octet-stream")?;
-
-        curl_request.http_headers(headers)?;
-
-        curl_request.post(true)?;
-        curl_request.post_field_size(data.len() as u64)?;
-        curl_request.fail_on_error(true)?;
-
-        let mut received_body = std::string::String::new();
-        let mut received_header = std::string::String::new();
-        {
-            let mut transfer = curl_request.transfer();
-
-            transfer.read_function(|buf| Ok(data_reader.read(buf).unwrap_or(0)))?;
-
-            transfer.write_function(|buf| {
-                received_body.push_str(
-                    std::str::from_utf8(buf)
-                        .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                );
-                Ok(buf.len())
-            })?;
-            transfer.header_function(|buf| {
-                received_header.push_str(
-                    std::str::from_utf8(buf)
-                        .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                );
-                true
-            })?;
-
-            transfer.perform()?;
-        }
-
-        let header_lines: Vec<&str> = {
-            let lines = received_header.split("\n");
-            lines.collect()
-        };
-        let mut header_fields = std::collections::HashMap::new();
-        for this_line in header_lines.iter() {
-            let fields: Vec<&str> = this_line.split(":").collect();
-            if fields.len() == 2 {
-                header_fields.insert(fields[0], fields[1]);
-            }
-        }
-        Ok(received_body)
-    }
-
-    fn attestation_flow(
-        proxy_attestation_server_url: &String,
-        expected_enclave_hash: &String,
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let challenge = rand::thread_rng().gen::<[u8; 32]>();
-        info!(
-            "veracruz-server-test/attestation_flow: challenge:{:?}",
-            challenge
-        );
-        let serialized_pagt =
-            transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
-        let pagt_ret = veracruz_server.plaintext_data(serialized_pagt)?;
-        let received_bytes = pagt_ret.ok_or(VeracruzServerError::MissingFieldError(
-            "attestation_flow pagt_ret",
-        ))?;
-
-        let encoded_token = base64::encode(&received_bytes);
-        let complete_proxy_attestation_server_url =
-            format!("{:}/VerifyPAT", proxy_attestation_server_url);
-        let received_buffer = post_buffer(&complete_proxy_attestation_server_url, &encoded_token)?;
-
-        let received_payload = base64::decode(&received_buffer)?;
-
-        if challenge != received_payload[8..40] {
-            return Err(VeracruzServerError::MismatchError {
-                variable: "attestation_flow challenge",
-                received: received_payload[8..40].to_vec(),
-                expected: challenge.to_vec(),
-            });
-        }
-        let hash_bin = hex::decode(expected_enclave_hash)?;
-        // specifying 0..32 because some platforms give us measurements in
-        // SHA384 (Nitro Enclaves, I'm talking about you)
-        // but the PSA attestation token only contains 32 bytes of it in order
-        // to keep the offsets the same
-        if hash_bin[0..32] != received_payload[47..79] {
-            #[cfg(all(feature = "debug", feature = "nitro"))]
-            {
-                println!("veracruz-server-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
-            }
-            #[cfg(not(feature = "debug"))]
-            {
-                return Err(VeracruzServerError::MismatchError {
-                    variable: "attestation_flow hash_bin",
-                    received: received_payload[47..79].to_vec(),
-                    expected: hash_bin.to_vec(),
-                });
-            }
-        }
-        let enclave_cert_hash = received_payload[86..118].to_vec();
-        Ok(enclave_cert_hash)
     }
 
     fn read_cert_file(filename: &str) -> Result<rustls::Certificate, VeracruzServerError> {

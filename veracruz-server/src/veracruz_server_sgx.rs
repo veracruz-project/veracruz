@@ -174,7 +174,7 @@ pub mod veracruz_server_sgx {
         collateral_challenge: &Vec<u8>,
         context: &sgx_ra_context_t,
         msg2: &sgx_ra_msg2_t,
-    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>, Vec<u8>, Vec<u8>), VeracruzServerError> {
+    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>, Vec<u8>), VeracruzServerError> {
         let mut p_msg3 = std::ptr::null_mut();
         let mut msg3_size = 0;
         let msg2_size: u32 = std::mem::size_of::<sgx_ra_msg2_t>() as u32;
@@ -282,9 +282,6 @@ pub mod veracruz_server_sgx {
             )
         };
 
-        let mut pubkey_hash: Vec<u8> = Vec::with_capacity(32);
-        let pubkey_hash_buf_size = pubkey_hash.capacity();
-        let mut pubkey_hash_size: u64 = 0;
         let mut csr: Vec<u8> = Vec::with_capacity(1024);
         let csr_buf_size = csr.capacity();
         let mut csr_size: u64 = 0;
@@ -297,11 +294,6 @@ pub mod veracruz_server_sgx {
                 collateral_challenge.len() as u64,
                 bindgen_target_info_ref,
                 bindgen_collateral_report_ref,
-                //collateral.as_mut_ptr() as *mut u8,
-                //collateral_buf_size as u64,
-                pubkey_hash.as_mut_ptr() as *mut u8,
-                pubkey_hash_buf_size as u64,
-                &mut pubkey_hash_size,
                 csr.as_mut_ptr() as *mut u8,
                 csr_buf_size as u64,
                 &mut csr_size,
@@ -313,7 +305,6 @@ pub mod veracruz_server_sgx {
             ));
         }
 
-        unsafe { pubkey_hash.set_len(pubkey_hash_size as usize) };
         unsafe { csr.set_len(csr_size as usize) };
 
         let mut collateral_quote_size: u32 = 0;
@@ -340,8 +331,8 @@ pub mod veracruz_server_sgx {
                 &collateral_report,
                 sgx_types::sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE,
                 &spid,
-                p_nonce_nul, //std::ptr::null() as *const sgx_types::sgx_quote_nonce_t,
-                p_sig_rl,    //std::ptr::null() as *const sgx_types::uint8_t,
+                p_nonce_nul,
+                p_sig_rl,
                 0,
                 p_qe_report,
                 collateral_quote_vec.as_mut_ptr() as *mut sgx_types::sgx_quote_t,
@@ -364,7 +355,6 @@ pub mod veracruz_server_sgx {
             sig.to_vec(),
             collateral_quote,
             collateral_quote_sig.to_vec(),
-            pubkey_hash,
             csr
         ))
     }
@@ -380,7 +370,6 @@ pub mod veracruz_server_sgx {
             collateral_quote: &sgx_quote_t,
             collateral_quote_sig: &Vec<u8>,
             device_id: i32,
-            pubkey_hash: &Vec<u8>,
             csr: &Vec<u8>
         ) -> Result<(Vec<u8>, Vec<u8>), VeracruzServerError> {
             let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens2(
@@ -390,7 +379,6 @@ pub mod veracruz_server_sgx {
                 msg3_sig,
                 collateral_quote,
                 collateral_quote_sig,
-                pubkey_hash,
                 csr,
                 device_id,
             )?;
@@ -477,7 +465,7 @@ pub mod veracruz_server_sgx {
             let (challenge, msg2) =
                 self.send_sgx_msg1(&proxy_attestation_server_url, &ra_context, &msg1, device_id)?;
 
-            let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_quote_sig, pubkey_hash, csr) =
+            let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_quote_sig, csr) =
                 attestation_challenge(&sgx_root_enclave, &challenge, &ra_context, &msg2)
                     .expect("Attestation challenge failed");
             let (root_cert, enclave_cert) = self.send_msg3(
@@ -489,7 +477,6 @@ pub mod veracruz_server_sgx {
                 &collateral_quote,
                 &collateral_quote_sig,
                 device_id,
-                &pubkey_hash,
                 &csr
             )?;
 
@@ -520,18 +507,9 @@ pub mod veracruz_server_sgx {
                 runtime_manager_enclave: runtime_manager_enclave,
             };
 
-            let mut result: u32 = 0;
-            let ret = unsafe {
-                runtime_manager_init_session_manager_enc(
-                    new_veracruz_server.runtime_manager_enclave.geteid(),
-                    &mut result,
-                    policy_json.as_bytes().as_ptr() as *const u8,
-                    policy_json.len() as u64,
-                )
-            };
-
             let policy = Policy::from_json(policy_json)?;
 
+            // Start the root enclave, if necessary
             {
                 let mut sgx_root_enclave = SGX_ROOT_ENCLAVE.lock()?;
                 match *sgx_root_enclave {
@@ -570,7 +548,7 @@ pub mod veracruz_server_sgx {
                 unreachable!("Unimplemented");
         }
 
-        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
