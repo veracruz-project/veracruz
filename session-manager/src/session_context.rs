@@ -133,6 +133,7 @@ impl SessionContext {
         Ok(Self {
             server_config,
             principals,
+            policy,
             server_public_key,
             server_private_key,
         })

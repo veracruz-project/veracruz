@@ -207,8 +207,6 @@ mod tests {
         });
     }
 
-    /// Auxiliary function: self signed certificate for enclave
-
     #[test]
     /// Load the Veracruz server and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
@@ -217,7 +215,7 @@ mod tests {
             let policy = Policy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
             let result = VeracruzServerEnclave::new(&policy_json);
-            assert!(result.is_ok(), "error:{:?}", result);
+            assert!(result.is_ok());
         });
     }
 
@@ -258,7 +256,7 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
+        let (mut veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
 
         let client_cert_filename = "../test-collateral/never_used_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
@@ -542,7 +540,6 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[("input-0", SINGLE_F64_DATA)],
             &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
-            true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -557,7 +554,6 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[("input-0", SINGLE_F64_DATA)],
             &[("stream-0", VEC_F64_1_DATA)],
-            true,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -572,7 +568,6 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[],
             &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
-            true,
         );
         assert!(result.is_err(), "An error should occur");
     }
