@@ -29,7 +29,7 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   read-file
 RUST_EXAMPLE_DIR = rust-examples/
 # Navigate to the actual wasm programs.
-RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-arm-veracruz/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
+RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-wasi/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
 # All dataset filenames
 DATA = hello-world-1.dat \
  	   hello-world-2.dat \
@@ -68,7 +68,7 @@ wasm-checker:
 .SECONDEXPANSION:
 $(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUST_EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env wasm-checker
 	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@)))
-	#./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
+	./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
 
 freestanding-execution-engine: env
 	$(MAKE) -C freestanding-execution-engine/
