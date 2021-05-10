@@ -10,3 +10,8 @@ description = "Minimal Veracruz runtime library.  Supports `no_std` development 
 [dependencies]
 wee_alloc = { version = "0.4.5" }
 
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+
