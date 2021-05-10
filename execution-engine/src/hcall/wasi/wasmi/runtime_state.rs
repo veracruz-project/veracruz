@@ -575,8 +575,6 @@ impl WASMIRuntimeState {
     /// Invokes an exported entry point function with a given name,
     /// `export_name`, in the WASM program provisioned into the Veracruz host
     /// state.
-    ///
-    /// TODO: some awkwardness with the borrow checker here --- revisit.
     fn invoke_export(&mut self, export_name: &str) -> Result<Option<RuntimeValue>, Error> {
         // Eliminate this .cloned() call, if possible
         let (not_started, program_arguments) = match self.get_program().cloned() {
@@ -891,9 +889,6 @@ impl WASMIRuntimeState {
 
     /// The implementation of the WASI `fd_sync` function.  This is not
     /// supported by Veracruz.  We simply return `ErrNo::NoSys`.
-    ///
-    /// TODO: consider whether this should just return `ErrNo::Success`,
-    /// instead.
     fn wasi_fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 1 {
             return Err(WASIAPIName::FD_SEEK.into());
@@ -1071,8 +1066,6 @@ impl WASMIRuntimeState {
 
     /// The implementation of the WASI `path_unlink_file` function.  This is not
     /// supported by Veracruz.  We simply return `ErrNo::NoSys`.
-    ///
-    /// TODO: re-assess whether we want to support this.
     fn wasi_path_unlink_file(&mut self, args: RuntimeArgs) -> WASIError {
         if args.len() != 3 {
             return Err(WASIAPIName::PATH_UNLINK_FILE.into());
@@ -1220,7 +1213,6 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     fn invoke_entry_point(&mut self, file_name: &str) -> Result<ErrNo, FatalEngineError> {
-        //TODO change error type
         let program = self.vfs.read_file_by_filename(file_name)?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());

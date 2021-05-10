@@ -28,7 +28,7 @@ use std::{
     convert::TryFrom,
     mem::size_of,
     slice::from_raw_parts,
-    string::{String, ToString},
+    string::String,
     vec::Vec,
     io::Cursor,
 };
@@ -463,7 +463,7 @@ impl WASIWrapper {
     ) -> ErrNo {
         let clock_id = decode_wasi_arg!(clock_id, u8);
         let clock_id = decode_wasi_arg!(clock_id, ClockId);
-        let mut fs = lock_vfs!(self);
+        let fs = lock_vfs!(self);
         match fs.clock_res_get(clock_id) {
             Ok(o) => memory_ref.write_buffer(address, &u64::to_le_bytes(o.as_nanos())),
 
@@ -483,7 +483,7 @@ impl WASIWrapper {
     ) -> ErrNo {
         let clock_id = decode_wasi_arg!(clock_id, u8);
         let clock_id = decode_wasi_arg!(clock_id, ClockId);
-        let mut fs = lock_vfs!(self);
+        let fs = lock_vfs!(self);
         match fs.clock_time_get(clock_id, precision.into()) {
             Ok(o) => memory_ref.write_buffer(address, &u64::to_le_bytes(o.as_nanos())),
 
@@ -1309,13 +1309,6 @@ pub enum FatalEngineError {
     /// Wasmtime trap.
     #[error(display = "FatalEngineError: Wasmtime Trap Error {:?}.", _0)]
     WasmtimeTrapError(String),
-    /// Wrapper for direct error message.
-    #[error(display = "FatalEngineError: Error message {:?}.", _0)]
-    DirectErrorMessage(String),
-    /// Something unknown or unexpected went wrong, and there's no more detailed
-    /// information.
-    #[error(display = "FatalEngineError: Unknown error.")]
-    Generic,
 }
 
 /// Either the index or the name of a host call
@@ -1329,18 +1322,6 @@ pub enum HostFunctionIndexOrName {
 impl<T> From<std::sync::PoisonError<T>> for FatalEngineError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         FatalEngineError::FailedToObtainLock(format!("{:?}", error))
-    }
-}
-
-impl From<String> for FatalEngineError {
-    fn from(err: String) -> Self {
-        FatalEngineError::DirectErrorMessage(err)
-    }
-}
-
-impl From<&str> for FatalEngineError {
-    fn from(err: &str) -> Self {
-        FatalEngineError::DirectErrorMessage(err.to_string())
     }
 }
 
