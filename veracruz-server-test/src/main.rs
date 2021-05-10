@@ -31,12 +31,9 @@ mod tests {
     use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
     #[cfg(feature = "tz")]
     use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
-
     use veracruz_utils::{platform::Platform, policy::policy::Policy};
-
     #[cfg(feature = "nitro")]
     use regex::Regex;
-
     use proxy_attestation_server;
     use std::{
         collections::HashMap,

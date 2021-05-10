@@ -38,6 +38,7 @@ use crate::fs::FileSystem;
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "sgx")]
 use std::sync::{Arc, SgxMutex as Mutex};
+use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
@@ -401,7 +402,7 @@ impl WASIWrapper {
     /// interact with the execution engine.
     #[inline]
     pub(crate) fn args_get(&self, memory_ref: &mut impl MemoryHandler, address_for_string_ptrs: u32, buf_address: u32) -> ErrNo {
-        println!("args_get is called");
+        info!("args_get is called");
         let buffer = self.program_arguments.iter().map(|arg| {
             format!("{}\0", arg).into_bytes()
 
@@ -412,7 +413,7 @@ impl WASIWrapper {
     /// The implementation of the WASI `args_sizes_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
     pub(crate) fn args_sizes_get(&self, memory_ref: &mut impl MemoryHandler, address_for_counts: u32, address_for_buffer_size: u32) -> ErrNo {
-        println!("args_sizes_get is called");
+        info!("args_sizes_get is called");
         let environc = self.program_arguments.len() as u32;
         let environ_buf_size = self.program_arguments.iter().fold(0, |acc, arg|{
             acc + format!("{}\0", arg).as_bytes().len()
@@ -428,7 +429,7 @@ impl WASIWrapper {
     /// The implementation of the WASI `environ_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
     pub(crate) fn environ_get(&self, memory_ref: &mut impl MemoryHandler, address_for_string_ptrs: u32, buf_address: u32) -> ErrNo {
-        println!("environ_get is called");
+        info!("environ_get is called");
         let buffer = self.environment_variables.iter().map(|(key,value)| {
             let environ = format!("{}={}\0", key, value);
             environ.into_bytes()
@@ -439,7 +440,7 @@ impl WASIWrapper {
     /// THe implementation of the WASI `environ_sizes_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
     pub(crate) fn environ_sizes_get(&self,memory_ref: &mut impl MemoryHandler, address_for_counts: u32, address_for_buffer_size: u32) -> ErrNo {
-        println!("environ_sizes_get is called");
+        info!("environ_sizes_get is called");
         let environc = self.environment_variables.len() as u32;
         let environ_buf_size = self.environment_variables.iter().fold(0, |acc, (key,value)|{
             acc + format!("{}={}\0", key, value).as_bytes().len()
