@@ -10,4 +10,6 @@
 //! information on licensing and copyright.
 
 pub mod common;
-pub mod wasi;
+pub mod wasmi;
+#[cfg(feature = "std")]
+pub mod wasmtime;

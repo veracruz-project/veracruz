@@ -27,7 +27,7 @@ use std::{
     vec::Vec,
 };
 use lazy_static::lazy_static;
-use execution_engine::{fs::FileSystem, factory::execute};
+use execution_engine::{fs::FileSystem, execute};
 use veracruz_utils::policy::{
     policy::Policy,
     principal::Principal,
@@ -67,7 +67,6 @@ type ProvisioningResponse = Option<Vec<u8>>;
 /// Result type of provisioning functions.
 pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 
-//TODO CHANGE TO RuntimeState and move to a separate file
 /// The configuration details for the ongoing provisioning of secrets into the
 /// Veracruz platform, containing information that must be persisted across the
 /// different rounds of the provisioning process and the fixed global policy.
