@@ -68,30 +68,10 @@ fn response_invalid_request() -> super::ProvisioningResult {
 // Protocol message dispatch.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Returns the SHA-256 digest of the provisioned program.  Fails if no hash has
-/// yet been computed.
-#[deprecated]
-fn dispatch_on_pi_hash(
-    _: transport_protocol::RequestPiHash,
-    _protocol_state: &ProtocolState,
-) -> ProvisioningResult {
-    let response = transport_protocol::serialize_pi_hash(b"deprecated")?;
-    Ok(Some(response))
-}
-
 /// Returns the SHA-256 digest of the policy.
 fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
     let hash = protocol_state.get_policy_hash();
     let response = transport_protocol::serialize_policy_hash(hash.as_bytes())?;
-    Ok(Some(response))
-}
-
-/// Returns the current lifecycle state of the host provisioning state.  This
-/// state can be queried unconditionally (though it may change between the query
-/// being serviced and being received back/being acted upon...)
-#[deprecated]
-fn dispatch_on_request_state(_: &ProtocolState) -> ProvisioningResult {
-    let response = transport_protocol::serialize_machine_state(u8::from(0))?;
     Ok(Some(response))
 }
 
@@ -193,14 +173,16 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
     match request {
         MESSAGE::data(data) => dispatch_on_data(protocol_state, data, client_id),
         MESSAGE::program(prog) => dispatch_on_program(protocol_state, prog, client_id),
-        MESSAGE::request_pi_hash(pi_hash_request) => {
-            dispatch_on_pi_hash(pi_hash_request, protocol_state)
+        MESSAGE::request_pi_hash(_) => {
+            Ok(Some(transport_protocol::serialize_pi_hash(b"deprecated")?))
         }
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
         MESSAGE::request_result(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
         }
-        MESSAGE::request_state(_) => dispatch_on_request_state(protocol_state),
+        MESSAGE::request_state(_) => {
+            Ok(Some(transport_protocol::serialize_machine_state(u8::from(0))?))
+        },
         MESSAGE::request_shutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
             if is_dead {

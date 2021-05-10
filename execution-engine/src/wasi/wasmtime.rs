@@ -9,11 +9,10 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{vec::Vec, collections::HashMap};
-use std::convert::TryFrom;
+use std::{vec::Vec, collections::HashMap, convert::TryFrom};
 use crate::{
     fs::FileSystem,
-    hcall::common::{
+    wasi::common::{
         ExecutionEngine, EntrySignature, FatalEngineError, HostFunctionIndexOrName, 
         WASIWrapper, MemoryHandler, WASIAPIName
     }

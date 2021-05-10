@@ -120,7 +120,7 @@ impl FileSystem {
             right_table,
             prestat_table: HashMap::new(),
         };
-        rst.install_prestat(&vec!["/temp/"]);
+        rst.install_prestat(&vec![""]);
         rst
     }
 
@@ -128,7 +128,8 @@ impl FileSystem {
     // Internal auxiliary methods
     ////////////////////////////////////////////////////////////////////////
 
-    /// Install all the pre open fd, including the stdin, stdout, stderr and root.
+    /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
+    /// and then pre-open them. 
     fn install_prestat(&mut self, dir_paths: &[&str]) {
         // Pre open the stdin stdout and stderr.
         self.install_file("stderr",Inode(0), "".as_bytes());
@@ -154,6 +155,8 @@ impl FileSystem {
         }
     }
     
+    /// Install a dir and attatch it to `inode`. 
+    /// NOTE: Since we do not have dir structure, it installs a file without any content for now.
     fn install_dir(&mut self, path: impl AsRef<str>, inode : Inode) {
         let file_stat = FileStat{
             device: (0u64).into(),
@@ -173,6 +176,7 @@ impl FileSystem {
         self.path_table.insert(path.as_ref().to_string(),inode.clone());
     }
 
+    /// Install a file with content `raw_file_data` and attatch it to `inode`. 
     fn install_file(&mut self, path: impl AsRef<str>, inode : Inode, raw_file_data : &[u8]) {
         let file_size = raw_file_data.len();
         let file_stat = FileStat{

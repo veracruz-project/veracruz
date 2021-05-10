@@ -364,7 +364,7 @@ impl WASIWrapper {
     // Creating and modifying runtime states.
     ////////////////////////////////////////////////////////////////////////////
     
-    /// Creates a new initial `HostProvisioningState`.
+    /// Creates a new initial `WASIWrapper`.
     pub fn new(
         filesystem: Arc<Mutex<FileSystem>>,
         principal: Principal,
@@ -1237,14 +1237,13 @@ impl WASIWrapper {
             Err(e) => e,
         }
     }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Fatal host errors/runtime panics.
+// Fatal execution errors/runtime panics.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// A fatal, runtime error that terminates the Veracruz host immediately.  This
+/// A fatal, runtime error that terminates the Veracruz execution immediately.  This
 /// is akin to a "kernel panic" for Veracruz: these errors are not passed to the
 /// WASM program running on the platform, but are instead fundamental issues
 /// that require immediate shutdown as they cannot be fixed.
@@ -1258,7 +1257,7 @@ pub enum FatalEngineError {
     /// not be parsed.
     #[error(display = "FatalEngineError: Invalid WASM program (e.g. failed to parse it).")]
     InvalidWASMModule,
-    /// The Veracruz host was passed bad arguments by the WASM program running
+    /// The Veracruz engine was passed bad arguments by the WASM program running
     /// on the platform.  This should never happen if the WASM program uses
     /// `libveracruz` as the platform should ensure H-Calls are always
     /// well-formed.  Seeing this either indicates a bug in `libveracruz` or a
@@ -1272,7 +1271,7 @@ pub enum FatalEngineError {
         /// The name of the host function that was being invoked.
         function_name: WASIAPIName,
     },
-    /// The WASM program tried to invoke an unknown H-call on the Veracruz host.
+    /// The WASM program tried to invoke an unknown H-call on the Veracruz engine.
     #[error(display = "FatalEngineError: Unknown Host call invoked: '{:?}'.", _0)]
     UnknownHostFunction(HostFunctionIndexOrName),
     /// No linear memory was registered: this is a programming error (a bug)
@@ -1369,8 +1368,7 @@ pub(crate) enum EntrySignature {
 /// missing that these components require then it should be added to this trait
 /// and implemented for all supported implementation strategies.
 ///
-/// Note that a factory method, in the file `hcall/factory.rs` will return an
-/// opaque instance of this trait depending on the
+/// Note that the top-level function `execute` in this crate relies on this trait.
 pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code

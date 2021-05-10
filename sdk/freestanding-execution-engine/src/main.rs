@@ -35,7 +35,7 @@ use std::{
     error::Error,
 };
 use execution_engine::{
-    factory::execute,
+    execute,
     fs::FileSystem,
 };
 use wasi_types::Rights;

@@ -12,7 +12,7 @@
 use std::{convert::TryFrom, string::ToString, vec::Vec, boxed::Box};
 use crate::{
     fs::FileSystem,
-    hcall::common::{
+    wasi::common::{
         ExecutionEngine, EntrySignature, FatalEngineError, HostFunctionIndexOrName,
         WASIWrapper, MemoryHandler, WASIAPIName
     }
