@@ -212,15 +212,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
     let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK;
-    let write_right = Rights::PATH_OPEN | Rights::FD_WRITE | Rights::FD_SEEK;
+    let write_right = Rights::PATH_OPEN | Rights::FD_WRITE | Rights::FD_SEEK | Rights::PATH_CREATE_FILE | Rights::PATH_FILESTAT_SET_SIZE;
 
     // Manually create the Right table for the VFS.
+    file_table.insert(prog_file_name.to_string(), write_right);
     for file_path in cmdline.data_sources.iter() {
         file_table.insert(file_path.to_string(), read_right);
     }
     file_table.insert(OUTPUT_FILE.to_string(), write_right);
-    // TODO remove
-    file_table.insert("output.txt".to_string(), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
     let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
