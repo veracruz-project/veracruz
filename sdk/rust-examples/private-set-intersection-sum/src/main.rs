@@ -16,9 +16,8 @@
 //! information on licensing and copyright.
 
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::{fs, process::exit, collections::HashSet};
 use wasi_types::ErrNo;
-use std::{fs, process::exit};
 
 /// The identifier of each customer, a pair of `u64` values.
 type Id = (u64, u64);

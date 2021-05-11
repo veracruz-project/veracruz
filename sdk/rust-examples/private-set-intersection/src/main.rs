@@ -16,8 +16,7 @@
 //! copyright information.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::{result::Result, fs, process::exit};
+use std::{result::Result, fs, process::exit, collections::HashSet};
 use wasi_types::ErrNo;
 
 /// The format of the contents of the input sets, encoding meta-data about an employee.
