@@ -194,7 +194,6 @@ impl error::ResponseError for VeracruzServerError {
         ResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
     }
     fn status_code(&self) -> StatusCode {
-        println!("XXX {:?}", self);
         match self {
             VeracruzServerError::DirectMessageError(_, e) => e.clone(),
             VeracruzServerError::UnimplementedRequestError

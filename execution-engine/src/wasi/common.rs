@@ -1,9 +1,9 @@
 //! Common code for any implementation of WASI:
 //! - An interface for handling memory access.
 //! - An interface for executing a program.
-//! - A WASI Wrapper. it wraps the strictly type WASI-like API
-//! in the virtual file system. It convert wasm u32-based parameters to 
-//! properly typed parameters and rust-style error handling to 
+//! - A WASI Wrapper. It wraps the strictly type WASI-like API
+//! in the virtual file system, and converts wasm number- and address-based
+//! parameters to properly typed parameters and rust-style error handling to 
 //! c-style returning code. 
 //!
 //! ## Authors
@@ -45,7 +45,7 @@ use log::info;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// List of WASI API.
-#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
 pub enum WASIAPIName {
     ARGS_GET = 1,
     ARGS_SIZES_GET,
@@ -301,7 +301,7 @@ pub trait MemoryHandler {
             }
             // Modify the offset
             buf_address += to_write.len() as u32;
-            buf_pointers += 4;
+            buf_pointers += size_of::<u32>() as u32;
         }
         ErrNo::Success
     }
@@ -349,6 +349,17 @@ macro_rules! decode_wasi_arg {
         match <$t>::try_from($var) {
             Err(_) => return ErrNo::Inval,
             Ok(o) => o,
+        }
+    }
+}
+
+/// A macro to call read_cstring at `$address` of length `$len`.
+/// It returns String, or the error code.
+macro_rules! read_cstring {
+    ($mem:ident, $address:ident, $len:ident) => {
+        match $mem.read_cstring($address, $len) {
+            Ok(o) => o,
+            Err(e) => return e,
         }
     }
 }
@@ -467,7 +478,6 @@ impl WASIWrapper {
         let fs = lock_vfs!(self);
         match fs.clock_res_get(clock_id) {
             Ok(o) => memory_ref.write_buffer(address, &u64::to_le_bytes(o.as_nanos())),
-
             Err(e) => e,
         }
     }
@@ -487,7 +497,6 @@ impl WASIWrapper {
         let fs = lock_vfs!(self);
         match fs.clock_time_get(clock_id, precision.into()) {
             Ok(o) => memory_ref.write_buffer(address, &u64::to_le_bytes(o.as_nanos())),
-
             Err(e) => e,
         }
     }
@@ -524,7 +533,6 @@ impl WASIWrapper {
         let mut fs = lock_vfs!(self);
         match fs.fd_allocate(fd.into(), offset, len) {
             Ok(_) => ErrNo::Success,
-
             Err(e) => e,
         }
     }
@@ -759,7 +767,7 @@ impl WASIWrapper {
 
         let mut written = 0;
         for dir in dir_entries {
-            //NOTE: assume the buf_len is the count of how many dir entries can store.
+            //NOTE: `buf_len` is the count of how many dir entries can store.
             if buf_len == written { break; }
             memory_ref.write_struct(buf_ptr, &dir);
             buf_ptr += size_of::<DirEnt>() as u32;
@@ -791,10 +799,7 @@ impl WASIWrapper {
         whence: u8,
         address: u32,
     ) -> ErrNo {
-        let whence = match Whence::try_from(whence) {
-            Ok(o) => o,
-            Err(_) => return ErrNo::Inval,
-        };
+        let whence = decode_wasi_arg!(whence, Whence); 
         let mut fs = lock_vfs!(self);
         let new_offset = match fs.fd_seek(fd.into(), offset, whence) {
             Ok(o) => o,
@@ -861,10 +866,7 @@ impl WASIWrapper {
     #[inline]
     pub(crate) fn path_create_directory(&mut self, 
         memory_ref: &mut impl MemoryHandler, fd: u32, path_address: u32, path_length: u32) -> ErrNo {
-        let path = match memory_ref.read_cstring(path_address, path_length) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_length);
         let mut fs = lock_vfs!(self);
         match fs.path_create_directory(fd.into(), path) {
             Ok(_) => ErrNo::Success,
@@ -884,10 +886,7 @@ impl WASIWrapper {
         path_length: u32,
         address: u32,
     ) -> ErrNo {
-        let path = match memory_ref.read_cstring(path_address, path_length) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_length);
         let flags = decode_wasi_arg!(flags, LookupFlags);
         let mut fs = lock_vfs!(self);
         match fs.path_filestat_get(fd.into(), flags, path) {
@@ -908,10 +907,7 @@ impl WASIWrapper {
         path_length: u32,
         atime: u64, mtime: u64, fst_flag: u16
     ) -> ErrNo {
-        let path = match memory_ref.read_cstring(path_address, path_length) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_length);
         let flags = decode_wasi_arg!(flags, LookupFlags);
         let fst_flag = decode_wasi_arg!(fst_flag, SetTimeFlags);
         let mut fs = lock_vfs!(self);
@@ -936,14 +932,8 @@ impl WASIWrapper {
         new_path_len: u32,
     ) -> ErrNo {
         let old_flags = decode_wasi_arg!(old_flags, LookupFlags);
-        let old_path = match memory_ref.read_cstring(old_address, old_path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
-        let new_path = match memory_ref.read_cstring(new_address, new_path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let old_path = read_cstring!(memory_ref, old_address, old_path_len);
+        let new_path = read_cstring!(memory_ref, new_address, new_path_len);
         let mut fs = lock_vfs!(self);
         match fs.path_link(old_fd.into(), old_flags, old_path, new_fd.into(), new_path) {
             Ok(_) => ErrNo::Success,
@@ -968,10 +958,7 @@ impl WASIWrapper {
         address: u32,
     ) -> ErrNo {
         let fd = Fd(fd);
-        let path = match memory_ref.read_cstring(path_address, path_length) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_length);
         let dir_flags = decode_wasi_arg!(dir_flags, LookupFlags);
         let oflags = decode_wasi_arg!(oflags, OpenFlags);
         let fs_rights_base = decode_wasi_arg!(fs_rights_base,Rights);
@@ -999,10 +986,7 @@ impl WASIWrapper {
     pub(crate) fn path_readlink(&mut self,
         memory_ref: &mut impl MemoryHandler,
         fd: u32, path_address: u32, path_length: u32, buf: u32, buf_len: u32, address: u32) -> ErrNo {
-        let path = match memory_ref.read_cstring(path_address, path_length) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_length);
         let mut fs = lock_vfs!(self);
         let mut rst = match fs.path_readlink(fd.into(), path) {
             Ok(o) => o,
@@ -1025,10 +1009,7 @@ impl WASIWrapper {
     pub(crate) fn path_remove_directory(&mut self,
         memory_ref: &mut impl MemoryHandler,
         fd: u32, path_address: u32, path_length: u32) -> ErrNo {
-        let path = match memory_ref.read_cstring(path_address, path_length) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_length);
         let mut fs = lock_vfs!(self);
         match fs.path_remove_directory(fd.into(), path) {
             Ok(_) => ErrNo::Success,
@@ -1043,20 +1024,14 @@ impl WASIWrapper {
         &mut self,
         memory_ref: &mut impl MemoryHandler,
         old_fd: u32,
-        old_path_address: u32,
+        old_address: u32,
         old_path_len: u32,
         new_fd: u32,
-        new_path_address: u32,
+        new_address: u32,
         new_path_len: u32,
     ) -> ErrNo {
-        let old_path = match memory_ref.read_cstring(old_path_address, old_path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
-        let new_path = match memory_ref.read_cstring(new_path_address, new_path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let old_path = read_cstring!(memory_ref, old_address, old_path_len);
+        let new_path = read_cstring!(memory_ref, new_address, new_path_len);
         let mut fs = lock_vfs!(self);
         match fs.path_rename(old_fd.into(), old_path, new_fd.into(), new_path) {
             Ok(_) => ErrNo::Success,
@@ -1076,14 +1051,8 @@ impl WASIWrapper {
         new_address: u32,
         new_path_len: u32,
     ) -> ErrNo {
-        let old_path = match memory_ref.read_cstring(old_address, old_path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
-        let new_path = match memory_ref.read_cstring(new_address, new_path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let old_path = read_cstring!(memory_ref, old_address, old_path_len);
+        let new_path = read_cstring!(memory_ref, new_address, new_path_len);
         let mut fs = lock_vfs!(self);
         match fs.path_symlink(old_path, fd.into(), new_path) {
             Ok(_) => ErrNo::Success,
@@ -1101,10 +1070,7 @@ impl WASIWrapper {
         path_address: u32,
         path_len: u32,
     ) -> ErrNo {
-        let path = match memory_ref.read_cstring(path_address, path_len) {
-            Ok(o) => o,
-            Err(e) => return e,
-        };
+        let path = read_cstring!(memory_ref, path_address, path_len);
         let mut fs = lock_vfs!(self);
         match fs.path_unlink_file(fd.into(), path) {
             Ok(_) => ErrNo::Success,

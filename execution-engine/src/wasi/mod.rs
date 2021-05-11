@@ -1,4 +1,4 @@
-//! An implementation of the WASI API for Chihuahua.
+//! An implementation of the WASI API for Execution Engine.
 //!
 //! ## Authors
 //!
@@ -10,6 +10,6 @@
 //! information on licensing and copyright.
 
 pub mod common;
-pub mod wasmi;
+pub(crate) mod wasmi;
 #[cfg(feature = "std")]
-pub mod wasmtime;
+pub(crate) mod wasmtime;

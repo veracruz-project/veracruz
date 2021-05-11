@@ -28,10 +28,10 @@ wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branc
 pinecone = "0.2"
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 wast = "=35.0.0"
-num-traits = {version = "0.2", default-features=false}
-num-derive = {version = "0.3", default-features=false} 
-num = {version = "0.4", default-features=false}
-anyhow = {version = "1.0", default-features = false}
+num-traits = { version = "0.2", default-features = false }
+num-derive = { version = "0.3", default-features = false } 
+num = { version = "0.4", default-features = false }
+anyhow = { version = "1.0", default-features = false }
 log = "=0.4.13"
 
 [lib]
