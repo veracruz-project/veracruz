@@ -16,7 +16,7 @@
 //! information on licensing and copyright.
 
 use serde::Deserialize;
-use std::{fs, process::exit, collections::HashSet};
+use std::{collections::HashSet, fs, process::exit};
 use wasi_types::ErrNo;
 
 /// The identifier of each customer, a pair of `u64` values.
@@ -67,10 +67,10 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 
 /// The program entry point: reads exactly one input, decodes it and computes the set
 /// intersection-sum before re-encoding it into Pinecone and returning.
-fn compute() -> Result<(),ErrNo> {
+fn compute() -> Result<(), ErrNo> {
     let data = read_inputs()?;
     let result = set_intersection_sum(data.data, data.sample);
-    let result_encode = pinecone::to_vec::<(usize, u64)>(&result).map_err(|_| ErrNo::Proto)?; 
+    let result_encode = pinecone::to_vec::<(usize, u64)>(&result).map_err(|_| ErrNo::Proto)?;
     fs::write("/output", result_encode)?;
     Ok(())
 }

@@ -17,9 +17,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use std::{fs, process::exit, result::Result};
 use strsim::jaro_winkler;
 use wasi_types::ErrNo;
-use std::{result::Result, fs, process::exit};
 
 /// Reads two input strings via the H-call mechanism.  Fails
 ///
@@ -42,10 +42,10 @@ fn read_inputs() -> Result<(String, String), ErrNo> {
 /// are not met with an error code.  Writes a Pinecone-encoded `usize`, the
 /// distance between the two strings, back as output.
 //fn main() -> return_code::Veracruz {
-fn compute() -> Result<(),ErrNo> {
+fn compute() -> Result<(), ErrNo> {
     let (left, right) = read_inputs()?;
     let distance = jaro_winkler(&left, &right);
-    let result_encode = pinecone::to_vec::<f64>(&distance).map_err(|_| ErrNo::Proto)?; 
+    let result_encode = pinecone::to_vec::<f64>(&distance).map_err(|_| ErrNo::Proto)?;
     fs::write("/output", result_encode)?;
     Ok(())
 }
