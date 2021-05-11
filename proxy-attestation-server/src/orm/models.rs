@@ -9,7 +9,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use super::schema::devices;
 use super::schema::firmware_versions;
 
 #[derive(Queryable, Associations, Debug, Identifiable, AsChangeset)]
