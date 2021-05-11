@@ -667,13 +667,13 @@ impl FileSystem {
             let t_offset = new_base_offset + (delta.abs() as u64);
             // Offset is allowed to equal to file size
             if t_offset > file_size {
-                return Err(ErrNo::Inval);
+                return Err(ErrNo::SPipe);
             }
             t_offset
         } else {
             // It is safe to convert a positive i64 to u64.
             if (delta.abs() as u64) > new_base_offset {
-                return Err(ErrNo::Inval);
+                return Err(ErrNo::SPipe);
             }
             new_base_offset - (delta.abs() as u64)
         };
