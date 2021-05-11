@@ -7,11 +7,16 @@
 using namespace RoutingKit;
 using namespace std;
 
+void log_message(std::string str)
+{
+	cout << str << endl;
+}
+
 int main (int argc, char *argv []) {
 	cout << "<<< entry point" << endl;
 
 	// Load a car routing graph from OpenStreetMap-based data
-	auto graph = simple_load_osm_car_routing_graph_from_pbf("cambridgeshire-latest.osm.pbf");
+	auto graph = simple_load_osm_car_routing_graph_from_pbf("cambridgeshire-latest.osm.pbf", log_message);
 	cout << "<<< graph: " << graph.node_count() << endl;
 	auto tail = invert_inverse_vector(graph.first_out);
 
