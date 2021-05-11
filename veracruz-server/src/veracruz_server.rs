@@ -169,6 +169,8 @@ pub enum VeracruzServerError {
     DirectStrError(&'static str),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
+    #[error(display = "VeracruzServer: Invalid runtime manager hash")]
+    InvalidRuntimeManagerHash,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {

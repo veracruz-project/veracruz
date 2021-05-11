@@ -14,13 +14,9 @@
 
 mod tests {
     use actix_rt::System;
-    use base64;
-    use curl::easy::{Easy, List};
     use env_logger;
     use lazy_static::lazy_static;
     use log::{debug, info, LevelFilter};
-    use rand;
-    use rand::Rng;
     use ring;
 
     use serde::Deserialize;
@@ -49,8 +45,6 @@ mod tests {
         time::Instant,
         vec::Vec,
     };
-    #[cfg(feature = "sgx")]
-    use stringreader;
 
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "../test-collateral/one_data_source_policy.json";
@@ -810,6 +804,9 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+                check_runtime_manager_hash(&policy,
+                                           &client_session)?;
+
                 let response = provision_program(
                     path,
                     client_session_id,
@@ -843,6 +840,8 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+                check_runtime_manager_hash(&policy,
+                    &client_session)?;
                 info!(
                     "             Data provider hash response time (μs): {}.",
                     time_data_hash.elapsed().as_micros()
@@ -885,6 +884,9 @@ mod tests {
                     // convert vec of raw stream packages to queue of them
                     stream_data_vec.push(decoded_data);
                 }
+
+                check_runtime_manager_hash(&policy,
+                    &client_session)?;
 
                 // Reverse the vec so we can use `pop` for the `first` element of the list.
                 // In each round of stream, the loop pops an element from the `stream_data_vec`
@@ -957,6 +959,8 @@ mod tests {
                         &client_tls_tx,
                         &client_tls_rx,
                     )?;
+                    check_runtime_manager_hash(&policy,
+                        &client_session)?;
                     info!(
                         "             Result retriever hash response time (μs): {}.",
                         time_result_hash.elapsed().as_micros()
@@ -1024,6 +1028,9 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+
+                check_runtime_manager_hash(&policy,
+                    &client_session)?;
                 info!(
                     "             Result retriever hash response time (μs): {}.",
                     time_result_hash.elapsed().as_micros()
@@ -1260,6 +1267,59 @@ mod tests {
         }
     }
 
+    fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
+
+        let expected = match policy.runtime_manager_hash(platform) {
+            Err(_) => return false,
+            Ok(data) => data,
+        };
+        let expected_bytes = match hex::decode(expected) {
+            Err(_) => return false,
+            Ok(bytes) => bytes,
+        };
+
+        if &received[..] != expected_bytes.as_slice() {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    fn check_runtime_manager_hash(policy: &Policy,
+                                  client_session: &dyn rustls::Session) -> Result<(), VeracruzServerError> {
+        match client_session.get_peer_certificates() {
+            None => {
+                return Err(VeracruzServerError::MissingFieldError("NO PEER CERTIFICATES. WTF?"));
+            },
+            Some(certs) => {
+                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref()).unwrap();
+                let ues = ee_cert.unrecognized_extensions();
+                // check for OUR extension
+                static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
+                match ues.get(&OUR_EXTENSION_ID[..]) {
+                    None => {
+                        println!("Our extension is not present. This should be fatal");
+                        return Err(VeracruzServerError::MissingFieldError("MY CRAZY CUSTOM EXTENSION AIN'T TERE"));
+                    },
+                    Some(data) => {
+                        let extension_data = data.read_all(VeracruzServerError::MissingFieldError("CAN'T READ MY CRAZY CUSTOM EXTENSION"), |input| {
+                            Ok(input.read_bytes_to_end())
+                        })?;
+                        if !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::SGX) &&
+                           !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::TrustZone) &&
+                           !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::Nitro) &&
+                           !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::Mock) {
+                               // None of the hashes matched.
+                               println!("None of the hashes matched.");
+                               return Err(VeracruzServerError::InvalidRuntimeManagerHash);
+                        }
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
+
     fn provision_data(
         filename: &str,
         client_session_id: u32,
@@ -1395,7 +1455,7 @@ mod tests {
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
-            let mut data = std::fs::read("../proxy-attestation-server/CACert.pem").unwrap();
+            let data = std::fs::read("../proxy-attestation-server/CACert.pem").unwrap();
             let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
             certs[0].clone()
         };

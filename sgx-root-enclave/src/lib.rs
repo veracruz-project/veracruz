@@ -33,7 +33,6 @@ use veracruz_utils::csr;
 
 lazy_static! {
     static ref SESSION_ID: AtomicU64 = AtomicU64::new(1);
-    static ref DEVICE_ID: std::sync::SgxMutex<Option<i32>> = std::sync::SgxMutex::new(None);
     static ref INITIATOR_HASH: std::sync::SgxMutex<HashMap<u64, SgxDhInitiator>> =
         std::sync::SgxMutex::new(HashMap::new());
     static ref PRIVATE_KEY: std::sync::SgxMutex<Option<std::vec::Vec<u8>>> = std::sync::SgxMutex::new(None);
@@ -75,10 +74,6 @@ pub extern "C" fn init_remote_attestation_enc(
         gx: from_slice(&pub_key_vec[0..32]),
         gy: from_slice(&pub_key_vec[32..64]),
     };
-    {
-        let mut device_id_wrapper = DEVICE_ID.lock().expect("Failed to get lock on DEVICE_ID");
-        *device_id_wrapper = Some(device_id); // intentionall obliterate any previous value
-    }
 
     let mut context: sgx_ra_context_t = 0;
     assert!(pub_key_vec.len() > 0);
@@ -294,7 +289,7 @@ pub extern "C" fn finish_local_attest_ca_enc(
         let private_key_vec = get_private_key().unwrap();
         EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec).unwrap()
     };
-    let mut compute_enclave_cert = match csr::convert_csr_to_cert(&csr_slice, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &private_key) {
+    let mut compute_enclave_cert = match csr::convert_csr_to_cert(&csr_slice, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &responder_identity.mr_enclave.m, &private_key) {
         Ok(bytes) => bytes,
         Err(err) => {
             println!("Failed to convert csr to cert:{:?}", err);
