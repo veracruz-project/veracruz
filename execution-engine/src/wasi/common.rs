@@ -247,7 +247,7 @@ pub trait MemoryHandler {
     /// Read `length` bytes from `address`.
     fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo>;
 
-    /// Reads a null-terminated C-style string from the runtime state's memory,
+    /// Reads a string at `address` of `length` from the runtime state's memory,
     /// starting at base address `address`.  If it fails, return ErrNo.
     fn read_cstring(&self, address: u32, length: u32) -> Result<String, ErrNo> {
         let bytes = self.read_buffer(address, length)?;
