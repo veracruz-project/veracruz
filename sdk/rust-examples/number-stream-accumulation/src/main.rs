@@ -12,8 +12,13 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
+use std::{
+    fs,
+    fs::File,
+    io::{ErrorKind, Read, Seek, SeekFrom},
+    process::exit,
+};
 use wasi_types::ErrNo;
-use std::{fs, fs::File, process::exit, io::{Read, ErrorKind, SeekFrom, Seek}};
 
 fn main() {
     if let Err(e) = compute() {
@@ -21,10 +26,12 @@ fn main() {
     }
 }
 
-fn compute() -> Result<(),ErrNo> {
+fn compute() -> Result<(), ErrNo> {
     let (count, last_result_or_init) = read_last_result_or_init()?;
     let (stream1, stream2) = read_stream((count * 8) as u64)?;
-    let result_encode = pinecone::to_vec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2))).map_err(|_| ErrNo::Proto)?;
+    let result_encode =
+        pinecone::to_vec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))
+            .map_err(|_| ErrNo::Proto)?;
     fs::write("/output", result_encode)?;
     Ok(())
 }
@@ -36,11 +43,11 @@ fn read_last_result_or_init() -> Result<(u64, f64), ErrNo> {
             // Not found the last result, read the init.
             ErrorKind::NotFound => {
                 let input = fs::read("/input-0")?;
-                let init = pinecone::from_bytes(&input).map_err(|_|ErrNo::Proto)?;
+                let init = pinecone::from_bytes(&input).map_err(|_| ErrNo::Proto)?;
                 return Ok((0, init));
             }
             _kind => return Err(e.into()),
-            },
+        },
     };
 
     let mut data = Vec::new();

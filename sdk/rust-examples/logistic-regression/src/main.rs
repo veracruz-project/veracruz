@@ -30,8 +30,8 @@ use rusty_machine::{
     linalg::{Matrix, Vector},
 };
 use serde::Deserialize;
-use wasi_types::ErrNo;
 use std::{fs, process::exit};
+use wasi_types::ErrNo;
 
 /// This is a row of the input that each contributor to the computation
 /// provides: it consists of a vector, representing an N-dimension
@@ -224,7 +224,7 @@ fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, ErrNo> {
 fn read_input() -> Result<Dataset, ErrNo> {
     let i0 = fs::read("/input-0")?;
     let i1 = fs::read("/input-1")?;
-    let datas = read_all_datasets(&vec![i0,i1])?;
+    let datas = read_all_datasets(&vec![i0, i1])?;
     Ok(flatten(&datas))
 }
 
@@ -254,7 +254,7 @@ fn train(dataset: &Dataset) -> Vec<f64> {
 /// source, concatenates them together into a single compound dataset, then
 /// trains a logistic regressor on this new dataset.  Input and output are
 /// assumed to be encoded by `pinecone`.
-fn compute() -> Result<(),ErrNo> {
+fn compute() -> Result<(), ErrNo> {
     let dataset = read_input()?;
     let model = train(&dataset);
     let result_encode = match pinecone::to_vec::<Vec<f64>>(&model) {

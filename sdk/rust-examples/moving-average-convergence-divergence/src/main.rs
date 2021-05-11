@@ -24,8 +24,8 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use wasi_types::ErrNo;
 use std::{fs, process::exit};
+use wasi_types::ErrNo;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reading inputs.
@@ -35,7 +35,7 @@ use std::{fs, process::exit};
 /// values.
 fn read_inputs() -> Result<Vec<f64>, ErrNo> {
     let input = fs::read("/input-0")?;
-    pinecone::from_bytes(&input).map_err(|_| ErrNo::Proto) 
+    pinecone::from_bytes(&input).map_err(|_| ErrNo::Proto)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,11 +160,12 @@ fn dec_approx(data: &[f64], norm: f64) -> Vec<f64> {
 
 /// Entry point: reads the vector of floats, processes them, and writes back a new vector of
 /// floats as output.
-fn compute() -> Result<(),ErrNo> {
+fn compute() -> Result<(), ErrNo> {
     let dataset = read_inputs()?;
     let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
         computation(dataset.as_slice());
-    let result_encode = pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_|ErrNo::Proto)?;
+    let result_encode =
+        pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_| ErrNo::Proto)?;
     fs::write("/output", result_encode)?;
     Ok(())
 }

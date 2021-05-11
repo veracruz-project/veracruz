@@ -20,8 +20,8 @@
 //! and copyright information.
 
 use rand::Rng;
+use std::{fs, process::exit, result::Result};
 use wasi_types::ErrNo;
-use std::{result::Result, fs, process::exit};
 
 /// Entry point: generates a four-element long random vector of `u8` values and
 /// writes this back as the result.
@@ -33,7 +33,7 @@ fn main() {
     exit(0);
 }
 
-fn random() -> Result<(),wasi_types::ErrNo> {
+fn random() -> Result<(), wasi_types::ErrNo> {
     let output = "/output";
     let bytes = rand::thread_rng().gen::<[u8; 32]>();
     let rst = pinecone::to_vec(&bytes.to_vec()).map_err(|_| ErrNo::Proto)?;

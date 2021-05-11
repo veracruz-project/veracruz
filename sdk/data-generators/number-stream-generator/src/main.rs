@@ -8,10 +8,10 @@
 //!
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
-//! 
+//!
 //! # Example
 //! ```
-//! cargo run -- --file_prefix [PREFIX_STRING] --size [VEC_SIZE] --seed [RANDOM_SEED]; 
+//! cargo run -- --file_prefix [PREFIX_STRING] --size [VEC_SIZE] --seed [RANDOM_SEED];
 //! ```
 
 use clap::{App, Arg};
@@ -19,9 +19,9 @@ use rand::{rngs::StdRng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 use std::{error::Error, fs::File, io::prelude::*};
 
-/// Generate 3 data files: *-init.dat containing a single 64-bit floating point number, 
+/// Generate 3 data files: *-init.dat containing a single 64-bit floating point number,
 /// and *-1.dat and *-2.dat which are two Vecs of 64-bit floating point numbers respectively.
-/// Parameters: 
+/// Parameters:
 /// * `file_prefix`, String, the prefix of the generated files.
 /// * `size`, u64, the size of the Vecs, default is 10.
 /// * `seed`, u64, random number seed, default is 0.

@@ -23,25 +23,21 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use clap::{App, Arg};
+use execution_engine::{execute, fs::FileSystem};
+use log::*;
 use std::{
     collections::HashMap,
-    sync::Arc,
-    vec::Vec,
-    path::Path,
-    sync::Mutex,
-    fs::File, 
-    io::Read,
-    time::Instant,
     error::Error,
+    fs::File,
+    io::Read,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::Instant,
+    vec::Vec,
 };
-use execution_engine::{
-    execute,
-    fs::FileSystem,
-};
-use wasi_types::Rights;
 use veracruz_utils::policy::principal::{ExecutionStrategy, Principal};
-use clap::{App, Arg};
-use log::*;
+use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -80,7 +76,7 @@ struct CommandLineOptions {
 /// Parses the command line options, building a `CommandLineOptions` struct out
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
-fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> { 
+fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -119,8 +115,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
 
     info!("Parsed command line.");
 
-    let execution_strategy = 
-    if let Some(strategy) = matches.value_of("execution-strategy") {
+    let execution_strategy = if let Some(strategy) = matches.value_of("execution-strategy") {
         if strategy == "interp" {
             info!("Selecting interpretation as the execution strategy.");
             ExecutionStrategy::Interpretation
@@ -128,21 +123,23 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             info!("Selecting JITting as the execution strategy.");
             ExecutionStrategy::JIT
         } else {
-            return Err(format!("Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",strategy).into());
+            return Err(format!(
+                "Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",
+                strategy
+            )
+            .into());
         }
     } else {
         return Err("Default 'interp' value is not loaded correctly".into());
     };
 
-    let binary = 
-        if let Some(binary) = matches.value_of("program") {
+    let binary = if let Some(binary) = matches.value_of("program") {
         info!("Using '{}' as our WASM executable.", binary);
         binary.to_string()
     } else {
         return Err("No binary file provided.".into());
     };
-    let data_sources = 
-    if let Some(data) = matches.values_of("data") {
+    let data_sources = if let Some(data) = matches.values_of("data") {
         let data_sources: Vec<String> = data.map(|e| e.to_string()).collect();
         info!(
             "Selected {} data sources as input to computation.",
@@ -171,30 +168,41 @@ fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
 
     file.read_to_end(&mut contents)?;
 
-    Ok((Path::new(file_path)
+    Ok((
+        Path::new(file_path)
             .file_name()
-            .ok_or(format!("Failed to obtain file name on {}",file_path))?
+            .ok_or(format!("Failed to obtain file name on {}", file_path))?
             .to_str()
-            .ok_or(format!("Failed to convert file name to string on {}",file_path))?
-            .to_string(), contents))
+            .ok_or(format!(
+                "Failed to convert file name to string on {}",
+                file_path
+            ))?
+            .to_string(),
+        contents,
+    ))
 }
 
 /// Loads the specified data sources, as provided on the command line, for
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
-fn load_data_sources(cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>) -> Result<(), Box<dyn Error>> {
+fn load_data_sources(
+    cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>,
+) -> Result<(), Box<dyn Error>> {
     for (id, file_path) in cmdline.data_sources.iter().enumerate() {
-        info!("Loading data source '{}' with id {} for reading.", file_path, id);
+        info!(
+            "Loading data source '{}' with id {} for reading.",
+            file_path, id
+        );
         let mut file = File::open(file_path)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
         vfs.lock()
-            .map_err(|e|format!("Failed to lock vfs, error: {:?}",e))?
+            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
             .write_file_by_filename(&Principal::InternalSuperUser, &file_path, &buffer, false)?;
 
-        info!( "Loading '{}' into vfs.", file_path);
+        info!("Loading '{}' into vfs.", file_path);
     }
     Ok(())
 }
@@ -212,7 +220,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
     let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK;
-    let write_right = Rights::PATH_OPEN | Rights::FD_WRITE | Rights::FD_SEEK | Rights::PATH_CREATE_FILE | Rights::PATH_FILESTAT_SET_SIZE;
+    let write_right = Rights::PATH_OPEN
+        | Rights::FD_WRITE
+        | Rights::FD_SEEK
+        | Rights::PATH_CREATE_FILE
+        | Rights::PATH_FILESTAT_SET_SIZE;
 
     // Manually create the Right table for the VFS.
     file_table.insert(prog_file_name.to_string(), write_right);
@@ -223,15 +235,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
     let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
-    // Write the program twice on purpose, 
+    // Write the program twice on purpose,
     // to check if `write_file_by_filename` overwrite the file correctly.
     vfs.lock()
-        .map_err(|e|format!("Failed to lock vfs, error: {:?}",e))?
-        .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
+        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+        .write_file_by_filename(
+            &Principal::InternalSuperUser,
+            &prog_file_name,
+            &program,
+            false,
+        )
         .expect(&format!("Failed to write to file {}", prog_file_name));
     vfs.lock()
-        .map_err(|e|format!("Failed to lock vfs, error: {:?}",e))?
-        .write_file_by_filename(&Principal::InternalSuperUser, &prog_file_name, &program, false)
+        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+        .write_file_by_filename(
+            &Principal::InternalSuperUser,
+            &prog_file_name,
+            &program,
+            false,
+        )
         .expect(&format!("Failed to write to file {}", prog_file_name));
     info!("WASM program {} loaded into VFS.", prog_file_name);
 

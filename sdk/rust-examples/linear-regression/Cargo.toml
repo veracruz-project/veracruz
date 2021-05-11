@@ -14,5 +14,6 @@ wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branc
 
 [profile.release]
 codegen-units = 1
+lto = true
 opt-level = 3
 

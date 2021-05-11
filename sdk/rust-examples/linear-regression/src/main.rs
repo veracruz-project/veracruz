@@ -25,8 +25,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{vec::Vec, fs, process::exit};
 use serde::Serialize;
+use std::{fs, process::exit, vec::Vec};
 use wasi_types::ErrNo;
 
 /// Reads the single input dataset, which is assumed to be a Bincode-encoded
@@ -36,7 +36,7 @@ use wasi_types::ErrNo;
 /// decoded from `pinecone` into a Rust vector of floating-point pairs.
 fn read_input() -> Result<Vec<(f64, f64)>, ErrNo> {
     let input = fs::read("/input-0")?;
-    pinecone::from_bytes(&input).map_err(|_|ErrNo::Proto)
+    pinecone::from_bytes(&input).map_err(|_| ErrNo::Proto)
 }
 
 /// The result of a linear regression is a line which is encoded as a gradient
@@ -89,7 +89,7 @@ fn linear_regression(data: &[(f64, f64)]) -> LinearRegression {
 /// be a Rust vector of pairs of `f64` values.  Writes back a Bincode-encoded
 /// `LinearRegression` struct as output.  Whoever receives the result is assumed
 /// to know how to decode the result.
-fn compute() -> Result<(),wasi_types::ErrNo> {
+fn compute() -> Result<(), wasi_types::ErrNo> {
     let data = read_input()?;
     let result = linear_regression(&data);
     let result_encode = match pinecone::to_vec(&result) {

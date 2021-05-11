@@ -49,7 +49,7 @@ type Dataset = Vec<Vec<f64>>;
 ///
 fn read_inputs() -> Result<(Dataset, Dataset, u32, u32, i32, i32), ErrNo> {
     let input = fs::read("/input-0")?;
-    pinecone::from_bytes(&input).map_err(|_|ErrNo::Proto)
+    pinecone::from_bytes(&input).map_err(|_| ErrNo::Proto)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,7 +161,7 @@ fn plain_ip(dataset: &Dataset, data_vec: &[f64]) -> Result<Vec<f64>, ErrNo> {
         rst
     }))
 }
-  
+
 // Look-up tables for sigmoid computations.
 static DEGREE_3: &'static [f64] = &[-0.5, 0.15012, -0.001593];
 static DEGREE_5: &'static [f64] = &[-0.5, 0.19131, -0.0045963, 0.0000412332];
@@ -280,8 +280,9 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> Result<f64, ErrNo> {
 /// Entry point.  Reads an arbitrary number of input datasets, one from each source, concatenates
 /// them together into a single compound dataset, then trains a logistic regressor on this new
 /// dataset.  Input and output are assumed to be encoded in Pinecone.
-fn compute() -> Result<(),ErrNo> {
-    let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) = read_inputs()?;
+fn compute() -> Result<(), ErrNo> {
+    let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
+        read_inputs()?;
     let (w_data, correct, auc) = nlgd(
         &mut train_set,
         &mut test_set,
@@ -297,7 +298,6 @@ fn compute() -> Result<(),ErrNo> {
     fs::write("/output", result_encode)?;
     Ok(())
 }
-
 
 fn main() {
     if let Err(e) = compute() {

@@ -27,8 +27,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{string::String, fs, process::exit, vec::Vec};
 use serde::Deserialize;
+use std::{fs, process::exit, string::String, vec::Vec};
 use wasi_types::ErrNo;
 
 /// The advertising platform provides a Rust vec filled with `AdvertisementViewer` structs.  These
@@ -65,8 +65,8 @@ fn read_inputs() -> Result<(Vec<AdvertisementViewer>, Vec<Customer>), ErrNo> {
     let adverts = fs::read("/input-0")?;
     let customs = fs::read("/input-1")?;
 
-    let adverts = pinecone::from_bytes(&adverts).map_err(|_|ErrNo::Proto)?;
-    let customs = pinecone::from_bytes(&customs).map_err(|_|ErrNo::Proto)?; 
+    let adverts = pinecone::from_bytes(&adverts).map_err(|_| ErrNo::Proto)?;
+    let customs = pinecone::from_bytes(&customs).map_err(|_| ErrNo::Proto)?;
 
     Ok((adverts, customs))
 }
@@ -93,7 +93,7 @@ fn intersection_set_sum(vs: &[AdvertisementViewer], cs: &[Customer]) -> f64 {
 /// not exactly two inputs, or if either input cannot be deserialized from Bincode, and fails with
 /// [`return_code::ErrorCode::InvariantFailed`] if the result cannot be serialized to Bincode, or if
 /// more than one result is written.
-fn compute() -> Result<(),ErrNo> {
+fn compute() -> Result<(), ErrNo> {
     let (adverts, customs) = read_inputs()?;
     let total = intersection_set_sum(&adverts, &customs);
     let result_encode = match pinecone::to_vec::<f64>(&total) {

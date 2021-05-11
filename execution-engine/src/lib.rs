@@ -33,26 +33,20 @@ mod wasi;
 // Expose the error to the external.
 pub use wasi::common::FatalEngineError;
 
-#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
-use std::sync::Mutex;
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
 #[cfg(feature = "std")]
 use crate::wasi::wasmtime::WasmtimeRuntimeState;
 use crate::{
     fs::FileSystem,
-    wasi::{
-        common::ExecutionEngine,
-        wasmi::WASMIRuntimeState,
-    }
+    wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-use std::{
-    boxed::Box,
-    sync::Arc,
-};
+#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
+use std::sync::Mutex;
+#[cfg(feature = "sgx")]
+use std::sync::SgxMutex as Mutex;
+use std::{boxed::Box, sync::Arc};
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
-/// The top-level function executes program `program_name` on 
+/// The top-level function executes program `program_name` on
 /// the `filesystem` handle, in which inputs, outputs and programs are stored.
 /// The function requires execution `strategy`. In the case of
 /// `Interpretation` being chosen, an implementation of the `ExecutionEngine` trait
@@ -66,10 +60,11 @@ pub fn execute(
     filesystem: Arc<Mutex<FileSystem>>,
     program_name: &str,
 ) -> Result<wasi_types::ErrNo, FatalEngineError> {
-    let mut engine : Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, program_name)),
-        ExecutionStrategy::JIT => 
-        {
+    let mut engine: Box<dyn ExecutionEngine> = match strategy {
+        ExecutionStrategy::Interpretation => {
+            Box::new(WASMIRuntimeState::new(filesystem, program_name))
+        }
+        ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
             {
                 Box::new(WasmtimeRuntimeState::new(filesystem, program_name))
