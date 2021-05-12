@@ -18,7 +18,7 @@ debug their programs.
 
 ## WASI ABI Summary
 
-Implementation is based on the discription in [wasi_snapshot_preview1][1].
+Implementation is based on the description in [wasi_snapshot_preview1][1].
 However, the actual ABI definitions, particularly parameters, is slightly different, which can be found in 
 [here](https://github.com/alexcrichton/rust-wasi/blob/master/src/wasi_unstable/raw.rs) or [here][2].
 We use a fork of [wasi-type](https://github.com/veracruz-project/wasi-types) for all type definitions in [wasi_snapshot_preview1][1].
@@ -38,15 +38,15 @@ Notes:
 
 ## WASI Implementation Summary
 
-A summary our WASI implementation. We repeat the high-level WASI API defintions in [wasi_snapshot_preview1][1] 
+A summary our WASI implementation. We repeat the high-level WASI API definitions in [wasi_snapshot_preview1][1] 
 and the actual ABI definitions in [here][2], and provide our understanding of the WASI ABI standard and implementation strategy.
 Any WASI ABI that veracruz currently does not support, labelled with **NOT SUPPORTED** through this document,
-will return `ErrNo::NoSys` _after_ right (capability) check and minimum validatity check on parameters.
+will return `ErrNo::NoSys` _after_ right (capability) check and minimum validity check on parameters.
 
 #### Args and Env
 
-We implement argument and environment WASI ABI for the prorgam yet they are _NOT_ tested.
-Also, there is _NO_ API for partipants to access the arguments and environment variables.
+We implement argument and environment WASI ABI for the program yet they are _NOT_ tested.
+Also, there is _NO_ API for participants to access the arguments and environment variables.
 
 * `args_get`
 ```rust
@@ -134,7 +134,7 @@ We only tested the following calls:
 * `fd_seek`
 * `fd_tell`
 * `path_open`
-The test source programs can be found at `$VARCRUZ_ROOT/sdk/rust-examples`.
+The test source programs can be found at `$VERACRUZ_ROOT/sdk/rust-examples`.
 
 * `fd_advise`
 ```rust
@@ -195,7 +195,7 @@ fn fd_filestat_set_size(fd: u32, size: u64) -> ErrNo
 ```
 Set the file size of the file opened by the file descriptor `fd` to the new size `size`. 
 It will zero-fill, if the new size is larger than the existing size,
-or truacate, if the new size is smaller.
+or truncate, if the new size is smaller.
 * `fd_filestat_set_times`
 ```rust
 fn fd_filestat_set_times(fd: Fd, atime: Timestamp, mtime: Timestamp, flags: SetTimeFlags) -> Result<(), ErrNo>
@@ -209,7 +209,7 @@ Set the time(s) of the file opened by the file descriptor `fd` based on the `fla
 Veracruz immediately returns `NoSys` if `ATIME_NOW` or `MTIME_NOW` is set.
 Veracruz internally does _NOT_ update the time information and also never use them.
 WASM passes a `u32` as the `flags` parameter.
-**QUESTION:** Priorty of the flags.
+**QUESTION:** Priority of the flags.
 * `fd_prestat_get`
 ```rust
 fn fd_prestat_get(fd: Fd) -> Result<Prestat, ErrNo>
@@ -229,7 +229,7 @@ fn fd_readdir(fd: fd, buf: Pointer<u8>, len: size, cookie: DirCookie) -> Result<
 fn fd_readdir(fd: u32, buf: u32, len: u32, size: u32) -> ErrNo
 ```
 Write the directory entries, consisting of meta-data of type `DirEnt` and the path name as a string, to the memory at `buf` in sequence.
-The path name, particularly the length, must be consitent with the metadata.
+The path name, particularly the length, must be consistent with the metadata.
 Write the actual number of written bytes to the memory at `size`, which must not exceed `len`.
 For example,
 
@@ -372,7 +372,7 @@ Set the time(s) of the file at the path starting from the descriptor opened by t
 We ignore the lookup flags `lookup_flags` and only support `fd` being the `ROOT`.
 Veracruz internally does _NOT_ update the time information and also never use them.
 WASM passes a `u32` as the `flags` parameter.
-**QUESTION:** Priorty of the flags.
+**QUESTION:** Priority of the flags.
 * `path_link`
 ```rust
 fn path_link(old_fd: Fd, old_flags: LookupFlags, old_path: String, new_fd: Fd, new_path: String) -> Result<(),ErrNo>
@@ -386,10 +386,10 @@ fn path_open(fd: u32, dirflags: u32, path_addr: u32, path_len: u32, oflags: u16,
 ```
 Read the path at address `path_addr` of length `path_len`.
 The behaviour of `path_open` varies based on the open flags `oflags`:
-    - if no flag is set, open a file at the path, if exists, starting from the directory opened by the file discriptor `fd`;
+    - if no flag is set, open a file at the path, if exists, starting from the directory opened by the file descriptor `fd`;
     - if `EXCL` is set, `path_open` fails if the path exists;
     - if `CREATE` is set, create a new file at the path if the path does not exist;
-    - if `TRUNC` is set, the file at the path is truacated, that is, clean the content and set the file size to ZERO; and
+    - if `TRUNC` is set, the file at the path is truncated, that is, clean the content and set the file size to ZERO; and
     - if `DIRECTORY` is set, `path_open` fails if the path is not a directory.
 The base rights and inheriting rights the new fd `new_fd` cannot exceed `base` and `inheriting`, respectively.
 Veracruz internally use an extra `principal` parameter to restrict the rights.
@@ -398,7 +398,7 @@ Last, write the new file descriptor to the memory at `new_fd`.
 We ignore the lookup flags `lookup_flags` and only support `fd` being the `ROOT`.
 Veracruz does _NOT_ support `DIRECTORY` flag.
 WASM passes `u32` as the `oflags` and `fdflags` parameters.
-**QUESTION:** Priorty of the flags.
+**QUESTION:** Priority of the flags.
 * `path_readlink`
 ```rust
 fn path_readlink(fd: Fd, path: String, buf: Pointer<u8>, buf_len: size) -> Result<Size, ErrNo>
@@ -493,7 +493,7 @@ WASM passes a `u32` as the `flags` parameter.
  * More WASI functionality: 
     - Add the support for directories. 
     - Separate file descriptor spaces for different principals, 
-      e.g. partipants and programs. Pre-opened file descriptors in each 
+      e.g. participants and programs. Pre-opened file descriptors in each 
       space have the rights match the policy file.
  * Event-oriented models: WASI poll could be implemented to allow Veracruz
    programs to wait for events.
