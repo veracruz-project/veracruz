@@ -8,7 +8,7 @@ description = "Computes the moving-average-convergence-divergence (MACD) metric 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pinecone = "*"
+pinecone = "0.2.3"
 serde = { version = "1.0.3", features = ["derive"] }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 

@@ -3,6 +3,15 @@
 //!
 //! ## Context
 //!
+//! Add an initial float-64 number and two stream of float-64 numbers. 
+//! The result is a pair of the number of (function) calls and the final accumulation result.
+//!
+//! Inputs:                  One.
+//! Assumed 'input-0'  : A Pinecone-encoded Rust `f64` value.
+//! Assumed 'stream-0' : A Pinecone-encoded Rust vector of  `f64` values.
+//! Assumed 'stream-2' : A Pinecone-encoded Rust vector of  `f64` values.
+//! Ensured 'output'   : A Pinecone-encoded pair of `u64` and `f64`.
+//!
 //! ## Authors
 //!
 //! The Veracruz Development Team.
@@ -20,12 +29,20 @@ use std::{
 };
 use wasi_types::ErrNo;
 
+/// Entry point
 fn main() {
     if let Err(e) = compute() {
         exit((e as u16).into());
     }
 }
 
+/// Read the initial value, if there is no previous result at 'output' file. 
+/// Otherwise, read the previous result.
+/// Read two new numbers from 'stream-0' and 'stream-1'.
+/// Add the two new numbers, and either the initial value or the previous result 
+/// as the new result and write it to 'output'.
+/// The result also contains the number of function calls, which 
+/// track the starting point of the next nunbers in 'stream-0' and 'stream-1'.
 fn compute() -> Result<(), ErrNo> {
     let (count, last_result_or_init) = read_last_result_or_init()?;
     let (stream1, stream2) = read_stream((count * 8) as u64)?;
@@ -36,6 +53,7 @@ fn compute() -> Result<(), ErrNo> {
     Ok(())
 }
 
+/// Read 'output' if exists. Othewise read 'input-0'.
 fn read_last_result_or_init() -> Result<(u64, f64), ErrNo> {
     let mut file = match File::open("/output") {
         Ok(o) => o,
@@ -56,6 +74,7 @@ fn read_last_result_or_init() -> Result<(u64, f64), ErrNo> {
     pinecone::from_bytes(&data).map_err(|_| ErrNo::Proto)
 }
 
+/// Read from 'stream-0' and 'stream-1' at `offset`
 fn read_stream(offset: u64) -> Result<(f64, f64), ErrNo> {
     let mut stream0 = File::open("/stream-0")?;
     stream0.seek(SeekFrom::Start(offset))?;

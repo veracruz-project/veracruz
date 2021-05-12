@@ -40,7 +40,7 @@ pub enum Principal {
 
 /// The Right Table, contains the `Right`, i.e.
 /// the allowed operations of a Principal on a file
-pub type RightTable = HashMap<Principal, HashMap<String, Rights>>;
+pub type RightsTable = HashMap<Principal, HashMap<String, Rights>>;
 
 /// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -74,6 +74,7 @@ impl FileRights {
     }
 
     /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
+    #[inline]
     pub fn to_right_map(file_right_vec: &[FileRights]) -> HashMap<String, Rights> {
         file_right_vec.iter().fold(HashMap::new(), |mut acc, FileRights{file_name, rights}| {
             acc.insert(file_name.to_string(), Rights::from_bits_truncate(*rights as u64));

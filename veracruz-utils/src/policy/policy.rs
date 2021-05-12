@@ -35,7 +35,7 @@ use crate::{
         error::PolicyError,
         expiry::Timepoint,
         principal::{
-            RightTable, ExecutionStrategy, Identity, Principal,
+            RightsTable, ExecutionStrategy, Identity, Principal,
             Program,
         },
     },
@@ -286,7 +286,7 @@ impl Policy {
 
     /// Return the CapabilityTable in this policy. It contains capabilities related to all
     /// participants and programs.
-    pub fn get_rights_table(&self) -> RightTable {
+    pub fn get_rights_table(&self) -> RightsTable {
         let mut table = HashMap::new();
         for identity in self.identities() {
             let id = Principal::Participant(*identity.id() as u64);

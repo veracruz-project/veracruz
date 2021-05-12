@@ -13,7 +13,7 @@ use crate::{
     fs::{FileSystem, FileSystemError},
     wasi::common::{
         EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
-        WASIAPIName, WASIWrapper,
+        WasiAPIName, WasiWrapper,
     },
 };
 use lazy_static::lazy_static;
@@ -32,7 +32,7 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, ValTyp
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WASIWrapper> = Mutex::new(WASIWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new()))), Principal::NoCap));
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new()))), Principal::NoCap));
 }
 
 /// A macro for lock the global VFS and store the result in the variable,
@@ -60,11 +60,11 @@ macro_rules! convert_wasi_arg {
 }
 
 /// Impl the MemoryHandler for Caller.
-/// This allows passing the Caller to WASIWrapper on any VFS call.
+/// This allows passing the Caller to WasiWrapper on any VFS call.
 impl<'a> MemoryHandler for Caller<'a> {
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemError<()> {
         let memory = match self
-            .get_export(WASIWrapper::LINEAR_MEMORY_NAME)
+            .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
         {
             Some(s) => s,
@@ -81,7 +81,7 @@ impl<'a> MemoryHandler for Caller<'a> {
     fn read_buffer(&self, address: u32, length: u32) -> FileSystemError<Vec<u8>> {
         let length = length as usize;
         let memory = match self
-            .get_export(WASIWrapper::LINEAR_MEMORY_NAME)
+            .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
         {
             Some(s) => s,
@@ -133,11 +133,11 @@ pub struct WasmtimeRuntimeState {}
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(filesystem: Arc<Mutex<FileSystem>>, program_name: &str) -> Self {
+    pub fn new(filesystem: Arc<Mutex<FileSystem>>, program_name: String) -> Result<Self, FatalEngineError> {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock().unwrap() =
-            WASIWrapper::new(filesystem, Principal::Program(program_name.to_string()));
-        Self {}
+        *VFS_INSTANCE.lock()? =
+            WasiWrapper::new(filesystem, Principal::Program(program_name));
+        Ok(Self {})
     }
 
     /// Executes the entry point of the WASM program provisioned into the
@@ -162,83 +162,83 @@ impl WasmtimeRuntimeState {
         let mut exports: Vec<Extern> = Vec::new();
 
         for import in module.imports() {
-            if import.module() != WASIWrapper::WASI_SNAPSHOT_MODULE_NAME {
+            if import.module() != WasiWrapper::WASI_SNAPSHOT_MODULE_NAME {
                 return Err(FatalEngineError::InvalidWASMModule);
             }
 
-            let host_call_body = match WASIAPIName::try_from(import.name()).map_err(|_| {
+            let host_call_body = match WasiAPIName::try_from(import.name()).map_err(|_| {
                 FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
                     import.name().to_string(),
                 ))
             })? {
-                WASIAPIName::ARGS_GET => Func::wrap(&store, Self::wasi_arg_get),
-                WASIAPIName::ARGS_SIZES_GET => Func::wrap(&store, Self::wasi_args_sizes_get),
-                WASIAPIName::ENVIRON_GET => Func::wrap(&store, Self::wasi_environ_get),
-                WASIAPIName::ENVIRON_SIZES_GET => Func::wrap(&store, Self::wasi_environ_size_get),
-                WASIAPIName::CLOCK_RES_GET => Func::wrap(&store, Self::wasi_clock_res_get),
-                WASIAPIName::CLOCK_TIME_GET => Func::wrap(&store, Self::wasi_clock_time_get),
-                WASIAPIName::FD_ADVISE => Func::wrap(&store, Self::wasi_fd_advise),
-                WASIAPIName::FD_ALLOCATE => Func::wrap(&store, Self::wasi_fd_allocate),
-                WASIAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
-                WASIAPIName::FD_DATASYNC => Func::wrap(&store, Self::wasi_fd_datasync),
-                WASIAPIName::FD_FDSTAT_GET => Func::wrap(&store, Self::wasi_fd_fdstat_get),
-                WASIAPIName::FD_FDSTAT_SET_FLAGS => {
+                WasiAPIName::ARGS_GET => Func::wrap(&store, Self::wasi_arg_get),
+                WasiAPIName::ARGS_SIZES_GET => Func::wrap(&store, Self::wasi_args_sizes_get),
+                WasiAPIName::ENVIRON_GET => Func::wrap(&store, Self::wasi_environ_get),
+                WasiAPIName::ENVIRON_SIZES_GET => Func::wrap(&store, Self::wasi_environ_size_get),
+                WasiAPIName::CLOCK_RES_GET => Func::wrap(&store, Self::wasi_clock_res_get),
+                WasiAPIName::CLOCK_TIME_GET => Func::wrap(&store, Self::wasi_clock_time_get),
+                WasiAPIName::FD_ADVISE => Func::wrap(&store, Self::wasi_fd_advise),
+                WasiAPIName::FD_ALLOCATE => Func::wrap(&store, Self::wasi_fd_allocate),
+                WasiAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
+                WasiAPIName::FD_DATASYNC => Func::wrap(&store, Self::wasi_fd_datasync),
+                WasiAPIName::FD_FDSTAT_GET => Func::wrap(&store, Self::wasi_fd_fdstat_get),
+                WasiAPIName::FD_FDSTAT_SET_FLAGS => {
                     Func::wrap(&store, Self::wasi_fd_fdstat_set_flags)
                 }
-                WASIAPIName::FD_FDSTAT_SET_RIGHTS => {
+                WasiAPIName::FD_FDSTAT_SET_RIGHTS => {
                     Func::wrap(&store, Self::wasi_fd_fdstat_set_rights)
                 }
-                WASIAPIName::FD_FILESTAT_GET => Func::wrap(&store, Self::wasi_fd_filestat_get),
-                WASIAPIName::FD_FILESTAT_SET_SIZE => {
+                WasiAPIName::FD_FILESTAT_GET => Func::wrap(&store, Self::wasi_fd_filestat_get),
+                WasiAPIName::FD_FILESTAT_SET_SIZE => {
                     Func::wrap(&store, Self::wasi_fd_filestat_set_size)
                 }
-                WASIAPIName::FD_FILESTAT_SET_TIMES => {
+                WasiAPIName::FD_FILESTAT_SET_TIMES => {
                     Func::wrap(&store, Self::wasi_fd_filestat_set_times)
                 }
-                WASIAPIName::FD_PREAD => Func::wrap(&store, Self::wasi_fd_pread),
-                WASIAPIName::FD_PRESTAT_GET => Func::wrap(&store, Self::wasi_fd_prestat_get),
-                WASIAPIName::FD_PRESTAT_DIR_NAME => {
+                WasiAPIName::FD_PREAD => Func::wrap(&store, Self::wasi_fd_pread),
+                WasiAPIName::FD_PRESTAT_GET => Func::wrap(&store, Self::wasi_fd_prestat_get),
+                WasiAPIName::FD_PRESTAT_DIR_NAME => {
                     Func::wrap(&store, Self::wasi_fd_prestat_dir_name)
                 }
-                WASIAPIName::FD_PWRITE => Func::wrap(&store, Self::wasi_fd_pwrite),
-                WASIAPIName::FD_READ => Func::wrap(&store, Self::wasi_fd_read),
-                WASIAPIName::FD_READDIR => Func::wrap(&store, Self::wasi_fd_readdir),
-                WASIAPIName::FD_RENUMBER => Func::wrap(&store, Self::wasi_fd_renumber),
-                WASIAPIName::FD_SEEK => Func::wrap(&store, Self::wasi_fd_seek),
-                WASIAPIName::FD_SYNC => Func::wrap(&store, Self::wasi_fd_sync),
-                WASIAPIName::FD_TELL => Func::wrap(&store, Self::wasi_fd_tell),
-                WASIAPIName::FD_WRITE => Func::wrap(&store, Self::wasi_fd_write),
-                WASIAPIName::PATH_CREATE_DIRECTORY => {
+                WasiAPIName::FD_PWRITE => Func::wrap(&store, Self::wasi_fd_pwrite),
+                WasiAPIName::FD_READ => Func::wrap(&store, Self::wasi_fd_read),
+                WasiAPIName::FD_READDIR => Func::wrap(&store, Self::wasi_fd_readdir),
+                WasiAPIName::FD_RENUMBER => Func::wrap(&store, Self::wasi_fd_renumber),
+                WasiAPIName::FD_SEEK => Func::wrap(&store, Self::wasi_fd_seek),
+                WasiAPIName::FD_SYNC => Func::wrap(&store, Self::wasi_fd_sync),
+                WasiAPIName::FD_TELL => Func::wrap(&store, Self::wasi_fd_tell),
+                WasiAPIName::FD_WRITE => Func::wrap(&store, Self::wasi_fd_write),
+                WasiAPIName::PATH_CREATE_DIRECTORY => {
                     Func::wrap(&store, Self::wasi_path_create_directory)
                 }
-                WASIAPIName::PATH_FILESTAT_GET => Func::wrap(&store, Self::wasi_path_filestat_get),
-                WASIAPIName::PATH_FILESTAT_SET_TIMES => {
+                WasiAPIName::PATH_FILESTAT_GET => Func::wrap(&store, Self::wasi_path_filestat_get),
+                WasiAPIName::PATH_FILESTAT_SET_TIMES => {
                     Func::wrap(&store, Self::wasi_path_filestat_set_times)
                 }
-                WASIAPIName::PATH_LINK => Func::wrap(&store, Self::wasi_path_link),
-                WASIAPIName::PATH_OPEN => Func::wrap(&store, Self::wasi_path_open),
-                WASIAPIName::PATH_READLINK => Func::wrap(&store, Self::wasi_path_readlink),
-                WASIAPIName::PATH_REMOVE_DIRECTORY => {
+                WasiAPIName::PATH_LINK => Func::wrap(&store, Self::wasi_path_link),
+                WasiAPIName::PATH_OPEN => Func::wrap(&store, Self::wasi_path_open),
+                WasiAPIName::PATH_READLINK => Func::wrap(&store, Self::wasi_path_readlink),
+                WasiAPIName::PATH_REMOVE_DIRECTORY => {
                     Func::wrap(&store, Self::wasi_path_remove_directory)
                 }
-                WASIAPIName::PATH_RENAME => Func::wrap(&store, Self::wasi_path_rename),
-                WASIAPIName::PATH_SYMLINK => Func::wrap(&store, Self::wasi_path_symlink),
-                WASIAPIName::PATH_UNLINK_FILE => Func::wrap(&store, Self::wasi_path_unlink_file),
-                WASIAPIName::POLL_ONEOFF => Func::wrap(&store, Self::wasi_poll_oneoff),
-                WASIAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
-                WASIAPIName::PROC_RAISE => Func::wrap(&store, Self::wasi_proc_raise),
-                WASIAPIName::SCHED_YIELD => Func::wrap(&store, Self::wasi_sched_yield),
-                WASIAPIName::RANDOM_GET => Func::wrap(&store, Self::wasi_random_get),
-                WASIAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
-                WASIAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
-                WASIAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
+                WasiAPIName::PATH_RENAME => Func::wrap(&store, Self::wasi_path_rename),
+                WasiAPIName::PATH_SYMLINK => Func::wrap(&store, Self::wasi_path_symlink),
+                WasiAPIName::PATH_UNLINK_FILE => Func::wrap(&store, Self::wasi_path_unlink_file),
+                WasiAPIName::POLL_ONEOFF => Func::wrap(&store, Self::wasi_poll_oneoff),
+                WasiAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
+                WasiAPIName::PROC_RAISE => Func::wrap(&store, Self::wasi_proc_raise),
+                WasiAPIName::SCHED_YIELD => Func::wrap(&store, Self::wasi_sched_yield),
+                WasiAPIName::RANDOM_GET => Func::wrap(&store, Self::wasi_random_get),
+                WasiAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
+                WasiAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
+                WasiAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
             };
             exports.push(Extern::Func(host_call_body))
         }
 
         let instance = Instance::new(&store, &module, &exports)?;
         let export = instance
-            .get_export(WASIWrapper::ENTRY_POINT_NAME)
+            .get_export(WasiWrapper::ENTRY_POINT_NAME)
             .ok_or(FatalEngineError::NoProgramEntryPoint)?;
         let return_from_main = match check_main(&export.ty()) {
             EntrySignature::ArgvAndArgc => {

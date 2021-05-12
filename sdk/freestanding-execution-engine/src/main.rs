@@ -235,8 +235,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
     let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
-    // Write the program twice on purpose,
-    // to check if `write_file_by_filename` overwrite the file correctly.
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(
@@ -244,17 +242,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             &prog_file_name,
             &program,
             false,
-        )
-        .expect(&format!("Failed to write to file {}", prog_file_name));
-    vfs.lock()
-        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-        .write_file_by_filename(
-            &Principal::InternalSuperUser,
-            &prog_file_name,
-            &program,
-            false,
-        )
-        .expect(&format!("Failed to write to file {}", prog_file_name));
+        )?;
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
     load_data_sources(&cmdline, vfs.clone())?;
