@@ -731,9 +731,6 @@ mod tests {
         #[cfg(feature = "tz")]
         let test_target_platform: Platform = Platform::TrustZone;
 
-        let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        //TODO Check the runtime manager hash against the contents of the certificate extension
-
         info!("             Enclave generated a self-signed certificate:");
 
         let mut client_session = create_client_test_session(
@@ -805,7 +802,8 @@ mod tests {
                     &client_tls_rx,
                 )?;
                 check_runtime_manager_hash(&policy,
-                                           &client_session)?;
+                                           &client_session,
+                                           &test_target_platform)?;
 
                 let response = provision_program(
                     path,
@@ -841,7 +839,8 @@ mod tests {
                     &client_tls_rx,
                 )?;
                 check_runtime_manager_hash(&policy,
-                    &client_session)?;
+                                           &client_session,
+                                           &test_target_platform)?;
                 info!(
                     "             Data provider hash response time (μs): {}.",
                     time_data_hash.elapsed().as_micros()
@@ -886,7 +885,8 @@ mod tests {
                 }
 
                 check_runtime_manager_hash(&policy,
-                    &client_session)?;
+                                           &client_session,
+                                           &test_target_platform)?;
 
                 // Reverse the vec so we can use `pop` for the `first` element of the list.
                 // In each round of stream, the loop pops an element from the `stream_data_vec`
@@ -960,7 +960,8 @@ mod tests {
                         &client_tls_rx,
                     )?;
                     check_runtime_manager_hash(&policy,
-                        &client_session)?;
+                                               &client_session,
+                                               &test_target_platform)?;
                     info!(
                         "             Result retriever hash response time (μs): {}.",
                         time_result_hash.elapsed().as_micros()
@@ -1030,7 +1031,8 @@ mod tests {
                 )?;
 
                 check_runtime_manager_hash(&policy,
-                    &client_session)?;
+                                           &client_session,
+                                           &test_target_platform)?;
                 info!(
                     "             Result retriever hash response time (μs): {}.",
                     time_result_hash.elapsed().as_micros()
@@ -1286,7 +1288,9 @@ mod tests {
     }
 
     fn check_runtime_manager_hash(policy: &Policy,
-                                  client_session: &dyn rustls::Session) -> Result<(), VeracruzServerError> {
+                                  client_session: &dyn rustls::Session,
+                                  test_target_platform: &Platform,
+    ) -> Result<(), VeracruzServerError> {
         match client_session.get_peer_certificates() {
             None => {
                 return Err(VeracruzServerError::MissingFieldError("NO PEER CERTIFICATES. WTF?"));
@@ -1305,11 +1309,8 @@ mod tests {
                         let extension_data = data.read_all(VeracruzServerError::MissingFieldError("CAN'T READ MY CRAZY CUSTOM EXTENSION"), |input| {
                             Ok(input.read_bytes_to_end())
                         })?;
-                        if !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::SGX) &&
-                           !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::TrustZone) &&
-                           !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::Nitro) &&
-                           !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, &Platform::Mock) {
-                               // None of the hashes matched.
+                        if !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, test_target_platform) {
+                               // The hashes didn't match
                                println!("None of the hashes matched.");
                                return Err(VeracruzServerError::InvalidRuntimeManagerHash);
                         }

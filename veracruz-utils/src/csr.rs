@@ -214,7 +214,8 @@ pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_has
     constructed_cert.splice(cert_template.valid_from_location.0..cert_template.valid_from_location.1,
         valid_from,
     );
-    let valid_until = generate_utc_time(2021, 5, 30, 17, 1, 0)?;
+    // TODO: Once the root enclave is gone, this can be done properly inside the proxy service
+    let valid_until = generate_utc_time(2031, 5, 30, 17, 1, 0)?;
     constructed_cert.splice(cert_template.valid_until_location.0..cert_template.valid_until_location.1,
         valid_until,
     );
