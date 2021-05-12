@@ -23,9 +23,9 @@ use err_derive::Error;
 use log::info;
 use serde::{Deserialize, Serialize};
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 #[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutex as Mutex};
+use std::sync::{Arc, SgxMutex as Mutex, SgxMutexGuard as MutexGuard};
 use std::{
     convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
 };
@@ -33,7 +33,7 @@ use veracruz_utils::policy::principal::Principal;
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
     IoVec, LookupFlags, OpenFlags, RiFlags, Rights, RoFlags, SdFlags, SetTimeFlags, SiFlags,
-    Signal, Subscription, SubscriptionClock, SubscriptionFdReadwrite, Whence,
+    Signal, Subscription, SubscriptionClock, SubscriptionUnion, SubscriptionFdReadwrite, Whence,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +42,7 @@ use wasi_types::{
 
 /// List of WASI API.
 #[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
-pub enum WASIAPIName {
+pub enum WasiAPIName {
     ARGS_GET = 1,
     ARGS_SIZES_GET,
     ENVIRON_GET,
@@ -90,55 +90,55 @@ pub enum WASIAPIName {
     SOCK_SHUTDOWN,
 }
 
-impl TryFrom<&str> for WASIAPIName {
+impl TryFrom<&str> for WasiAPIName {
     type Error = ();
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let rst = match s {
-            "args_get" => WASIAPIName::ARGS_GET,
-            "args_sizes_get" => WASIAPIName::ARGS_SIZES_GET,
-            "environ_get" => WASIAPIName::ENVIRON_GET,
-            "environ_sizes_get" => WASIAPIName::ENVIRON_SIZES_GET,
-            "clock_res_get" => WASIAPIName::CLOCK_RES_GET,
-            "clock_time_get" => WASIAPIName::CLOCK_TIME_GET,
-            "fd_advise" => WASIAPIName::FD_ADVISE,
-            "fd_allocate" => WASIAPIName::FD_ALLOCATE,
-            "fd_close" => WASIAPIName::FD_CLOSE,
-            "fd_datasync" => WASIAPIName::FD_DATASYNC,
-            "fd_fdstat_get" => WASIAPIName::FD_FDSTAT_GET,
-            "fd_fdstat_set_flags" => WASIAPIName::FD_FDSTAT_SET_FLAGS,
-            "fd_fdstat_set_rights" => WASIAPIName::FD_FDSTAT_SET_RIGHTS,
-            "fd_filestat_get" => WASIAPIName::FD_FILESTAT_GET,
-            "fd_filestat_set_size" => WASIAPIName::FD_FILESTAT_SET_SIZE,
-            "fd_filestat_set_times" => WASIAPIName::FD_FILESTAT_SET_TIMES,
-            "fd_pread" => WASIAPIName::FD_PREAD,
-            "fd_prestat_get" => WASIAPIName::FD_PRESTAT_GET,
-            "fd_prestat_dir_name" => WASIAPIName::FD_PRESTAT_DIR_NAME,
-            "fd_pwrite" => WASIAPIName::FD_PWRITE,
-            "fd_read" => WASIAPIName::FD_READ,
-            "fd_readdir" => WASIAPIName::FD_READDIR,
-            "fd_renumber" => WASIAPIName::FD_RENUMBER,
-            "fd_seek" => WASIAPIName::FD_SEEK,
-            "fd_sync" => WASIAPIName::FD_SYNC,
-            "fd_tell" => WASIAPIName::FD_TELL,
-            "fd_write" => WASIAPIName::FD_WRITE,
-            "path_create_directory" => WASIAPIName::PATH_CREATE_DIRECTORY,
-            "path_filestat_get" => WASIAPIName::PATH_FILESTAT_GET,
-            "path_filestat_set_times" => WASIAPIName::PATH_FILESTAT_SET_TIMES,
-            "path_link" => WASIAPIName::PATH_LINK,
-            "path_open" => WASIAPIName::PATH_OPEN,
-            "path_readlink" => WASIAPIName::PATH_READLINK,
-            "path_remove_directory" => WASIAPIName::PATH_REMOVE_DIRECTORY,
-            "path_rename" => WASIAPIName::PATH_RENAME,
-            "path_symlink" => WASIAPIName::PATH_SYMLINK,
-            "path_unlink_file" => WASIAPIName::PATH_UNLINK_FILE,
-            "poll_oneoff" => WASIAPIName::POLL_ONEOFF,
-            "proc_exit" => WASIAPIName::PROC_EXIT,
-            "proc_raise" => WASIAPIName::PROC_RAISE,
-            "sched_yield" => WASIAPIName::SCHED_YIELD,
-            "random_get" => WASIAPIName::RANDOM_GET,
-            "sock_recv" => WASIAPIName::SOCK_RECV,
-            "sock_send" => WASIAPIName::SOCK_SEND,
-            "sock_shutdown" => WASIAPIName::SOCK_SHUTDOWN,
+            "args_get" => WasiAPIName::ARGS_GET,
+            "args_sizes_get" => WasiAPIName::ARGS_SIZES_GET,
+            "environ_get" => WasiAPIName::ENVIRON_GET,
+            "environ_sizes_get" => WasiAPIName::ENVIRON_SIZES_GET,
+            "clock_res_get" => WasiAPIName::CLOCK_RES_GET,
+            "clock_time_get" => WasiAPIName::CLOCK_TIME_GET,
+            "fd_advise" => WasiAPIName::FD_ADVISE,
+            "fd_allocate" => WasiAPIName::FD_ALLOCATE,
+            "fd_close" => WasiAPIName::FD_CLOSE,
+            "fd_datasync" => WasiAPIName::FD_DATASYNC,
+            "fd_fdstat_get" => WasiAPIName::FD_FDSTAT_GET,
+            "fd_fdstat_set_flags" => WasiAPIName::FD_FDSTAT_SET_FLAGS,
+            "fd_fdstat_set_rights" => WasiAPIName::FD_FDSTAT_SET_RIGHTS,
+            "fd_filestat_get" => WasiAPIName::FD_FILESTAT_GET,
+            "fd_filestat_set_size" => WasiAPIName::FD_FILESTAT_SET_SIZE,
+            "fd_filestat_set_times" => WasiAPIName::FD_FILESTAT_SET_TIMES,
+            "fd_pread" => WasiAPIName::FD_PREAD,
+            "fd_prestat_get" => WasiAPIName::FD_PRESTAT_GET,
+            "fd_prestat_dir_name" => WasiAPIName::FD_PRESTAT_DIR_NAME,
+            "fd_pwrite" => WasiAPIName::FD_PWRITE,
+            "fd_read" => WasiAPIName::FD_READ,
+            "fd_readdir" => WasiAPIName::FD_READDIR,
+            "fd_renumber" => WasiAPIName::FD_RENUMBER,
+            "fd_seek" => WasiAPIName::FD_SEEK,
+            "fd_sync" => WasiAPIName::FD_SYNC,
+            "fd_tell" => WasiAPIName::FD_TELL,
+            "fd_write" => WasiAPIName::FD_WRITE,
+            "path_create_directory" => WasiAPIName::PATH_CREATE_DIRECTORY,
+            "path_filestat_get" => WasiAPIName::PATH_FILESTAT_GET,
+            "path_filestat_set_times" => WasiAPIName::PATH_FILESTAT_SET_TIMES,
+            "path_link" => WasiAPIName::PATH_LINK,
+            "path_open" => WasiAPIName::PATH_OPEN,
+            "path_readlink" => WasiAPIName::PATH_READLINK,
+            "path_remove_directory" => WasiAPIName::PATH_REMOVE_DIRECTORY,
+            "path_rename" => WasiAPIName::PATH_RENAME,
+            "path_symlink" => WasiAPIName::PATH_SYMLINK,
+            "path_unlink_file" => WasiAPIName::PATH_UNLINK_FILE,
+            "poll_oneoff" => WasiAPIName::POLL_ONEOFF,
+            "proc_exit" => WasiAPIName::PROC_EXIT,
+            "proc_raise" => WasiAPIName::PROC_RAISE,
+            "sched_yield" => WasiAPIName::SCHED_YIELD,
+            "random_get" => WasiAPIName::RANDOM_GET,
+            "sock_recv" => WasiAPIName::SOCK_RECV,
+            "sock_send" => WasiAPIName::SOCK_SEND,
+            "sock_shutdown" => WasiAPIName::SOCK_SHUTDOWN,
             _otherwise => return Err(()),
         };
         Ok(rst)
@@ -173,32 +173,47 @@ impl Unpack<Subscription> for Subscription {
         }
         let mut rdr = Cursor::new(bytes);
         let userdata = rdr.read_u64::<LittleEndian>()?;
-        // build SubscriptionClock
-        // NOTE: not sure if clock_id is read correctly as it is u8
-        let clock_id = rdr.read_u64::<LittleEndian>()?;
-        let clock_id = u8::try_from(clock_id).map_err(|_| ErrNo::Inval)?;
-        let clock_id = ClockId::try_from(clock_id).map_err(|_| ErrNo::Inval)?;
-        let timeout = rdr.read_u64::<LittleEndian>()?.into();
-        let precision = rdr.read_u64::<LittleEndian>()?.into();
-        // NOTE: not sure if clock_id is read correctly as it is u16
-        let flags = rdr.read_u64::<LittleEndian>()?;
-        let flags = u16::try_from(flags).map_err(|_| ErrNo::Inval)?;
-        let clock = SubscriptionClock {
-            clock_id,
-            timeout,
-            precision,
-            flags,
+        // build SubscriptionUnion
+        let tag = rdr.read_u64::<LittleEndian>()?;
+        let u = match tag {
+            // build clock
+            0 => {
+                let clock_id = rdr.read_u64::<LittleEndian>()?;
+                let clock_id = u32::try_from(clock_id).map_err(|_| ErrNo::Inval)?;
+                let clock_id = ClockId::try_from(clock_id).map_err(|_| ErrNo::Inval)?;
+                let timeout = rdr.read_u64::<LittleEndian>()?.into();
+                let precision = rdr.read_u64::<LittleEndian>()?.into();
+                // NOTE: not sure if flags is read correctly as it is u16
+                let flags = rdr.read_u64::<LittleEndian>()?;
+                let flags = u16::try_from(flags).map_err(|_| ErrNo::Inval)?;
+                let clock = SubscriptionClock {
+                    clock_id,
+                    timeout,
+                    precision,
+                    flags,
+                };
+                SubscriptionUnion::Clock(clock)
+            },
+            // FdRead or FdWrite
+            1 | 2 => {
+                let fd = rdr.read_u64::<LittleEndian>()?;
+                let fd = u32::try_from(fd).map_err(|_| ErrNo::Inval)?.into();
+                // Read the unused bytes
+                rdr.read_u64::<LittleEndian>()?;
+                rdr.read_u64::<LittleEndian>()?;
+                rdr.read_u64::<LittleEndian>()?;
+                let fd_rw = SubscriptionFdReadwrite{ fd };
+                if tag == 1 {
+                    SubscriptionUnion::FdRead(fd_rw)
+                } else {
+                    SubscriptionUnion::FdWrite(fd_rw)
+                }
+            }
+            _otherwise => return Err(ErrNo::Inval),
         };
-        // build SubscriptionFdReadwrite
-        // NOTE: not sure if fd is read correctly as FD itself is u32,
-        //       but SubscriptionFdReadwrites occupies a u64 slot
-        let fd = rdr.read_u64::<LittleEndian>()?;
-        let fd = u32::try_from(fd).map_err(|_| ErrNo::Inval)?.into();
-        let fd_readwrite = SubscriptionFdReadwrite { fd };
         Ok(Subscription {
             userdata,
-            clock,
-            fd_readwrite,
+            u,
         })
     }
 }
@@ -237,7 +252,7 @@ impl Unpack<Event> for Event {
 
 /// The memory handler for interacting with the wasm memory space.
 /// An execution engine must implement `write_buffer` and `read_buffer`
-/// before using the WASIWrapper, because the WASI implementation requires
+/// before using the WasiWrapper, because the WASI implementation requires
 /// an extra memory handler as the first parameter.
 ///
 /// NOTE: we purposely choose u32 here as the execution engine is likely received u32 as
@@ -308,7 +323,7 @@ pub trait MemoryHandler {
     /// For example:
     /// buf_address:
     /// --------------------------------------------------------------------
-    ///  conten[0] content[1] ......
+    ///  content[0] content[1] ......
     /// --------------------------------------------------------------------
     ///    ^           ^
     ///   0x10        0x64
@@ -316,7 +331,7 @@ pub trait MemoryHandler {
     ///
     fn write_string_list(
         &mut self,
-        content: &Vec<Vec<u8>>,
+        content: &[Vec<u8>],
         mut buf_address: u32,
         mut buf_pointers: u32,
     ) -> FileSystemError<()> {
@@ -338,8 +353,21 @@ pub trait MemoryHandler {
 
 /// A wrapper on VFS for WASI, which provides common API used by wasm execution engine.
 #[derive(Clone)]
-pub struct WASIWrapper {
+pub struct WasiWrapper {
     /// The synthetic filesystem associated with this machine.
+    /// Note: Veracruz runtime also need to hold a reference to the 
+    ///       filesystem. Both the Veracruz runtime and this WasiWrapper 
+    ///       need to have the ability to update, i.e. mutate, the file system,
+    ///       e.g.
+    ///       ---------------------------
+    ///           Runtime  |  WasiWrapper
+    ///               v    |   v          
+    ///       ---------------------------  
+    ///            |  ^        ^  |
+    ///            |  FileSystem  |
+    ///            ----------------      
+    ///       As there is no 'sharable' and 'mutable' reference in Rust, 
+    ///       we can either use `Arc` or use `unsafe`. Here we choose `Arc`.
     filesystem: Arc<Mutex<FileSystem>>,
     /// The environment variables that have been passed to this program from the
     /// global policy file.  These are stored as a key-value mapping from
@@ -354,7 +382,7 @@ pub struct WASIWrapper {
     exit_code: Option<u32>,
 }
 
-impl WASIWrapper {
+impl WasiWrapper {
     /// The name of the WASM program's entry point.
     pub(crate) const ENTRY_POINT_NAME: &'static str = "_start";
     /// The name of the WASM program's linear memory.
@@ -366,7 +394,8 @@ impl WASIWrapper {
     // Creating and modifying runtime states.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Creates a new initial `WASIWrapper`.
+    /// Creates a new initial `WasiWrapper`.
+    #[inline]
     pub fn new(filesystem: Arc<Mutex<FileSystem>>, principal: Principal) -> Self {
         Self {
             filesystem,
@@ -388,6 +417,8 @@ impl WASIWrapper {
         fs.read_file_by_filename(&Principal::InternalSuperUser, file_name)
     }
 
+    /// Return the exit code from `proc_exit` call.
+    #[inline]
     pub(crate) fn exit_code(&self) -> Option<u32> {
         self.exit_code
     }
@@ -398,7 +429,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `args_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.
-    #[inline]
     pub(crate) fn args_get(
         &self,
         memory_ref: &mut impl MemoryHandler,
@@ -410,7 +440,7 @@ impl WASIWrapper {
             .program_arguments
             .iter()
             .map(|arg| format!("{}\0", arg).into_bytes())
-            .collect();
+            .collect::<Vec<_>>();
         memory_ref.write_string_list(&buffer, buf_address, address_for_string_ptrs)
     }
 
@@ -482,14 +512,12 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `clock_res_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn clock_res_get(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
         clock_id: u32,
         address: u32,
     ) -> FileSystemError<()> {
-        let clock_id: u8 = Self::decode_wasi_arg(clock_id)?;
         let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
         let fs = self.lock_vfs()?;
         let time = fs.clock_res_get(clock_id)?;
@@ -498,7 +526,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn clock_time_get(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -506,7 +533,6 @@ impl WASIWrapper {
         precision: u64,
         address: u32,
     ) -> FileSystemError<()> {
-        let clock_id: u8 = Self::decode_wasi_arg(clock_id)?;
         let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
         let fs = self.lock_vfs()?;
         let time = fs.clock_time_get(clock_id, precision.into())?;
@@ -515,7 +541,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_advise(
         &mut self,
         _: &mut impl MemoryHandler,
@@ -531,7 +556,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_allocate` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_allocate(
         &mut self,
         _: &mut impl MemoryHandler,
@@ -561,7 +585,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_fdstat_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_fdstat_get(
         &self,
         memory_ref: &mut impl MemoryHandler,
@@ -575,7 +598,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_fdstat_set_flags` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_fdstat_set_flags(
         &mut self,
         _: &mut impl MemoryHandler,
@@ -589,7 +611,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_fdstat_set_rights` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_fdstat_set_rights(
         &mut self,
         _: &mut impl MemoryHandler,
@@ -605,7 +626,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_filestat_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_filestat_get(
         &self,
         memory_ref: &mut impl MemoryHandler,
@@ -632,7 +652,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_filestat_set_times` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_filestat_set_times(
         &mut self,
         _: &mut impl MemoryHandler,
@@ -648,7 +667,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_pread(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -688,7 +706,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_prestat_dir_name` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_prestat_dir_name(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -707,7 +724,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_pwrite` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_pwrite(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -731,7 +747,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_read` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_read(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -754,7 +769,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_readdir` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_readdir(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -794,7 +808,6 @@ impl WASIWrapper {
     }
 
     /// The implementation of the WASI `fd_seek` function.
-    #[inline]
     pub(crate) fn fd_seek(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -819,7 +832,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_tell` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_tell(
         &self,
         memory_ref: &mut impl MemoryHandler,
@@ -833,7 +845,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `fd_write` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn fd_write(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -855,7 +866,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_create_directory` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_create_directory(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -870,7 +880,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_filestat_get` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_filestat_get(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -889,7 +898,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_filestat_set_times` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_filestat_set_times(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -917,7 +925,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_link(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -938,7 +945,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_open` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_open(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -975,7 +981,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_readlink` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_readlink(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1003,7 +1008,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_remove_directory` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_remove_directory(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1018,7 +1022,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_rename` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_rename(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1037,7 +1040,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_symlink` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_symlink(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1055,7 +1057,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `path_unlink_file` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn path_unlink_file(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1070,7 +1071,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `poll_oneoff` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn poll_oneoff(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1108,7 +1108,6 @@ impl WASIWrapper {
         Err(ErrNo::NoSys)
     }
 
-    #[inline]
     pub(crate) fn random_get(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1122,7 +1121,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn sock_recv(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1152,7 +1150,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `sock_send` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn sock_send(
         &mut self,
         memory_ref: &mut impl MemoryHandler,
@@ -1176,7 +1173,6 @@ impl WASIWrapper {
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
-    #[inline]
     pub(crate) fn sock_shutdown(
         &mut self,
         _: &mut impl MemoryHandler,
@@ -1193,11 +1189,13 @@ impl WASIWrapper {
     ///////////////////////////////////////
     /// Lock the VFS in WASIWrapper.
     /// If the locks fails, it returns Busy error code.
-    fn lock_vfs(&self) -> FileSystemError<std::sync::MutexGuard<'_, FileSystem>> {
+    #[inline]
+    fn lock_vfs(&self) -> FileSystemError<MutexGuard<'_, FileSystem>> {
         self.filesystem.lock().map_err(|_|ErrNo::Busy)
     }
     /// Converts `arg` of type `R` to type `T`,
     /// or returns from the function with the `Inval` error code.
+    #[inline]
     fn decode_wasi_arg<T, R>(arg: R) -> FileSystemError<T> where T: TryFrom<R> {
         T::try_from(arg).map_err(|_| ErrNo::Inval)
     }
@@ -1233,7 +1231,7 @@ pub enum FatalEngineError {
     )]
     BadArgumentsToHostFunction {
         /// The name of the host function that was being invoked.
-        function_name: WASIAPIName,
+        function_name: WasiAPIName,
     },
     /// The WASM program tried to invoke an unknown H-call on the Veracruz engine.
     #[error(display = "FatalEngineError: Unknown Host call invoked: '{:?}'.", _0)]
@@ -1301,8 +1299,8 @@ impl From<wasmtime::Trap> for FatalEngineError {
     }
 }
 
-impl From<WASIAPIName> for FatalEngineError {
-    fn from(error: WASIAPIName) -> Self {
+impl From<WasiAPIName> for FatalEngineError {
+    fn from(error: WasiAPIName) -> Self {
         FatalEngineError::BadArgumentsToHostFunction {
             function_name: error,
         }

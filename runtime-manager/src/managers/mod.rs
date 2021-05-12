@@ -100,9 +100,9 @@ impl ProtocolState {
     ) -> Result<Self, RuntimeManagerError> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let right_table = global_policy.get_rights_table();
+        let rights_table = global_policy.get_rights_table();
         let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
+        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table)));
 
         Ok(ProtocolState {
             global_policy,
@@ -169,6 +169,7 @@ impl ProtocolState {
     }
 
     /// Compute the digest of a `buffer`
+    #[inline]
     fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
         ring::digest::digest(&ring::digest::SHA256, buffer)
             .as_ref()

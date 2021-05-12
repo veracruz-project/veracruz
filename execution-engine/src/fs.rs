@@ -23,7 +23,7 @@ use std::{
     string::ToString,
     vec::Vec,
 };
-use veracruz_utils::policy::principal::{Principal, RightTable};
+use veracruz_utils::policy::principal::{Principal, RightsTable};
 use wasi_types::{
     Advice, ClockId, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize,
     FileStat, FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights,
@@ -47,7 +47,7 @@ pub type FileSystemError<T> = Result<T, ErrNo>;
 /// INodes wrap the actual raw file data, and associate meta-data with that raw
 /// data buffer.
 #[derive(Clone, Debug)]
-struct InodeImpl {
+struct InodeEntry {
     /// The status of this file.
     file_stat: FileStat,
     /// The content of the file in bytes.  NOTE: the buffer.size() *must* match
@@ -60,7 +60,7 @@ struct InodeImpl {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Each file table entry contains an index into the inode table, pointing to an
-/// `InodeImpl`, where the static file data is stored.
+/// `InodeEntry`, where the static file data is stored.
 #[derive(Clone, Debug)]
 struct FileTableEntry {
     /// The index to `inode_table` in FileSystem.
@@ -91,11 +91,11 @@ pub struct FileSystem {
     path_table: HashMap<String, Inode>,
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
-    inode_table: HashMap<Inode, InodeImpl>,
+    inode_table: HashMap<Inode, InodeEntry>,
     /// The Right table for Principal, including participants and programs.
     /// It will be used in, e.g.  `path_open` function,
     /// to constrain the `Right` of file descriptors.
-    right_table: RightTable,
+    rights_table: RightsTable,
     /// Preopen FD table. Mapping the FD to dir name.
     prestat_table: HashMap<Fd, String>,
 }
@@ -119,12 +119,12 @@ impl FileSystem {
     /// similar.  Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
-    pub fn new(right_table: RightTable) -> Self {
+    pub fn new(rights_table: RightsTable) -> Self {
         let mut rst = Self {
             file_table: HashMap::new(),
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
-            right_table,
+            rights_table,
             prestat_table: HashMap::new(),
         };
         rst.install_prestat(&vec![""]);
@@ -186,7 +186,7 @@ impl FileSystem {
             mtime: Timestamp::from_nanos(0),
             ctime: Timestamp::from_nanos(0),
         };
-        let node = InodeImpl {
+        let node = InodeEntry {
             file_stat,
             raw_file_data: Vec::new(),
         };
@@ -208,7 +208,7 @@ impl FileSystem {
             mtime: Timestamp::from_nanos(0),
             ctime: Timestamp::from_nanos(0),
         };
-        let node = InodeImpl {
+        let node = InodeEntry {
             file_stat,
             raw_file_data: raw_file_data.to_vec(),
         };
@@ -325,6 +325,7 @@ impl FileSystem {
 
     /// Allows the programmer to declare how they intend to use various parts of
     /// a file to the runtime.
+    #[inline]
     pub(crate) fn fd_advise(
         &mut self,
         fd: Fd,
@@ -359,6 +360,7 @@ impl FileSystem {
 
     /// Implements the `fd_close` operation on the filesystem, which closes a
     /// file descriptor.  Returns `ErrNo::BadF`, if `fd` is not a current file-descriptor.
+    #[inline]
     pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
         info!("call fd_close on {:?}", fd);
         self.file_table.remove(&fd).ok_or(ErrNo::BadF)?;
@@ -374,12 +376,14 @@ impl FileSystem {
     }
 
     /// Return a copy of the status of the file descriptor, `fd`.
+    #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemError<FdStat> {
         info!("call fd_fdstat_get on {:?}", fd);
         Ok(self.file_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat.clone())
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
+    #[inline]
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemError<()> {
         info!(
             "call fd_fdstat_set_flags on fd {:?} and flags {:?}",
@@ -388,13 +392,14 @@ impl FileSystem {
         self.check_right(&fd, Rights::FD_FDSTAT_SET_FLAGS)?;
         self.file_table
             .get_mut(&fd)
-            .map(|FileTableEntry { mut fd_stat, .. }| {
-                fd_stat.flags = flags;
-            })
-            .ok_or(ErrNo::BadF)
+            .ok_or(ErrNo::BadF)?
+            .fd_stat
+            .flags = flags;
+        Ok(())
     }
 
     /// Change the right associated with the file descriptor, `fd`.
+    #[inline]
     pub(crate) fn fd_fdstat_set_rights(
         &mut self,
         fd: Fd,
@@ -428,7 +433,7 @@ impl FileSystem {
             .clone())
     }
 
-    /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bypes are
+    /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bytes are
     /// filled with ZERO.
     pub(crate) fn fd_filestat_set_size(&mut self, fd: Fd, size: FileSize) -> FileSystemError<()> {
         info!(
@@ -489,7 +494,7 @@ impl FileSystem {
     /// However, the implementation of WASI spec of fd_pread depends on
     /// how a particular execution engine handles the memory.
     /// That is, different engines provide different API to interact the linear memory
-    /// space of WASM. Hence, the method here return the read bypes as `Vec<u8>`.
+    /// space of WASM. Hence, the method here return the read bytes as `Vec<u8>`.
     pub(crate) fn fd_pread(
         &mut self,
         fd: Fd,
@@ -531,6 +536,7 @@ impl FileSystem {
     }
 
     /// Return the status of a pre-opened Fd `fd`.
+    #[inline]
     pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemError<Prestat> {
         info!("call fd_prestat_get on {:?}", fd);
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
@@ -541,6 +547,7 @@ impl FileSystem {
     }
 
     /// Return the path of a pre-opened Fd `fd`. The path must be consistent with the status returned by `fd_prestat_get`
+    #[inline]
     pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemError<String> {
         info!("call fd_prestat_dir_name on {:?}", fd);
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
@@ -613,6 +620,7 @@ impl FileSystem {
     }
 
     /// The stub implementation of `fd_readdir`. Return unsupported error `NoSys`.
+    #[inline]
     pub(crate) fn fd_readdir(&mut self, fd: Fd, cookie: DirCookie) -> FileSystemError<Vec<DirEnt>> {
         info!("call fd_readdir on {:?} and cookie {:?}", fd, cookie);
         self.check_right(&fd, Rights::FD_READDIR)?;
@@ -620,7 +628,7 @@ impl FileSystem {
     }
 
     /// Atomically renumbers the `old_fd` to the `new_fd`.  Note that as
-    /// Chihuahua is single-threaded this is atomic from the WASM program's
+    /// execution engine is single-threaded this is atomic from the WASM program's
     /// point of view.
     pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemError<()> {
         info!("call fd_renumber on {:?} to a new fd {:?}", old_fd, new_fd);
@@ -693,6 +701,7 @@ impl FileSystem {
     }
 
     /// Returns the current offset associated with the file descriptor.
+    #[inline]
     pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemError<FileSize> {
         info!("call fd_tell on fd {:?}", fd);
         self.check_right(&fd, Rights::FD_TELL)?;
@@ -792,6 +801,13 @@ impl FileSystem {
 
     /// A minimum functionality of opening a file or directory on behalf of the principal `principal`.
     /// We only support search from the root Fd. We ignore the dir look up flag.
+    ///
+    /// The behaviour of `path_open` varies based on the open flags `oflags`:
+    /// * if no flag is set, open a file at the path, if exists, starting from the directory opened by the file descriptor `fd`;
+    /// * if `EXCL` is set, `path_open` fails if the path exists;
+    /// * if `CREATE` is set, create a new file at the path if the path does not exist;
+    /// * if `TRUNC` is set, the file at the path is truncated, that is, clean the content and set the file size to ZERO; and
+    /// * if `DIRECTORY` is set, `path_open` fails if the path is not a directory. **NOT SUUPORT**.
     pub(crate) fn path_open(
         &mut self,
         principal: &Principal,
@@ -860,7 +876,7 @@ impl FileSystem {
                 new_inode
             }
         };
-        // Truacate the file if `trunc` flag is set.
+        // Truncate the file if `trunc` flag is set.
         if oflags.contains(OpenFlags::TRUNC) {
             info!("call path_open trunc flag");
             // Check the right of the program on truacate
@@ -960,6 +976,7 @@ impl FileSystem {
     }
 
     /// Get random bytes.
+    #[inline]
     pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemError<Vec<u8>> {
         let mut buf = vec![0; buf_len as usize];
         if let result::Result::Success = getrandom(&mut buf) {
@@ -1096,17 +1113,13 @@ impl FileSystem {
     ) -> Result<(), ErrNo> {
         let file_name = file_name.as_ref();
         info!("write_file_by_filename: {}", file_name);
+        let oflag = OpenFlags::CREATE | if !is_append { OpenFlags::TRUNC } else { OpenFlags::empty() };
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,
             LookupFlags::empty(),
             file_name,
-            OpenFlags::CREATE
-                | if !is_append {
-                    OpenFlags::TRUNC
-                } else {
-                    OpenFlags::empty()
-                },
+            oflag,
             FileSystem::DEFAULT_RIGHTS,
             FileSystem::DEFAULT_RIGHTS,
             FdFlags::empty(),
@@ -1167,7 +1180,7 @@ impl FileSystem {
 
     /// Get the maximum right associated to the principal on the file
     fn get_right(&self, principal: &Principal, file_name: &str) -> FileSystemError<Rights> {
-        self.right_table
+        self.rights_table
             .get(principal)
             .ok_or(ErrNo::Access)?
             .get(file_name)

@@ -43,16 +43,14 @@ use crate::{
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::sync::SgxMutex as Mutex;
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, sync::Arc, string::ToString};
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
 /// The top-level function executes program `program_name` on
-/// the `filesystem` handle, in which inputs, outputs and programs are stored.
-/// The function requires execution `strategy`. In the case of
-/// `Interpretation` being chosen, an implementation of the `ExecutionEngine` trait
-/// is returned which uses an interpretation execution strategy.  Similarly, in
-/// the case of `JIT` an implementation using a JITting execution strategy is
-/// returned.  Note that the `execute` function is essentially this library's
+/// the `filesystem` handler, in which inputs, outputs and programs are stored.
+/// The function requires execution `strategy`.
+/// It currently supports `interp` or `JIT`, backed by `WASI` and `wasmtime`, respectively.
+/// Note that the `execute` function is essentially this library's
 /// interface to the outside world, and details exactly what external clients
 /// such as `freestanding-executuon-engine` and `runtime-manager` can rely on.
 pub fn execute(
@@ -62,12 +60,12 @@ pub fn execute(
 ) -> Result<wasi_types::ErrNo, FatalEngineError> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, program_name))
+            Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string()))
         }
         ExecutionStrategy::JIT => {
             #[cfg(feature = "std")]
             {
-                Box::new(WasmtimeRuntimeState::new(filesystem, program_name))
+                Box::new(WasmtimeRuntimeState::new(filesystem, program_name.to_string())?)
             }
             #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
             {
@@ -75,5 +73,5 @@ pub fn execute(
             }
         }
     };
-    engine.invoke_entry_point(&program_name)
+    engine.invoke_entry_point(program_name)
 }

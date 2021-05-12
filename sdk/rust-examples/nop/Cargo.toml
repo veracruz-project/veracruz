@@ -8,6 +8,7 @@ description = "The NOP example: does not do anything."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [profile.release]
-opt-level = 3
 codegen-units = 1
+lto = true
+opt-level = 3
 

@@ -8,7 +8,7 @@ description = "A Rust reimplementation of the winning logistic regression entry 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pinecone = "*"
+pinecone = "0.2.3"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
 [profile.release]

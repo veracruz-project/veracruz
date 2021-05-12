@@ -8,7 +8,7 @@ description = "Samples random data from the trusted Veracruz runtime.  Used to t
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pinecone = "*"
+pinecone = "0.2.3"
 rand = "0.8.0"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 

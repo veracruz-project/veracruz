@@ -29,10 +29,8 @@ use wasi_types::ErrNo;
 ///   provided to the program is not exactly 2.
 ///
 fn read_inputs() -> Result<(String, String), ErrNo> {
-    let input0 = fs::read("/input-0")?;
-    let this = String::from_utf8(input0).map_err(|_| ErrNo::Proto)?;
-    let input1 = fs::read("/input-1")?;
-    let that = String::from_utf8(input1).map_err(|_| ErrNo::Proto)?;
+    let this = String::from_utf8(fs::read("/input-0")?).map_err(|_| ErrNo::Proto)?;
+    let that = String::from_utf8(fs::read("/input-1")?).map_err(|_| ErrNo::Proto)?;
 
     Ok((this, that))
 }
@@ -41,7 +39,6 @@ fn read_inputs() -> Result<(String, String), ErrNo> {
 /// which are Rust strings encoded with Pinecone.  Fails if these assumptions
 /// are not met with an error code.  Writes a Pinecone-encoded `usize`, the
 /// distance between the two strings, back as output.
-//fn main() -> return_code::Veracruz {
 fn compute() -> Result<(), ErrNo> {
     let (left, right) = read_inputs()?;
     let distance = jaro_winkler(&left, &right);

@@ -38,10 +38,10 @@ Notes:
 
 ## WASI Implementation Summary
 
-A summary our WASI implementation. We repeat the high-level WASI API defintions in [wasi_snapshot_preview1][1] 
+A summary our WASI implementation. We repeat the high-level WASI API definitions in [wasi_snapshot_preview1][1] 
 and the actual ABI definitions in [here][2], and provide our understanding of the WASI ABI standard and implementation strategy.
-Any WASI ABI that veracruz currently does not support, labelled with **NOT SUPPORTED** through this document,
-will return `ErrNo::NoSys` _after_ right (capability) check and minimum validatity check on parameters.
+Any WASI ABI that veracruz currently does not support, labeled with **NOT SUPPORTED** through this document,
+will return `ErrNo::NoSys` _after_ right (capability) check and minimum validity check on parameters.
 
 ### Args and Env
 
@@ -65,7 +65,7 @@ argv_buf --> |  ... \0 ... \0 ... \0 ... ...
 argv --> |  0x12  |  0x34  |  0x56 | ..
          ----------------------------------
 ``` 
-**Question:** Not sure the uppper bound of `argv` and `argv_buf`.
+**Question:** Not sure the upper bound of `argv` and `argv_buf`.
 
 #### `args_sizes_get`
 ```rust
@@ -92,7 +92,7 @@ environ_buf --> |  key1=value1 \0 key2=value \0 ...  ...
 environ -->   |  0x12         |  0x34        |  0x56 | ..
               ---------------------------------------------
 ``` 
-**Question:** Not sure the uppper bound of `environ_buf` and `environ`.
+**Question:** Not sure the upper bound of `environ_buf` and `environ`.
 
 #### `environ_sizes_get`
 ```rust
@@ -228,7 +228,7 @@ Veracruz immediately returns `NoSys` if `ATIME_NOW` or `MTIME_NOW` is set.
 Veracruz internally does _NOT_ update the time information and also never use them.
 WASM passes a `u32` as the `flags` parameter.
 
-**QUESTION:** Priorty of the flags.
+**QUESTION:** Priority of the flags.
 
 #### `fd_prestat_get`
 ```rust
@@ -412,7 +412,7 @@ We ignore the lookup flags `lookup_flags` and only support `fd` being the `ROOT`
 Veracruz internally does _NOT_ update the time information and also never use them.
 WASM passes a `u32` as the `flags` parameter.
 
-**QUESTION:** Priorty of the flags.
+**QUESTION:** Priority of the flags.
 
 #### `path_link`
 ```rust
@@ -429,10 +429,10 @@ fn path_open(fd: u32, dirflags: u32, path_addr: u32, path_len: u32, oflags: u16,
 ```
 Read the path at address `path_addr` of length `path_len`.
 The behaviour of `path_open` varies based on the open flags `oflags`:
-* if no flag is set, open a file at the path, if exists, starting from the directory opened by the file discriptor `fd`;
+* if no flag is set, open a file at the path, if exists, starting from the directory opened by the file descriptor `fd`;
 * if `EXCL` is set, `path_open` fails if the path exists;
 * if `CREATE` is set, create a new file at the path if the path does not exist;
-* if `TRUNC` is set, the file at the path is truacated, that is, clean the content and set the file size to ZERO; and
+* if `TRUNC` is set, the file at the path is truncated, that is, clean the content and set the file size to ZERO; and
 * if `DIRECTORY` is set, `path_open` fails if the path is not a directory.
 
 The base rights and inheriting rights the new fd `new_fd` cannot exceed `base` and `inheriting`, respectively.
@@ -443,7 +443,7 @@ We ignore the lookup flags `lookup_flags` and only support `fd` being the `ROOT`
 Veracruz does _NOT_ support `DIRECTORY` flag.
 WASM passes `u32` as the `oflags` and `fdflags` parameters.
 
-**QUESTION:** Priorty of the flags.
+**QUESTION:** Priority of the flags.
 
 #### `path_readlink`
 ```rust
