@@ -10,7 +10,7 @@
 //! and copyright information.
 
 use crate::{
-    fs::FileSystem,
+    fs::{FileSystem, FileSystemError},
     wasi::common::{
         EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
         WASIAPIName, WASIWrapper,
@@ -47,17 +47,17 @@ impl MemoryHandler for MemoryRef {
     /// Writes a buffer of bytes, `buffer`, to the runtime state's memory at
     /// address, `address`.  Success on returing ErrNo::Success,
     /// Fails with `ErrNo::NoMem` if no memory is registered in the runtime state.
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo {
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemError<()> {
         if let Err(_e) = self.set(address, buffer) {
-            return ErrNo::NoMem;
+            return Err(ErrNo::NoMem);
         }
-        ErrNo::Success
+        Ok(())
     }
 
     /// Read a buffer of bytes from the runtime state's memory at
     /// address, `address`. Return the bytes or Err with ErrNo,
     /// e.g. `Err(ErrNo::NoMem)` if no memory is registered in the runtime state.
-    fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo> {
+    fn read_buffer(&self, address: u32, length: u32) -> FileSystemError<Vec<u8>> {
         self.get(address, length as usize)
             .map_err(|_e| ErrNo::Fault)
             .map(|buf| buf.to_vec())
@@ -574,13 +574,21 @@ impl WASMIRuntimeState {
     ////////////////////////////////////////////////////////////////////////////
     // The WASI host call implementations.
     ////////////////////////////////////////////////////////////////////////////
+    
+    fn convert_to_errno(input: FileSystemError<()>) -> WASIError {
+        let errno = match input {
+            Ok(_) => ErrNo::Success,
+            Err(e) => e,
+        };
+        Ok(errno)
+    }
 
     /// The implementation of the WASI `args_get` function.
     fn wasi_args_get(&mut self, args: RuntimeArgs) -> WASIError {
         TypeCheck::check_args_number(&args, WASIAPIName::ARGS_GET)?;
         let string_ptr_address = args.nth(0);
         let buf_address = args.nth(1);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .args_get(&mut self.memory()?, string_ptr_address, buf_address))
     }
@@ -590,7 +598,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::ARGS_SIZES_GET)?;
         let arg_count_address: u32 = args.nth(0);
         let arg_buf_size_address: u32 = args.nth(1);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .args_sizes_get(&mut self.memory()?, arg_count_address, arg_buf_size_address))
     }
@@ -600,7 +608,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::ENVIRON_GET)?;
         let string_ptr_address = args.nth(0);
         let buf_address = args.nth(1);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .environ_get(&mut self.memory()?, string_ptr_address, buf_address))
     }
@@ -610,7 +618,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::ENVIRON_SIZES_GET)?;
         let environc_address = args.nth::<u32>(0);
         let environ_buf_size_address = args.nth::<u32>(1);
-        Ok(self.vfs.environ_sizes_get(
+        Self::convert_to_errno(self.vfs.environ_sizes_get(
             &mut self.memory()?,
             environc_address,
             environ_buf_size_address,
@@ -624,7 +632,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::CLOCK_RES_GET)?;
         let clock_id = args.nth::<u32>(0);
         let address = args.nth::<u32>(1);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .clock_res_get(&mut self.memory()?, clock_id, address))
     }
@@ -635,7 +643,7 @@ impl WASMIRuntimeState {
         let clock_id = args.nth::<u32>(0);
         let precision = args.nth::<u64>(1);
         let address = args.nth::<u32>(2);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .clock_time_get(&mut self.memory()?, clock_id, precision, address))
     }
@@ -647,7 +655,7 @@ impl WASMIRuntimeState {
         let offset = args.nth::<u64>(1);
         let len = args.nth::<u64>(2);
         let advice = args.nth::<u8>(3);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_advise(&mut self.memory()?, fd, offset, len, advice))
     }
@@ -658,21 +666,21 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(0);
         let offset = args.nth::<u64>(1);
         let len = args.nth::<u64>(2);
-        Ok(self.vfs.fd_allocate(&mut self.memory()?, fd, offset, len))
+        Self::convert_to_errno(self.vfs.fd_allocate(&mut self.memory()?, fd, offset, len))
     }
 
     /// The implementation of the WASI `fd_close` function.
     fn wasi_fd_close(&mut self, args: RuntimeArgs) -> WASIError {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_CLOSE)?;
         let fd = args.nth::<u32>(0);
-        Ok(self.vfs.fd_close(fd))
+        Self::convert_to_errno(self.vfs.fd_close(fd))
     }
 
     /// The implementation of the WASI `fd_datasync` function.
     fn wasi_fd_datasync(&mut self, args: RuntimeArgs) -> WASIError {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_DATASYNC)?;
         let fd = args.nth::<u32>(0);
-        Ok(self.vfs.fd_datasync(&mut self.memory()?, fd))
+        Self::convert_to_errno(self.vfs.fd_datasync(&mut self.memory()?, fd))
     }
 
     /// The implementation of the WASI `fd_fdstat_get` function.
@@ -680,7 +688,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_FDSTAT_GET)?;
         let fd = args.nth::<u32>(0);
         let address = args.nth::<u32>(1);
-        Ok(self.vfs.fd_fdstat_get(&mut self.memory()?, fd, address))
+        Self::convert_to_errno(self.vfs.fd_fdstat_get(&mut self.memory()?, fd, address))
     }
 
     /// The implementation of the WASI `fd_fdstat_set_flags` function.
@@ -688,7 +696,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_FDSTAT_SET_FLAGS)?;
         let fd = args.nth::<u32>(0);
         let flags = args.nth::<u16>(1);
-        Ok(self.vfs.fd_fdstat_set_flags(&mut self.memory()?, fd, flags))
+        Self::convert_to_errno(self.vfs.fd_fdstat_set_flags(&mut self.memory()?, fd, flags))
     }
 
     /// The implementation of the WASI `fd_fdstat_set_rights` function.
@@ -697,7 +705,7 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(0);
         let rights_base = args.nth::<u64>(1);
         let rights_inheriting = args.nth::<u64>(2);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_fdstat_set_rights(&mut self.memory()?, fd, rights_base, rights_inheriting))
     }
@@ -707,7 +715,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_FILESTAT_GET)?;
         let fd = args.nth::<u32>(0);
         let address = args.nth::<u32>(1);
-        Ok(self.vfs.fd_filestat_get(&mut self.memory()?, fd, address))
+        Self::convert_to_errno(self.vfs.fd_filestat_get(&mut self.memory()?, fd, address))
     }
 
     /// The implementation of the WASI `fd_filestat_set_size` function.
@@ -715,7 +723,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_FILESTAT_SET_SIZE)?;
         let fd = args.nth::<u32>(0);
         let size = args.nth::<u64>(1);
-        Ok(self.vfs.fd_filestat_set_size(&mut self.memory()?, fd, size))
+        Self::convert_to_errno(self.vfs.fd_filestat_set_size(&mut self.memory()?, fd, size))
     }
 
     /// The implementation of the WASI `fd_filestat_set_times` function.  This
@@ -726,7 +734,7 @@ impl WASMIRuntimeState {
         let atime = args.nth::<u64>(1);
         let mtime = args.nth::<u64>(2);
         let fst_flag = args.nth::<u16>(3);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_filestat_set_times(&mut self.memory()?, fd, atime, mtime, fst_flag))
     }
@@ -739,7 +747,7 @@ impl WASMIRuntimeState {
         let iovec_length = args.nth::<u32>(2);
         let offset = args.nth::<u64>(3);
         let address = args.nth::<u32>(4);
-        Ok(self.vfs.fd_pread(
+        Self::convert_to_errno(self.vfs.fd_pread(
             &mut self.memory()?,
             fd,
             iovec_base,
@@ -754,7 +762,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_PRESTAT_GET)?;
         let fd = args.nth::<u32>(0);
         let address = args.nth::<u32>(1);
-        Ok(self.vfs.fd_prestat_get(&mut self.memory()?, fd, address))
+        Self::convert_to_errno(self.vfs.fd_prestat_get(&mut self.memory()?, fd, address))
     }
 
     /// The implementation of the WASI `fd_prestat_dir_name` function.
@@ -763,7 +771,7 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(0);
         let address = args.nth::<u32>(1);
         let size = args.nth::<u32>(2);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_prestat_dir_name(&mut self.memory()?, fd, address, size))
     }
@@ -776,7 +784,7 @@ impl WASMIRuntimeState {
         let iovec_length = args.nth::<u32>(2);
         let offset = args.nth::<u64>(3);
         let address = args.nth::<u32>(4);
-        Ok(self.vfs.fd_pwrite(
+        Self::convert_to_errno(self.vfs.fd_pwrite(
             &mut self.memory()?,
             fd,
             iovec_base,
@@ -793,7 +801,7 @@ impl WASMIRuntimeState {
         let iovec_base: u32 = args.nth::<u32>(1);
         let iovec_len: u32 = args.nth::<u32>(2);
         let address: u32 = args.nth::<u32>(3);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_read(&mut self.memory()?, fd, iovec_base, iovec_len, address))
     }
@@ -806,7 +814,7 @@ impl WASMIRuntimeState {
         let dirent_length = args.nth::<u32>(2);
         let cookie = args.nth::<u64>(3);
         let address = args.nth::<u32>(4);
-        Ok(self.vfs.fd_readdir(
+        Self::convert_to_errno(self.vfs.fd_readdir(
             &mut self.memory()?,
             fd,
             dirent_base,
@@ -821,7 +829,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_RENUMBER)?;
         let old_fd = args.nth::<u32>(0);
         let new_fd = args.nth::<u32>(1);
-        Ok(self.vfs.fd_renumber(&mut self.memory()?, old_fd, new_fd))
+        Self::convert_to_errno(self.vfs.fd_renumber(&mut self.memory()?, old_fd, new_fd))
     }
 
     /// The implementation of the WASI `fd_seek` function.
@@ -831,7 +839,7 @@ impl WASMIRuntimeState {
         let offset = args.nth::<i64>(1);
         let whence = args.nth::<u8>(2);
         let address = args.nth::<u32>(3);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_seek(&mut self.memory()?, fd, offset, whence, address))
     }
@@ -841,7 +849,7 @@ impl WASMIRuntimeState {
     fn wasi_fd_sync(&mut self, args: RuntimeArgs) -> WASIError {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_SYNC)?;
         let fd = args.nth::<u32>(0);
-        Ok(self.vfs.fd_sync(&mut self.memory()?, fd))
+        Self::convert_to_errno(self.vfs.fd_sync(&mut self.memory()?, fd))
     }
 
     /// The implementation of the WASI `fd_tell` function.
@@ -849,7 +857,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::FD_TELL)?;
         let fd = args.nth::<u32>(0);
         let address = args.nth::<u32>(1);
-        Ok(self.vfs.fd_tell(&mut self.memory()?, fd, address))
+        Self::convert_to_errno(self.vfs.fd_tell(&mut self.memory()?, fd, address))
     }
 
     /// The implementation of the WASI `fd_write` function.
@@ -859,7 +867,7 @@ impl WASMIRuntimeState {
         let iovec_base = args.nth::<u32>(1);
         let iovec_len = args.nth::<u32>(2);
         let address = args.nth::<u32>(3);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .fd_write(&mut self.memory()?, fd, iovec_base, iovec_len, address))
     }
@@ -870,7 +878,7 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(0);
         let path = args.nth::<u32>(1);
         let path_len = args.nth::<u32>(2);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .path_create_directory(&mut self.memory()?, fd, path, path_len))
     }
@@ -883,7 +891,7 @@ impl WASMIRuntimeState {
         let path_address = args.nth::<u32>(2);
         let path_length = args.nth::<u32>(3);
         let address = args.nth::<u32>(4);
-        Ok(self.vfs.path_filestat_get(
+        Self::convert_to_errno(self.vfs.path_filestat_get(
             &mut self.memory()?,
             fd,
             flag,
@@ -904,7 +912,7 @@ impl WASMIRuntimeState {
         let atime = args.nth::<u64>(4);
         let mtime = args.nth::<u64>(5);
         let fst_flags = args.nth::<u16>(6);
-        Ok(self.vfs.path_filestat_set_times(
+        Self::convert_to_errno(self.vfs.path_filestat_set_times(
             &mut self.memory()?,
             fd,
             flag,
@@ -927,7 +935,7 @@ impl WASMIRuntimeState {
         let new_fd = args.nth::<u32>(4);
         let new_address = args.nth::<u32>(5);
         let new_path_len = args.nth::<u32>(6);
-        Ok(self.vfs.path_link(
+        Self::convert_to_errno(self.vfs.path_link(
             &mut self.memory()?,
             old_fd,
             old_flags,
@@ -951,7 +959,7 @@ impl WASMIRuntimeState {
         let fs_rights_inheriting = args.nth::<u64>(6);
         let fd_flags = args.nth::<u16>(7);
         let address = args.nth::<u32>(8);
-        Ok(self.vfs.path_open(
+        Self::convert_to_errno(self.vfs.path_open(
             &mut self.memory()?,
             fd,
             dirflags,
@@ -974,7 +982,7 @@ impl WASMIRuntimeState {
         let buf_address = args.nth::<u32>(3);
         let buf_length = args.nth::<u32>(4);
         let address = args.nth::<u32>(5);
-        Ok(self.vfs.path_readlink(
+        Self::convert_to_errno(self.vfs.path_readlink(
             &mut self.memory()?,
             fd,
             path_address,
@@ -991,7 +999,7 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(0);
         let path_address = args.nth::<u32>(1);
         let path_length = args.nth::<u32>(2);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .path_remove_directory(&mut self.memory()?, fd, path_address, path_length))
     }
@@ -1005,7 +1013,7 @@ impl WASMIRuntimeState {
         let new_fd = args.nth::<u32>(3);
         let new_path_address = args.nth::<u32>(4);
         let new_path_len = args.nth::<u32>(5);
-        Ok(self.vfs.path_rename(
+        Self::convert_to_errno(self.vfs.path_rename(
             &mut self.memory()?,
             old_fd,
             old_path_address,
@@ -1024,7 +1032,7 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(2);
         let new_path_address = args.nth::<u32>(3);
         let new_path_len = args.nth::<u32>(4);
-        Ok(self.vfs.path_symlink(
+        Self::convert_to_errno(self.vfs.path_symlink(
             &mut self.memory()?,
             old_path_address,
             old_path_len,
@@ -1041,7 +1049,7 @@ impl WASMIRuntimeState {
         let fd = args.nth::<u32>(0);
         let path_address = args.nth::<u32>(1);
         let path_len = args.nth::<u32>(2);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .path_unlink_file(&mut self.memory()?, fd, path_address, path_len))
     }
@@ -1055,7 +1063,7 @@ impl WASMIRuntimeState {
         let events = args.nth::<u32>(1);
         let size = args.nth::<u32>(2);
         let address = args.nth::<u32>(3);
-        Ok(self
+        Self::convert_to_errno(self
             .vfs
             .poll_oneoff(&mut self.memory()?, subscriptions, events, size, address))
     }
@@ -1078,14 +1086,14 @@ impl WASMIRuntimeState {
     fn wasi_proc_raise(&mut self, args: RuntimeArgs) -> WASIError {
         TypeCheck::check_args_number(&args, WASIAPIName::PROC_RAISE)?;
         let signal = args.nth::<u8>(0);
-        Ok(self.vfs.proc_raise(&mut self.memory()?, signal))
+        Self::convert_to_errno(self.vfs.proc_raise(&mut self.memory()?, signal))
     }
 
     /// The implementation of the WASI `sched_yield` function.  This is
     /// not supported by Veracruz and simply returns `ErrNo::NoSys`.
     fn wasi_sched_yield(&mut self, args: RuntimeArgs) -> WASIError {
         TypeCheck::check_args_number(&args, WASIAPIName::SCHED_YIELD)?;
-        Ok(self.vfs.sched_yield(&mut self.memory()?))
+        Self::convert_to_errno(self.vfs.sched_yield(&mut self.memory()?))
     }
 
     /// The implementation of the WASI `random_get` function, which calls
@@ -1098,7 +1106,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::RANDOM_GET)?;
         let address = args.nth::<u32>(0);
         let size = args.nth::<u32>(1);
-        Ok(self.vfs.random_get(&mut self.memory()?, address, size))
+        Self::convert_to_errno(self.vfs.random_get(&mut self.memory()?, address, size))
     }
 
     /// The implementation of the WASI `sock_send` function.  This is not
@@ -1111,7 +1119,7 @@ impl WASMIRuntimeState {
         let buf_len = args.nth::<u32>(2);
         let si_flag = args.nth::<u16>(3);
         let ro_data_len = args.nth::<u32>(4);
-        Ok(self.vfs.sock_send(
+        Self::convert_to_errno(self.vfs.sock_send(
             &mut self.memory()?,
             socket,
             buf_address,
@@ -1132,7 +1140,7 @@ impl WASMIRuntimeState {
         let ri_flag = args.nth::<u16>(3);
         let ro_data_len = args.nth::<u32>(4);
         let ro_flag = args.nth::<u32>(5);
-        Ok(self.vfs.sock_recv(
+        Self::convert_to_errno(self.vfs.sock_recv(
             &mut self.memory()?,
             socket,
             buf_address,
@@ -1149,7 +1157,7 @@ impl WASMIRuntimeState {
         TypeCheck::check_args_number(&args, WASIAPIName::SOCK_SHUTDOWN)?;
         let socket = args.nth::<u32>(0);
         let sd_flag = args.nth::<u8>(1);
-        Ok(self.vfs.sock_shutdown(&mut self.memory()?, socket, sd_flag))
+        Self::convert_to_errno(self.vfs.sock_shutdown(&mut self.memory()?, socket, sd_flag))
     }
 }
 

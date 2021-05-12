@@ -10,7 +10,7 @@
 //! and copyright information.
 
 use crate::{
-    fs::FileSystem,
+    fs::{FileSystem, FileSystemError},
     wasi::common::{
         EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
         WASIAPIName, WASIWrapper,
@@ -62,23 +62,23 @@ macro_rules! convert_wasi_arg {
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WASIWrapper on any VFS call.
 impl<'a> MemoryHandler for Caller<'a> {
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> ErrNo {
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemError<()> {
         let memory = match self
             .get_export(WASIWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
         {
             Some(s) => s,
-            None => return ErrNo::NoMem,
+            None => return Err(ErrNo::NoMem),
         };
         let address = address as usize;
         unsafe {
             std::slice::from_raw_parts_mut(memory.data_ptr().add(address), buffer.len())
                 .copy_from_slice(buffer)
         };
-        ErrNo::Success
+        Ok(())
     }
 
-    fn read_buffer(&self, address: u32, length: u32) -> Result<Vec<u8>, ErrNo> {
+    fn read_buffer(&self, address: u32, length: u32) -> FileSystemError<Vec<u8>> {
         let length = length as usize;
         let memory = match self
             .get_export(WASIWrapper::LINEAR_MEMORY_NAME)
@@ -276,19 +276,27 @@ impl WasmtimeRuntimeState {
         Ok(ErrNo::try_from(return_code).map_err(|_| FatalEngineError::ReturnedCodeError)?)
     }
 
+    fn convert_to_errno(input: FileSystemError<()>) -> u32 {
+        let errno = match input {
+            Ok(_) => ErrNo::Success,
+            Err(e) => e,
+        };
+        errno as u32
+    }
+
     fn wasi_arg_get(mut caller: Caller, string_ptr_address: u32, buf_address: u32) -> u32 {
         let vfs = lock_vfs!();
-        vfs.args_get(&mut caller, string_ptr_address, buf_address) as u32
+        Self::convert_to_errno(vfs.args_get(&mut caller, string_ptr_address, buf_address))
     }
 
     fn wasi_args_sizes_get(mut caller: Caller, count_address: u32, size_address: u32) -> u32 {
         let vfs = lock_vfs!();
-        vfs.args_sizes_get(&mut caller, count_address, size_address) as u32
+        Self::convert_to_errno(vfs.args_sizes_get(&mut caller, count_address, size_address))
     }
 
     fn wasi_environ_get(mut caller: Caller, string_ptr_address: u32, buf_address: u32) -> u32 {
         let vfs = lock_vfs!();
-        vfs.environ_get(&mut caller, string_ptr_address, buf_address) as u32
+        Self::convert_to_errno(vfs.environ_get(&mut caller, string_ptr_address, buf_address))
     }
 
     fn wasi_environ_size_get(
@@ -297,49 +305,49 @@ impl WasmtimeRuntimeState {
         environ_buf_size_address: u32,
     ) -> u32 {
         let vfs = lock_vfs!();
-        vfs.environ_sizes_get(&mut caller, environc_address, environ_buf_size_address) as u32
+        Self::convert_to_errno(vfs.environ_sizes_get(&mut caller, environc_address, environ_buf_size_address))
     }
 
     fn wasi_clock_res_get(mut caller: Caller, clock_id: u32, address: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.clock_res_get(&mut caller, clock_id, address) as u32
+        Self::convert_to_errno(vfs.clock_res_get(&mut caller, clock_id, address))
     }
 
     fn wasi_clock_time_get(mut caller: Caller, clock_id: u32, precision: u64, address: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.clock_time_get(&mut caller, clock_id, precision, address) as u32
+        Self::convert_to_errno(vfs.clock_time_get(&mut caller, clock_id, precision, address))
     }
 
     fn wasi_fd_advise(mut caller: Caller, fd: u32, offset: u64, len: u64, advice: u32) -> u32 {
         let advice = convert_wasi_arg!(advice, u8);
         let mut vfs = lock_vfs!();
-        vfs.fd_advise(&mut caller, fd, offset, len, advice) as u32
+        Self::convert_to_errno(vfs.fd_advise(&mut caller, fd, offset, len, advice))
     }
 
     fn wasi_fd_allocate(mut caller: Caller, fd: u32, offset: u64, len: u64) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_allocate(&mut caller, fd, offset, len) as u32
+        Self::convert_to_errno(vfs.fd_allocate(&mut caller, fd, offset, len))
     }
 
     fn wasi_fd_close(_caller: Caller, fd: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_close(fd) as u32
+        Self::convert_to_errno(vfs.fd_close(fd))
     }
 
     fn wasi_fd_datasync(mut caller: Caller, fd: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_datasync(&mut caller, fd) as u32
+        Self::convert_to_errno(vfs.fd_datasync(&mut caller, fd))
     }
 
     fn wasi_fd_fdstat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
         let vfs = lock_vfs!();
-        vfs.fd_fdstat_get(&mut caller, fd, address) as u32
+        Self::convert_to_errno(vfs.fd_fdstat_get(&mut caller, fd, address))
     }
 
     fn wasi_fd_fdstat_set_flags(mut caller: Caller, fd: u32, flag: u32) -> u32 {
         let flag = convert_wasi_arg!(flag, u16);
         let mut vfs = lock_vfs!();
-        vfs.fd_fdstat_set_flags(&mut caller, fd, flag) as u32
+        Self::convert_to_errno(vfs.fd_fdstat_set_flags(&mut caller, fd, flag))
     }
 
     fn wasi_fd_fdstat_set_rights(
@@ -349,17 +357,17 @@ impl WasmtimeRuntimeState {
         rights_inheriting: u64,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_fdstat_set_rights(&mut caller, fd, rights_base, rights_inheriting) as u32
+        Self::convert_to_errno(vfs.fd_fdstat_set_rights(&mut caller, fd, rights_base, rights_inheriting))
     }
 
     fn wasi_fd_filestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
         let vfs = lock_vfs!();
-        vfs.fd_filestat_get(&mut caller, fd, address) as u32
+        Self::convert_to_errno(vfs.fd_filestat_get(&mut caller, fd, address))
     }
 
     fn wasi_fd_filestat_set_size(mut caller: Caller, fd: u32, size: u64) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_filestat_set_size(&mut caller, fd, size) as u32
+        Self::convert_to_errno(vfs.fd_filestat_set_size(&mut caller, fd, size))
     }
 
     fn wasi_fd_filestat_set_times(
@@ -371,7 +379,7 @@ impl WasmtimeRuntimeState {
     ) -> u32 {
         let fst_flags = convert_wasi_arg!(fst_flags, u16);
         let mut vfs = lock_vfs!();
-        vfs.fd_filestat_set_times(&mut caller, fd, atime, mtime, fst_flags) as u32
+        Self::convert_to_errno(vfs.fd_filestat_set_times(&mut caller, fd, atime, mtime, fst_flags))
     }
 
     fn wasi_fd_pread(
@@ -383,17 +391,17 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_pread(&mut caller, fd, iovec_base, iovec_count, offset, address) as u32
+        Self::convert_to_errno(vfs.fd_pread(&mut caller, fd, iovec_base, iovec_count, offset, address))
     }
 
     fn wasi_fd_prestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_prestat_get(&mut caller, fd, address) as u32
+        Self::convert_to_errno(vfs.fd_prestat_get(&mut caller, fd, address))
     }
 
     fn wasi_fd_prestat_dir_name(mut caller: Caller, fd: u32, address: u32, size: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_prestat_dir_name(&mut caller, fd, address, size) as u32
+        Self::convert_to_errno(vfs.fd_prestat_dir_name(&mut caller, fd, address, size))
     }
 
     fn wasi_fd_pwrite(
@@ -405,7 +413,7 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_pwrite(&mut caller, fd, iovec_base, iovec_number, offset, address) as u32
+        Self::convert_to_errno(vfs.fd_pwrite(&mut caller, fd, iovec_base, iovec_number, offset, address))
     }
 
     fn wasi_fd_read(
@@ -416,7 +424,7 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_read(&mut caller, fd, iovec_base, iovec_count, address) as u32
+        Self::convert_to_errno(vfs.fd_read(&mut caller, fd, iovec_base, iovec_count, address))
     }
 
     fn wasi_fd_readdir(
@@ -428,28 +436,28 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_readdir(&mut caller, fd, dirent_base, dirent_length, cookie, address) as u32
+        Self::convert_to_errno(vfs.fd_readdir(&mut caller, fd, dirent_base, dirent_length, cookie, address))
     }
 
     fn wasi_fd_renumber(mut caller: Caller, fd: u32, to_fd: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_renumber(&mut caller, fd, to_fd) as u32
+        Self::convert_to_errno(vfs.fd_renumber(&mut caller, fd, to_fd))
     }
 
     fn wasi_fd_seek(mut caller: Caller, fd: u32, offset: i64, whence: u32, address: u32) -> u32 {
         let whence = convert_wasi_arg!(whence, u8);
         let mut vfs = lock_vfs!();
-        vfs.fd_seek(&mut caller, fd, offset, whence, address) as u32
+        Self::convert_to_errno(vfs.fd_seek(&mut caller, fd, offset, whence, address))
     }
 
     fn wasi_fd_sync(mut caller: Caller, fd: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_sync(&mut caller, fd) as u32
+        Self::convert_to_errno(vfs.fd_sync(&mut caller, fd))
     }
 
     fn wasi_fd_tell(mut caller: Caller, fd: u32, address: u32) -> u32 {
         let vfs = lock_vfs!();
-        vfs.fd_tell(&mut caller, fd, address) as u32
+        Self::convert_to_errno(vfs.fd_tell(&mut caller, fd, address))
     }
 
     fn wasi_fd_write(
@@ -460,12 +468,12 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.fd_write(&mut caller, fd, iovec_base, iovec_number, address) as u32
+        Self::convert_to_errno(vfs.fd_write(&mut caller, fd, iovec_base, iovec_number, address))
     }
 
     fn wasi_path_create_directory(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_create_directory(&mut caller, fd, path, path_len) as u32
+        Self::convert_to_errno(vfs.path_create_directory(&mut caller, fd, path, path_len))
     }
 
     fn wasi_path_filestat_get(
@@ -477,7 +485,7 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_filestat_get(&mut caller, fd, flag, path, path_len, address) as u32
+        Self::convert_to_errno(vfs.path_filestat_get(&mut caller, fd, flag, path, path_len, address))
     }
 
     fn wasi_path_filestat_set_times(
@@ -492,7 +500,7 @@ impl WasmtimeRuntimeState {
     ) -> u32 {
         let fst_flags = convert_wasi_arg!(fst_flags, u16);
         let mut vfs = lock_vfs!();
-        vfs.path_filestat_set_times(
+        Self::convert_to_errno(vfs.path_filestat_set_times(
             &mut caller,
             fd,
             flag,
@@ -501,7 +509,7 @@ impl WasmtimeRuntimeState {
             atime,
             mtime,
             fst_flags,
-        ) as u32
+        ))
     }
 
     fn wasi_path_link(
@@ -515,7 +523,7 @@ impl WasmtimeRuntimeState {
         new_path_len: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_link(
+        Self::convert_to_errno(vfs.path_link(
             &mut caller,
             old_fd,
             old_flags,
@@ -524,7 +532,7 @@ impl WasmtimeRuntimeState {
             new_fd,
             new_address,
             new_path_len,
-        ) as u32
+        ))
     }
 
     fn wasi_path_open(
@@ -542,7 +550,7 @@ impl WasmtimeRuntimeState {
         let oflags = convert_wasi_arg!(oflags, u16);
         let fd_flags = convert_wasi_arg!(fd_flags, u16);
         let mut vfs = lock_vfs!();
-        vfs.path_open(
+        Self::convert_to_errno(vfs.path_open(
             &mut caller,
             fd,
             dir_flags,
@@ -553,7 +561,7 @@ impl WasmtimeRuntimeState {
             fs_rights_inheriting,
             fd_flags,
             address,
-        ) as u32
+        ))
     }
 
     fn wasi_path_readlink(
@@ -566,12 +574,12 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_readlink(&mut caller, fd, path, path_len, buf, buf_len, address) as u32
+        Self::convert_to_errno(vfs.path_readlink(&mut caller, fd, path, path_len, buf, buf_len, address))
     }
 
     fn wasi_path_remove_directory(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_remove_directory(&mut caller, fd, path, path_len) as u32
+        Self::convert_to_errno(vfs.path_remove_directory(&mut caller, fd, path, path_len))
     }
 
     fn wasi_path_rename(
@@ -584,7 +592,7 @@ impl WasmtimeRuntimeState {
         new_len: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_rename(
+        Self::convert_to_errno(vfs.path_rename(
             &mut caller,
             old_fd,
             old_path,
@@ -592,7 +600,7 @@ impl WasmtimeRuntimeState {
             new_fd,
             new_path,
             new_len,
-        ) as u32
+        ))
     }
 
     fn wasi_path_symlink(
@@ -604,19 +612,19 @@ impl WasmtimeRuntimeState {
         new_path_len: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_symlink(
+        Self::convert_to_errno(vfs.path_symlink(
             &mut caller,
             old_address,
             old_path_len,
             fd,
             new_address,
             new_path_len,
-        ) as u32
+        ))
     }
 
     fn wasi_path_unlink_file(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.path_unlink_file(&mut caller, fd, path, path_len) as u32
+        Self::convert_to_errno(vfs.path_unlink_file(&mut caller, fd, path, path_len))
     }
 
     fn wasi_poll_oneoff(
@@ -627,7 +635,7 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.poll_oneoff(&mut caller, subscriptions, events, size, address) as u32
+        Self::convert_to_errno(vfs.poll_oneoff(&mut caller, subscriptions, events, size, address))
     }
 
     fn wasi_proc_exit(mut caller: Caller, exit_code: u32) {
@@ -645,17 +653,17 @@ impl WasmtimeRuntimeState {
     fn wasi_proc_raise(mut caller: Caller, signal: u32) -> u32 {
         let signal = convert_wasi_arg!(signal, u8);
         let mut vfs = lock_vfs!();
-        vfs.proc_raise(&mut caller, signal) as u32
+        Self::convert_to_errno(vfs.proc_raise(&mut caller, signal))
     }
 
     fn wasi_sched_yield(mut caller: Caller) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.sched_yield(&mut caller) as u32
+        Self::convert_to_errno(vfs.sched_yield(&mut caller))
     }
 
     fn wasi_random_get(mut caller: Caller, address: u32, length: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        vfs.random_get(&mut caller, address, length) as u32
+        Self::convert_to_errno(vfs.random_get(&mut caller, address, length))
     }
 
     fn wasi_sock_recv(
@@ -669,7 +677,7 @@ impl WasmtimeRuntimeState {
     ) -> u32 {
         let ri_flag = convert_wasi_arg!(ri_flag, u16);
         let mut vfs = lock_vfs!();
-        vfs.sock_recv(
+        Self::convert_to_errno(vfs.sock_recv(
             &mut caller,
             socket,
             buf_address,
@@ -677,7 +685,7 @@ impl WasmtimeRuntimeState {
             ri_flag,
             ro_data_len,
             ro_flag,
-        ) as u32
+        ))
     }
 
     fn wasi_sock_send(
@@ -690,20 +698,20 @@ impl WasmtimeRuntimeState {
     ) -> u32 {
         let si_flag = convert_wasi_arg!(si_flag, u16);
         let mut vfs = lock_vfs!();
-        vfs.sock_send(
+        Self::convert_to_errno(vfs.sock_send(
             &mut caller,
             socket,
             buf_address,
             buf_len,
             si_flag,
             ro_data_len,
-        ) as u32
+        ))
     }
 
     fn wasi_sock_shutdown(mut caller: Caller, socket: u32, sd_flag: u32) -> u32 {
         let sd_flag = convert_wasi_arg!(sd_flag, u8);
         let mut vfs = lock_vfs!();
-        vfs.sock_shutdown(&mut caller, socket, sd_flag) as u32
+        Self::convert_to_errno(vfs.sock_shutdown(&mut caller, socket, sd_flag))
     }
 }
 
