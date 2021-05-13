@@ -29,11 +29,11 @@ use std::{
 type EnclaveHandler<A> = Arc<Mutex<Option<Box<dyn crate::veracruz_server::VeracruzServer<A> + Sync + Send>>>>;
 
 #[post("/veracruz_server")]
-async fn veracruz_server_request<A>(
+async fn veracruz_server_request<A: std::fmt::Debug + std::fmt::Display>(
     enclave_handler: web::Data<EnclaveHandler<A>>,
     _request: HttpRequest,
     input_data: String,
-) -> VeracruzServerResponder {
+) -> VeracruzServerResponder<A> {
     let enclave_handler_locked = enclave_handler.lock()?;
     let enclave = enclave_handler_locked
         .as_ref()
@@ -48,12 +48,12 @@ async fn veracruz_server_request<A>(
 }
 
 #[post("/runtime_manager")]
-async fn runtime_manager_request<A>(
+async fn runtime_manager_request<A: std::fmt::Debug + std::fmt::Display>(
     enclave_handler: web::Data<EnclaveHandler<A>>,
     stopper: web::Data<mpsc::Sender<()>>,
     _request: HttpRequest,
     input_data: String,
-) -> VeracruzServerResponder {
+) -> VeracruzServerResponder<A> {
     let fields = input_data.split_whitespace().collect::<Vec<&str>>();
     if fields.len() < 2 {
         return Err(VeracruzServerError::InvalidRequestFormatError);
@@ -102,11 +102,11 @@ async fn runtime_manager_request<A>(
 }
 
 /// Return an actix server. The caller should call .await for starting the service.
-pub fn server<A>(policy_filename: &str) -> Result<Server, VeracruzServerError<A>> {
+pub fn server<A: std::fmt::Debug + std::fmt::Display + 'static>(policy_filename: &str) -> Result<Server, VeracruzServerError<A>> {
     let policy_json = std::fs::read_to_string(policy_filename)?;
     let policy: veracruz_utils::VeracruzPolicy = serde_json::from_str(policy_json.as_str())?;
     #[allow(non_snake_case)]
-    let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
+    let VERACRUZ_SERVER: EnclaveHandler<A> = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
         &policy_json,
     )?))));
 

@@ -23,7 +23,7 @@ use veracruz_utils::nitro_enclave::NitroError;
 pub type VeracruzServerResponder<A> = Result<String, VeracruzServerError<A>>;
 
 #[derive(Debug, Error)]
-pub enum VeracruzServerError<A> {
+pub enum VeracruzServerError<A: std::fmt::Debug> {
     #[error(display = "VeracruzServer: TLSError: {:?}.", _0)]
     TLSError(#[error(source)] rustls::TLSError),
     #[error(display = "VeracruzServer: HexError: {:?}.", _0)]
@@ -169,17 +169,18 @@ pub enum VeracruzServerError<A> {
     DirectStrError(&'static str),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
+    #[error(display = "TODO: Unimplemented")]
     Extension(A)
 }
 
-impl<T, A> From<std::sync::PoisonError<T>> for VeracruzServerError<A> {
+impl<T, A: std::fmt::Debug> From<std::sync::PoisonError<T>> for VeracruzServerError<A> {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         VeracruzServerError::LockError(format!("{:?}", error))
     }
 }
 
 #[cfg(feature = "sgx")]
-impl<A> From<sgx_types::sgx_status_t> for VeracruzServerError<A> {
+impl<A: std::fmt::Debug> From<sgx_types::sgx_status_t> for VeracruzServerError<A> {
     fn from(error: sgx_types::sgx_status_t) -> Self {
         match error {
             sgx_types::sgx_status_t::SGX_SUCCESS => {
@@ -212,7 +213,7 @@ impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError<A> {
     }
 }
 
-pub trait VeracruzServer<A> {
+pub trait VeracruzServer<A: std::fmt::Debug + std::fmt::Display> {
     fn new(policy: &str) -> Result<Self, VeracruzServerError<A>>
     where
         Self: Sized;
@@ -244,7 +245,7 @@ pub trait VeracruzServer<A> {
     fn close(&mut self) -> Result<bool, VeracruzServerError<A>>;
 }
 
-pub fn send_proxy_attestation_server_start<A>(
+pub fn send_proxy_attestation_server_start<A: std::fmt::Debug + std::fmt::Display>(
     url_base: &str,
     protocol: &str,
     firmware_version: &str,
@@ -260,7 +261,7 @@ pub fn send_proxy_attestation_server_start<A>(
     return Ok(response);
 }
 
-pub fn post_buffer<A>(url: &str, buffer: &String) -> Result<String, VeracruzServerError<A>> {
+pub fn post_buffer<A: std::fmt::Debug + std::fmt::Display>(url: &str, buffer: &String) -> Result<String, VeracruzServerError<A>> {
     let mut buffer_reader = stringreader::StringReader::new(buffer);
 
     let mut curl_request = Easy::new();

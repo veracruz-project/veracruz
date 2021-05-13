@@ -47,7 +47,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn tls_data_needed<A>(&self, session_id: u32) -> Result<bool, VeracruzServerError<A>> {
+        fn tls_data_needed<A: std::fmt::Debug + std::fmt::Display>(&self, session_id: u32) -> Result<bool, VeracruzServerError<A>> {
             let mut needed: u8 = 4;
             let mut result: u32 = 0;
             let ret = unsafe {
@@ -67,7 +67,7 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    fn start_enclave<A>(library_fn: &str) -> Result<SgxEnclave, VeracruzServerError<A>> {
+    fn start_enclave<A: std::fmt::Debug + std::fmt::Display>(library_fn: &str) -> Result<SgxEnclave, VeracruzServerError<A>> {
         let mut launch_token: sgx_launch_token_t = [0; 1024];
         let mut launch_token_updated: i32 = 0;
 
@@ -87,7 +87,7 @@ pub mod veracruz_server_sgx {
         Ok(enclave)
     }
 
-    fn fetch_firmware_version<A>(enclave: &SgxEnclave) -> Result<String, VeracruzServerError<A>> {
+    fn fetch_firmware_version<A: std::fmt::Debug + std::fmt::Display>(enclave: &SgxEnclave) -> Result<String, VeracruzServerError<A>> {
         let mut gfvl_result: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_ret = unsafe {
@@ -117,7 +117,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn send_start<A>(
+        fn send_start<A: std::fmt::Debug + std::fmt::Display>(
             &mut self,
             url_base: &str,
             protocol: &str,
@@ -135,7 +135,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn send_sgx_msg1<A>(
+        fn send_sgx_msg1<A: std::fmt::Debug + std::fmt::Display>(
             &mut self,
             url_base: &str,
             attestation_context: &sgx_ra_context_t,
@@ -160,7 +160,7 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    fn attestation_challenge<A>(
+    fn attestation_challenge<A: std::fmt::Debug + std::fmt::Display>(
         enclave: &SgxEnclave,
         pubkey_challenge: &Vec<u8>,
         context: &sgx_ra_context_t,
@@ -341,7 +341,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn send_msg3<A>(
+        fn send_msg3<A: std::fmt::Debug + std::fmt::Display>(
             &self,
             url_base: &str,
             attestation_context: &sgx_ra_context_t,
@@ -378,7 +378,7 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
-        fn native_attestation<A>(
+        fn native_attestation<A: std::fmt::Debug + std::fmt::Display>(
             &mut self,
             sgx_root_enclave: &SgxEnclave,
             proxy_attestation_server_url: &String,
@@ -463,7 +463,7 @@ pub mod veracruz_server_sgx {
         }
     }
 
-    impl<A> VeracruzServer for VeracruzServerSGX {
+    impl<A> VeracruzServer<A> for VeracruzServerSGX where A: std::fmt::Debug + std::fmt::Display {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError<A>> {
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_FILE)?;
 
