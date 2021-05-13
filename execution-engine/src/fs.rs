@@ -14,7 +14,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use log::info;
 use platform_services::{getrandom, result};
 use std::{
     collections::HashMap,
@@ -303,8 +302,7 @@ impl FileSystem {
 
     /// The stub implementation of `clock_res_get`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn clock_res_get(&self, clock_id: ClockId) -> FileSystemError<Timestamp> {
-        info!("call clock_res_get on clock_id {:?}", clock_id);
+    pub(crate) fn clock_res_get(&self, _clock_id: ClockId) -> FileSystemError<Timestamp> {
         Err(ErrNo::NoSys)
     }
 
@@ -312,13 +310,9 @@ impl FileSystem {
     #[inline]
     pub(crate) fn clock_time_get(
         &self,
-        clock_id: ClockId,
-        precision: Timestamp,
+        _clock_id: ClockId,
+        _precision: Timestamp,
     ) -> FileSystemError<Timestamp> {
-        info!(
-            "call clock_time_get on clock_id {:?}, precision {:?}",
-            clock_id, precision
-        );
         Err(ErrNo::NoSys)
     }
 
@@ -332,10 +326,6 @@ impl FileSystem {
         len: FileSize,
         adv: Advice,
     ) -> FileSystemError<()> {
-        info!(
-            "call fd_advise on fd {:?}, offset {:?}, len {:?}, advice {:?}",
-            fd, offset, len, adv
-        );
         self.check_right(&fd, Rights::FD_ADVISE)?;
         let entry = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?;
         entry.advice.push((offset, len, adv));
@@ -346,14 +336,10 @@ impl FileSystem {
     #[inline]
     pub(crate) fn fd_allocate(
         &mut self,
-        fd: Fd,
-        offset: FileSize,
-        len: FileSize,
+        _fd: Fd,
+        _offset: FileSize,
+        _len: FileSize,
     ) -> FileSystemError<()> {
-        info!(
-            "call fd_allocate on fd {:?}, offset {:?}, len {:?}",
-            fd, offset, len
-        );
         Err(ErrNo::NoSys)
     }
 
@@ -361,7 +347,6 @@ impl FileSystem {
     /// file descriptor.  Returns `ErrNo::BadF`, if `fd` is not a current file-descriptor.
     #[inline]
     pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
-        info!("call fd_close on {:?}", fd);
         self.fd_table.remove(&fd).ok_or(ErrNo::BadF)?;
         Ok(())
     }
@@ -369,7 +354,6 @@ impl FileSystem {
     /// The stub implementation of `fd_datasync`. Return unsupported error `NoSys`.
     #[inline]
     pub(crate) fn fd_datasync(&mut self, fd: Fd) -> FileSystemError<()> {
-        info!("call fd_datasync on fd {:?}", fd);
         self.check_right(&fd, Rights::FD_DATASYNC)?;
         Err(ErrNo::NoSys)
     }
@@ -377,17 +361,12 @@ impl FileSystem {
     /// Return a copy of the status of the file descriptor, `fd`.
     #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemError<FdStat> {
-        info!("call fd_fdstat_get on {:?}", fd);
         Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat.clone())
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
     #[inline]
     pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemError<()> {
-        info!(
-            "call fd_fdstat_set_flags on fd {:?} and flags {:?}",
-            fd, flags
-        );
         self.check_right(&fd, Rights::FD_FDSTAT_SET_FLAGS)?;
         self.fd_table
             .get_mut(&fd)
@@ -405,10 +384,6 @@ impl FileSystem {
         rights_base: Rights,
         rights_inheriting: Rights,
     ) -> FileSystemError<()> {
-        info!(
-            "call fd_fdstat_set_rights on fd {:?}, right base {:?} and inheriting {:?}",
-            fd, rights_base, rights_inheriting
-        );
         let mut fd_stat = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat;
         fd_stat.rights_base = rights_base;
         fd_stat.rights_inheriting = rights_inheriting;
@@ -417,7 +392,6 @@ impl FileSystem {
 
     /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
     pub(crate) fn fd_filestat_get(&self, fd: Fd) -> FileSystemError<FileStat> {
-        info!("call fd_filestat_get on fd {:?}", fd);
         let inode = self
             .fd_table
             .get(&fd)
@@ -435,10 +409,6 @@ impl FileSystem {
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bytes are
     /// filled with ZERO.
     pub(crate) fn fd_filestat_set_size(&mut self, fd: Fd, size: FileSize) -> FileSystemError<()> {
-        info!(
-            "call fd_filestat_set_size on fd {:?} and size {:?}",
-            fd, size
-        );
         self.check_right(&fd, Rights::FD_FILESTAT_SET_SIZE)?;
         let inode = self
             .fd_table
@@ -462,10 +432,6 @@ impl FileSystem {
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
     ) -> FileSystemError<()> {
-        info!(
-            "call fd_filestat_set_times on fd {:?}, atime {:?}, mtime {:?} and fst_flags {:?}",
-            fd, atime, mtime, fst_flags
-        );
         self.check_right(&fd, Rights::FD_FILESTAT_SET_TIMES)?;
         let inode = self
             .fd_table
@@ -500,10 +466,6 @@ impl FileSystem {
         buffer_len: usize,
         offset: FileSize,
     ) -> FileSystemError<Vec<u8>> {
-        info!(
-            "call fd_pread on fd {:?} buffer_len {:?} and offset {:?}",
-            fd, buffer_len, offset
-        );
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
         // NOTE: It should be safe to convert a u64 to usize.
@@ -530,14 +492,12 @@ impl FileSystem {
             to_read.len()
         };
         let (rst, _) = to_read.split_at(read_length);
-        info!("call fd_pread read {:?} bytes", rst.len());
         Ok(rst.to_vec())
     }
 
     /// Return the status of a pre-opened Fd `fd`.
     #[inline]
     pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemError<Prestat> {
-        info!("call fd_prestat_get on {:?}", fd);
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         let resource_type = PreopenType::Dir {
             name_len: path.as_os_str().len() as u32,
@@ -548,7 +508,6 @@ impl FileSystem {
     /// Return the path of a pre-opened Fd `fd`. The path must be consistent with the status returned by `fd_prestat_get`
     #[inline]
     pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemError<PathBuf> {
-        info!("call fd_prestat_dir_name on {:?}", fd);
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         Ok(path.to_path_buf())
     }
@@ -565,20 +524,10 @@ impl FileSystem {
         buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemError<Size> {
-        info!(
-            "call fd_pwrite on fd {:?}, offset {:?} and buf {:?}",
-            fd,
-            offset,
-            buf.len()
-        );
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
         let inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
-        info!(
-            "call fd_pwrite before: {:?}",
-            inode_impl.raw_file_data.len()
-        );
         //          offset
         //             v  .. remain_length .. v
         // ----------------------------------------------
@@ -591,27 +540,20 @@ impl FileSystem {
         let remain_length = (inode_impl.file_stat.file_size - offset) as usize;
         let offset = offset as usize;
         if remain_length <= buf.len() {
-            info!("call fd_pwrite grows length");
             let mut grow_vec = vec![0; buf.len() - remain_length];
             inode_impl.raw_file_data.append(&mut grow_vec);
         }
         let rst = buf.len();
         inode_impl.raw_file_data[offset..(offset + rst)].copy_from_slice(&buf);
         inode_impl.file_stat.file_size = inode_impl.raw_file_data.len() as u64;
-        info!(
-            "call fd_pwrite result: {:?}",
-            inode_impl.raw_file_data.len()
-        );
         Ok(rst as Size)
     }
 
     /// A rust-style base implementation for `fd_read`. It directly calls `fd_pread` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
     pub(crate) fn fd_read(&mut self, fd: Fd, len: usize) -> FileSystemError<Vec<u8>> {
-        info!("call fd_read on {:?} and length {:?}", fd, len);
         self.check_right(&fd, Rights::FD_READ)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
-        info!("call fd_read new offset {:?}", offset);
 
         let rst = self.fd_pread(fd, len, offset)?;
         self.fd_seek(fd, rst.len() as i64, Whence::Current)?;
@@ -620,8 +562,7 @@ impl FileSystem {
 
     /// The stub implementation of `fd_readdir`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn fd_readdir(&mut self, fd: Fd, cookie: DirCookie) -> FileSystemError<Vec<DirEnt>> {
-        info!("call fd_readdir on {:?} and cookie {:?}", fd, cookie);
+    pub(crate) fn fd_readdir(&mut self, fd: Fd, _cookie: DirCookie) -> FileSystemError<Vec<DirEnt>> {
         self.check_right(&fd, Rights::FD_READDIR)?;
         Err(ErrNo::NoSys)
     }
@@ -630,7 +571,6 @@ impl FileSystem {
     /// execution engine is single-threaded this is atomic from the WASM program's
     /// point of view.
     pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemError<()> {
-        info!("call fd_renumber on {:?} to a new fd {:?}", old_fd, new_fd);
         let entry = self.fd_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
         if self.fd_table.get(&new_fd).is_none() {
             self.fd_table.insert(new_fd, entry);
@@ -648,10 +588,6 @@ impl FileSystem {
         delta: FileDelta,
         whence: Whence,
     ) -> FileSystemError<FileSize> {
-        info!(
-            "call fd_seek on fd {:?}, delta {:?} and whence {:?}",
-            fd, delta, whence
-        );
         self.check_right(&fd, Rights::FD_SEEK)?;
         let FileTableEntry { inode, offset, .. } = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?;
         let file_size = self
@@ -667,7 +603,6 @@ impl FileSystem {
             Whence::Start => 0,
         };
 
-        info!("call fd_seek on new base offset {:?}", new_base_offset);
         // NOTE: Ensure the computation does not overflow.
         let new_offset: FileSize = if delta >= 0 {
             // It is safe to convert a positive i64 to u64.
@@ -685,7 +620,6 @@ impl FileSystem {
             new_base_offset - (delta.abs() as u64)
         };
 
-        info!("call fd_seek on new offset {:?}", new_offset);
         // Update the offset
         self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.offset = new_offset;
         Ok(new_offset)
@@ -694,7 +628,6 @@ impl FileSystem {
     /// The stub implementation of `fd_sync`. Return unsupported error `NoSys`.
     #[inline]
     pub(crate) fn fd_sync(&mut self, fd: Fd) -> FileSystemError<()> {
-        info!("call fd_sync on fd {:?}", fd);
         self.check_right(&fd, Rights::FD_SYNC)?;
         Err(ErrNo::NoSys)
     }
@@ -702,7 +635,6 @@ impl FileSystem {
     /// Returns the current offset associated with the file descriptor.
     #[inline]
     pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemError<FileSize> {
-        info!("call fd_tell on fd {:?}", fd);
         self.check_right(&fd, Rights::FD_TELL)?;
         Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset.clone())
     }
@@ -710,7 +642,6 @@ impl FileSystem {
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
     pub(crate) fn fd_write(&mut self, fd: Fd, buf: Vec<u8>) -> FileSystemError<Size> {
-        info!("call fd_write on {:?}", fd);
         self.check_right(&fd, Rights::FD_WRITE)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
@@ -724,13 +655,8 @@ impl FileSystem {
     pub(crate) fn path_create_directory(
         &mut self,
         fd: Fd,
-        path: impl AsRef<Path>,
+        _path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
-        info!(
-            "call path_create_directory on fd {:?} and path {:?}",
-            fd,
-            path.as_ref()
-        );
         self.check_right(&fd, Rights::PATH_CREATE_DIRECTORY)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -743,14 +669,10 @@ impl FileSystem {
     pub(crate) fn path_filestat_get(
         &mut self,
         fd: Fd,
-        flags: LookupFlags,
+        _flags: LookupFlags,
         path: impl AsRef<Path>,
     ) -> FileSystemError<FileStat> {
         let path = path.as_ref();
-        info!(
-            "call path_filestat_get on fd {:?} flag {:?} and path {:?}",
-            fd, flags, path
-        );
         self.check_right(&fd, Rights::PATH_FILESTAT_GET)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -771,14 +693,13 @@ impl FileSystem {
     pub(crate) fn path_filestat_set_times(
         &mut self,
         fd: Fd,
-        flags: LookupFlags,
+        _flags: LookupFlags,
         path: impl AsRef<Path>,
         atime: Timestamp,
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
     ) -> FileSystemError<()> {
         let path = path.as_ref();
-        info!("call path_filestat_get on fd {:?} flag {:?}, path {:?}, atime {:?}, mtime {:?} and fst_flags {:?}", fd, flags, path, atime, mtime, fst_flags);
         self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -812,7 +733,7 @@ impl FileSystem {
         principal: &Principal,
         // The parent fd for searching
         fd: Fd,
-        dirflags: LookupFlags,
+        _dirflags: LookupFlags,
         path: impl AsRef<Path>,
         oflags: OpenFlags,
         rights_base: Rights,
@@ -820,8 +741,6 @@ impl FileSystem {
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
         let path = path.as_ref();
-        info!("call path_open, on behalf of fd {:?} and principal {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
-            fd, principal, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
@@ -849,10 +768,6 @@ impl FileSystem {
         }
         let rights_base = rights_base & principal_right;
         let rights_inheriting = rights_inheriting & principal_right;
-        info!(
-            "call path_open, the actually right {:?} and inheriting right {:?}",
-            rights_base, rights_inheriting
-        );
         // Several oflags logic, inc. `create`, `excl` and `trunc`. We ignore `directory`.
         let inode = match self.path_table.get(path) {
             Some(i) => {
@@ -878,7 +793,6 @@ impl FileSystem {
         };
         // Truncate the file if `trunc` flag is set.
         if oflags.contains(OpenFlags::TRUNC) {
-            info!("call path_open trunc flag");
             // Check the right of the program on truacate
             if !principal_right.contains(Rights::PATH_FILESTAT_SET_SIZE) {
                 return Err(ErrNo::Access);
@@ -908,7 +822,6 @@ impl FileSystem {
                 advice: vec![(0, file_size, Advice::Normal)],
             },
         );
-        info!("new fd {:?} created for {:?}.", new_fd, path);
         Ok(new_fd)
     }
 
@@ -918,13 +831,8 @@ impl FileSystem {
     pub(crate) fn path_readlink(
         &mut self,
         fd: Fd,
-        path: impl AsRef<Path>,
+        _path: impl AsRef<Path>,
     ) -> FileSystemError<Vec<u8>> {
-        info!(
-            "call path_readlink on fd {:?}, path {:?}",
-            fd,
-            path.as_ref()
-        );
         self.check_right(&fd, Rights::PATH_READLINK)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -939,13 +847,8 @@ impl FileSystem {
     pub(crate) fn path_remove_directory(
         &mut self,
         fd: Fd,
-        path: impl AsRef<Path>,
+        _path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
-        info!(
-            "call path_remove_directory on fd {:?}, path {:?}",
-            fd,
-            path.as_ref()
-        );
         self.check_right(&fd, Rights::PATH_REMOVE_DIRECTORY)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -959,17 +862,10 @@ impl FileSystem {
     pub(crate) fn path_rename(
         &mut self,
         old_fd: Fd,
-        old_path: impl AsRef<Path>,
+        _old_path: impl AsRef<Path>,
         new_fd: Fd,
-        new_path: impl AsRef<Path>,
+        _new_path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
-        info!(
-            "call path_rename on old fd {:?}, old path {:?}, new fd {:?}, new path: {:?}",
-            old_fd,
-            old_path.as_ref(),
-            new_fd,
-            new_path.as_ref()
-        );
         self.check_right(&old_fd, Rights::PATH_RENAME_SOURCE)?;
         self.check_right(&new_fd, Rights::PATH_RENAME_TARGET)?;
         Err(ErrNo::NoSys)
@@ -991,19 +887,11 @@ impl FileSystem {
     pub(crate) fn path_link(
         &mut self,
         old_fd: Fd,
-        old_flag: LookupFlags,
-        old_path: impl AsRef<Path>,
+        _old_flag: LookupFlags,
+        _old_path: impl AsRef<Path>,
         new_fd: Fd,
-        new_path: impl AsRef<Path>,
+        _new_path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
-        info!(
-            "call path_link on fd {:?}, flag {:?}, old path {:?}, new fd {:?}, new path: {:?}",
-            old_fd,
-            old_flag,
-            old_path.as_ref(),
-            new_fd,
-            new_path.as_ref()
-        );
         self.check_right(&old_fd, Rights::PATH_LINK_SOURCE)?;
         self.check_right(&new_fd, Rights::PATH_LINK_TARGET)?;
         Err(ErrNo::NoSys)
@@ -1013,16 +901,10 @@ impl FileSystem {
     #[inline]
     pub(crate) fn path_symlink(
         &mut self,
-        old_path: impl AsRef<Path>,
+        _old_path: impl AsRef<Path>,
         fd: Fd,
-        new_path: impl AsRef<Path>,
+        _new_path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
-        info!(
-            "call path_symlink on old path {:?}, fd {:?}, new path: {:?}",
-            old_path.as_ref(),
-            fd,
-            new_path.as_ref()
-        );
         self.check_right(&fd, Rights::PATH_SYMLINK)?;
         Err(ErrNo::NoSys)
     }
@@ -1032,9 +914,8 @@ impl FileSystem {
     pub(crate) fn path_unlink_file(
         &mut self,
         fd: Fd,
-        path: impl AsRef<Path>,
+        _path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
-        info!("call path_symlink on fd {:?}, path {:?}", fd, path.as_ref());
         self.check_right(&fd, Rights::PATH_UNLINK_FILE)?;
         Err(ErrNo::NoSys)
     }
@@ -1043,14 +924,9 @@ impl FileSystem {
     #[inline]
     pub(crate) fn poll_oneoff(
         &mut self,
-        subscriptions: Vec<Subscription>,
-        events: Vec<Event>,
+        _subscriptions: Vec<Subscription>,
+        _events: Vec<Event>,
     ) -> FileSystemError<Size> {
-        info!(
-            "call path_symlink on the length subscriptions {:?}, event {:?}",
-            subscriptions.len(),
-            events.len()
-        );
         Err(ErrNo::NoSys)
     }
 
@@ -1059,13 +935,9 @@ impl FileSystem {
     pub(crate) fn sock_recv(
         &mut self,
         socket: Fd,
-        buffer_len: usize,
-        ri_flags: RiFlags,
+        _buffer_len: usize,
+        _ri_flags: RiFlags,
     ) -> FileSystemError<(Vec<u8>, RoFlags)> {
-        info!(
-            "call sock_recv on the socket {:?}, buffer_len {:?}, ri_flag {:?}",
-            socket, buffer_len, ri_flags
-        );
         self.check_right(&socket, Rights::FD_READ)?;
         Err(ErrNo::NoSys)
     }
@@ -1075,23 +947,16 @@ impl FileSystem {
     pub(crate) fn sock_send(
         &mut self,
         socket: Fd,
-        buf: Vec<u8>,
-        si_flags: SiFlags,
+        _buf: Vec<u8>,
+        _si_flags: SiFlags,
     ) -> FileSystemError<Size> {
-        info!(
-            "call sock_recv on the socket {:?}, buffer len {:?}, si_flag {:?}",
-            socket,
-            buf.len(),
-            si_flags
-        );
         self.check_right(&socket, Rights::FD_WRITE)?;
         Err(ErrNo::NoSys)
     }
 
     /// The stub implementation of `sock_shutdown`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn sock_shutdown(&mut self, socket: Fd, flags: SdFlags) -> FileSystemError<()> {
-        info!("call sock_recv on the socket {:?} flag {:?}", socket, flags);
+    pub(crate) fn sock_shutdown(&mut self, socket: Fd, _flags: SdFlags) -> FileSystemError<()> {
         self.check_right(&socket, Rights::SOCK_SHUTDOWN)?;
         Err(ErrNo::NoSys)
     }
@@ -1112,7 +977,6 @@ impl FileSystem {
         is_append: bool,
     ) -> Result<(), ErrNo> {
         let file_name = file_name.as_ref();
-        info!("write_file_by_filename: {:?}", file_name);
         let oflag = OpenFlags::CREATE | if !is_append { OpenFlags::TRUNC } else { OpenFlags::empty() };
         let fd = self.path_open(
             principal,
@@ -1151,7 +1015,6 @@ impl FileSystem {
         file_name: impl AsRef<Path>,
     ) -> Result<Vec<u8>, ErrNo> {
         let file_name = file_name.as_ref();
-        info!("read_file_by_filename: {:?}", file_name);
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,

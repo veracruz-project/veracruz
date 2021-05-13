@@ -20,7 +20,6 @@
 use crate::fs::{FileSystem, FileSystemError};
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
-use log::info;
 use serde::{Deserialize, Serialize};
 #[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -436,7 +435,6 @@ impl WasiWrapper {
         address_for_string_ptrs: u32,
         buf_address: u32,
     ) -> FileSystemError<()> {
-        info!("args_get is called");
         let buffer = self
             .program_arguments
             .iter()
@@ -453,7 +451,6 @@ impl WasiWrapper {
         address_for_counts: u32,
         address_for_buffer_size: u32,
     ) -> FileSystemError<()> {
-        info!("args_sizes_get is called");
         let environc = self.program_arguments.len() as u32;
         let environ_buf_size = self
             .program_arguments
@@ -475,7 +472,6 @@ impl WasiWrapper {
         address_for_string_ptrs: u32,
         buf_address: u32,
     ) -> FileSystemError<()> {
-        info!("environ_get is called");
         let buffer = self
             .environment_variables
             .iter()
@@ -495,7 +491,6 @@ impl WasiWrapper {
         address_for_counts: u32,
         address_for_buffer_size: u32,
     ) -> FileSystemError<()> {
-        info!("environ_sizes_get is called");
         let environc = self.environment_variables.len() as u32;
         let environ_buf_size = self
             .environment_variables
