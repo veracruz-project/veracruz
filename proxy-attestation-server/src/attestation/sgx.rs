@@ -214,7 +214,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
     let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_sig, csr, device_id) =
         transport_protocol::parse_attestation_tokens(&parsed)
         .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::msg3a parse_attestation_tokens failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
             err
         })?;
     {
