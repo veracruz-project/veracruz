@@ -35,6 +35,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
     vec::Vec,
+    path::PathBuf,
 };
 use veracruz_utils::policy::principal::{ExecutionStrategy, Principal};
 use wasi_types::Rights;
@@ -227,11 +228,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::PATH_FILESTAT_SET_SIZE;
 
     // Manually create the Right table for the VFS.
-    file_table.insert(prog_file_name.to_string(), write_right);
+    file_table.insert(PathBuf::from(prog_file_name.clone()), write_right);
     for file_path in cmdline.data_sources.iter() {
-        file_table.insert(file_path.to_string(), read_right);
+        file_table.insert(PathBuf::from(file_path), read_right);
     }
-    file_table.insert(OUTPUT_FILE.to_string(), write_right);
+    file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
     let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));

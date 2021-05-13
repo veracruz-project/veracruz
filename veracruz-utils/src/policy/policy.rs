@@ -46,6 +46,7 @@ use std::{
     collections::HashMap,
     string::{String, ToString},
     vec::Vec,
+    path::PathBuf,
 };
 use wasi_types::Rights;
 
@@ -318,7 +319,7 @@ impl Policy {
     }
 
     /// Return the program input table, mapping program filenames to their expected input filenames.
-    pub fn get_input_table(&self) -> Result<HashMap<String, Vec<String>>, PolicyError> {
+    pub fn get_input_table(&self) -> Result<HashMap<String, Vec<PathBuf>>, PolicyError> {
         let mut table = HashMap::new();
         for program in &self.programs {
             let program_file_name = program.program_file_name();
@@ -333,10 +334,10 @@ impl Policy {
 
     /// Extract the input filenames from a right_map. If a prorgam has rights call 
     /// fd_read and path_open, it is considered as an input file.
-    fn get_required_inputs(right_map: &HashMap<String, Rights>) -> Vec<String> {
+    fn get_required_inputs(right_map: &HashMap<PathBuf, Rights>) -> Vec<PathBuf> {
         let mut rst = right_map.iter().fold(Vec::new(), |mut acc, (file_name, right)| {
             if right.contains(Rights::FD_READ | Rights::PATH_OPEN) {
-                acc.push(file_name.to_string());
+                acc.push(file_name.into());
             }
             acc
         });

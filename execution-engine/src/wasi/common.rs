@@ -35,6 +35,7 @@ use wasi_types::{
     IoVec, LookupFlags, OpenFlags, RiFlags, Rights, RoFlags, SdFlags, SetTimeFlags, SiFlags,
     Signal, Subscription, SubscriptionClock, SubscriptionUnion, SubscriptionFdReadwrite, Whence,
 };
+use std::os::unix::ffi::OsStrExt;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
@@ -715,11 +716,11 @@ impl WasiWrapper {
     ) -> FileSystemError<()> {
         let size = size as usize;
         let mut fs = self.lock_vfs()?;
-        let result = fs.fd_prestat_dir_name(fd.into())?;
+        let result = fs.fd_prestat_dir_name(fd.into())?.into_os_string();
         if result.len() > size as usize {
             return Err(ErrNo::NameTooLong);
         }
-        memory_ref.write_buffer(address, &result.into_bytes())
+        memory_ref.write_buffer(address, result.as_bytes())
     }
 
     /// The implementation of the WASI `fd_pwrite` function. It requires an extra `memory_ref` to
