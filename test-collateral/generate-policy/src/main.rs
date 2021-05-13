@@ -10,7 +10,7 @@
 //! and copyright information.
 
 use std::{
-    fs::File,
+    fs::{ File, read_to_string},
     io::{Read, Write},
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -116,6 +116,8 @@ struct Arguments {
     veracruz_server_ip: Option<SocketAddr>,
     /// The socket address (IP and port) of the Veracruz proxy attestation instance.
     proxy_attestation_server_ip: Option<SocketAddr>,
+    /// The filename of the Proxy Attestation Service certificate
+    proxy_service_cert: PathBuf,
     /// The filename of the Runtime Manager CSS file for SGX measurement.  This is
     /// optional.
     css_file: Option<PathBuf>,
@@ -156,6 +158,7 @@ impl Arguments {
             binary_capabilities: Vec::new(),
             veracruz_server_ip: None,
             proxy_attestation_server_ip: None,
+            proxy_service_cert: PathBuf::new(),
             css_file: None,
             pcr0_file: None,
             output_policy_file: PathBuf::new(),
@@ -243,6 +246,13 @@ fn parse_command_line() -> Arguments {
                 .long("proxy-attestation-server-ip")
                 .value_name("IP ADDRESS")
                 .help("IP address of the Veracruz proxy attestation server.")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("proxy-attestation-server-cert")
+                .long("proxy-attestation-server-cert")
+                .value_name("PROXY_CERT")
+                .help("CA Certificate that the proxy attestation service uses to create and sign certificates")
                 .required(true),
         )
         .arg(
@@ -391,6 +401,12 @@ binary.",
         }
     } else {
         abort_with("No Veracruz proxy attestation server IP address was passed as a command line parameter.");
+    }
+
+    if let Some(cert_file) = matches.value_of("proxy-attestation-server-cert") {
+        arguments.proxy_service_cert = PathBuf::from(cert_file);
+    } else {
+        abort_with("No Proxy Attestation Server certificate filename was passed as a command line parameter.");
     }
 
     if let Some(fname) = matches.value_of("output-policy-file") {
@@ -632,6 +648,12 @@ fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
     values
 }
 
+/// Serializes the proxy attestation service certificate (basically reads the
+/// string from the file and returns that
+pub fn serialize_certificate(path: &PathBuf) -> String {
+    return read_to_string(path.to_str().unwrap()).unwrap();
+}
+
 /// Serializes the identities of all principals in the Veracruz computation into
 /// a vec of VeracruzProgram.
 fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
@@ -750,6 +772,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
         format!("{}", &arguments.proxy_attestation_server_ip.as_ref().expect(&format!("Failed to get the proxy attestation server ip"))),
+        serialize_certificate(&arguments.proxy_service_cert),
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
         serialize_std_streams(arguments),

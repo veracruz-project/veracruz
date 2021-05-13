@@ -69,7 +69,7 @@ mod tests {
     use veracruz_server;
     use std::{io::Read, sync::Once, path::Path};
     use proxy_attestation_server;
-    use veracruz_utils::{platform::Platform, policy::policy::Policy};
+    use veracruz_utils::policy::policy::Policy;
 
     #[derive(Debug, Error)]
     pub enum VeracruzTestError {
@@ -293,20 +293,12 @@ mod tests {
         task::sleep(std::time::Duration::from_millis(5000)).await;
         let server_handle = server_tls_loop(LINEAR_REGRESSION_PARALLEL_POLICY);
 
-        #[cfg(feature = "sgx")]
-        let target_platform = Platform::SGX;
-        #[cfg(feature = "tz")]
-        let target_platform = Platform::TrustZone;
-        #[cfg(feature = "nitro")]
-        let target_platform = Platform::Nitro;
-
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
             info!("### program provider start.");
             let mut client =
                 veracruz_client::VeracruzClient::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
-                                      &policy_json,
-                                      &target_platform)?;
+                                      &policy_json)?;
             let program_path = LINEAR_REGRESSION_WASM;
             let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
             info!("### program provider read binary.");
@@ -321,7 +313,7 @@ mod tests {
             task::sleep(std::time::Duration::from_millis(15000)).await;
             info!("### data provider start.");
             let mut client =
-                veracruz_client::VeracruzClient::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json, &target_platform)?;
+                veracruz_client::VeracruzClient::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json)?;
 
             let data_filename = LINEAR_REGRESSION_DATA;
             info!("### data provider read input.");
@@ -378,14 +370,7 @@ mod tests {
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
-                #[cfg(feature = "sgx")]
-                let target_platform = Platform::SGX;
-                #[cfg(feature = "tz")]
-                let target_platform = Platform::TrustZone;
-                #[cfg(feature = "nitro")]
-                let target_platform = Platform::Nitro;
-
-                clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json, &target_platform)?);
+                clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json)?);
             }
 
             info!(
