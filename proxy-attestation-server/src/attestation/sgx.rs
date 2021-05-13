@@ -207,12 +207,12 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             println!("proxy-attestation-server::attestation::sgx::msg3 parse_proxy_attestation_server_request failed:{:?}", err);
             err
         })?;
-    if !parsed.has_sgx_attestation_tokens2() {
+    if !parsed.has_sgx_attestation_tokens() {
         println!("received data is incorrect. TODO: Handle this");
         return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
     }
     let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_sig, csr, device_id) =
-        transport_protocol::parse_attestation_tokens2(&parsed)
+        transport_protocol::parse_attestation_tokens(&parsed)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg3a parse_attestation_tokens2 failed:{:?}", err);
             err

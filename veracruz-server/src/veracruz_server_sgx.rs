@@ -372,7 +372,7 @@ pub mod veracruz_server_sgx {
             device_id: i32,
             csr: &Vec<u8>
         ) -> Result<(Vec<u8>, Vec<u8>), VeracruzServerError> {
-            let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens2(
+            let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens(
                 *attestation_context,
                 msg3,
                 msg3_quote,
