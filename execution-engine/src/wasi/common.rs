@@ -34,7 +34,6 @@ use wasi_types::{
     IoVec, LookupFlags, OpenFlags, RiFlags, Rights, RoFlags, SdFlags, SetTimeFlags, SiFlags,
     Signal, Subscription, SubscriptionClock, SubscriptionUnion, SubscriptionFdReadwrite, Whence,
 };
-use std::os::unix::ffi::OsStrExt;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
@@ -715,6 +714,7 @@ impl WasiWrapper {
         if result.len() > size as usize {
             return Err(ErrNo::NameTooLong);
         }
+        let result = result.into_string().map_err(|_| ErrNo::Inval)?;
         memory_ref.write_buffer(address, result.as_bytes())
     }
 
