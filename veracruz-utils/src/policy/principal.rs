@@ -16,8 +16,9 @@ use super::error::PolicyError;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    string::{String, ToString},
+    string::String,
     vec::Vec,
+    path::PathBuf,
 };
 use wasi_types::Rights;
 
@@ -40,7 +41,7 @@ pub enum Principal {
 
 /// The Right Table, contains the `Right`, i.e.
 /// the allowed operations of a Principal on a file
-pub type RightsTable = HashMap<Principal, HashMap<String, Rights>>;
+pub type RightsTable = HashMap<Principal, HashMap<PathBuf, Rights>>;
 
 /// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -75,9 +76,9 @@ impl FileRights {
 
     /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
     #[inline]
-    pub fn to_right_map(file_right_vec: &[FileRights]) -> HashMap<String, Rights> {
+    pub fn to_right_map(file_right_vec: &[FileRights]) -> HashMap<PathBuf, Rights> {
         file_right_vec.iter().fold(HashMap::new(), |mut acc, FileRights{file_name, rights}| {
-            acc.insert(file_name.to_string(), Rights::from_bits_truncate(*rights as u64));
+            acc.insert(file_name.into(), Rights::from_bits_truncate(*rights as u64));
             acc
         })
     }
@@ -140,7 +141,7 @@ impl Program {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<String, Rights> {
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
         FileRights::to_right_map(&self.file_rights)
     }
 }
@@ -207,7 +208,7 @@ impl<U> Identity<U> {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<String, Rights> {
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
         FileRights::to_right_map(&self.file_rights)
     }
 

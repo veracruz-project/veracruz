@@ -19,9 +19,8 @@ use platform_services::{getrandom, result};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryInto},
-    string::String,
-    string::ToString,
     vec::Vec,
+    path::{Path, PathBuf},
 };
 use veracruz_utils::policy::principal::{Principal, RightsTable};
 use wasi_types::{
@@ -83,12 +82,12 @@ struct FileTableEntry {
 pub struct FileSystem {
     /// A table of file descriptor table entries.  This is indexed by file
     /// descriptors.  
-    file_table: HashMap<Fd, FileTableEntry>,
+    fd_table: HashMap<Fd, FileTableEntry>,
     /// The structure of the file system.
     ///
-    /// NOTE: This is a flat map from files to inodes for now.  It will evolve
-    /// to a full directory (tree) structure.
-    path_table: HashMap<String, Inode>,
+    /// NOTE: This is a flat map from files to inodes for now, assuming everything is in $ROOT.
+    /// It will evolve to a full directory (tree) structure.
+    path_table: HashMap<PathBuf, Inode>,
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
     inode_table: HashMap<Inode, InodeEntry>,
@@ -97,7 +96,7 @@ pub struct FileSystem {
     /// to constrain the `Right` of file descriptors.
     rights_table: RightsTable,
     /// Preopen FD table. Mapping the FD to dir name.
-    prestat_table: HashMap<Fd, String>,
+    prestat_table: HashMap<Fd, PathBuf>,
 }
 
 impl FileSystem {
@@ -121,7 +120,7 @@ impl FileSystem {
     #[inline]
     pub fn new(rights_table: RightsTable) -> Self {
         let mut rst = Self {
-            file_table: HashMap::new(),
+            fd_table: HashMap::new(),
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
             rights_table,
@@ -137,7 +136,7 @@ impl FileSystem {
 
     /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
     /// and then pre-open them.
-    fn install_prestat(&mut self, dir_paths: &[&str]) {
+    fn install_prestat<T>(&mut self, dir_paths: &[T]) where T: AsRef<Path> + Sized {
         // Pre open the stdin stdout and stderr.
         self.install_file("stderr", Inode(0), "".as_bytes());
         self.install_fd(Fd(0), Inode(0), &Rights::FD_READ, &Rights::FD_READ);
@@ -147,7 +146,7 @@ impl FileSystem {
         self.install_fd(Fd(2), Inode(2), &Rights::FD_READ, &Rights::FD_READ);
 
         // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
-        self.install_dir(Self::ROOT_DIRECTORY, Self::ROOT_DIRECTORY_INODE);
+        self.install_dir(Path::new(Self::ROOT_DIRECTORY), Self::ROOT_DIRECTORY_INODE);
         self.install_fd(
             Self::ROOT_DIRECTORY_FD,
             Self::ROOT_DIRECTORY_INODE,
@@ -155,7 +154,7 @@ impl FileSystem {
             &Self::DEFAULT_RIGHTS,
         );
         self.prestat_table
-            .insert(Self::ROOT_DIRECTORY_FD, Self::ROOT_DIRECTORY.to_string());
+            .insert(Self::ROOT_DIRECTORY_FD, PathBuf::from(Self::ROOT_DIRECTORY));
 
         // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
         let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
@@ -169,13 +168,13 @@ impl FileSystem {
                 &Self::DEFAULT_RIGHTS,
                 &Self::DEFAULT_RIGHTS,
             );
-            self.prestat_table.insert(new_fd, path.to_string());
+            self.prestat_table.insert(new_fd, path.as_ref().to_path_buf());
         }
     }
 
     /// Install a dir and attatch it to `inode`.
     /// NOTE: Since we do not have dir structure, it installs a file without any content for now.
-    fn install_dir(&mut self, path: impl AsRef<str>, inode: Inode) {
+    fn install_dir(&mut self, path: impl AsRef<Path>, inode: Inode) {
         let file_stat = FileStat {
             device: (0u64).into(),
             inode: inode.clone(),
@@ -192,11 +191,11 @@ impl FileSystem {
         };
         self.inode_table.insert(inode.clone(), node);
         self.path_table
-            .insert(path.as_ref().to_string(), inode.clone());
+            .insert(path.as_ref().to_path_buf(), inode.clone());
     }
 
     /// Install a file with content `raw_file_data` and attatch it to `inode`.
-    fn install_file(&mut self, path: impl AsRef<str>, inode: Inode, raw_file_data: &[u8]) {
+    fn install_file(&mut self, path: impl AsRef<Path>, inode: Inode, raw_file_data: &[u8]) {
         let file_size = raw_file_data.len();
         let file_stat = FileStat {
             device: 0u64.into(),
@@ -214,7 +213,7 @@ impl FileSystem {
         };
         self.inode_table.insert(inode.clone(), node);
         self.path_table
-            .insert(path.as_ref().to_string(), inode.clone());
+            .insert(path.as_ref().to_path_buf(), inode.clone());
     }
 
     /// Install a `fd` to the file system. The fd will be of type RegularFile.
@@ -239,7 +238,7 @@ impl FileSystem {
             /// Advice on how regions of the file are to be used.
             advice: Vec::new(),
         };
-        self.file_table.insert(fd.clone(), fd_entry);
+        self.fd_table.insert(fd.clone(), fd_entry);
     }
 
     /// Return a random u32
@@ -266,7 +265,7 @@ impl FileSystem {
     fn new_fd(&self) -> FileSystemError<Fd> {
         loop {
             let new_fd = self.random_u32()?.into();
-            if !self.file_table.contains_key(&new_fd) {
+            if !self.fd_table.contains_key(&new_fd) {
                 return Ok(new_fd);
             }
         }
@@ -285,7 +284,7 @@ impl FileSystem {
     /// Check if `op` is allowed in `fd`
     fn check_right(&self, fd: &Fd, rights: Rights) -> FileSystemError<()> {
         if self
-            .file_table
+            .fd_table
             .get(fd)
             .ok_or(ErrNo::BadF)?
             .fd_stat
@@ -338,7 +337,7 @@ impl FileSystem {
             fd, offset, len, adv
         );
         self.check_right(&fd, Rights::FD_ADVISE)?;
-        let entry = self.file_table.get_mut(&fd).ok_or(ErrNo::BadF)?;
+        let entry = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?;
         entry.advice.push((offset, len, adv));
         Ok(())
     }
@@ -363,7 +362,7 @@ impl FileSystem {
     #[inline]
     pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
         info!("call fd_close on {:?}", fd);
-        self.file_table.remove(&fd).ok_or(ErrNo::BadF)?;
+        self.fd_table.remove(&fd).ok_or(ErrNo::BadF)?;
         Ok(())
     }
 
@@ -379,7 +378,7 @@ impl FileSystem {
     #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemError<FdStat> {
         info!("call fd_fdstat_get on {:?}", fd);
-        Ok(self.file_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat.clone())
+        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat.clone())
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
@@ -390,7 +389,7 @@ impl FileSystem {
             fd, flags
         );
         self.check_right(&fd, Rights::FD_FDSTAT_SET_FLAGS)?;
-        self.file_table
+        self.fd_table
             .get_mut(&fd)
             .ok_or(ErrNo::BadF)?
             .fd_stat
@@ -410,7 +409,7 @@ impl FileSystem {
             "call fd_fdstat_set_rights on fd {:?}, right base {:?} and inheriting {:?}",
             fd, rights_base, rights_inheriting
         );
-        let mut fd_stat = self.file_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat;
+        let mut fd_stat = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat;
         fd_stat.rights_base = rights_base;
         fd_stat.rights_inheriting = rights_inheriting;
         Ok(())
@@ -420,7 +419,7 @@ impl FileSystem {
     pub(crate) fn fd_filestat_get(&self, fd: Fd) -> FileSystemError<FileStat> {
         info!("call fd_filestat_get on fd {:?}", fd);
         let inode = self
-            .file_table
+            .fd_table
             .get(&fd)
             .map(|fte| fte.inode)
             .ok_or(ErrNo::BadF)?;
@@ -442,7 +441,7 @@ impl FileSystem {
         );
         self.check_right(&fd, Rights::FD_FILESTAT_SET_SIZE)?;
         let inode = self
-            .file_table
+            .fd_table
             .get(&fd)
             .map(|FileTableEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
@@ -469,7 +468,7 @@ impl FileSystem {
         );
         self.check_right(&fd, Rights::FD_FILESTAT_SET_TIMES)?;
         let inode = self
-            .file_table
+            .fd_table
             .get(&fd)
             .map(|FileTableEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
@@ -506,7 +505,7 @@ impl FileSystem {
             fd, buffer_len, offset
         );
         self.check_right(&fd, Rights::FD_READ)?;
-        let inode = self.file_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
+        let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
         // NOTE: It should be safe to convert a u64 to usize.
         let offset = offset as usize;
 
@@ -541,17 +540,17 @@ impl FileSystem {
         info!("call fd_prestat_get on {:?}", fd);
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         let resource_type = PreopenType::Dir {
-            name_len: path.len() as u32,
+            name_len: path.as_os_str().len() as u32,
         };
         Ok(Prestat { resource_type })
     }
 
     /// Return the path of a pre-opened Fd `fd`. The path must be consistent with the status returned by `fd_prestat_get`
     #[inline]
-    pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemError<String> {
+    pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemError<PathBuf> {
         info!("call fd_prestat_dir_name on {:?}", fd);
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
-        Ok(path.to_string())
+        Ok(path.to_path_buf())
     }
 
     /// A rust-style implementation for `fd_pwrite`.
@@ -573,7 +572,7 @@ impl FileSystem {
             buf.len()
         );
         self.check_right(&fd, Rights::FD_WRITE)?;
-        let inode = self.file_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
+        let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
         let inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
         info!(
@@ -611,7 +610,7 @@ impl FileSystem {
     pub(crate) fn fd_read(&mut self, fd: Fd, len: usize) -> FileSystemError<Vec<u8>> {
         info!("call fd_read on {:?} and length {:?}", fd, len);
         self.check_right(&fd, Rights::FD_READ)?;
-        let offset = self.file_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
+        let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
         info!("call fd_read new offset {:?}", offset);
 
         let rst = self.fd_pread(fd, len, offset)?;
@@ -632,10 +631,10 @@ impl FileSystem {
     /// point of view.
     pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemError<()> {
         info!("call fd_renumber on {:?} to a new fd {:?}", old_fd, new_fd);
-        let entry = self.file_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
-        if self.file_table.get(&new_fd).is_none() {
-            self.file_table.insert(new_fd, entry);
-            self.file_table.remove(&old_fd);
+        let entry = self.fd_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
+        if self.fd_table.get(&new_fd).is_none() {
+            self.fd_table.insert(new_fd, entry);
+            self.fd_table.remove(&old_fd);
             Ok(())
         } else {
             Err(ErrNo::BadF)
@@ -654,7 +653,7 @@ impl FileSystem {
             fd, delta, whence
         );
         self.check_right(&fd, Rights::FD_SEEK)?;
-        let FileTableEntry { inode, offset, .. } = self.file_table.get(&fd).ok_or(ErrNo::BadF)?;
+        let FileTableEntry { inode, offset, .. } = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?;
         let file_size = self
             .inode_table
             .get(inode)
@@ -688,7 +687,7 @@ impl FileSystem {
 
         info!("call fd_seek on new offset {:?}", new_offset);
         // Update the offset
-        self.file_table.get_mut(&fd).ok_or(ErrNo::BadF)?.offset = new_offset;
+        self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.offset = new_offset;
         Ok(new_offset)
     }
 
@@ -705,7 +704,7 @@ impl FileSystem {
     pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemError<FileSize> {
         info!("call fd_tell on fd {:?}", fd);
         self.check_right(&fd, Rights::FD_TELL)?;
-        Ok(self.file_table.get(&fd).ok_or(ErrNo::BadF)?.offset.clone())
+        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset.clone())
     }
 
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
@@ -713,7 +712,7 @@ impl FileSystem {
     pub(crate) fn fd_write(&mut self, fd: Fd, buf: Vec<u8>) -> FileSystemError<Size> {
         info!("call fd_write on {:?}", fd);
         self.check_right(&fd, Rights::FD_WRITE)?;
-        let offset = self.file_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
+        let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
         let rst = self.fd_pwrite(fd, buf, offset)?;
         self.fd_seek(fd, rst as i64, Whence::Current)?;
@@ -725,7 +724,7 @@ impl FileSystem {
     pub(crate) fn path_create_directory(
         &mut self,
         fd: Fd,
-        path: impl AsRef<str>,
+        path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
         info!(
             "call path_create_directory on fd {:?} and path {:?}",
@@ -745,7 +744,7 @@ impl FileSystem {
         &mut self,
         fd: Fd,
         flags: LookupFlags,
-        path: impl AsRef<str>,
+        path: impl AsRef<Path>,
     ) -> FileSystemError<FileStat> {
         let path = path.as_ref();
         info!(
@@ -773,7 +772,7 @@ impl FileSystem {
         &mut self,
         fd: Fd,
         flags: LookupFlags,
-        path: impl AsRef<str>,
+        path: impl AsRef<Path>,
         atime: Timestamp,
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
@@ -814,12 +813,13 @@ impl FileSystem {
         // The parent fd for searching
         fd: Fd,
         dirflags: LookupFlags,
-        path: &str,
+        path: impl AsRef<Path>,
         oflags: OpenFlags,
         rights_base: Rights,
         rights_inheriting: Rights,
         flags: FdFlags,
     ) -> FileSystemError<Fd> {
+        let path = path.as_ref();
         info!("call path_open, on behalf of fd {:?} and principal {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
             fd, principal, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
         // ONLY allow search on the root for now.
@@ -837,7 +837,7 @@ impl FileSystem {
         };
         // Intersect with the inheriting right from `fd`
         let fd_inheriting = self
-            .file_table
+            .fd_table
             .get(&fd)
             .ok_or(ErrNo::BadF)?
             .fd_stat
@@ -899,7 +899,7 @@ impl FileSystem {
             rights_base,
             rights_inheriting,
         };
-        self.file_table.insert(
+        self.fd_table.insert(
             new_fd,
             FileTableEntry {
                 inode,
@@ -918,7 +918,7 @@ impl FileSystem {
     pub(crate) fn path_readlink(
         &mut self,
         fd: Fd,
-        path: impl AsRef<str>,
+        path: impl AsRef<Path>,
     ) -> FileSystemError<Vec<u8>> {
         info!(
             "call path_readlink on fd {:?}, path {:?}",
@@ -939,7 +939,7 @@ impl FileSystem {
     pub(crate) fn path_remove_directory(
         &mut self,
         fd: Fd,
-        path: impl AsRef<str>,
+        path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
         info!(
             "call path_remove_directory on fd {:?}, path {:?}",
@@ -959,9 +959,9 @@ impl FileSystem {
     pub(crate) fn path_rename(
         &mut self,
         old_fd: Fd,
-        old_path: impl AsRef<str>,
+        old_path: impl AsRef<Path>,
         new_fd: Fd,
-        new_path: impl AsRef<str>,
+        new_path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
         info!(
             "call path_rename on old fd {:?}, old path {:?}, new fd {:?}, new path: {:?}",
@@ -992,9 +992,9 @@ impl FileSystem {
         &mut self,
         old_fd: Fd,
         old_flag: LookupFlags,
-        old_path: impl AsRef<str>,
+        old_path: impl AsRef<Path>,
         new_fd: Fd,
-        new_path: impl AsRef<str>,
+        new_path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
         info!(
             "call path_link on fd {:?}, flag {:?}, old path {:?}, new fd {:?}, new path: {:?}",
@@ -1013,9 +1013,9 @@ impl FileSystem {
     #[inline]
     pub(crate) fn path_symlink(
         &mut self,
-        old_path: impl AsRef<str>,
+        old_path: impl AsRef<Path>,
         fd: Fd,
-        new_path: impl AsRef<str>,
+        new_path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
         info!(
             "call path_symlink on old path {:?}, fd {:?}, new path: {:?}",
@@ -1032,7 +1032,7 @@ impl FileSystem {
     pub(crate) fn path_unlink_file(
         &mut self,
         fd: Fd,
-        path: impl AsRef<str>,
+        path: impl AsRef<Path>,
     ) -> FileSystemError<()> {
         info!("call path_symlink on fd {:?}, path {:?}", fd, path.as_ref());
         self.check_right(&fd, Rights::PATH_UNLINK_FILE)?;
@@ -1107,12 +1107,12 @@ impl FileSystem {
     pub fn write_file_by_filename(
         &mut self,
         principal: &Principal,
-        file_name: impl AsRef<str>,
+        file_name: impl AsRef<Path>,
         data: &[u8],
         is_append: bool,
     ) -> Result<(), ErrNo> {
         let file_name = file_name.as_ref();
-        info!("write_file_by_filename: {}", file_name);
+        info!("write_file_by_filename: {:?}", file_name);
         let oflag = OpenFlags::CREATE | if !is_append { OpenFlags::TRUNC } else { OpenFlags::empty() };
         let fd = self.path_open(
             principal,
@@ -1125,7 +1125,7 @@ impl FileSystem {
             FdFlags::empty(),
         )?;
         if !self
-            .file_table
+            .fd_table
             .get(&fd)
             .ok_or(ErrNo::BadF)?
             .fd_stat
@@ -1148,10 +1148,10 @@ impl FileSystem {
     pub fn read_file_by_filename(
         &mut self,
         principal: &Principal,
-        file_name: impl AsRef<str>,
+        file_name: impl AsRef<Path>,
     ) -> Result<Vec<u8>, ErrNo> {
         let file_name = file_name.as_ref();
-        info!("read_file_by_filename: {}", file_name);
+        info!("read_file_by_filename: {:?}", file_name);
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,
@@ -1163,7 +1163,7 @@ impl FileSystem {
             FdFlags::empty(),
         )?;
         if !self
-            .file_table
+            .fd_table
             .get(&fd)
             .ok_or(ErrNo::BadF)?
             .fd_stat
@@ -1179,7 +1179,8 @@ impl FileSystem {
     }
 
     /// Get the maximum right associated to the principal on the file
-    fn get_right(&self, principal: &Principal, file_name: &str) -> FileSystemError<Rights> {
+    fn get_right(&self, principal: &Principal, file_name: impl AsRef<Path>) -> FileSystemError<Rights> {
+        let file_name = file_name.as_ref();
         self.rights_table
             .get(principal)
             .ok_or(ErrNo::Access)?
