@@ -9,13 +9,46 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{
-    string::String,
-    vec::Vec,
-};
+use std::vec::Vec;
 
-use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
-use ring::signature::KeyPair;
+use ring::{ rand::SystemRandom, signature::{ EcdsaKeyPair, KeyPair } };
+use err_derive::Error;
+
+////////////////////////////////////////////////////////////////////////////////
+// Error type.
+////////////////////////////////////////////////////////////////////////////////
+
+/// A generic catch-all error type for functionality related to policies.  This
+/// error type contains more constructors when compiling for clients or hosts.
+#[derive(Debug, Error)]
+pub enum CertError {
+    #[error(
+        display = "CertError: Invalid: length for `{}`, expected {:?} but received {:?}.",
+        variable,
+        expected,
+        received
+    )]
+    InvalidLength {
+        variable: &'static str,
+        expected: usize,
+        received: usize,
+    },
+    #[error(
+        display = "CertError: Invalid UTC Inputs: M:{}, D:{}, H:{}, min:{}, s:{}",
+        month,
+        day,
+        hour,
+        minute,
+        second
+    )]
+    InvalidUtcInputs {
+        month: u8,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8
+    },
+}
 
 /// A struct to contain all of the information needed to generate a CSR (except
 /// the signing key, of course)
@@ -172,11 +205,11 @@ pub const COMPUTE_ENCLAVE_CERT_TEMPLATE: CertTemplate = CertTemplate {
     enclave_hash_location: (383, 383 + 32),
 };
 
-pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Result<Vec<u8>, String> {
+pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Result<Vec<u8>, CertError> {
     let public_key = private_key.public_key().as_ref().clone();
     let mut constructed_csr = template.template.to_vec();
     if public_key.len() != (template.public_key_location.1 - template.public_key_location.0) {
-        return Err(format!("veracruz_utils::csr::generate_csr Invalid length: public_key, wanted:{:?}, got:{:?}", template.public_key_location.1 - template.public_key_location.0, public_key.len()));
+        return Err(CertError::InvalidLength { variable: "public_key", expected: template.public_key_location.1 - template.public_key_location.0, received: public_key.len() } );
     }
     constructed_csr.splice(
         template.public_key_location.0..template.public_key_location.1,
@@ -208,7 +241,7 @@ pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Resul
 }
 
 const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
-pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_hash: &[u8], private_key: &EcdsaKeyPair) -> Result<std::vec::Vec<u8>, std::string::String> {
+pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_hash: &[u8], private_key: &EcdsaKeyPair) -> Result<std::vec::Vec<u8>, CertError> {
     let mut constructed_cert = cert_template.template.to_vec();
     let valid_from = generate_utc_time(2021, 5, 2, 17, 1, 0)?;
     constructed_cert.splice(cert_template.valid_from_location.0..cert_template.valid_from_location.1,
@@ -247,15 +280,9 @@ pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_has
     return Ok(constructed_cert.clone());
 }
 
-pub fn generate_utc_time(year: u32, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Result<Vec<u8>, String> {
+pub fn generate_utc_time(year: u32, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Result<Vec<u8>, CertError> {
     if month > 11 || day > 30 || hour > 23 || minute > 59 || second > 59 {
-        return Err(
-            format!("veracruz_utils::csr::generate_utc_time invalid inputs: month:{:?}, day:{:?}, hour:{:?}, minute:{:?}, second:{:?}",
-                    month,
-                    day,
-                    hour,
-                    minute,
-                    second));
+        return Err(CertError::InvalidUtcInputs { month, day, hour, minute, second });
     }
     let year = year % 2000;
     let generated_time = format!(

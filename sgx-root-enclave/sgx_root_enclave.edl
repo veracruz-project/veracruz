@@ -22,7 +22,7 @@ enclave {
         /* define ECALLs here. */
         public sgx_status_t get_firmware_version_len([out] size_t *p_fwv_len);
         public sgx_status_t get_firmware_version([out, size=fv_size] uint8_t *p_firmware_version, size_t fv_size);
-        public sgx_status_t init_remote_attestation_enc([in, size=pub_key_size, readonly] const uint8_t *p_pub_key, size_t pub_key_size, int32_t device_id, [out] sgx_ra_context_t *p_context);
+        public sgx_status_t init_remote_attestation_enc([in, size=pub_key_size, readonly] const uint8_t *p_pub_key, size_t pub_key_size, [out] sgx_ra_context_t *p_context);
         public sgx_status_t sgx_get_collateral_report([in, size = collateral_challenge_size, readonly] const uint8_t *p_collateral_challenge,
                                                       size_t collateral_challenge_size,
                                                       [in, readonly] const sgx_target_info_t *p_target_info,

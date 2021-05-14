@@ -16,7 +16,6 @@ lazy_static = { version = "1.4.0", features= ["spin_no_std"] }
 transport-protocol = { path = "../transport-protocol", features=["sgx"] }
 ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", features = ["mesalock_sgx"] }
 veracruz-utils = { path = "../veracruz-utils", features = ["sgx"] }
-psa-attestation = { path = "../psa-attestation", features = ["sgx"] }
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
 sgx_tdh = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }

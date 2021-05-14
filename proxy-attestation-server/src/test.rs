@@ -100,7 +100,6 @@ fn test_sgx_attestation() {
             &mut ira_ret,
             public_key.as_ptr() as *const u8,
             public_key.len().try_into().unwrap(),
-            device_id,
             &mut attestation_context,
         )
     };

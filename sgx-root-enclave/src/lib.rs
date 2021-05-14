@@ -14,10 +14,6 @@
 extern crate sgx_tstd as std;
 
 use lazy_static::lazy_static;
-use psa_attestation;
-use psa_attestation::{
-    psa_initial_attest_get_token, psa_initial_attest_load_key, t_cose_sign1_get_verification_pubkey,
-};
 use sgx_tdh::{SgxDhInitiator, SgxDhMsg3};
 use sgx_types;
 use sgx_types::{
@@ -25,9 +21,8 @@ use sgx_types::{
     sgx_dh_session_enclave_identity_t, sgx_ec256_public_t, sgx_key_128bit_t, sgx_ra_context_t,
     sgx_ra_init, sgx_status_t, sgx_target_info_t,
 };
-use std::{collections::HashMap, mem, string::ToString, sync::atomic::{AtomicU64, Ordering}};
+use std::{collections::HashMap, mem, sync::atomic::{AtomicU64, Ordering}};
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
-use ring::signature::KeyPair;
 
 use veracruz_utils::csr;
 
@@ -37,6 +32,19 @@ lazy_static! {
         std::sync::SgxMutex::new(HashMap::new());
     static ref PRIVATE_KEY: std::sync::SgxMutex<Option<std::vec::Vec<u8>>> = std::sync::SgxMutex::new(None);
     static ref CERT_CHAIN: std::sync::SgxMutex<Option<(std::vec::Vec<u8>, std::vec::Vec<u8>)>> = std::sync::SgxMutex::new(None);
+}
+
+pub enum SgxRootEnclave {
+    Success = 0x00,
+    Msg3RawError = 0x01,
+    ProcMsg3Error = 0x02,
+    CsrVerifyFail = 0x03,
+    CsrToCertFail = 0x04,
+    LockFail      = 0x05,
+    HashError     = 0x06,
+    PKCS8Error    = 0x07,
+    StateError    = 0x08,
+    PrivateKeyNotPopulated = 0x09,
 }
 
 #[no_mangle]
@@ -63,7 +71,6 @@ pub extern "C" fn get_firmware_version(
 pub extern "C" fn init_remote_attestation_enc(
     pub_key_buf: *const u8,
     pub_key_size: usize,
-    device_id: i32,
     p_context: *mut sgx_ra_context_t,
 ) -> sgx_status_t {
     assert!(pub_key_size != 0);
@@ -96,8 +103,11 @@ pub extern "C" fn init_remote_attestation_enc(
 }
 
 /// Retrieve or generate the private key as a Vec<u8>
-fn get_private_key() -> Result<std::vec::Vec<u8>, std::string::String> {
-    let mut private_key_guard = PRIVATE_KEY.lock().unwrap();
+fn get_private_key() -> Result<std::vec::Vec<u8>, SgxRootEnclave> {
+    let mut private_key_guard = match PRIVATE_KEY.lock() {
+        Err(_) => return Err(SgxRootEnclave::LockFail),
+        Ok(guard) => guard,
+    };
     let pkcs8_bytes = match &*private_key_guard {
         Some(bytes) => {
             bytes.clone()
@@ -106,8 +116,8 @@ fn get_private_key() -> Result<std::vec::Vec<u8>, std::string::String> {
             // ECDSA prime256r1 generation.
             let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
                 &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-                &SystemRandom::new(),
-            ).unwrap();
+                &SystemRandom::new(),)
+                    .map_err(|_| SgxRootEnclave::PKCS8Error)?;
             *private_key_guard = Some(pkcs8_bytes.as_ref().to_vec());
             pkcs8_bytes.as_ref().to_vec()
         }
@@ -133,19 +143,23 @@ pub extern "C" fn sgx_get_collateral_report(
     report_data.d[0..pubkey_challenge_size].copy_from_slice(&pubkey_challenge_vec);
 
     let private_key_ring = {
-        let private_key_vec = get_private_key().unwrap();
-        EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec).unwrap()
+        let private_key_vec = match get_private_key() {
+            Ok(vec) => vec,
+            Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
+        };
+        match EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec) {
+            Ok(pkr) => pkr,
+            Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
+        }
     };
 
-
-    let mut proto_collateral = transport_protocol::SgxCollateral::new();
-
     // generate the certificate signing request
-    let csr_vec = csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &private_key_ring).unwrap();
+    let csr_vec = match csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &private_key_ring) {
+        Ok(csr) => csr,
+        Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
+    };
 
-    proto_collateral.set_csr(csr_vec.clone());
-    let collateral = transport_protocol::serialize_sgx_collateral(&proto_collateral).unwrap();
-    // // place the hash of the collateral in the report
+    // // place the hash of the csr in the report
     let collateral_hash = ring::digest::digest(&ring::digest::SHA256, &csr_vec);
     report_data.d[pubkey_challenge_size..48].copy_from_slice(collateral_hash.as_ref());
 
@@ -174,7 +188,10 @@ pub extern "C" fn sgx_send_cert_chain(
     let root_cert_slice = unsafe { std::slice::from_raw_parts(root_cert, root_cert_size) };
     let enclave_cert_slice = unsafe { std::slice::from_raw_parts(enclave_cert, enclave_cert_size) };
 
-    let mut cert_chain_guard = CERT_CHAIN.lock().unwrap();
+    let mut cert_chain_guard = match CERT_CHAIN.lock() {
+        Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
+        Ok(guard) => guard,
+    };
     match &*cert_chain_guard {
         Some(_) => {
             panic!("Unhandled. CERT_CHAIN is not None.");
@@ -199,22 +216,15 @@ pub extern "C" fn start_local_attest_enc(
     let session_id = SESSION_ID.fetch_add(1, Ordering::SeqCst);
 
     {
-        let mut initiator_hash = INITIATOR_HASH
-            .lock()
-            .expect("Failed to obtain lock on INITIATOR_HASH");
+        let mut initiator_hash = match INITIATOR_HASH.lock() {
+            Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
+            Ok(guard) => guard,
+        };
         initiator_hash.insert(session_id, initiator);
     }
     *sgx_root_enclave_session_id = session_id;
 
     sgx_status_t::SGX_SUCCESS
-}
-
-pub enum SgxRootEnclave {
-    Success = 0x00,
-    Msg3RawError = 0x01,
-    ProcMsg3Error = 0x02,
-    CsrVerifyFail = 0x03,
-    CsrToCertFail = 0x04,
 }
 
 const CSR_BODY_LOCATION: (usize, usize) = (4, 4 + 218);
@@ -249,13 +259,19 @@ pub extern "C" fn finish_local_attest_enc(
         mem::size_of::<sgx_dh_msg3_t>() as u32 + dh_msg3_raw.msg3_body.additional_prop_length;
     let dh_msg3 = unsafe { SgxDhMsg3::from_raw_dh_msg3_t(dh_msg3_raw, dh_msg3_raw_len) };
     assert!(!dh_msg3.is_none());
-    if dh_msg3.is_none() {
-        return SgxRootEnclave::Msg3RawError;
-    }
-    let dh_msg3 = dh_msg3.unwrap();
+
+    let dh_msg3 = match dh_msg3 {
+        Some(msg) => msg,
+        None => {
+            return SgxRootEnclave::Msg3RawError;
+        }
+    };
 
     let mut initiator = {
-        let mut initiator_hash = INITIATOR_HASH.lock().unwrap();
+        let mut initiator_hash = match INITIATOR_HASH.lock() {
+            Err(_) => return SgxRootEnclave::LockFail,
+            Ok(guard) => guard,
+        };
         initiator_hash.remove(&sgx_root_enclave_session_id).unwrap()
     };
 
@@ -286,8 +302,14 @@ pub extern "C" fn finish_local_attest_enc(
 
     //generate cert from csr, signed by PRIVATE_KEY
     let private_key = {
-        let private_key_vec = get_private_key().unwrap();
-        EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec).unwrap()
+        let private_key_vec = match get_private_key() {
+            Ok(key) => key,
+            Err(_)  => return SgxRootEnclave::PrivateKeyNotPopulated,
+        };
+        match EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec) {
+            Ok(key) => key,
+            Err(_)  => return SgxRootEnclave::PKCS8Error,
+        }
     };
     let mut compute_enclave_cert = match csr::convert_csr_to_cert(&csr_slice, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &responder_identity.mr_enclave.m, &private_key) {
         Ok(bytes) => bytes,
@@ -297,7 +319,10 @@ pub extern "C" fn finish_local_attest_enc(
         },
     };
     let (mut root_enclave_cert, mut root_cert) = {
-        let mut cert_chain_guard = CERT_CHAIN.lock().unwrap();
+        let cert_chain_guard = match CERT_CHAIN.lock() {
+            Err(_) => return SgxRootEnclave::LockFail,
+            Ok(guard) => guard,
+        };
         match &*cert_chain_guard {
             Some((re_cert, r_cert)) => {
                 (re_cert.clone(), r_cert.clone())
@@ -311,7 +336,7 @@ pub extern "C" fn finish_local_attest_enc(
     if cert_buf_size < (compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) {
         assert!(false);
     }
-    let mut cert_buf_slice = unsafe { std::slice::from_raw_parts_mut(p_cert_buf, compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) };
+    let cert_buf_slice = unsafe { std::slice::from_raw_parts_mut(p_cert_buf, compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) };
     unsafe { *p_cert_size = compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len() };
     let cert_lengths_slice = unsafe { std::slice::from_raw_parts_mut(cert_lengths, cert_lengths_size/std::mem::size_of::<u32>()) };
 

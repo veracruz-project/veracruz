@@ -415,7 +415,6 @@ pub mod veracruz_server_sgx {
                     &mut ira_result,
                     public_key.as_ptr() as *const u8,
                     public_key.len() as u64,
-                    device_id,
                     &mut ra_context,
                 )
             };
