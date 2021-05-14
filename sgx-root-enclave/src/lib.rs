@@ -234,7 +234,7 @@ fn verify_csr(csr: &[u8]) -> Result<bool, std::string::String> {
 }
 
 #[no_mangle]
-pub extern "C" fn finish_local_attest_ca_enc(
+pub extern "C" fn finish_local_attest_enc(
     dh_msg3_raw: &mut sgx_dh_msg3_t,
     csr: *const u8,
     csr_size: usize,

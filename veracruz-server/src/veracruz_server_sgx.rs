@@ -28,7 +28,7 @@ pub mod veracruz_server_sgx {
         sgx_root_enclave_init_remote_attestation_enc, sgx_root_enclave_sgx_ra_get_ga,
         sgx_root_enclave_sgx_ra_get_msg3_trusted, sgx_root_enclave_sgx_ra_proc_msg2_trusted,
         sgx_root_enclave_start_local_attest_enc, sgx_root_enclave_sgx_get_collateral_report,
-        sgx_root_enclave_sgx_send_cert_chain, sgx_root_enclave_finish_local_attest_ca_enc,
+        sgx_root_enclave_sgx_send_cert_chain, sgx_root_enclave_finish_local_attest_enc,
     };
     use std::{ffi::CStr, mem};
     use std::io::Write;
@@ -698,7 +698,7 @@ pub mod veracruz_server_sgx {
                     mem::transmute::<&sgx_dh_msg3_t, &sgx_root_enclave_bind::_sgx_dh_msg3_t>(dh_msg3)
                 };
                 let ret = unsafe {
-                    sgx_root_enclave_finish_local_attest_ca_enc(
+                    sgx_root_enclave_finish_local_attest_enc(
                         sgx_root_enclave.geteid(),
                         &mut result,
                         bindgen_msg3_ref,

@@ -40,14 +40,14 @@ enclave {
                                                    [out] sgx_dh_msg2_t *p_msg2,
                                                    [out] uint64_t *sgx_root_enclave_session_id);
 
-        public sgx_status_t finish_local_attest_ca_enc([in, readonly] const sgx_dh_msg3_t *dh_msg3_raw,
-                                                       [in, size=csr_size, readonly] const uint8_t *csr,
-                                                       size_t csr_size,
-                                                       uint64_t sgx_root_enclave_session_id,
-                                                       [out, size=cert_buf_size] uint8_t *p_cert_buf,
-                                                       size_t cert_buf_size,
-                                                       [out] size_t *p_cert_size,
-                                                       [out, size=cert_lengths_size] uint32_t *cert_lengths,
-                                                       size_t cert_lengths_size);
+        public sgx_status_t finish_local_attest_enc([in, readonly] const sgx_dh_msg3_t *dh_msg3_raw,
+                                                    [in, size=csr_size, readonly] const uint8_t *csr,
+                                                    size_t csr_size,
+                                                    uint64_t sgx_root_enclave_session_id,
+                                                    [out, size=cert_buf_size] uint8_t *p_cert_buf,
+                                                    size_t cert_buf_size,
+                                                    [out] size_t *p_cert_size,
+                                                    [out, size=cert_lengths_size] uint32_t *cert_lengths,
+                                                    size_t cert_lengths_size);
     };
 };
