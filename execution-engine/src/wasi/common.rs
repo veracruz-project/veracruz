@@ -704,7 +704,7 @@ impl WasiWrapper {
 
         let mut size_read = 0;
         for iovec in iovecs.iter() {
-            let mut fs = self.lock_vfs()?;
+            let fs = self.lock_vfs()?;
             let to_write = fs.fd_pread(fd.into(), iovec.len as usize, offset)?;
             offset = offset + (to_write.len() as u64);
             memory_ref.write_buffer(iovec.buf, &to_write)?;

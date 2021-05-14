@@ -20,7 +20,7 @@ use crate::{
 use lazy_static::lazy_static;
 use policy_utils::principal::Principal;
 use std::sync::{Arc, Mutex};
-use std::{collections::HashMap, convert::TryFrom, vec::Vec};
+use std::{convert::TryFrom, vec::Vec};
 use wasi_types::ErrNo;
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};
 
@@ -30,7 +30,7 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, V
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new(), &vec![]))), Principal::NoCap));
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new_dummy(), &vec![])), Principal::NoCap));
 }
 
 /// A macro for lock the global VFS and store the result in the variable,

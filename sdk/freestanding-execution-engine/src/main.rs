@@ -382,7 +382,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)?));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(
@@ -435,5 +435,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         eprint!("{}", stderr_dump);
     }
 
+    let output = vfs.lock()
+        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+        .read_file_by_filename(
+            &Principal::InternalSuperUser,
+            OUTPUT_FILE
+        );
+    info!("result: {:?}", output);
     Ok(())
 }
