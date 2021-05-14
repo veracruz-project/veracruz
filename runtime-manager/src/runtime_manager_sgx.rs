@@ -28,7 +28,7 @@ extern "C" {
         sgx_root_enclave_session_id: &mut u64,
     ) -> sgx_status_t;
 
-    pub fn finish_local_attest_ca_ocall(
+    pub fn finish_local_attest_ocall(
         ret: &mut sgx_status_t,
         dh_msg3: &sgx_dh_msg3_t,
         csr: *const u8,
@@ -168,7 +168,7 @@ fn local_attestation_get_cert_enc(
     let mut certificate_lengths: std::vec::Vec<u32> = vec!(0, 0, 0);
 
     let ocall_status = unsafe {
-        finish_local_attest_ca_ocall(
+        finish_local_attest_ocall(
             &mut ocall_ret,
             &dh_msg3_raw,
             csr.as_ptr() as *const u8,

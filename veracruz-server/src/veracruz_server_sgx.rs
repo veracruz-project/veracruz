@@ -679,7 +679,7 @@ pub mod veracruz_server_sgx {
 
 
     #[no_mangle]
-    pub extern "C" fn finish_local_attest_ca_ocall(
+    pub extern "C" fn finish_local_attest_ocall(
         dh_msg3: &sgx_dh_msg3_t,
         csr: *const u8,
         csr_size: u64,
