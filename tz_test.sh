@@ -7,8 +7,8 @@
 #
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
-cd /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/build
-ln -sf /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/out-br/images/rootfs.cpio.gz ../out/bin
+cd /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0
+ln -sf /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/outbr/images/rootfs.cpio.gz out/bin
 cd /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/out/bin && /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/qemu/aarch64-softmmu/qemu-system-aarch64 \
         -nodefaults \
 		-nographic \

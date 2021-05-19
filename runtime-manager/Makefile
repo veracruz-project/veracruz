@@ -36,7 +36,8 @@ $(FINAL_DIR)/$(Signed_RustEnclave_RootName): $(Signed_RustEnclave_Name)
 
 sgx: $(FINAL_DIR)/$(Signed_RustEnclave_RootName) $(SGX_Enclave_Name) $(Signed_RustEnclave_Name) $(Untrusted_Lib_Name)
 
-css.bin: $(Signed_RustEnclave_Name)
+css-sgx.bin: $(Signed_RustEnclave_Name)
+	cp $< $@
 
 ############# Source code #################
 
@@ -94,7 +95,7 @@ $(RustEnclave_Name): $(OUT_DIR)/runtime_manager_t.o $(SGX_Enclave_Name)
 	@echo $(INFO_COLOR) "LINK =>  $@" $(RESET_COLOR)
 
 $(Signed_RustEnclave_Name): $(RustEnclave_Name) $(SGX_Enclave_Name)
-	@$(SGX_ENCLAVE_SIGNER) sign -key ./Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config ./Enclave.config.xml -cssfile css.bin
+	@$(SGX_ENCLAVE_SIGNER) sign -key ./Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config ./Enclave.config.xml -cssfile css-sgx.bin
 	@echo $(INFO_COLOR) "SIGN =>  $@" $(RESET_COLOR)
 
 $(RuntimeManager_u_Object): $(OUT_DIR)/runtime_manager_u.o
@@ -128,6 +129,9 @@ TZ_TARGET := aarch64-unknown-optee-trustzone
 
 trustzone: $(FINAL_DIR)/$(TZ_UUID).ta
 
+css-tz.bin: $(FINAL_DIR)/$(TZ_UUID).ta
+	cp $< $@
+
 $(FINAL_DIR)/$(TZ_UUID).ta: $(OUT_DIR)/$(TZ_UUID).ta
 	cp $< $@
 
@@ -141,7 +145,7 @@ $(OUT_DIR)/stripped_ta: $(OUT_DIR)/runtime_manager_enclave
 
 $(OUT_DIR)/runtime_manager_enclave: $(TZ_Src)
 	@echo $(INFO_COLOR)"CARGO <=  $(TZ_Src)" $(RESET_COLOR)
-	@xargo build --target $(TZ_TARGET) --features tz --release --verbose --out-dir $(OUT_DIR) -Z unstable-options
+	@OPTEE_OS_DIR=$(OPTEE_OS_DIR) xargo build --target $(TZ_TARGET) --features tz --release --verbose --out-dir $(OUT_DIR) -Z unstable-options
 	@echo $(INFO_COLOR)"GEN   =>  runtime_manager_enclave" $(RESET_COLOR)
 
 
@@ -169,4 +173,4 @@ clean:
 	@rm -f $(OUT_DIR)/stripped_ta
 	@rm -f $(OUT_DIR)/runtime_manager_enclave
 	@rm -rf bin/
-	@rm -f css.bin
+	@rm -f css-*.bin

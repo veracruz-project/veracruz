@@ -1,6 +1,6 @@
 [target.aarch64-unknown-optee-trustzone]
-linker = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch64/bin/aarch64-linux-gnu-ld"
-ar = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch64/bin/aarch64-linux-gnu-gcc-ar"
+linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-ld"
+ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc-ar"
 rustflags = [
     "-C", "link-arg=-nostdlib",
     "-C", "link-arg=-Tta.lds",
@@ -10,12 +10,12 @@ rustflags = [
 ]
 
 [target.aarch64-unknown-linux-gnu]
-linker = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch64/bin/aarch64-linux-gnu-gcc"
-ar = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch64/bin/aarch64-linux-gnu-gcc-ar"
+linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc"
+ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc-ar"
 
 [target.arm-unknown-optee-trustzone]
-linker = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch32/bin/arm-linux-gnueabihf-ld.bfd"
-ar = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch32/bin/arm-linux-gnueabihf-ar"
+linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-ld.bfd"
+ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-ar"
 rustflags = [
     "-C", "link-arg=-nostdlib",
     "-C", "link-arg=-Tta.lds",
@@ -25,5 +25,5 @@ rustflags = [
 ]
 
 [target.arm-unknown-linux-gnueabihf]
-linker = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc"
-ar = "/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc-ar"
+linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc"
+ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc-ar"
