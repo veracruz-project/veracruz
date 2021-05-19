@@ -62,7 +62,7 @@ fn main() {
     // problem under the rug (until it comes back to bite me later, which it
     // it will)
     #[cfg(feature="tz")]
-    let rename_status = Command::new("/work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy")
+    let rename_status = Command::new("/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy")
         .current_dir(target_dir.clone())
         .args(&["--redefine-syms", &format!("{}/redefined_symbols",project_dir), "./libmbedcrypto.a"])
         .status()

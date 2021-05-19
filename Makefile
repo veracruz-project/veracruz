@@ -16,7 +16,7 @@ WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 OPTEE_DIR_SDK ?= /work/rust-optee-trustzone-sdk/
-AARCH64_OPENSSL_DIR ?= /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/build/openssl-1.0.2s/
+#AARCH64_OPENSSL_DIR ?= /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/build/openssl-1.0.2s/
 AARCH64_GCC ?= $(OPTEE_DIR)/toolchains/aarch64/bin/aarch64-linux-gnu-gcc
 SGX_RUST_FLAG ?= "-L/work/sgxsdk/lib64 -L/work/sgxsdk/sdk_libs"
 NITRO_RUST_FLAG ?= ""
@@ -29,15 +29,15 @@ sdk:
 	$(MAKE) -C sdk
 
 # Generate all test policy
-test_cases: sdk
-	$(MAKE) -C test-collateral
+sgx-test-collateral:
+	TEE=sgx $(MAKE) -C test-collateral
 
 # Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
-sgx-veracruz-client-test: sgx test_cases 
+sgx-veracruz-client-test: sgx sgx-test-collateral 
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --lib --features "mock sgx" -- --test-threads=1
 
 # Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
-trustzone-veracruz-client-test: trustzone test_cases
+trustzone-veracruz-client-test: trustzone trustzone-test-collateral
 	cd veracruz-client && cargo test --lib --features "mock tz" -- --test-threads=1
 
 # Compile for sgx
@@ -55,28 +55,28 @@ nitro: sdk
 
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
-	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC)
-	$(MAKE) -C trustzone-root-enclave trustzone
+	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC) OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
+	$(MAKE) -C trustzone-root-enclave trustzone OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
 
-sgx-veracruz-server-test: sgx test_cases
+sgx-veracruz-server-test:
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_debug --features sgx  -- --ignored --test-threads=1
 
-sgx-veracruz-server-test-dry-run: sgx test_cases
+sgx-veracruz-server-test-dry-run: sgx-test-collateral
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run 
 
-sgx-veracruz-server-performance: sgx test_cases
+sgx-veracruz-server-performance: sgx-test-collateral
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_performance_ --features sgx -- --ignored 
 
-sgx-veracruz-test-dry-run: sgx test_cases
+sgx-veracruz-test-dry-run: sgx-test-collateral
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run
 
-sgx-veracruz-test: sgx test_cases
+sgx-veracruz-test: sgx-test-collateral
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx 
 
@@ -86,24 +86,27 @@ sgx-psa-attestation: sgx-env
 tz-psa-attestation: trustzone-env
 	cd psa-attestation && cargo build --target aarch64-unknown-linux-gnu --features tz
 
-trustzone-veracruz-server-test: trustzone test_cases trustzone-test-env
+trustzone-test-collateral:
+	chmod u+x tz_test.sh run_tz_test.sh
+	TEE=tz $(MAKE) -C test-collateral
+
+trustzone-veracruz-server-test: trustzone-test-collateral
 	cd veracruz-server-test \
-		&& export OPENSSL_DIR=$(AARCH64_OPENSSL_DIR) \
-		&& cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
+        && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=/usr/include/aarch64-linux-gnu \
+                OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu C_INCLUDE_PATH=/usr/include/aarch64-linux-gnu:/usr/include \
+                cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
 		&& ./cp-veracruz-server-test-tz.sh
 	chmod u+x run_veracruz_server_test_tz.sh
 	./run_veracruz_server_test_tz.sh
 
-trustzone-veracruz-test: trustzone test_cases trustzone-test-env
+trustzone-veracruz-test: trustzone-test-collateral
 	cd veracruz-test \
-		&& export OPENSSL_DIR=$(AARCH64_OPENSSL_DIR) \
-		&& cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
-		&& ./cp-veracruz-tz.sh
+        && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=/usr/include/aarch64-linux-gnu \
+                OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu C_INCLUDE_PATH=/usr/include/aarch64-linux-gnu:/usr/include \
+                cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1
+	cd veracruz-test && ./cp-veracruz-tz.sh
 	chmod u+x run_veracruz_test_tz.sh
 	./run_veracruz_test_tz.sh
-
-trustzone-test-env: tz_test.sh run_tz_test.sh
-	chmod u+x $^
 
 nitro-veracruz-server-test: nitro test_cases
 	cd veracruz-server-test \

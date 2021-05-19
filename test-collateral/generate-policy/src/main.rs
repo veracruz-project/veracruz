@@ -26,7 +26,6 @@ use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
     policy::Policy,
-    error::PolicyError,
     expiry::Timepoint,
     principal::{ExecutionStrategy, Identity, Program, FileRights},
 };
