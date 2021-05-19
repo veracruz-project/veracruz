@@ -1,0 +1,20 @@
+[package]
+name = "image-processing"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "Processes images."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#photon-rs = "0.3.1"
+image = "0.23.14"
+pinecone = "*"
+serde = { version = "1.0.3", default-features = false, features = ["derive"] }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+
