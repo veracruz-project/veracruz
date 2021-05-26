@@ -27,11 +27,8 @@
 
 extern crate image;
 
-use image::{GenericImageView, imageops};
-use serde::Serialize;
-use serde::Deserialize;
-use std::{fs, process::exit, string::String, vec::Vec};
-use std::error::Error;
+use image::{GenericImageView, imageops, ImageFormat, io::Reader};
+use std::process::exit;
 use wasi_types::ErrNo;
 
 /// Reads two input sources from the Veracruz host: the first input source is assumed to be a vector
@@ -39,31 +36,29 @@ use wasi_types::ErrNo;
 /// structs.  Fails with [`return_code::ErrorCode::BadInput`] if the number of inputs provided is
 /// not equal to 2, or if the inputs cannot be deserialized from Bincode.
 /// TODO: read image directly (stream)
-fn read_inputs() -> Result<Vec<String>, ErrNo> {
-    let image = fs::read("/input-0")?;
-    let image = pinecone::from_bytes(&image).map_err(|_| ErrNo::Proto)?;
 
-    Ok(image)
-}
-
-//fn main() -> Result<(), Error> {
 fn process_image() -> Result<(), wasi_types::ErrNo> {
     // Use the open function to load an image from a Path.
     // `open` returns a `DynamicImage` on success.
-    let mut img = image::open("/test.jpg").map_err(|_|ErrNo::Proto)?;
+    // By default, jpeg-decode reads JPEG images in parallel threads (cf. rayon), which aren't supported in WASM. The workaround is to read PNG images instead
+    let mut img = image::open("/test.png").map_err(|_| {
+        println!("Failure opening /test.png");
+        ErrNo::Proto
+    })?;
 
-    // The dimensions method returns the images width and height.
-    fs::write("/output", format!("dimensions {:?}", img.dimensions()));
-
-    // The color method returns the image's `ColorType`.
-    fs::write("/output", format!("{:?}", img.color()));
-
+    // Transform the image
     let subimg = imageops::crop(&mut img, 0, 0, 100, 100);
+    println!("new dimensions: {:?}", subimg.dimensions());
 
     // Write the contents of this image to the Writer in PNG format.
-    subimg.to_image().save("/test.png").unwrap();
+    subimg.to_image().save_with_format("/output", ImageFormat::Png).unwrap();
 
-    fs::write("/output", "goodie")?;
+    // Verify the output
+    /*
+    let img = Reader::open("/output").unwrap().with_guessed_format().unwrap().decode().unwrap();
+    println!("dimensions {:?}", img.dimensions());
+    println!("color type: {:?}", img.color());
+    */
 
     Ok(())
 }
