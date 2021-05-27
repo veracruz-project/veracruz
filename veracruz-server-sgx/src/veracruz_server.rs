@@ -23,7 +23,6 @@ pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 pub enum VeracruzServerSGXError {
     #[error(display = "VeracruzServerSGX: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
-
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerSGXError {
