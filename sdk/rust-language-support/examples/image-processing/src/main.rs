@@ -1,20 +1,16 @@
-//! A simple linear-regression example
+//! A simple image processing example
 //!
 //! ## Context
 //!
 //! A relatively-low powered device (think e.g. an M-class microcontroller, or similar)
-//! wants to offload some heavy, complex calculation to a third-party---here represented by a linear
-//! regression problem.  The owner of the device wishes to ensure that the computation was
-//! faithfully executed---that is, the results are trustworthy and are definitely the output of a
-//! linear regression algorithm---and also are kept secret from third parties wishing to see what is
-//! happening on the device.
+//! wants to offload some heavy, complex calculation to a third-party---image processing here.
+//! The owner of the device wishes to ensure that the computation was faithfully executed---that is,
+//! the results are trustworthy and are definitely the output of the image transform---and also are
+//! kept secret from third parties wishing to see what is happening on the device.
 //!
 //! Inputs:                  1.
-//! Assumed form of inputs:  one Pinecode-encoded `Vec<(f64, f64)>` representing a dataset of (x, y)
-//!                          co-ordinates from which a linear relationship is to be extracted.
-//! Ensured form of outputs: A Pinecode-encoded `LinearRegression` struct (see below) consisting of
-//!                          a gradient and a Y-intercept, representing the best linear fit for the
-//!                          input data.
+//! Assumed form of inputs:  A PNG image mapped to the virtual filesystem at runtime
+//! Ensured form of outputs: A PNG image mapped saved to the virtual filesystem
 //!
 //! ## Authors
 //!
