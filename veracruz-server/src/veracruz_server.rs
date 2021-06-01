@@ -169,6 +169,8 @@ pub enum VeracruzServerError {
     DirectStrError(&'static str),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
+    #[error(display = "TODO: Unimplemented")]
+    Extension(VeracruzServerErrorExtension)
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
