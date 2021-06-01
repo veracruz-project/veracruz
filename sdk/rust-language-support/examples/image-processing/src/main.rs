@@ -32,10 +32,7 @@ fn process_image() -> Result<(), wasi_types::ErrNo> {
     // `open` returns a `DynamicImage` on success.
     // By default, jpeg-decode reads JPEG images in parallel threads (cf. rayon), which aren't
     // supported in WASM. The workaround is to read PNG images instead
-    let mut img = image::open("/test.png").map_err(|_| {
-        println!("Failure opening /test.png");
-        ErrNo::Proto
-    })?;
+    let mut img = image::open("/test.png").map_err(|_| ErrNo::Proto)?;
 
     // Transform the image
     let subimg = imageops::crop(&mut img, 0, 0, 100, 100);
