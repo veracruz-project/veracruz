@@ -23,7 +23,7 @@
 
 extern crate image;
 
-use image::{GenericImageView, imageops, ImageFormat, io::Reader};
+use image::{GenericImageView, imageops, ImageFormat};
 use std::process::exit;
 use wasi_types::ErrNo;
 
