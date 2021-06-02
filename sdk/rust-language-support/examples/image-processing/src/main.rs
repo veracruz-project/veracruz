@@ -27,11 +27,13 @@ use image::{GenericImageView, imageops, ImageFormat};
 use std::process::exit;
 use wasi_types::ErrNo;
 
+/// Read image from the virtual filesystem, crop the image, display the new dimensions and write
+/// the new image to /output in PNG format.
+/// By default, `jpeg-decode` reads JPEG images in parallel threads using `rayon`, which are not
+/// supported in WASM. The workaround is to read PNG images instead
 fn process_image() -> Result<(), wasi_types::ErrNo> {
     // Use the open function to load an image from a Path.
     // `open` returns a `DynamicImage` on success.
-    // By default, jpeg-decode reads JPEG images in parallel threads (cf. rayon), which aren't
-    // supported in WASM. The workaround is to read PNG images instead
     let mut img = image::open("/test.png").map_err(|_| ErrNo::Io)?;
 
     // Transform the image
@@ -44,6 +46,7 @@ fn process_image() -> Result<(), wasi_types::ErrNo> {
     Ok(())
 }
 
+/// Entry point
 fn main() {
     if let Err(e) = process_image() {
         exit((e as u16).into());
