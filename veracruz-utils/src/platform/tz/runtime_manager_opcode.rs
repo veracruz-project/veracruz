@@ -26,14 +26,6 @@ pub const RUNTIME_MANAGER_UUID: &str =
 pub enum RuntimeManagerOpcode {
     /// A message requesting that the runtime manager is initialized.
     Initialize,
-    /// A message requesting the size of the enclave's certificate.
-    GetEnclaveCertSize,
-    /// A message requesting the enclave's certificate.
-    GetEnclaveCert,
-    /// A message requesting the size of the enclave's name.
-    GetEnclaveNameSize,
-    /// A message requesting the enclave's name.
-    GetEnclaveName,
     /// A message requesting that a new TLS session be initiated.
     NewTLSSession,
     /// A message requesting that an existing TLS session be torn down.
@@ -44,9 +36,12 @@ pub enum RuntimeManagerOpcode {
     SendTLSData,
     /// A message requesting TLS data.
     GetTLSData,
-    /// A message requesting a PSA attestation token, for use during the
-    /// Veracruz attestation process, is returned from the runtime manager.
-    GetPSAAttestationToken,
+    /// A message requesting a Certificate Signing Request (CSR) to be sent
+    /// to the root enclave to be converted to a certificate
+    GetCSR,
+    /// A message signaling the engine to populate it's certificate chain
+    /// with provided certificate data
+    PopulateCertificates,
     /// A message requesting that the runtime manager enclave be reset.
     ResetEnclave,
 }
@@ -61,17 +56,14 @@ impl TryFrom<u32> for RuntimeManagerOpcode {
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(RuntimeManagerOpcode::Initialize),
-            1 => Ok(RuntimeManagerOpcode::GetEnclaveCertSize),
-            2 => Ok(RuntimeManagerOpcode::GetEnclaveCert),
-            3 => Ok(RuntimeManagerOpcode::GetEnclaveNameSize),
-            4 => Ok(RuntimeManagerOpcode::GetEnclaveName),
-            5 => Ok(RuntimeManagerOpcode::NewTLSSession),
-            6 => Ok(RuntimeManagerOpcode::CloseTLSSession),
-            7 => Ok(RuntimeManagerOpcode::GetTLSDataNeeded),
-            8 => Ok(RuntimeManagerOpcode::SendTLSData),
-            9 => Ok(RuntimeManagerOpcode::GetTLSData),
-            10 => Ok(RuntimeManagerOpcode::GetPSAAttestationToken),
-            11 => Ok(RuntimeManagerOpcode::ResetEnclave),
+            1 => Ok(RuntimeManagerOpcode::NewTLSSession),
+            2 => Ok(RuntimeManagerOpcode::CloseTLSSession),
+            3 => Ok(RuntimeManagerOpcode::GetTLSDataNeeded),
+            4 => Ok(RuntimeManagerOpcode::SendTLSData),
+            5 => Ok(RuntimeManagerOpcode::GetTLSData),
+            6 => Ok(RuntimeManagerOpcode::GetCSR),
+            7 => Ok(RuntimeManagerOpcode::PopulateCertificates),
+            8 => Ok(RuntimeManagerOpcode::ResetEnclave),
             _ => Err(format!(
                 "RuntimeManagerOpcode could not be converted from: {}",
                 value

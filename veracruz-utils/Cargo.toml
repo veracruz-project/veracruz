@@ -7,9 +7,9 @@ description = "Miscellaneous and common code used by multiple Veracruz component
 
 [features]
 
-sgx = ["sgx_tstd", "serde/mesalock_sgx", "serde_json/mesalock_sgx", "serde_json/alloc", "ring", "wasi-types/sgx"]
-tz = ["serde_json/std", "wasi-types/std"]
-std = ["x509-parser", "serde/std", "rustls","serde_json/std", "actix-web", "futures", "actix-http", "failure", "wasi-types/std"]
+sgx = ["sgx_tstd", "serde/mesalock_sgx", "serde_json/mesalock_sgx", "serde_json/alloc", "ring/mesalock_sgx", "wasi-types/sgx"]
+tz = ["serde_json/std", "ring", "wasi-types/std"]
+std = ["x509-parser", "serde/std", "rustls","serde_json/std", "actix-web", "futures", "actix-http", "failure", "ring", "wasi-types/std"]
 nitro = ["serde_json/std", "nix", "byteorder", "wasi-types/std"]
 
 [dependencies]
@@ -28,7 +28,7 @@ nix = { version = "0.15", optional = true }
 byteorder = { version = "1.3", optional = true }
 hex = { version = "=0.4.2", default-features = false }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
-ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", features = ["mesalock_sgx"], optional = true }
+ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", optional = true }
 
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }

@@ -20,16 +20,17 @@ use optee_utee::{
     ErrorKind, Parameters,
 };
 use psa_attestation::{
-    psa_initial_attest_get_token, psa_initial_attest_load_key, t_cose_sign1_get_verification_pubkey,
+    psa_initial_attest_get_token, psa_initial_attest_load_key,
 };
-use ring;
+use ring::{digest, rand::{ SecureRandom, SystemRandom}, signature };
 use std::{convert::{TryFrom, TryInto}, io::Write};
+use std::collections::HashMap;
+use std::sync::atomic::{ AtomicU32, Ordering};
 use veracruz_utils::platform::tz::root_enclave_opcode::TrustZoneRootEnclaveOpcode;
+use veracruz_utils::csr;
 
 lazy_static! {
     static ref DEVICE_PRIVATE_KEY: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
-    static ref DEVICE_PUBLIC_KEY: std::sync::Mutex<Option<Vec<u8>>> =
-        std::sync::Mutex::new(None);
     static ref DEVICE_ID: std::sync::Mutex<Option<i32>> = std::sync::Mutex::new(None);
     // Yes, I'm doing what you think I'm doing here. Each instance of the TrustZone root enclave
     // will have the same private key. Yes, I'm embedding that key in the source
@@ -54,6 +55,14 @@ lazy_static! {
         0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
     ];
     static ref RUNTIME_MANAGER_HASH: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
+    /// Mutex to hold the certificate chain provided by the Proxy Attestation Service
+    /// after a successful native attestation
+    static ref CERT_CHAIN: std::sync::Mutex<Option<(std::vec::Vec<u8>, std::vec::Vec<u8>)>> = std::sync::Mutex::new(None);
+    /// A monotonically increasing value to keep track of which challenge value was sent to which compute enclave
+    static ref CHALLENGE_ID: AtomicU32 = AtomicU32::new(0);
+    /// A hash map for storing challenge values associated with their challenge_id
+    static ref CHALLENGE_HASH: std::sync::Mutex<HashMap<u32, Vec<u8>>> =
+        std::sync::Mutex::new(HashMap::new());
 }
 
 #[ta_create]
@@ -61,64 +70,23 @@ fn create() -> optee_utee::Result<()> {
     trace_println!("trustzone-root-enclave:create");
 
     let device_private_key = {
-        let rng = ring::rand::SystemRandom::new();
+        let rng = SystemRandom::new();
         // ECDSA prime256r1 generation.
-        let pkcs8_bytes = ring::signature::EcdsaKeyPair::generate_pkcs8(
-            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+        let pkcs8_bytes = signature::EcdsaKeyPair::generate_pkcs8(
+            &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
             &rng,
         )
         .map_err(|err| {
             trace_println!("Error generating PKCS-8:{:?}", err);
             ErrorKind::TargetDead
         })?;
-        pkcs8_bytes.as_ref()[38..70].to_vec()
+        pkcs8_bytes.as_ref().to_vec()
     };
     {
         let mut dpk_guard = DEVICE_PRIVATE_KEY
             .lock()
             .map_err(|_| ErrorKind::TargetDead)?;
         *dpk_guard = Some(device_private_key.clone());
-    }
-
-    // I've found that the best way to get a key formatted appropriately is to
-    // load it into PSA (via the attestation APIs) and then export the public
-    // component. It's sort of wonky, but it works. So that's what I'm doing
-    // below
-    let mut device_key_handle: u16 = 0;
-    let status = unsafe {
-        psa_initial_attest_load_key(
-            device_private_key.as_ptr(),
-            device_private_key.len() as u64,
-            &mut device_key_handle,
-        )
-    };
-    if status != 0 {
-        trace_println!("trustzone-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
-        return Err(optee_utee::Error::new(ErrorKind::TargetDead));
-    }
-    let mut public_key = std::vec::Vec::with_capacity(128); // TODO: Don't do this
-    let mut public_key_size: u64 = 0;
-    let status = unsafe {
-        t_cose_sign1_get_verification_pubkey(
-            device_key_handle,
-            public_key.as_mut_ptr() as *mut u8,
-            public_key.capacity() as u64,
-            &mut public_key_size as *mut u64,
-        )
-    };
-    if status != 0 {
-        trace_println!(
-            "trustzone-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
-            status
-        );
-        return Err(optee_utee::Error::new(ErrorKind::TargetDead));
-    }
-    unsafe { public_key.set_len(public_key_size as usize) };
-    {
-        let mut dpk_guard = DEVICE_PUBLIC_KEY
-            .lock()
-            .map_err(|_| ErrorKind::TargetDead)?;
-        *dpk_guard = Some(public_key);
     }
 
     return Ok(());
@@ -193,7 +161,12 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
             *rmh_guard = Some(hash_value);
         }
         TrustZoneRootEnclaveOpcode::NativeAttestation => {
+            // p0 - input: a: device_id, output: a: token Length output, b: CSR length
+            // p1 - challenge
+            // p2 - token buffer
+            // p3 - CSR buffer
             trace_println!("trustzone-root-enclave::invoke_command NativeAttestation Opcode started");
+
             let mut values = unsafe {
                 params.0.as_value().map_err(|err| {
                     trace_println!(
@@ -203,7 +176,6 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
                     ErrorKind::Unknown
                 })?
             };
-
             let device_id: i32 = values.a().try_into().map_err(|err| {
                 trace_println!(
                     "trustzone-root-enclave::invoke_command NativeAttestation failed to convert a into i32:{:?}",
@@ -227,14 +199,33 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
                 })?
             };
 
-            let mut pubkey_buf = unsafe {
+            let mut csr_buf = unsafe {
                 params.3.as_memref().map_err(|err| {
                     trace_println!("trustzone-root-enclave::NativeAttestation failed to extrac public key buffer from parameters:{:?}", err);
                     ErrorKind::Unknown
                 })?
             };
+
+            let dpk_ring = {
+                let dpk = device_private_key()
+                    .map_err(|err| {
+                        trace_println!("trustzon-root-enclave::NativeAttestation failed to get device private_key:{:?}", err);
+                        ErrorKind::Unknown
+                    })?;
+                signature::EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, &dpk)
+                    .map_err(|err| {
+                        trace_println!("trustzone-root-enclave::NativeAttestation failed to generate EcdsaKeyPair from device private key:{:?}", err);
+                        ErrorKind::Unknown
+                    })?
+            };
+
+            let csr = csr::generate_csr(&csr::ROOT_ENCLAVE_CSR_TEMPLATE, &dpk_ring)
+                .map_err(|err| {
+                    trace_println!("trustzone-root-enclave::NativeAttestation failed to generate csr:{:?}", err);
+                    ErrorKind::Unknown
+                })?;
             trace_println!("trustzone-root-enclave::invoke_command calling native_attestation function");
-            let token = native_attestation(device_id, &challenge).map_err(|err| {
+            let token = native_attestation(device_id, &challenge, &csr).map_err(|err| {
                 trace_println!(
                     "trustzone-root-enclave::invoke_command call to native_attestation failed:{:?}",
                     err
@@ -249,133 +240,236 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> optee_utee::Result<()
                 );
                 ErrorKind::Unknown
             })?;
-            trace_println!("trustzone-root-enclave::invoke_command setting token.len:{:}", token.len());
-            values.set_b(token.len() as u32);
 
-            let public_key = {
-                let dpk_guard = DEVICE_PUBLIC_KEY.lock().map_err(|err| {
-                    trace_println!(
-                        "trustzone-root-enclave::native_attestation failed to obtain lock on PUBLIC_KEY_HASH:{:}",
-                        err
-                    );
-                    ErrorKind::Unknown
-                })?;
-                let dpk = dpk_guard.clone().unwrap();
-                dpk
-            };
-            pubkey_buf.buffer().write(&public_key).map_err(|err| {
+            trace_println!("trustzone-root-enclave::invoke_command setting token.len:{:}", token.len());
+            values.set_a(token.len() as u32);
+
+            csr_buf.buffer().write(&csr).map_err(|err| {
                 trace_println!(
-                    "trustzone-root-enclave::NativeAttestation failed to place public key in pubkey_buf:{:?}",
+                    "trustzone-root-enclave::NativeAttestation failed to place CSR in csr_buf:{:?}",
                     err
                 );
                 ErrorKind::Unknown
             })?;
-            values.set_a(public_key.len() as u32);
+            values.set_b(csr.len() as u32);
         }
+        TrustZoneRootEnclaveOpcode::CertificateChain => {
+            // p0 - root certificate input
+            // p1 - Root Enclave certificate input
+            // p2-p3 - NULL
+            trace_println!("trustzone-root-enclave::invoke_command CertificateChain Opcode started");
+            let root_certificate = unsafe {
+                let mut memref = params.0.as_memref().map_err(|err| {
+                    trace_println!("trustzone-root-enclave::invoke_command CertificateChain failed to get params.0 as memref{:?}", err);
+                    ErrorKind::BadParameters
+                })?;
+                memref.buffer().to_vec()
+            };
+            let root_enclave_certificate = unsafe {
+                let mut memref = params.1.as_memref().map_err(|err| {
+                    trace_println!("trustzone-root-enclave::invoke_command CertificateChain failed to get params.1 as memref:{:?}", err);
+                    ErrorKind::BadParameters
+                })?;
+                memref.buffer().to_vec()
+            };
+            let mut cert_chain_guard = CERT_CHAIN.lock()
+                .map_err(|err| {
+                    trace_println!("trustzone-root-enclave::invoke_command CertificateChain failed to obtain lock on CERT_CHAIN:{:?}", err);
+                    ErrorKind::Unknown
+                })?;
+            match &*cert_chain_guard {
+                Some(_) => {
+                    panic!("Unhandled. CERT_CHAIN is not None.");
+                }
+                None => {
+                    *cert_chain_guard = Some((root_enclave_certificate, root_certificate));
+                }
+            }
+        }
+        TrustZoneRootEnclaveOpcode::StartLocalAttestation => {
+            // p0 - challenge output
+            // p1.a - challenge ID output value
+            // p2-p3 - NULL
+            let challenge_id = CHALLENGE_ID.fetch_add(1, Ordering::SeqCst);
+            let mut challenge_buffer = unsafe {
+                let mut memref = params.0.as_memref().map_err(|err| {
+                    trace_println!("trustzone-root-enclave::invoke_command StartLocalAttestation failed to get params.0 as memref:{:?}", err);
+                    ErrorKind::BadParameters
+                })?;
+                memref.buffer().to_vec()
+            };
+            let mut values = unsafe {
+                params.1.as_value().map_err(|err| {
+                    trace_println!(
+                        "trustzone-root-enclave::invoke_command StartLocalAttestation failed to extract values from params.1:{:?}",
+                        err
+                    );
+                    ErrorKind::Unknown
+                })?
+            };
+            // fill challenge buffer with random data
+            SystemRandom::new().fill(&mut challenge_buffer)
+                .map_err(|err| {
+                    trace_println!("trustzone-root-enclave::invoke_command StartLocalAttestation failed to fill challenge_buffer:{:?}", err);
+                    ErrorKind::Unknown
+                })?;
+
+            // save the challenge_id, challenge in the hash
+            {
+                let mut ch_guard = CHALLENGE_HASH.lock()
+                    .map_err(|err| {
+                        trace_println!("trustzone-root-enclave::invoke_command StartLocalAttestation failed to obtain lock on CHALLENGE_HASH:{:?}", err);
+                        ErrorKind::Unknown
+                    })?;
+                ch_guard.insert(challenge_id, challenge_buffer);
+            }
+
+            // return the challenge_id
+            values.set_a(challenge_id);
+        }
+        // TrustZoneRootEnclaveOpcode::FinishLocalAttestation => {
+        //     TODO: Implement this
+        // }
         TrustZoneRootEnclaveOpcode::ProxyAttestation => {
-            // p0 - challenge input
-            // p1 - enclave_cert input / TrustZone root enclave Pubkey Output
-            // p2 - token output
-            // p3 - a: device_id output b:none
-            trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation Opcode started");
-            let challenge = unsafe {
-                trace_println!(
-                    "trustzone-root-enclave::invoke_command ProxyAttestation params.0.param_type:{:?}",
-                    params.0.param_type
-                );
-                trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation params.0.raw:");
-                trace_println!("\traw.buffer:{:?}", (*params.0.raw).memref.buffer);
-                trace_println!("\traw.size: {:?}", (*params.0.raw).memref.size);
-                trace_println!("\tparam_type:{:?}", params.0.param_type);
+            // p0 - csr input
+            // p1 -a: challenge id input
+            // p2 - cert_chain_buffer output
+            // p3 - cert_lengths - output
+
+            let csr = unsafe {
                 let mut memref = params.0.as_memref().map_err(|err| {
                     trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to get params.0 as memref:{:?}", err);
                     ErrorKind::BadParameters
                 })?;
                 memref.buffer().to_vec()
             };
-            trace_println!(
-                "trustzone-root-enclave::invoke_command ProxyAttestation challenge:{:?}",
-                challenge
-            );
-            trace_println!(
-                "trustzone-root-enclave::invoke_command ProxyAttestation challenge.len: {:?}",
-                challenge.len()
-            );
-            let mut cert_pubkey_buffer = unsafe {
-                let memref = params.1.as_memref().map_err(|err| {
+            let challenge_id = unsafe {
+                params.1.as_value()
+                    .map_err(|e| {
+                        trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to get params.1 as value:{:?}", e);
+                        ErrorKind::BadParameters
+                    })?
+                    .a()
+            };
+            let mut cert_chain_buffer = unsafe {
+                let memref = params.2.as_memref().map_err(|err| {
                     trace_println!(
-                        "trustzone-root-enclave::invoke_command failed to get memref from params.1:{:?}",
+                        "trustzone-root-enclave::invoke_command failed to get memref from params.2:{:?}",
                         err
                     );
                     ErrorKind::TargetDead
                 })?;
                 memref
             };
-            let cert = cert_pubkey_buffer.buffer().to_vec();
-            let mut token_buf = unsafe { params.2.as_memref().unwrap() };
-
-            let token = proxy_attestation(&challenge, &cert).map_err(|err| {
-                trace_println!("trustzone-root-enclave::invoke_command proxy_attestation failed:{:?}", err);
-                ErrorKind::TargetDead
-            })?;
-            let mut param3_value = unsafe {
-                params.3.as_value().map_err(|err| {
+            // Note: we really want cert_lengths_buffer to be a vec of u32,
+            // but the optee-utee library doesn't support that.
+            // instead, we are going to get it as u8, collect the data for it
+            // in another vec of u32, and then transmute that vec and then copy
+            let mut cert_lengths_buffer = unsafe {
+                let memref = params.3.as_memref().map_err(|err| {
                     trace_println!(
-                    "trustzone-root-enclave::invoke_command ProxyAttestation failed to get params.3 as_value:{:?}",
-                    err
-                );
-                    ErrorKind::TargetDead
-                })?
-            };
-            let device_id = {
-                let di_guard = DEVICE_ID.lock().map_err(|err| {
-                                       trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to get lock on DEVICE_ID:{:?}", err);
-                                       ErrorKind::TargetDead
-                                   })?;
-                di_guard.unwrap()
-            };
-
-            let device_public_key = {
-                let dpk_guard = DEVICE_PUBLIC_KEY.lock().map_err(|err| {
-                    trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to get lock on DEVICE_PUBLIC_KEY:{:?}", err);
+                        "trustzone-root-enclave::invoke_command failed to get memref from params.3:{:?}",
+                        err
+                    );
                     ErrorKind::TargetDead
                 })?;
-                (*dpk_guard).clone().unwrap()
+                memref
             };
-            trace_println!(
-                "trustzone-root-enclave::invoke_command ProxyAttestation has device_public_key:{:?}",
-                device_public_key
-            );
-            param3_value.set_a(device_id.try_into().map_err(|err| {
-                trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to convert device_id into u32:{:?}", err);
-                ErrorKind::Unknown
-            })?);
 
-            token_buf.buffer().write(&token).map_err(|err| {
-                trace_println!(
-                    "trustzone-root-enclave::ProxyAttestation failed to place token in token_buf:{:?}",
-                    err
-                );
-                ErrorKind::Unknown
-            })?;
-            unsafe {
-                (*params.2.as_memref().unwrap().raw()).size = token.len().try_into().unwrap()
+            // look up the challenge using challenge_id
+            // NOTE: In a system that supported local attestation, We would 
+            // compare the expected challenge against a challenge value provided
+            // in a token. We don't have that, so we won't do the comparison.
+            // One way around this: place the challenge in the CSR as an extension,
+            // then extract it and compare. We are not doing that now. TODO
+            let _expected_challenge = {
+                let mut ch_guard = CHALLENGE_HASH.lock()
+                    .map_err(|err| {
+                        trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to obtain lock on CHALLENGE_HASH:{:?}", err);
+                        ErrorKind::TargetDead
+                    })?;
+                ch_guard.remove(&challenge_id).ok_or(ErrorKind::BadParameters)?
             };
-            cert_pubkey_buffer.buffer().write(&device_public_key).map_err(|err| {
-                trace_println!("trustzone-root-enclave::invoke_command::ProxyAttestation faeild to place pubkey in cert_pubkey_buffer:{:?}", err);
-                ErrorKind::Unknown
+
+            // In world where TrustZone had local attestation (not our platform)
+            // the hash of the runtime_manager enclave would be sent in a local
+            // attestation token, or at least provided to this call by TF-A
+            // We don't have that, so we have our own call (TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack)
+            // that populates RUNTIME_MANAGER_HASH for us. This is a dirty
+            // hack.
+            let runtime_manager_hash = {
+                let rmh = RUNTIME_MANAGER_HASH.lock()
+                    .map_err(|err| {
+                        trace_println!("trustzone-root-enclave::invoke_command ProxyAttestation failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}", err);
+                        ErrorKind::TargetDead
+                    })?;
+                match &*rmh {
+                    Some(hash) => hash.clone(),
+                    None => return Err(optee_utee::Error::new(ErrorKind::TargetDead)),
+                }
+            };
+
+            let private_key = {
+                let dpk = device_private_key()
+                    .map_err(|_| ErrorKind::TargetDead)?;
+                signature::EcdsaKeyPair::from_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, &dpk)
+                    .map_err(|_| ErrorKind::Unknown)?
+            };
+            // Now that we've "verified" the challenge, convert the CSR to a 
+            // certificate
+            let mut runtime_manager_cert = 
+                veracruz_utils::csr::convert_csr_to_cert(&csr, 
+                                                         &veracruz_utils::csr::COMPUTE_ENCLAVE_CERT_TEMPLATE,
+                                                         &runtime_manager_hash,
+                                                         &private_key)
+                    .map_err(|err| {
+                        trace_println!("convert_csr_to_cert failed:{:?}", err);
+                        ErrorKind::Unknown
+                    })?;
+            let (mut root_enclave_cert, mut root_cert) = {
+                let cc_guard = CERT_CHAIN.lock()
+                    .map_err(|_| ErrorKind::TargetDead)?;
+                match &*cc_guard {
+                    Some((re_cert, r_cert)) => (re_cert.clone(), r_cert.clone()),
+                    None => return Err(optee_utee::Error::new(ErrorKind::BadParameters)),
+                }
+            };
+
+            // create a buffer to aggregate the certificates
+            let mut temp_cert_buf: Vec<u8> = Vec::new();
+            let mut temp_cert_lengths: Vec<u32> = Vec::new();
+
+            temp_cert_lengths.push(runtime_manager_cert.len() as u32);
+            temp_cert_buf.append(&mut runtime_manager_cert);
+
+            temp_cert_lengths.push(root_enclave_cert.len() as u32);
+            temp_cert_buf.append(&mut root_enclave_cert);
+
+            temp_cert_lengths.push(root_cert.len() as u32);
+            temp_cert_buf.append(&mut root_cert);
+
+            cert_chain_buffer.buffer().write(&temp_cert_buf).map_err(|e| {
+                trace_println!("runtime_manager_trustzone::invoke_command ProxyAttestation failed to write buffer {:?}",
+                    e);
+                ErrorKind::TargetDead
             })?;
-            unsafe {
-                (*params.1.as_memref().unwrap().raw()).size =
-                    device_public_key.len().try_into().unwrap()
-            }
+
+            // since our target buffer is vec<u8>, and our source is vec<u32>,
+            // we need to transmute the source before the copy
+            let temp_cert_lengths_u8: Vec<u8> = veracruz_utils::platform::tz::transmute_from_u32(&temp_cert_lengths);
+            cert_lengths_buffer.buffer().write(&temp_cert_lengths_u8)
+                .map_err(|e| {
+                    trace_println!("runtime_manager_trustzone::invoke_command ProxyAttestation failed to write buffer {:?}",
+                        e);
+                    ErrorKind::TargetDead
+            })?;
         }
     }
     trace_println!("trustzone-root-enclave::invoke_command done");
     return Ok(());
 }
 
-fn native_attestation(device_id: i32, challenge: &Vec<u8>) -> Result<Vec<u8>, String> {
+fn native_attestation(device_id: i32, challenge: &Vec<u8>, csr: &Vec<u8>) -> Result<Vec<u8>, String> {
     let mut root_key_handle: u16 = 0;
     let status = unsafe {
         psa_initial_attest_load_key(
@@ -402,61 +496,18 @@ fn native_attestation(device_id: i32, challenge: &Vec<u8>) -> Result<Vec<u8>, St
         *di_guard = Some(device_id);
     }
 
-    let device_public_key_hash: Vec<u8> = {
-        let dpk_guard = DEVICE_PUBLIC_KEY.lock().map_err(|err| {
-            format!(
-                "trustzone-root-enclave::native_attestation failed to obtain lock on PUBLIC_KEY_HASH:{:}",
-                err
-            )
-        })?;
-        let dpk = dpk_guard.clone().unwrap();
-        trace_println!(
-            "trustzone-root-enclave::native_attestation calculating hash of device public key:{:?}",
-            dpk
-        );
-        let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, dpk.as_ref());
-        trace_println!(
-            "trustzone-root-enclave::native_attestation calculated hash:{:?}",
-            pubkey_hash
-        );
-        pubkey_hash.as_ref().to_vec()
-    };
-
-    // let mut identity = TEE_Identity {
-    //     login: 0,
-    //     uuid: TEE_UUID {
-    //         timeLow: 0,
-    //         timeMid: 0,
-    //         timeHiAndVersion: 0,
-    //         clockSeqAndNode: [0; 8],
-    //     },
-    // };
-    // let result = unsafe {
-    //     TEE_GetPropertyAsIdentity(
-    //         TEE_PROPSET_CURRENT_CLIENT,
-    //         "gpd.client.identity\0".as_ptr() as *const u8,
-    //         &mut identity,
-    //     )
-    // };
-    // if result != 0 {
-    //     return Err(format!(
-    //         "trustzone-root-enclave::native_attestation TEE_GetPropertyAsIdentity failed:{:}",
-    //         result
-    //     ));
-    // }
+    let csr_hash: Vec<u8> = digest::digest(&digest::SHA256, csr).as_ref().to_vec();
 
     let mut trustzone_root_enclave_hash: [u8; 32] = [0; 32];
     trustzone_root_enclave_hash.clone_from_slice(&TRUSTZONE_ROOT_ENCLAVE_HASH[0..32]);
     let mut token_buffer: Vec<u8> = Vec::with_capacity(1024); // TODO: Don't do this
     let mut token_size: u64 = 0;
-    trace_println!("token_buffer.capacity():{:?}", token_buffer.capacity());
-    trace_println!("challenge.len():{:?}", challenge.len());
     let status = unsafe {
         psa_initial_attest_get_token(
             &trustzone_root_enclave_hash as *const u8,
             trustzone_root_enclave_hash.len() as u64,
-            device_public_key_hash.as_ptr() as *const u8,
-            device_public_key_hash.len() as u64,
+            csr_hash.as_ptr() as *const u8,
+            csr_hash.len() as u64,
             std::ptr::null() as *const u8,
             0,
             challenge.as_ptr() as *const u8,
@@ -473,76 +524,39 @@ fn native_attestation(device_id: i32, challenge: &Vec<u8>) -> Result<Vec<u8>, St
         ));
     }
     unsafe { token_buffer.set_len(token_size as usize) };
-    trace_println!(
-        "trustzone-root-enclave::native_attestation token_buffer value:{:?}",
-        token_buffer
-    );
     Ok(token_buffer.clone())
 }
 
-fn proxy_attestation(challenge: &Vec<u8>, enclave_cert: &Vec<u8>) -> Result<Vec<u8>, String> {
-    let device_private_key = {
-        let dpk_guard = DEVICE_PRIVATE_KEY.lock().map_err(|err| {
-            format!(
-                "trustzone-root-enclave::proxy_attestation failed to obtain lock on DEVICE_PRIVATE_KEY:{:?}",
-                err
-            )
-        })?;
-        match &*dpk_guard {
-            Some(dpk) => dpk.clone(),
-            None => return Err(format!("Device private key is not populated?")),
-        }
-    };
-    let mut device_key_handle: u16 = 0;
-    let _status = unsafe {
-        psa_initial_attest_load_key(
-            device_private_key.as_ptr(),
-            device_private_key.len() as u64,
-            &mut device_key_handle,
+fn device_private_key() -> Result<Vec<u8>, String> {
+    let dpk_guard = DEVICE_PRIVATE_KEY.lock().map_err(|err| {
+        format!(
+            "trustzone-root-enclave::device_private_key failed to obtain lock on DEVICE_PRIVATE_KEY:{:?}",
+            err
         )
-    };
-    trace_println!("trustzone-root-enclave::proxy_attestation started");
-    let runtime_manager_hash = {
-        let rmh_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
-            format!(
-                "trustzone-root-enclave::proxy_attestation failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}",
-                err
-            )
-        })?;
-        match &*rmh_guard {
-            Some(hash) => hash.clone(),
-            None => return Err(format!("trustzone-root-enclave::proxy_attestation RUNTIME_MANAGER_HASH does not contain data and that's a problem")),
-        }
-    };
-    let mut token: Vec<u8> = Vec::with_capacity(2048);
-    let mut token_len: u64 = 0;
-    let enclave_cert_hash = ring::digest::digest(&ring::digest::SHA256, &enclave_cert);
-    let enclave_name = "ac40a0c"; // TODO: Get the real enclave name
-    let enclave_name_vec = enclave_name.as_bytes();
-    let status = unsafe {
-        psa_initial_attest_get_token(
-            runtime_manager_hash.as_ptr() as *const u8,
-            runtime_manager_hash.len() as u64,
-            enclave_cert_hash.as_ref().as_ptr() as *const u8,
-            enclave_cert_hash.as_ref().len() as u64,
-            enclave_name_vec.as_ptr() as *const u8,
-            enclave_name_vec.len() as u64,
-            challenge.as_ptr() as *const u8,
-            challenge.len() as u64,
-            token.as_mut_ptr() as *mut u8,
-            2048,
-            &mut token_len as *mut u64,
-        )
-    };
-    if status != 0 {
-        return Err(format!(
-            "trustzone-root-enclave::proxy_attestation psa_initial_attest_get_token failed with error code:{:}",
-            status
-        ));
+    })?;
+    match &*dpk_guard {
+        Some(dpk) => Ok(dpk.clone()),
+        None => return Err(format!("trustzone-root-enclave::device_private_key Device private key is not populated?")),
     }
-    unsafe { token.set_len(token_len as usize) };
-    trace_println!("trustzone-root-enclave::proxy_attestation token_buffer value:{:?}", token);
-    Ok(token.clone())
+}
+
+// NOTE: fix a mystery where a bcmp function implementation is required for compiling the
+// trustzone-root-enclave which optee does not provide.
+// Have tried to patch in the rust/libc but it will introduce double implementation.
+// TODO: Why does it happen in the first place???
+#[allow(non_camel_case_types)]
+type c_int = i32;
+#[allow(non_camel_case_types)]
+type size_t = usize;
+use libc::c_void;
+
+extern "C" {
+    pub fn memcmp(cx: *const c_void, ct: *const c_void, n: size_t) -> c_int;
+}
+
+#[no_mangle]
+extern "C" fn bcmp(cx: *const c_void, ct: *const c_void, n: size_t) -> c_int {
+    unsafe { memcmp(cx, ct, n) }
 }
 
 // TA configurations

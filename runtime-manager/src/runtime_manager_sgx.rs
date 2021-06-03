@@ -83,9 +83,21 @@ pub extern "C" fn init_session_manager_enc(
         }
     };
 
-    let certs = local_attestation_get_cert_enc(&csr).unwrap();
+    let certs = match local_attestation_get_cert_enc(&csr) {
+        Ok(data) => data,
+        Err(e)  => {
+            println!("runtime_manager_sgx::init_session_manager_enc call to local_attestation_get_cert_enc failed:{:?}", e);
+            return sgx_status_t::SGX_ERROR_UNEXPECTED;
+        }
+    };
 
-    managers::session_manager::load_cert_chain(certs).unwrap();
+    match managers::session_manager::load_cert_chain(certs) {
+        Ok(_) => (),
+        Err(e) => {
+            println!("runtime_manager_sgx::init_session_manager_enc call to load_cert_chain failed:{:?}", e);
+            return sgx_status_t::SGX_ERROR_UNEXPECTED;
+        }
+    }
 
     return sgx_status_t::SGX_SUCCESS;
 }
@@ -192,19 +204,8 @@ fn local_attestation_get_cert_enc(
     // Set the length of cert_array according to what the ocall told us
     unsafe { cert_array.set_len(cert_array_size) };
 
-    // create the 2D vec of bytes to contain the certificates
-    let mut certs: std::vec::Vec< std::vec::Vec<u8> > = std::vec::Vec::new();
-
-
-    let mut aggregate_length: usize = 0;
-    // break the `cert_array` up according to the values in `certificate_lengths`
-    // and place them in `certs`
-    for this_length in certificate_lengths.iter() {
-        let mut this_cert: std::vec::Vec<u8> = vec![0; *this_length as usize];
-        this_cert.copy_from_slice(&cert_array[aggregate_length..(aggregate_length + *this_length as usize)]);
-        certs.push(this_cert);
-        aggregate_length += *this_length as usize;
-    }
+    let certs: std::vec::Vec< std::vec::Vec<u8> > = 
+        break_up_cert_array(&cert_array, &certificate_lengths)?;
 
     return Ok(certs);
 }

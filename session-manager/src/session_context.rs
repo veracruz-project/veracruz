@@ -145,7 +145,7 @@ impl SessionContext {
             let cert: rustls::Certificate = rustls::Certificate(this_chain_data.clone());
             cert_chain.push(cert);
         }
-        self.server_config.set_single_cert(cert_chain, self.server_private_key.clone());
+        self.server_config.set_single_cert(cert_chain, self.server_private_key.clone())?;
         return Ok(());
     }
 

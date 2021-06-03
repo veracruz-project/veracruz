@@ -295,9 +295,10 @@ pub fn parse_proxy_psa_attestation_token(
     )
 }
 
-pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> TransportProtocolResult {
+pub fn serialize_native_psa_attestation_token(token: &[u8], csr: &[u8], device_id: i32) -> TransportProtocolResult {
     let mut pat_proto = transport_protocol::NativePsaAttestationToken::new();
     pat_proto.set_token(token.to_vec());
+    pat_proto.set_csr(csr.to_vec());
     pat_proto.set_device_id(device_id);
     let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_native_psa_attestation_token(pat_proto);
@@ -307,8 +308,8 @@ pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> T
 
 pub fn parse_native_psa_attestation_token(
     proto: &transport_protocol::NativePsaAttestationToken,
-) -> (std::vec::Vec<u8>, i32) {
-    (proto.get_token().to_vec(), proto.get_device_id())
+) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
+    (proto.get_token().to_vec(), proto.get_csr().to_vec(), proto.get_device_id())
 }
 
 pub fn parse_sgx_attestation_init(proto: &transport_protocol::SgxAttestationInit) -> (std::vec::Vec<u8>, i32) {

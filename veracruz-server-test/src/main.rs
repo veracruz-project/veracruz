@@ -1456,7 +1456,7 @@ mod tests {
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
-            let data = std::fs::read("../proxy-attestation-server/CACert.pem").unwrap();
+            let data = std::fs::read("../test-collateral/CACert.pem").unwrap();
             let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
             certs[0].clone()
         };

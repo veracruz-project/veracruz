@@ -128,7 +128,7 @@ get_random_policy.json: pgen pgen css-$(TEE).bin client_rsa_cert.pem random-sour
        --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) --proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) --proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 one_data_source_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem linear-regression.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
@@ -137,7 +137,7 @@ one_data_source_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem linear-regr
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 test_multiple_key_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem moving-average-convergence-divergence.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), moving-average-convergence-divergence.wasm : $(WRITE_RIGHT)" \
@@ -146,7 +146,7 @@ test_multiple_key_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem moving-av
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 two_data_source_string_edit_distance_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem string-edit-distance.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT), string-edit-distance.wasm : $(WRITE_RIGHT)" \
@@ -155,7 +155,7 @@ two_data_source_string_edit_distance_policy.json: pgen css-$(TEE).bin client_rsa
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 two_data_source_intersection_set_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem intersection-set-sum.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT), intersection-set-sum.wasm : $(WRITE_RIGHT)" \
@@ -164,7 +164,7 @@ two_data_source_intersection_set_policy.json: pgen css-$(TEE).bin client_rsa_cer
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 two_data_source_private_set_intersection_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem private-set-intersection.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT), private-set-intersection.wasm : $(WRITE_RIGHT)" \
@@ -173,7 +173,7 @@ two_data_source_private_set_intersection_policy.json: pgen css-$(TEE).bin client
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 dual_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem linear-regression.wasm
 	./pgen --certificate program_client_cert.pem --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
@@ -183,7 +183,7 @@ dual_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.p
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 dual_parallel_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem linear-regression.wasm
 	./pgen --certificate program_client_cert.pem --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
@@ -193,7 +193,7 @@ dual_parallel_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_clie
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 triple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem linear-regression.wasm
 	./pgen --certificate program_client_cert.pem --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
@@ -204,7 +204,7 @@ triple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert
 		 --execution-strategy Interpretation \
 		 --stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 triple_parties_two_data_sources_sum_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm
 	./pgen --certificate program_client_cert.pem --capability "intersection-set-sum.wasm : $(WRITE_RIGHT)" \
@@ -215,7 +215,7 @@ triple_parties_two_data_sources_sum_policy.json: pgen css-$(TEE).bin program_cli
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 permuted_triple_parties_two_data_sources_sum_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm
 	./pgen --certificate program_client_cert.pem --capability "intersection-set-sum.wasm : $(WRITE_RIGHT)" \
@@ -226,7 +226,7 @@ permuted_triple_parties_two_data_sources_sum_policy.json: pgen css-$(TEE).bin pr
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 triple_parties_two_data_sources_string_edit_distance_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm
 	./pgen --certificate program_client_cert.pem --capability "string-edit-distance.wasm : $(WRITE_RIGHT)" \
@@ -237,7 +237,7 @@ triple_parties_two_data_sources_string_edit_distance_policy.json: pgen css-$(TEE
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 quadruple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm
 	./pgen --certificate program_client_cert.pem --capability "string-edit-distance.wasm : $(WRITE_RIGHT)" \
@@ -249,7 +249,7 @@ quadruple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_c
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 invalid_policy/one_expired_data_source_policy.json: pgen css-$(TEE).bin expired_cert.pem linear-regression.wasm
 	./pgen --certificate expired_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
@@ -258,7 +258,7 @@ invalid_policy/one_expired_data_source_policy.json: pgen css-$(TEE).bin expired_
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 idash2017_logistic_regression_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem idash2017-logistic-regression.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), idash2017-logistic-regression.wasm : $(WRITE_RIGHT)" \
@@ -267,7 +267,7 @@ idash2017_logistic_regression_policy.json: pgen css-$(TEE).bin client_rsa_cert.p
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 moving_average_convergence_divergence.json: pgen css-$(TEE).bin client_rsa_cert.pem moving-average-convergence-divergence.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), moving-average-convergence-divergence.wasm : $(WRITE_RIGHT)" \
@@ -276,21 +276,16 @@ moving_average_convergence_divergence.json: pgen css-$(TEE).bin client_rsa_cert.
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 private_set_intersection_sum.json: pgen css-$(TEE).bin client_rsa_cert.pem private-set-intersection-sum.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), private-set-intersection-sum.wasm : $(WRITE_RIGHT)" \
 		--binary private-set-intersection-sum.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
 		--veracruz-server-ip 127.0.0.1:3025 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--execution-strategy Interpretation \
-<<<<<<< HEAD
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0)
-=======
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
->>>>>>> Added the proxy-service-cert field to the Policy. Updated the veracruz-client code to handle the new attestation mechanism
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 number-stream-accumulation.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem number-stream-accumulation.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "stream-0 : $(WRITE_RIGHT), stream-1 : $(WRITE_RIGHT), input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), number-stream-accumulation.wasm : $(WRITE_RIGHT)" \
@@ -298,7 +293,7 @@ number-stream-accumulation.json: pgen css-$(TEE).bin program_client_cert.pem dat
 		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../proxy-attestation-server/CACert.pem
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 basic_file_read_write.json: pgen css-$(TEE).bin client_rsa_cert.pem read-file.wasm 
 	./pgen --certificate client_rsa_cert.pem --capability "input.txt: $(WRITE_RIGHT), output : $(READ_RIGHT), read-file.wasm : $(WRITE_RIGHT)" \

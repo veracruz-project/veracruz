@@ -13,7 +13,6 @@ use crate::managers::*;
 use ::session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::policy::policy::Policy;
-use ring::{rand::SystemRandom};
 use rustls::PrivateKey;
 use veracruz_utils::csr;
 
@@ -46,7 +45,7 @@ pub fn load_cert_chain(chain: Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> {
     let mut sm_guard = MY_SESSION_MANAGER.lock()?;
     match &mut *sm_guard {
         Some(session_manager) => {
-            session_manager.set_cert_chain(&chain);
+            session_manager.set_cert_chain(&chain)?;
         },
         None => {
             panic!("Invalid state");
@@ -136,17 +135,6 @@ pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
         None => Err(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
         )),
-    }
-}
-
-fn get_enclave_public_key() -> Result<Vec<u8>, RuntimeManagerError> {
-    match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(session_manager) => {
-            return Ok(session_manager.public_key());
-        },
-        None => {
-            return Err(RuntimeManagerError::UninitializedSessionError("get_enclave_public_key"));
-        },
     }
 }
 

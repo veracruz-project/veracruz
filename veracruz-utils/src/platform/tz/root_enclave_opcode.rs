@@ -30,6 +30,11 @@ pub enum TrustZoneRootEnclaveOpcode {
     NativeAttestation,
     /// A message requesting proxy attestation.
     ProxyAttestation,
+    /// Start the local attestation process by requesting a challenge value from
+    /// the root enclave
+    StartLocalAttestation,
+    /// A message containing the certificate chain for the Root enclave
+    CertificateChain,
     /// A message requesting that a "hack" (due to us not implementing
     /// attestation for Arm TrustZone, yet) is performed.
     SetRuntimeManagerHashHack,
@@ -48,7 +53,9 @@ impl TryFrom<u32> for TrustZoneRootEnclaveOpcode {
             1 => Ok(TrustZoneRootEnclaveOpcode::GetFirmwareVersion),
             2 => Ok(TrustZoneRootEnclaveOpcode::NativeAttestation),
             3 => Ok(TrustZoneRootEnclaveOpcode::ProxyAttestation),
-            4 => Ok(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack),
+            4 => Ok(TrustZoneRootEnclaveOpcode::StartLocalAttestation),
+            5 => Ok(TrustZoneRootEnclaveOpcode::CertificateChain),
+            6 => Ok(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack),
             _ => Err(format!(
                 "TrustZoneRootEnclaveOpcode:from_u32: Unknown value: {}",
                 value
