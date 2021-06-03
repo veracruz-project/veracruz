@@ -205,7 +205,7 @@ fn local_attestation_get_cert_enc(
     unsafe { cert_array.set_len(cert_array_size) };
 
     let certs: std::vec::Vec< std::vec::Vec<u8> > = 
-        break_up_cert_array(&cert_array, &certificate_lengths)?;
+        crate::runtime_manager::break_up_cert_array(&cert_array, &certificate_lengths)?;
 
     return Ok(certs);
 }

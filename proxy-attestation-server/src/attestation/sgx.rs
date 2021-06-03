@@ -339,7 +339,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         }
 
         // All's good. Generate a Certificate from the CSR...
-        let cert = convert_csr_to_certificate(&csr)?;
+        let cert = crate::attestation::convert_csr_to_certificate(&csr)?;
 
         let root_cert_der = crate::attestation::get_ca_certificate()?;
 
