@@ -98,7 +98,7 @@ mod tests {
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, "../test-collateral/CACert.pem", false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });

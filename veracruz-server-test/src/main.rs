@@ -125,11 +125,11 @@ mod tests {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 #[cfg(feature = "debug")]
                 let server =
-                    proxy_attestation_server::server::server(proxy_attestation_server_url, true)
+                    proxy_attestation_server::server::server(proxy_attestation_server_url, "../test-collateral/CACert.pem", true)
                         .unwrap();
                 #[cfg(not(feature = "debug"))]
                 let server =
-                    proxy_attestation_server::server::server(proxy_attestation_server_url, false)
+                    proxy_attestation_server::server::server(proxy_attestation_server_url, "../test-collateral/CACert.pem", false)
                         .unwrap();
                 sys.block_on(server).unwrap();
             });

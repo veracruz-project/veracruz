@@ -195,10 +195,14 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> P
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
-pub fn server(url: String, debug: bool) -> Result<Server, String> {
+pub fn server(url: String, ca_cert_path: &str, debug: bool) -> Result<Server, String> {
     if debug {
         DEBUG_MODE.store(true, Ordering::SeqCst);
     }
+    crate::attestation::load_ca_certificate(ca_cert_path)
+        .map_err(|err| {
+            format!("proxy-attestation-server::server::server load_ca_certificate returned an error:{:?}", err)
+        })?;
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())

@@ -81,7 +81,9 @@ pub enum ProxyAttestationServerError {
     #[error(display = "ProxyAttestationServer: CSR Verify failed")]
     CsrVerifyError,
     #[error(display = "ProxyAttestationServer: IOError {}.", _0)]
-    IOError(#[error(source)] std::io::Error)
+    IOError(#[error(source)] std::io::Error),
+    #[error(display = "ProxyAttestationServer: BadState error")]
+    BadStateError,
 }
 
 #[cfg(feature = "sgx")]
