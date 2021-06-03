@@ -189,16 +189,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             err
         })?;
 
-    let root_cert_der = {
-        let mut f = std::fs::File::open("../test-collateral/CACert.der")
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::psa::attestation_token failed to open CA Certificate:{:?}", err);
-                ProxyAttestationServerError::IOError(err)
-            })?;
-        let mut buffer: Vec<u8> = Vec::new();
-        f.read_to_end(&mut buffer)?;
-        buffer
-    };
+    let root_cert_der = crate::attestation::get_ca_certificate()?;
 
     let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
         

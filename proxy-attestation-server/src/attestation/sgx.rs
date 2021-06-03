@@ -341,13 +341,8 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         // All's good. Generate a Certificate from the CSR...
         let cert = convert_csr_to_certificate(&csr)?;
 
-        let root_cert_der = {
-            let mut f = std::fs::File::open("../test-collateral/CACert.der")
-                .map_err(|err| ProxyAttestationServerError::IOError(err))?;
-            let mut buffer: Vec<u8> = Vec::new();
-            f.read_to_end(&mut buffer)?;
-            buffer
-        };
+        let root_cert_der = crate::attestation::get_ca_certificate()?;
+
         let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
         
         let response_b64 = base64::encode(&response_bytes);

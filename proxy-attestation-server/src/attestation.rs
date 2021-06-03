@@ -21,6 +21,8 @@ use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::io::Read;
 
+use openssl;
+
 lazy_static! {
     static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
 }
@@ -55,6 +57,16 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
         "nitro" => nitro::start(&firmware_version, device_id),
         _ => Err(ProxyAttestationServerError::UnknownAttestationTokenError),
     }
+}
+
+fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
+    let mut f = std::fs::File::open("../test-collateral/CACert.pem")
+        .map_err(|err| ProxyAttestationServerError::IOError(err))?;
+    let mut buffer: Vec<u8> = Vec::new();
+    f.read_to_end(&mut buffer)?;
+    let cert = openssl::x509::X509::from_pem(&buffer)?;
+    let der = cert.to_der()?;
+    return Ok(der);
 }
 
 fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
