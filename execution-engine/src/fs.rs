@@ -45,6 +45,8 @@ pub type FileSystemResult<T> = Result<T, ErrNo>;
 /// data buffer.
 #[derive(Clone, Debug)]
 struct InodeEntry {
+    /// The current inode.
+    current: Inode, 
     /// The parent inode.
     parent: Inode, 
     /// The path of this inode relative to the parent.
@@ -100,6 +102,22 @@ impl InodeEntry {
     pub(self) fn find_file(&self, path: impl AsRef<Path>) -> FileSystemError<Inode> {
         self.data.find_file(path)
     }
+
+    /// Return the absolute path
+    pub(self) fn absolute_path(&self, fs: &FileSystem) -> FileSystemError<PathBuf> {
+        if self.current == self.parent {
+            Ok(self.path.clone())
+        } else {
+            let mut parent_path = fs.get_inode(&self.parent)?.absolute_path(fs)?;
+            parent_path.push(self.path.as_path());
+            Ok(parent_path)
+        }
+    }
+
+    /// Check if the inode is a directory
+    pub(crate) fn is_dir(&self) -> bool {
+        self.data.is_dir()
+    }
 }
 
 /// The actual data of an inode, either a file or a directory.
@@ -112,6 +130,14 @@ enum InodeImpl {
 }
 
 impl InodeImpl {
+    /// Return a new Directory with current and parent paths
+    pub(crate) fn new_directory(current: Inode, parent: Inode) -> Self {
+        let mut dir = HashMap::new();
+        dir.insert(PathBuf::from("."), current);
+        dir.insert(PathBuf::from(".."), parent);
+        Self::Directory(dir)
+    }
+
     /// Resize a file to `size`, and fill with `fill_byte` if it grows.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemError<()> {
@@ -217,6 +243,14 @@ impl InodeImpl {
             Self::Directory(f) => f.len(),
         };
         Ok(rst as FileSize)
+    }
+
+    /// Check if it is a directory
+    pub(crate) fn is_dir(&self) -> bool {
+        match self {
+            Self::Directory(_) => true,
+            _ => false,
+        }
     }
 }
 
@@ -407,13 +441,17 @@ impl FileSystem {
         };
         let path = path.as_ref().to_path_buf();
         let node = InodeEntry {
+            current: new_inode.clone(),
             parent: Self::ROOT_DIRECTORY_INODE,
             file_stat,
             path: path.clone(),
-            data: InodeImpl::Directory(HashMap::new()),
+            data: InodeImpl::new_directory(new_inode.clone(),parent.clone()),
         };
         self.inode_table.insert(new_inode.clone(), node);
-        self.inode_table.get_mut(&parent).ok_or(ErrNo::NoEnt)?.insert_file(path.clone(), new_inode.clone())?;
+        // If parent is not equal to new_inode, it means `new_inode` is not a ROOT.
+        if parent != new_inode {
+            self.inode_table.get_mut(&parent).ok_or(ErrNo::NoEnt)?.insert_file(path.clone(), new_inode.clone())?;
+        }
         Ok(())
     }
 
@@ -431,6 +469,7 @@ impl FileSystem {
             ctime: Timestamp::from_nanos(0),
         };
         let node = InodeEntry {
+            current: new_inode.clone(),
             parent,
             file_stat,
             path: path.as_ref().to_path_buf(),
@@ -514,10 +553,15 @@ impl FileSystem {
         }
     }
 
+    /// Return the inode entry related to `inode`
+    fn get_inode(&self, inode: &Inode) -> FileSystemError<InodeEntry> {
+        self.inode_table.get(&inode).ok_or(ErrNo::NoEnt).map(|i| i.clone())
+    }
+
     /// Get the inode related to a Fd
     fn find_inode(&self, fd: &Fd) -> FileSystemError<(Inode, InodeEntry)> {
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
-        Ok((inode,self.inode_table.get(&inode).ok_or(ErrNo::BadF)?.clone()))
+        Ok((inode,self.get_inode(&inode)?))
     }
 
     /// Get the the inode related to path in the Fd
@@ -908,7 +952,7 @@ impl FileSystem {
         principal: &Principal,
         // The parent fd for searching
         fd: Fd,
-        _dirflags: LookupFlags,
+        dirflags: LookupFlags,
         path: T,
         oflags: OpenFlags,
         rights_base: Rights,
@@ -916,16 +960,24 @@ impl FileSystem {
         flags: FdFlags,
     ) -> FileSystemResult<Fd> {
         let path = path.as_ref();
-        // ONLY allow search on the root for now.
-        if fd != Self::ROOT_DIRECTORY_FD {
+        info!("call path_open, on behalf of fd {:?} and principal {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
+            fd, principal, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
+        // Read the parent inode.
+        let (parent_inode, parent_inode_entry) = self.find_inode(&fd)?;
+        let mut absolute_path = parent_inode_entry.absolute_path(&self)?;
+        absolute_path.push(path.clone());
+        // Manually convert to the canonicalize form. 
+        // NOTE that the canonicalize function call in pathbuf seems require some sys info.
+        let absolute_path: PathBuf = absolute_path.iter().map(|c| c.clone()).collect();
+        info!("call path_open on abs path {:?} and dir: {:?}",absolute_path, parent_inode_entry.data);
+        if !parent_inode_entry.is_dir() {
             return Err(ErrNo::NotDir);
         }
+        // Read the right related to the principal.
         // NOTE: A pontential better way to control capability is to
         // separate the Fd space of of different participants.
-
-        // Read the right related to the principal.
         let principal_right = if *principal != Principal::InternalSuperUser {
-            self.get_right(&principal, path)?
+            self.get_right(&principal, absolute_path)?
         } else {
             Rights::all()
         };
@@ -947,7 +999,6 @@ impl FileSystem {
             "call path_open, the actually right {:?} and inheriting right {:?}",
             rights_base, rights_inheriting
         );
-        let (parent_inode, _) = self.find_inode(&fd)?;
         // Several oflags logic, inc. `create`, `excl` and `trunc`. We ignore `directory`.
         let inode = match self.find_path(&fd, path) {
             Ok(i) => {
@@ -1138,14 +1189,15 @@ impl FileSystem {
     /// Write to a file on path `file_name`. If `is_append` is set, `data` will be append to `file_name`.
     /// Otherwise this file will be truncated. The `principal` must have the right on `path_open`,
     /// `fd_write` and `fd_seek`.
-    pub fn write_file_by_filename<T: AsRef<Path>>(
+    pub fn write_file_by_absolute_path<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
         file_name: T,
         data: &[u8],
         is_append: bool,
     ) -> Result<(), ErrNo> {
-        let file_name = file_name.as_ref();
+        let file_name = file_name.as_ref().strip_prefix("/").map_err(|_|ErrNo::NoEnt)?.clone();
+        info!("write_file_by_filename: {:?}", file_name);
         let oflag = OpenFlags::CREATE
             | if !is_append {
                 OpenFlags::TRUNC
@@ -1183,12 +1235,13 @@ impl FileSystem {
     /// Read from a file on path `file_name`.
     /// The `principal` must have the right on `path_open`,
     /// `fd_read` and `fd_seek`.
-    pub fn read_file_by_filename<T: AsRef<Path>>(
+    pub fn read_file_by_absolute_path<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
-        let file_name = file_name.as_ref();
+        let file_name = file_name.as_ref().strip_prefix("/").map_err(|_|ErrNo::NoEnt)?.clone();
+        info!("read_file_by_filename: {:?}", file_name);
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,

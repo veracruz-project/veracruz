@@ -406,7 +406,7 @@ impl WasiWrapper {
     #[inline]
     pub(crate) fn read_file_by_filename(&mut self, file_name: &str) -> FileSystemResult<Vec<u8>> {
         let mut fs = self.filesystem.lock().map_err(|_| ErrNo::Busy)?;
-        fs.read_file_by_filename(&Principal::InternalSuperUser, file_name)
+        fs. read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
     }
 
     /// Return the exit code from `proc_exit` call.

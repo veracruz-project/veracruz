@@ -24,5 +24,8 @@ fn main() -> anyhow::Result<()> {
     let f = fs::read(input)?;
     let rst = pinecone::to_vec(&f)?;
     fs::write(output, rst)?;
+
+    fs::read_dir("/")?;
+
     Ok(())
 }

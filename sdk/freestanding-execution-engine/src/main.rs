@@ -59,7 +59,7 @@ const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUT
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
 /// Application version number.
-const OUTPUT_FILE: &'static str = "output";
+const OUTPUT_FILE: &'static str = "/output";
 
 /// The default dump status of `stdout`, if no alternative is provided on the
 /// command line.
@@ -322,7 +322,7 @@ fn load_data_sources(
 
         vfs.lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .write_file_by_filename(&Principal::InternalSuperUser, &file_path, &buffer, false)?;
+            .write_file_by_absolute_path(&Principal::InternalSuperUser, &Path::new("/").join(file_path), &buffer, false)?;
 
         info!("Loading '{}' into vfs.", file_path);
     }
@@ -338,6 +338,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("Command line read successfully.");
 
     let (prog_file_name, program) = load_file(&cmdline.binary)?;
+    let prog_file_abs_path = Path::new("/").join(prog_file_name.clone());
 
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
@@ -365,9 +366,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // Manually create the Right table for the VFS.
-    file_table.insert(PathBuf::from(prog_file_name.clone()), write_right);
+    // NOTE: inject the root path.
+    file_table.insert(prog_file_abs_path.clone(), write_right);
     for file_path in cmdline.data_sources.iter() {
-        file_table.insert(PathBuf::from(file_path), read_right);
+        file_table.insert(Path::new("/").join(file_path), read_right);
     }
     for std_stream in &std_streams_table {
         let (path, rights) = match std_stream {
@@ -380,14 +382,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         file_table.insert(PathBuf::from(path), rights);
     }
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
-    right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
+    right_table.insert(Principal::Program(prog_file_abs_path.to_str().ok_or("Failed to convert program path to a string.")?.to_string()), file_table);
+    info!("The final right tables: {:?}",right_table);
 
     let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)?));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-        .write_file_by_filename(
+        .write_file_by_absolute_path(
             &Principal::InternalSuperUser,
-            &prog_file_name,
+            &prog_file_abs_path,
             &program,
             false,
         )?;
@@ -407,7 +410,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let return_code = execute(
         &cmdline.execution_strategy,
         vfs.clone(),
-        &prog_file_name,
+        prog_file_abs_path.to_str().ok_or("Failed to convert program path to a string.")?,
         options,
     )?;
     info!("return code: {:?}", return_code);
@@ -437,7 +440,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let output = vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-        .read_file_by_filename(
+        .read_file_by_absolute_path(
             &Principal::InternalSuperUser,
             OUTPUT_FILE
         );
