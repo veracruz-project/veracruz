@@ -280,7 +280,7 @@ impl FileSystem {
         }
     }
 
-    /// Check if `op` is allowed in `fd`
+    /// Check if `rights` is allowed in `fd`
     fn check_right(&self, fd: &Fd, rights: Rights) -> FileSystemError<()> {
         if self
             .fd_table
@@ -438,12 +438,13 @@ impl FileSystem {
             .get(&fd)
             .map(|FileTableEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
+        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
 
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
-            return Err(ErrNo::NoSys);
+            inode_impl.file_stat.atime = current_time;
         } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
-            return Err(ErrNo::NoSys);
+            inode_impl.file_stat.mtime = current_time;
         } else if fst_flags.contains(SetTimeFlags::ATIME) {
             inode_impl.file_stat.atime = atime;
         } else if fst_flags.contains(SetTimeFlags::MTIME) {
@@ -705,12 +706,14 @@ impl FileSystem {
         if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
+        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
+
         let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?;
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
-            return Err(ErrNo::NoSys);
+            inode_impl.file_stat.atime = current_time;
         } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
-            return Err(ErrNo::NoSys);
+            inode_impl.file_stat.mtime = current_time;
         } else if fst_flags.contains(SetTimeFlags::ATIME) {
             inode_impl.file_stat.atime = atime;
         } else if fst_flags.contains(SetTimeFlags::MTIME) {
