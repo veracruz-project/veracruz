@@ -52,6 +52,7 @@ uuid = { version = "0.7", features = ["v4"] }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
 sgx_alloc = { branch="veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
+sgx_tstd = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
 
 [profile.release]
 lto = true
