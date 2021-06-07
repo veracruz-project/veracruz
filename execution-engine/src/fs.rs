@@ -26,6 +26,7 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
+use std::os::unix::ffi::OsStrExt;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -118,6 +119,12 @@ impl InodeEntry {
     pub(crate) fn is_dir(&self) -> bool {
         self.data.is_dir()
     }
+
+    /// Read metadata of files in the dir and return a vec of DirEnt,
+    /// or return NotDir if `self` is not a dir
+    pub(self) fn read_dir(&self, fs: &FileSystem) -> FileSystemError<Vec<(DirEnt, Vec<u8>)>> {
+        self.data.read_dir(fs)
+    }
 }
 
 /// The actual data of an inode, either a file or a directory.
@@ -126,6 +133,7 @@ enum InodeImpl {
     /// A file
     File(Vec<u8>),
     /// A directory. The `PathBuf` key must  match to the name inside the `Inode`.
+    /// TODO May change to BTREE for the ordering
     Directory(HashMap<PathBuf, Inode>),
 }
 
@@ -251,6 +259,27 @@ impl InodeImpl {
             Self::Directory(_) => true,
             _ => false,
         }
+    }
+
+    /// Read metadata of files in the dir and return a vec of DirEnt,
+    /// or return NotDir if `self` is not a dir
+    pub(self) fn read_dir(&self, fs: &FileSystem) -> FileSystemError<Vec<(DirEnt, Vec<u8>)>> {
+        let dir = match self {
+            InodeImpl::Directory(d) => d,
+            _otherwise => return Err(ErrNo::NotDir),
+        };
+        let mut rst = Vec::new();
+        for (index,(path,inode)) in dir.iter().enumerate() {
+            let path = path.as_os_str().as_bytes().to_vec();
+            let dir_ent = DirEnt {
+                next: (index as u64 + 1u64).into(),
+                inode: inode.clone(),
+                name_len: path.len() as u32,
+                file_type: fs.get_inode(&inode)?.file_stat.file_type,
+            };
+            rst.push((dir_ent, path))
+        }
+        Ok(rst)
     }
 }
 
@@ -559,14 +588,14 @@ impl FileSystem {
     }
 
     /// Get the inode related to a Fd
-    fn find_inode(&self, fd: &Fd) -> FileSystemError<(Inode, InodeEntry)> {
+    fn get_inode_by_fd(&self, fd: &Fd) -> FileSystemError<(Inode, InodeEntry)> {
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
         Ok((inode,self.get_inode(&inode)?))
     }
 
     /// Get the the inode related to path in the Fd
-    fn find_path(&self, fd: &Fd, path: impl AsRef<Path>) -> FileSystemError<Inode> {
-        let (_, parent_inode_entry) = self.find_inode(&fd)?;
+    fn get_inode_by_path(&self, fd: &Fd, path: impl AsRef<Path>) -> FileSystemError<Inode> {
+        let (_, parent_inode_entry) = self.get_inode_by_fd(&fd)?;
         parent_inode_entry.find_file(path.as_ref())
     }
 
@@ -778,10 +807,19 @@ impl FileSystem {
     pub(crate) fn fd_readdir(
         &mut self,
         fd: Fd,
-        _cookie: DirCookie,
-    ) -> FileSystemResult<Vec<DirEnt>> {
+        cookie: DirCookie,
+    ) -> FileSystemResult<Vec<(DirEnt,Vec<u8>)>> {
+        info!("call fd_readdir on {:?} and cookie {:?}", fd, cookie);
         self.check_right(&fd, Rights::FD_READDIR)?;
-        Err(ErrNo::NoSys)
+        //TODO REMOVE DEBUG CODE
+        let mut dirs = self.get_inode_by_fd(&fd)?.1.read_dir(self)?;
+        let cookie = cookie.0 as usize;
+        if dirs.len() <  cookie {
+            return Err(ErrNo::Inval);
+        }
+        let rst = dirs.split_off(cookie);
+        info!("call fd_readdir dir {:?}", rst);
+        Ok(rst)
     }
 
     /// Atomically renumbers the `old_fd` to the `new_fd`.  Note that as
@@ -895,7 +933,7 @@ impl FileSystem {
         if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
-        let inode = self.find_path(&fd, path)?;
+        let inode = self.get_inode_by_path(&fd, path)?;
         Ok(self
             .inode_table
             .get(&inode)
@@ -924,7 +962,7 @@ impl FileSystem {
             return Err(ErrNo::NotDir);
         }
 
-        let inode = self.find_path(&fd, path)?;
+        let inode = self.get_inode_by_path(&fd, path)?;
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
             inode_impl.file_stat.atime = current_time;
@@ -963,7 +1001,7 @@ impl FileSystem {
         info!("call path_open, on behalf of fd {:?} and principal {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
             fd, principal, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
         // Read the parent inode.
-        let (parent_inode, parent_inode_entry) = self.find_inode(&fd)?;
+        let (parent_inode, parent_inode_entry) = self.get_inode_by_fd(&fd)?;
         let mut absolute_path = parent_inode_entry.absolute_path(&self)?;
         absolute_path.push(path.clone());
         // Manually convert to the canonicalize form. 
@@ -977,7 +1015,7 @@ impl FileSystem {
         // NOTE: A pontential better way to control capability is to
         // separate the Fd space of of different participants.
         let principal_right = if *principal != Principal::InternalSuperUser {
-            self.get_right(&principal, absolute_path)?
+            self.get_right(&principal, absolute_path.as_path())?
         } else {
             Rights::all()
         };
@@ -1000,7 +1038,7 @@ impl FileSystem {
             rights_base, rights_inheriting
         );
         // Several oflags logic, inc. `create`, `excl` and `trunc`. We ignore `directory`.
-        let inode = match self.find_path(&fd, path) {
+        let inode = match self.get_inode_by_path(&fd, path) {
             Ok(i) => {
                 // If file exists and `excl` is set, return `Exist` error.
                 if oflags.contains(OpenFlags::EXCL) {
@@ -1029,8 +1067,6 @@ impl FileSystem {
                 return Err(ErrNo::Access);
             }
             self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?.truncate_file()?;
-            //inode_impl.raw_file_data = Vec::new();
-            //inode_impl.file_stat.file_size = 0u64;
         }
         let new_fd = self.new_fd()?;
         let FileStat {
@@ -1053,6 +1089,7 @@ impl FileSystem {
                 advice: vec![(0, file_size, Advice::Normal)],
             },
         );
+        info!("new fd {:?} created for {:?}.", new_fd, absolute_path);
         Ok(new_fd)
     }
 

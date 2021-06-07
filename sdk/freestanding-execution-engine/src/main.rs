@@ -366,9 +366,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     // Manually create the Right table for the VFS.
-    // NOTE: inject the root path.
-    file_table.insert(prog_file_abs_path.clone(), write_right);
+    // Add read and readdir permissions to root dir
+    file_table.insert(Path::new("/").to_path_buf(), read_right | Rights::FD_READDIR);
+    // Add read permission to program
+    file_table.insert(prog_file_abs_path.clone(), read_right);
+    // Add read permission to input file
     for file_path in cmdline.data_sources.iter() {
+        // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), read_right);
     }
     for std_stream in &std_streams_table {
@@ -381,6 +385,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(|e| format!("Failed to convert u64 to Rights: {:?}", e))?;
         file_table.insert(PathBuf::from(path), rights);
     }
+    // Add write permission to output file
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_abs_path.to_str().ok_or("Failed to convert program path to a string.")?.to_string()), file_table);
     info!("The final right tables: {:?}",right_table);
@@ -444,6 +449,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             &Principal::InternalSuperUser,
             OUTPUT_FILE
         );
+    info!("result: {:?}", output);
+    //TODO REMOVE
+    let output : String = pinecone::from_bytes(&output?).unwrap();
     info!("result: {:?}", output);
     Ok(())
 }

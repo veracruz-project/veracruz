@@ -802,18 +802,25 @@ impl WasiWrapper {
         cookie: u64,
         result_ptr: u32,
     ) -> FileSystemResult<()> {
+        info!("call fd_readdir lenth {:?}", buf_len);
         let mut fs = self.lock_vfs()?;
         let dir_entries = fs.fd_readdir(fd.into(), cookie.into())?;
 
         let mut written = 0;
-        for dir in dir_entries {
-            //NOTE: `buf_len` is the count of how many dir entries can store.
-            if buf_len == written {
+        for (dir, path) in dir_entries {
+            //NOTE: `buf_len` is the number of bytes dir entries can store.
+            //      If there is not enough space, stop writing and filling the last entry 
+            //      with random bytes.
+            let require_len = (size_of::<DirEnt>() + path.len()) as u32;
+            if written + require_len > buf_len {
+                written = buf_len;
                 break;
             }
             memory_ref.write_struct(buf_ptr, &dir)?;
             buf_ptr += size_of::<DirEnt>() as u32;
-            written += 1;
+            memory_ref.write_buffer(buf_ptr, &path)?;
+            buf_ptr += path.len() as u32;
+            written += require_len ;
         }
         memory_ref.write_u32(result_ptr, written as u32)
     }
