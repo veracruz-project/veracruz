@@ -63,13 +63,12 @@ pub fn execute(
             Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string()))
         }
         ExecutionStrategy::JIT => {
-            #[cfg(feature = "std")]
-            {
-                Box::new(WasmtimeRuntimeState::new(filesystem, program_name.to_string())?)
-            }
-            #[cfg(any(feature = "tz", feature = "sgx", feature = "nitro"))]
-            {
-                return Err(FatalEngineError::EngineIsNotReady);
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "std")] {
+                    Box::new(WasmtimeRuntimeState::new(filesystem, program_name.to_string())?)
+                } else {
+                    return Err(FatalEngineError::EngineIsNotReady);
+                }
             }
         }
     };
