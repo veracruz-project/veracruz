@@ -39,10 +39,7 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::Mutex;
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
 use std::{boxed::Box, sync::Arc, string::ToString};
 use veracruz_utils::policy::principal::ExecutionStrategy;
 

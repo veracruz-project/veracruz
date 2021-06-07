@@ -17,10 +17,7 @@ use crate::{
     },
 };
 use lazy_static::lazy_static;
-#[cfg(any(feature = "std", feature = "tz", feature = "nitro"))]
 use std::sync::{Arc, Mutex};
-#[cfg(feature = "sgx")]
-use std::sync::{Arc, SgxMutex as Mutex};
 use std::{collections::HashMap, convert::TryFrom, vec::Vec};
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;

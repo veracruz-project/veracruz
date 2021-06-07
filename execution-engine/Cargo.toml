@@ -43,3 +43,4 @@ serde = { git = "https://github.com/veracruz-project/serde.git", features=["deri
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
 sgx_alloc = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
+sgx_tstd = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
