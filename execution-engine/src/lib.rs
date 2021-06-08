@@ -40,7 +40,7 @@ use crate::{
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
 use std::sync::Mutex;
-use std::{boxed::Box, sync::Arc, string::ToString};
+use std::{boxed::Box, string::ToString, sync::Arc};
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
 /// The top-level function executes program `program_name` on

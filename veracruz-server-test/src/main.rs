@@ -1097,28 +1097,6 @@ mod tests {
                 );
                 let time_result = Instant::now();
                 info!("             Result retrievers request result.");
-                // NOTE: Fetch result twice on purpose.
-                let _response = client_tls_send(
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
-                )
-                .and_then(|response| {
-                    // decode the result
-                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
-                    let response = transport_protocol::parse_result(&response)?;
-                    response.ok_or(VeracruzServerError::MissingFieldError(
-                        "Result retrievers response",
-                    ))
-                })?;
-                info!(
-                    "             Computation result time (μs): {}.",
-                    time_result.elapsed().as_micros()
-                );
-
                 let response = client_tls_send(
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1139,7 +1117,6 @@ mod tests {
                     "             Computation result time (μs): {}.",
                     time_result.elapsed().as_micros()
                 );
-
                 info!("### Step 9.  Client decodes the result.");
                 let result: T = pinecone::from_bytes(&response.as_slice())?;
                 info!("             Client received result: {:?},", result);
