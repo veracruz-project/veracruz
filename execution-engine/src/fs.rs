@@ -18,8 +18,8 @@ use platform_services::{getrandom, result};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryInto},
-    vec::Vec,
     path::{Path, PathBuf},
+    vec::Vec,
 };
 use veracruz_utils::policy::principal::{Principal, RightsTable};
 use wasi_types::{
@@ -36,7 +36,7 @@ use wasi_types::{
 /// code.  The return code `ErrNo::Success` is implicit if `Ok(result)` is ever
 /// returned from a filesystem function.  The result `Err(ErrNo::Success)`
 /// should never be returned.
-pub type FileSystemError<T> = Result<T, ErrNo>;
+pub type FileSystemResult<T> = Result<T, ErrNo>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // INodes.
@@ -135,7 +135,7 @@ impl FileSystem {
 
     /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
     /// and then pre-open them.
-    fn install_prestat<T>(&mut self, dir_paths: &[T]) where T: AsRef<Path> + Sized {
+    fn install_prestat<T: AsRef<Path> + Sized>(&mut self, dir_paths: &[T]) {
         // Pre open the stdin stdout and stderr.
         self.install_file("stderr", Inode(0), "".as_bytes());
         self.install_fd(Fd(0), Inode(0), &Rights::FD_READ, &Rights::FD_READ);
@@ -167,13 +167,14 @@ impl FileSystem {
                 &Self::DEFAULT_RIGHTS,
                 &Self::DEFAULT_RIGHTS,
             );
-            self.prestat_table.insert(new_fd, path.as_ref().to_path_buf());
+            self.prestat_table
+                .insert(new_fd, path.as_ref().to_path_buf());
         }
     }
 
     /// Install a dir and attatch it to `inode`.
     /// NOTE: Since we do not have dir structure, it installs a file without any content for now.
-    fn install_dir(&mut self, path: impl AsRef<Path>, inode: Inode) {
+    fn install_dir<T: AsRef<Path>>(&mut self, path: T, inode: Inode) {
         let file_stat = FileStat {
             device: (0u64).into(),
             inode: inode.clone(),
@@ -194,7 +195,7 @@ impl FileSystem {
     }
 
     /// Install a file with content `raw_file_data` and attatch it to `inode`.
-    fn install_file(&mut self, path: impl AsRef<Path>, inode: Inode, raw_file_data: &[u8]) {
+    fn install_file<T: AsRef<Path>>(&mut self, path: T, inode: Inode, raw_file_data: &[u8]) {
         let file_size = raw_file_data.len();
         let file_stat = FileStat {
             device: 0u64.into(),
@@ -241,7 +242,7 @@ impl FileSystem {
     }
 
     /// Return a random u32
-    fn random_u32(&self) -> FileSystemError<u32> {
+    fn random_u32(&self) -> FileSystemResult<u32> {
         let result: [u8; 4] = self
             .random_get(4)?
             .as_slice()
@@ -251,7 +252,7 @@ impl FileSystem {
     }
 
     /// Return a random u64
-    fn random_u64(&self) -> FileSystemError<u64> {
+    fn random_u64(&self) -> FileSystemResult<u64> {
         let result: [u8; 8] = self
             .random_get(8)?
             .as_slice()
@@ -261,7 +262,7 @@ impl FileSystem {
     }
 
     /// Pick a new fd randomly.
-    fn new_fd(&self) -> FileSystemError<Fd> {
+    fn new_fd(&self) -> FileSystemResult<Fd> {
         loop {
             let new_fd = self.random_u32()?.into();
             if !self.fd_table.contains_key(&new_fd) {
@@ -271,7 +272,7 @@ impl FileSystem {
     }
 
     /// Pick a new inode randomly.
-    fn new_inode(&self) -> FileSystemError<Inode> {
+    fn new_inode(&self) -> FileSystemResult<Inode> {
         loop {
             let new_inode = Inode(self.random_u64()?);
             if !self.inode_table.contains_key(&new_inode) {
@@ -281,7 +282,7 @@ impl FileSystem {
     }
 
     /// Check if `rights` is allowed in `fd`
-    fn check_right(&self, fd: &Fd, rights: Rights) -> FileSystemError<()> {
+    fn check_right(&self, fd: &Fd, rights: Rights) -> FileSystemResult<()> {
         if self
             .fd_table
             .get(fd)
@@ -302,7 +303,7 @@ impl FileSystem {
 
     /// The stub implementation of `clock_res_get`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn clock_res_get(&self, _clock_id: ClockId) -> FileSystemError<Timestamp> {
+    pub(crate) fn clock_res_get(&self, _clock_id: ClockId) -> FileSystemResult<Timestamp> {
         Err(ErrNo::NoSys)
     }
 
@@ -312,7 +313,7 @@ impl FileSystem {
         &self,
         _clock_id: ClockId,
         _precision: Timestamp,
-    ) -> FileSystemError<Timestamp> {
+    ) -> FileSystemResult<Timestamp> {
         Err(ErrNo::NoSys)
     }
 
@@ -325,7 +326,7 @@ impl FileSystem {
         offset: FileSize,
         len: FileSize,
         adv: Advice,
-    ) -> FileSystemError<()> {
+    ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_ADVISE)?;
         let entry = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?;
         entry.advice.push((offset, len, adv));
@@ -339,40 +340,36 @@ impl FileSystem {
         _fd: Fd,
         _offset: FileSize,
         _len: FileSize,
-    ) -> FileSystemError<()> {
+    ) -> FileSystemResult<()> {
         Err(ErrNo::NoSys)
     }
 
     /// Implements the `fd_close` operation on the filesystem, which closes a
     /// file descriptor.  Returns `ErrNo::BadF`, if `fd` is not a current file-descriptor.
     #[inline]
-    pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemError<()> {
+    pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemResult<()> {
         self.fd_table.remove(&fd).ok_or(ErrNo::BadF)?;
         Ok(())
     }
 
     /// The stub implementation of `fd_datasync`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn fd_datasync(&mut self, fd: Fd) -> FileSystemError<()> {
+    pub(crate) fn fd_datasync(&mut self, fd: Fd) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_DATASYNC)?;
         Err(ErrNo::NoSys)
     }
 
     /// Return a copy of the status of the file descriptor, `fd`.
     #[inline]
-    pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemError<FdStat> {
+    pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemResult<FdStat> {
         Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat.clone())
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
     #[inline]
-    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemError<()> {
+    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_FDSTAT_SET_FLAGS)?;
-        self.fd_table
-            .get_mut(&fd)
-            .ok_or(ErrNo::BadF)?
-            .fd_stat
-            .flags = flags;
+        self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat.flags = flags;
         Ok(())
     }
 
@@ -383,7 +380,7 @@ impl FileSystem {
         fd: Fd,
         rights_base: Rights,
         rights_inheriting: Rights,
-    ) -> FileSystemError<()> {
+    ) -> FileSystemResult<()> {
         let mut fd_stat = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat;
         fd_stat.rights_base = rights_base;
         fd_stat.rights_inheriting = rights_inheriting;
@@ -391,7 +388,7 @@ impl FileSystem {
     }
 
     /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
-    pub(crate) fn fd_filestat_get(&self, fd: Fd) -> FileSystemError<FileStat> {
+    pub(crate) fn fd_filestat_get(&self, fd: Fd) -> FileSystemResult<FileStat> {
         let inode = self
             .fd_table
             .get(&fd)
@@ -408,7 +405,7 @@ impl FileSystem {
 
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bytes are
     /// filled with ZERO.
-    pub(crate) fn fd_filestat_set_size(&mut self, fd: Fd, size: FileSize) -> FileSystemError<()> {
+    pub(crate) fn fd_filestat_set_size(&mut self, fd: Fd, size: FileSize) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_FILESTAT_SET_SIZE)?;
         let inode = self
             .fd_table
@@ -431,7 +428,7 @@ impl FileSystem {
         atime: Timestamp,
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
-    ) -> FileSystemError<()> {
+    ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_FILESTAT_SET_TIMES)?;
         let inode = self
             .fd_table
@@ -466,7 +463,7 @@ impl FileSystem {
         fd: Fd,
         buffer_len: usize,
         offset: FileSize,
-    ) -> FileSystemError<Vec<u8>> {
+    ) -> FileSystemResult<Vec<u8>> {
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
         // NOTE: It should be safe to convert a u64 to usize.
@@ -498,7 +495,7 @@ impl FileSystem {
 
     /// Return the status of a pre-opened Fd `fd`.
     #[inline]
-    pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemError<Prestat> {
+    pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemResult<Prestat> {
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         let resource_type = PreopenType::Dir {
             name_len: path.as_os_str().len() as u32,
@@ -508,7 +505,7 @@ impl FileSystem {
 
     /// Return the path of a pre-opened Fd `fd`. The path must be consistent with the status returned by `fd_prestat_get`
     #[inline]
-    pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemError<PathBuf> {
+    pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemResult<PathBuf> {
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         Ok(path.to_path_buf())
     }
@@ -522,9 +519,9 @@ impl FileSystem {
     pub(crate) fn fd_pwrite(
         &mut self,
         fd: Fd,
-        buf: Vec<u8>,
+        buf: &[u8],
         offset: FileSize,
-    ) -> FileSystemError<Size> {
+    ) -> FileSystemResult<Size> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
@@ -552,7 +549,7 @@ impl FileSystem {
 
     /// A rust-style base implementation for `fd_read`. It directly calls `fd_pread` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
-    pub(crate) fn fd_read(&mut self, fd: Fd, len: usize) -> FileSystemError<Vec<u8>> {
+    pub(crate) fn fd_read(&mut self, fd: Fd, len: usize) -> FileSystemResult<Vec<u8>> {
         self.check_right(&fd, Rights::FD_READ)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
@@ -563,7 +560,11 @@ impl FileSystem {
 
     /// The stub implementation of `fd_readdir`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn fd_readdir(&mut self, fd: Fd, _cookie: DirCookie) -> FileSystemError<Vec<DirEnt>> {
+    pub(crate) fn fd_readdir(
+        &mut self,
+        fd: Fd,
+        _cookie: DirCookie,
+    ) -> FileSystemResult<Vec<DirEnt>> {
         self.check_right(&fd, Rights::FD_READDIR)?;
         Err(ErrNo::NoSys)
     }
@@ -571,7 +572,7 @@ impl FileSystem {
     /// Atomically renumbers the `old_fd` to the `new_fd`.  Note that as
     /// execution engine is single-threaded this is atomic from the WASM program's
     /// point of view.
-    pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemError<()> {
+    pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemResult<()> {
         let entry = self.fd_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
         if self.fd_table.get(&new_fd).is_none() {
             self.fd_table.insert(new_fd, entry);
@@ -588,7 +589,7 @@ impl FileSystem {
         fd: Fd,
         delta: FileDelta,
         whence: Whence,
-    ) -> FileSystemError<FileSize> {
+    ) -> FileSystemResult<FileSize> {
         self.check_right(&fd, Rights::FD_SEEK)?;
         let FileTableEntry { inode, offset, .. } = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?;
         let file_size = self
@@ -608,9 +609,9 @@ impl FileSystem {
         let new_offset: FileSize = if delta >= 0 {
             // It is safe to convert a positive i64 to u64.
             let t_offset = new_base_offset + (delta.abs() as u64);
-            // Offset is allowed to equal to file size
+            // If offset is greater the file size, then expand the file.
             if t_offset > file_size {
-                return Err(ErrNo::SPipe);
+                self.fd_filestat_set_size(fd.clone(),t_offset)?;
             }
             t_offset
         } else {
@@ -626,23 +627,23 @@ impl FileSystem {
         Ok(new_offset)
     }
 
-    /// The stub implementation of `fd_sync`. Return unsupported error `NoSys`.
+    /// The stub implementation of `fd_sync`. It is a no-op now.
     #[inline]
-    pub(crate) fn fd_sync(&mut self, fd: Fd) -> FileSystemError<()> {
+    pub(crate) fn fd_sync(&mut self, fd: Fd) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_SYNC)?;
-        Err(ErrNo::NoSys)
+        Ok(())
     }
 
     /// Returns the current offset associated with the file descriptor.
     #[inline]
-    pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemError<FileSize> {
+    pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemResult<FileSize> {
         self.check_right(&fd, Rights::FD_TELL)?;
         Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset.clone())
     }
 
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
-    pub(crate) fn fd_write(&mut self, fd: Fd, buf: Vec<u8>) -> FileSystemError<Size> {
+    pub(crate) fn fd_write(&mut self, fd: Fd, buf: &[u8]) -> FileSystemResult<Size> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
@@ -653,11 +654,11 @@ impl FileSystem {
 
     /// The stub implementation of `path_create_directory`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn path_create_directory(
+    pub(crate) fn path_create_directory<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
-        _path: impl AsRef<Path>,
-    ) -> FileSystemError<()> {
+        _path: T,
+    ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::PATH_CREATE_DIRECTORY)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -667,12 +668,12 @@ impl FileSystem {
     }
 
     /// Return a copy of the status of the file at path `path`. We only support the searching from the root Fd. We ignore searching flag `flags`.
-    pub(crate) fn path_filestat_get(
+    pub(crate) fn path_filestat_get<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
         _flags: LookupFlags,
-        path: impl AsRef<Path>,
-    ) -> FileSystemError<FileStat> {
+        path: T,
+    ) -> FileSystemResult<FileStat> {
         let path = path.as_ref();
         self.check_right(&fd, Rights::PATH_FILESTAT_GET)?;
         // ONLY allow search on the root for now.
@@ -691,15 +692,15 @@ impl FileSystem {
     /// Change the time of the open file at `path` If `fst_flags`
     /// contains `ATIME_NOW` or `MTIME_NOW`, the method immediately returns unsupported error
     /// `NoSys`. We only support searching from the root Fd. We ignore searching flag `flags`.
-    pub(crate) fn path_filestat_set_times(
+    pub(crate) fn path_filestat_set_times<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
         _flags: LookupFlags,
-        path: impl AsRef<Path>,
+        path: T,
         atime: Timestamp,
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
-    ) -> FileSystemError<()> {
+    ) -> FileSystemResult<()> {
         let path = path.as_ref();
         self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
         // ONLY allow search on the root for now.
@@ -731,18 +732,18 @@ impl FileSystem {
     /// * if `CREATE` is set, create a new file at the path if the path does not exist;
     /// * if `TRUNC` is set, the file at the path is truncated, that is, clean the content and set the file size to ZERO; and
     /// * if `DIRECTORY` is set, `path_open` fails if the path is not a directory. **NOT SUUPORT**.
-    pub(crate) fn path_open(
+    pub(crate) fn path_open<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
         // The parent fd for searching
         fd: Fd,
         _dirflags: LookupFlags,
-        path: impl AsRef<Path>,
+        path: T,
         oflags: OpenFlags,
         rights_base: Rights,
         rights_inheriting: Rights,
         flags: FdFlags,
-    ) -> FileSystemError<Fd> {
+    ) -> FileSystemResult<Fd> {
         let path = path.as_ref();
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -831,11 +832,11 @@ impl FileSystem {
     /// The stub implementation of `path_readlink`. Return unsupported error `NoSys`.
     /// We only support the searching from the root Fd.
     #[inline]
-    pub(crate) fn path_readlink(
+    pub(crate) fn path_readlink<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
-        _path: impl AsRef<Path>,
-    ) -> FileSystemError<Vec<u8>> {
+        _path: T,
+    ) -> FileSystemResult<Vec<u8>> {
         self.check_right(&fd, Rights::PATH_READLINK)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -847,11 +848,11 @@ impl FileSystem {
     /// The stub implementation of `path_remove_directory`. Return unsupported error `NoSys`.
     /// We only support the searching from the root Fd.
     #[inline]
-    pub(crate) fn path_remove_directory(
+    pub(crate) fn path_remove_directory<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
-        _path: impl AsRef<Path>,
-    ) -> FileSystemError<()> {
+        _path: T,
+    ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::PATH_REMOVE_DIRECTORY)?;
         // ONLY allow search on the root for now.
         if fd != Self::ROOT_DIRECTORY_FD {
@@ -862,13 +863,13 @@ impl FileSystem {
 
     /// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn path_rename(
+    pub(crate) fn path_rename<T: AsRef<Path>, R: AsRef<Path>>(
         &mut self,
         old_fd: Fd,
-        _old_path: impl AsRef<Path>,
+        _old_path: T,
         new_fd: Fd,
-        _new_path: impl AsRef<Path>,
-    ) -> FileSystemError<()> {
+        _new_path: R,
+    ) -> FileSystemResult<()> {
         self.check_right(&old_fd, Rights::PATH_RENAME_SOURCE)?;
         self.check_right(&new_fd, Rights::PATH_RENAME_TARGET)?;
         Err(ErrNo::NoSys)
@@ -876,7 +877,7 @@ impl FileSystem {
 
     /// Get random bytes.
     #[inline]
-    pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemError<Vec<u8>> {
+    pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemResult<Vec<u8>> {
         let mut buf = vec![0; buf_len as usize];
         if let result::Result::Success = getrandom(&mut buf) {
             Ok(buf)
@@ -887,14 +888,14 @@ impl FileSystem {
 
     /// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn path_link(
+    pub(crate) fn path_link<T: AsRef<Path>, R: AsRef<Path>>(
         &mut self,
         old_fd: Fd,
         _old_flag: LookupFlags,
-        _old_path: impl AsRef<Path>,
+        _old_path: T,
         new_fd: Fd,
-        _new_path: impl AsRef<Path>,
-    ) -> FileSystemError<()> {
+        _new_path: R,
+    ) -> FileSystemResult<()> {
         self.check_right(&old_fd, Rights::PATH_LINK_SOURCE)?;
         self.check_right(&new_fd, Rights::PATH_LINK_TARGET)?;
         Err(ErrNo::NoSys)
@@ -902,23 +903,23 @@ impl FileSystem {
 
     /// The stub implementation of `path_symlink`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn path_symlink(
+    pub(crate) fn path_symlink<T: AsRef<Path>, R: AsRef<Path>>(
         &mut self,
-        _old_path: impl AsRef<Path>,
+        _old_path: T,
         fd: Fd,
-        _new_path: impl AsRef<Path>,
-    ) -> FileSystemError<()> {
+        _new_path: R,
+    ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::PATH_SYMLINK)?;
         Err(ErrNo::NoSys)
     }
 
     /// The stub implementation of `path_unlink_file`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn path_unlink_file(
+    pub(crate) fn path_unlink_file<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
-        _path: impl AsRef<Path>,
-    ) -> FileSystemError<()> {
+        _path: T,
+    ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::PATH_UNLINK_FILE)?;
         Err(ErrNo::NoSys)
     }
@@ -929,7 +930,7 @@ impl FileSystem {
         &mut self,
         _subscriptions: Vec<Subscription>,
         _events: Vec<Event>,
-    ) -> FileSystemError<Size> {
+    ) -> FileSystemResult<Size> {
         Err(ErrNo::NoSys)
     }
 
@@ -940,7 +941,7 @@ impl FileSystem {
         socket: Fd,
         _buffer_len: usize,
         _ri_flags: RiFlags,
-    ) -> FileSystemError<(Vec<u8>, RoFlags)> {
+    ) -> FileSystemResult<(Vec<u8>, RoFlags)> {
         self.check_right(&socket, Rights::FD_READ)?;
         Err(ErrNo::NoSys)
     }
@@ -950,16 +951,16 @@ impl FileSystem {
     pub(crate) fn sock_send(
         &mut self,
         socket: Fd,
-        _buf: Vec<u8>,
+        _buf: &[u8],
         _si_flags: SiFlags,
-    ) -> FileSystemError<Size> {
+    ) -> FileSystemResult<Size> {
         self.check_right(&socket, Rights::FD_WRITE)?;
         Err(ErrNo::NoSys)
     }
 
     /// The stub implementation of `sock_shutdown`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn sock_shutdown(&mut self, socket: Fd, _flags: SdFlags) -> FileSystemError<()> {
+    pub(crate) fn sock_shutdown(&mut self, socket: Fd, _flags: SdFlags) -> FileSystemResult<()> {
         self.check_right(&socket, Rights::SOCK_SHUTDOWN)?;
         Err(ErrNo::NoSys)
     }
@@ -972,15 +973,20 @@ impl FileSystem {
     /// Write to a file on path `file_name`. If `is_append` is set, `data` will be append to `file_name`.
     /// Otherwise this file will be truncated. The `principal` must have the right on `path_open`,
     /// `fd_write` and `fd_seek`.
-    pub fn write_file_by_filename(
+    pub fn write_file_by_filename<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
-        file_name: impl AsRef<Path>,
+        file_name: T,
         data: &[u8],
         is_append: bool,
     ) -> Result<(), ErrNo> {
         let file_name = file_name.as_ref();
-        let oflag = OpenFlags::CREATE | if !is_append { OpenFlags::TRUNC } else { OpenFlags::empty() };
+        let oflag = OpenFlags::CREATE
+            | if !is_append {
+                OpenFlags::TRUNC
+            } else {
+                OpenFlags::empty()
+            };
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,
@@ -1004,7 +1010,7 @@ impl FileSystem {
         if is_append {
             self.fd_seek(fd, 0, Whence::End)?;
         }
-        self.fd_write(fd, data.to_vec())?;
+        self.fd_write(fd, data)?;
         self.fd_close(fd)?;
         Ok(())
     }
@@ -1012,10 +1018,10 @@ impl FileSystem {
     /// Read from a file on path `file_name`.
     /// The `principal` must have the right on `path_open`,
     /// `fd_read` and `fd_seek`.
-    pub fn read_file_by_filename(
+    pub fn read_file_by_filename<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
-        file_name: impl AsRef<Path>,
+        file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
         let file_name = file_name.as_ref();
         let fd = self.path_open(
@@ -1045,7 +1051,11 @@ impl FileSystem {
     }
 
     /// Get the maximum right associated to the principal on the file
-    fn get_right(&self, principal: &Principal, file_name: impl AsRef<Path>) -> FileSystemError<Rights> {
+    fn get_right<T: AsRef<Path>>(
+        &self,
+        principal: &Principal,
+        file_name: T,
+    ) -> FileSystemResult<Rights> {
         let file_name = file_name.as_ref();
         self.rights_table
             .get(principal)

@@ -10,7 +10,7 @@
 //! and copyright information.
 
 use crate::{
-    fs::{FileSystem, FileSystemError},
+    fs::{FileSystem, FileSystemResult},
     wasi::common::{
         EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
         WasiAPIName, WasiWrapper,
@@ -59,7 +59,7 @@ macro_rules! convert_wasi_arg {
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WasiWrapper on any VFS call.
 impl<'a> MemoryHandler for Caller<'a> {
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemError<()> {
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -75,7 +75,7 @@ impl<'a> MemoryHandler for Caller<'a> {
         Ok(())
     }
 
-    fn read_buffer(&self, address: u32, length: u32) -> FileSystemError<Vec<u8>> {
+    fn read_buffer(&self, address: u32, length: u32) -> FileSystemResult<Vec<u8>> {
         let length = length as usize;
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
@@ -130,10 +130,12 @@ pub struct WasmtimeRuntimeState {}
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(filesystem: Arc<Mutex<FileSystem>>, program_name: String) -> Result<Self, FatalEngineError> {
+    pub fn new(
+        filesystem: Arc<Mutex<FileSystem>>,
+        program_name: String,
+    ) -> Result<Self, FatalEngineError> {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock()? =
-            WasiWrapper::new(filesystem, Principal::Program(program_name));
+        *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, Principal::Program(program_name));
         Ok(Self {})
     }
 
@@ -273,7 +275,7 @@ impl WasmtimeRuntimeState {
         Ok(ErrNo::try_from(return_code).map_err(|_| FatalEngineError::ReturnedCodeError)?)
     }
 
-    fn convert_to_errno(input: FileSystemError<()>) -> u32 {
+    fn convert_to_errno(input: FileSystemResult<()>) -> u32 {
         let errno = match input {
             Ok(_) => ErrNo::Success,
             Err(e) => e,
@@ -302,7 +304,11 @@ impl WasmtimeRuntimeState {
         environ_buf_size_address: u32,
     ) -> u32 {
         let vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.environ_sizes_get(&mut caller, environc_address, environ_buf_size_address))
+        Self::convert_to_errno(vfs.environ_sizes_get(
+            &mut caller,
+            environc_address,
+            environ_buf_size_address,
+        ))
     }
 
     fn wasi_clock_res_get(mut caller: Caller, clock_id: u32, address: u32) -> u32 {
@@ -326,9 +332,9 @@ impl WasmtimeRuntimeState {
         Self::convert_to_errno(vfs.fd_allocate(&mut caller, fd, offset, len))
     }
 
-    fn wasi_fd_close(_caller: Caller, fd: u32) -> u32 {
+    fn wasi_fd_close(caller: Caller, fd: u32) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.fd_close(fd))
+        Self::convert_to_errno(vfs.fd_close(&caller, fd))
     }
 
     fn wasi_fd_datasync(mut caller: Caller, fd: u32) -> u32 {
@@ -354,7 +360,12 @@ impl WasmtimeRuntimeState {
         rights_inheriting: u64,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.fd_fdstat_set_rights(&mut caller, fd, rights_base, rights_inheriting))
+        Self::convert_to_errno(vfs.fd_fdstat_set_rights(
+            &mut caller,
+            fd,
+            rights_base,
+            rights_inheriting,
+        ))
     }
 
     fn wasi_fd_filestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
@@ -388,7 +399,14 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.fd_pread(&mut caller, fd, iovec_base, iovec_count, offset, address))
+        Self::convert_to_errno(vfs.fd_pread(
+            &mut caller,
+            fd,
+            iovec_base,
+            iovec_count,
+            offset,
+            address,
+        ))
     }
 
     fn wasi_fd_prestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
@@ -410,7 +428,14 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.fd_pwrite(&mut caller, fd, iovec_base, iovec_number, offset, address))
+        Self::convert_to_errno(vfs.fd_pwrite(
+            &mut caller,
+            fd,
+            iovec_base,
+            iovec_number,
+            offset,
+            address,
+        ))
     }
 
     fn wasi_fd_read(
@@ -433,7 +458,14 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.fd_readdir(&mut caller, fd, dirent_base, dirent_length, cookie, address))
+        Self::convert_to_errno(vfs.fd_readdir(
+            &mut caller,
+            fd,
+            dirent_base,
+            dirent_length,
+            cookie,
+            address,
+        ))
     }
 
     fn wasi_fd_renumber(mut caller: Caller, fd: u32, to_fd: u32) -> u32 {
@@ -482,7 +514,14 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.path_filestat_get(&mut caller, fd, flag, path, path_len, address))
+        Self::convert_to_errno(vfs.path_filestat_get(
+            &mut caller,
+            fd,
+            flag,
+            path,
+            path_len,
+            address,
+        ))
     }
 
     fn wasi_path_filestat_set_times(
@@ -571,7 +610,15 @@ impl WasmtimeRuntimeState {
         address: u32,
     ) -> u32 {
         let mut vfs = lock_vfs!();
-        Self::convert_to_errno(vfs.path_readlink(&mut caller, fd, path, path_len, buf, buf_len, address))
+        Self::convert_to_errno(vfs.path_readlink(
+            &mut caller,
+            fd,
+            path,
+            path_len,
+            buf,
+            buf_len,
+            address,
+        ))
     }
 
     fn wasi_path_remove_directory(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
