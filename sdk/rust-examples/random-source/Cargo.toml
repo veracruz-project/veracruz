@@ -10,7 +10,6 @@ description = "Samples random data from the trusted Veracruz runtime.  Used to t
 [dependencies]
 pinecone = "0.2.3"
 rand = "0.8.0"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
 [profile.release]
 codegen-units = 1

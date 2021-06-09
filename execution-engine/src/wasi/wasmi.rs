@@ -1112,7 +1112,7 @@ impl WASMIRuntimeState {
     /// is returned to the calling WASM process.
     fn wasi_proc_exit(&mut self, args: RuntimeArgs) -> WasiResult {
         TypeCheck::check_args_number(&args, WasiAPIName::PROC_EXIT)?;
-        let exit_code = args.nth_checked::<u32>(0)?;
+        let exit_code = args.nth_checked::<i32>(0)?;
         self.vfs.proc_exit(&mut self.memory()?, exit_code);
         // NB: this gets routed to the runtime, not the calling WASM program,
         // for handling.
@@ -1222,7 +1222,7 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<ErrNo, FatalEngineError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalEngineError> {
         let program = self.vfs.read_file_by_filename(file_name)?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());
@@ -1231,20 +1231,21 @@ impl ExecutionEngine for WASMIRuntimeState {
         let exit_code = self.vfs.exit_code();
 
         // Get the return code, ZERO as the default, or the exit_code if exists.
-        let return_code = match execute_result {
+        match execute_result {
+            // If the function does not explicitly provide return code, 
+            // either read the exit_code passed by proc_exit call or use ZERO as the default.
             Ok(None) => Ok(exit_code.unwrap_or(0)),
+            // Return the explicit return code
+            Ok(Some(RuntimeValue::I32(c))) => Ok(c),
+            // NOTE: Surpress the trap, if the `proc_exit` is called.
+            //       In this case, the error code is exit_code.
             Ok(Some(_)) => Err(FatalEngineError::ReturnedCodeError),
+            // NOTE: Surpress the trap, if the `proc_exit` is called.
+            //       In this case, the error code is exit_code.
             Err(Error::Trap(trap)) => {
-                // NOTE: Surpress the trap, if the `proc_exit` is called.
-                //       In this case, the error code is self.return_code.
                 exit_code.ok_or(FatalEngineError::WASMITrapError(trap))
             }
             Err(err) => Err(FatalEngineError::WASMIError(err)),
-        }?;
-
-        // Parse the return code
-        let return_code =
-            u16::try_from(return_code).map_err(|_| FatalEngineError::ReturnedCodeError)?;
-        Ok(ErrNo::try_from(return_code).map_err(|_| FatalEngineError::ReturnedCodeError)?)
+        }
     }
 }
