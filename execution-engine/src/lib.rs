@@ -54,7 +54,7 @@ pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: Arc<Mutex<FileSystem>>,
     program_name: &str,
-) -> Result<i32, FatalEngineError> {
+) -> Result<u32, FatalEngineError> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
             Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string()))

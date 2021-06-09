@@ -251,7 +251,7 @@ impl ProtocolState {
     }
 
     #[inline]
-    fn response_error_code_returned(error_code: i32) -> std::vec::Vec<u8> {
+    fn response_error_code_returned(error_code: u32) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(
             transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
             Some(error_code.to_le_bytes().to_vec()),

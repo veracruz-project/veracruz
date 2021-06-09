@@ -34,8 +34,8 @@ use std::{fs, process::exit, vec::Vec};
 /// and fails with `return_code::ErrorCode::BadInput` if the input cannot be
 /// decoded from `pinecone` into a Rust vector of floating-point pairs.
 fn read_input() -> Result<Vec<(f64, f64)>, i32> {
-    let input = fs::read("/input-0").map_err(|_| -1)?;
-    pinecone::from_bytes(&input).map_err(|_| -1)
+    let input = fs::read("/input-0").map_err(|_| 1)?;
+    pinecone::from_bytes(&input).map_err(|_| 1)
 }
 
 /// The result of a linear regression is a line which is encoded as a gradient
@@ -92,10 +92,10 @@ fn compute() -> Result<(), i32> {
     let data = read_input()?;
     let result = linear_regression(&data);
     let result_encode = match pinecone::to_vec(&result) {
-        Err(_err) => return Err(-1),
+        Err(_err) => return Err(1),
         Ok(s) => s,
     };
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

@@ -611,7 +611,7 @@ impl FileSystem {
             let t_offset = new_base_offset + (delta.abs() as u64);
             // If offset is greater the file size, then expand the file.
             if t_offset > file_size {
-                self.fd_filestat_set_size(fd.clone(),t_offset)?;
+                self.fd_filestat_set_size(fd.clone(), t_offset)?;
             }
             t_offset
         } else {

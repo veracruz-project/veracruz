@@ -364,7 +364,7 @@ pub struct WasiWrapper {
     /// The principal that accesses the filesystem. This information is used in path_open.
     principal: Principal,
     /// The exit code, if program calls proc_exit.
-    exit_code: Option<i32>,
+    exit_code: Option<u32>,
 }
 
 impl WasiWrapper {
@@ -404,7 +404,7 @@ impl WasiWrapper {
 
     /// Return the exit code from `proc_exit` call.
     #[inline]
-    pub(crate) fn exit_code(&self) -> Option<i32> {
+    pub(crate) fn exit_code(&self) -> Option<u32> {
         self.exit_code
     }
 
@@ -1065,7 +1065,7 @@ impl WasiWrapper {
     /// The implementation of the WASI `proc_exit` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.                  
     #[inline]
-    pub(crate) fn proc_exit<T: MemoryHandler>(&mut self, _: &mut T, exit_code: i32) {
+    pub(crate) fn proc_exit<T: MemoryHandler>(&mut self, _: &mut T, exit_code: u32) {
         self.exit_code = Some(exit_code);
     }
 
@@ -1317,5 +1317,5 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalEngineError>;
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<u32, FatalEngineError>;
 }

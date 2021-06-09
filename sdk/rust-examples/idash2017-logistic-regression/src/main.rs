@@ -47,8 +47,8 @@ type Dataset = Vec<Vec<f64>>;
 ///     program is not exactly 1.
 ///
 fn read_inputs() -> Result<(Dataset, Dataset, u32, u32, i32, i32), i32> {
-    let input = fs::read("/input-0").map_err(|_| -1)?;
-    pinecone::from_bytes(&input).map_err(|_| -1)
+    let input = fs::read("/input-0").map_err(|_| 1)?;
+    pinecone::from_bytes(&input).map_err(|_| 1)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,7 +125,7 @@ fn normalize_data_inplace(dataset: &mut Dataset) -> Result<(), i32> {
 fn get_factor_len(dataset: &Dataset) -> Result<usize, i32> {
     match dataset.first() {
         // No element in the dataset
-        None => return Err(-1),
+        None => return Err(1),
         Some(first) => Ok(first.len()),
     }
 }
@@ -148,7 +148,7 @@ fn plain_nlgd_iteration(
 /// Multply the matrix in dataset by `w_data`.
 fn plain_ip(dataset: &Dataset, data_vec: &[f64]) -> Result<Vec<f64>, i32> {
     if get_factor_len(&dataset)? != data_vec.len() {
-        return Err(-1);
+        return Err(1);
     }
 
     Ok(dataset.iter().fold(Vec::new(), |mut rst, row| {
@@ -175,7 +175,7 @@ fn plain_sigmoid(
     gamma: f64,
 ) -> Result<Vec<f64>, i32> {
     if dataset.len() != ip_vec.len() {
-        return Err(-1);
+        return Err(1);
     }
     let init_grad = vec![0.0 as f64; get_factor_len(dataset)?];
     let rst = dataset
@@ -233,7 +233,7 @@ fn calculate_auc(dataset: &Dataset, w_data: &[f64]) -> Result<(f64, f64), i32> {
     let mut theta_fp = Vec::new();
 
     for row in dataset.iter() {
-        let y_value = row.first().ok_or(-1)?;
+        let y_value = row.first().ok_or(1)?;
 
         // These two iters are slices that do not include the first element
         let mut row_iter = row.iter();
@@ -267,7 +267,7 @@ fn calculate_auc(dataset: &Dataset, w_data: &[f64]) -> Result<(f64, f64), i32> {
 
 fn true_ip(lhs: &[f64], rhs: &[f64]) -> Result<f64, i32> {
     if lhs.len() != rhs.len() {
-        return Err(-1);
+        return Err(1);
     }
     Ok(lhs
         .iter()
@@ -280,7 +280,7 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> Result<f64, i32> {
 /// dataset.  Input and output are assumed to be encoded in Pinecone.
 fn compute() -> Result<(), i32> {
     let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
-        read_inputs().map_err(|_| -1)?;
+        read_inputs().map_err(|_| 1)?;
     let (w_data, correct, auc) = nlgd(
         &mut train_set,
         &mut test_set,
@@ -290,10 +290,10 @@ fn compute() -> Result<(), i32> {
         gamma_down,
     )?;
     let result_encode = match pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc)) {
-        Err(_err) => return Err(-1),
+        Err(_err) => return Err(1),
         Ok(s) => s,
     };
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

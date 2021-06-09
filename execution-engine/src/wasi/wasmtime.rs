@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, convert::TryFrom, vec::Vec};
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;
-use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, ValType, Val};
+use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
@@ -155,7 +155,7 @@ impl WasmtimeRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point(binary: Vec<u8>) -> Result<i32, FatalEngineError> {
+    pub(crate) fn invoke_entry_point(binary: Vec<u8>) -> Result<u32, FatalEngineError> {
         let store = Store::default();
         let module = Module::new(store.engine(), binary)?;
         let mut exports: Vec<Extern> = Vec::new();
@@ -240,18 +240,14 @@ impl WasmtimeRuntimeState {
             .get_export(WasiWrapper::ENTRY_POINT_NAME)
             .ok_or(FatalEngineError::NoProgramEntryPoint)?;
         let return_from_main = match check_main(&export.ty()) {
-            EntrySignature::ArgvAndArgc => {
-                export
-                    .into_func()
-                    .ok_or(FatalEngineError::NoProgramEntryPoint)?
-                    .call(&[Val::I32(0), Val::I32(0)])
-            }
-            EntrySignature::NoParameters => {
-                export
-                    .into_func()
-                    .ok_or(FatalEngineError::NoProgramEntryPoint)?
-                    .call(&[])
-            }
+            EntrySignature::ArgvAndArgc => export
+                .into_func()
+                .ok_or(FatalEngineError::NoProgramEntryPoint)?
+                .call(&[Val::I32(0), Val::I32(0)]),
+            EntrySignature::NoParameters => export
+                .into_func()
+                .ok_or(FatalEngineError::NoProgramEntryPoint)?
+                .call(&[]),
             EntrySignature::NoEntryFound => return Err(FatalEngineError::NoProgramEntryPoint),
         };
 
@@ -273,9 +269,9 @@ impl WasmtimeRuntimeState {
                 match result.get(0) {
                     None => Ok(0),
                     Some(return_code) => match return_code {
-                        Val::I32(c) => Ok(*c),
+                        Val::I32(c) => Ok(*c as u32),
                         _otherwise => Err(FatalEngineError::ReturnedCodeError),
-                    }
+                    },
                 }
             }
         }
@@ -688,7 +684,7 @@ impl WasmtimeRuntimeState {
         Self::convert_to_errno(vfs.poll_oneoff(&mut caller, subscriptions, events, size, address))
     }
 
-    fn wasi_proc_exit(mut caller: Caller, exit_code: i32) {
+    fn wasi_proc_exit(mut caller: Caller, exit_code: u32) {
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             // NOTE: We have no choice but panic here, since this function cannot return error!
@@ -771,7 +767,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalEngineError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<u32, FatalEngineError> {
         let program = VFS_INSTANCE.lock()?.read_file_by_filename(file_name)?;
         Self::invoke_entry_point(program.to_vec())
     }
