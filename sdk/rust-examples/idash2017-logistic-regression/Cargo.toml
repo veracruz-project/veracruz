@@ -9,7 +9,6 @@ description = "A Rust reimplementation of the winning logistic regression entry 
 
 [dependencies]
 pinecone = "0.2.3"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
 [profile.release]
 opt-level = 3

@@ -29,7 +29,6 @@
 
 use serde::Deserialize;
 use std::{fs, process::exit, string::String, vec::Vec};
-use wasi_types::ErrNo;
 
 /// The advertising platform provides a Rust vec filled with `AdvertisementViewer` structs.  These
 /// contain the unique identifiers of every web-surfer who viewed the company's advertisements on
@@ -61,12 +60,12 @@ struct Customer {
 /// of `AdvertisementViewer` structs, whilst the second is assumed to be a vector of `Customer`
 /// structs.  Fails with [`return_code::ErrorCode::BadInput`] if the number of inputs provided is
 /// not equal to 2, or if the inputs cannot be deserialized from Bincode.
-fn read_inputs() -> Result<(Vec<AdvertisementViewer>, Vec<Customer>), ErrNo> {
-    let adverts = fs::read("/input-0")?;
-    let customs = fs::read("/input-1")?;
+fn read_inputs() -> Result<(Vec<AdvertisementViewer>, Vec<Customer>), i32> {
+    let adverts = fs::read("/input-0").map_err(|_| -1)?;
+    let customs = fs::read("/input-1").map_err(|_| -1)?;
 
-    let adverts = pinecone::from_bytes(&adverts).map_err(|_| ErrNo::Proto)?;
-    let customs = pinecone::from_bytes(&customs).map_err(|_| ErrNo::Proto)?;
+    let adverts = pinecone::from_bytes(&adverts).map_err(|_| -1)?;
+    let customs = pinecone::from_bytes(&customs).map_err(|_| -1)?;
 
     Ok((adverts, customs))
 }
@@ -93,19 +92,19 @@ fn intersection_set_sum(vs: &[AdvertisementViewer], cs: &[Customer]) -> f64 {
 /// not exactly two inputs, or if either input cannot be deserialized from Bincode, and fails with
 /// [`return_code::ErrorCode::InvariantFailed`] if the result cannot be serialized to Bincode, or if
 /// more than one result is written.
-fn compute() -> Result<(), ErrNo> {
+fn compute() -> Result<(), i32> {
     let (adverts, customs) = read_inputs()?;
     let total = intersection_set_sum(&adverts, &customs);
     let result_encode = match pinecone::to_vec::<f64>(&total) {
-        Err(_err) => return Err(ErrNo::Proto),
+        Err(_err) => return Err(-1),
         Ok(s) => s,
     };
-    fs::write("/output", result_encode)?;
+    fs::write("/output", result_encode).map_err(|_| -1)?;
     Ok(())
 }
 
 fn main() {
     if let Err(e) = compute() {
-        exit((e as u16).into());
+        exit(e);
     }
 }

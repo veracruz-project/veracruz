@@ -11,7 +11,6 @@ description = "Logistic regression example, using the Rust rusty-machine ML libr
 pinecone = "0.2.3"
 rusty-machine = "0.5.4"
 serde = { version = "1.0.3", features = ["derive"] }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
 [profile.release]
 codegen-units = 1

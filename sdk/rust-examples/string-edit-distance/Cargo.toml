@@ -10,7 +10,6 @@ description = "Computes the edit distance of two strings using the Rust `strsim`
 [dependencies]
 pinecone = "0.2.3"
 strsim = "0.10.0"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
 [profile.release]
 opt-level = 3

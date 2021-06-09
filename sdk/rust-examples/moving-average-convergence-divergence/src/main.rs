@@ -25,7 +25,6 @@
 //! copyright information.
 
 use std::{fs, process::exit};
-use wasi_types::ErrNo;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reading inputs.
@@ -33,9 +32,9 @@ use wasi_types::ErrNo;
 
 /// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
 /// values.
-fn read_inputs() -> Result<Vec<f64>, ErrNo> {
-    let input = fs::read("/input-0")?;
-    pinecone::from_bytes(&input).map_err(|_| ErrNo::Proto)
+fn read_inputs() -> Result<Vec<f64>, i32> {
+    let input = fs::read("/input-0").map_err(|_| -1)?;
+    pinecone::from_bytes(&input).map_err(|_| -1)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,18 +159,18 @@ fn dec_approx(data: &[f64], norm: f64) -> Vec<f64> {
 
 /// Entry point: reads the vector of floats, processes them, and writes back a new vector of
 /// floats as output.
-fn compute() -> Result<(), ErrNo> {
+fn compute() -> Result<(), i32> {
     let dataset = read_inputs()?;
     let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
         computation(dataset.as_slice());
     let result_encode =
-        pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_| ErrNo::Proto)?;
-    fs::write("/output", result_encode)?;
+        pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_| -1)?;
+    fs::write("/output", result_encode).map_err(|_| -1)?;
     Ok(())
 }
 
 fn main() {
     if let Err(e) = compute() {
-        exit((e as u16).into());
+        exit(e);
     }
 }

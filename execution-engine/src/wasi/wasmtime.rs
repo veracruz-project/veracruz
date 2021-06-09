@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, convert::TryFrom, vec::Vec};
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;
-use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, ValType};
+use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, ValType, Val};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
@@ -155,7 +155,7 @@ impl WasmtimeRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point(binary: Vec<u8>) -> Result<ErrNo, FatalEngineError> {
+    pub(crate) fn invoke_entry_point(binary: Vec<u8>) -> Result<i32, FatalEngineError> {
         let store = Store::default();
         let module = Module::new(store.engine(), binary)?;
         let mut exports: Vec<Extern> = Vec::new();
@@ -241,18 +241,16 @@ impl WasmtimeRuntimeState {
             .ok_or(FatalEngineError::NoProgramEntryPoint)?;
         let return_from_main = match check_main(&export.ty()) {
             EntrySignature::ArgvAndArgc => {
-                let main = export
+                export
                     .into_func()
                     .ok_or(FatalEngineError::NoProgramEntryPoint)?
-                    .get2::<i32, i32, ()>()?;
-                main(0, 0)
+                    .call(&[Val::I32(0), Val::I32(0)])
             }
             EntrySignature::NoParameters => {
-                let main = export
+                export
                     .into_func()
                     .ok_or(FatalEngineError::NoProgramEntryPoint)?
-                    .get0::<()>()?;
-                main()
+                    .call(&[])
             }
             EntrySignature::NoEntryFound => return Err(FatalEngineError::NoProgramEntryPoint),
         };
@@ -261,18 +259,26 @@ impl WasmtimeRuntimeState {
         //       In this case, the error code is in .exit_code().
         //
         let exit_code = VFS_INSTANCE.lock()?.exit_code();
-        let return_code = match exit_code {
-            Some(e) => e,
+        match exit_code {
+            Some(e) => Ok(e),
             // If proc_exit is not call, return possible error and trap,
-            // otherwise success code `0`.
+            // otherwise the actual return code or default success code `0`.
             None => {
-                return_from_main?;
-                0
+                let result = return_from_main?;
+                // Too many return values.
+                if result.len() > 1 {
+                    return Err(FatalEngineError::ReturnedCodeError);
+                }
+                // Fetch the return I32 value or default ZERO.
+                match result.get(0) {
+                    None => Ok(0),
+                    Some(return_code) => match return_code {
+                        Val::I32(c) => Ok(*c),
+                        _otherwise => Err(FatalEngineError::ReturnedCodeError),
+                    }
+                }
             }
-        };
-        let return_code =
-            u16::try_from(return_code).map_err(|_| FatalEngineError::ReturnedCodeError)?;
-        Ok(ErrNo::try_from(return_code).map_err(|_| FatalEngineError::ReturnedCodeError)?)
+        }
     }
 
     fn convert_to_errno(input: FileSystemResult<()>) -> u32 {
@@ -682,7 +688,7 @@ impl WasmtimeRuntimeState {
         Self::convert_to_errno(vfs.poll_oneoff(&mut caller, subscriptions, events, size, address))
     }
 
-    fn wasi_proc_exit(mut caller: Caller, exit_code: u32) {
+    fn wasi_proc_exit(mut caller: Caller, exit_code: i32) {
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             // NOTE: We have no choice but panic here, since this function cannot return error!
@@ -765,7 +771,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<ErrNo, FatalEngineError> {
+    fn invoke_entry_point(&mut self, file_name: &str) -> Result<i32, FatalEngineError> {
         let program = VFS_INSTANCE.lock()?.read_file_by_filename(file_name)?;
         Self::invoke_entry_point(program.to_vec())
     }
