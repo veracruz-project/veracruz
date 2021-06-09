@@ -35,10 +35,10 @@ struct Person {
 /// returns a `Vec` of all hash-sets, one from each input provider.  Fails with
 /// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
 fn read_inputs() -> Result<Vec<HashSet<Person>>, i32> {
-    let input0 = fs::read("/input-0").map_err(|_| -1)?;
-    let data0 = pinecone::from_bytes(&input0).map_err(|_| -1)?;
-    let input1 = fs::read("/input-1").map_err(|_| -1)?;
-    let data1 = pinecone::from_bytes(&input1).map_err(|_| -1)?;
+    let input0 = fs::read("/input-0").map_err(|_| 1)?;
+    let data0 = pinecone::from_bytes(&input0).map_err(|_| 1)?;
+    let input1 = fs::read("/input-1").map_err(|_| 1)?;
+    let data1 = pinecone::from_bytes(&input1).map_err(|_| 1)?;
     Ok(vec![data0, data1])
 }
 
@@ -68,8 +68,8 @@ fn set_intersection(sets: &[HashSet<Person>]) -> HashSet<Person> {
 fn compute() -> Result<(), i32> {
     let inputs = read_inputs()?;
     let result = set_intersection(&inputs);
-    let result_encode = pinecone::to_vec::<HashSet<Person>>(&result).map_err(|_| -1)?;
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    let result_encode = pinecone::to_vec::<HashSet<Person>>(&result).map_err(|_| 1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

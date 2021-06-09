@@ -173,12 +173,12 @@ fn flatten(ds: &[Dataset]) -> Dataset {
 /// with respect to the dimensions of each of its points.
 fn read_dataset(input: &[u8]) -> Result<Dataset, i32> {
     match pinecone::from_bytes::<Dataset>(input) {
-        Err(_err) => Err(-1),
+        Err(_err) => Err(1),
         Ok(data) => {
             if data.self_consistent() {
                 Ok(data)
             } else {
-                Err(-1)
+                Err(1)
             }
         }
     }
@@ -201,11 +201,11 @@ fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
         }
 
         match dimension {
-            None => dimension = Some(dataset.dimension().ok_or(-1)?),
+            None => dimension = Some(dataset.dimension().ok_or(1)?),
             Some(dim) => {
                 // Unwrap is safe as we have checked that the dataset is not empty.
-                if dataset.dimension().ok_or(-1)? != dim {
-                    return Err(-1);
+                if dataset.dimension().ok_or(1)? != dim {
+                    return Err(1);
                 } else {
                     result.push(dataset);
                 }
@@ -221,8 +221,8 @@ fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
 /// if the deserialization of any dataset fails for any reason, or if the
 /// datasets have differing dimensionalities.
 fn read_input() -> Result<Dataset, i32> {
-    let i0 = fs::read("/input-0").map_err(|_| -1)?;
-    let i1 = fs::read("/input-1").map_err(|_| -1)?;
+    let i0 = fs::read("/input-0").map_err(|_| 1)?;
+    let i1 = fs::read("/input-1").map_err(|_| 1)?;
     let datas = read_all_datasets(&vec![i0, i1])?;
     Ok(flatten(&datas))
 }
@@ -242,9 +242,9 @@ fn train(dataset: &Dataset) -> Result<Vec<f64>, i32> {
     let mut regressor = LogisticRegressor::default();
     let (inputs, targets) = split_dataset(dataset);
 
-    regressor.train(&inputs, &targets).map_err(|_| -1)?;
+    regressor.train(&inputs, &targets).map_err(|_| 1)?;
 
-    let parameters = regressor.parameters().ok_or(-1)?;
+    let parameters = regressor.parameters().ok_or(1)?;
 
     Ok(parameters.to_owned().into_vec())
 }
@@ -256,8 +256,8 @@ fn train(dataset: &Dataset) -> Result<Vec<f64>, i32> {
 fn compute() -> Result<(), i32> {
     let dataset = read_input()?;
     let model = train(&dataset)?;
-    let result_encode = pinecone::to_vec::<Vec<f64>>(&model).map_err(|_| -1)?;
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    let result_encode = pinecone::to_vec::<Vec<f64>>(&model).map_err(|_| 1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

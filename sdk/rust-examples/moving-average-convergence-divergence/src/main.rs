@@ -33,8 +33,8 @@ use std::{fs, process::exit};
 /// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
 /// values.
 fn read_inputs() -> Result<Vec<f64>, i32> {
-    let input = fs::read("/input-0").map_err(|_| -1)?;
-    pinecone::from_bytes(&input).map_err(|_| -1)
+    let input = fs::read("/input-0").map_err(|_| 1)?;
+    pinecone::from_bytes(&input).map_err(|_| 1)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -116,14 +116,14 @@ fn dec(data: &[f64]) -> Vec<i32> {
                         0.0
                     } else {
                         //  mul.is_sign_negative()
-                        -1.0
+                        1.0
                     };
                     // decision
                     let decision = dec_point * (first - second);
                     if decision.abs() < f64::EPSILON {
                         0
                     } else if decision.is_sign_negative() {
-                        -1
+                        1
                     } else {
                         // is_sign_positive
                         1
@@ -164,8 +164,8 @@ fn compute() -> Result<(), i32> {
     let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
         computation(dataset.as_slice());
     let result_encode =
-        pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_| -1)?;
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+        pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_| 1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

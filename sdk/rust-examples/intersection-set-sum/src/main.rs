@@ -61,11 +61,11 @@ struct Customer {
 /// structs.  Fails with [`return_code::ErrorCode::BadInput`] if the number of inputs provided is
 /// not equal to 2, or if the inputs cannot be deserialized from Bincode.
 fn read_inputs() -> Result<(Vec<AdvertisementViewer>, Vec<Customer>), i32> {
-    let adverts = fs::read("/input-0").map_err(|_| -1)?;
-    let customs = fs::read("/input-1").map_err(|_| -1)?;
+    let adverts = fs::read("/input-0").map_err(|_| 1)?;
+    let customs = fs::read("/input-1").map_err(|_| 1)?;
 
-    let adverts = pinecone::from_bytes(&adverts).map_err(|_| -1)?;
-    let customs = pinecone::from_bytes(&customs).map_err(|_| -1)?;
+    let adverts = pinecone::from_bytes(&adverts).map_err(|_| 1)?;
+    let customs = pinecone::from_bytes(&customs).map_err(|_| 1)?;
 
     Ok((adverts, customs))
 }
@@ -96,10 +96,10 @@ fn compute() -> Result<(), i32> {
     let (adverts, customs) = read_inputs()?;
     let total = intersection_set_sum(&adverts, &customs);
     let result_encode = match pinecone::to_vec::<f64>(&total) {
-        Err(_err) => return Err(-1),
+        Err(_err) => return Err(1),
         Ok(s) => s,
     };
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

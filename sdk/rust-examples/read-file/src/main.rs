@@ -20,9 +20,9 @@ fn compute() -> Result<(), i32> {
     let input = "/input.txt";
     let output = "/output";
 
-    let f = fs::read(input).map_err(|_| -1)?;
-    let rst = pinecone::to_vec(&f).map_err(|_| -1)?;
-    fs::write(output, rst).map_err(|_| -1)?;
+    let f = fs::read(input).map_err(|_| 1)?;
+    let rst = pinecone::to_vec(&f).map_err(|_| 1)?;
+    fs::write(output, rst).map_err(|_| 1)?;
     Ok(())
 }
 

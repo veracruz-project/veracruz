@@ -46,8 +46,8 @@ struct Input {
 /// Reads exactly one input, which is assumed to be a Pinecone-encoded `Input`
 /// struct, as above.
 fn read_inputs() -> Result<Input, i32> {
-    let input = fs::read("/input-0").map_err(|_| -1)?;
-    pinecone::from_bytes(input.as_slice()).map_err(|_| -1)
+    let input = fs::read("/input-0").map_err(|_| 1)?;
+    pinecone::from_bytes(input.as_slice()).map_err(|_| 1)
 }
 
 /// Computes the set intersection-sum, returning the number of elements the sample and input
@@ -69,8 +69,8 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 fn compute() -> Result<(), i32> {
     let data = read_inputs()?;
     let result = set_intersection_sum(data.data, data.sample);
-    let result_encode = pinecone::to_vec::<(usize, u64)>(&result).map_err(|_| -1)?;
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    let result_encode = pinecone::to_vec::<(usize, u64)>(&result).map_err(|_| 1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 

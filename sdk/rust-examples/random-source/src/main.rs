@@ -36,7 +36,7 @@ fn main() {
 fn random() -> Result<(), i32> {
     let output = "/output";
     let bytes = rand::thread_rng().gen::<[u8; 32]>();
-    let rst = pinecone::to_vec(&bytes.to_vec()).map_err(|_| -1)?;
-    fs::write(output, rst).map_err(|_| -1)?;
+    let rst = pinecone::to_vec(&bytes.to_vec()).map_err(|_| 1)?;
+    fs::write(output, rst).map_err(|_| 1)?;
     Ok(())
 }

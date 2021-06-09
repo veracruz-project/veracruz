@@ -28,8 +28,8 @@ use strsim::jaro_winkler;
 ///   provided to the program is not exactly 2.
 ///
 fn read_inputs() -> Result<(String, String), i32> {
-    let this = String::from_utf8(fs::read("/input-0").map_err(|_| -1)?).map_err(|_| -1)?;
-    let that = String::from_utf8(fs::read("/input-1").map_err(|_| -1)?).map_err(|_| -1)?;
+    let this = String::from_utf8(fs::read("/input-0").map_err(|_| 1)?).map_err(|_| 1)?;
+    let that = String::from_utf8(fs::read("/input-1").map_err(|_| 1)?).map_err(|_| 1)?;
 
     Ok((this, that))
 }
@@ -41,8 +41,8 @@ fn read_inputs() -> Result<(String, String), i32> {
 fn compute() -> Result<(), i32> {
     let (left, right) = read_inputs()?;
     let distance = jaro_winkler(&left, &right);
-    let result_encode = pinecone::to_vec::<f64>(&distance).map_err(|_| -1)?;
-    fs::write("/output", result_encode).map_err(|_| -1)?;
+    let result_encode = pinecone::to_vec::<f64>(&distance).map_err(|_| 1)?;
+    fs::write("/output", result_encode).map_err(|_| 1)?;
     Ok(())
 }
 
