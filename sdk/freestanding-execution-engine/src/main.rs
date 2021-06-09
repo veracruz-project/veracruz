@@ -77,8 +77,10 @@ const DEFAULT_ENABLE_CLOCK: &'static str = "false";
 
 /// A struct capturing all of the command line options passed to the program.
 struct CommandLineOptions {
-    /// The list of file names passed as data-sources.
-    data_sources: Vec<String>,
+    /// The list of file names passed as input data-sources.
+    input_sources: Vec<String>,
+    /// The list of file names passed as ouput.
+    output_sources: Vec<String>,
     /// The filename passed as the WASM program to be executed.
     binary: String,
     /// The execution strategy to use when performing the computation.
@@ -105,11 +107,19 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         .author(AUTHORS)
         .about(ABOUT)
         .arg(
-            Arg::with_name("data")
-                .short("d")
-                .long("data")
+            Arg::with_name("input")
+                .short("i")
+                .long("input-source")
+                .value_name("FILES OR DIRECTORIES")
+                .help("Space-separated paths to the input data source files or directories on disk.")
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output-source")
                 .value_name("FILES")
-                .help("Space-separated paths to the data source files on disk.")
+                .help("Space-separated paths to the output data source files on disk.")
                 .multiple(true),
         )
         .arg(
@@ -133,7 +143,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         )
         .arg(
             Arg::with_name("dump-stdout")
-                .short("o")
+                .short("d")
                 .long("dump-stdout")
                 .help("Whether the contents of stdout should be dumped before exiting.")
                 .value_name("BOOLEAN"),
@@ -200,13 +210,24 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     } else {
         return Err("No binary file provided.".into());
     };
-    let data_sources = if let Some(data) = matches.values_of("data") {
-        let data_sources: Vec<String> = data.map(|e| e.to_string()).collect();
+    let input_sources = if let Some(data) = matches.values_of("input") {
+        let input_sources: Vec<String> = data.map(|e| e.to_string()).collect();
         info!(
             "Selected {} data sources as input to computation.",
-            data_sources.len()
+            input_sources.len()
         );
-        data_sources
+        input_sources
+    } else {
+        Vec::new()
+    };
+
+    let output_sources = if let Some(data) = matches.values_of("output") {
+        let output_sources: Vec<String> = data.map(|e| e.to_string()).collect();
+        info!(
+            "Selected {} data sources as input to computation.",
+            output_sources.len()
+        );
+        output_sources
     } else {
         Vec::new()
     };
@@ -268,7 +289,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     };
 
     Ok(CommandLineOptions {
-        data_sources,
+        input_sources,
+        output_sources,
         binary,
         execution_strategy,
         dump_stdout,
@@ -308,10 +330,10 @@ fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
-fn load_data_sources(
+fn load_input_sources(
     cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>,
 ) -> Result<(), Box<dyn Error>> {
-    for (id, file_path) in cmdline.data_sources.iter().enumerate() {
+    for (id, file_path) in cmdline.input_sources.iter().enumerate() {
         info!(
             "Loading data source '{}' with id {} for reading.",
             file_path, id
@@ -371,7 +393,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Add read permission to program
     file_table.insert(prog_file_abs_path.clone(), read_right);
     // Add read permission to input file
-    for file_path in cmdline.data_sources.iter() {
+    for file_path in cmdline.input_sources.iter() {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), read_right);
     }
@@ -386,7 +408,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         file_table.insert(PathBuf::from(path), rights);
     }
     // Add write permission to output file
-    file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
+    for file_path in cmdline.output_sources.iter() {
+        // NOTE: inject the root path.
+        file_table.insert(Path::new("/").join(file_path), write_right);
+    }
     right_table.insert(Principal::Program(prog_file_abs_path.to_str().ok_or("Failed to convert program path to a string.")?.to_string()), file_table);
     info!("The final right tables: {:?}",right_table);
 
@@ -401,7 +426,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    load_data_sources(&cmdline, vfs.clone())?;
+    load_input_sources(&cmdline, vfs.clone())?;
     info!("Data sources loaded.");
 
     info!("Invoking main.");
@@ -426,10 +451,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let buf = vfs
             .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_filename(&Principal::InternalSuperUser, "stdout")?;
+            .read_file_by_absolute_path(
+                &Principal::InternalSuperUser,
+                "/stdout",
+            )?;
         let stdout_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        print!("{}", stdout_dump);
+        print!("---- stdout dump ----\n{}---- stdout dump end ----\n", stdout_dump);
     }
 
     // Dump contents of stderr
@@ -437,21 +465,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         let buf = vfs
             .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_filename(&Principal::InternalSuperUser, "stderr")?;
+            .read_file_by_absolute_path(
+                &Principal::InternalSuperUser,
+                "/stderr",
+            )?;
         let stderr_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        eprint!("{}", stderr_dump);
+        eprint!("---- stderr dump ----\n{}---- stderr dump end ----\n", stderr_dump);
     }
 
-    let output = vfs.lock()
-        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-        .read_file_by_absolute_path(
-            &Principal::InternalSuperUser,
-            OUTPUT_FILE
-        );
-    info!("result: {:?}", output);
-    //TODO REMOVE
-    let output : String = pinecone::from_bytes(&output?).unwrap();
-    info!("result: {:?}", output);
+    for file_path in cmdline.output_sources.iter() {
+        let output = vfs.lock()
+            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+            .read_file_by_absolute_path(
+                &Principal::InternalSuperUser,
+                Path::new("/").join(file_path)
+            );
+        info!("{}: {:?}", file_path, output);
+        //TODO REMOVE
+        let output : String = pinecone::from_bytes(&output?).unwrap();
+        info!("{}: {:?}",file_path, output);
+    }
     Ok(())
 }

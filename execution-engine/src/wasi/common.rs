@@ -35,6 +35,7 @@ use wasi_types::{
     Signal, Subscription, SubscriptionClock, SubscriptionFdReadwrite, SubscriptionUnion, Timestamp,
     Whence,
 };
+use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
