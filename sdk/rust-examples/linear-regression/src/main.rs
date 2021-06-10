@@ -26,16 +26,17 @@
 //! information on licensing and copyright.
 
 use serde::Serialize;
-use std::{fs, process::exit, vec::Vec};
+use std::fs;
+use anyhow;
 
 /// Reads the single input dataset, which is assumed to be a Bincode-encoded
 /// vector of 64-bit float pairs.  Fails with
 /// `return_code::ErrorCode::DataSourceCount` if there is not exactly one input,
 /// and fails with `return_code::ErrorCode::BadInput` if the input cannot be
 /// decoded from `pinecone` into a Rust vector of floating-point pairs.
-fn read_input() -> Result<Vec<(f64, f64)>, i32> {
-    let input = fs::read("/input-0").map_err(|_| 1)?;
-    pinecone::from_bytes(&input).map_err(|_| 1)
+fn read_input() -> anyhow::Result<Vec<(f64, f64)>> {
+    let input = fs::read("/input-0")?;
+    Ok(pinecone::from_bytes(&input)?)
 }
 
 /// The result of a linear regression is a line which is encoded as a gradient
@@ -88,19 +89,10 @@ fn linear_regression(data: &[(f64, f64)]) -> LinearRegression {
 /// be a Rust vector of pairs of `f64` values.  Writes back a Bincode-encoded
 /// `LinearRegression` struct as output.  Whoever receives the result is assumed
 /// to know how to decode the result.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let data = read_input()?;
     let result = linear_regression(&data);
-    let result_encode = match pinecone::to_vec(&result) {
-        Err(_err) => return Err(1),
-        Ok(s) => s,
-    };
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec(&result)?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit(e);
-    }
 }

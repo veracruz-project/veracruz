@@ -20,23 +20,14 @@
 //! and copyright information.
 
 use rand::Rng;
-use std::{fs, process::exit, result::Result};
-
-/// Entry point: generates a four-element long random vector of `u8` values and
-/// writes this back as the result.
-fn main() {
-    if let Err(e) = random() {
-        exit(e);
-    }
-    //NOTE: it is not necessary to explicitly call exit(0).
-    exit(0);
-}
+use std::fs;
+use anyhow;
 
 /// Write 32 random bytes to 'output'. The result is a Pinecone-encoded vector of u8.
-fn random() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let output = "/output";
     let bytes = rand::thread_rng().gen::<[u8; 32]>();
-    let rst = pinecone::to_vec(&bytes.to_vec()).map_err(|_| 1)?;
-    fs::write(output, rst).map_err(|_| 1)?;
+    let rst = pinecone::to_vec(&bytes.to_vec())?;
+    fs::write(output, rst)?;
     Ok(())
 }

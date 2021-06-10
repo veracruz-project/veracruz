@@ -30,7 +30,8 @@ use rusty_machine::{
     linalg::{Matrix, Vector},
 };
 use serde::Deserialize;
-use std::{fs, process::exit};
+use std::fs;
+use anyhow::anyhow;
 
 /// This is a row of the input that each contributor to the computation
 /// provides: it consists of a vector, representing an N-dimension
@@ -171,16 +172,12 @@ fn flatten(ds: &[Dataset]) -> Dataset {
 /// `return_code::ErrorCode::BadInput` if the bytes cannot be decoded from
 /// `pinecone` into a `Dataset` value, or if the dataset is not self-consistent
 /// with respect to the dimensions of each of its points.
-fn read_dataset(input: &[u8]) -> Result<Dataset, i32> {
-    match pinecone::from_bytes::<Dataset>(input) {
-        Err(_err) => Err(1),
-        Ok(data) => {
-            if data.self_consistent() {
-                Ok(data)
-            } else {
-                Err(1)
-            }
-        }
+fn read_dataset(input: &[u8]) -> anyhow::Result<Dataset> {
+    let data = pinecone::from_bytes::<Dataset>(input)?;
+    if data.self_consistent() {
+        Ok(data)
+    } else {
+        Err(anyhow!("data inconsistent"))
     }
 }
 
@@ -189,7 +186,7 @@ fn read_dataset(input: &[u8]) -> Result<Dataset, i32> {
 /// `return_code::ErrorCode::BadInput` if the datasets do not share the same
 /// dimensionality, or if the deserialization of any of the datasets fails for
 /// any reason.
-fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
+fn read_all_datasets(input: &[Vec<u8>]) -> anyhow::Result<Vec<Dataset>> {
     let mut result = Vec::new();
     let mut dimension: Option<usize> = None;
 
@@ -201,11 +198,11 @@ fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
         }
 
         match dimension {
-            None => dimension = Some(dataset.dimension().ok_or(1)?),
+            None => dimension = Some(dataset.dimension().ok_or_else(|| anyhow!("empty dimensions"))?),
             Some(dim) => {
                 // Unwrap is safe as we have checked that the dataset is not empty.
-                if dataset.dimension().ok_or(1)? != dim {
-                    return Err(1);
+                if dataset.dimension().ok_or_else(|| anyhow!("empty dataset"))? != dim {
+                    return Err(anyhow!("bad dimensions"));
                 } else {
                     result.push(dataset);
                 }
@@ -220,9 +217,9 @@ fn read_all_datasets(input: &[Vec<u8>]) -> Result<Vec<Dataset>, i32> {
 /// them all appended together.  Fails with `return_code::ErrorCode::BadInput`
 /// if the deserialization of any dataset fails for any reason, or if the
 /// datasets have differing dimensionalities.
-fn read_input() -> Result<Dataset, i32> {
-    let i0 = fs::read("/input-0").map_err(|_| 1)?;
-    let i1 = fs::read("/input-1").map_err(|_| 1)?;
+fn read_input() -> anyhow::Result<Dataset> {
+    let i0 = fs::read("/input-0")?;
+    let i1 = fs::read("/input-1")?;
     let datas = read_all_datasets(&vec![i0, i1])?;
     Ok(flatten(&datas))
 }
@@ -238,13 +235,13 @@ fn split_dataset(dataset: &Dataset) -> (Matrix<f64>, Vector<f64>) {
 
 /// Trains a logistic regressor on the input data, returning a vector of learnt
 /// parameters.
-fn train(dataset: &Dataset) -> Result<Vec<f64>, i32> {
+fn train(dataset: &Dataset) -> anyhow::Result<Vec<f64>> {
     let mut regressor = LogisticRegressor::default();
     let (inputs, targets) = split_dataset(dataset);
 
-    regressor.train(&inputs, &targets).map_err(|_| 1)?;
+    regressor.train(&inputs, &targets)?;
 
-    let parameters = regressor.parameters().ok_or(1)?;
+    let parameters = regressor.parameters().ok_or_else(|| anyhow!("empty parameters"))?;
 
     Ok(parameters.to_owned().into_vec())
 }
@@ -253,16 +250,10 @@ fn train(dataset: &Dataset) -> Result<Vec<f64>, i32> {
 /// source, concatenates them together into a single compound dataset, then
 /// trains a logistic regressor on this new dataset.  Input and output are
 /// assumed to be encoded by `pinecone`.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let dataset = read_input()?;
     let model = train(&dataset)?;
-    let result_encode = pinecone::to_vec::<Vec<f64>>(&model).map_err(|_| 1)?;
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec::<Vec<f64>>(&model)?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit(e);
-    }
 }

@@ -25,15 +25,8 @@ use std::{
     fs,
     fs::File,
     io::{ErrorKind, Read, Seek, SeekFrom},
-    process::exit,
 };
-
-/// Entry point
-fn main() {
-    if let Err(e) = compute() {
-        exit(e);
-    }
-}
+use anyhow::anyhow;
 
 /// Read the initial value, if there is no previous result at 'output' file. 
 /// Otherwise, read the previous result.
@@ -42,50 +35,49 @@ fn main() {
 /// as the new result and write it to 'output'.
 /// The result also contains the number of function calls, which 
 /// track the starting point of the next nunbers in 'stream-0' and 'stream-1'.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let (count, last_result_or_init) = read_last_result_or_init()?;
     let (stream1, stream2) = read_stream((count * 8) as u64)?;
     let result_encode =
-        pinecone::to_vec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))
-            .map_err(|_| 1)?;
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+        pinecone::to_vec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))?;
+    fs::write("/output", result_encode)?;
     Ok(())
 }
 
 /// Read 'output' if exists. Othewise read 'input-0'.
-fn read_last_result_or_init() -> Result<(u64, f64), i32> {
+fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
     let mut file = match File::open("/output") {
         Ok(o) => o,
         Err(e) => match e.kind() {
             // Not found the last result, read the init.
             ErrorKind::NotFound => {
-                let input = fs::read("/input-0").map_err(|_| 1)?;
-                let init = pinecone::from_bytes(&input).map_err(|_| 1)?;
+                let input = fs::read("/input-0")?;
+                let init = pinecone::from_bytes(&input)?;
                 return Ok((0, init));
             }
-            _kind => return Err(1),
+            _kind => return Err(anyhow!(e)),
         },
     };
 
     let mut data = Vec::new();
-    file.read_to_end(&mut data).map_err(|_| 1)?;
+    file.read_to_end(&mut data)?;
 
-    pinecone::from_bytes(&data).map_err(|_| 1)
+    Ok(pinecone::from_bytes(&data)?)
 }
 
 /// Read from 'stream-0' and 'stream-1' at `offset`
-fn read_stream(offset: u64) -> Result<(f64, f64), i32> {
-    let mut stream0 = File::open("/stream-0").map_err(|_| 1)?;
-    stream0.seek(SeekFrom::Start(offset)).map_err(|_| 1)?;
+fn read_stream(offset: u64) -> anyhow::Result<(f64, f64)> {
+    let mut stream0 = File::open("/stream-0")?;
+    stream0.seek(SeekFrom::Start(offset))?;
     let mut data0 = Vec::new();
-    stream0.read_to_end(&mut data0).map_err(|_| 1)?;
-    let n1: f64 = pinecone::from_bytes(&data0).map_err(|_| 1)?;
+    stream0.read_to_end(&mut data0)?;
+    let n1: f64 = pinecone::from_bytes(&data0)?;
 
-    let mut stream1 = File::open("/stream-1").map_err(|_| 1)?;
-    stream1.seek(SeekFrom::Start(offset)).map_err(|_| 1)?;
+    let mut stream1 = File::open("/stream-1")?;
+    stream1.seek(SeekFrom::Start(offset))?;
     let mut data1 = Vec::new();
-    stream1.read_to_end(&mut data1).map_err(|_| 1)?;
-    let n2: f64 = pinecone::from_bytes(&data1).map_err(|_| 1)?;
+    stream1.read_to_end(&mut data1)?;
+    let n2: f64 = pinecone::from_bytes(&data1)?;
 
     Ok((n1, n2))
 }
