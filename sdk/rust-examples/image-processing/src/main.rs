@@ -21,8 +21,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-extern crate image;
-
 use image::{GenericImageView, imageops, ImageFormat};
 use std::process::exit;
 use wasi_types::ErrNo;
