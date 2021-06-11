@@ -17,7 +17,7 @@ use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
 #[cfg(feature = "nitro")]
-use veracruz_utils::nitro::{NitroRootEnclaveMessage, VeracruzSocketError};
+use veracruz_utils::{platform::nitro::nitro::NitroRootEnclaveMessage, io::error::SocketError};
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {
@@ -59,7 +59,7 @@ pub enum RuntimeManagerError {
     SocketError(nix::Error),
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Veracruz Socket error:{:?}", _0)]
-    VeracruzSocketError(VeracruzSocketError),
+    VeracruzSocketError(SocketError),
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
     BincodeError(bincode::Error),

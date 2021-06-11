@@ -80,19 +80,19 @@ pub enum VeracruzServerError {
     BincodeError(bincode::ErrorKind),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
-    RuntimeManagerMessageStatus(veracruz_utils::RuntimeManagerMessage),
+    RuntimeManagerMessageStatus(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
-    NitroStatus(veracruz_utils::NitroStatus),
+    NitroStatus(veracruz_utils::platform::nitro::nitro::NitroStatus),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}", _0)]
-    InvalidRuntimeManagerMessage(veracruz_utils::RuntimeManagerMessage),
+    InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
         display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
         _0
     )]
-    InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
+    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
@@ -104,7 +104,7 @@ pub enum VeracruzServerError {
     SerdeError,
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Veracruz Socket Error:{:?}", _0)]
-    VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    VeracruzSocketError(#[error(source)] veracruz_utils::io::error::SocketError),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),

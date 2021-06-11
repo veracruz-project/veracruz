@@ -117,6 +117,11 @@ message SgxAttestationTokens {
   SgxCollateral collateral = 6;
 }
 
+message NitroAttestationDoc {
+  bytes doc = 1;
+  int32 device_id = 2;
+}
+
 message PsaAttestationInit {
   bytes challenge = 1;
   int32 device_id = 2;
@@ -203,6 +208,7 @@ message ProxyAttestationServerRequest {
     ProxyPsaAttestationToken proxy_psa_attestation_token = 4;
     SgxMsg1 msg1 = 5;
     SgxAttestationTokens sgx_attestation_tokens = 6;
+    NitroAttestationDoc nitro_attestation_doc = 7;
   }
   uint32 context = 1;
 }

@@ -120,16 +120,28 @@ mod tests {
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
 
         SETUP.call_once(|| {
-            info!("SETUP.call_once called");
+            println!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
+                #[cfg(feature = "nitro")]
+                let ip_addr = 
+                {
+                    let ip_string = local_ipaddress::get()
+                        .expect("Failed to get local ip address");
+                    let ip_port_string = format!("{:}:3010", ip_string);
+                    ip_port_string
+                };
+                #[cfg(not(feature = "nitro"))]
+                let ip_addr = {
+                    proxy_attestation_server_url
+                };
                 #[cfg(feature = "debug")]
                 let server =
-                    proxy_attestation_server::server::server(proxy_attestation_server_url, "../test-collateral/CACert.pem", true)
+                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", true)
                         .unwrap();
                 #[cfg(not(feature = "debug"))]
                 let server =
-                    proxy_attestation_server::server::server(proxy_attestation_server_url, "../test-collateral/CACert.pem", false)
+                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", false)
                         .unwrap();
                 sys.block_on(server).unwrap();
             });
@@ -1162,10 +1174,14 @@ mod tests {
         // the policy files. so we need to replace it with the private IP of the current instance
         #[cfg(feature = "nitro")]
         {
-            let ip_string = local_ipaddress::get().expect("Failed to get local ip address");
-            let ip_address = format!("\"proxy_attestation_server_url\": \"{:}:3010\"", ip_string);
-            let re =
-                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let ip_string = std::env::var("TABASCO_IP_ADDRESS")
+                .expect("TABASCO_IP_ADDRESS environment variable not set");
+            let ip_address =
+                format!("\"proxy_attestation_server_url\": \"{:}:3010\"",
+                        ip_string);
+            let re = 
+                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#)
+                    .unwrap();
             let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
             let policy_hash =

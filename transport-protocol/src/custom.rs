@@ -277,6 +277,16 @@ pub fn serialize_proxy_psa_attestation_token(
     Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
+pub fn serialize_nitro_attestation_doc(doc: &[u8], device_id: i32) -> TransportProtocolResult {
+    let mut nad_proto = transport_protocol::NitroAttestationDoc::new();
+    nad_proto.set_doc(doc.to_vec());
+    nad_proto.set_device_id(device_id);
+    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
+    proxy_attestation_server_request.set_nitro_attestation_doc(nad_proto);
+
+    Ok(proxy_attestation_server_request.write_to_bytes()?)
+}
+
 pub fn serialize_certificate(cert: &[u8]) -> TransportProtocolResult {
     let mut proto_cert = transport_protocol::Cert::new();
     proto_cert.set_data(cert.to_vec());
@@ -310,6 +320,12 @@ pub fn parse_native_psa_attestation_token(
     proto: &transport_protocol::NativePsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
     (proto.get_token().to_vec(), proto.get_csr().to_vec(), proto.get_device_id())
+}
+
+pub fn parse_nitro_attestation_doc(
+    proto: &transport_protocol::NitroAttestationDoc,
+) -> (std::vec::Vec<u8>, i32) {
+    (proto.get_doc().to_vec(), proto.get_device_id())
 }
 
 pub fn parse_sgx_attestation_init(proto: &transport_protocol::SgxAttestationInit) -> (std::vec::Vec<u8>, i32) {

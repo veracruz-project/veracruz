@@ -28,17 +28,12 @@ pub mod policy;
 pub use crate::policy::*;
 
 #[cfg(feature = "nitro")]
-pub mod nitro;
-#[cfg(feature = "nitro")]
-pub use crate::nitro::*;
+pub use crate::platform::nitro::*;
 
 #[cfg(feature = "nitro")]
-pub mod vsocket;
+pub use self::io::vsocket::*;
+
 #[cfg(feature = "nitro")]
-pub use self::vsocket::*;
-#[cfg(feature = "nitro")]
-pub mod nitro_enclave;
-#[cfg(feature = "nitro")]
-pub use self::nitro_enclave::*;
+pub use self::platform::nitro::nitro_enclave::*;
 
 pub mod csr;

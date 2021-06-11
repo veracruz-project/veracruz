@@ -91,29 +91,65 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
     let csr = openssl::x509::X509Req::from_der(&csr_der)?;
     // first, verify the signature on the CSR
     let public_key = csr.public_key()?;
-    let verify_result = csr.verify(&public_key)?;
+    let verify_result = csr.verify(&public_key)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate csr.verify failed:{:?}", err);
+            err
+        })?;
 
     if !verify_result {
         println!("proxy_attestation_server::convert_csr_to_certificate verify of CSR failed");
         return Err(ProxyAttestationServerError::CsrVerifyError);
     }
-    let mut cert_builder = openssl::x509::X509Builder::new()?;
-    cert_builder.set_version(2)?;
-    let now = {
-        openssl::asn1::Asn1Time::days_from_now(0)?
-    };
-    cert_builder.set_not_before(&now)?;
+    let mut cert_builder = openssl::x509::X509Builder::new()
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate X509Builder::new failed:{:?}", err);
+            err
+        })?;
+    cert_builder.set_version(2)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_version failed:{:?}", err);
+            err
+        })?;
+    let now = openssl::asn1::Asn1Time::days_from_now(0)
+                .map_err(|err| {
+                    println!("proxy-attestation-server::attestation::convert_csr_to_certificate days_from_now failed:{:?}", err);
+                    err
+                })?;
+    cert_builder.set_not_before(&now)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_not_before failed:{:?}", err);
+            err
+        })?;
 
-    let expiry = {
-        openssl::asn1::Asn1Time::days_from_now(1)?
-    };
-    cert_builder.set_not_after(&expiry)?;
+    let expiry =openssl::asn1::Asn1Time::days_from_now(1)
+                    .map_err(|err| {
+                        println!("proxy-attestation-server::attestation::convert_csr_to_certificate days_from_now failed:{:?}", err);
+                        err
+                    })?;
+    cert_builder.set_not_after(&expiry)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_not_after failed:{:?}", err);
+            err
+        })?;
 
     let serial_number = {
-        let sn_bignum = openssl::bn::BigNum::from_u32(23)?;
-        openssl::asn1::Asn1Integer::from_bn(&sn_bignum)?
+        let sn_bignum = openssl::bn::BigNum::from_u32(23)
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::convert_csr_to_certificate from_u32 failed:{:?}", err);
+                err
+            })?;
+        openssl::asn1::Asn1Integer::from_bn(&sn_bignum)
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::convert_csr_to_certificate from_bn failed:{:?}", err);
+                err
+            })?
     };
-    cert_builder.set_serial_number(&serial_number)?;
+    cert_builder.set_serial_number(&serial_number)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_serial_number failed:{:?}", err);
+            err
+        })?;
 
     let issuer_name = {
         let mut issuer_name_builder = openssl::x509::X509NameBuilder::new()?;
@@ -125,27 +161,71 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
         issuer_name_builder.append_entry_by_text("CN", "VeracruzProxyServer")?;
         issuer_name_builder.build()
     };
-    cert_builder.set_issuer_name(&issuer_name)?;
+    cert_builder.set_issuer_name(&issuer_name)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_issuer_name failed:{:?}", err);
+            err
+        })?;
 
-    cert_builder.set_subject_name(csr.subject_name())?;
-    cert_builder.set_pubkey(csr.public_key()?.as_ref())?;
+    cert_builder.set_subject_name(csr.subject_name())
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_subject_name failed:{:?}", err);
+            err
+        })?;
+    cert_builder.set_pubkey(csr.public_key()?.as_ref())
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_pubkey failed:{:?}", err);
+            err
+        })?;
 
     let mut alt_name_extension = openssl::x509::extension::SubjectAlternativeName::new();
     alt_name_extension.dns("RootEnclave.dev");
-    let built_extension = alt_name_extension.build(&cert_builder.x509v3_context(None, None))?;
-    cert_builder.append_extension(built_extension)?;
+    let built_extension = alt_name_extension.build(&cert_builder.x509v3_context(None, None))
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate alt_name_extension.build failed:{:?}", err);
+            err
+        })?;
+    cert_builder.append_extension(built_extension)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate append_extension failed:{:?}", err);
+            err
+        })?;
 
-    let constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build()?;
-    cert_builder.append_extension(constraints_extension)?;
+    let constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build()
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate BasicConstraints::new failed:{:?}", err);
+            err
+        })?;
+    cert_builder.append_extension(constraints_extension)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate append_extension failed:{:?}", err);
+            err
+        })?;
 
     let key_pem = {
-        let mut f = std::fs::File::open("../test-collateral/CAKey.pem")?;
+        let mut f = std::fs::File::open("../test-collateral/CAKey.pem")
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::convert_csr_to_certificate open of file failed:{:?}", err);
+                err
+            })?;
         let mut buffer: Vec<u8> = Vec::new();
-        f.read_to_end(&mut buffer)?;
+        f.read_to_end(&mut buffer)
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::convert_csr_to_certificate read_to_end failed:{:?}", err);
+                err
+            })?;
         buffer
     };
 
-    let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem)?;
-    cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256())?;
+    let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate private_key_from_pem failed:{:?}", err);
+            err
+        })?;
+    cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256())
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate cert_builder.sign failed:{:?}", err);
+            err
+        })?;
     Ok(cert_builder.build())
 }

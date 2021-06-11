@@ -21,7 +21,7 @@ use std::{
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use clap::{App, Arg};
 use data_encoding::HEXLOWER;
-use log::{error, info};
+use log::{error, info, warn};
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
@@ -575,8 +575,8 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
             abort_with("Invocation of 'dd' command failed.");
         }
     } else {
-        error!("Runtime Manager CSS.bin file cannot be opened.");
-        error!("Continuing on without computing an SGX hash.");
+        warn!("Runtime Manager CSS.bin file cannot be opened.");
+        warn!("Continuing on without computing an SGX hash.");
         None
     }
 }
