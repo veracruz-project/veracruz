@@ -22,30 +22,22 @@
 //! information on licensing and copyright.
 
 use image::{GenericImageView, imageops, ImageFormat};
-use std::process::exit;
 
 /// Read image from the virtual filesystem, crop the image, display the new dimensions and write
 /// the new image to /output in PNG format.
 /// By default, `jpeg-decode` reads JPEG images in parallel threads using `rayon`, which are not
 /// supported in WASM. The workaround is to read PNG images instead
-fn process_image() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     // Use the open function to load an image from a Path.
     // `open` returns a `DynamicImage` on success.
-    let mut img = image::open("/test.png").map_err(|_| 1)?;
+    let mut img = image::open("/test.png")?;
 
     // Transform the image
     let subimg = imageops::crop(&mut img, 0, 0, 100, 100);
     println!("new dimensions: {:?}", subimg.dimensions());
 
     // Write the contents of this image to the Writer in PNG format.
-    subimg.to_image().save_with_format("/output", ImageFormat::Png).map_err(|_| 1)?;
+    subimg.to_image().save_with_format("/output", ImageFormat::Png)?;
 
     Ok(())
-}
-
-/// Entry point
-fn main() {
-    if let Err(e) = process_image() {
-        exit(e);
-    }
 }
