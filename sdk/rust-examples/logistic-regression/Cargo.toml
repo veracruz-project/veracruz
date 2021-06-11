@@ -8,9 +8,10 @@ description = "Logistic regression example, using the Rust rusty-machine ML libr
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pinecone = "0.2.3"
+pinecone = { version = "0.2.3", features = ["use-std"] }
 rusty-machine = "0.5.4"
 serde = { version = "1.0.3", features = ["derive"] }
+anyhow = "1.0.14"
 
 [profile.release]
 codegen-units = 1

@@ -30,7 +30,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{fs, process::exit};
+use std::fs;
+use anyhow::anyhow;
 ////////////////////////////////////////////////////////////////////////////////
 // Reading input
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,9 +47,9 @@ type Dataset = Vec<Vec<f64>>;
 ///   - [`return_code::ErrorCode::DataSourceCount`] if the number of inputs provided to the
 ///     program is not exactly 1.
 ///
-fn read_inputs() -> Result<(Dataset, Dataset, u32, u32, i32, i32), i32> {
-    let input = fs::read("/input-0").map_err(|_| 1)?;
-    pinecone::from_bytes(&input).map_err(|_| 1)
+fn read_inputs() -> anyhow::Result<(Dataset, Dataset, u32, u32, i32, i32)> {
+    let input = fs::read("/input-0")?;
+    Ok(pinecone::from_bytes(&input)?)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +64,7 @@ fn nlgd(
     degree_of_sigmoid: u32,
     gamma_up: i32,
     gamma_down: i32,
-) -> Result<(Vec<f64>, f64, f64), i32> {
+) -> anyhow::Result<(Vec<f64>, f64, f64)> {
     let training_sample = train_set.len();
 
     normalize_data_inplace(train_set)?;
@@ -98,7 +99,7 @@ fn nlgd(
 }
 
 /// Normalizes a data set in-place.
-fn normalize_data_inplace(dataset: &mut Dataset) -> Result<(), i32> {
+fn normalize_data_inplace(dataset: &mut Dataset) -> anyhow::Result<()> {
     let maximum_abs_values = vec![0.0 as f64; get_factor_len(&dataset)?];
 
     // Compute the maximum value for each column/factor
@@ -122,10 +123,10 @@ fn normalize_data_inplace(dataset: &mut Dataset) -> Result<(), i32> {
 
 /// Returns the length of each row in the data set.  All rows are assumed to have the
 /// same length, and the input `dataset` is assumed to have at least one row.
-fn get_factor_len(dataset: &Dataset) -> Result<usize, i32> {
+fn get_factor_len(dataset: &Dataset) -> anyhow::Result<usize> {
     match dataset.first() {
         // No element in the dataset
-        None => return Err(1),
+        None => return Err(anyhow!("empty dataset")),
         Some(first) => Ok(first.len()),
     }
 }
@@ -138,7 +139,7 @@ fn plain_nlgd_iteration(
     approximate_degree: u32,
     gamma: f64,
     eta: f64,
-) -> Result<(Vec<f64>, Vec<f64>), i32> {
+) -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
     let ip_vec = plain_ip(&dataset, &v_data)?;
     let grad_vec = plain_sigmoid(&dataset, &ip_vec, approximate_degree, gamma)?;
     let (w_data, v_data) = plain_nlgd_step(w_data, v_data, grad_vec, eta)?;
@@ -146,9 +147,9 @@ fn plain_nlgd_iteration(
 }
 
 /// Multply the matrix in dataset by `w_data`.
-fn plain_ip(dataset: &Dataset, data_vec: &[f64]) -> Result<Vec<f64>, i32> {
+fn plain_ip(dataset: &Dataset, data_vec: &[f64]) -> anyhow::Result<Vec<f64>> {
     if get_factor_len(&dataset)? != data_vec.len() {
-        return Err(1);
+        return Err(anyhow!("bad factor len"));
     }
 
     Ok(dataset.iter().fold(Vec::new(), |mut rst, row| {
@@ -173,9 +174,9 @@ fn plain_sigmoid(
     ip_vec: &[f64],
     approximate_degree: u32,
     gamma: f64,
-) -> Result<Vec<f64>, i32> {
+) -> anyhow::Result<Vec<f64>> {
     if dataset.len() != ip_vec.len() {
-        return Err(1);
+        return Err(anyhow!("bad input len"));
     }
     let init_grad = vec![0.0 as f64; get_factor_len(dataset)?];
     let rst = dataset
@@ -215,7 +216,7 @@ fn plain_nlgd_step(
     v_data: Vec<f64>,
     grad: Vec<f64>,
     eta: f64,
-) -> Result<(Vec<f64>, Vec<f64>), i32> {
+) -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
     let new_w_data: Vec<f64> = v_data.iter().zip(grad.iter()).map(|(v, g)| v - g).collect();
     let new_v_data: Vec<f64> = w_data
         .iter()
@@ -226,14 +227,14 @@ fn plain_nlgd_step(
 }
 
 /// Calculate the quality of the result.
-fn calculate_auc(dataset: &Dataset, w_data: &[f64]) -> Result<(f64, f64), i32> {
+fn calculate_auc(dataset: &Dataset, w_data: &[f64]) -> anyhow::Result<(f64, f64)> {
     let mut tn = 0.0 as f64;
     let mut fp = 0.0 as f64;
     let mut theta_tn = Vec::new();
     let mut theta_fp = Vec::new();
 
     for row in dataset.iter() {
-        let y_value = row.first().ok_or(1)?;
+        let y_value = row.first().ok_or_else(|| anyhow!("empty row"))?;
 
         // These two iters are slices that do not include the first element
         let mut row_iter = row.iter();
@@ -265,9 +266,9 @@ fn calculate_auc(dataset: &Dataset, w_data: &[f64]) -> Result<(f64, f64), i32> {
     Ok((correctness, auc))
 }
 
-fn true_ip(lhs: &[f64], rhs: &[f64]) -> Result<f64, i32> {
+fn true_ip(lhs: &[f64], rhs: &[f64]) -> anyhow::Result<f64> {
     if lhs.len() != rhs.len() {
-        return Err(1);
+        return Err(anyhow!("lhs/rhs len mismatch"));
     }
     Ok(lhs
         .iter()
@@ -278,9 +279,9 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> Result<f64, i32> {
 /// Entry point.  Reads an arbitrary number of input datasets, one from each source, concatenates
 /// them together into a single compound dataset, then trains a logistic regressor on this new
 /// dataset.  Input and output are assumed to be encoded in Pinecone.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
-        read_inputs().map_err(|_| 1)?;
+        read_inputs()?;
     let (w_data, correct, auc) = nlgd(
         &mut train_set,
         &mut test_set,
@@ -289,16 +290,7 @@ fn compute() -> Result<(), i32> {
         gamma_up,
         gamma_down,
     )?;
-    let result_encode = match pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc)) {
-        Err(_err) => return Err(1),
-        Ok(s) => s,
-    };
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit((e as u16).into());
-    }
 }

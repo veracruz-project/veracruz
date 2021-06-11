@@ -16,7 +16,8 @@
 //! copyright information.
 
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs, process::exit, result::Result};
+use std::{collections::HashSet, fs};
+use anyhow;
 
 /// The format of the contents of the input sets, encoding meta-data about an employee.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
@@ -34,11 +35,11 @@ struct Person {
 /// Reads all inputs: each input is assumed to be a Bincode-encoded `HashSet<Person>`.  Function
 /// returns a `Vec` of all hash-sets, one from each input provider.  Fails with
 /// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
-fn read_inputs() -> Result<Vec<HashSet<Person>>, i32> {
-    let input0 = fs::read("/input-0").map_err(|_| 1)?;
-    let data0 = pinecone::from_bytes(&input0).map_err(|_| 1)?;
-    let input1 = fs::read("/input-1").map_err(|_| 1)?;
-    let data1 = pinecone::from_bytes(&input1).map_err(|_| 1)?;
+fn read_inputs() -> anyhow::Result<Vec<HashSet<Person>>> {
+    let input0 = fs::read("/input-0")?;
+    let data0 = pinecone::from_bytes(&input0)?;
+    let input1 = fs::read("/input-1")?;
+    let data1 = pinecone::from_bytes(&input1)?;
     Ok(vec![data0, data1])
 }
 
@@ -65,16 +66,10 @@ fn set_intersection(sets: &[HashSet<Person>]) -> HashSet<Person> {
 /// Entry point.  Reads an unbounded number of `HashSet<Person>` inputs and finds their
 /// intersection, returning the result (again, a `HashSet<Person>`).  Assumes inputs and output are
 /// encoded as Bincode.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let inputs = read_inputs()?;
     let result = set_intersection(&inputs);
-    let result_encode = pinecone::to_vec::<HashSet<Person>>(&result).map_err(|_| 1)?;
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec::<HashSet<Person>>(&result)?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit(e);
-    }
 }

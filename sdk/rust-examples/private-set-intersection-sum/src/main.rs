@@ -16,7 +16,8 @@
 //! information on licensing and copyright.
 
 use serde::Deserialize;
-use std::{collections::HashSet, fs, process::exit};
+use std::{collections::HashSet, fs};
+use anyhow;
 
 /// The identifier of each customer, a pair of `u64` values.
 type Id = (u64, u64);
@@ -45,9 +46,9 @@ struct Input {
 
 /// Reads exactly one input, which is assumed to be a Pinecone-encoded `Input`
 /// struct, as above.
-fn read_inputs() -> Result<Input, i32> {
-    let input = fs::read("/input-0").map_err(|_| 1)?;
-    pinecone::from_bytes(input.as_slice()).map_err(|_| 1)
+fn read_inputs() -> anyhow::Result<Input> {
+    let input = fs::read("/input-0")?;
+    Ok(pinecone::from_bytes(input.as_slice())?)
 }
 
 /// Computes the set intersection-sum, returning the number of elements the sample and input
@@ -66,16 +67,10 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 
 /// The program entry point: reads exactly one input, decodes it and computes the set
 /// intersection-sum before re-encoding it into Pinecone and returning.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let data = read_inputs()?;
     let result = set_intersection_sum(data.data, data.sample);
-    let result_encode = pinecone::to_vec::<(usize, u64)>(&result).map_err(|_| 1)?;
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec::<(usize, u64)>(&result)?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit((e as u16).into());
-    }
 }

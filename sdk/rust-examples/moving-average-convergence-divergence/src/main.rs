@@ -24,7 +24,8 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::{fs, process::exit};
+use std::fs;
+use anyhow;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reading inputs.
@@ -32,9 +33,9 @@ use std::{fs, process::exit};
 
 /// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
 /// values.
-fn read_inputs() -> Result<Vec<f64>, i32> {
-    let input = fs::read("/input-0").map_err(|_| 1)?;
-    pinecone::from_bytes(&input).map_err(|_| 1)
+fn read_inputs() -> anyhow::Result<Vec<f64>> {
+    let input = fs::read("/input-0")?;
+    Ok(pinecone::from_bytes(&input)?)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,18 +160,11 @@ fn dec_approx(data: &[f64], norm: f64) -> Vec<f64> {
 
 /// Entry point: reads the vector of floats, processes them, and writes back a new vector of
 /// floats as output.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let dataset = read_inputs()?;
     let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
         computation(dataset.as_slice());
-    let result_encode =
-        pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx).map_err(|_| 1)?;
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx)?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit(e);
-    }
 }

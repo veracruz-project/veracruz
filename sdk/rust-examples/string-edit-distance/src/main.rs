@@ -17,8 +17,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::{fs, process::exit, result::Result};
+use std::fs;
 use strsim::jaro_winkler;
+use anyhow;
 
 /// Reads two input strings via the H-call mechanism.  Fails
 ///
@@ -27,9 +28,9 @@ use strsim::jaro_winkler;
 /// - with `return_code::ErrorCode::DataSourceCount` if the number of inputs
 ///   provided to the program is not exactly 2.
 ///
-fn read_inputs() -> Result<(String, String), i32> {
-    let this = String::from_utf8(fs::read("/input-0").map_err(|_| 1)?).map_err(|_| 1)?;
-    let that = String::from_utf8(fs::read("/input-1").map_err(|_| 1)?).map_err(|_| 1)?;
+fn read_inputs() -> anyhow::Result<(String, String)> {
+    let this = String::from_utf8(fs::read("/input-0")?)?;
+    let that = String::from_utf8(fs::read("/input-1")?)?;
 
     Ok((this, that))
 }
@@ -38,16 +39,10 @@ fn read_inputs() -> Result<(String, String), i32> {
 /// which are Rust strings encoded with Pinecone.  Fails if these assumptions
 /// are not met with an error code.  Writes a Pinecone-encoded `usize`, the
 /// distance between the two strings, back as output.
-fn compute() -> Result<(), i32> {
+fn main() -> anyhow::Result<()> {
     let (left, right) = read_inputs()?;
     let distance = jaro_winkler(&left, &right);
-    let result_encode = pinecone::to_vec::<f64>(&distance).map_err(|_| 1)?;
-    fs::write("/output", result_encode).map_err(|_| 1)?;
+    let result_encode = pinecone::to_vec::<f64>(&distance)?;
+    fs::write("/output", result_encode)?;
     Ok(())
-}
-
-fn main() {
-    if let Err(e) = compute() {
-        exit(e);
-    }
 }
