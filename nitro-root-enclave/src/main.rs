@@ -213,7 +213,7 @@ fn proxy_attestation(
 
     let private_key: EcdsaKeyPair = get_device_key_pair()?;
     // convert the CSR into a certificate
-    let compute_enclave_cert = csr::convert_csr_to_cert(&csr, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &document.pcrs[0], &private_key)
+    let compute_enclave_cert = csr::convert_csr_to_cert(&csr, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &document.pcrs[0][0..32], &private_key)
         .map_err(|err| format!("nitro-root-enclave::proxy_attestation convert_csr_to_cert failed:{:?}", err))?;
 
     let (root_enclave_cert, root_cert) = {

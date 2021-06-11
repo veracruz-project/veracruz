@@ -599,6 +599,10 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
             .expect("Failed to read file.");
 
         content = content.replace("\n", "");
+        // Nitro Enclave hashes are computed using SHA384, which produces 48
+        // bytes. We only have room right now for 32 byte hashes.
+        // Thus, we need to truncate down to 32 bytes (64 hex characters)
+        content = content[0..64].to_string();
 
         info!("Hash successfully computed, {}.", content);
 
