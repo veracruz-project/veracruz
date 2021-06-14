@@ -15,7 +15,7 @@ use env_logger;
 use log::{info, error};
 use std::process;
 use actix_rt;
-use sinaloa;
+use veracruz_server;
 use veracruz_utils;
 
 
@@ -40,7 +40,7 @@ fn main() {
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
-    let (policy, policy_hash) = match veracruz_utils::policy_and_hash_from_file(
+    let (policy, policy_hash) = match veracruz_utils::policy::policy::policy_and_hash_from_file(
         &opt.policy_path
     ) {
         Ok((policy, policy_hash)) => (policy, policy_hash),
@@ -65,7 +65,7 @@ fn main() {
     let mut sys = actix_rt::System::new("Sinaloa Server");
 
     // create Sinaloa server instance
-    let sinaloa_server = match sinaloa::server::server(policy_path) {
+    let sinaloa_server = match veracruz_server::server::server(policy_path) {
         Ok(sinaloa_server) => sinaloa_server,
         Err(err) => {
             error!("{}", err);
@@ -75,7 +75,7 @@ fn main() {
 
     // TODO support restarting in a loop?
     // TODO there's an unwrap panic that happens if we ctrl-C, need to fix
-    info!("Sinaloa running on {}", policy.sinaloa_url());
+    info!("Sinaloa running on {}", policy.veracruz_server_url());
     match sys.block_on(sinaloa_server) {
         Ok(_) => {},
         Err(err) => {

@@ -40,14 +40,18 @@ use crate::{
         },
     },
 };
+use ring;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
     collections::HashMap,
     string::{String, ToString},
     vec::Vec,
+    path,
     path::PathBuf,
 };
+#[cfg(feature = "std")]
+use std::fs;
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -351,7 +355,7 @@ impl Policy {
         Ok(table)
     }
 
-    /// Extract the input filenames from a right_map. If a prorgam has rights call 
+    /// Extract the input filenames from a right_map. If a prorgam has rights call
     /// fd_read and path_open, it is considered as an input file.
     fn get_required_inputs(right_map: &HashMap<PathBuf, Rights>) -> Vec<PathBuf> {
         let mut rst = right_map.iter().fold(Vec::new(), |mut acc, (file_name, right)| {
@@ -363,4 +367,38 @@ impl Policy {
         rst.sort();
         rst
     }
+}
+
+/// Parses and hashes a Veracruz policy from the given file, validating
+/// the well-formedness of the resulting policy in the process.
+/// Returns `Ok((policy, policy_hash))` iff these well-formedness checks pass.
+#[cfg(feature = "std")]
+pub fn policy_and_hash_from_file<P>(
+    path: P
+) -> Result<(Policy, String), PolicyError>
+where
+    P: AsRef<path::Path>
+{
+    let policy_json = fs::read_to_string(path)?;
+    policy_and_hash_from_json(&policy_json)
+}
+
+/// Parses and hashes a Veracruz policy from a JSON-encoded string, `json`,
+/// validating the well-formedness of the resulting policy in the process.
+/// Returns `Ok((policy, policy_hash))` iff these well-formedness checks pass.
+#[cfg(feature = "std")]
+pub fn policy_and_hash_from_json(
+    json: &str
+) -> Result<(Policy, String), PolicyError> {
+    // hash
+    let hash_bytes = ring::digest::digest(
+        &ring::digest::SHA256,
+        json.as_bytes()
+    );
+    let hash = hex::encode(&hash_bytes);
+
+    // decode policy
+    let policy = Policy::from_json(json)?;
+
+    Ok((policy, hash))
 }

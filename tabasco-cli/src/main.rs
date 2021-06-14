@@ -50,7 +50,7 @@ fn main() {
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
-    let (policy, policy_hash) = match veracruz_utils::policy_and_hash_from_file(
+    let (policy, policy_hash) = match veracruz_utils::policy::policy::policy_and_hash_from_file(
         &opt.policy_path
     ) {
         Ok((policy, policy_hash)) => (policy, policy_hash),
