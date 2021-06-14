@@ -168,6 +168,31 @@ impl VeracruzClient {
             policy_json.as_bytes(),
         ));
         let policy = Policy::from_json(&policy_json)?;
+
+        Self::with_policy_and_hash(
+            client_cert_filename,
+            client_key_filename,
+            policy,
+            policy_hash,
+            target_platform,
+        )
+    }
+
+    /// Load the client certificate and key, and the global policy, which contains information
+    /// about the enclave. This takes the global policy as a VeracruzPolicy struct and
+    /// related hash.
+    /// Attest the enclave.
+    pub fn with_policy_and_hash<P1, P2>(
+        client_cert_filename: P1,
+        client_key_filename: P2,
+        policy: Policy,
+        policy_hash: String,
+        target_platform: &Platform
+    ) -> Result<VeracruzClient, VeracruzClientError>
+    where
+        P1: AsRef<path::Path>,
+        P2: AsRef<path::Path>
+    {
         let client_cert = Self::read_cert(&client_cert_filename)?;
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 

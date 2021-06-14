@@ -14,13 +14,13 @@ use std::path;
 use env_logger;
 use log::{info, warn, error};
 use std::process;
-use durango::Durango;
+use veracruz_client::VeracruzClient;
 use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::ffi;
-use veracruz_utils::EnclavePlatform;
+use veracruz_utils::platform::Platform;
 
 
 /// parser for file paths either in the form of
@@ -76,7 +76,7 @@ struct Opt {
 
     /// Target enclave platform
     #[structopt(short, long)]
-    target: EnclavePlatform,
+    target: Platform,
 
     /// Path to client certificate file
     #[structopt(short, long, parse(from_os_str))]
@@ -175,7 +175,7 @@ fn main() {
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
-    let (policy, policy_hash) = match veracruz_utils::policy_and_hash_from_file(
+    let (policy, policy_hash) = match veracruz_utils::policy::policy::policy_and_hash_from_file(
         &opt.policy_path
     ) {
         Ok((policy, policy_hash)) => (policy, policy_hash),
@@ -188,7 +188,7 @@ fn main() {
 
     // create Durango instance
     // TODO allow AsRef<VeracruzPolicy>?
-    let mut durango = match Durango::with_policy_and_hash(
+    let mut durango = match VeracruzClient::with_policy_and_hash(
         opt.identity,
         opt.key,
         policy.clone(),
@@ -201,7 +201,7 @@ fn main() {
             process::exit(1);
         }
     };
-    info!("Connected to {}", policy.sinaloa_url());
+    info!("Connected to {}", policy.veracruz_server_url());
 
     let mut did_something = false;
 

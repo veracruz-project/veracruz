@@ -14,7 +14,7 @@ name = "durango"
 path = "src/main.rs"
 
 [dependencies]
-durango = {path = "../durango"}
+veracruz-client = {path = "../veracruz-client"}
 veracruz-utils = {path = "../veracruz-utils", features=["std"] }
 structopt = { version="0.3", features=["wrap_help"] }
 log = "0.4"

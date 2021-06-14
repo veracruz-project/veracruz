@@ -14,11 +14,11 @@ name = "sinaloa"
 path = "src/main.rs"
 
 [features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "sinaloa/sgx", "veracruz-utils/std"]
-tz = ["sinaloa/tz", "veracruz-utils/tz"]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-server/sgx", "veracruz-utils/std"]
+tz = ["veracruz-server/tz", "veracruz-utils/tz"]
 
 [dependencies]
-sinaloa = { path = "../sinaloa" }
+veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = {path = "../veracruz-utils", features=["std"] }
 structopt = { version="0.3", features=["wrap_help"] }
 log = "0.4"
