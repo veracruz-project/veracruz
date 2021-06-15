@@ -56,6 +56,9 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
         "runtime_manager_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
         CID, PORT
     );
+
+    setsockopt(socket_fd, ReuseAddr, &true)?;
+    setsockopt(socket_fd, ReusePort, &true)?;
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
     bind(socket_fd, &sockaddr).map_err(|err| RuntimeManagerError::SocketError(err))?;
@@ -194,7 +197,6 @@ fn initialize(policy_json: &str, challenge: Vec<u8>, challenge_id: i32) -> Resul
         NitroRootEnclaveMessage::CertChain(chain) => chain,
         _ => return Err(RuntimeManagerError::WrongMessageTypeError(received_message)),
     };
-    println!("runtime-manager::runtime-manager_nitro::initialize setting certchain:{:02x?}", cert_chain);
 
     managers::session_manager::load_cert_chain(cert_chain)?;
 

@@ -49,7 +49,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
     let mut challenge: [u8; 32] = [0; 32];
     let mut rng = rand::thread_rng();
 
-    rng.fill(&mut challenge);
+    rng.fill(&mut challenge)?;
 
     let attestation_context = PsaAttestationContext {
         firmware_version: firmware_version.to_string(),

@@ -35,7 +35,7 @@ pub enum NitroRootEnclaveMessage {
     /// return a status.
     /// Most operations return data, but if they fail, they will return a
     /// status set to `NitroStatus::Fail` (or `NitroStatus::Unimplemented` if
-    /// it is not implmeneted).
+    /// it is not implemented).
     /// Parameters:
     /// NitroStatus - the Status
     Status(NitroStatus),

@@ -102,20 +102,6 @@ fn get_firmware_version() -> Result<String, String> {
     return Ok(version.to_string());
 }
 
-/// Set the hash value of the Runtime Manager to be included in the proxy attestation
-/// token.
-/// I DO NOT THINK THIS IS NECESSARY ANYMORE
-fn set_runtime_manager_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
-    let mut runtime_manager_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
-        format!(
-            "set_runtime_manager_hash failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}",
-            err
-        )
-    })?;
-    *runtime_manager_guard = Some(hash);
-    Ok(NitroStatus::Success)
-}
-
 /// Perform the native attestation flow
 fn native_attestation(challenge: &[u8], device_id: i32) -> Result<(Vec<u8>, Vec<u8>), String> {
     let mut att_doc: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
@@ -179,15 +165,13 @@ fn proxy_attestation(
     challenge_id: i32,
 ) -> Result<NitroRootEnclaveMessage, String> {
     // first authenticate the attestation document
-    let document: AttestationDocument =
-        NitroToken::authenticate_token(att_doc, &AWS_NITRO_ROOT_CERTIFICATE).map_err(
-            |err| {
-                format!(
-                    "nitro-root-enclave::proxy_attestation failed to authenticate token:{:?}",
-                    err
-                )
-            },
-        )?;
+    let document: AttestationDocument = match NitroToken::authenticate_token(att_doc, &AWS_NITRO_ROOT_CERTIFICATE) {
+        Ok(data) => data,
+        Err(err) => {
+            println!("nitro-root-enclave::proxy_attestation authenticate_token failed:{:?}", err);
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
+    };
     // check that the challenge in the attestation document matches the one we
     // generated
     // we call `remove` on the hash map because if the entry is there, we no
@@ -196,25 +180,40 @@ fn proxy_attestation(
         .map_err(|err| format!("nitro-root-enclave::proxy_attestation failed to obtain lock on CHALLENGE_HASHMAP:{:?}", err))?
         .remove(&challenge_id) {
         Some(value) => value,
-        None => return Err(format!("nitro-root-enclave::proxy_attestation value for challenge_id:{:?} not found on CHALLENGE_HASHMAP", challenge_id)),
+        None => {
+            println!("nitro-root-enclave::proxy_attestation value for challenge_id:{:?} not found on CHALLENGE_HASHMAP", challenge_id);
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
     };
     let received_challenge = match document.nonce {
         Some(data) => data,
-        None => return Err(format!("nitro-root-enclave::proxy_attestation attestation document did not contain a nonce value")),
+        None => {
+            println!("nitro-root-enclave::proxy_attestation attestation document did not contain a nonce value");
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
     };
     if expected_challenge != received_challenge {
-        return Err(format!("nitro-root-enclave::proxy_attestation challenge values did not match"));
+        println!("nitro-root-enclave::proxy_attestation challenge values did not match");
+        return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
     }
 
     let csr: Vec<u8> = match document.user_data {
         Some(data) => data,
-        None => return Err(format!("nitro-root-enclave::proxy_attestation AttestationDocument does not contain user_data")),
+        None => {
+            println!("nitro-root-enclave::proxy_attestation AttestationDocument does not contain user_data");
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
     };
 
     let private_key: EcdsaKeyPair = get_device_key_pair()?;
     // convert the CSR into a certificate
-    let compute_enclave_cert = csr::convert_csr_to_cert(&csr, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &document.pcrs[0][0..32], &private_key)
-        .map_err(|err| format!("nitro-root-enclave::proxy_attestation convert_csr_to_cert failed:{:?}", err))?;
+    let compute_enclave_cert = match csr::convert_csr_to_cert(&csr, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &document.pcrs[0][0..32], &private_key) {
+        Ok(cert) => cert,
+        Err(err) => {
+            println!("nitro-root-enclave::proxy_attestation convert_csr_to_cert failed:{:?}", err);
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
+    };
 
     let (root_enclave_cert, root_cert) = {
         let cc_guard = CERT_CHAIN.lock()
@@ -269,6 +268,9 @@ fn main() -> Result<(), String> {
         None,
     )
     .map_err(|err| format!("nitro-root-enclave::main failed to create socket:{:?}", err))?;
+
+    setsockopt(socket_fd, ReuseAddr, &true)?;
+    setsockopt(socket_fd, ReusePort, &true)?;
 
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 

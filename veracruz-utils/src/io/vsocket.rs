@@ -13,7 +13,7 @@
 
 use nix::{
     sys::socket::{
-        connect, shutdown, socket, AddressFamily, Shutdown, SockAddr, SockFlag, SockType,
+        connect, setsockopt, shutdown, socket, AddressFamily, sockopt::{ReuseAddr, ReusePort}, Shutdown, SockAddr, SockFlag, SockType,
     },
     unistd::close,
 };
@@ -65,6 +65,9 @@ impl VsockSocket {
                 SockFlag::empty(),
                 None,
             )?);
+
+            setsockopt(vsocket.as_raw_fd(), ReuseAddr, &true)?;
+            setsockopt(vsocket.as_raw_fd(), ReusePort, &true)?;
 
             match connect(vsocket.as_raw_fd(), &sockaddr) {
                 Ok(_) => return Ok(vsocket),

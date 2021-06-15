@@ -120,7 +120,7 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
         let mut pubkey_challenge: [u8; 16] = [0; 16];
         let mut rng = rand::thread_rng();
 
-        rng.fill(&mut pubkey_challenge);
+        rng.fill(&mut pubkey_challenge)?;
         let sgx_ecc_handle = SgxEccHandle::new();
         sgx_ecc_handle.open()
             .map_err(|err| {
