@@ -644,18 +644,15 @@ impl FileSystem {
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
     pub(crate) fn fd_write(&mut self, fd: Fd, buf: &[u8]) -> FileSystemResult<Size> {
-        #[cfg(debug_assertions)]
-        {
-            // Redirect writes to stdout and stderr to the host's stdout and stderr respectively
-            if fd.0 == 0 || fd.0 == 1 {
-                let s = std::str::from_utf8(&buf).expect("Found invalid UTF-8");
-                print!("{}", s);
-                return Ok(buf.len() as u32)
-            } else if fd.0 == 2 {
-                let s = std::str::from_utf8(&buf).expect("Found invalid UTF-8");
-                eprint!("{}", s);
-                return Ok(buf.len() as u32)
-            }
+        // Redirect writes to fd(0) and fd(1) to the host's stdout and stderr respectively
+        if fd.0 == 0 || fd.0 == 1 {
+            let s = std::str::from_utf8(&buf).expect("Found invalid UTF-8");
+            print!("{}", s);
+            return Ok(buf.len() as u32)
+        } else if fd.0 == 2 {
+            let s = std::str::from_utf8(&buf).expect("Found invalid UTF-8");
+            eprint!("{}", s);
+            return Ok(buf.len() as u32)
         }
 
         self.check_right(&fd, Rights::FD_WRITE)?;
