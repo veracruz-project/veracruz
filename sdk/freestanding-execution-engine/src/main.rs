@@ -254,5 +254,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     let return_code = execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name)?;
     info!("return code: {:?}", return_code);
     info!("time: {} micro seconds", main_time.elapsed().as_micros());
+
+    // Dump contents of stdout
+    let buf = vfs.lock()
+        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+        .read_file_by_filename(
+            &Principal::InternalSuperUser,
+            "stdout",
+        )?;
+    let stdout_dump = std::str::from_utf8(&buf)
+        .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+    print!("{}", stdout_dump);
+
+    // Dump contents of stderr
+    let buf = vfs.lock()
+        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+        .read_file_by_filename(
+            &Principal::InternalSuperUser,
+            "stderr",
+        )?;
+    let stderr_dump = std::str::from_utf8(&buf)
+        .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+    eprint!("{}", stderr_dump);
+
+    info!("WASM program {} loaded into VFS.", prog_file_name);
     Ok(())
 }
