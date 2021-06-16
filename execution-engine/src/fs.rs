@@ -137,12 +137,12 @@ impl FileSystem {
     /// and then pre-open them.
     fn install_prestat<T: AsRef<Path> + Sized>(&mut self, dir_paths: &[T]) {
         // Pre open the stdin stdout and stderr.
-        self.install_file("stderr", Inode(0), "".as_bytes());
-        self.install_fd(Fd(0), Inode(0), &Rights::FD_READ, &Rights::FD_READ);
-        self.install_file("stdin", Inode(1), "".as_bytes());
-        self.install_fd(Fd(1), Inode(1), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_file("stdin", Inode(0), "".as_bytes());
+        self.install_fd(Fd(0), Inode(0), &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
+        self.install_file("stdout", Inode(1), "".as_bytes());
+        self.install_fd(Fd(1), Inode(1), &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
         self.install_file("stderr", Inode(2), "".as_bytes());
-        self.install_fd(Fd(2), Inode(2), &Rights::FD_READ, &Rights::FD_READ);
+        self.install_fd(Fd(2), Inode(2), &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
 
         // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
         self.install_dir(Path::new(Self::ROOT_DIRECTORY), Self::ROOT_DIRECTORY_INODE);
