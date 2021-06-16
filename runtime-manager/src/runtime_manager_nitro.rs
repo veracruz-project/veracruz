@@ -57,8 +57,6 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
         CID, PORT
     );
 
-    setsockopt(socket_fd, ReuseAddr, &true)?;
-    setsockopt(socket_fd, ReusePort, &true)?;
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
     bind(socket_fd, &sockaddr).map_err(|err| RuntimeManagerError::SocketError(err))?;

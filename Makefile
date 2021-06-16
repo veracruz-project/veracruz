@@ -153,7 +153,7 @@ nitro-veracruz-test-dry-run: nitro test_cases
 
 nitro-veracruz-test: nitro test_cases  veracruz-test/proxy-attestation-server.db
 	cd veracruz-test \
-		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro
+		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro -- --test-threads=1
 	cd veracruz-server-test \
 		&& ./nitro-terminate.sh
 	cd ./veracruz-server-test \

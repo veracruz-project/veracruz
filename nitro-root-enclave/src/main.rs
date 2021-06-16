@@ -269,9 +269,6 @@ fn main() -> Result<(), String> {
     )
     .map_err(|err| format!("nitro-root-enclave::main failed to create socket:{:?}", err))?;
 
-    setsockopt(socket_fd, ReuseAddr, &true)?;
-    setsockopt(socket_fd, ReusePort, &true)?;
-
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
     bind(socket_fd, &sockaddr)
