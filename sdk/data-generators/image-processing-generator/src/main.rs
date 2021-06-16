@@ -11,7 +11,7 @@
 //!
 //! # Example
 //! ```
-//! cargo run -- --file_prefix [PREFIX_STRING] --size [VEC_SIZE] --seed [RANDOM_SEED];
+//! cargo run -- --file_prefix [PREFIX_STRING] --width [WIDTH] --height [HEIGHT];
 //! ```
 
 use clap::{App, Arg};
@@ -19,17 +19,17 @@ use downloader::{Download, Downloader};
 use image::{ImageFormat, io::Reader};
 use std::{error::Error, path::Path};
 
-/// Download a random image from https://picsum.photos/ 1 image data files: *-init.dat containing a single 64-bit floating point number,
-/// and *-1.dat and *-2.dat which are two Vecs of 64-bit floating point numbers respectively.
+/// Download a random JPEG image from https://picsum.photos/ and save it in a *.dat, then convert it
+/// to a PNG image under the same name.
 /// Parameters:
 /// * `file_prefix`, String, the prefix of the generated files.
-/// * `size`, u64, the size of the Vecs, default is 10.
-/// * `seed`, u64, random number seed, default is 0.
+/// * `width`, u64, the image width, default is 10.
+/// * `height`, u64, the image height, default is 10.
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for image processing")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Generate an initial f64 encoded by pinecone and then 2 vectors of streaming data, each of which contains [SIZE] numbers of f64 encoded individually by pinecone.") 
+        .about("Download a random JPEG image of dimensions ([WIDTH], [HEIGHT]) and convert it to a PNG image") 
        .arg(
            Arg::with_name("file_prefix")
                .short("f")
