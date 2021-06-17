@@ -11,6 +11,10 @@ std = []
 [dependencies]
 anyhow = "1.0.41"
 pinecone = "0.2"
-petgraph = "0.5.1"
+pathfinding = "2.1.5"
 serde = { version = "1.0.97", features = ["derive"] }
 
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1

@@ -16,10 +16,10 @@
 //! for licensing and copyright information.
 
 use anyhow::{Context, Result};
-use petgraph::graph::NodeIndex;
-use petgraph::{algo::astar, Directed, Graph};
+use pathfinding::directed::astar::astar;
 use pinecone::{from_bytes, to_vec};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::{
     fs::File,
     io::{Read, Write},
@@ -44,16 +44,44 @@ const RESPONSE_OUTPUT_PATH: &'static str = "response-output.dat";
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The input graph is provided to us as a serialized (in Pinecone format)
-/// struct containing a vector of node-node pairs, with an additional "weight",
-/// where nodes are represented as Rust `String`s.  A given triple `(e, f, w)`
-/// in the vector asserts the existence of a directed edge from node `e` to node
-/// `f` with weight `w`.
+/// struct capturing the structure of a directed weighted graph.
 #[derive(Deserialize)]
 struct SerializedGraph {
-    /// The edges of the graph, encoding connections between nodes represented
-    /// as a `String`, with a given weight, capturing e.g. timing information,
-    /// length, traffic-carrying capacity, and so on.
-    edges: Vec<(String, String, i32)>,
+    /// The nodes of the graph.
+    nodes: HashSet<String>,
+    /// A map from nodes to a list of the node's successor nodes, along with
+    /// their weight.
+    successors: HashMap<String, Vec<(String, i32)>>,
+}
+
+impl SerializedGraph {
+    /// Returns the set of successor nodes of a particular node, if any.
+    pub fn successors(&self, node: &String) -> Vec<(String, i32)> {
+        if let Some(succs) = self.successors.get(node) {
+            succs.clone()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Returns `true` iff the `node` is a node of the graph.
+    #[inline]
+    pub fn is_graph_node(&self, node: &String) -> bool {
+        self.nodes.contains(node)
+    }
+
+    /// Returns `true` iff the representation of the graph is valid, in the
+    /// sense that:
+    /// 1. Every node has a list of successor nodes (even if empty),
+    /// 2. Every node mentioned in the successor map is contained in the set of
+    ///    nodes.
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        self.nodes.iter().all(|n| self.successors.contains_key(n))
+            && self.successors.iter().all(|(n, succs)| {
+                self.is_graph_node(n) && succs.iter().all(|(n, _w)| self.is_graph_node(n))
+            })
+    }
 }
 
 /// A "challenge" represents a graph routing problem, consisting of a node to
@@ -62,9 +90,23 @@ struct SerializedGraph {
 #[derive(Deserialize)]
 struct Challenge {
     /// Node to start routing from.
-    from: String,
+    source: String,
     /// Node to end routing at.
-    to: String,
+    sink: String,
+}
+
+impl Challenge {
+    /// Returns the source, or start node of the challenge.
+    #[inline]
+    pub fn source(&self) -> &String {
+        &self.source
+    }
+
+    /// Returns the sink, or end node of the challenge.
+    #[inline]
+    pub fn sink(&self) -> &String {
+        &self.sink
+    }
 }
 
 /// A "response" represents a route through the graph, made in reponse to a
@@ -75,6 +117,8 @@ struct Challenge {
 /// we use the `CannotRoute` constructor to signal failure.
 #[derive(Serialize)]
 enum Response {
+    /// The graph is not valid.
+    GraphInvalid,
     /// There is no route between the `from` and `to` nodes of the `Challenge`.
     CannotRoute,
     /// A route was found between the two nodes.  The route, or path, is
@@ -87,28 +131,24 @@ enum Response {
 // Routing.
 ////////////////////////////////////////////////////////////////////////////////
 
-fn construct_graph(
-    edges: &[(String, String, i32)],
-    from: &String,
-    to: &String,
-) -> (Graph<String, i32, Directed, u32>, NodeIndex, NodeIndex) {
-    unimplemented!()
-}
-
 /// Calculates a route through `graph` using the `from` and `to` points using
 /// the A-Star pathfinding algorithm.  Returns `Response::Route(route, weight)`
 /// if a `route` is found with a calculated `weight`.  Otherwise, returns
 /// `Response::CannotRoute`.
-fn calculate_route(
-    graph: &Graph<String, i32, Directed, u32>,
-    from: NodeIndex,
-    to: NodeIndex,
-) -> Response {
-    if let Some((weight, route)) = astar(graph, from, |finish| finish == to, |e| e.weight(), |_| &0)
-    {
-        Response::Route((route, *weight))
+fn calculate_route(serialized_graph: &SerializedGraph, from: &String, to: &String) -> Response {
+    if !serialized_graph.is_valid() {
+        Response::GraphInvalid
     } else {
-        Response::CannotRoute
+        if let Some((route, weight)) = astar(
+            from,
+            |node| serialized_graph.successors(node),
+            |_e| 0,
+            |e| e == to,
+        ) {
+            Response::Route((route, weight))
+        } else {
+            Response::CannotRoute
+        }
     }
 }
 
@@ -148,8 +188,7 @@ fn main() -> Result<()> {
 
     /* Perform routing. */
 
-    let (graph, from, to) = construct_graph(&graph.edges, &challenge.from, &challenge.to);
-    let route = calculate_route(&graph, from, to);
+    let route = calculate_route(&graph, &challenge.source(), &challenge.sink());
 
     /* Serialize and write the result back. */
 
