@@ -1,0 +1,16 @@
+[package]
+name = "test-program"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "A simple test program for demonstrating how to deploy computations on Veracruz."
+
+[features]
+std = []
+
+[dependencies]
+anyhow = "1.0.41"
+pinecone = "0.2"
+petgraph = "0.5.1"
+serde = { version = "1.0.97", features = ["derive"] }
+
