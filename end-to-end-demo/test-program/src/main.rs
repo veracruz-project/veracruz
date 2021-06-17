@@ -31,13 +31,13 @@ use std::{
 
 /// Path in the Veracruz Virtual File System (VFS) where the serialized input
 /// graph is stored.
-const GRAPH_INPUT_PATH: &'static str = "input-graph.dat";
+const GRAPH_INPUT_PATH: &'static str = "/input-graph.dat";
 /// Path in the Veracruz Virtual File System (VFS) where the serialized routing
 /// challenge is stored.
-const CHALLENGE_INPUT_PATH: &'static str = "challenge-input.dat";
+const CHALLENGE_INPUT_PATH: &'static str = "/input-challenge.dat";
 /// Path in the Veracruz Virtual File System (VFS) where the serialized output
 /// route will be stored.
-const RESPONSE_OUTPUT_PATH: &'static str = "response-output.dat";
+const RESPONSE_OUTPUT_PATH: &'static str = "/output-response.dat";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Input and output conventions.
@@ -46,7 +46,7 @@ const RESPONSE_OUTPUT_PATH: &'static str = "response-output.dat";
 /// The input graph is provided to us as a serialized (in Pinecone format)
 /// struct capturing the structure of a directed weighted graph.
 #[derive(Deserialize)]
-struct SerializedGraph {
+struct Graph {
     /// The nodes of the graph.
     nodes: HashSet<String>,
     /// A map from nodes to a list of the node's successor nodes, along with
@@ -54,7 +54,7 @@ struct SerializedGraph {
     successors: HashMap<String, Vec<(String, i32)>>,
 }
 
-impl SerializedGraph {
+impl Graph {
     /// Returns the set of successor nodes of a particular node, if any.
     pub fn successors(&self, node: &String) -> Vec<(String, i32)> {
         if let Some(succs) = self.successors.get(node) {
@@ -135,7 +135,7 @@ enum Response {
 /// the A-Star pathfinding algorithm.  Returns `Response::Route(route, weight)`
 /// if a `route` is found with a calculated `weight`.  Otherwise, returns
 /// `Response::CannotRoute`.
-fn calculate_route(serialized_graph: &SerializedGraph, from: &String, to: &String) -> Response {
+fn calculate_route(serialized_graph: &Graph, from: &String, to: &String) -> Response {
     if !serialized_graph.is_valid() {
         Response::GraphInvalid
     } else {
@@ -170,8 +170,7 @@ fn main() -> Result<()> {
         .read_to_end(&mut buffer)
         .context("Failed to read graph input file to end.")?;
 
-    let graph: SerializedGraph =
-        from_bytes(&buffer).context("Failed to deserialize graph input file.")?;
+    let graph: Graph = from_bytes(&buffer).context("Failed to deserialize graph input file.")?;
 
     /* Read the secret challenge. */
 

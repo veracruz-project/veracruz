@@ -17,13 +17,14 @@ use actix_rt::System;
 use anyhow::Result;
 use async_std::task;
 use env_logger;
-use err_derive::Error;
 use log::{error, info};
 use ring::digest::{digest, SHA256};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use std::{
+    collections::{HashMap, HashSet},
     error::Error,
+    fmt::{Display, Error, Formatter},
     fs::File,
     io::Read,
     path::Path,
@@ -45,33 +46,133 @@ use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
 /// The path of the WASM binary that will be used for the collaborative
 /// computation.
-const WASM_BINARY_PATH: &'static str = "../test-program/target/release/test-program.wasm";
+const WASM_BINARY_PATH: &'static str =
+    "../test-program/target/wasm32-wasi/release/test-program.wasm";
 /// The filename of the WASM binary when stored in Veracruz's Virtual File
 /// System (VFS).
-const WASM_BINARY_VFS_PATH: &'static str = "test-program.wasm";
-/// The path of the input dataset that will be used as input to the
-/// collaborative computation.
-const INPUT_DATASET_PATH: &'static str = "../test-collateral/test-input-dataset.dat";
-/// The path of the input dataset when stored in Veracruz's Virtual File System
-/// (VFS).
-const INPUT_DATASET_VFS_PATH: &'static str = "test-input-dataset.dat";
+const WASM_BINARY_VFS_PATH: &'static str = "/test-program.wasm";
 /// Path of the certificate for the program provider.
 const PROGRAM_PROVIDER_CERTIFICATE_PATH: &'static str =
     "../test-collateral/program-provider-certificate";
-/// Path of the certificate for the data provider.
-const DATA_PROVIDER_CERTIFICATE_PATH: &'static str = "../test-collateral/data-provider-certificate";
+/// Path of the certificate for the graph provider.
+const GRAPH_PROVIDER_CERTIFICATE_PATH: &'static str =
+    "../test-collateral/graph-provider-certificate";
+/// Path of the certificate for the challenge provider.
+const CHALLENGE_PROVIDER_CERTIFICATE_PATH: &'static str =
+    "../test-collateral/graph-provider-certificate";
 /// Path of the public key for the program provider.
 const PROGRAM_PROVIDER_PUBLIC_KEY_PATH: &'static str =
     "../test-collateral/program-provider-key.pem";
-/// Path of the public key for the data provider.
-const DATA_PROVIDER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/data-provider-key.pem";
+/// Path of the public key for the graph provider.
+const GRAPH_PROVIDER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/graph-provider-key.pem";
+/// Path of the public key for the challenge provider.
+const CHALLENGE_PROVIDER_PUBLIC_KEY_PATH: &'static str =
+    "../test-collateral/challenge-provider-key.pem";
 /// The path of the policy file describing the roles of various principals in
 /// the computation.
-const POLICY_PATH: &'static str = "../test-collateral/test-policy.json";
+const POLICY_PATH: &'static str = "../test-collateral/policy.json";
 /// The log settings for all of the various subcomponents that are about to be
 /// exercised.
 const RUST_LOG_SETTINGS: &'static str =
     "debug,actix_server=info,actix_web=info,tokio_reactor=info,hyper=info,reqwest=info,rustls=info";
+
+////////////////////////////////////////////////////////////////////////////////
+// Input and output conventions.
+////////////////////////////////////////////////////////////////////////////////
+
+/// The input graph is provided to us as a serialized (in Pinecone format)
+/// struct capturing the structure of a directed weighted graph.
+#[derive(Serialize)]
+struct Graph {
+    /// The nodes of the graph.
+    nodes: HashSet<String>,
+    /// A map from nodes to a list of the node's successor nodes, along with
+    /// their weight.
+    successors: HashMap<String, Vec<(String, i32)>>,
+}
+
+impl Graph {
+    /// Creates a new, empty graph with no nodes and no edges.
+    #[inline]
+    pub fn new() -> Self {
+        Graph {
+            nodes: HashSet::new(),
+            successors: HashMap::new(),
+        }
+    }
+
+    /// Adds a new edge to the graph, from `source` to `sink` with a given
+    /// `weight`, updating the node set as appropriate.
+    pub fn add_edge(&mut self, source: String, weight: i32, sink: String) -> &mut Self {
+        self.nodes.insert(source.clone());
+        self.nodes.insert(sink.clone());
+
+        if let Some(mut existing_successors) = self.successors.get(&source) {
+            existing_successors.push((sink, weight));
+            self.successors.insert(source, existing_successors.clone());
+            self
+        } else {
+            self.successors.insert(source, vec![(sink, weight)]);
+            self
+        }
+    }
+}
+
+/// A "challenge" represents a graph routing problem, consisting of a node to
+/// start routing from and a node to end routing at.  We are therefore then
+/// tasked with finding a route between the two nodes in the input graph.
+#[derive(Serialize)]
+struct Challenge {
+    /// Node to start routing from.
+    source: String,
+    /// Node to end routing at.
+    sink: String,
+}
+
+impl Challenge {
+    /// Creates a new challenge from a `source` and a `sink` node.
+    #[inline]
+    pub fn new(source: String, sink: String) -> Self {
+        Self { source, sink }
+    }
+}
+
+/// A "response" represents a route through the graph, made in reponse to a
+/// `Challenge`.  A route consists of a vector of graph nodes, representing a
+/// path through the graph, from node-to-node.  Note that the routing process
+/// may fail for a variety of reasons (e.g. the nodes in the challenge may not
+/// be present in the graph, or the two nodes may be unconnected), in which case
+/// we use the `CannotRoute` constructor to signal failure.
+#[derive(Deserialize)]
+enum Response {
+    /// The graph is not valid.
+    GraphInvalid,
+    /// There is no route between the `from` and `to` nodes of the `Challenge`.
+    CannotRoute,
+    /// A route was found between the two nodes.  The route, or path, is
+    /// represented as a series of nodes through the graph and is returned along
+    /// with the total route weight.
+    Route((Vec<String>, i32)),
+}
+
+impl Display for Response {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        match self {
+            Response::CannotRoute => write!(f, "No route was found."),
+            Response::GraphInvalid => write!(f, "The input graph was invalid."),
+            Response::Route((route, cost)) => {
+                writeln!(
+                    f,
+                    "Route of length {} found with weight {}.",
+                    route.len(),
+                    cost
+                )?;
+
+                writeln!("{}", route.iter().join(" ⟶ "))
+            }
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Waiting to proceed.
