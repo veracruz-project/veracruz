@@ -9,6 +9,7 @@ description = "Client code for provisioning secrets into, and otherwise interact
 sgx = ["sgx_types", "sgx_ucrypto", "transport-protocol/sgx_attestation"]
 tz = []
 nitro = []
+icecap = []
 mock = ["mockall", "mockito"]
 
 [dependencies]

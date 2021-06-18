@@ -19,6 +19,7 @@ wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch="veracru
 wast = "=35.0.0"
 wat = "<1.0.38"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wat = "<1.0.38"
 
 [[bin]]
 name = "freestanding-execution-engine"

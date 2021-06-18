@@ -26,10 +26,15 @@ test-collateral/*.dat
 test-collateral/*.json
 test-collateral/*.wasm
 test-collateral/invalid_policy/**
+test-collateral/idash2017/
+test-collateral/macd/
+test-collateral/private-set-inter-sum/
+test-collateral/pgen
 *.vscode/
 *.orig
 veracruz-server/fuzz/*
 sdk/data-generators/**/*.dat
+sdk/data-generators/**/*.txt
 sdk/data-generators/idash2017-logistic-regression-generator/*.csv
 *.ta
 sdk/datasets/

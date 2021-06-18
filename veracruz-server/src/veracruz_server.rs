@@ -19,6 +19,8 @@ use log::debug;
 use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
+#[cfg(feature = "icecap")]
+use crate::veracruz_server_icecap::IceCapError;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -117,6 +119,9 @@ pub enum VeracruzServerError {
     #[cfg(feature = "tz")]
     #[error(display = "VeracruzServer: OpteeError: {:?}.", _0)]
     OpteeError(#[error(source)] optee_teec::Error),
+    #[cfg(feature = "icecap")]
+    #[error(display = "VeracruzServer: IceCap error: {:?}", _0)]
+    IceCapError(IceCapError),
     #[error(display = "VeracruzServer: Enclave function {} failed.", _0)]
     EnclaveCallError(&'static str),
     #[error(
@@ -166,7 +171,7 @@ pub enum VeracruzServerError {
     #[error(display = "VeracruzServer: Direct response message {}.", _0)]
     DirectMessageError(String, StatusCode),
     #[error(display = "VeracruzServer: Error message {}.", _0)]
-    DirectStrError(&'static str),
+    DirectStringError(String),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
 }

@@ -299,6 +299,8 @@ mod tests {
         let target_platform = Platform::TrustZone;
         #[cfg(feature = "nitro")]
         let target_platform = Platform::Nitro;
+        #[cfg(feature = "icecap")]
+        let target_platform = Platform::IceCap;
 
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
@@ -384,6 +386,8 @@ mod tests {
                 let target_platform = Platform::TrustZone;
                 #[cfg(feature = "nitro")]
                 let target_platform = Platform::Nitro;
+                #[cfg(feature = "icecap")]
+                let target_platform = Platform::IceCap;
 
                 clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json, &target_platform)?);
             }

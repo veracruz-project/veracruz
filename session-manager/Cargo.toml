@@ -10,6 +10,7 @@ sgx = ["veracruz-utils/sgx", "sgx_tstd", "sgx_types", "rustls/mesalock_sgx", "we
 # NOTE: turn on the `std` on ring for Error trait
 tz = ["veracruz-utils/tz", "webpki/default", "webpki-roots/default", "ring/std", "ring/non_sgx", "optee-utee", "rustls/default"]
 nitro = ["ring/std", "ring/non_sgx"]
+icecap = ["veracruz-utils/icecap", "ring/std", "ring/non_sgx"]
 std = ["veracruz-utils/std", "ring/std"]
 
 [dependencies]

@@ -12,7 +12,7 @@
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use nix;
-#[cfg(any(feature = "tz", feature = "nitro"))]
+#[cfg(any(feature = "tz", feature = "nitro", feature = "icecap"))]
 use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;

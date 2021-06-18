@@ -11,6 +11,7 @@ std = ["getrandom"]
 sgx = ["sgx_trts"]
 tz = ["optee-utee"]
 nitro = ["nsm_io", "nsm_lib"]
+icecap = []
 
 [lib]
 name = "platform_services"

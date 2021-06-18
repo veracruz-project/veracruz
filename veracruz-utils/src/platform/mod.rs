@@ -16,6 +16,8 @@
 pub mod nitro;
 #[cfg(feature = "tz")]
 pub mod tz;
+#[cfg(feature = "icecap")]
+pub mod icecap;
 
 /// A type capturing the platform the enclave is running on.
 pub enum Platform {
@@ -25,6 +27,8 @@ pub enum Platform {
     TrustZone,
     /// The enclave is running under AWS Nitro enclaves.
     Nitro,
+    /// The enclave is running under IceCap.
+    IceCap,
     /// The mock platform for unit testing (client unit tests, at the moment).
     Mock,
 }
