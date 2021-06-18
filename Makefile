@@ -59,20 +59,33 @@ sgx: sdk sgx-env
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
 # TODO add -cli to other TEEs
+# TODO should we move all CLIs into the root dir?
 sgx-cli: sgx-env
+	# build CLIs in top-level crates
 	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
 	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+	# build CLIs in the SDK/test-collateral
+	$(MAKE) -C sdk/freestanding-execution-engine
+	$(MAKE) -C sdk/wasm-checker
+	$(MAKE) -C test-collateral/generate-policy
 
 sgx-cli-install: sgx-cli
 	# install to Cargo's bin directory
 	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
 	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
+	# install CLIs in SDK/test-collateral
+	cargo install --path sdk/freestanding-execution-engine
+	cp sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
+	cargo install --path test-collateral/generate-policy
 	# create shorter names
-	ln -s $(BIN_DIR)/proxy-attestation-server $(BIN_DIR)/vc-pas
-	ln -s $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
-	ln -s $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
+	ln -sf $(BIN_DIR)/proxy-attestation-server      $(BIN_DIR)/vc-pas
+	ln -sf $(BIN_DIR)/veracruz-server               $(BIN_DIR)/vc-server
+	ln -sf $(BIN_DIR)/veracruz-client               $(BIN_DIR)/vc-client
+	ln -sf $(BIN_DIR)/freestanding-execution-engine $(BIN_DIR)/vc-fee
+	ln -sf $(BIN_DIR)/wasm-checker                  $(BIN_DIR)/vc-wc
+	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/vc-pgen
 
 nitro: sdk
 	pwd
