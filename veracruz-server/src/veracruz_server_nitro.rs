@@ -96,7 +96,7 @@ pub mod veracruz_server_nitro {
                             nre.send_buffer(&encoded_buffer)?;
                             nre.receive_buffer()?
                         },
-                        None => panic!("Crap"),
+                        None => return Err(VeracruzServerError::UninitializedEnclaveError),
                     }
                 };
                 let message: NitroRootEnclaveMessage = bincode::deserialize(&response_buffer)?;
@@ -128,7 +128,7 @@ pub mod veracruz_server_nitro {
         }
 
         fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
-            panic!("Unimplemented");
+            return Err(VeracruzServerError::UnimplementedError);
         }
 
         fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {

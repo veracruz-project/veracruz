@@ -240,6 +240,8 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                 "runtime_manager_trustzone::invoke_command GetCSR".to_string(),
             );
 
+            // We don't currently have anything to do with the challenge value
+            // (since we are faking attestation on TrustZone platforms for now)
             let mut _challenge = unsafe {
                 let mut memref = params.0.as_memref().map_err(|err|
                     print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetCSR failed to get memref from params.0:{:?}", err))

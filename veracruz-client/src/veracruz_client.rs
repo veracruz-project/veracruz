@@ -188,11 +188,12 @@ impl VeracruzClient {
         client_config.set_single_client_cert(client_cert_vec, client_priv_key);
         let proxy_service_cert = {
             let certs_pem = policy.proxy_service_cert();
-            let certs = rustls::internal::pemfile::certs(&mut certs_pem.as_bytes()).unwrap();
+            let certs = rustls::internal::pemfile::certs(&mut certs_pem.as_bytes())
+                .map_err(|_| VeracruzClientError::X509ParserError(format!("pemfile::certs found not certificates")))?;
             certs[0].clone()
         };
-        client_config.root_store.add(&proxy_service_cert).unwrap();
-        Self::set_up_client_ciphersuite(&mut client_config, &policy_ciphersuite_string).unwrap();
+        client_config.root_store.add(&proxy_service_cert)?;
+        Self::set_up_client_ciphersuite(&mut client_config, &policy_ciphersuite_string)?;
 
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&enclave_name)?;
         let session = rustls::ClientSession::new(&std::sync::Arc::new(client_config), dns_name);
@@ -322,7 +323,7 @@ impl VeracruzClient {
                 return Err(VeracruzClientError::NoPeerCertificatesError);
             },
             Some(certs) => {
-                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref()).unwrap();
+                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
                 static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
@@ -332,7 +333,7 @@ impl VeracruzClient {
                         return Err(VeracruzClientError::RuntimeHashExtensionMissingError);
                     },
                     Some(data) => {
-                        let extension_data = data.read_all(VeracruzClientError::UnableToReadEerror, |input| {
+                        let extension_data = data.read_all(VeracruzClientError::UnableToReadError, |input| {
                             Ok(input.read_bytes_to_end())
                         })?;
                         match self.compare_runtime_hash(extension_data.as_slice_less_safe()) {

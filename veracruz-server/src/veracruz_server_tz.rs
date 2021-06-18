@@ -48,7 +48,6 @@ pub mod veracruz_server_tz {
             if !TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.load(Ordering::SeqCst) {
                 let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
 
-
                 let runtime_manager_hash = {
                     match policy.runtime_manager_hash(&Platform::TrustZone) {
                         Ok(hash) => hash,
@@ -303,7 +302,7 @@ pub mod veracruz_server_tz {
                     .invoke_command(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
             }
             let (challenge, device_id) =
-                    VeracruzServerTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
+                VeracruzServerTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
 
             let p0 = ParamValue::new(device_id.try_into()?, 0, ParamType::ValueInout);
             let p1 = ParamTmpRef::new_input(&challenge);

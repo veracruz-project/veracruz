@@ -205,7 +205,7 @@ fn native_attestation(
 /// Send the native (AWS Nitro) attestation token to the proxy attestation server
 fn post_native_attestation_token(
     proxy_attestation_server_url: &str,
-    att_doc: &Vec<u8>,
+    att_doc: &[u8],
     device_id: i32,
 ) -> Result<(Vec<u8>, Vec<u8>), NitroServerError> {
     let serialized_nitro_attestation_doc_request =

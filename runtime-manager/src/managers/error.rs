@@ -17,7 +17,7 @@ use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
 #[cfg(feature = "nitro")]
-use veracruz_utils::{platform::nitro::nitro::NitroRootEnclaveMessage, io::error::SocketError};
+use veracruz_utils::{csr::CertError, platform::nitro::nitro::NitroRootEnclaveMessage, io::error::SocketError};
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {
@@ -76,6 +76,8 @@ pub enum RuntimeManagerError {
     DataWrongSizeForField(std::string::String, usize, usize),
     #[error(display = "RuntimeManager: RingKeyRejected error:{:?}", _0)]
     RingKeyRejected(ring::error::KeyRejected),
+    #[error(display = "RuntimeManager: Certificate error:{:?}", _0)]
+    CertError(CertError),
 }
 
 impl<T> From<PoisonError<T>> for RuntimeManagerError {

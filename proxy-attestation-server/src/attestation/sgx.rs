@@ -224,8 +224,10 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
                     println!("proxy-attestation-server::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                     err
                 })?;
+            // we are calling remove because after this, the context will no
+            // longer be needed
             let context = ac_hash
-                .get(&device_id)
+                .remove(&device_id)
                 .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
                     println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
@@ -330,7 +332,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             // TODO: Even if this is true, does this eman that they are from the same enclave?
             // Or could they be different enclaves running the same firmware?
             // What is the consequence if they are?
-            println!("msg3 and collateral_quote came from different system");
+            println!("msg3 and collateral_quote came from different systems");
             return Err(ProxyAttestationServerError::MismatchError {
                 variable: "function msg3 msg3_quote.report_body.mr_enclave.m",
                 expected: collateral_quote.report_body.mr_enclave.m.to_vec(),
@@ -347,15 +349,8 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         
         let response_b64 = base64::encode(&response_bytes);
 
-        // clean up the Attestation Context by removing this context
-        {
-            let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
-            ac_hash.remove(&device_id);
-        }
         return Ok(response_b64);
     }
-
-    //Ok("All's well that ends well".to_string())
 }
 
 fn generate_sgx_symmetric_keys(

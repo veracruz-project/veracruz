@@ -92,7 +92,7 @@ pub enum VeracruzClientError {
     #[error(display = "VeracruzClient: Direct message: {}.", _0)]
     DirectMessage(String),
     #[error(display = "VeracruzClient: Unable to read")]
-    UnableToReadEerror,
+    UnableToReadError,
     #[error(display = "VeracruzClient: No match found for runtime isolate hash")]
     NoMatchingRuntimeIsolateHash,
 }

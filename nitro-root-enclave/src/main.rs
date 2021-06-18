@@ -151,10 +151,10 @@ fn native_attestation(challenge: &[u8], device_id: i32) -> Result<(Vec<u8>, Vec<
     return Ok((att_doc, csr.clone()));
 }
 
-fn set_cert_chain(re_cert: Vec<u8>, ca_cert: Vec<u8>) -> Result<(), String> {
+fn set_cert_chain(re_cert: &[u8], ca_cert: &[u8]) -> Result<(), String> {
     let mut cc_guard = CERT_CHAIN.lock()
         .map_err(|err| format!("nitro-root-enclave:set_cert_chain failed to obtain lock on CERT_CHAIN:{:?}", err))?;
-    *cc_guard = Some((re_cert, ca_cert));
+    *cc_guard = Some((re_cert.to_vec(), ca_cert.to_vec()));
     return Ok(());
 }
 
@@ -185,6 +185,8 @@ fn proxy_attestation(
             return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
         },
     };
+    // The document.nonce value is optional for Nitro Enclaves in general, but
+    // required by us
     let received_challenge = match document.nonce {
         Some(data) => data,
         None => {
@@ -304,7 +306,7 @@ fn main() -> Result<(), String> {
                 NitroRootEnclaveMessage::TokenData(proxy_token, csr)
             }
             NitroRootEnclaveMessage::SetCertChain(re_cert, ca_cert) => {
-                set_cert_chain(re_cert, ca_cert)?;
+                set_cert_chain(&re_cert, &ca_cert)?;
                 // If we got thhis far, we have succeeded. Return a success message
                 NitroRootEnclaveMessage::Success
             }

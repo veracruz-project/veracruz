@@ -122,6 +122,7 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
+    // TODO: Make this configurable
     let expiry =openssl::asn1::Asn1Time::days_from_now(1)
                     .map_err(|err| {
                         println!("proxy-attestation-server::attestation::convert_csr_to_certificate days_from_now failed:{:?}", err);
@@ -133,6 +134,7 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
+    // TODO: Do we want to manage serial numbers? Right now, they are all the same
     let serial_number = {
         let sn_bignum = openssl::bn::BigNum::from_u32(23)
             .map_err(|err| {
