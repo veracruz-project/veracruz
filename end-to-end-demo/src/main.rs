@@ -401,7 +401,8 @@ fn main() -> anyhow::Result<()> {
         });
     });
 
-    sleep(Duration::from_secs(2));
+
+    sleep(Duration::from_secs(5));
 
     info!(
         "Veracruz Proxy Attestation Server now initialized (at {}).",
@@ -428,7 +429,7 @@ fn main() -> anyhow::Result<()> {
         });
     });
 
-    sleep(Duration::from_secs(2));
+    sleep(Duration::from_secs(5));
 
     info!("Veracruz Server now initialized.");
 

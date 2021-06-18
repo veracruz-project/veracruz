@@ -3,7 +3,6 @@ name = "end-to-end-demo"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
-build = "build.rs"
 description = "A simple end-to-end demo of Veracruz, showing how to develop and deploy a computation with the framework."
 
 [features]

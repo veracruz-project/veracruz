@@ -68,7 +68,6 @@
   ],
   "proxy_attestation_server_url": "127.0.0.1:3010",
   "runtime_manager_hash_nitro": null,
-  "runtime_manager_hash_sgx": "8af961edea7427c7d652202256ccc91ad7c972770b07f8f433fb58e5a129a278",
-  "runtime_manager_hash_tz": "8af961edea7427c7d652202256ccc91ad7c972770b07f8f433fb58e5a129a278",
+  "runtime_manager_hash_sgx": "97e4b9f11dfe23745eafba11f03985e018d8c500510e526ab66b6e11753838b8",
   "veracruz_server_url": "127.0.0.1:3019"
 }
