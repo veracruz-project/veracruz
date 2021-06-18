@@ -22,6 +22,7 @@ OPENSSL_INCLUDE_DIR ?= /usr/include/aarch64-linux-gnu
 OPENSSL_LIB_DIR ?= /usr/lib/aarch64-linux-gnu
 TRUSTZONE_C_INCLUDE_PATH ?= /usr/include/aarch64-linux-gnu:/usr/include
 NITRO_RUST_FLAG ?= ""
+BIN_DIR ?= /usr/local/cargo/bin
  
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
@@ -52,23 +53,26 @@ nitro-test-collateral:
 	TEE=nitro $(MAKE) -C test-collateral
 # Compile for sgx
 # offset the CC OPENSSL_DIR, which might be used in compiling trustzone
-sgx: sdk sgx-enclaves sgx-env
-
-sgx-enclaves: sgx-env
+sgx: sdk sgx-env
 	cd runtime-manager-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
-sgx-cli: sgx-enclaves sgx-env
-	mkdir -p bin
-	# TODO do we really need SGX flag for tabasco?
-	cd tabasco-cli && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx
-	cd sinaloa-cli && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx
-	cd durango-cli && cargo build
-	cp tabasco-cli/target/debug/tabasco bin/tabasco
-	# TODO remove relative path to enclave .so in Sinaloa?
-	cp sinaloa-cli/target/debug/sinaloa bin/sinaloa
-	cp durango-cli/target/debug/durango bin/durango
+# TODO add -cli to other TEEs
+sgx-cli: sgx-env
+	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+
+sgx-cli-install: sgx-cli
+	# install to Cargo's bin directory
+	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
+	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
+	# create shorter names
+	ln -s $(BIN_DIR)/proxy-attestation-server $(BIN_DIR)/vc-pas
+	ln -s $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
+	ln -s $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
 
 nitro: sdk
 	pwd
@@ -206,9 +210,9 @@ clean:
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
-	cd tabasco-cli && cargo clean
-	cd sinaloa-cli && cargo clean
-	cd durango-cli && cargo clean
+	cd proxy-attestation-server-cli && cargo clean
+	cd veracruz-server-cli && cargo clean
+	cd veracruz-client-cli && cargo clean
 	rm -rf bin
 
 # NOTE: this target deletes ALL cargo.lock.
@@ -231,6 +235,6 @@ fmt:
 	cd trustzone-root-enclave && cargo fmt
 	cd proxy-attestation-server && cargo fmt
 	$(MAKE) -C sdk fmt
-	cd tabasco-cli && cargo fmt
-	cd sinaloa-cli && cargo fmt
-	cd durango-cli && cargo fmt
+	cd proxy-attestation-server-cli && cargo fmt
+	cd veracruz-server-cli && cargo fmt
+	cd veracruz-client-cli && cargo fmt

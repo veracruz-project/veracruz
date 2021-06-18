@@ -79,11 +79,11 @@ fn main() {
     let mut sys = actix_rt::System::new("Tabasco Server");
 
     // create Tabasco instance
-    let tabasco_server = match proxy_attestation_server::server::server(
+    let proxy_attestation_server = match proxy_attestation_server::server::server(
         policy.proxy_attestation_server_url().clone(),
         opt.debug
     ) {
-        Ok(tabasco_server) => tabasco_server,
+        Ok(proxy_attestation_server) => proxy_attestation_server,
         Err(err) => {
             error!("{}", err);
             process::exit(1);
@@ -91,7 +91,7 @@ fn main() {
     };
 
     info!("Tabasco running on {}", policy.proxy_attestation_server_url());
-    match sys.block_on(tabasco_server) {
+    match sys.block_on(proxy_attestation_server) {
         Ok(()) => {}
         Err(err) => {
             error!("{}", err);

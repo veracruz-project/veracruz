@@ -65,8 +65,8 @@ fn main() {
     let mut sys = actix_rt::System::new("Sinaloa Server");
 
     // create Sinaloa server instance
-    let sinaloa_server = match veracruz_server::server::server(policy_path) {
-        Ok(sinaloa_server) => sinaloa_server,
+    let veracruz_server = match veracruz_server::server::server(policy_path) {
+        Ok(veracruz_server) => veracruz_server,
         Err(err) => {
             error!("{}", err);
             process::exit(1);
@@ -76,7 +76,7 @@ fn main() {
     // TODO support restarting in a loop?
     // TODO there's an unwrap panic that happens if we ctrl-C, need to fix
     info!("Sinaloa running on {}", policy.veracruz_server_url());
-    match sys.block_on(sinaloa_server) {
+    match sys.block_on(veracruz_server) {
         Ok(_) => {},
         Err(err) => {
             error!("{}", err);
