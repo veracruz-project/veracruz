@@ -430,6 +430,10 @@ fn main() -> anyhow::Result<()> {
 
     sleep(Duration::from_secs(2));
 
+    info!("Veracruz Server now initialized.");
+
+    wait_for_user();
+
     /* Describe the two clients that will be connecting to the server in the
      * computation.
      */
