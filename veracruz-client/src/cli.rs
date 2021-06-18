@@ -188,14 +188,14 @@ fn main() {
 
     // create Durango instance
     // TODO allow AsRef<VeracruzPolicy>?
-    let mut durango = match VeracruzClient::with_policy_and_hash(
+    let mut veracruz_client = match VeracruzClient::with_policy_and_hash(
         opt.identity,
         opt.key,
         policy.clone(),
         policy_hash,
         &opt.target,
     ) {
-        Ok(durango) => durango,
+        Ok(veracruz_client) => veracruz_client,
         Err(err) => {
             error!("{}", err);
             process::exit(1);
@@ -228,7 +228,7 @@ fn main() {
             }
         };
 
-        match durango.send_program(&program_name, &program_data) {
+        match veracruz_client.send_program(&program_name, &program_data) {
             Ok(()) => {}
             Err(err) => {
                 error!("{}", err);
@@ -262,7 +262,7 @@ fn main() {
             }
         };
 
-        match durango.send_data(data_name, &data_data) {
+        match veracruz_client.send_data(data_name, &data_data) {
             Ok(()) => {}
             Err(err) => {
                 error!("{}", err);
@@ -277,7 +277,7 @@ fn main() {
     for (output_name, output_path) in opt.output.iter().flatten() {
         did_something = true;
 
-        let results = match durango.get_results(output_name) {
+        let results = match veracruz_client.get_results(output_name) {
             Ok(results) => results,
             Err(err) => {
                 error!("{}", err);
@@ -311,7 +311,7 @@ fn main() {
     if (!opt.output.is_empty() && !opt.no_shutdown) || opt.shutdown {
         did_something = true;
 
-        match durango.request_shutdown() {
+        match veracruz_client.request_shutdown() {
             Ok(()) => {}
             Err(err) => {
                 error!("{}", err);
