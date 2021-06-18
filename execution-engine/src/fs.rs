@@ -105,7 +105,7 @@ impl FileSystem {
     /// The root directory name. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY: &'static str = "/";
     /// The root directory inode. It will be pre-opened for any wasm program.
-    pub const ROOT_DIRECTORY_INODE: Inode = Inode(2);
+    pub const ROOT_DIRECTORY_INODE: Inode = Inode(3);
     /// The root directory file descriptor. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
@@ -157,13 +157,14 @@ impl FileSystem {
 
         // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
         let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
+        let root_inode_number = Self::ROOT_DIRECTORY_INODE.0;
         for (index, path) in dir_paths.iter().enumerate() {
-            let index = index as u32;
-            let new_fd = Fd(index + root_fd_number + 1);
-            self.install_dir(path, Self::ROOT_DIRECTORY_INODE);
+            let new_inode = Inode(index as u64 + root_inode_number + 1);
+            let new_fd = Fd(index as u32 + root_fd_number + 1);
+            self.install_dir(path, new_inode);
             self.install_fd(
                 new_fd,
-                Self::ROOT_DIRECTORY_INODE,
+                new_inode,
                 &Self::DEFAULT_RIGHTS,
                 &Self::DEFAULT_RIGHTS,
             );
