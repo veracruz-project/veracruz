@@ -4,6 +4,27 @@
 //! framework.  Demonstrates provisioning secrets into the enclave via a secure
 //! TLS link.
 //!
+//! We use an oblivious routing example, here, wherein a user wishes to query a
+//! map (expressed as a graph of locations connected by roads, along with their
+//! approximate distance in miles) without the mapping service knowing where
+//! they are starting from, or where they are going.  As a result, there are
+//! two principals involved in the computation:
+//!
+//! 1. The mapping service, which produces the connectivity map and all of its
+//!    metadata, which is going to be queried, and also supplies the program
+//!    that will actually perform the routing (see the contents of
+//!    `test-program`).
+//! 2. The user, who issues a "routing challenge" to the mapping service asking
+//!    it to compute a route from location `A` to location `B`.  Note that in
+//!    this computation, it is the user that will be able to retrieve the result
+//!    with all routing shielded from the routing service itself by the enclave.
+//!
+//! In a real deployment, these two principals will obviously distinct,
+//! possessing their own machines through which they interact with the Veracruz
+//! runtime, though here for the purposes of demonstrating Veracruz we use a
+//! single thread of execution with two different clients to represent the two
+//! principals.
+//!
 //! # Authors
 //!
 //! The Veracruz Development Team.
@@ -18,13 +39,14 @@ use anyhow::Result;
 use async_std::task;
 use env_logger;
 use log::{error, info};
+use rand::seq::SliceRandom;
 use ring::digest::{digest, SHA256};
 use serde::{Deserialize, Serialize};
 
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    fmt::{Display, Error, Formatter},
+    fmt::{Display, Error as FormatError, Formatter},
     fs::File,
     io::Read,
     path::Path,
@@ -32,7 +54,7 @@ use std::{
     time::Duration,
 };
 
-use pinecone::from_bytes;
+use pinecone::{from_bytes, to_vec};
 use proxy_attestation_server;
 use std::io::stdin;
 use std::process::exit;
@@ -44,33 +66,33 @@ use veracruz_utils::{platform::Platform, policy::policy::Policy};
 // Constants.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The path of the WASM binary that will be used for the collaborative
-/// computation.
+/// The path of the WASM routing program supplied by the mapping service that
+/// will be used for the collaborative computation.
 const WASM_BINARY_PATH: &'static str =
     "../test-program/target/wasm32-wasi/release/test-program.wasm";
 /// The filename of the WASM binary when stored in Veracruz's Virtual File
 /// System (VFS).
 const WASM_BINARY_VFS_PATH: &'static str = "/test-program.wasm";
+/// The filename of the routing graph when stored in Veracruz's Virtual File
+/// System (VFS).
+const ROUTING_GRAPH_VFS_PATH: &'static str = "/routing-graph";
+/// The filename of the routing challenge when stored in Veracruz's Virtual File
+/// System (VFS).
+const ROUTING_CHALLENGE_VFS_PATH: &'static str = "/routing-challenge";
 /// Path of the certificate for the program provider.
-const PROGRAM_PROVIDER_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/program-provider-certificate";
-/// Path of the certificate for the graph provider.
-const GRAPH_PROVIDER_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/graph-provider-certificate";
-/// Path of the certificate for the challenge provider.
-const CHALLENGE_PROVIDER_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/graph-provider-certificate";
-/// Path of the public key for the program provider.
-const PROGRAM_PROVIDER_PUBLIC_KEY_PATH: &'static str =
-    "../test-collateral/program-provider-key.pem";
-/// Path of the public key for the graph provider.
-const GRAPH_PROVIDER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/graph-provider-key.pem";
-/// Path of the public key for the challenge provider.
-const CHALLENGE_PROVIDER_PUBLIC_KEY_PATH: &'static str =
-    "../test-collateral/challenge-provider-key.pem";
+const MAPPING_SERVICE_CERTIFICATE_PATH: &'static str =
+    "../test-collateral/mapping-service-certificate";
+/// Path of the certificate for the mapping user/challenge provider.
+const MAPPING_USER_PROVIDER_CERTIFICATE_PATH: &'static str =
+    "../test-collateral/mapping-user-certificate";
+/// Path of the public key for the mapping service.
+const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str =
+    "../test-collateral/mapping-service-public-key.pem";
+/// Path of the public key for the mapping user/challenge provider.
+const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/mapping-user-public-key.pem";
 /// The path of the policy file describing the roles of various principals in
 /// the computation.
-const POLICY_PATH: &'static str = "../test-collateral/policy.json";
+const POLICY_PATH: &'static str = "../test-collateral/oblivious-routing-policy.json";
 /// The log settings for all of the various subcomponents that are about to be
 /// exercised.
 const RUST_LOG_SETTINGS: &'static str =
@@ -81,14 +103,19 @@ const RUST_LOG_SETTINGS: &'static str =
 ////////////////////////////////////////////////////////////////////////////////
 
 /// The input graph is provided to us as a serialized (in Pinecone format)
-/// struct capturing the structure of a directed weighted graph.
+/// struct capturing the structure of a directed weighted graph.  Note that in a
+/// real routing scenario this graph will need to be much more complex: we don't
+/// even include road names here, for example, we just note whether two locations
+/// are connected or not.  In the real world, locations may be connected by
+/// multiple different routes, naturally.  A more realistic example of oblivious
+/// routing could use OpenStreetMap data, for example.
 #[derive(Serialize)]
 struct Graph {
     /// The nodes of the graph.
     nodes: HashSet<String>,
     /// A map from nodes to a list of the node's successor nodes, along with
     /// their weight.
-    successors: HashMap<String, Vec<(String, i32)>>,
+    successors: HashMap<String, Vec<(String, f32)>>,
 }
 
 impl Graph {
@@ -101,26 +128,49 @@ impl Graph {
         }
     }
 
-    /// Adds a new edge to the graph, from `source` to `sink` with a given
-    /// `weight`, updating the node set as appropriate.
-    pub fn add_edge(&mut self, source: String, weight: i32, sink: String) -> &mut Self {
-        self.nodes.insert(source.clone());
-        self.nodes.insert(sink.clone());
+    /// Adds a new directed edge to the graph, from `source` to `sink` with a
+    /// given `weight`, updating the node set as appropriate.
+    pub fn add_directed_edge<T, U>(&mut self, source: T, weight: U, sink: T) -> &mut Self
+    where
+        T: Into<String> + Clone,
+        U: Into<f32>,
+    {
+        self.nodes.insert(source.clone().into());
+        self.nodes.insert(sink.clone().into());
 
         if let Some(mut existing_successors) = self.successors.get(&source) {
-            existing_successors.push((sink, weight));
-            self.successors.insert(source, existing_successors.clone());
+            existing_successors.push((sink.into(), weight.into()));
+            self.successors
+                .insert(source.into(), existing_successors.clone());
             self
         } else {
-            self.successors.insert(source, vec![(sink, weight)]);
+            self.successors
+                .insert(source.into(), vec![(sink.into(), weight.into())]);
             self
         }
+    }
+
+    /// Adds a new undirected edge to the graph (or rather, two directed edges
+    /// pointing in both directions), from `first_node` to `second_node` with a
+    /// given `weight`, updating the node set as appropriate.
+    pub fn add_undirected_edge<T, U>(
+        &mut self,
+        first_node: T,
+        weight: U,
+        second_node: T,
+    ) -> &mut Self
+    where
+        T: Into<String> + Clone,
+        U: Into<f32> + Clone,
+    {
+        self.add_directed_edge(first_node.clone(), weight.clone(), second_node.clone())
+            .add_directed_edge(second_node, weight, first_node)
     }
 }
 
 /// A "challenge" represents a graph routing problem, consisting of a node to
-/// start routing from and a node to end routing at.  We are therefore then
-/// tasked with finding a route between the two nodes in the input graph.
+/// start routing from and a node to end routing at.  The routing service is
+/// then tasked with finding a route between the two nodes in the input graph.
 #[derive(Serialize)]
 struct Challenge {
     /// Node to start routing from.
@@ -132,7 +182,10 @@ struct Challenge {
 impl Challenge {
     /// Creates a new challenge from a `source` and a `sink` node.
     #[inline]
-    pub fn new(source: String, sink: String) -> Self {
+    pub fn new<T>(source: T, sink: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self { source, sink }
     }
 }
@@ -155,6 +208,7 @@ enum Response {
     Route((Vec<String>, i32)),
 }
 
+/// Pretty-printing for `Response` types.
 impl Display for Response {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
@@ -175,11 +229,84 @@ impl Display for Response {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Input data.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Generates a graph of locations around South Cambridgeshire and their
+/// approximate distances (in miles) from each other.  This graph will be used
+/// as one of the inputs to the collaborative computation.
+fn generate_graph() -> Graph {
+    let mut graph = Graph::new();
+
+    graph
+        .add_undirected_edge("Cottenham", 0.5, "Rampton")
+        .add_undirected_edge("Cottenham", 3, "Wilburton")
+        .add_undirected_edge("Cottenham", 2, "Landbeach")
+        .add_undirected_edge("Cottenham", 2, "Histon")
+        .add_undirected_edge("Cottenham", 3, "Oakington")
+        .add_undirected_edge("Rampton", 1, "Willingham")
+        .add_undirected_edge("Histon", 0.5, "Impington")
+        .add_undirected_edge("Histon", 0.5, "Oakington")
+        .add_undirected_edge("Histon", 0.5, "Girton")
+        .add_undirected_edge("Impington", 1, "Milton")
+        .add_undirected_edge("Milton", 0.7, "Landbeach")
+        .add_undirected_edge("Milton", 0.4, "Clayhithe")
+        .add_undirected_edge("Clayhithe", 0.4, "Horningsea")
+        .add_undirected_edge("Horningsea", 0.5, "Fen Ditton")
+        .add_undirected_edge("Willingham", 0.5, "Over")
+        .add_undirected_edge("Willingham", 0.5, "Longstanton")
+        .add_undirected_edge("Willingham", 1.1, "Earith")
+        .add_undirected_edge("Earith", 3, "Haddenham");
+
+    graph
+}
+
+/// Creates a new routing challenge by randomly choosing a source and a target
+/// destination from the list of locations present in the graph.  This challenge
+/// will be used as one of the inputs to the collaborative computation.
+#[inline]
+fn generate_challenge() -> Challenge {
+    let locations = vec![
+        "Clayhithe",
+        "Cottenham",
+        "Earith",
+        "Haddenham",
+        "Fen Ditton",
+        "Girton",
+        "Histon",
+        "Impington",
+        "Landbeach",
+        "Longstanton",
+        "Milton",
+        "Oakington",
+        "Over",
+        "Rampton",
+        "Wilburton",
+        "Willingham",
+    ];
+
+    let first_location = locations
+        .choose(&mut rand::thread_rng())
+        .expect("Random location could not be chosen (locations list may be empty).");
+    let second_location = locations
+        .choose(&mut rand::thread_rng())
+        .expect("Random location could not be chosen (locations list may be empty).");
+
+    info!(
+        "Chosen locations {} to {}.",
+        first_location, second_location
+    );
+
+    Challenge::new(first_location, second_location)
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Waiting to proceed.
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Prints a prompt to `stdout` asking for the user to provide input, then
-/// blocks waiting for input.
+/// blocks waiting for input.  This is just a simple utility function to help
+/// "show off" the different stages of the Veracruz provisioning flow.
 fn wait_for_user() {
     println!(">>> Press any key to continue...");
 
@@ -200,7 +327,10 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
     std::env::set_var("RUST_LOG", RUST_LOG_SETTINGS);
 
-    info!("Logging initialized (with: {}).", RUST_LOG_SETTINGS);
+    info!(
+        "Logging initialized (with settings: {}).",
+        RUST_LOG_SETTINGS
+    );
 
     wait_for_user();
 
@@ -289,20 +419,20 @@ fn main() -> anyhow::Result<()> {
      * computation.
      */
 
-    let mut program_provider_client = VeracruzClient::new(
-        PROGRAM_PROVIDER_CERTIFICATE_PATH,
-        PROGRAM_PROVIDER_PUBLIC_KEY_PATH,
+    let mut mapping_service_client = VeracruzClient::new(
+        MAPPING_SERVICE_CERTIFICATE_PATH,
+        MAPPING_SERVICE_PUBLIC_KEY_PATH,
         &policy_content,
         &Platform::SGX,
     )
     .map_err(|e| {
         error!(
-            "Failed to describe program provider principal.  Error produced: {:?}.",
+            "Failed to describe mapping service client.  Error produced: {:?}.",
             e
         );
     })?;
 
-    let mut data_provider_client = VeracruzClient::new(
+    let mut mapping_user_client = VeracruzClient::new(
         DATA_PROVIDER_CERTIFICATE_PATH,
         DATA_PROVIDER_PUBLIC_KEY_PATH,
         &policy_content,
@@ -310,12 +440,12 @@ fn main() -> anyhow::Result<()> {
     )
     .map_err(|e| {
         error!(
-            "Failed to describe data provider principal.  Error produced: {:?}.",
+            "Failed to describe mapping user client.  Error produced: {:?}.",
             e
         );
     })?;
 
-    info!("Data provider and program provider clients created.");
+    info!("Mapping service and user clients created.");
 
     wait_for_user();
 
@@ -353,11 +483,18 @@ fn main() -> anyhow::Result<()> {
 
     wait_for_user();
 
+    /* Generate and serialize the routing map. */
+
+    let graph = generate_graph();
+    let serialized_graph = to_vec(&graph).map_err(|e| {
+        error!("Failed to serialize routing map.  Error produced: {}.", e);
+    })?;
+
     /* Provision the program, via the program provider client.  Note that this
      * implicitly checks that the policy in force is the one that is expected.
      */
 
-    program_provider_client
+    mapping_service_client
         .send_program(&WASM_BINARY_VFS_PATH, &wasm_binary_content)
         .map_err(|e| {
             error!(
@@ -366,7 +503,13 @@ fn main() -> anyhow::Result<()> {
             );
         })?;
 
-    program_provider_client.request_shutdown().map_err(|e| {
+    mapping_service_client
+        .send_data(&ROUTING_GRAPH_VFS_PATH, &serialized_graph)
+        .map_err(|e| {
+            error!("Failed to provision routing map.  Error produced: {:?}.", e);
+        })?;
+
+    mapping_service_client.request_shutdown().map_err(|e| {
         error!(
             "Failed to shutdown program provider client.  Error produced: {:?}.",
             e
@@ -374,34 +517,26 @@ fn main() -> anyhow::Result<()> {
     })?;
 
     info!(
-        "WASM program ({}) provisioned successfully.  Now stored in Veracruz VFS (at {}).",
-        WASM_BINARY_PATH, WASM_BINARY_VFS_PATH
+        "WASM program ({}) and routing map provisioned successfully.  Now stored in Veracruz VFS (at {} and {}).",
+        WASM_BINARY_PATH, WASM_BINARY_VFS_PATH, ROUTING_GRAPH_VFS_PATH
     );
 
     wait_for_user();
 
-    /* Read the data input in preparation of provisioning. */
+    /* Generate and serialize a routing challenge. */
 
-    let mut data_input_file = File::open(&INPUT_DATASET_PATH).map_err(|e| {
+    let challenge = generate_challenge();
+    let serialized_challenge = to_vec(&challenge).map_err(|e| {
         error!(
-            "Failed to open data input file ({}).  Error produced: {}.",
-            INPUT_DATASET_PATH, e
+            "Failed to serialize routing challenge.  Error produced: {:?}.",
+            e
         );
-        e
     })?;
 
-    let mut data_input_content = Vec::new();
-    data_input_file
-        .read_to_end(&mut data_input_content)
-        .map_err(|e| {
-            error!(
-                "Failed to read content of data input file ({}).  Error produced: {}.",
-                INPUT_DATASET_PATH, e
-            );
-            e
-        })?;
-
-    info!("Data input ({}) read successfully.", INPUT_DATASET_PATH);
+    info!(
+        "Requesting route from {} to {}.",
+        &challenge.source, &challenge.sink
+    );
 
     wait_for_user();
 
@@ -410,25 +545,25 @@ fn main() -> anyhow::Result<()> {
      * expected.
      */
 
-    data_provider_client
-        .send_data(INPUT_DATASET_VFS_PATH, &data_input_content)
+    mapping_user_client
+        .send_data(ROUTING_CHALLENGE_VFS_PATH, &serialized_challenge)
         .map_err(|e| {
             error!(
-                "Failed to provision data input ({}).  Error produced: {:?}.",
-                INPUT_DATASET_PATH, e
+                "Failed to provision routing challenge input.  Error produced: {:?}.",
+                e
             );
         })?;
 
     info!(
-        "Data input ({}) provisioned successfully.  Now stored in Veracruz VFS (at {}).",
-        INPUT_DATASET_PATH, INPUT_DATASET_VFS_PATH
+        "Routing challenge provisioned successfully.  Now stored in Veracruz VFS (at {}).",
+        ROUTING_CHALLENGE_VFS_PATH
     );
 
     wait_for_user();
 
-    /* Now, everything is in place to request the result. */
+    /* Now, everything is in place to request the routing result. */
 
-    let result = data_provider_client
+    let result = mapping_user_client
         .get_results(&WASM_BINARY_VFS_PATH)
         .map_err(|e| {
             error!(
@@ -443,8 +578,8 @@ fn main() -> anyhow::Result<()> {
 
     /* Now, decode the raw result into something more intelligible. */
 
-    let result: f32 = from_bytes(&result).map_err(|e| {
-        error!("Failed to decode result.  Error produced: {}.", e);
+    let result: Response = from_bytes(&result).map_err(|e| {
+        error!("Failed to decode routing response.  Error produced: {}.", e);
     })?;
 
     info!("Decoded result: {}.", result);
@@ -453,7 +588,7 @@ fn main() -> anyhow::Result<()> {
 
     /* Shutdown the data provider client gracefully. */
 
-    data_provider_client.request_shutdown().map_err(|e| {
+    mapping_user_client.request_shutdown().map_err(|e| {
         error!(
             "Failed to shutdown data input provider client.  Error produced: {:?}.",
             e
