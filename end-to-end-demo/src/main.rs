@@ -45,11 +45,9 @@ use serde::{Deserialize, Serialize};
 
 use std::{
     collections::{HashMap, HashSet},
-    error::Error,
     fmt::{Display, Error as FormatError, Formatter},
     fs::File,
     io::Read,
-    path::Path,
     thread::{sleep, spawn},
     time::Duration,
 };
@@ -83,7 +81,7 @@ const ROUTING_CHALLENGE_VFS_PATH: &'static str = "/routing-challenge";
 const MAPPING_SERVICE_CERTIFICATE_PATH: &'static str =
     "../test-collateral/mapping-service-certificate";
 /// Path of the certificate for the mapping user/challenge provider.
-const MAPPING_USER_PROVIDER_CERTIFICATE_PATH: &'static str =
+const MAPPING_USER_CERTIFICATE_PATH: &'static str =
     "../test-collateral/mapping-user-certificate";
 /// Path of the public key for the mapping service.
 const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str =
@@ -138,7 +136,7 @@ impl Graph {
         self.nodes.insert(source.clone().into());
         self.nodes.insert(sink.clone().into());
 
-        if let Some(mut existing_successors) = self.successors.get(&source) {
+        if let Some(mut existing_successors) = self.successors.get(&source.into()) {
             existing_successors.push((sink.into(), weight.into()));
             self.successors
                 .insert(source.into(), existing_successors.clone());
@@ -186,7 +184,10 @@ impl Challenge {
     where
         T: Into<String>,
     {
-        Self { source, sink }
+        Self {
+            source: source.into(),
+            sink: sink.into()
+        }
     }
 }
 
@@ -222,7 +223,7 @@ impl Display for Response {
                     cost
                 )?;
 
-                writeln!("{}", route.iter().join(" ⟶ "))
+                writeln!(f, "{}", route.join(" ⟶ "))
             }
         }
     }
@@ -287,10 +288,13 @@ fn generate_challenge() -> Challenge {
 
     let first_location = locations
         .choose(&mut rand::thread_rng())
-        .expect("Random location could not be chosen (locations list may be empty).");
+        .expect("Random location could not be chosen (locations list may be empty).")
+        .clone();
+
     let second_location = locations
         .choose(&mut rand::thread_rng())
-        .expect("Random location could not be chosen (locations list may be empty).");
+        .expect("Random location could not be chosen (locations list may be empty).")
+        .clone();
 
     info!(
         "Chosen locations {} to {}.",
@@ -360,6 +364,7 @@ fn main() -> anyhow::Result<()> {
             "Failed to parse JSON policy file ({}).  Error produced: {:?}.",
             POLICY_PATH, e
         );
+        e
     })?;
 
     info!("Policy file read ({}).", POLICY_PATH);
@@ -388,7 +393,8 @@ fn main() -> anyhow::Result<()> {
             error!(
                 "Failed to initialize Veracruz Proxy Attestation Server.  Error produced: {}.",
                 e
-            )
+            );
+            e
         });
     });
 
@@ -403,15 +409,14 @@ fn main() -> anyhow::Result<()> {
 
     /* Bring up the Veracruz server. */
 
-    let _veracruz_server_handle = veracruz_server::server::server(policy)
+    let _veracruz_server_handle = veracruz_server::server::server(POLICY_PATH)
         .map_err(|e| {
             error!(
                 "Failed to start the Veracruz Server.  Error produced: {:?}.",
                 e
             );
             e
-        })?
-        .await?;
+        })?;
 
     sleep(Duration::from_secs(2));
 
@@ -430,11 +435,12 @@ fn main() -> anyhow::Result<()> {
             "Failed to describe mapping service client.  Error produced: {:?}.",
             e
         );
+        e
     })?;
 
     let mut mapping_user_client = VeracruzClient::new(
-        DATA_PROVIDER_CERTIFICATE_PATH,
-        DATA_PROVIDER_PUBLIC_KEY_PATH,
+        MAPPING_USER_CERTIFICATE_PATH,
+        MAPPING_USER_PUBLIC_KEY_PATH,
         &policy_content,
         &Platform::SGX,
     )
@@ -443,6 +449,7 @@ fn main() -> anyhow::Result<()> {
             "Failed to describe mapping user client.  Error produced: {:?}.",
             e
         );
+        e
     })?;
 
     info!("Mapping service and user clients created.");
@@ -488,6 +495,7 @@ fn main() -> anyhow::Result<()> {
     let graph = generate_graph();
     let serialized_graph = to_vec(&graph).map_err(|e| {
         error!("Failed to serialize routing map.  Error produced: {}.", e);
+        e
     })?;
 
     /* Provision the program, via the program provider client.  Note that this
@@ -501,12 +509,14 @@ fn main() -> anyhow::Result<()> {
                 "Failed to provision WASM program ({}).  Error produced: {:?}.",
                 WASM_BINARY_PATH, e
             );
+            e
         })?;
 
     mapping_service_client
         .send_data(&ROUTING_GRAPH_VFS_PATH, &serialized_graph)
         .map_err(|e| {
             error!("Failed to provision routing map.  Error produced: {:?}.", e);
+            e
         })?;
 
     mapping_service_client.request_shutdown().map_err(|e| {
@@ -514,6 +524,7 @@ fn main() -> anyhow::Result<()> {
             "Failed to shutdown program provider client.  Error produced: {:?}.",
             e
         );
+        e
     })?;
 
     info!(
@@ -531,6 +542,7 @@ fn main() -> anyhow::Result<()> {
             "Failed to serialize routing challenge.  Error produced: {:?}.",
             e
         );
+        e
     })?;
 
     info!(
@@ -552,6 +564,7 @@ fn main() -> anyhow::Result<()> {
                 "Failed to provision routing challenge input.  Error produced: {:?}.",
                 e
             );
+            e
         })?;
 
     info!(
@@ -570,6 +583,7 @@ fn main() -> anyhow::Result<()> {
                 "Failed to retrieve result of computation.  Error produced: {:?}.",
                 e
             );
+            e
         })?;
 
     info!("Received {} bytes of result.", result.len());
@@ -580,6 +594,7 @@ fn main() -> anyhow::Result<()> {
 
     let result: Response = from_bytes(&result).map_err(|e| {
         error!("Failed to decode routing response.  Error produced: {}.", e);
+        e
     })?;
 
     info!("Decoded result: {}.", result);
@@ -593,6 +608,7 @@ fn main() -> anyhow::Result<()> {
             "Failed to shutdown data input provider client.  Error produced: {:?}.",
             e
         );
+        e
     })?;
 
     info!("All done...");
