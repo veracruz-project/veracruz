@@ -72,21 +72,21 @@ const WASM_BINARY_PATH: &'static str =
 const WASM_BINARY_VFS_PATH: &'static str = "/test-program.wasm";
 /// The filename of the routing graph when stored in Veracruz's Virtual File
 /// System (VFS).
-const ROUTING_GRAPH_VFS_PATH: &'static str = "/routing-graph";
+const ROUTING_GRAPH_VFS_PATH: &'static str = "/routing-graph.dat";
 /// The filename of the routing challenge when stored in Veracruz's Virtual File
 /// System (VFS).
-const ROUTING_CHALLENGE_VFS_PATH: &'static str = "/routing-challenge";
+const ROUTING_CHALLENGE_VFS_PATH: &'static str = "/routing-challenge.dat";
 /// Path of the certificate for the program provider.
 const MAPPING_SERVICE_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/mapping-service-certificate";
+    "../test-collateral/mapping-service-certificate.pem";
 /// Path of the certificate for the mapping user/challenge provider.
 const MAPPING_USER_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/mapping-user-certificate";
+    "../test-collateral/mapping-user-certificate.pem";
 /// Path of the public key for the mapping service.
 const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str =
-    "../test-collateral/mapping-service-public-key.pem";
+    "../test-collateral/mapping-service-key.pem";
 /// Path of the public key for the mapping user/challenge provider.
-const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/mapping-user-public-key.pem";
+const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/mapping-user-key.pem";
 /// The path of the policy file describing the roles of various principals in
 /// the computation.
 const POLICY_PATH: &'static str = "../test-collateral/oblivious-routing-policy.json";

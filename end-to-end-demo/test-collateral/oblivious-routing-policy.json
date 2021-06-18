@@ -1,0 +1,74 @@
+{
+  "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+  "debug": false,
+  "enclave_cert_expiry": {
+    "day": 26,
+    "hour": 11,
+    "minute": 8,
+    "month": 9,
+    "year": 2021
+  },
+  "execution_strategy": "Interpretation",
+  "identities": [
+    {
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUPWHS0HfecylNhpsOsGeB6PTH5bYwDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MjkwMFoXDTMwMDkxNDE5MjkwMFowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtFDp4NHy03SxEgODdTmI5bWBvjCEKUg6rU445r1A7lIMGLtWVa5aSv4WoJ7cMkzFc7iqNZ4uTOgAjsaLyBF0qFyOsiu7fO2xgIhGFUQtKwG9FxfYIoF+h61bW80fb7VBXRE6/cG1+tXfFbiMAYzUW+mLr97xbN5FHySwFTmELbl0wV4vUX9v5P4N2Hmrg35IAKNkUoRuB8tqGK03bRtG7Ui6OK4BP61JujwbbDwhtFsk6v9LduyYvLxL3DUc/xl9Uyh54VyrlIilMuXMfsIzppEhx1QtiQWQuZ26KE/t+iumfpchhR5x3IuzoxuXoc7YxXGD7hhuKyEWMaC2s1gGSQIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAIP+1j8E6kfk3w3dDCegczhiGnvRFLRoaRaldGD3Ppj8lOnjKVTfuQGjcWElrNE/Mwf4wrkYKMlksip+bu3xRxkwVX93EQn1aAZPXxSAZYTkGh4Seo5t9y9E0K4frhIcNFoDXITcF6UPck/Ehx8Rx8KXuGy8H4YfjPWjNrQMpr0wbdtrOaIksnDKsOnM2R2sr0v/6sG1Nmg5BiJl2zKRzK+arPTPTQIT4OnSz6mJzzId0tibNXfPkmdK/wWdOGB0saMtE/+M4p4xOtn9d4strrgtK3d5Cjdlv31g9uLyHHNF+SEQk+swE2tAr0EXj1245gTRMxF8R9XwOEkFIMFIl8Q==\n-----END CERTIFICATE-----",
+      "file_rights": [
+        {
+          "file_name": "test-program.wasm",
+          "rights": 533572
+        }
+      ],
+      "id": 0
+    },
+    {
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUfaXU2GiXIf2tI5+EOp7hMs74YK4wDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MzEzM1oXDTMwMDkxNDE5MzEzM1owgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuy0vUp8RWRZ4HAZjIZekZWgBFHTxJNzsa0xOLqO6Aj4lKkO6wJsRGZf6ci2n0hlQdQrmVLkgq9kgezJy8ysZuDgW0XVcZ7otqCtaC4jrDLnobtBHGqHm6Sc9qteuhZunjnVGtdXmMZwifHWV1geuLA47i/hn65tapqFdRXAeOVortMaOKTSVFP+OgSlQvuc08wMagKQ456IB352n9+cDS4nWbSowe/+ZWx/nE9eV/vZkrTQPJ7YBaloWxeDnjiC5psQJjs+X48wNtyXzv1XGdv7MwbjBGko61gzR/LCYTzvUtTEtJBcTQGg4Cp4Y7Jbr+PY47QUqgvz0Salsl7IIdwIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAkO+yW8Vumxl5ZOdgS6siJjw9r6QSolLpzZmPfRbsUa5xicEvs5WJnWSHoYTxxoy25K1wpL6OdvVZCukGcOBkHKeoJn04xlubshghCcDMTCZyvJ1OUFVLB6Db/0NvssvqhiibZu39SLeyunz9wgFxy8jQbJnCV8tN/Dsgk6tsgEn0pPEZZSSt2lkYFYN1qdGU1SqI9czTNljWK/DjFMmp4918peOcrfEfLiloGdwxSYGQP7adSD61ZjmFPo6l+05QvRSJ8ess/bCacSYWmd7c2Kgg4av34duOr4ImIjRPSzMfDSPAc0Fx/pL+cmiZOj4jK8eIIlKkyj5xtBu2VRA0gw==\n-----END CERTIFICATE-----",
+      "file_rights": [
+        {
+          "file_name": "routing-graph.dat",
+          "rights": 533572
+        }
+      ],
+      "id": 1
+    },
+    {
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUISn71GauuAIC6Q1Bs5EzOhe+bDYwDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MzAwMFoXDTMwMDkxNDE5MzAwMFowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy+Ad0OlY7stFQ9g8Ie1dLxcHUpYgd19sW+bmJNX8ahqBm/fVIT5retBAFEBJHqwkUc87E0+VfI4jGOrOYSqlo9OvTMsEv96DXjNVUr5vzQhuvvNF99AnvrfbYi//AqquYQgqG9ShrbTf6eU67+oUtfM3OjeLiSvj3qg508RvfFp8DIPVqSmuA67ZxiSvNkbSRa0pZaIi185o2XR4YH4JSEX158yZx3rfGWp+tP2yUnKfV6Ps4T5NAodomhdABED1Sbi15sOkXkFPan6TUpClttNKqbJb5m06JFiPQPGR+5p1LPCjwN/f1lG1zfH7XpuqtgVYzuGWzrm2Rm/+9+r8awIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAU75tk4OQC94CMmu6mw4UG5pOBwoqt79/V8GUAXuSo17tj1Cz/sFmVgCwzc/TwQV5rPoWEYb0DaaynK0VtkyFWenLr5RY51GBkvOsfksias5CHEYTaPk+BOTDiuC6yXJsHlcNf71QzHTnaRcS+bQtgW0Jmuyt0y1WifiTDxFelDMHBi4FKmBUp9m2Kae4hel/I2IeyURh+eQxZZGlLmzTds/yKgtNj3PcN5kBtwyybi9y/JYRKEAuNIZ5TeGnFoP1V6OR5MgNYSlV+ooxGu+u439jprneOySpjTSbaX1aAhwsXM2T3tmuhLcwTNnS+Pth5iXVMuAT5V4xnQsiDSj7zw==\n-----END CERTIFICATE-----",
+      "file_rights": [
+        {
+          "file_name": "routing-challenge.dat",
+          "rights": 533572
+        },
+        {
+          "file_name": "routing-response.dat",
+          "rights": 8198
+        }
+      ],
+      "id": 2
+    }
+  ],
+  "programs": [
+    {
+      "file_rights": [
+        {
+          "file_name": "routing-graph.dat",
+          "rights": 8198
+        },
+        {
+          "file_name": "routing-challenge.dat",
+          "rights": 8198
+        },
+        {
+          "file_name": "routing-response.dat",
+          "rights": 533572
+        }
+      ],
+      "id": 0,
+      "pi_hash": "a91e93727e89d51e53a3b2eb33d5857b34742ad0d0390539def3d7bb06592c27",
+      "program_file_name": "test-program.wasm"
+    }
+  ],
+  "proxy_attestation_server_url": "127.0.0.1:3010",
+  "runtime_manager_hash_nitro": null,
+  "runtime_manager_hash_sgx": "8af961edea7427c7d652202256ccc91ad7c972770b07f8f433fb58e5a129a278",
+  "runtime_manager_hash_tz": "8af961edea7427c7d652202256ccc91ad7c972770b07f8f433fb58e5a129a278",
+  "veracruz_server_url": "127.0.0.1:3019"
+}
