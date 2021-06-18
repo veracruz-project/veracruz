@@ -36,7 +36,6 @@
 
 use actix_rt::System;
 use anyhow::Result;
-use async_std::task;
 use env_logger;
 use log::{error, info};
 use rand::seq::SliceRandom;
@@ -136,10 +135,11 @@ impl Graph {
         self.nodes.insert(source.clone().into());
         self.nodes.insert(sink.clone().into());
 
-        if let Some(mut existing_successors) = self.successors.get(&source.into()) {
+        if let Some(existing_successors) = self.successors.get(&source.clone().into()) {
+            let mut existing_successors = existing_successors.clone();
             existing_successors.push((sink.into(), weight.into()));
             self.successors
-                .insert(source.into(), existing_successors.clone());
+                .insert(source.into(), existing_successors);
             self
         } else {
             self.successors
@@ -382,14 +382,17 @@ fn main() -> anyhow::Result<()> {
 
     /* Start the Veracruz proxy attestation server. */
 
+    let proxy_attestation_server_url = policy.proxy_attestation_server_url().clone();
+
     let _main_loop_handle = spawn(|| {
         let mut sys = System::new("Veracruz Proxy Attestation Server");
+        
         let server = proxy_attestation_server::server::server(
-            policy.proxy_attestation_server_url().clone(),
+            proxy_attestation_server_url,
             false,
-        )
-        .unwrap();
-        sys.block_on(server).map_err(|e| {
+        ).unwrap();
+        
+        let _result = sys.block_on(server).map_err(|e| {
             error!(
                 "Failed to initialize Veracruz Proxy Attestation Server.  Error produced: {}.",
                 e
@@ -409,14 +412,21 @@ fn main() -> anyhow::Result<()> {
 
     /* Bring up the Veracruz server. */
 
-    let _veracruz_server_handle = veracruz_server::server::server(POLICY_PATH)
-        .map_err(|e| {
+    let _veracruz_server_handle = spawn(move || {
+        let mut sys = System::new("Veracruz Server");
+        
+        let server = veracruz_server::server::server(
+            &POLICY_PATH
+        ).unwrap();
+
+        let _result = sys.block_on(server).map_err(|e| {
             error!(
-                "Failed to start the Veracruz Server.  Error produced: {:?}.",
+                "Failed to initialize Veracruz Server.  Error produced: {}.",
                 e
             );
             e
-        })?;
+        });
+    });
 
     sleep(Duration::from_secs(2));
 
