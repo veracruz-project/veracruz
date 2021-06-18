@@ -205,12 +205,12 @@ enum Response {
     /// A route was found between the two nodes.  The route, or path, is
     /// represented as a series of nodes through the graph and is returned along
     /// with the total route weight.
-    Route((Vec<String>, i32)),
+    Route((Vec<String>, f32)),
 }
 
 /// Pretty-printing for `Response` types.
 impl Display for Response {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
         match self {
             Response::CannotRoute => write!(f, "No route was found."),
             Response::GraphInvalid => write!(f, "The input graph was invalid."),
