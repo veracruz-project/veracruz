@@ -115,7 +115,7 @@ struct Graph {
     nodes: HashSet<String>,
     /// A map from nodes to a list of the node's successor nodes, along with
     /// their weight.
-    successors: HashMap<String, Vec<(String, f32)>>,
+    successors: HashMap<String, Vec<(String, i32)>>,
 }
 
 impl Graph {
@@ -133,7 +133,7 @@ impl Graph {
     pub fn add_directed_edge<T, U>(&mut self, source: T, weight: U, sink: T) -> &mut Self
     where
         T: Into<String> + Clone,
-        U: Into<f32>,
+        U: Into<i32>,
     {
         self.nodes.insert(source.clone().into());
         self.nodes.insert(sink.clone().into());
@@ -161,7 +161,7 @@ impl Graph {
     ) -> &mut Self
     where
         T: Into<String> + Clone,
-        U: Into<f32> + Clone,
+        U: Into<i32> + Clone,
     {
         self.add_directed_edge(first_node.clone(), weight.clone(), second_node.clone())
             .add_directed_edge(second_node, weight, first_node)
@@ -205,7 +205,7 @@ enum Response {
     /// A route was found between the two nodes.  The route, or path, is
     /// represented as a series of nodes through the graph and is returned along
     /// with the total route weight.
-    Route((Vec<String>, f32)),
+    Route((Vec<String>, i32)),
 }
 
 /// Pretty-printing for `Response` types.
@@ -239,23 +239,23 @@ fn generate_graph() -> Graph {
     let mut graph = Graph::new();
 
     graph
-        .add_undirected_edge("Cottenham", 0.5, "Rampton")
+        .add_undirected_edge("Cottenham", 1, "Rampton")
         .add_undirected_edge("Cottenham", 3, "Wilburton")
         .add_undirected_edge("Cottenham", 2, "Landbeach")
         .add_undirected_edge("Cottenham", 2, "Histon")
         .add_undirected_edge("Cottenham", 3, "Oakington")
         .add_undirected_edge("Rampton", 1, "Willingham")
-        .add_undirected_edge("Histon", 0.5, "Impington")
-        .add_undirected_edge("Histon", 0.5, "Oakington")
-        .add_undirected_edge("Histon", 0.5, "Girton")
+        .add_undirected_edge("Histon", 0, "Impington")
+        .add_undirected_edge("Histon", 1, "Oakington")
+        .add_undirected_edge("Histon", 1, "Girton")
         .add_undirected_edge("Impington", 1, "Milton")
-        .add_undirected_edge("Milton", 0.7, "Landbeach")
-        .add_undirected_edge("Milton", 0.4, "Clayhithe")
-        .add_undirected_edge("Clayhithe", 0.4, "Horningsea")
-        .add_undirected_edge("Horningsea", 0.5, "Fen Ditton")
-        .add_undirected_edge("Willingham", 0.5, "Over")
-        .add_undirected_edge("Willingham", 0.5, "Longstanton")
-        .add_undirected_edge("Willingham", 1.1, "Earith")
+        .add_undirected_edge("Milton", 1, "Landbeach")
+        .add_undirected_edge("Milton", 1, "Clayhithe")
+        .add_undirected_edge("Clayhithe", 1, "Horningsea")
+        .add_undirected_edge("Horningsea", 1, "Fen Ditton")
+        .add_undirected_edge("Willingham", 1, "Over")
+        .add_undirected_edge("Willingham", 2, "Longstanton")
+        .add_undirected_edge("Willingham", 1, "Earith")
         .add_undirected_edge("Earith", 3, "Haddenham");
 
     graph

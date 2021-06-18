@@ -51,12 +51,12 @@ struct Graph {
     nodes: HashSet<String>,
     /// A map from nodes to a list of the node's successor nodes, along with
     /// their weight.
-    successors: HashMap<String, Vec<(String, f32)>>,
+    successors: HashMap<String, Vec<(String, i32)>>,
 }
 
 impl Graph {
     /// Returns the set of successor nodes of a particular node, if any.
-    pub fn successors(&self, node: &String) -> Vec<(String, f32)> {
+    pub fn successors(&self, node: &String) -> Vec<(String, i32)> {
         if let Some(succs) = self.successors.get(node) {
             succs.clone()
         } else {
@@ -124,7 +124,7 @@ enum Response {
     /// A route was found between the two nodes.  The route, or path, is
     /// represented as a series of nodes through the graph and is returned along
     /// with the total route weight.
-    Route((Vec<String>, f32)),
+    Route((Vec<String>, i32)),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -142,7 +142,7 @@ fn calculate_route(serialized_graph: &Graph, from: &String, to: &String) -> Resp
         if let Some((route, weight)) = astar(
             from,
             |node| serialized_graph.successors(node),
-            |_e| 0f32,
+            |_e| 0,
             |e| e == to,
         ) {
             Response::Route((route, weight))
