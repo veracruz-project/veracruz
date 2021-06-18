@@ -78,18 +78,18 @@ const ROUTING_GRAPH_VFS_PATH: &'static str = "/routing-graph.dat";
 const ROUTING_CHALLENGE_VFS_PATH: &'static str = "/routing-challenge.dat";
 /// Path of the certificate for the program provider.
 const MAPPING_SERVICE_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/mapping-service-certificate.pem";
+    "test-collateral/mapping-service-certificate.pem";
 /// Path of the certificate for the mapping user/challenge provider.
 const MAPPING_USER_CERTIFICATE_PATH: &'static str =
-    "../test-collateral/mapping-user-certificate.pem";
+    "test-collateral/mapping-user-certificate.pem";
 /// Path of the public key for the mapping service.
 const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str =
-    "../test-collateral/mapping-service-key.pem";
+    "test-collateral/mapping-service-key.pem";
 /// Path of the public key for the mapping user/challenge provider.
-const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "../test-collateral/mapping-user-key.pem";
+const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-user-key.pem";
 /// The path of the policy file describing the roles of various principals in
 /// the computation.
-const POLICY_PATH: &'static str = "../test-collateral/oblivious-routing-policy.json";
+const POLICY_PATH: &'static str = "test-collateral/oblivious-routing-policy.json";
 /// The log settings for all of the various subcomponents that are about to be
 /// exercised.
 const RUST_LOG_SETTINGS: &'static str =
