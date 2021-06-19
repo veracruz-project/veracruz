@@ -72,13 +72,13 @@ sgx-cli: sgx-env
 
 sgx-cli-install: sgx-cli
 	# install to Cargo's bin directory
-	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
-	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
-	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo install --features sgx --features cli --path . --debug
+	cp proxy-attestation-server/target/debug/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
+	cp veracruz-server/target/debug/veracruz-server $(BIN_DIR)/veracruz-server
+	cp veracruz-client/target/debug/veracruz-client $(BIN_DIR)/veracruz-client
 	# install CLIs in SDK/test-collateral
-	cargo install --path sdk/freestanding-execution-engine
+	cp sdk/freestanding-execution-engine/target/release/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
 	cp sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
-	cargo install --path test-collateral/generate-policy
+	cp test-collateral/generate-policy/target/release/generate-policy $(BIN_DIR)/generate-policy
 	# create shorter names
 	ln -sf $(BIN_DIR)/proxy-attestation-server      $(BIN_DIR)/vc-pas
 	ln -sf $(BIN_DIR)/veracruz-server               $(BIN_DIR)/vc-server
