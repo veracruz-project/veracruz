@@ -61,6 +61,9 @@ sgx: sdk sgx-env
 # TODO add -cli to other TEEs
 # TODO should we move all CLIs into the root dir?
 sgx-cli: sgx-env
+	# enclave binaries needed for veracruz-server
+	cd runtime-manager-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
+	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	# build CLIs in top-level crates
 	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
 	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
