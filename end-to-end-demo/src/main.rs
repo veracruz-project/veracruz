@@ -66,7 +66,7 @@ use veracruz_utils::{platform::Platform, policy::policy::Policy};
 /// The path of the WASM routing program supplied by the mapping service that
 /// will be used for the collaborative computation.
 const WASM_BINARY_PATH: &'static str =
-    "../test-program/target/wasm32-wasi/release/test-program.wasm";
+    "test-program/target/wasm32-wasi/release/test-program.wasm";
 /// The filename of the WASM binary when stored in Veracruz's Virtual File
 /// System (VFS).
 const WASM_BINARY_VFS_PATH: &'static str = "/test-program.wasm";
@@ -402,7 +402,7 @@ fn main() -> anyhow::Result<()> {
     });
 
 
-    sleep(Duration::from_secs(5));
+    sleep(Duration::from_secs(8));
 
     info!(
         "Veracruz Proxy Attestation Server now initialized (at {}).",
@@ -429,7 +429,7 @@ fn main() -> anyhow::Result<()> {
         });
     });
 
-    sleep(Duration::from_secs(5));
+    sleep(Duration::from_secs(8));
 
     info!("Veracruz Server now initialized.");
 
