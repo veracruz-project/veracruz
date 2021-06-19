@@ -82,13 +82,15 @@ sgx-cli-install: sgx-cli
 	cp sdk/freestanding-execution-engine/target/release/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
 	cp sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
 	cp test-collateral/generate-policy/target/release/generate-policy $(BIN_DIR)/generate-policy
-	# create shorter names
+	# symlink concise names
 	ln -sf $(BIN_DIR)/proxy-attestation-server      $(BIN_DIR)/vc-pas
 	ln -sf $(BIN_DIR)/veracruz-server               $(BIN_DIR)/vc-server
 	ln -sf $(BIN_DIR)/veracruz-client               $(BIN_DIR)/vc-client
 	ln -sf $(BIN_DIR)/freestanding-execution-engine $(BIN_DIR)/vc-fee
 	ln -sf $(BIN_DIR)/wasm-checker                  $(BIN_DIR)/vc-wc
 	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/vc-pgen
+	# symlink backwards compatible names
+	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/pgen
 
 nitro: sdk
 	pwd
