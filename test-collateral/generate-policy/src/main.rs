@@ -16,6 +16,7 @@ use std::{
     path::{Path, PathBuf},
     process::{exit, Command},
     str::FromStr,
+    convert::TryFrom,
 };
 
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
@@ -228,7 +229,7 @@ fn parse_command_line() -> Arguments {
                 .short("p")
                 .long("capability")
                 .value_name("CAPABILITIES")
-                .help("The capability table of a client or a program of the form 'output:rw,input-0:w,prorgam.wasm:x' where each entry is separated by ','")
+                .help("The capability table of a client or a program of the form 'output:rw,input-0:w,prorgam.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
                 .required(true)
                 .multiple(true),
         )
@@ -711,19 +712,51 @@ fn serialize_capability(cap_string : &[String]) -> Vec<FileRights> {
 }
 
 fn serialize_capability_entry(cap_string : &str) -> FileRights {
+    // common shorthand (r = read, w = write, rw = read + write)
+    #[allow(non_snake_case)]
+    let READ_RIGHTS: Rights
+        = Rights::FD_READ
+        | Rights::FD_SEEK
+        | Rights::PATH_OPEN;
+
+    #[allow(non_snake_case)]
+    let WRITE_RIGHTS: Rights
+        = Rights::FD_WRITE
+        | Rights::PATH_CREATE_FILE
+        | Rights::PATH_FILESTAT_SET_SIZE
+        | Rights::FD_SEEK
+        | Rights::PATH_OPEN;
+
     let mut split = cap_string.split(':'); 
-    let file_name = split.next().expect(&format!("Failed to parse {}, empty string", cap_string));
+    let file_name = split
+        .next()
+        .expect(&format!("Failed to parse {}, empty string", cap_string))
+        .trim()
+        .to_string();
     let string_number = split
-                .next()
-                .expect(&format!("Failed to parse `{}`, contain no `:`", cap_string));
-    let number = string_number
-                .trim()
-                .parse::<u32>()
-                .expect(&format!("Failed to parse {}, not a u64", string_number));
-    // check if this is a valid number
-    let _cap = Rights::from_bits(number as u64)
-                .expect(&format!("Failed to parse {}, not a u64 representing WASI Right", number));
-    FileRights::new(file_name.trim().to_string(),number)
+        .next()
+        .expect(&format!("Failed to parse `{}`, contain no `:`", cap_string))
+        .trim();
+
+    let rights = match string_number {
+        // allow "rw" shorthand
+        "r" => READ_RIGHTS,
+        "w" => WRITE_RIGHTS,
+        "rw" => READ_RIGHTS | WRITE_RIGHTS,
+        "wr" => READ_RIGHTS | WRITE_RIGHTS,
+        // parse raw WASI rights
+        _ => {
+            let number = string_number
+                        .parse::<u32>()
+                        .expect(&format!("Failed to parse {}, not a u64", string_number));
+            // check if this is a valid number
+            Rights::from_bits(number as u64)
+                .expect(&format!("Failed to parse {}, not a u64 representing WASI Right", number))
+        }
+    };
+
+    FileRights::new(file_name,
+        u32::try_from(rights.bits()).expect("capability could not fit into u32"))
 }
 
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
