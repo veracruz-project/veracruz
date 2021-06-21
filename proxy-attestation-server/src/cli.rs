@@ -1,4 +1,4 @@
-//! Tabasco command-line interface
+//! Proxy Attestation Server command-line interface
 //!
 //! ## Authors
 //!
@@ -76,9 +76,9 @@ fn main() {
     }
 
     // create Actix runtime
-    let mut sys = actix_rt::System::new("Tabasco Server");
+    let mut sys = actix_rt::System::new("Proxy Attestation Server");
 
-    // create Tabasco instance
+    // create Proxy Attestation Server instance
     let proxy_attestation_server = match proxy_attestation_server::server::server(
         policy.proxy_attestation_server_url().clone(),
         opt.debug
@@ -90,7 +90,7 @@ fn main() {
         }
     };
 
-    info!("Tabasco running on {}", policy.proxy_attestation_server_url());
+    info!("Proxy Attestation Server running on {}", policy.proxy_attestation_server_url());
     match sys.block_on(proxy_attestation_server) {
         Ok(()) => {}
         Err(err) => {

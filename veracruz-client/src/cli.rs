@@ -1,4 +1,4 @@
-//! Durango command-line interface
+//! Veracruz Client command-line interface
 //!
 //! ## Authors
 //!
@@ -132,7 +132,7 @@ struct Opt {
     /// or a comma-separated list of files may be provided. Also
     /// accepts "-" to write to stdout.
     ///
-    /// If --no-shutdown is not provided, Durango will request a shutdown
+    /// If --no-shutdown is not provided, Veracruz Client will request a shutdown
     /// from the Sinaloa server after recieving the results.
     ///
     /// Note: This requires "ResultReader" permissions in the
@@ -186,7 +186,7 @@ fn main() {
     };
     info!("Loaded policy {}", policy_hash);
 
-    // create Durango instance
+    // create Veracruz Client instance
     // TODO allow AsRef<VeracruzPolicy>?
     let mut veracruz_client = match VeracruzClient::with_policy_and_hash(
         opt.identity,

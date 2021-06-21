@@ -1,4 +1,4 @@
-//! Sinaloa command-line interface
+//! Veracruz Server command-line interface
 //!
 //! ## Authors
 //!
@@ -52,9 +52,9 @@ fn main() {
     info!("Loaded policy {}", policy_hash);
 
     // create Actix runtime
-    let mut sys = actix_rt::System::new("Sinaloa Server");
+    let mut sys = actix_rt::System::new("Veracruz Server");
 
-    // create Sinaloa server instance
+    // create Veracruz Server instance
     let veracruz_server = match veracruz_server::server::server(&opt.policy_path) {
         Ok(veracruz_server) => veracruz_server,
         Err(err) => {
@@ -65,7 +65,7 @@ fn main() {
 
     // TODO support restarting in a loop?
     // TODO there's an unwrap panic that happens if we ctrl-C, need to fix
-    info!("Sinaloa running on {}", policy.veracruz_server_url());
+    info!("Veracruz Server running on {}", policy.veracruz_server_url());
     match sys.block_on(veracruz_server) {
         Ok(_) => {},
         Err(err) => {
