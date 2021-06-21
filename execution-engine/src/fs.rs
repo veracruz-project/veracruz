@@ -133,16 +133,32 @@ impl FileSystem {
     // Internal auxiliary methods
     ////////////////////////////////////////////////////////////////////////
 
+    #[inline]
+    /// Install standard channels (`stdin`, `stdout`, `stderr`)
+    fn install_standard_channel<T: AsRef<Path> + Sized>(
+        &mut self,
+        path: T,
+        fd_number: u32,
+        inode_number: u64,
+        rights_base: &Rights,
+    ) {
+        self.install_file(&path, Inode(inode_number), "".as_bytes());
+        self.install_fd(
+            Fd(fd_number),
+            Inode(inode_number),
+            rights_base,
+            &Rights::empty()
+        );
+    }
+
     /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
     /// and then pre-open them.
     fn install_prestat<T: AsRef<Path> + Sized>(&mut self, dir_paths: &[T]) {
-        // Pre open the stdin stdout and stderr.
-        self.install_file("stdin", Inode(0), "".as_bytes());
-        self.install_fd(Fd(0), Inode(0), &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
-        self.install_file("stdout", Inode(1), "".as_bytes());
-        self.install_fd(Fd(1), Inode(1), &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
-        self.install_file("stderr", Inode(2), "".as_bytes());
-        self.install_fd(Fd(2), Inode(2), &Self::DEFAULT_RIGHTS, &Self::DEFAULT_RIGHTS);
+        // Pre open the standard channels.
+        // TODO: fix std channels' names and fd/inode numbers
+        self.install_standard_channel("stdin", 0, 0, &Rights::FD_READ);
+        self.install_standard_channel("stdout", 1, 1, &Rights::FD_WRITE);
+        self.install_standard_channel("stderr", 2, 2, &Rights::FD_WRITE);
 
         // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
         self.install_dir(Path::new(Self::ROOT_DIRECTORY), Self::ROOT_DIRECTORY_INODE);
