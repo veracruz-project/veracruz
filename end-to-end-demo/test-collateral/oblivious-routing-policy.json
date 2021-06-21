@@ -56,8 +56,8 @@
         }
       ],
       "id": 0,
-      "pi_hash": "b90400e59d51d3691d8ec930b3a8251b1e6259a3bcd6131c6a531c634b13a0e6",
-      "program_file_name": "test-program.wasm"
+      "pi_hash": "2f60759397843d0bbd0ba6729d1f69b25d98fac5eccb17742caf69d7ffe09848",
+      "program_file_name": "oblivious-routing.wasm"
     }
   ],
   "proxy_attestation_server_url": "127.0.0.1:3010",

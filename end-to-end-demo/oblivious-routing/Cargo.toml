@@ -1,9 +1,9 @@
 [package]
-name = "test-program"
+name = "oblivious-routing"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
-description = "A simple test program for demonstrating how to deploy computations on Veracruz."
+description = "A simple test program, privacy-preserving routing in a graph (using the A-star algorithm), for demonstrating how to deploy computations on Veracruz."
 
 [features]
 std = []
