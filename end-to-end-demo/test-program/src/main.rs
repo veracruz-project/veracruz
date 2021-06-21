@@ -31,13 +31,13 @@ use std::{
 
 /// Path in the Veracruz Virtual File System (VFS) where the serialized input
 /// graph is stored.
-const GRAPH_INPUT_PATH: &'static str = "/input-graph.dat";
+const GRAPH_INPUT_PATH: &'static str = "/routing-graph.dat";
 /// Path in the Veracruz Virtual File System (VFS) where the serialized routing
 /// challenge is stored.
-const CHALLENGE_INPUT_PATH: &'static str = "/input-challenge.dat";
+const CHALLENGE_INPUT_PATH: &'static str = "/routing-challenge.dat";
 /// Path in the Veracruz Virtual File System (VFS) where the serialized output
 /// route will be stored.
-const RESPONSE_OUTPUT_PATH: &'static str = "/output-response.dat";
+const RESPONSE_OUTPUT_PATH: &'static str = "/routing-response.dat";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Input and output conventions.
@@ -161,7 +161,7 @@ fn calculate_route(serialized_graph: &Graph, from: &String, to: &String) -> Resp
 /// routing, and then writes the serialized result back to the VFS.
 fn main() -> Result<()> {
     /* Read the graph input. */
-
+    
     let mut serialized_graph_file =
         File::open(&GRAPH_INPUT_PATH).context("Failed to read graph input file.")?;
 
@@ -169,7 +169,7 @@ fn main() -> Result<()> {
     serialized_graph_file
         .read_to_end(&mut buffer)
         .context("Failed to read graph input file to end.")?;
-
+    
     let graph: Graph = from_bytes(&buffer).context("Failed to deserialize graph input file.")?;
 
     /* Read the secret challenge. */
@@ -184,7 +184,6 @@ fn main() -> Result<()> {
 
     let challenge: Challenge =
         from_bytes(&buffer).context("Failed to deserialize challenge input file.")?;
-
     /* Perform routing. */
 
     let route = calculate_route(&graph, &challenge.source(), &challenge.sink());
@@ -192,13 +191,13 @@ fn main() -> Result<()> {
     /* Serialize and write the result back. */
 
     let mut serialized_output_file =
-        File::open(RESPONSE_OUTPUT_PATH).context("Failed to open output file for writing.")?;
-
+        File::create(RESPONSE_OUTPUT_PATH).context("Failed to open output file for writing.")?;
+    
     let serialized_output = to_vec(&route).context("Failed to serialize the routing result.")?;
 
     serialized_output_file
         .write_all(&serialized_output)
         .context("Failed to write result to output file.")?;
-
+    
     Ok(())
 }
