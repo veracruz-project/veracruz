@@ -65,8 +65,7 @@ use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
 /// The path of the WASM routing program supplied by the mapping service that
 /// will be used for the collaborative computation.
-const WASM_BINARY_PATH: &'static str =
-    "test-program/target/wasm32-wasi/release/test-program.wasm";
+const WASM_BINARY_PATH: &'static str = "test-program/target/wasm32-wasi/release/test-program.wasm";
 /// The filename of the WASM binary when stored in Veracruz's Virtual File
 /// System (VFS).
 const WASM_BINARY_VFS_PATH: &'static str = "test-program.wasm";
@@ -80,11 +79,9 @@ const ROUTING_CHALLENGE_VFS_PATH: &'static str = "routing-challenge.dat";
 const MAPPING_SERVICE_CERTIFICATE_PATH: &'static str =
     "test-collateral/mapping-service-certificate.pem";
 /// Path of the certificate for the mapping user/challenge provider.
-const MAPPING_USER_CERTIFICATE_PATH: &'static str =
-    "test-collateral/mapping-user-certificate.pem";
+const MAPPING_USER_CERTIFICATE_PATH: &'static str = "test-collateral/mapping-user-certificate.pem";
 /// Path of the public key for the mapping service.
-const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str =
-    "test-collateral/mapping-service-key.pem";
+const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-service-key.pem";
 /// Path of the public key for the mapping user/challenge provider.
 const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-user-key.pem";
 /// The path of the policy file describing the roles of various principals in
@@ -138,8 +135,7 @@ impl Graph {
         if let Some(existing_successors) = self.successors.get(&source.clone().into()) {
             let mut existing_successors = existing_successors.clone();
             existing_successors.push((sink.into(), weight.into()));
-            self.successors
-                .insert(source.into(), existing_successors);
+            self.successors.insert(source.into(), existing_successors);
             self
         } else {
             self.successors
@@ -186,7 +182,7 @@ impl Challenge {
     {
         Self {
             source: source.into(),
-            sink: sink.into()
+            sink: sink.into(),
         }
     }
 }
@@ -240,24 +236,61 @@ fn generate_graph() -> Graph {
     let mut graph = Graph::new();
 
     graph
-        .add_undirected_edge("Cottenham", 1, "Rampton")
-        .add_undirected_edge("Cottenham", 3, "Wilburton")
-        .add_undirected_edge("Cottenham", 2, "Landbeach")
-        .add_undirected_edge("Cottenham", 2, "Histon")
-        .add_undirected_edge("Cottenham", 3, "Oakington")
-        .add_undirected_edge("Rampton", 1, "Willingham")
-        .add_undirected_edge("Histon", 0, "Impington")
-        .add_undirected_edge("Histon", 1, "Oakington")
-        .add_undirected_edge("Histon", 1, "Girton")
-        .add_undirected_edge("Impington", 1, "Milton")
-        .add_undirected_edge("Milton", 1, "Landbeach")
-        .add_undirected_edge("Milton", 1, "Clayhithe")
-        .add_undirected_edge("Clayhithe", 1, "Horningsea")
-        .add_undirected_edge("Horningsea", 1, "Fen Ditton")
-        .add_undirected_edge("Willingham", 1, "Over")
-        .add_undirected_edge("Willingham", 2, "Longstanton")
-        .add_undirected_edge("Willingham", 1, "Earith")
-        .add_undirected_edge("Earith", 3, "Haddenham");
+        .add_undirected_edge("Cottenham", 2700, "Rampton")
+        .add_undirected_edge("Cottenham", 8800, "Wilburton")
+        .add_undirected_edge("Cottenham", 4000, "Landbeach")
+        .add_undirected_edge("Cottenham", 5400, "Histon")
+        .add_undirected_edge("Cottenham", 5800, "Oakington")
+        .add_undirected_edge("Aldreth", 2600, "Haddenham")
+        .add_undirected_edge("Rampton", 4000, "Willingham")
+        .add_undirected_edge("Histon", 1500, "Impington")
+        .add_undirected_edge("Histon", 3600, "Oakington")
+        .add_undirected_edge("Histon", 3300, "Girton")
+        .add_undirected_edge("Impington", 4200, "Milton")
+        .add_undirected_edge("Oakington", 2700, "Girton")
+        .add_undirected_edge("Milton", 2800, "Landbeach")
+        .add_undirected_edge("Milton", 3600, "Waterbeach")
+        .add_undirected_edge("Waterbeach", 1300, "Clayhithe")
+        .add_undirected_edge("Waterbeach", 2500, "Landbeach")
+        .add_undirected_edge("Waterbeach", 6600, "Chittering")
+        .add_undirected_edge("Chittering", 5700, "Stretham")
+        .add_undirected_edge("Stretham", 3300, "Wilburton")
+        .add_undirected_edge("Stretham", 7700, "Upware")
+        .add_undirected_edge("Stretham", 7600, "Wicken")
+        .add_undirected_edge("Clayhithe", 2200, "Horningsea")
+        .add_undirected_edge("Horningsea", 2400, "Fen Ditton")
+        .add_undirected_edge("Willingham", 3400, "Over")
+        .add_undirected_edge("Willingham", 4600, "Longstanton")
+        .add_undirected_edge("Willingham", 5900, "Earith")
+        .add_undirected_edge("Earith", 8500, "Haddenham")
+        .add_undirected_edge("Earith", 1900, "Bluntisham")
+        .add_undirected_edge("Earith", 2100, "Colne")
+        .add_undirected_edge("Colne", 1000, "Bluntisham")
+        .add_undirected_edge("Wilburton", 2200, "Haddenham")
+        .add_undirected_edge("Upware", 1500, "River Bank")
+        .add_undirected_edge("Upware", 4900, "Wicken")
+        .add_undirected_edge("River Bank", 5600, "Reach")
+        .add_undirected_edge("River Bank", 6900, "Swaffham Prior")
+        .add_undirected_edge("Reach", 2400, "Swaffham Prior")
+        .add_undirected_edge("Commercial End", 1800, "Swaffham Prior")
+        .add_undirected_edge("Commercial End", 1300, "Swaffham Bulbeck")
+        .add_undirected_edge("Swaffham Bulbeck", 2400, "Swaffham Prior")
+        .add_undirected_edge("Swaffham Bulbeck", 2500, "Bottisham")
+        .add_undirected_edge("Swaffham Bulbeck", 4600, "Stow cum Quy")
+        .add_undirected_edge("Bottisham", 2700, "Stow cum Quy")
+        .add_undirected_edge("Stow cum Quy", 4600, "Fen Ditton")
+        .add_undirected_edge("Longstanton", 3900, "Bar Hill")
+        .add_undirected_edge("Bar Hill", 5000, "Oakington")
+        .add_undirected_edge("Orchard Park", 3800, "Histon")
+        .add_undirected_edge("Orchard Park", 3100, "Impington")
+        .add_undirected_edge("Stretham", 3300, "Little Thetford")
+        .add_undirected_edge("Stretham", 6900, "Ely")
+        .add_undirected_edge("Little Thetford", 5000, "Ely")
+        .add_undirected_edge("Ely", 4200, "Witchford")
+        .add_undirected_edge("Witchford", 5900, "Little Thetford")
+        .add_undirected_edge("Witchford", 4800, "Stretham")
+        .add_undirected_edge("Witchford", 6500, "Wilburton")
+        .add_undirected_edge("Witchford", 6300, "Haddenham");
 
     graph
 }
@@ -268,22 +301,41 @@ fn generate_graph() -> Graph {
 #[inline]
 fn generate_challenge() -> Challenge {
     let locations = vec![
+        "Aldreth",
+        "Bar Hill",
+        "Bluntisham",
+        "Bottisham",
+        "Chittering",
         "Clayhithe",
+        "Colne",
+        "Commercial End",
         "Cottenham",
         "Earith",
+        "Ely",
         "Haddenham",
         "Fen Ditton",
         "Girton",
         "Histon",
         "Impington",
         "Landbeach",
+        "Little Thetford",
         "Longstanton",
         "Milton",
         "Oakington",
+        "Orchard Park",
         "Over",
         "Rampton",
+        "Reach",
+        "River Bank",
+        "Stow cum Quy",
+        "Stretham",
+        "Swaffham Bulbeck",
+        "Swaffham Prior",
+        "Upware",
+        "Wicken",
         "Wilburton",
         "Willingham",
+        "Witchford",
     ];
 
     let first_location = locations
@@ -386,12 +438,10 @@ fn main() -> anyhow::Result<()> {
 
     let _main_loop_handle = spawn(|| {
         let mut sys = System::new("Veracruz Proxy Attestation Server");
-        
-        let server = proxy_attestation_server::server::server(
-            proxy_attestation_server_url,
-            false,
-        ).unwrap();
-        
+
+        let server =
+            proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+
         let _result = sys.block_on(server).map_err(|e| {
             error!(
                 "Failed to initialize Veracruz Proxy Attestation Server.  Error produced: {}.",
@@ -400,7 +450,6 @@ fn main() -> anyhow::Result<()> {
             e
         });
     });
-
 
     sleep(Duration::from_secs(8));
 
@@ -415,10 +464,8 @@ fn main() -> anyhow::Result<()> {
 
     let _veracruz_server_handle = spawn(move || {
         let mut sys = System::new("Veracruz Server");
-        
-        let server = veracruz_server::server::server(
-            &POLICY_PATH
-        ).unwrap();
+
+        let server = veracruz_server::server::server(&POLICY_PATH).unwrap();
 
         let _result = sys.block_on(server).map_err(|e| {
             error!(
