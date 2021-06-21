@@ -25,7 +25,10 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use libveracruz::{host, return_code};
+use std::io;
+use std::fs;
+use anyhow;
+// TODO remove?
 use hex;
 
 // lookup tables for log and exp of polynomials in GF(256), 
@@ -190,15 +193,39 @@ fn shares_reconstruct<S: AsRef<[u8]>>(shares: &[S]) -> Vec<u8> {
     secret
 }
 
+/// read all shares from the filesystem
+fn shares_read_all() -> io::Result<Vec<Vec<u8>>> {
+    // expect inputs to be named input-0, input-1, input-2, etc
+    // we don't know how many there are, so we keep trying to
+    // open files until one fails
+    let mut shares = vec![];
+    for i in 0.. {
+        let filename = format!("input-{}", i);
+        let share = match fs::read(filename) {
+            Ok(share) => share,
+            Err(err) => {
+                match err.kind() {
+                    io::ErrorKind::NotFound => break,
+                    _ => return Err(err)
+                }
+            }
+        };
+
+        shares.push(share);
+    };
+
+    Ok(shares)
+}
+
 /// entry point
-fn main() -> return_code::Veracruz {
+fn main() -> anyhow::Result<()> {
     // read inputs through libveracruz
-    let shares: Vec<Vec<u8>> = host::read_all_inputs();
+    let shares: Vec<Vec<u8>> = shares_read_all()?;
 
     // reconstruct the original secret
     let secret = shares_reconstruct(&shares);
 
-    // write our output through libveracruz
-    host::write_output(&secret).unwrap();
-    return_code::success()
+    // write our output
+    fs::write("output", &secret)?;
+    Ok(())
 }
