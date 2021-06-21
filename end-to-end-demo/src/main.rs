@@ -69,13 +69,13 @@ const WASM_BINARY_PATH: &'static str =
     "test-program/target/wasm32-wasi/release/test-program.wasm";
 /// The filename of the WASM binary when stored in Veracruz's Virtual File
 /// System (VFS).
-const WASM_BINARY_VFS_PATH: &'static str = "/test-program.wasm";
+const WASM_BINARY_VFS_PATH: &'static str = "test-program.wasm";
 /// The filename of the routing graph when stored in Veracruz's Virtual File
 /// System (VFS).
-const ROUTING_GRAPH_VFS_PATH: &'static str = "/routing-graph.dat";
+const ROUTING_GRAPH_VFS_PATH: &'static str = "routing-graph.dat";
 /// The filename of the routing challenge when stored in Veracruz's Virtual File
 /// System (VFS).
-const ROUTING_CHALLENGE_VFS_PATH: &'static str = "/routing-challenge.dat";
+const ROUTING_CHALLENGE_VFS_PATH: &'static str = "routing-challenge.dat";
 /// Path of the certificate for the program provider.
 const MAPPING_SERVICE_CERTIFICATE_PATH: &'static str =
     "test-collateral/mapping-service-certificate.pem";

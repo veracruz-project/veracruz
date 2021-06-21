@@ -11,38 +11,32 @@
   "execution_strategy": "Interpretation",
   "identities": [
     {
-      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUPWHS0HfecylNhpsOsGeB6PTH5bYwDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MjkwMFoXDTMwMDkxNDE5MjkwMFowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtFDp4NHy03SxEgODdTmI5bWBvjCEKUg6rU445r1A7lIMGLtWVa5aSv4WoJ7cMkzFc7iqNZ4uTOgAjsaLyBF0qFyOsiu7fO2xgIhGFUQtKwG9FxfYIoF+h61bW80fb7VBXRE6/cG1+tXfFbiMAYzUW+mLr97xbN5FHySwFTmELbl0wV4vUX9v5P4N2Hmrg35IAKNkUoRuB8tqGK03bRtG7Ui6OK4BP61JujwbbDwhtFsk6v9LduyYvLxL3DUc/xl9Uyh54VyrlIilMuXMfsIzppEhx1QtiQWQuZ26KE/t+iumfpchhR5x3IuzoxuXoc7YxXGD7hhuKyEWMaC2s1gGSQIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAIP+1j8E6kfk3w3dDCegczhiGnvRFLRoaRaldGD3Ppj8lOnjKVTfuQGjcWElrNE/Mwf4wrkYKMlksip+bu3xRxkwVX93EQn1aAZPXxSAZYTkGh4Seo5t9y9E0K4frhIcNFoDXITcF6UPck/Ehx8Rx8KXuGy8H4YfjPWjNrQMpr0wbdtrOaIksnDKsOnM2R2sr0v/6sG1Nmg5BiJl2zKRzK+arPTPTQIT4OnSz6mJzzId0tibNXfPkmdK/wWdOGB0saMtE/+M4p4xOtn9d4strrgtK3d5Cjdlv31g9uLyHHNF+SEQk+swE2tAr0EXj1245gTRMxF8R9XwOEkFIMFIl8Q==\n-----END CERTIFICATE-----",
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUV1IHvUvh+cKvEwHl+0N+dex+4KcwDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MjkzMloXDTMwMDkxNDE5MjkzMlowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv9pR8EG/QprMQ1CXRuKmvGvCETJcWlL4TlMgIPTvlvRCWIkFECBCm+/HTP6urtaQnADmsBt8APPVT5Ad6r3ieMl5IoCoYOLnBxr6+toi3Oa37a+hSqL5JdyS60IkMlp0M3y+ErN6oHPIpOJBIKZiohcPv1Y2XvXca+ULdXXudRiTDBJMl6HXuDD8vypL8y6AsDhR7t7RQi7yR5P6Z42cWjZGkv3aniM6CRVmh7Bt/H8YyBNBVUjmk+9jE7GiYWSpTteR0jBRsGJT2j9SXNNmqzhhw5XXBF36/GtCQtfNmFCvQWoP8PTEfFVi0OOStai5Ho7PhnLzYkC0KnGc9LNZrwIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEADtWV3cIiNSgBDC87qg2qFKtCEUEuRw8b0CpVO2B0dWM4xILRlHhrwZkLqxrtGZTk7rsIw2pH3vDv/1zg74+n5ECgcSZYpnMLuXYWi1NdF3w6IUNDoWDPkgzo7KKxz9MNlZPa9YpeJ7s0osjfJlNf/i2wEjTqj2hI0PalbPqtG15IpGAos1Y/UXbhouj4LVQMzO4h+dgzOWYwA8jGVXi9kP9bWafruqeBahyxNdNQIrD2/nfCrD3oNFbW6bvtR2UQw70DbLh5znkJe7Kzn4zPcfgTvT1S6Q8n28NK2sRtiLTYHMQBmUW9J/vzd1t9KTLD0SUj+PxWx03LveKMpbrBHA==\n-----END CERTIFICATE-----",
       "file_rights": [
         {
           "file_name": "test-program.wasm",
-          "rights": 533572
+          "rights": 134217727
+        },
+        {
+          "file_name": "routing-graph.dat",
+          "rights": 134217727
         }
       ],
       "id": 0
     },
     {
-      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUfaXU2GiXIf2tI5+EOp7hMs74YK4wDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MzEzM1oXDTMwMDkxNDE5MzEzM1owgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuy0vUp8RWRZ4HAZjIZekZWgBFHTxJNzsa0xOLqO6Aj4lKkO6wJsRGZf6ci2n0hlQdQrmVLkgq9kgezJy8ysZuDgW0XVcZ7otqCtaC4jrDLnobtBHGqHm6Sc9qteuhZunjnVGtdXmMZwifHWV1geuLA47i/hn65tapqFdRXAeOVortMaOKTSVFP+OgSlQvuc08wMagKQ456IB352n9+cDS4nWbSowe/+ZWx/nE9eV/vZkrTQPJ7YBaloWxeDnjiC5psQJjs+X48wNtyXzv1XGdv7MwbjBGko61gzR/LCYTzvUtTEtJBcTQGg4Cp4Y7Jbr+PY47QUqgvz0Salsl7IIdwIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAkO+yW8Vumxl5ZOdgS6siJjw9r6QSolLpzZmPfRbsUa5xicEvs5WJnWSHoYTxxoy25K1wpL6OdvVZCukGcOBkHKeoJn04xlubshghCcDMTCZyvJ1OUFVLB6Db/0NvssvqhiibZu39SLeyunz9wgFxy8jQbJnCV8tN/Dsgk6tsgEn0pPEZZSSt2lkYFYN1qdGU1SqI9czTNljWK/DjFMmp4918peOcrfEfLiloGdwxSYGQP7adSD61ZjmFPo6l+05QvRSJ8ess/bCacSYWmd7c2Kgg4av34duOr4ImIjRPSzMfDSPAc0Fx/pL+cmiZOj4jK8eIIlKkyj5xtBu2VRA0gw==\n-----END CERTIFICATE-----",
-      "file_rights": [
-        {
-          "file_name": "routing-graph.dat",
-          "rights": 533572
-        }
-      ],
-      "id": 1
-    },
-    {
-      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUISn71GauuAIC6Q1Bs5EzOhe+bDYwDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MzAwMFoXDTMwMDkxNDE5MzAwMFowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy+Ad0OlY7stFQ9g8Ie1dLxcHUpYgd19sW+bmJNX8ahqBm/fVIT5retBAFEBJHqwkUc87E0+VfI4jGOrOYSqlo9OvTMsEv96DXjNVUr5vzQhuvvNF99AnvrfbYi//AqquYQgqG9ShrbTf6eU67+oUtfM3OjeLiSvj3qg508RvfFp8DIPVqSmuA67ZxiSvNkbSRa0pZaIi185o2XR4YH4JSEX158yZx3rfGWp+tP2yUnKfV6Ps4T5NAodomhdABED1Sbi15sOkXkFPan6TUpClttNKqbJb5m06JFiPQPGR+5p1LPCjwN/f1lG1zfH7XpuqtgVYzuGWzrm2Rm/+9+r8awIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAU75tk4OQC94CMmu6mw4UG5pOBwoqt79/V8GUAXuSo17tj1Cz/sFmVgCwzc/TwQV5rPoWEYb0DaaynK0VtkyFWenLr5RY51GBkvOsfksias5CHEYTaPk+BOTDiuC6yXJsHlcNf71QzHTnaRcS+bQtgW0Jmuyt0y1WifiTDxFelDMHBi4FKmBUp9m2Kae4hel/I2IeyURh+eQxZZGlLmzTds/yKgtNj3PcN5kBtwyybi9y/JYRKEAuNIZ5TeGnFoP1V6OR5MgNYSlV+ooxGu+u439jprneOySpjTSbaX1aAhwsXM2T3tmuhLcwTNnS+Pth5iXVMuAT5V4xnQsiDSj7zw==\n-----END CERTIFICATE-----",
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUOnnAKBO+ORrhvZdTeVGqwTUXoN0wDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5NDkzMVoXDTMwMDkxNDE5NDkzMVowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsrLRYOlYMRADmM/sl3rYbKqm/hl/K1xGRQ/sBMDfa3tl+jSK68KxdOqXqFVXwYFNh8k+7WwCCsic/3gdTzvtCNDjoB5p8gaXxmqYBrxllRuUWRIAuAHVpdyUnuLAzwZ7VT6bUczbUi09qmnjB3u4zOg+9Tfv0wgxmyg4HSUNrRIUgWWe9DJKIOJphA1QyecGFpTIbcAFuBWyjP1Cuz6TOAof74O0KOkpEgB7tMfJuxCcEGuRSbZ5Y+m+gjsoy/UYInpLcIRuP2+cG6bFwUGlfKY+a+qzu6ViKvF+1R6YwHVORFl001qipcPpyp5ei2+AUCFgMiBFpiHnksCFHaWGDQIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAeRU3kKyHu39O6NGcRtrcf5qOIQfgKlSReiVcEvv2EYLsFW/QuqpQE7HdsaHx9NmIJmdB4HTjjSI72RgIOYsddAjeuxuVyCurQMSTVgQSiIWy52yf/J3//3f7kS4MViiJtP5bWdK2ydThtjK1/byXzw4wpaYdX+zzZfUpLlK3f8DGas9gv+HZ83fcZH8rRiarpOVfhU0uANyD56rPLlg0LG65vLXF1ZX+huEywTuc6oh2/JXQpGrDvttpbiBNo3D5qQaFI4Jqf3yXjKvbQvs7EKrQj+GIP2Klzsv+btEF7UFcaSms1/C3Rg5AL7wxh9R9zNXsErFpeCM/nbGm5SluXA==\n-----END CERTIFICATE-----",
       "file_rights": [
         {
           "file_name": "routing-challenge.dat",
-          "rights": 533572
+          "rights": 134217727
         },
         {
           "file_name": "routing-response.dat",
-          "rights": 8198
+          "rights": 134217727
         }
       ],
-      "id": 2
+      "id": 1
     }
   ],
   "programs": [
@@ -50,15 +44,15 @@
       "file_rights": [
         {
           "file_name": "routing-graph.dat",
-          "rights": 8198
+          "rights": 134217727
         },
         {
           "file_name": "routing-challenge.dat",
-          "rights": 8198
+          "rights": 134217727
         },
         {
           "file_name": "routing-response.dat",
-          "rights": 533572
+          "rights": 134217727
         }
       ],
       "id": 0,
