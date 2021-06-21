@@ -68,7 +68,7 @@ const WASM_BINARY_PATH: &'static str =
     "oblivious-routing/target/wasm32-wasi/release/oblivious-routing.wasm";
 /// The filename of the WASM binary when stored in Veracruz's Virtual File
 /// System (VFS).
-const WASM_BINARY_VFS_PATH: &'static str = "test-program.wasm";
+const WASM_BINARY_VFS_PATH: &'static str = "oblivious-routing.wasm";
 /// The filename of the routing graph when stored in Veracruz's Virtual File
 /// System (VFS).
 const ROUTING_GRAPH_VFS_PATH: &'static str = "routing-graph.dat";
