@@ -32,7 +32,7 @@
           "rights": 134217727
         },
         {
-          "file_name": "routing-response.dat",
+          "file_name": "output",
           "rights": 134217727
         }
       ],
@@ -51,12 +51,12 @@
           "rights": 134217727
         },
         {
-          "file_name": "routing-response.dat",
+          "file_name": "output",
           "rights": 134217727
         }
       ],
       "id": 0,
-      "pi_hash": "1e566d211ec629e29fc2fba6cddf925029c828f0eed3f2200c8dc4a462cc933d",
+      "pi_hash": "b90400e59d51d3691d8ec930b3a8251b1e6259a3bcd6131c6a531c634b13a0e6",
       "program_file_name": "test-program.wasm"
     }
   ],

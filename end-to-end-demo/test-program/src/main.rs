@@ -37,7 +37,7 @@ const GRAPH_INPUT_PATH: &'static str = "/routing-graph.dat";
 const CHALLENGE_INPUT_PATH: &'static str = "/routing-challenge.dat";
 /// Path in the Veracruz Virtual File System (VFS) where the serialized output
 /// route will be stored.
-const RESPONSE_OUTPUT_PATH: &'static str = "/routing-response.dat";
+const RESPONSE_OUTPUT_PATH: &'static str = "/output";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Input and output conventions.
