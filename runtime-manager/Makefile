@@ -36,8 +36,8 @@ $(FINAL_DIR)/$(Signed_RustEnclave_RootName): $(Signed_RustEnclave_Name)
 
 sgx: $(FINAL_DIR)/$(Signed_RustEnclave_RootName) $(SGX_Enclave_Name) $(Signed_RustEnclave_Name) $(Untrusted_Lib_Name)
 
+# Note: css-sgx.bin will be generated as a side effect of the dependency $(Signed_RustEnclave_Name)
 css-sgx.bin: $(Signed_RustEnclave_Name)
-	cp $< $@
 
 ############# Source code #################
 
