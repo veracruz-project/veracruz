@@ -44,8 +44,8 @@ struct Opt {
 
     /// Specify optional program files to upload
     ///
-    /// This can be in the form of "--program=name", or in the form
-    /// of "--program=enclave_name:name" if you want to supply the file
+    /// This can be in the form of "--program name", or in the form
+    /// of "--program enclave_name=path" if you want to supply the file
     /// as a different name in the enclave. Multiple --program flags
     /// or a comma-separated list of files may be provided. Also
     /// accepts "-" to read from stdin.
@@ -62,8 +62,8 @@ struct Opt {
 
     /// Specify optional data files to upload
     ///
-    /// This can be in the form of "--data=name", or in the form
-    /// of "--data=enclave_name:name" if you want to supply the file
+    /// This can be in the form of "--data name", or in the form
+    /// of "--data enclave_name=path" if you want to supply the file
     /// as a different name in the enclave. Multiple --data flags
     /// or a comma-separated list of files may be provided. Also
     /// accepts "-" to read from stdin.
@@ -82,8 +82,8 @@ struct Opt {
     /// Specify optional output files to store results. If not provided
     /// the results will not be fetched.
     ///
-    /// This can be in the form of "--result=name", or in the form
-    /// of "--result=enclave_name:name" if you want to fetch with a
+    /// This can be in the form of "--result name", or in the form
+    /// of "--result enclave_name=path" if you want to fetch with a
     /// different name in the enclave. Multiple --result flags
     /// or a comma-separated list of files may be provided. Also
     /// accepts "-" to write to stdout.

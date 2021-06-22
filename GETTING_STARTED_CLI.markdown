@@ -157,7 +157,7 @@ $ vc-pgen \
     --capability "input-2:w" \
     --certificate example-result-cert.pem \
     --capability "output:r" \
-    --binary example-binary.wasm:example/example-binary.wasm \
+    --binary example-binary.wasm=example/example-binary.wasm \
     --capability "input-0:r,input-1:r,input-2:r,output:w" \
     --output-policy-file example/example-policy.json
 ```
@@ -224,11 +224,14 @@ functionality, but in a CLI form.
 First lets send over the program to our Veracruz server, this requires an
 identity with the "PiProvider" role:
 
+<!-- TODO do we need - - target sgx? -->
+
 ``` bash
-$ ./bin/vc-client example/example-policy.json \
+$ vc-client example/example-policy.json \
+    --target sgx \
     --key example/example-program-key.pem \
     --identity example/example-program-cert.pem \
-    --program example-binary.wasm:example/example-binary.wasm
+    --program example-binary.wasm=example/example-binary.wasm
 [2021-02-12T01:27:18Z INFO  veracruz-client] Loading policy "example/example-policy.json"
 [2021-02-12T01:27:18Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
@@ -241,28 +244,31 @@ secret message. Keep in mind most likely these datas will be coming from
 different devices:
 
 ``` bash
-$ ./bin/vc-client example/example-policy.json \
+$ vc-client example/example-policy.json \
+    --target sgx \
     --key example/example-data0-key.pem \
     --identity example/example-data0-cert.pem \
-    --data input-0:<(echo "018b76552fa61d7f7661d2119b" | xxd -r -p)
+    --data input-0=<(echo "018b76552fa61d7f7661d2119b" | xxd -r -p)
 [2021-02-12T01:27:18Z INFO  veracruz-client] Loading policy "example/example-policy.json"
 [2021-02-12T01:27:18Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
 [2021-02-12T01:27:18Z INFO  veracruz-client] Submitted data "/dev/fd/63"
 
-$ ./bin/vc-client example/example-policy.json \
+$ vc-client example/example-policy.json \
+    --target sgx \
     --key example/example-data1-key.pem \
     --identity example/example-data1-cert.pem \
-    --data input-1:<(echo "02063622071451f67d6b00e602" | xxd -r -p)
+    --data input-1=<(echo "02063622071451f67d6b00e602" | xxd -r -p)
 [2021-02-12T01:36:35Z INFO  veracruz-client] Loading policy "example/example-policy.json"
 [2021-02-12T01:36:35Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
 [2021-02-12T01:36:35Z INFO  veracruz-client] Submitted data "/dev/fd/63"
 
-$ ./bin/vc-client example/example-policy.json \
+$ vc-client example/example-policy.json \
+    --target sgx \
     --key example/example-data2-key.pem \
     --identity example/example-data2-cert.pem \
-    --data input-2:<(echo "03c5251b44dd6cde6478be93b8" | xxd -r -p)
+    --data input-2=<(echo "03c5251b44dd6cde6478be93b8" | xxd -r -p)
 [2021-02-12T01:37:58Z INFO  veracruz-client] Loading policy "example/example-policy.json"
 [2021-02-12T01:37:58Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...
@@ -273,10 +279,11 @@ And finally, we can request the result using an identity with the
 "RequestResult" role:
 
 ``` bash
-$ ./bin/vc-client example/example-policy.json \
+$ vc-client example/example-policy.json \
+    --target sgx \
     --key example/example-result-key.pem \
     --identity example/example-result-cert.pem \
-    --output example-binary.wasm:-
+    --output example-binary.wasm=-
 [2021-02-12T01:40:21Z INFO  veracruz-client] Loading policy "example/example-policy.json"
 [2021-02-12T01:40:21Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 ...

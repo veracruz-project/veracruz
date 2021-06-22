@@ -298,7 +298,7 @@ as an RFC-2822 formatted timepoint.",
                 .long("binary")
                 .value_name("FILE")
                 .help("Specifies the filename of the WASM binary to use for the computation. \
-This can be of the form \"--binary name\" or \"--binary enclave_name:path\" if you want to \
+This can be of the form \"--binary name\" or \"--binary enclave_name=path\" if you want to \
 supply the file as a different name in the enclave. Multiple --binary flags or a comma-separated \
 list of files may be provided.")
                 .required(true)
