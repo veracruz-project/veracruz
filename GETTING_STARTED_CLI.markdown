@@ -83,6 +83,7 @@ Lets go ahead and copy this to an example directory to make the paths a bit
 easier to use:
 
 ``` bash
+$ cd /work/veracruz
 $ mkdir example
 $ cp sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm example/example-binary.wasm
 ```

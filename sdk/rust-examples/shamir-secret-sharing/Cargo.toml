@@ -13,6 +13,6 @@ hex = "0.4"
 
 [profile.release]
 opt-level = 3
-#lto = true
+lto = true
 codegen-units = 1
 
