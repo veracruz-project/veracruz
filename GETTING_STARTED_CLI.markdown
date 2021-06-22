@@ -157,7 +157,7 @@ $ vc-pgen \
     --capability "input-2:w" \
     --certificate example-result-cert.pem \
     --capability "output:r" \
-    --binary example-binary.wasm \
+    --binary example-binary.wasm:example/example-binary.wasm \
     --capability "input-0:r,input-1:r,input-2:r,output:w" \
     --output-policy-file example/example-policy.json
 ```

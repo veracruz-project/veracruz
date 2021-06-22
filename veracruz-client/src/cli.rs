@@ -19,52 +19,8 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::ffi;
 use veracruz_utils::platform::Platform;
-
-
-/// parser for file paths either in the form of
-/// --program=a.wasm or --program=b:a.wasm if a file should
-/// be provided as a different name.
-///
-/// Also accepts comma-separated lists of files.
-///
-/// Note we can't fail, because a malformed string may be
-/// interpreted as a really ugly filename. Fortunately these
-/// sort of mistakes should still be caught by a later
-/// "file-not-found" error.
-fn parse_file_paths(
-    s: &ffi::OsStr
-) -> Result<Vec<(String, path::PathBuf)>, ffi::OsString> {
-    match s.to_str() {
-        Some(s) => {
-            Ok(
-                s.split(",")
-                    .map(|s| {
-                        // TODO should we actually use = as a separator? more
-                        // common in CLIs
-                        match s.splitn(2, ":").collect::<Vec<_>>().as_slice() {
-                            [name, path] => (
-                                String::from(*name),
-                                path::PathBuf::from(*path)
-                            ),
-                            [path] => (
-                                String::from(*path),
-                                path::PathBuf::from(*path)
-                            ),
-                            _ => unreachable!(),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            )
-        },
-        None => {
-            Err(ffi::OsString::from(
-                format!("invalid path: {:?}", s)
-            ))
-        }
-    }
-}
+use veracruz_utils::policy::parsers;
 
 
 #[derive(Debug, StructOpt)]
@@ -100,7 +56,7 @@ struct Opt {
     #[structopt(
         short, long, multiple=true, number_of_values=1,
         visible_alias="programs",
-        parse(try_from_os_str=parse_file_paths)
+        parse(try_from_os_str=parsers::parse_renamable_paths)
     )]
     program: Vec<Vec<(String, path::PathBuf)>>,
 
@@ -118,7 +74,7 @@ struct Opt {
     #[structopt(
         short, long, multiple=true, number_of_values=1,
         visible_alias="datas",
-        parse(try_from_os_str=parse_file_paths)
+        parse(try_from_os_str=parsers::parse_renamable_paths)
     )]
     data: Vec<Vec<(String, path::PathBuf)>>,
 
@@ -143,7 +99,7 @@ struct Opt {
         visible_alias="outputs",
         visible_alias="result",
         visible_alias="results",
-        parse(try_from_os_str=parse_file_paths)
+        parse(try_from_os_str=parsers::parse_renamable_paths)
     )]
     output: Vec<Vec<(String, path::PathBuf)>>,
 
