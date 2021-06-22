@@ -230,6 +230,8 @@ fn main() {
     }
 
     // fetch result(s)?
+    // TODO why does results take the path to the _binary_? can this
+    // API be better?
     for (output_name, output_path) in opt.output.iter().flatten() {
         did_something = true;
 

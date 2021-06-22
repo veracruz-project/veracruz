@@ -28,8 +28,6 @@
 use std::io;
 use std::fs;
 use anyhow;
-// TODO remove?
-use hex;
 
 // lookup tables for log and exp of polynomials in GF(256), 
 const GF256_LOG: [u8; 256] = [
@@ -200,13 +198,13 @@ fn shares_read_all() -> io::Result<Vec<Vec<u8>>> {
     // open files until one fails
     let mut shares = vec![];
     for i in 0.. {
-        let filename = format!("input-{}", i);
+        let filename = format!("/input-{}", i);
         let share = match fs::read(filename) {
             Ok(share) => share,
             Err(err) => {
                 match err.kind() {
-                    io::ErrorKind::NotFound => break,
-                    _ => return Err(err)
+                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => break,
+                    _ => return Err(err),
                 }
             }
         };
@@ -226,6 +224,6 @@ fn main() -> anyhow::Result<()> {
     let secret = shares_reconstruct(&shares);
 
     // write our output
-    fs::write("output", &secret)?;
+    fs::write("/output", &secret)?;
     Ok(())
 }
