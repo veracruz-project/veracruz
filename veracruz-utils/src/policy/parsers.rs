@@ -20,7 +20,7 @@ use std::{
 };
 
 /// parser for a single file path either in the form of
-/// --program a.wasm or --program b:a.wasm if a file should
+/// --program a.wasm or --program b=a.wasm if a file should
 /// be provided as a different name.
 ///
 /// Note we can't fail, because a malformed string may be
@@ -34,9 +34,7 @@ pub fn parse_renamable_path(
     let s = s.to_str()
         .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
-    // TODO should we actually use = as a separator? more
-    // common in CLIs
-    match s.splitn(2, ":").collect::<Vec<_>>().as_slice() {
+    match s.splitn(2, "=").collect::<Vec<_>>().as_slice() {
         [name, path] => Ok((
             String::from(*name),
             path::PathBuf::from(*path)
@@ -50,7 +48,7 @@ pub fn parse_renamable_path(
 }
 
 /// parser for file paths either in the form of
-/// --program a.wasm or --program b:a.wasm if a file should
+/// --program a.wasm or --program b=a.wasm if a file should
 /// be provided as a different name.
 ///
 /// Also accepts comma-separated lists of files.
