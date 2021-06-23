@@ -16,9 +16,11 @@ WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 OPTEE_DIR_SDK ?= /work/rust-optee-trustzone-sdk/
-#AARCH64_OPENSSL_DIR ?= /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/build/openssl-1.0.2s/
 AARCH64_GCC ?= $(OPTEE_DIR)/toolchains/aarch64/bin/aarch64-linux-gnu-gcc
 SGX_RUST_FLAG ?= "-L/work/sgxsdk/lib64 -L/work/sgxsdk/sdk_libs"
+OPENSSL_INCLUDE_DIR ?= /usr/include/aarch64-linux-gnu
+OPENSSL_LIB_DIR ?= /usr/lib/aarch64-linux-gnu
+TRUSTZONE_C_INCLUDE_PATH ?= /usr/include/aarch64-linux-gnu:/usr/include
 NITRO_RUST_FLAG ?= ""
  
 all:
@@ -92,8 +94,8 @@ trustzone-test-collateral:
 
 trustzone-veracruz-server-test: trustzone-test-collateral
 	cd veracruz-server-test \
-        && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=/usr/include/aarch64-linux-gnu \
-                OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu C_INCLUDE_PATH=/usr/include/aarch64-linux-gnu:/usr/include \
+        && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
+                OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
                 cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
 		&& ./cp-veracruz-server-test-tz.sh
 	chmod u+x run_veracruz_server_test_tz.sh
@@ -101,8 +103,8 @@ trustzone-veracruz-server-test: trustzone-test-collateral
 
 trustzone-veracruz-test: trustzone-test-collateral
 	cd veracruz-test \
-        && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=/usr/include/aarch64-linux-gnu \
-                OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu C_INCLUDE_PATH=/usr/include/aarch64-linux-gnu:/usr/include \
+        && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
+                OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
                 cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1
 	cd veracruz-test && ./cp-veracruz-tz.sh
 	chmod u+x run_veracruz_test_tz.sh
