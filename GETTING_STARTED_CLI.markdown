@@ -233,10 +233,9 @@ $ vc-client example/example-policy.json \
     --key example/example-program-key.pem \
     --identity example/example-program-cert.pem \
     --program example-binary.wasm=example/example-binary.wasm
-[2021-02-12T01:27:18Z INFO  veracruz-client] Loading policy "example/example-policy.json"
-[2021-02-12T01:27:18Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-...
-[2021-02-12T01:27:18Z INFO  veracruz-client] Submitted program "example/example-binary.wasm"
+Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
+Connecting to 127.0.0.1:3017
+Submitting <enclave>/example-binary.wasm from example/example-binary.wasm
 ```
 
 Then lets send over our datas with identities with the "DataProvider" role.
@@ -249,31 +248,28 @@ $ vc-client example/example-policy.json \
     --target sgx \
     --key example/example-data0-key.pem \
     --identity example/example-data0-cert.pem \
-    --data input-0=<(echo "018b76552fa61d7f7661d2119b" | xxd -r -p)
-[2021-02-12T01:27:18Z INFO  veracruz-client] Loading policy "example/example-policy.json"
-[2021-02-12T01:27:18Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-...
-[2021-02-12T01:27:18Z INFO  veracruz-client] Submitted data "/dev/fd/63"
+    --data input-0=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
+Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
+Connecting to 127.0.0.1:3017
+Submitting <enclave>/input-0 from /dev/fd/63
 
 $ vc-client example/example-policy.json \
     --target sgx \
     --key example/example-data1-key.pem \
     --identity example/example-data1-cert.pem \
-    --data input-1=<(echo "02063622071451f67d6b00e602" | xxd -r -p)
-[2021-02-12T01:36:35Z INFO  veracruz-client] Loading policy "example/example-policy.json"
-[2021-02-12T01:36:35Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-...
-[2021-02-12T01:36:35Z INFO  veracruz-client] Submitted data "/dev/fd/63"
+    --data input-1=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
+Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
+Connecting to 127.0.0.1:3017
+Submitting <enclave>/input-1 from /dev/fd/63
 
 $ vc-client example/example-policy.json \
     --target sgx \
     --key example/example-data2-key.pem \
     --identity example/example-data2-cert.pem \
-    --data input-2=<(echo "03c5251b44dd6cde6478be93b8" | xxd -r -p)
-[2021-02-12T01:37:58Z INFO  veracruz-client] Loading policy "example/example-policy.json"
-[2021-02-12T01:37:58Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-...
-[2021-02-12T01:37:58Z INFO  veracruz-client] Submitted data "/dev/fd/63"
+    --data input-2=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
+Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
+Connecting to 127.0.0.1:3017
+Submitting <enclave>/input-2 from /dev/fd/63
 ```
 
 And finally, we can request the result using an identity with the
@@ -285,12 +281,11 @@ $ vc-client example/example-policy.json \
     --key example/example-result-key.pem \
     --identity example/example-result-cert.pem \
     --output example-binary.wasm=-
-[2021-02-12T01:40:21Z INFO  veracruz-client] Loading policy "example/example-policy.json"
-[2021-02-12T01:40:21Z INFO  veracruz-client] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-...
-[2021-02-12T01:40:21Z INFO  veracruz-client] Read results into "-"
-[2021-02-12T01:40:21Z INFO  veracruz-client] Shutdown server
+Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
+Connecting to 127.0.0.1:3017
+Reading <enclave>/example-binary.wasm into <stdout>
 Hello World!
+Shutting down enclave
 ```
 
 And that's it! You've now completed a confidential computation. Only the
