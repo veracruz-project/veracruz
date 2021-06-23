@@ -63,8 +63,6 @@ fn main() {
         }
     };
 
-    // TODO support restarting in a loop?
-    // TODO there's an unwrap panic that happens if we ctrl-C, need to fix
     info!("Veracruz Server running on {}", policy.veracruz_server_url());
     match sys.block_on(veracruz_server) {
         Ok(_) => {},
