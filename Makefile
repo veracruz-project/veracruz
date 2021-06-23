@@ -75,13 +75,13 @@ sgx-cli: sgx-env
 
 sgx-cli-install: sgx-cli
 	# install to Cargo's bin directory
-	cp proxy-attestation-server/target/debug/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
-	cp veracruz-server/target/debug/veracruz-server $(BIN_DIR)/veracruz-server
-	cp veracruz-client/target/debug/veracruz-client $(BIN_DIR)/veracruz-client
+	cp -f proxy-attestation-server/target/debug/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
+	cp -f veracruz-server/target/debug/veracruz-server $(BIN_DIR)/veracruz-server
+	cp -f veracruz-client/target/debug/veracruz-client $(BIN_DIR)/veracruz-client
 	# install CLIs in SDK/test-collateral
-	cp sdk/freestanding-execution-engine/target/release/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
-	cp sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
-	cp test-collateral/generate-policy/target/release/generate-policy $(BIN_DIR)/generate-policy
+	cp -f sdk/freestanding-execution-engine/target/release/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
+	cp -f sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
+	cp -f test-collateral/generate-policy/target/release/generate-policy $(BIN_DIR)/generate-policy
 	# symlink concise names
 	ln -sf $(BIN_DIR)/proxy-attestation-server      $(BIN_DIR)/vc-pas
 	ln -sf $(BIN_DIR)/veracruz-server               $(BIN_DIR)/vc-server
