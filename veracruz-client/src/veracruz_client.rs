@@ -477,7 +477,6 @@ impl VeracruzClient {
         enclave_session_id: u32,
         data: &Vec<u8>,
     ) -> Result<Option<(u32, Vec<Vec<u8>>)>, VeracruzClientError> {
-        println!("post_runtime_manager started");
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
