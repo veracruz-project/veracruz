@@ -21,38 +21,41 @@ tz = ["wasmi/std", "session-manager/tz", "execution-engine/tz", "veracruz-utils/
 nitro = [ "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "veracruz-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode", "wasi-types/std"]
 
 [dependencies]
-session-manager = { path = "../session-manager"}
+session-manager = { path = "../session-manager" }
 lazy_static = {version = "1.4.0", features=["spin_no_std"] }
 execution-engine = { path = "../execution-engine" }
 transport-protocol = { path = "../transport-protocol" }
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+protobuf = { path = "../third-party/protobuf/protobuf" }
+rustls = { path = "../third-party/rustls" }
+ring = { path = "../third-party/ring" }
+
 veracruz-utils = { path = "../veracruz-utils" }
-wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
+wasmi = { path = "../third-party/wasmi" }
 hex = { version = "=0.4.2", default-features = false }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
+serde_json = { path = "../third-party/serde_json" }
 err-derive = "0.2"
 nix = { version = "0.15", optional = true}
 byteorder = { version = "1.3", optional = true }
-bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }
-optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
+bincode = { path="../third-party/bincode", default-features = false, optional = true }
+libc = { path = "../third-party/libc", optional = true }
+
+optee-utee-sys = { path="../../rust-optee-trustzone-sdk/optee-utee/optee-utee-sys", optional = true }
+optee-utee = { path="../../rust-optee-trustzone-sdk/optee-utee", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib", optional = true }
 nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
-sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_tcrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_tdh = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+sgx_tcrypto = { path = "../third-party/rust-sgx-sdk/sgx_tcrypto", optional = true }
+sgx_tstd = { path = "../third-party/rust-sgx-sdk/sgx_tstd", optional = true }
+sgx_types = { path = "../third-party/rust-sgx-sdk/sgx_types", optional = true }
+sgx_tdh = { path = "../third-party/rust-sgx-sdk/sgx_tdh", optional = true }
+wasi-types = { path = "../third-party/wasi-types" }
 
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { branch="veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
-sgx_tstd = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
+sgx_alloc = { path = "../third-party/rust-sgx-sdk/sgx_alloc", optional = true }
+sgx_tstd = { path = "../third-party/rust-sgx-sdk/sgx_tstd", optional = true }
+
 
 [profile.release]
 lto = true

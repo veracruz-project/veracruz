@@ -13,8 +13,8 @@ clap = "2.33.3"
 data-encoding = "2.3.2"
 env_logger = "0.8.2"
 log = "0.4.14"
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
+ring = { path = "../../third-party/ring", features = ["non_sgx"] }
 veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
-serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", features = ["std"] }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz", features = ['std'] }
+serde = { path = "../../third-party/serde/serde", features = ["std"] }
+serde_json = { path = "../../third-party/serde_json", features = ["std"] }
+wasi-types = { path = "../../third-party/wasi-types.git", features = ['std'] }

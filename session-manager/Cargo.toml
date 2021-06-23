@@ -13,15 +13,15 @@ nitro = ["ring/std", "ring/non_sgx"]
 std = ["veracruz-utils/std", "ring/std"]
 
 [dependencies]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+rustls = { path = "../third-party/rustls" }
+ring = { path = "../third-party/ring" }
 veracruz-utils = { path = "../veracruz-utils" }
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
-webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git" , branch = "veracruz"}
+webpki = { path = "../third-party/webpki" }
+webpki-roots = { path = "../third-party/webpki-roots" }
 err-derive = "0.2"
-sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
+sgx_tstd = { path = "../third-party/rust-sgx-sdk/sgx_tstd", optional = true }
+sgx_types = { path = "../third-party/rust-sgx-sdk/sgx_types", optional = true }
+optee-utee = { path = "../../rust-optee-trustzone-sdk/optee-utee", optional = true }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
+sgx_alloc = { path = "../third-party/rust-sgx-sdk/sgx_alloc", optional = true }

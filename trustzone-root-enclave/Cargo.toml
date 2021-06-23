@@ -16,15 +16,15 @@ default = ["tz"]
 tz = []
 
 [dependencies]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+libc = { path = "../third-party/libc" }
 transport-protocol = { path = "../transport-protocol", features=["tz"] }
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz"}
+protobuf = { path = "../third-party/protobuf/protobuf" }
 psa-attestation = { path = "../psa-attestation", features=["tz"]}
-optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
+optee-utee-sys = { path="../rust-optee-trustzone-sdk/optee-utee/optee-utee-sys" }
+optee-utee = { path="../rust-optee-trustzone-sdk/optee-utee" }
 veracruz-utils = { path = "../veracruz-utils", features = ["tz"] }
 lazy_static = {version = "1.4.0", features=["spin_no_std"] }
-ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz" }
+ring = { path = "../third-party/ring" }
 
 [build-dependencies]
 uuid = { version = "=0.7.4", features = ["v4"] }

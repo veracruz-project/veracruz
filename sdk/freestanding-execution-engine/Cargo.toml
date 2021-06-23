@@ -13,11 +13,11 @@ veracruz-utils = { path = "../../veracruz-utils", features = ["std"] }
 clap = "2.33.3"
 env_logger = "0.7.1"
 log = "0.4.8"
-serde = { version = "1.0.103", features = ["derive"] }
+serde = { path = "../../third-party/serde/serde", features = ["derive"] }
 toml = "0.5.5"
-wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch="veracruz", features = ["non_sgx"] }
+wasmi = { path = "../../third-party/wasmi", features = ["non_sgx"] }
 wast = "=35.0.0"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { path = "../../third-party/wasi-types" }
 
 [[bin]]
 name = "freestanding-execution-engine"
