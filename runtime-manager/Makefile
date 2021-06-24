@@ -172,5 +172,6 @@ clean:
 	@rm -f $(OUT_DIR)/$(TZ_UUID).ta 
 	@rm -f $(OUT_DIR)/stripped_ta
 	@rm -f $(OUT_DIR)/runtime_manager_enclave
+	@rm -f $(RustEnclave_Name)
 	@rm -rf bin/
 	@rm -f css-*.bin
