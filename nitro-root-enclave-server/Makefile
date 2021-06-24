@@ -1,6 +1,5 @@
 # This makefile is used to generate the non-secure server for the AWS Nitro
-# Enclave for the Veracruz root
-# enclave
+# Enclave for the Veracruz root enclave
 #
 # AUTHORS
 #
@@ -14,6 +13,10 @@
 .PHONY:
 all:
 	cargo build
+
+.PHONY:
+fmt:
+	cargo fmt
 
 .PHONY:
 clean:
