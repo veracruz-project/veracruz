@@ -87,6 +87,8 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
     }
 }
 
+/// Convert a Certificate Signing Request (CSR) to an X.509 Certificate and
+/// sign it
 fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
     let csr = openssl::x509::X509Req::from_der(&csr_der)?;
     // first, verify the signature on the CSR
@@ -122,7 +124,9 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
-    // TODO: Make this configurable
+    // TODO: Currently setting the certificate expiry to a day from now. In the
+    // future it would be good to make it configurable (also, 1 day seems a bit
+    // long in this context)
     let expiry =openssl::asn1::Asn1Time::days_from_now(1)
                     .map_err(|err| {
                         println!("proxy-attestation-server::attestation::convert_csr_to_certificate days_from_now failed:{:?}", err);
@@ -134,6 +138,7 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
+    // Set the serial number of the certificate
     // TODO: Do we want to manage serial numbers? Right now, they are all the same
     let serial_number = {
         let sn_bignum = openssl::bn::BigNum::from_u32(23)
@@ -153,6 +158,7 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
+    // construct and set the issuer name of the certificate
     let issuer_name = {
         let mut issuer_name_builder = openssl::x509::X509NameBuilder::new()?;
         issuer_name_builder.append_entry_by_text("C", "US")?;
@@ -169,17 +175,21 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
+    // set the subject name of the certificate to the subject name from the CSR
     cert_builder.set_subject_name(csr.subject_name())
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_subject_name failed:{:?}", err);
             err
         })?;
+    // set the public key of the certificate to the public key from the CSR
     cert_builder.set_pubkey(csr.public_key()?.as_ref())
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate set_pubkey failed:{:?}", err);
             err
         })?;
 
+    // The alt-name extension is required by our client. It basically sets the
+    // URL that the certificat is valid for.
     let mut alt_name_extension = openssl::x509::extension::SubjectAlternativeName::new();
     alt_name_extension.dns("RootEnclave.dev");
     let built_extension = alt_name_extension.build(&cert_builder.x509v3_context(None, None))
@@ -193,6 +203,8 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
+    // setting the basic constraints extension to 'critical' - meaning required,
+    // to 'ca' meaning the certificate is a CA certificate
     let constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build()
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate BasicConstraints::new failed:{:?}", err);
@@ -224,10 +236,12 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate private_key_from_pem failed:{:?}", err);
             err
         })?;
+    // sign the certificate
     cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256())
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate cert_builder.sign failed:{:?}", err);
             err
         })?;
+    // build the final certificate and return it
     Ok(cert_builder.build())
 }

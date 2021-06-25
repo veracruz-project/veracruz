@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::vec::Vec;
+use std::{cmd::PartialOrd, fmt::Display, vec::Vec};
 
 use ring::{ rand::SystemRandom, signature::{ EcdsaKeyPair, KeyPair } };
 use err_derive::Error;
@@ -205,6 +205,10 @@ pub const COMPUTE_ENCLAVE_CERT_TEMPLATE: CertTemplate = CertTemplate {
     enclave_hash_location: (383, 383 + 32),
 };
 
+const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
+const CERTIFICATE_VALID_FROM: [u8; 6]= [2021, 5, 2, 17, 1, 0];
+const CERTIFICATE_EXPIRY: [u8; 6] = [2021, 5, 2, 17, 1, 0];
+
 pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Result<Vec<u8>, CertError> {
     let public_key = private_key.public_key().as_ref().clone();
     let mut constructed_csr = template.template.to_vec();
@@ -240,15 +244,24 @@ pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Resul
     return Ok(constructed_csr.clone());
 }
 
-const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
 pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_hash: &[u8], private_key: &EcdsaKeyPair) -> Result<std::vec::Vec<u8>, CertError> {
     let mut constructed_cert = cert_template.template.to_vec();
-    let valid_from = generate_utc_time(2021, 5, 2, 17, 1, 0)?;
+    let valid_from = generate_utc_time(CERTIFICATE_VALID_FROM[0].into(),
+                                       CERTIFICATE_VALID_FROM[1],
+                                       CERTIFICATE_VALID_FROM[2],
+                                       CERTIFICATE_VALID_FROM[3],
+                                       CERTIFICATE_VALID_FROM[4],
+                                       CERTIFICATE_VALID_FROM[5])?;
     constructed_cert.splice(cert_template.valid_from_location.0..cert_template.valid_from_location.1,
         valid_from,
     );
     // TODO: Once the root enclave is gone, this can be done properly inside the proxy service
-    let valid_until = generate_utc_time(2031, 5, 30, 17, 1, 0)?;
+    let valid_until = generate_utc_time(CERTIFICATE_EXPIRY[0].into(),
+                                        CERTIFICATE_EXPIRY[1],
+                                        CERTIFICATE_EXPIRY[2],
+                                        CERTIFICATE_EXPIRY[3],
+                                        CERTIFICATE_EXPIRY[4],
+                                        CERTIFICATE_EXPIRY[5])?;
     constructed_cert.splice(cert_template.valid_until_location.0..cert_template.valid_until_location.1,
         valid_until,
     );
@@ -280,9 +293,14 @@ pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_has
     return Ok(constructed_cert.clone());
 }
 
-pub fn generate_utc_time(year: u32, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Result<Vec<u8>, CertError> {
+pub fn generate_utc_time<T: Into<u8> + Clone + Display + PartialOrd> (year: u32, month: T, day: T, hour: T, minute: T, second: T) -> Result<Vec<u8>, CertError> {
     if month > 11 || day > 30 || hour > 23 || minute > 59 || second > 59 {
-        return Err(CertError::InvalidUtcInputs { month, day, hour, minute, second });
+        return Err(CertError::InvalidUtcInputs { month: month,
+            day: day.into(),
+            hour: hour.into(),
+            minute: minute.into(),
+            second: second.into(),
+        });
     }
     let year = year % 2000;
     let generated_time = format!(
