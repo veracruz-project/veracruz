@@ -42,11 +42,11 @@ pub enum CertError {
         second
     )]
     InvalidUtcInputs {
-        month: u8,
-        day: u8,
-        hour: u8,
-        minute: u8,
-        second: u8
+        month: u32,
+        day: u32,
+        hour: u32,
+        minute: u32,
+        second: u32,
     },
 }
 
@@ -206,8 +206,9 @@ pub const COMPUTE_ENCLAVE_CERT_TEMPLATE: CertTemplate = CertTemplate {
 };
 
 const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
-const CERTIFICATE_VALID_FROM: [u8; 6]= [2021, 5, 2, 17, 1, 0];
-const CERTIFICATE_EXPIRY: [u8; 6] = [2021, 5, 2, 17, 1, 0];
+
+const CERTIFICATE_VALID_FROM: [u32; 6]= [2021, 5, 2, 17, 1, 0];
+const CERTIFICATE_EXPIRY: [u32; 6] = [2021, 5, 2, 17, 1, 0];
 
 pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Result<Vec<u8>, CertError> {
     let public_key = private_key.public_key().as_ref().clone();
@@ -246,7 +247,7 @@ pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Resul
 
 pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_hash: &[u8], private_key: &EcdsaKeyPair) -> Result<std::vec::Vec<u8>, CertError> {
     let mut constructed_cert = cert_template.template.to_vec();
-    let valid_from = generate_utc_time(CERTIFICATE_VALID_FROM[0].into(),
+    let valid_from = generate_utc_time(CERTIFICATE_VALID_FROM[0],
                                        CERTIFICATE_VALID_FROM[1],
                                        CERTIFICATE_VALID_FROM[2],
                                        CERTIFICATE_VALID_FROM[3],
@@ -256,7 +257,7 @@ pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_has
         valid_from,
     );
     // TODO: Once the root enclave is gone, this can be done properly inside the proxy service
-    let valid_until = generate_utc_time(CERTIFICATE_EXPIRY[0].into(),
+    let valid_until = generate_utc_time(CERTIFICATE_EXPIRY[0],
                                         CERTIFICATE_EXPIRY[1],
                                         CERTIFICATE_EXPIRY[2],
                                         CERTIFICATE_EXPIRY[3],
@@ -293,7 +294,7 @@ pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_has
     return Ok(constructed_cert.clone());
 }
 
-pub fn generate_utc_time(year: u32, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Result<Vec<u8>, CertError> {
+pub fn generate_utc_time(year: u32, month: u32, day: u32, hour: u32, minute: u32, second: u32) -> Result<Vec<u8>, CertError> {
     if month > 11 || day > 30 || hour > 23 || minute > 59 || second > 59 {
         return Err(CertError::InvalidUtcInputs { month,
                                                  day,
