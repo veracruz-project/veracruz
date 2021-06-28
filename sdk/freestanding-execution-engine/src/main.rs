@@ -28,6 +28,7 @@ use execution_engine::{execute, fs::FileSystem};
 use log::*;
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     error::Error,
     fs::File,
     io::Read,
@@ -37,7 +38,7 @@ use std::{
     vec::Vec,
     path::PathBuf,
 };
-use veracruz_utils::policy::principal::{ExecutionStrategy, Principal};
+use veracruz_utils::policy::principal::{ExecutionStrategy, FileRights, Principal, StandardChannel};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -227,15 +228,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::PATH_CREATE_FILE
         | Rights::PATH_FILESTAT_SET_SIZE;
 
+    // Set up standard channels table
+    let std_channels_table = vec![
+        StandardChannel::Stdin(FileRights::new(String::from("stdin"), u64::from(read_right) as u32)),
+        StandardChannel::Stdout(FileRights::new(String::from("stdout"), u64::from(write_right) as u32)),
+        StandardChannel::Stderr(FileRights::new(String::from("stderr"), u64::from(write_right) as u32)),
+    ];
+
     // Manually create the Right table for the VFS.
     file_table.insert(PathBuf::from(prog_file_name.clone()), write_right);
     for file_path in cmdline.data_sources.iter() {
         file_table.insert(PathBuf::from(file_path), read_right);
     }
+    for std_channel in &std_channels_table {
+        let (path, rights) = match std_channel {
+            StandardChannel::Stdin(file_rights) => (file_rights.file_name(), file_rights.rights()),
+            StandardChannel::Stdout(file_rights) => (file_rights.file_name(), file_rights.rights()),
+            StandardChannel::Stderr(file_rights) => (file_rights.file_name(), file_rights.rights()),
+        };
+        let rights = Rights::try_from(*rights as u64)
+            .map_err(|e| format!("Failed to convert u64 to Rights: {:?}", e))?;
+        file_table.insert(PathBuf::from(path), rights);
+    }
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_channels_table)));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(
