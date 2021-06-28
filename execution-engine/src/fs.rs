@@ -21,19 +21,12 @@ use std::{
     path::{Path, PathBuf},
     vec::Vec,
 };
-use veracruz_utils::policy::principal::{Principal, RightsTable};
+use veracruz_utils::policy::principal::{Principal, RightsTable, StandardChannel};
 use wasi_types::{
     Advice, ClockId, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize,
     FileStat, FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights,
     RoFlags, SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
-
-////////////////////////////////////////////////////////////////////////////////
-// Standard channels.
-////////////////////////////////////////////////////////////////////////////////
-pub const STDIN: (&'static str, u32, u64) = ("stdin", 0, 0);
-pub const STDOUT: (&'static str, u32, u64) = ("stdout", 1, 1);
-pub const STDERR: (&'static str, u32, u64) = ("stderr", 2, 2);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -112,6 +105,7 @@ impl FileSystem {
     /// The root directory name. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY: &'static str = "/";
     /// The root directory inode. It will be pre-opened for any wasm program.
+    /// File descriptors 0 to 2 are reserved for the standard channels.
     pub const ROOT_DIRECTORY_INODE: Inode = Inode(3);
     /// The root directory file descriptor. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
@@ -124,7 +118,10 @@ impl FileSystem {
     /// similar.  Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
-    pub fn new(rights_table: RightsTable) -> Self {
+    pub fn new(
+        rights_table: RightsTable,
+        std_channels_table: &Vec<StandardChannel>,
+    ) -> Self {
         let mut rst = Self {
             fd_table: HashMap::new(),
             path_table: HashMap::new(),
@@ -132,7 +129,7 @@ impl FileSystem {
             rights_table,
             prestat_table: HashMap::new(),
         };
-        rst.install_prestat(&vec![""]);
+        rst.install_prestat(&vec![""], std_channels_table);
         rst
     }
 
@@ -142,27 +139,39 @@ impl FileSystem {
 
     #[inline]
     /// Install standard channels (`stdin`, `stdout`, `stderr`)
-    fn install_standard_channel<T: AsRef<Path> + Sized>(
+    fn install_standard_channels(
         &mut self,
-        (path, fd_number, inode_number): (T, u32, u64),
-        rights_base: &Rights,
+        std_channels_table: &Vec<StandardChannel>,
     ) {
-        self.install_file(&path, Inode(inode_number), "".as_bytes());
-        self.install_fd(
-            Fd(fd_number),
-            Inode(inode_number),
-            rights_base,
-            &Rights::empty()
-        );
+        for std_channel in std_channels_table {
+            // Map each standard channel to an fd and inode.
+            // Rights are assumed to be already configured by the execution engine in the rights table
+            // at that point.
+            // Base rights are ignored and replaced with the default rights
+            let (path, fd_number, inode_number) = match std_channel {
+                StandardChannel::Stdin(file_rights) => (file_rights.file_name(), 0, 0),
+                StandardChannel::Stdout(file_rights) => (file_rights.file_name(), 1, 1),
+                StandardChannel::Stderr(file_rights) => (file_rights.file_name(), 2, 2),
+            };
+            self.install_file(&path, Inode(inode_number), "".as_bytes());
+            self.install_fd(
+                Fd(fd_number),
+                Inode(inode_number),
+                &Self::DEFAULT_RIGHTS,
+                &Self::DEFAULT_RIGHTS,
+            );
+        }
     }
 
     /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
     /// and then pre-open them.
-    fn install_prestat<T: AsRef<Path> + Sized>(&mut self, dir_paths: &[T]) {
+    fn install_prestat<T: AsRef<Path> + Sized>(
+        &mut self,
+        dir_paths: &[T],
+        std_channels_table: &Vec<StandardChannel>,
+    ) {
         // Pre open the standard channels.
-        self.install_standard_channel(STDIN, &Rights::FD_READ);
-        self.install_standard_channel(STDOUT, &Rights::FD_WRITE);
-        self.install_standard_channel(STDERR, &Rights::FD_WRITE);
+        self.install_standard_channels(std_channels_table);
 
         // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
         self.install_dir(Path::new(Self::ROOT_DIRECTORY), Self::ROOT_DIRECTORY_INODE);
