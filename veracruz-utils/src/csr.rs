@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{cmd::PartialOrd, fmt::Display, vec::Vec};
+use std::{cmp::PartialOrd, fmt::Display, vec::Vec};
 
 use ring::{ rand::SystemRandom, signature::{ EcdsaKeyPair, KeyPair } };
 use err_derive::Error;
