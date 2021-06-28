@@ -34,6 +34,9 @@ sdk:
 sgx-test-collateral:
 	TEE=sgx $(MAKE) -C test-collateral
 
+trustzone-test-collateral:
+	TEE=tz $(MAKE) -C test-collateral
+
 # Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
 sgx-veracruz-client-test: sgx sgx-test-collateral 
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --lib --features "mock sgx" -- --test-threads=1
