@@ -27,7 +27,7 @@ use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
     policy::Policy,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, Identity, Program, FileRights, StandardChannel},
+    principal::{ExecutionStrategy, Identity, Program, FileRights, StandardStream},
 };
 use wasi_types::Rights;
 
@@ -711,23 +711,23 @@ fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
     }
 }
 
-/// Serializes the standard channels of all principals in the Veracruz computation into
-/// a vec of StandardChannel.
-fn serialize_std_channels(arguments: &Arguments) -> Vec<StandardChannel> {
-    info!("Serializing standard channels.");
+/// Serializes the standard streams of all principals in the Veracruz computation into
+/// a vec of StandardStream.
+fn serialize_std_streams(arguments: &Arguments) -> Vec<StandardStream> {
+    info!("Serializing standard streams.");
     
-    let mut std_channels_table = Vec::new();
+    let mut std_streams_table = Vec::new();
     if let Some(stdin) = &arguments.stdin {
-        std_channels_table.push(StandardChannel::Stdin(serialize_capability_entry(&stdin)));
+        std_streams_table.push(StandardStream::Stdin(serialize_capability_entry(&stdin)));
     }
     if let Some(stdout) = &arguments.stdout {
-        std_channels_table.push(StandardChannel::Stdout(serialize_capability_entry(&stdout)));
+        std_streams_table.push(StandardStream::Stdout(serialize_capability_entry(&stdout)));
     }
     if let Some(stderr) = &arguments.stderr {
-        std_channels_table.push(StandardChannel::Stderr(serialize_capability_entry(&stderr)));
+        std_streams_table.push(StandardStream::Stderr(serialize_capability_entry(&stderr)));
     }
 
-    std_channels_table
+    std_streams_table
 }
 
 /// Serializes the Veracruz policy file as a JSON value.
@@ -752,7 +752,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         format!("{}", &arguments.proxy_attestation_server_ip.as_ref().expect(&format!("Failed to get the proxy attestation server ip"))),
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
-        serialize_std_channels(arguments),
+        serialize_std_streams(arguments),
     ).expect("Failed to instantiate a (struct) policy");
 
     json!(policy)

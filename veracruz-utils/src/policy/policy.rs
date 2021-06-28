@@ -35,7 +35,7 @@ use crate::{
         error::PolicyError,
         expiry::Timepoint,
         principal::{
-            RightsTable, ExecutionStrategy, Identity, Principal, StandardChannel,
+            RightsTable, ExecutionStrategy, Identity, Principal, StandardStream,
             Program,
         },
     },
@@ -88,8 +88,8 @@ pub struct Policy {
     debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
-    /// The rights table of the standard channels.
-    std_channels_table: Vec<StandardChannel>,
+    /// The rights table of the standard streams.
+    std_streams_table: Vec<StandardStream>,
 }
 
 impl Policy {
@@ -108,7 +108,7 @@ impl Policy {
         proxy_attestation_server_url: String,
         debug: bool,
         execution_strategy: ExecutionStrategy,
-        std_channels_table: Vec<StandardChannel>,
+        std_streams_table: Vec<StandardStream>,
     ) -> Result<Self, PolicyError> {
         let policy = Self {
             identities,
@@ -122,7 +122,7 @@ impl Policy {
             proxy_attestation_server_url,
             debug,
             execution_strategy,
-            std_channels_table,
+            std_streams_table,
         };
 
         policy.assert_valid()?;
@@ -225,10 +225,10 @@ impl Policy {
         &self.execution_strategy
     }
 
-    /// Return the rights of the standard channels, associated with this policy.
+    /// Return the rights of the standard streams, associated with this policy.
     #[inline]
-    pub fn std_channels_table(&self) -> &Vec<StandardChannel> {
-        &self.std_channels_table
+    pub fn std_streams_table(&self) -> &Vec<StandardStream> {
+        &self.std_streams_table
     }
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
