@@ -293,13 +293,13 @@ pub fn convert_csr_to_cert(csr: &[u8], cert_template: &CertTemplate, enclave_has
     return Ok(constructed_cert.clone());
 }
 
-pub fn generate_utc_time<T: Into<u8> + Clone + Display + PartialOrd> (year: u32, month: T, day: T, hour: T, minute: T, second: T) -> Result<Vec<u8>, CertError> {
+pub fn generate_utc_time(year: u32, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Result<Vec<u8>, CertError> {
     if month > 11 || day > 30 || hour > 23 || minute > 59 || second > 59 {
-        return Err(CertError::InvalidUtcInputs { month: month,
-            day: day.into(),
-            hour: hour.into(),
-            minute: minute.into(),
-            second: second.into(),
+        return Err(CertError::InvalidUtcInputs { month,
+                                                 day,
+                                                 hour,
+                                                 minute,
+                                                 second,
         });
     }
     let year = year % 2000;
