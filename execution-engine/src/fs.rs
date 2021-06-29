@@ -137,8 +137,7 @@ impl FileSystem {
     // Internal auxiliary methods
     ////////////////////////////////////////////////////////////////////////
 
-    #[inline]
-    /// Install standard streams (`stdin`, `stdout`, `stderr`)
+    /// Install standard streams (`stdin`, `stdout`, `stderr`).
     fn install_standard_streams(
         &mut self,
         std_streams_table: &Vec<StandardStream>,
