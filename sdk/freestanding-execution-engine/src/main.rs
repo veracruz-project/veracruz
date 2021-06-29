@@ -295,6 +295,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
     eprint!("{}", stderr_dump);
 
-    info!("WASM program {} loaded into VFS.", prog_file_name);
     Ok(())
 }
