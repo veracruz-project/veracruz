@@ -67,8 +67,8 @@ trustzone: sdk trustzone-env
 # Using wildcard in the dependencies because if they are there, and newer, it
 # should be rebuilt, but if they aren't there, they don't need to be built 
 # (they are optional)
-veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
-	cd veracruz-test &&
+veracruz-test/proxy-attestation-server.db: #$(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
+	cd veracruz-test && \
 		bash ../test-collateral/populate-test-database.sh
 
 # Using wildcard in the dependencies because if they are there, and newer, it
