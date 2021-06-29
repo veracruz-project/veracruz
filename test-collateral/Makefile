@@ -301,7 +301,8 @@ basic_file_read_write.json: pgen css-$(TEE).bin client_rsa_cert.pem read-file.wa
         --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0)
+		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 .SECONDEXPANSION:
 $(WASM_PROG_FILES) : %.wasm: ../sdk/rust-examples/%/target/wasm32-wasi/release/$$@
