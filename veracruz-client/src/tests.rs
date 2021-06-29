@@ -249,7 +249,7 @@ fn test_veracruz_client_new_succ() {
 
         assert!(policy.is_ok());
         let policy = policy.unwrap();
-        assert!(VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &Platform::Mock).is_ok());
+        assert!(VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy).is_ok());
     });
 }
 
@@ -271,7 +271,7 @@ fn test_veracruz_client_new_fail() {
     iterate_over_policy("../test-collateral/invalid_policy/", |policy| {
         if let Ok(policy) = policy {
             assert!(
-                VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy, &Platform::Mock).is_err(),
+                VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy).is_err(),
                 format!("{:?}", policy)
             );
         }
@@ -293,7 +293,7 @@ fn test_veracruz_client_new_unmatched_client_certificate() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let rst = VeracruzClient::new(DATA_CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &Platform::Mock);
+    let rst = VeracruzClient::new(DATA_CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json);
     assert!(rst.is_err());
 }
 
@@ -312,7 +312,7 @@ fn test_veracruz_client_new_unmatched_client_key() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let rst = VeracruzClient::new(CLIENT_CERT_FILENAME, DATA_CLIENT_KEY_FILENAME, &policy_json, &Platform::Mock);
+    let rst = VeracruzClient::new(CLIENT_CERT_FILENAME, DATA_CLIENT_KEY_FILENAME, &policy_json);
     assert!(rst.is_err());
 }
 
@@ -331,7 +331,7 @@ fn test_veracruz_client_new_invalid_enclave_name() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let rst = VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &Platform::Mock);
+    let rst = VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json);
     assert!(rst.is_err());
 }
 
@@ -403,7 +403,6 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
         DATA_CLIENT_CERT_FILENAME,
         DATA_CLIENT_KEY_FILENAME,
         &policy_json,
-        &Platform::Mock,
     )?;
 
     let fake_data = vec![0xde, 0xad, 0xbe, 0xef];
@@ -417,7 +416,6 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
         PROGRAM_CLIENT_CERT_FILENAME,
         PROGRAM_CLIENT_KEY_FILENAME,
         &policy_json,
-        &Platform::Mock,
     )?;
 
     let sd_ret = program_client.send_data("fake_data",&fake_data.to_vec());
@@ -468,7 +466,7 @@ fn veracruz_client_session() {
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
     let mut _veracruz_client =
-        crate::veracruz_client::VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json, &Platform::Mock)
+        crate::veracruz_client::VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json)
             .unwrap();
 
     let client_cert = {
