@@ -16,7 +16,7 @@
 
 use clap::{App, Arg};
 use downloader::{Download, Downloader};
-use image::{ImageFormat, io::Reader};
+use image::{io::Reader, ImageFormat};
 use std::{error::Error, path::Path};
 
 /// Download a random JPEG image from https://picsum.photos/ and save it in a *.dat, then convert it
@@ -86,28 +86,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .download_folder(std::path::Path::new("./"))
         .parallel_requests(1)
         .build()
-        .unwrap();
+        .expect("Failed to configure the downloader");
     let file_path = format!("{}.dat", file_prefix);
-    let dl = Download::new(
-        format!("https://picsum.photos/{}/{}", image_width, image_height).as_str()
-    )
-        .file_name(Path::new(&file_path));
-    let _result = downloader.download(&[dl]).map_err(|e| {
-        format!("Failed to download image: {}", e)
-    });
+    let dl =
+        Download::new(format!("https://picsum.photos/{}/{}", image_width, image_height).as_str())
+            .file_name(Path::new(&file_path));
+    let _result = downloader
+        .download(&[dl])
+        .map_err(|e| format!("Failed to download image: {}", e));
 
     // Convert image to PNG.
     // This is required by the example, as `image` uses threads to load JPG images, which are not supported in WebAssembly
-    let mut reader = Reader::open(&file_path).map_err(|e| {
-        format!("Failed to open image: {}", e)
-    })?;
+    let mut reader =
+        Reader::open(&file_path).map_err(|e| format!("Failed to open image: {}", e))?;
     reader.set_format(ImageFormat::Jpeg);
-    let img = reader.decode().map_err(|e| {
-        format!("Failed to load image: {}", e)
-    })?;
-    let _result = img.save_with_format(file_path, ImageFormat::Png).map_err(|e| {
-        format!("Failed to save image: {}", e)
-    });
+    let img = reader
+        .decode()
+        .map_err(|e| format!("Failed to load image: {}", e))?;
+    let _result = img
+        .save_with_format(file_path, ImageFormat::Png)
+        .map_err(|e| format!("Failed to save image: {}", e));
 
     Ok(())
 }
