@@ -81,7 +81,9 @@ struct CommandLineOptions {
     binary: String,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
+    /// Whether the contents of `stdout` should be dumped before exiting
     dump_stdout: bool,
+    /// Whether the contents of `stderr` should be dumped before exiting
     dump_stderr: bool,
 }
 
