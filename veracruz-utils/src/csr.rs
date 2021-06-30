@@ -208,7 +208,7 @@ pub const COMPUTE_ENCLAVE_CERT_TEMPLATE: CertTemplate = CertTemplate {
 const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
 
 const CERTIFICATE_VALID_FROM: [u32; 6]= [2021, 5, 2, 17, 1, 0];
-const CERTIFICATE_EXPIRY: [u32; 6] = [2021, 12, 31, 17, 1, 0];
+const CERTIFICATE_EXPIRY: [u32; 6] = [2021, 11, 29, 17, 1, 0];
 
 pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Result<Vec<u8>, CertError> {
     let public_key = private_key.public_key().as_ref().clone();
