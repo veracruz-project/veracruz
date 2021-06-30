@@ -29,7 +29,7 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, V
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new()))), Principal::NoCap));
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new(), &vec![]))), Principal::NoCap));
 }
 
 /// A macro for lock the global VFS and store the result in the variable,

@@ -100,8 +100,9 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let rights_table = global_policy.get_rights_table();
+        let std_streams_table = global_policy.std_streams_table();
         let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table)));
+        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)));
 
         Ok(ProtocolState {
             global_policy,

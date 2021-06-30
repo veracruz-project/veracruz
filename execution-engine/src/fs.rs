@@ -21,7 +21,7 @@ use std::{
     path::{Path, PathBuf},
     vec::Vec,
 };
-use veracruz_utils::policy::principal::{Principal, RightsTable};
+use veracruz_utils::policy::principal::{Principal, RightsTable, StandardStream};
 use wasi_types::{
     Advice, ClockId, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize,
     FileStat, FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights,
@@ -105,7 +105,8 @@ impl FileSystem {
     /// The root directory name. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY: &'static str = "/";
     /// The root directory inode. It will be pre-opened for any wasm program.
-    pub const ROOT_DIRECTORY_INODE: Inode = Inode(2);
+    /// File descriptors 0 to 2 are reserved for the standard streams.
+    pub const ROOT_DIRECTORY_INODE: Inode = Inode(3);
     /// The root directory file descriptor. It will be pre-opened for any wasm program.
     pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
@@ -117,7 +118,10 @@ impl FileSystem {
     /// similar.  Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
-    pub fn new(rights_table: RightsTable) -> Self {
+    pub fn new(
+        rights_table: RightsTable,
+        std_streams_table: &Vec<StandardStream>,
+    ) -> Self {
         let mut rst = Self {
             fd_table: HashMap::new(),
             path_table: HashMap::new(),
@@ -125,7 +129,7 @@ impl FileSystem {
             rights_table,
             prestat_table: HashMap::new(),
         };
-        rst.install_prestat(&vec![""]);
+        rst.install_prestat(&vec![""], std_streams_table);
         rst
     }
 
@@ -133,16 +137,40 @@ impl FileSystem {
     // Internal auxiliary methods
     ////////////////////////////////////////////////////////////////////////
 
+    /// Install standard streams (`stdin`, `stdout`, `stderr`).
+    fn install_standard_streams(
+        &mut self,
+        std_streams_table: &Vec<StandardStream>,
+    ) {
+        for std_stream in std_streams_table {
+            // Map each standard stream to an fd and inode.
+            // Rights are assumed to be already configured by the execution engine in the rights table
+            // at that point.
+            // Base rights are ignored and replaced with the default rights
+            let (path, fd_number, inode_number) = match std_stream {
+                StandardStream::Stdin(file_rights) => (file_rights.file_name(), 0, 0),
+                StandardStream::Stdout(file_rights) => (file_rights.file_name(), 1, 1),
+                StandardStream::Stderr(file_rights) => (file_rights.file_name(), 2, 2),
+            };
+            self.install_file(&path, Inode(inode_number), "".as_bytes());
+            self.install_fd(
+                Fd(fd_number),
+                Inode(inode_number),
+                &Self::DEFAULT_RIGHTS,
+                &Self::DEFAULT_RIGHTS,
+            );
+        }
+    }
+
     /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
     /// and then pre-open them.
-    fn install_prestat<T: AsRef<Path> + Sized>(&mut self, dir_paths: &[T]) {
-        // Pre open the stdin stdout and stderr.
-        self.install_file("stderr", Inode(0), "".as_bytes());
-        self.install_fd(Fd(0), Inode(0), &Rights::FD_READ, &Rights::FD_READ);
-        self.install_file("stdin", Inode(1), "".as_bytes());
-        self.install_fd(Fd(1), Inode(1), &Rights::FD_READ, &Rights::FD_READ);
-        self.install_file("stderr", Inode(2), "".as_bytes());
-        self.install_fd(Fd(2), Inode(2), &Rights::FD_READ, &Rights::FD_READ);
+    fn install_prestat<T: AsRef<Path> + Sized>(
+        &mut self,
+        dir_paths: &[T],
+        std_streams_table: &Vec<StandardStream>,
+    ) {
+        // Pre open the standard streams.
+        self.install_standard_streams(std_streams_table);
 
         // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
         self.install_dir(Path::new(Self::ROOT_DIRECTORY), Self::ROOT_DIRECTORY_INODE);
@@ -157,13 +185,14 @@ impl FileSystem {
 
         // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
         let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
+        let root_inode_number = Self::ROOT_DIRECTORY_INODE.0;
         for (index, path) in dir_paths.iter().enumerate() {
-            let index = index as u32;
-            let new_fd = Fd(index + root_fd_number + 1);
-            self.install_dir(path, Self::ROOT_DIRECTORY_INODE);
+            let new_inode = Inode(index as u64 + root_inode_number + 1);
+            let new_fd = Fd(index as u32 + root_fd_number + 1);
+            self.install_dir(path, new_inode);
             self.install_fd(
                 new_fd,
-                Self::ROOT_DIRECTORY_INODE,
+                new_inode,
                 &Self::DEFAULT_RIGHTS,
                 &Self::DEFAULT_RIGHTS,
             );

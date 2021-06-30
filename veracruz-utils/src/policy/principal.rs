@@ -257,3 +257,20 @@ impl Identity<String> {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Standard streams.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Standard streams (`stdin`, `stdout`, `stderr`) are mapped to the VFS just like any other file, though
+/// associated with specific file descriptors and inodes.
+/// Their path (filename) and access rights are configured in the JSON policy file.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum StandardStream {
+    /// Standard input stream with its rights
+    Stdin(FileRights),
+    /// Standard output stream with its rights
+    Stdout(FileRights),
+    /// Standard error stream with its rights
+    Stderr(FileRights),
+}

@@ -28,16 +28,18 @@ use execution_engine::{execute, fs::FileSystem};
 use log::*;
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     error::Error,
     fs::File,
     io::Read,
     path::Path,
     sync::{Arc, Mutex},
+    str::FromStr,
     time::Instant,
     vec::Vec,
     path::PathBuf,
 };
-use veracruz_utils::policy::principal::{ExecutionStrategy, Principal};
+use veracruz_utils::policy::principal::{ExecutionStrategy, FileRights, Principal, StandardStream};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +62,13 @@ const VERSION: &'static str = "pre-alpha";
 /// Application version number.
 const OUTPUT_FILE: &'static str = "output";
 
+/// The default dump status of `stdout`, if no alternative is provided on the
+/// command line.
+const DEFAULT_DUMP_STDOUT: bool = false;
+/// The default dump status of `stderr`, if no alternative is provided on the
+/// command line.
+const DEFAULT_DUMP_STDERR: bool = false;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,12 +81,20 @@ struct CommandLineOptions {
     binary: String,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
+    /// Whether the contents of `stdout` should be dumped before exiting
+    dump_stdout: bool,
+    /// Whether the contents of `stderr` should be dumped before exiting
+    dump_stderr: bool,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
+
+    let default_dump_stdout = DEFAULT_DUMP_STDOUT.to_string();
+    let default_dump_stderr = DEFAULT_DUMP_STDERR.to_string();
+
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -111,6 +128,24 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .required(false)
                 .multiple(false)
                 .default_value("interp"),
+        )
+        .arg(
+            Arg::with_name("dump-stdout")
+                .short("o")
+                .long("dump-stdout")
+                .help("Whether the contents of stdout should be dumped before exiting")
+                .required(true)
+                .value_name("BOOLEAN")
+                .default_value(&default_dump_stdout),
+        )
+        .arg(
+            Arg::with_name("dump-stderr")
+                .short("e")
+                .long("dump-stderr")
+                .help("Whether the contents of stderr should be dumped before exiting")
+                .required(true)
+                .value_name("BOOLEAN")
+                .default_value(&default_dump_stderr),
         )
         .get_matches();
 
@@ -151,10 +186,36 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         Vec::new()
     };
 
+    let dump_stdout = if let Some(dump_stdout) = matches.value_of("dump-stdout") {
+        if let Ok(dump_stdout) = bool::from_str(dump_stdout) {
+            if dump_stdout { info!("stdout configured to be dumped before exiting."); }
+            dump_stdout
+        } else {
+            return Err(format!("Expecting a boolean, but found {}", dump_stdout)
+            .into());
+        }
+    } else {
+        return Err("Default 'dump-stdout' value is not loaded correctly".into());
+    };
+
+    let dump_stderr = if let Some(dump_stderr) = matches.value_of("dump-stderr") {
+        if let Ok(dump_stderr) = bool::from_str(dump_stderr) {
+            if dump_stderr { info!("stderr configured to be dumped before exiting."); }
+            dump_stderr
+        } else {
+            return Err(format!("Expecting a boolean, but found {}", dump_stderr)
+            .into());
+        }
+    } else {
+        return Err("Default 'dump-stderr' value is not loaded correctly".into());
+    };
+
     Ok(CommandLineOptions {
         data_sources,
         binary,
         execution_strategy,
+        dump_stdout,
+        dump_stderr,
     })
 }
 
@@ -227,15 +288,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::PATH_CREATE_FILE
         | Rights::PATH_FILESTAT_SET_SIZE;
 
+    // Set up standard streams table
+    let std_streams_table = vec![
+        StandardStream::Stdin(FileRights::new(String::from("stdin"), u64::from(read_right) as u32)),
+        StandardStream::Stdout(FileRights::new(String::from("stdout"), u64::from(write_right) as u32)),
+        StandardStream::Stderr(FileRights::new(String::from("stderr"), u64::from(write_right) as u32)),
+    ];
+
     // Manually create the Right table for the VFS.
     file_table.insert(PathBuf::from(prog_file_name.clone()), write_right);
     for file_path in cmdline.data_sources.iter() {
         file_table.insert(PathBuf::from(file_path), read_right);
     }
+    for std_stream in &std_streams_table {
+        let (path, rights) = match std_stream {
+            StandardStream::Stdin(file_rights) => (file_rights.file_name(), file_rights.rights()),
+            StandardStream::Stdout(file_rights) => (file_rights.file_name(), file_rights.rights()),
+            StandardStream::Stderr(file_rights) => (file_rights.file_name(), file_rights.rights()),
+        };
+        let rights = Rights::try_from(*rights as u64)
+            .map_err(|e| format!("Failed to convert u64 to Rights: {:?}", e))?;
+        file_table.insert(PathBuf::from(path), rights);
+    }
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table)));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(
@@ -254,5 +332,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     let return_code = execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name)?;
     info!("return code: {:?}", return_code);
     info!("time: {} micro seconds", main_time.elapsed().as_micros());
+
+    // Dump contents of stdout
+    if cmdline.dump_stdout {
+        let buf = vfs.lock()
+            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+            .read_file_by_filename(
+                &Principal::InternalSuperUser,
+                "stdout",
+            )?;
+        let stdout_dump = std::str::from_utf8(&buf)
+            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        print!("{}", stdout_dump);
+    }
+
+    // Dump contents of stderr
+    if cmdline.dump_stderr {
+        let buf = vfs.lock()
+            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+            .read_file_by_filename(
+                &Principal::InternalSuperUser,
+                "stderr",
+            )?;
+        let stderr_dump = std::str::from_utf8(&buf)
+            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        eprint!("{}", stderr_dump);
+    }
+
     Ok(())
 }
