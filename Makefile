@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -45,6 +45,11 @@ sgx-veracruz-client-test: sgx sgx-test-collateral
 trustzone-veracruz-client-test: trustzone trustzone-test-collateral
 	cd veracruz-client && cargo test --lib --features "mock tz" -- --test-threads=1
 
+nitro-veracruz-client-test: nitro nitro-test-collateral
+	cd veracruz-client && cargo test --lib --features "mock" -- --test-threads=1
+
+nitro-test-collateral:
+	TEE=nitro $(MAKE) -C test-collateral
 # Compile for sgx
 # offset the CC OPENSSL_DIR, which might be used in compiling trustzone
 sgx: sdk sgx-env

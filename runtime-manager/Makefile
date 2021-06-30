@@ -136,6 +136,9 @@ trustzone: $(FINAL_DIR)/$(TZ_UUID).ta
 css-tz.bin: $(FINAL_DIR)/$(TZ_UUID).ta
 	cp $< $@
 
+css-nitro.bin: PCR0
+	cp $< $@
+
 $(FINAL_DIR)/$(TZ_UUID).ta: $(OUT_DIR)/$(TZ_UUID).ta
 	cp $< $@
 

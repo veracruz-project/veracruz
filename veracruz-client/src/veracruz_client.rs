@@ -511,23 +511,6 @@ impl VeracruzClient {
     }
 
     #[cfg(test)]
-    pub fn pub_init_self_signed_cert_client_config(
-        client_cert: rustls::Certificate,
-        client_priv_key: rustls::PrivateKey,
-        enclave_cert_hash: Vec<u8>,
-        enclave_name: &str,
-        ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
-        VeracruzClient::init_self_signed_cert_client_config(
-            client_cert,
-            client_priv_key,
-            enclave_cert_hash,
-            enclave_name,
-            ciphersuite_string,
-        )
-    }
-
-    #[cfg(test)]
     pub fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         self.send(data)
     }
