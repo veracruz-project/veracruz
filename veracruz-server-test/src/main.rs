@@ -284,7 +284,6 @@ mod tests {
             Some(READ_FILE_WASM),
             &[("input.txt", STRING_1_DATA)],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
