@@ -69,7 +69,10 @@ mod tests {
     use veracruz_server;
     use std::{io::Read, sync::Once, path::Path};
     use proxy_attestation_server;
-    use veracruz_utils::{platform::Platform, policy::policy::Policy};
+    use veracruz_utils::policy::policy::Policy;
+
+    #[cfg(feature = "nitro")]
+    use regex::Regex;
 
     #[derive(Debug, Error)]
     pub enum VeracruzTestError {
@@ -95,10 +98,20 @@ mod tests {
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
             std::env::set_var("RUST_LOG", "debug,actix_server=info,actix_web=info,tokio_reactor=info,hyper=info,reqwest=info,rustls=info");
+
+            #[cfg(feature = "nitro")]
+            let actual_server_url = {
+                let ip_string = local_ipaddress::get()
+                    .expect("Failed to get local ip address");
+                format!("{:}:3010", ip_string)
+            };
+            #[cfg(not(feature = "nitro"))]
+            let actual_server_url = proxy_attestation_server_url;
+
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                let server = proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+                let server = proxy_attestation_server::server::server(actual_server_url, "../test-collateral/CACert.pem", false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -285,7 +298,7 @@ mod tests {
     /// (one for program, one for data sending and retrieving)
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
-        let policy_json = std::fs::read_to_string(LINEAR_REGRESSION_PARALLEL_POLICY).unwrap();
+        let policy_json = read_policy(LINEAR_REGRESSION_PARALLEL_POLICY).unwrap();
         let policy = Policy::from_json(&policy_json).unwrap();
 
         setup(policy.proxy_attestation_server_url().clone());
@@ -293,20 +306,12 @@ mod tests {
         task::sleep(std::time::Duration::from_millis(5000)).await;
         let server_handle = server_tls_loop(LINEAR_REGRESSION_PARALLEL_POLICY);
 
-        #[cfg(feature = "sgx")]
-        let target_platform = Platform::SGX;
-        #[cfg(feature = "tz")]
-        let target_platform = Platform::TrustZone;
-        #[cfg(feature = "nitro")]
-        let target_platform = Platform::Nitro;
-
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
             info!("### program provider start.");
             let mut client =
                 veracruz_client::VeracruzClient::new(PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY,
-                                      &policy_json,
-                                      &target_platform)?;
+                                      &policy_json)?;
             let program_path = LINEAR_REGRESSION_WASM;
             let program_filename = Path::new(program_path).file_name().unwrap().to_str().unwrap();
             info!("### program provider read binary.");
@@ -321,7 +326,7 @@ mod tests {
             task::sleep(std::time::Duration::from_millis(15000)).await;
             info!("### data provider start.");
             let mut client =
-                veracruz_client::VeracruzClient::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json, &target_platform)?;
+                veracruz_client::VeracruzClient::new(DATA_CLIENT_CERT, DATA_CLIENT_KEY, &policy_json)?;
 
             let data_filename = LINEAR_REGRESSION_DATA;
             info!("### data provider read input.");
@@ -361,7 +366,7 @@ mod tests {
         // Result retriever, a list of indices refering to the `client_configs` parameter.
         result_retrievers: &[usize],
     ) -> Result<(), VeracruzTestError> {
-        let policy_json = std::fs::read_to_string(policy_path)?;
+        let policy_json = read_policy(policy_path)?;
         let policy = Policy::from_json(&policy_json)?;
         setup(policy.proxy_attestation_server_url().clone());
         info!("### Step 0. Read the policy file {}.", policy_path);
@@ -378,14 +383,7 @@ mod tests {
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
-                #[cfg(feature = "sgx")]
-                let target_platform = Platform::SGX;
-                #[cfg(feature = "tz")]
-                let target_platform = Platform::TrustZone;
-                #[cfg(feature = "nitro")]
-                let target_platform = Platform::Nitro;
-
-                clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json, &target_platform)?);
+                clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json)?);
             }
 
             info!(
@@ -440,7 +438,33 @@ mod tests {
     }
 
     async fn server_tls_loop(policy_filename: &str) -> Result<(), VeracruzTestError> {
-        veracruz_server::server::server(policy_filename)?.await?;
+        let policy_text = read_policy(policy_filename)?;
+        veracruz_server::server::server(&policy_text)?.await?;
         Ok(())
+    }
+
+    fn read_policy(policy_filename: &str) -> Result<String, VeracruzTestError> {
+        let policy_text =
+            std::fs::read_to_string(policy_filename).expect(&format!("Cannot open file {}", policy_filename));
+        // Since we need to run the root enclave on another system for nitro enclaves
+        // we can't use localhost for the URL of the proxy attestation server (like we do in
+        // the policy files. so we need to replace it with the private IP of the current instance
+        #[cfg(feature = "nitro")]
+        {
+            let ip_string = std::env::var("TABASCO_IP_ADDRESS")
+                .expect("TABASCO_IP_ADDRESS environment variable not set");
+            let ip_address =
+                format!("\"proxy_attestation_server_url\": \"{:}:3010\"",
+                        ip_string);
+            let re = 
+                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#)
+                    .unwrap();
+            let policy_text_mod = re.replace_all(&policy_text, ip_address.as_str()).to_owned();
+            return Ok(policy_text_mod.to_string());
+        }
+        #[cfg(not(feature = "nitro"))]
+        {
+            return Ok(policy_text);
+        }
     }
 }

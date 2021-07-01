@@ -22,6 +22,8 @@ pub mod managers;
 #[cfg(feature = "nitro")]
 pub mod runtime_manager_nitro;
 
+mod runtime_manager;
+
 #[cfg(feature = "nitro")]
 fn main() -> Result<(), String> {
     runtime_manager_nitro::nitro_main()

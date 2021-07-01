@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::{attestation::Attestation, error::VeracruzClientError};
+use crate::error::VeracruzClientError;
 use ring::signature::KeyPair;
 use rustls::Session;
 use std::{
@@ -17,12 +17,9 @@ use std::{
     io::{Read, Write},
     str::from_utf8,
 };
-use veracruz_utils::{platform::Platform, policy::policy::Policy};
+use veracruz_utils::policy::policy::Policy;
+use veracruz_utils::platform::Platform;
 use webpki;
-use webpki_roots;
-
-#[cfg(not(feature = "mock"))]
-use crate::attestation::AttestationPSA as AttestationHandler;
 
 // Use Mockall for testing
 #[cfg(feature = "mock")]
@@ -92,41 +89,13 @@ impl VeracruzClient {
         }
     }
 
-    /// Initialise self signed certificate client config
-    /// Set up the ciphersuite
-    fn init_self_signed_cert_client_config(
-        client_cert: rustls::Certificate,
-        client_priv_key: rustls::PrivateKey,
-        enclave_cert_hash: Vec<u8>,
-        _enclave_name: &str,
-        ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
-        let mut client_config = rustls::ClientConfig::new_self_signed();
-
-        let client_cert_vec = vec![client_cert];
-        client_config.set_single_client_cert(client_cert_vec, client_priv_key);
-
-        client_config
-            .root_store
-            .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
-
-        client_config
-            .pinned_cert_hashes
-            .push(enclave_cert_hash.to_vec());
-
-        // Set the client's supported ciphersuite to the one specified in the policy
-        client_config.ciphersuites.clear();
-
-        Self::set_up_client_ciphersuite(client_config, ciphersuite_string)
-    }
-
     /// If ``ciphersuite_string`` is a supported cipher suite,
     /// add it into ``client_config``.
     /// Otherwise return error message.
     fn set_up_client_ciphersuite(
-        mut client_config: rustls::ClientConfig,
+        client_config: &mut rustls::ClientConfig,
         ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
+    ) -> Result<(), VeracruzClientError> {
         client_config.ciphersuites.clear();
 
         let policy_ciphersuite =
@@ -146,7 +115,7 @@ impl VeracruzClient {
                 policy_ciphersuite,
             ))?;
         client_config.ciphersuites.push(supported_ciphersuite);
-        Ok(client_config)
+        return Ok(());
     }
 
     /// Check the validity of client_cert:
@@ -189,7 +158,6 @@ impl VeracruzClient {
         client_cert_filename: P1,
         client_key_filename: P2,
         policy_json: &str,
-        target_platform: &Platform
     ) -> Result<VeracruzClient, VeracruzClientError>
     where
         P1: AsRef<path::Path>,
@@ -210,17 +178,23 @@ impl VeracruzClient {
             })?;
         Self::check_certificate_validity(&client_cert_filename, key_pair.public_key().as_ref())?;
 
-        let (enclave_cert_hash, enclave_name) = AttestationHandler::attestation(&policy, target_platform)?;
+        let enclave_name = "ComputeEnclave.dev";
 
         let policy_ciphersuite_string = policy.ciphersuite().as_str();
 
-        let client_config = Self::init_self_signed_cert_client_config(
-            client_cert,
-            client_priv_key,
-            enclave_cert_hash,
-            &enclave_name,
-            policy_ciphersuite_string,
-        )?;
+        let mut client_config = rustls::ClientConfig::new();
+        let mut client_cert_vec = std::vec::Vec::new();
+        client_cert_vec.push(client_cert);
+        client_config.set_single_client_cert(client_cert_vec, client_priv_key);
+        let proxy_service_cert = {
+            let certs_pem = policy.proxy_service_cert();
+            let certs = rustls::internal::pemfile::certs(&mut certs_pem.as_bytes())
+                .map_err(|_| VeracruzClientError::X509ParserError(format!("pemfile::certs found not certificates")))?;
+            certs[0].clone()
+        };
+        client_config.root_store.add(&proxy_service_cert)?;
+        Self::set_up_client_ciphersuite(&mut client_config, &policy_ciphersuite_string)?;
+
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&enclave_name)?;
         let session = rustls::ClientSession::new(&std::sync::Arc::new(client_config), dns_name);
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
@@ -246,6 +220,7 @@ impl VeracruzClient {
 
     pub fn send_program(&mut self, file_name:&str, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
+        self.check_runtime_hash()?;
 
         let serialized_program = transport_protocol::serialize_program(&program, file_name)?;
         let response = self.send(&serialized_program)?;
@@ -261,6 +236,7 @@ impl VeracruzClient {
 
     pub fn send_data(&mut self,file_name:&str, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
+        self.check_runtime_hash()?;
         let serialized_data = transport_protocol::serialize_program_data(&data, file_name)?;
         let response = self.send(&serialized_data)?;
 
@@ -276,6 +252,7 @@ impl VeracruzClient {
 
     pub fn get_results(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
+        self.check_runtime_hash()?;
 
         let serialized_read_result = transport_protocol::serialize_request_result(file_name)?;
         let response = self.send(&serialized_read_result)?;
@@ -324,31 +301,53 @@ impl VeracruzClient {
         }
     }
 
-    #[deprecated]
-    fn check_pi_hash(&mut self, file_name:&str) -> Result<(), VeracruzClientError> {
-        let serialized_request = transport_protocol::serialize_request_pi_hash(file_name)?;
-        let mut iterations = 0;
-        let max_iterations = 10;
-        while iterations < max_iterations {
-            let response = self.send(&serialized_request)?;
-            let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
-            let status = parsed_response.get_status();
-            match status {
-                transport_protocol::ResponseStatus::SUCCESS => {
-                    //Since it is a deprecated function, we assume it always succeeds
-                    return Ok(());
-                }
-                transport_protocol::ResponseStatus::FAILED_NOT_READY => {
-                    std::thread::sleep(std::time::Duration::from_millis(5000));
-                    // go for another iteration
-                }
-                _ => {
-                    return Err(VeracruzClientError::ResponseError("check_pi_hash", status));
+    fn compare_runtime_hash(&self, received: &[u8]) -> Result<(), VeracruzClientError> {
+        let platforms = vec![Platform::SGX, Platform::TrustZone, Platform::Nitro];
+        for platform in platforms {
+            let expected = match self.policy.runtime_manager_hash(&platform) {
+                Err(_) => continue, // no hash found for this platform
+                Ok(data) => data,
+            };
+            let expected_bytes = hex::decode(expected)?;
+
+            if &received[..] == expected_bytes.as_slice() {
+                return Ok(());
+            }
+        }
+        return Err(VeracruzClientError::NoMatchingRuntimeIsolateHash);
+    }
+
+    fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
+        match self.tls_session.get_peer_certificates() {
+            None => {
+                return Err(VeracruzClientError::NoPeerCertificatesError);
+            },
+            Some(certs) => {
+                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
+                let ues = ee_cert.unrecognized_extensions();
+                // check for OUR extension
+                static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
+                match ues.get(&OUR_EXTENSION_ID[..]) {
+                    None => {
+                        println!("Our extension is not present. This should be fatal");
+                        return Err(VeracruzClientError::RuntimeHashExtensionMissingError);
+                    },
+                    Some(data) => {
+                        let extension_data = data.read_all(VeracruzClientError::UnableToReadError, |input| {
+                            Ok(input.read_bytes_to_end())
+                        })?;
+                        match self.compare_runtime_hash(extension_data.as_slice_less_safe()) {
+                            Ok(_) => return Ok(()),
+                            Err(err) => {
+                                // None of the hashes matched
+                                println!("None of the hashes matched.");
+                                return Err(err);
+                            }
+                        }
+                    }
                 }
             }
-            iterations = iterations + 1;
         }
-        return Err(VeracruzClientError::ExcessiveIterationError("check_pi_hash"));
     }
 
     /// send the data to the runtime_manager path on the Veracruz server.
@@ -509,23 +508,6 @@ impl VeracruzClient {
         P: AsRef<path::Path>
     {
         VeracruzClient::read_private_key(filename)
-    }
-
-    #[cfg(test)]
-    pub fn pub_init_self_signed_cert_client_config(
-        client_cert: rustls::Certificate,
-        client_priv_key: rustls::PrivateKey,
-        enclave_cert_hash: Vec<u8>,
-        enclave_name: &str,
-        ciphersuite_string: &str,
-    ) -> Result<rustls::ClientConfig, VeracruzClientError> {
-        VeracruzClient::init_self_signed_cert_client_config(
-            client_cert,
-            client_priv_key,
-            enclave_cert_hash,
-            enclave_name,
-            ciphersuite_string,
-        )
     }
 
     #[cfg(test)]

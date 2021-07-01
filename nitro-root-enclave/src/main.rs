@@ -14,14 +14,13 @@ use nitro_enclave_token::{AttestationDocument, NitroToken};
 use nix::sys::socket::listen as listen_vsock;
 use nix::sys::socket::{accept, bind, SockAddr};
 use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
-use psa_attestation::{psa_initial_attest_get_token, psa_initial_attest_load_key, t_cose_sign1_get_verification_pubkey};
-use ring;
-use ring::signature::KeyPair;
-use ring::signature::{EcdsaKeyPair, ECDSA_P256_SHA256_FIXED_SIGNING};
-use std::sync::Mutex;
-use veracruz_utils::{NitroRootEnclaveMessage, NitroStatus};
+use ring::{rand::{SecureRandom, SystemRandom},signature::{EcdsaKeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P256_SHA256_FIXED_SIGNING}};
+use std::{collections::HashMap, sync::{atomic::AtomicI32, atomic::Ordering, Mutex}};
+use veracruz_utils::platform::nitro::nitro::{NitroRootEnclaveMessage, NitroStatus};
 
-use veracruz_utils::{receive_buffer, send_buffer};
+use veracruz_utils::io::raw_fd::{receive_buffer, send_buffer};
+
+use veracruz_utils::csr;
 
 use nsm_io;
 use nsm_lib;
@@ -82,12 +81,18 @@ static AWS_NITRO_ROOT_CERTIFICATE: [u8; 533] = [
 const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
 lazy_static! {
-    /// The (randomly) self-generated device key pair
-    static ref DEVICE_KEY_PAIR: Mutex<Option<(EcdsaKeyPair, Vec<u8>)>> = Mutex::new(None);
+    /// The (randomly) self-generated device key pair.
+    /// Would like to have this stored as EcdsaKeyPair, instead of having
+    /// to generate it from bytes each time, but EcdsaKeyPair doesn't support
+    /// `copy` or `clone`, so it's hard to manage that way
+    static ref DEVICE_KEY_PAIR: Mutex<Option<Vec<u8>>> = Mutex::new(None);
     /// The hash value of the Runtime Manager enclave
     static ref RUNTIME_MANAGER_HASH: Mutex<Option<Vec<u8>>> = Mutex::new(None);
     /// The Device ID assigned to us by the Proxy Attestation Service
     static ref DEVICE_ID: Mutex<Option<i32>> = std::sync::Mutex::new(None);
+    static ref CERT_CHAIN: Mutex<Option<(Vec<u8>, Vec<u8>)>> = Mutex::new(None);
+    static ref CHALLENGE_ID_COUNTER: AtomicI32 = AtomicI32::new(0);
+    static ref CHALLENGE_HASHMAP: Mutex<HashMap<i32, Vec<u8>>> = Mutex::new(HashMap::new());
 }
 
 /// Query the enclave for its firmware version
@@ -97,22 +102,8 @@ fn get_firmware_version() -> Result<String, String> {
     return Ok(version.to_string());
 }
 
-/// Set the hash value of the Runtime Manager to be included in the proxy attestation
-/// token.
-/// I DO NOT THINK THIS IS NECESSARY ANYMORE
-fn set_runtime_manager_hash_hack(hash: Vec<u8>) -> Result<NitroStatus, String> {
-    let mut runtime_manager_guard = RUNTIME_MANAGER_HASH.lock().map_err(|err| {
-        format!(
-            "set_runtime_manager_hash failed to obtain lock on RUNTIME_MANAGER_HASH:{:?}",
-            err
-        )
-    })?;
-    *runtime_manager_guard = Some(hash);
-    Ok(NitroStatus::Success)
-}
-
 /// Perform the native attestation flow
-fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, Vec<u8>), String> {
+fn native_attestation(challenge: &[u8], device_id: i32) -> Result<(Vec<u8>, Vec<u8>), String> {
     let mut att_doc: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
 
     {
@@ -126,56 +117,9 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
     }
 
     let mut att_doc_len: u32 = att_doc.len() as u32;
-    let device_private_key = {
-        let dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| format!("nitro-root-enclave::native_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
-        match &*dkp_guard {
-            Some((_key, bytes)) => bytes.clone(),
-            None => return Err(format!("nitro-root-enclave::native_attestation for some reason the DEVICE_KEY_PAIR is uninitialized. I don't know how you got here")),
-        }
-    };
-    let device_public_key = {
-        // Oddity: the current way of extracting the public key from the private
-        // key is to load it into PSA Crytpo, and then extract the public
-        // component. There are better ways to do this, but this is what
-        // I know to do now. It's ugly, but it works, but there are 
-        // better ways
-        let mut device_key_handle: u16 = 0;
-        let status = unsafe {
-            psa_initial_attest_load_key(
-                device_private_key.as_ptr(),
-                device_private_key.len() as u64,
-                &mut device_key_handle,
-            )
-        };
-        if status != 0 {
-            println!("sgx-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
-            return Err(format!("sgx-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status));
-        }
-        let mut public_key = std::vec::Vec::with_capacity(128); // TODO: Don't do this
-        let mut public_key_size: u64 = 0;
-        let status = unsafe {
-            t_cose_sign1_get_verification_pubkey(
-                device_key_handle,
-                public_key.as_mut_ptr() as *mut u8,
-                public_key.capacity() as u64,
-                &mut public_key_size as *mut u64,
-            )
-        };
-        if status != 0 {
-            println!(
-                "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
-                status
-            );
-            return Err(format!(
-                "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
-                status
-            ));
-        }
-        unsafe {
-            public_key.set_len(public_key_size as usize);
-        }
-        public_key
-    };
+    let device_private_key: EcdsaKeyPair = get_device_key_pair()?;
+    let csr = veracruz_utils::csr::generate_csr(&veracruz_utils::csr::ROOT_ENCLAVE_CSR_TEMPLATE, &device_private_key)
+        .map_err(|err| format!("nitro-root-enclave::native_attestation generate_csr failed:{:?}", err))?;
 
     let nsm_fd = nsm_lib::nsm_lib_init();
     if nsm_fd < 0 {
@@ -186,13 +130,13 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
     }
     let status = unsafe {
         nsm_lib::nsm_get_attestation_doc(
-            nsm_fd,                                     //fd
-            std::ptr::null(),                           // user_data
-            0,                                          // user_data_len
+            nsm_fd,                                     // fd
+            csr.as_ptr() as *const u8,                  // user_data
+            csr.len() as u32,                           // user_data_len
             challenge.as_ptr(),                         // nonce_data
             challenge.len() as u32,                     // nonce_len
-            device_public_key.as_ptr() as *const u8,    // pub_key_data
-            device_public_key.len() as u32,             // pub_key_len
+            std::ptr::null(),                           // pub_key_data
+            0,                                          // pub_key_len
             att_doc.as_mut_ptr(),                       // att_doc_data
             &mut att_doc_len,                           // att_doc_len
         )
@@ -204,123 +148,121 @@ fn native_attestation(challenge: &Vec<u8>, device_id: i32) -> Result<(Vec<u8>, V
     unsafe {
         att_doc.set_len(att_doc_len as usize);
     }
-    println!(
-        "nitro-root-enclave::main::native_attestation returning token:{:?}",
-        att_doc
-    );
-    return Ok((att_doc, device_public_key.to_vec()));
+    return Ok((att_doc, csr.clone()));
+}
+
+fn set_cert_chain(re_cert: &[u8], ca_cert: &[u8]) -> Result<(), String> {
+    let mut cc_guard = CERT_CHAIN.lock()
+        .map_err(|err| format!("nitro-root-enclave:set_cert_chain failed to obtain lock on CERT_CHAIN:{:?}", err))?;
+    *cc_guard = Some((re_cert.to_vec(), ca_cert.to_vec()));
+    return Ok(());
 }
 
 /// Perform the proxy attestation service on behalf of a Runtime Manager enclave
 /// running on another AWS Nitro Enclave
 fn proxy_attestation(
-    challenge: &[u8],
-    native_token: &[u8],
-    enclave_name: String,
-) -> Result<Vec<u8>, String> {
-    // first authenticate the native token
-    let document: AttestationDocument =
-        NitroToken::authenticate_token(native_token, &AWS_NITRO_ROOT_CERTIFICATE).map_err(
-            |err| {
-                format!(
-                    "nitro-root-enclave::proxy_attestation failed to authenticate token:{:?}",
-                    err
-                )
-            },
-        )?;
-    let enclave_cert_hash: Vec<u8> = match document.user_data {
-        Some(hash) => hash,
-        None => return Err(format!("nitro-root-enclave::proxy_attestation AttestationDocument does not contain user_data")),
+    att_doc: &[u8],
+    challenge_id: i32,
+) -> Result<NitroRootEnclaveMessage, String> {
+    // first authenticate the attestation document
+    let document: AttestationDocument = match NitroToken::authenticate_token(att_doc, &AWS_NITRO_ROOT_CERTIFICATE) {
+        Ok(data) => data,
+        Err(err) => {
+            println!("nitro-root-enclave::proxy_attestation authenticate_token failed:{:?}", err);
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
+    };
+    // check that the challenge in the attestation document matches the one we
+    // generated
+    // we call `remove` on the hash map because if the entry is there, we no
+    // longer need it after this
+    let expected_challenge = match CHALLENGE_HASHMAP.lock()
+        .map_err(|err| format!("nitro-root-enclave::proxy_attestation failed to obtain lock on CHALLENGE_HASHMAP:{:?}", err))?
+        .remove(&challenge_id) {
+        Some(value) => value,
+        None => {
+            println!("nitro-root-enclave::proxy_attestation value for challenge_id:{:?} not found on CHALLENGE_HASHMAP", challenge_id);
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
+    };
+    // The document.nonce value is optional for Nitro Enclaves in general, but
+    // required by us
+    let received_challenge = match document.nonce {
+        Some(data) => data,
+        None => {
+            println!("nitro-root-enclave::proxy_attestation attestation document did not contain a nonce value");
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
+    };
+    if expected_challenge != received_challenge {
+        println!("nitro-root-enclave::proxy_attestation challenge values did not match");
+        return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+    }
+
+    let csr: Vec<u8> = match document.user_data {
+        Some(data) => data,
+        None => {
+            println!("nitro-root-enclave::proxy_attestation AttestationDocument does not contain user_data");
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
     };
 
-    // load the PSA key into PSA Crypto
-    let device_private_key = {
-        let dkp_guard = DEVICE_KEY_PAIR.lock()
-            .map_err(|err| format!("nitro-root-enclave:proxy_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
-        match &*dkp_guard {
-            Some((_key, bytes)) => bytes.clone(),
-            None => {
-                return Err(format!(
-                    "nitro-root-enclave::proxy_attestation Device Key pair is not populated?"
-                ))
-            }
+    let private_key: EcdsaKeyPair = get_device_key_pair()?;
+    // convert the CSR into a certificate
+    let compute_enclave_cert = match csr::convert_csr_to_cert(&csr, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &document.pcrs[0][0..32], &private_key) {
+        Ok(cert) => cert,
+        Err(err) => {
+            println!("nitro-root-enclave::proxy_attestation convert_csr_to_cert failed:{:?}", err);
+            return Ok(NitroRootEnclaveMessage::Status(NitroStatus::Fail));
+        },
+    };
+
+    let (root_enclave_cert, root_cert) = {
+        let cc_guard = CERT_CHAIN.lock()
+            .map_err(|err| format!("nitro-root-enclave::proxy_attestation failed to obtain lock on CERT_CHAIN:{:?}", err))?;
+        match &*cc_guard {
+            Some((re_cert, r_cert)) => (re_cert.clone(), r_cert.clone()),
+            None => return Err(format!("nitro-root-enclave::proxy_attestation CERT_CHAIN is uninitialized")),
         }
     };
-    let mut device_key_handle: u16 = 0;
-    let status = unsafe {
-        psa_initial_attest_load_key(
-            device_private_key.as_ptr(),
-            device_private_key.len() as u64,
-            &mut device_key_handle,
-        )
-    };
-    if status != 0 {
-        return Err(format!("nitro-root-enclave:proxy_attestation psa_initial_attest_load_key failed with status code:{:?}", status));
-    }
-    // generate the PSA Attestation token using challenge, measurement from the native token, and the enclave_cert_hash
-    let mut token: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
-    let mut token_len: u64 = 0;
-    let enclave_name_len: usize = enclave_name.len();
-    // AWS Nitro PCRs are SHA384 hashes. The rest of our hashes are SHA256.
-    // We are truncating it in the PSA token so the offsets don't change between
-    // platforms
-    let pcr_len: u64 = if document.pcrs[0].len() > 32 {
-        32
-    } else {
-        return Err(format!(
-            "nitro-root-enclave:proxy_attestation document.pcrs[0] is too short. Wanted > 32, got:{:?}", document.pcrs[0].len()
-        ));
-    };
-    let status = unsafe {
-        psa_initial_attest_get_token(
-            document.pcrs[0].as_ptr() as *const u8,
-            pcr_len as u64,
-            enclave_cert_hash.as_ptr() as *const u8, // user_data in the document is the certificate hash
-            enclave_cert_hash.len() as u64,
-            enclave_name.into_bytes().as_ptr() as *const i8,
-            enclave_name_len as u64,
-            challenge.as_ptr() as *const u8,
-            challenge.len() as u64,
-            token.as_mut_ptr() as *mut u8,
-            2048,
-            &mut token_len as *mut u64,
-        )
-    };
-    if status != 0 {
-        return Err(format!("nitro-root-enclave::proxy_attestation psa_initial_attest_get_token failed with error code:{:?}", status));
-    }
-    unsafe { token.set_len(token_len as usize) };
 
-    // return the proxy token
-    Ok(token.clone())
+    return Ok(NitroRootEnclaveMessage::CertChain(vec![compute_enclave_cert, root_enclave_cert, root_cert]));
+}
+
+fn set_device_key_pair(pkcs8: &[u8]) -> Result<(), String> {
+    let mut dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| {
+        format!(
+            "nitro-root-enclave::set_device_key_pair failed to obtain lock on DEVICE_KEY_PAIR:{:?}",
+            err
+        )
+    })?;
+    *dkp_guard = Some(pkcs8.to_vec());
+    return Ok(());
+}
+
+fn get_device_key_pair() -> Result<EcdsaKeyPair, String> {
+    let dkp_guard = DEVICE_KEY_PAIR.lock()
+        .map_err(|err| format!("nitro-root-enclave::proxy_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
+    let pkcs8_bytes = match &*dkp_guard {
+        Some(bytes) => bytes.clone(),
+        None => return Err(format!("nitro-root-enclave::proxy_attestation DEVICE_KEY_PAIR is uninitialized")),
+    };
+    return EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &pkcs8_bytes)
+        .map_err(|err| format!("nitro-root-enclave::proxy_attestation failed to convert pkcs8 bytes to EcdsaKeyPair:{:?}", err));
 }
 
 /// The main entry point for the Nitro Root enclave
 fn main() -> Result<(), String> {
     // generate the device private key
     // Let's try it as an EC key, because RSA is like, old, man.
-    let rng = ring::rand::SystemRandom::new();
+    let rng = SystemRandom::new();
     println!("nitro-root-enclave::main generating key with rng. Which will probably hang, because why wouldn't it?");
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
         .map_err(|err| format!("Error generating PKCS-8:{:?}", err))?
         .as_ref()
         .to_vec();
-    println!("nitro-root-enclave::main successfully generated key with rng. What the F do I know? I'm just a computer");
-    let device_key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &pkcs8_bytes)
-        .map_err(|err| format!("nitro-root-enclave::main from_pkcs8 failed:{:?}", err))?;
-    {
-        let mut dkp_guard = DEVICE_KEY_PAIR.lock().map_err(|err| {
-            format!(
-                "nitro-root-enclave::main failed to obtain lock on DEVICE_KEY_PAIR:{:?}",
-                err
-            )
-        })?;
-        *dkp_guard = Some((device_key_pair, pkcs8_bytes[38..70].to_vec()));
-    }
+    set_device_key_pair(&pkcs8_bytes)?;
 
-    println!(
-        "nitro-root-enclave::main successfully did the stupid plkcs8 to \"internal\" conversion."
-    );
     let socket_fd = socket(
         AddressFamily::Vsock,
         SockType::Stream,
@@ -352,109 +294,28 @@ fn main() -> Result<(), String> {
                 })?;
                 NitroRootEnclaveMessage::FirmwareVersion(version)
             }
-            NitroRootEnclaveMessage::SetRuntimeManagerHashHack(hash) => {
-                let status = set_runtime_manager_hash_hack(hash)?;
-                NitroRootEnclaveMessage::Status(status)
-            }
             NitroRootEnclaveMessage::NativeAttestation(challenge, device_id) => {
                 println!("nitro-root-enclave::main received NativeAttestaion message");
-                let (proxy_token, public_key) =
+                let (proxy_token, csr) =
                     native_attestation(&challenge, device_id).map_err(|err| {
                         format!(
                             "nitro-root-enclave::main native_attestation failed:{:?}",
                             err
                         )
                     })?;
-                NitroRootEnclaveMessage::TokenData(proxy_token, public_key)
+                NitroRootEnclaveMessage::TokenData(proxy_token, csr)
             }
-            NitroRootEnclaveMessage::ProxyAttestation(challenge, native_token, enclave_name) => {
+            NitroRootEnclaveMessage::SetCertChain(re_cert, ca_cert) => {
+                set_cert_chain(&re_cert, &ca_cert)?;
+                // If we got thhis far, we have succeeded. Return a success message
+                NitroRootEnclaveMessage::Success
+            }
+            NitroRootEnclaveMessage::StartProxy => {
+                generate_challenge_data()?
+            },
+            NitroRootEnclaveMessage::ProxyAttestation(att_doc, challenge_id) => {
                 println!("nitro-root-enclave::main received ProxyAttesstation message");
-                let proxy_token = proxy_attestation(&challenge, &native_token, enclave_name)
-                    .map_err(|err| {
-                        println!("proxy_attestation failed");
-                        format!(
-                            "nitro-root-enclave::main proxy_attestation failed:{:?}",
-                            err
-                        )
-                    })?;
-                let device_id: i32 = {
-                    let di_guard = DEVICE_ID.lock().map_err(|err| {
-                        println!("Failed to obtain lock on DEVICE_ID");
-                        format!(
-                            "nitro-root-enclave::main failed to obtain lock on DEVICE_ID:{:?}",
-                            err
-                        )
-                    })?;
-                    match &*di_guard {
-                        Some(did) => *did,
-                        None => {
-                            return Err(format!(
-                                "nitro-root-enclave::main DEVICE_ID is not set up?"
-                            ))
-                        }
-                    }
-                };
-                let device_private_key = {
-                    let dkp_guard = DEVICE_KEY_PAIR.lock()
-                        .map_err(|err| format!("ntiro-root-enclave:proxy_attestation failed to obtain lock on DEVICE_KEY_PAIR:{:?}", err))?;
-                    match &*dkp_guard {
-                        Some((_key, bytes)) => bytes.clone(),
-                        None => {
-                            return Err(format!(
-                                "nitro-root-enclave::proxy_attestation Device Key pair is not populated?"
-                            ))
-                        }
-                    }
-                };
-                let device_public_key = {
-                    // Oddity: the current way of extracting the public key from the private
-                    // key is to load it into PSA Crytpo, and then extract the public
-                    // component. There are better ways to do this, but this is what
-                    // I know to do now. It's ugly, but it works, but there are 
-                    // better ways
-                    let mut device_key_handle: u16 = 0;
-                    println!("Starting with device_private_key value:{:?}", device_private_key);
-                    let status = unsafe {
-                        psa_initial_attest_load_key(
-                            device_private_key.as_ptr(),
-                            device_private_key.len() as u64,
-                            &mut device_key_handle,
-                        )
-                    };
-                    if status != 0 {
-                        println!("sgx-root-enclave::create psa_initial_attest_load_key failed to load device private key with code:{:}", status);
-                        return Err(format!("nitro-root-enclave::proxy_attestation psa_initial_attest_load_key failed to load key with code:{:?}", status));
-                    }
-                    println!("nitro-root-enclave::proxy_attestation device_key_handle:{:?}", device_key_handle);
-                    let mut public_key = std::vec::Vec::with_capacity(1024); // TODO: Don't do this
-                    let mut public_key_size: u64 = 0;
-                    let status = unsafe {
-                        t_cose_sign1_get_verification_pubkey(
-                            device_key_handle,
-                            public_key.as_mut_ptr() as *mut u8,
-                            public_key.capacity() as u64,
-                            &mut public_key_size as *mut u64,
-                        )
-                    };
-                    if status != 0 {
-                        println!(
-                            "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
-                            status
-                        );
-                        return Err(format!(
-                            "sgx-root-enclave::create t_cose_sign1_get_verification_pubkey failed with error code:{:}",
-                            status
-                        ));
-                    }
-                    println!("nitro-root-enclave::main public_key_size:{:?}", public_key_size);
-                    unsafe {
-                        public_key.set_len(public_key_size as usize);
-                    }
-                    println!("nitro-root-enclave::main returning public_key value:{:?}", public_key);
-                    public_key.clone()
-                };
-                println!("nitro-root-enclave::main finished handling proxy attestation message");
-                NitroRootEnclaveMessage::PSAToken(proxy_token, device_public_key, device_id as u32)
+                proxy_attestation(&att_doc, challenge_id)?
             }
             _ => {
                 println!("nitro-root-enclave::main received unhandled message:{:?}", received_message);
@@ -470,10 +331,7 @@ fn main() -> Result<(), String> {
                 err
             )
         })?;
-        println!(
-            "nitro-root-enclave::main returning return_buffer:{:?}",
-            return_buffer
-        );
+
         send_buffer(fd, &return_buffer).map_err(|err| {
             format!(
                 "nitro-root-enclave::main failed to send return_buffer:{:?}",
@@ -481,4 +339,18 @@ fn main() -> Result<(), String> {
             )
         })?;
     }
+}
+
+fn generate_challenge_data() -> Result<NitroRootEnclaveMessage, String> {
+    let challenge_id = CHALLENGE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+
+    let mut challenge:Vec<u8> = Vec::with_capacity(16);
+    let rng = SystemRandom::new();
+    rng.fill(&mut challenge);
+    {
+        let mut chm_guard = CHALLENGE_HASHMAP.lock()
+            .map_err(|err| format!("nitro-root-enclave::generate_challenge_data failed to obtain lock on CHALLENGE_HASHMAP:{:?}", err))?;
+        chm_guard.insert(challenge_id, challenge.clone());
+    }
+    return Ok(NitroRootEnclaveMessage::ChallengeData(challenge, challenge_id));
 }

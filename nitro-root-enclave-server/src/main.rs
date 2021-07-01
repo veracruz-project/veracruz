@@ -22,7 +22,7 @@ use nix::sys::socket::{
 use std::io::Read;
 use stringreader;
 use veracruz_utils::nitro_enclave::NitroError;
-use veracruz_utils::{receive_buffer, send_buffer, NitroEnclave, NitroRootEnclaveMessage};
+use veracruz_utils::{io::raw_fd::{receive_buffer, send_buffer} , platform::nitro::{nitro_enclave::NitroEnclave, nitro::NitroRootEnclaveMessage}};
 
 /// Maximum number of outstanding connections in the socket's
 /// listen queue
@@ -123,7 +123,7 @@ fn main() {
     listen(socket_fd, BACKLOG).expect("Failed to listen to socket");
 
     println!("nitro-root-enclave-server::main waiting for someone to connect on the socket");
-    let fd = accept(socket_fd).expect("Failed to accept socket");
+    let mut fd = accept(socket_fd).expect("Failed to accept socket");
     loop {
         println!("nitro-root-enclave-server::main reading buffer from other instance");
         let received_buffer = receive_buffer(fd).expect("Failed to receive buffer");
@@ -132,11 +132,17 @@ fn main() {
             .send_buffer(&received_buffer)
             .expect("Failed to send buffer to enclave");
         println!("nitro-root-enclave-server::main reading buffer from enclave");
-        let buffer_to_return = enclave
-            .receive_buffer()
-            .expect("Failed to receive buffer from enclave");
-        println!("nitro-root-enclave-server::main forwarding return buffer to other instance");
-        send_buffer(fd, &buffer_to_return).expect("Failed to return buffer to caller");
+        match enclave.receive_buffer() {
+            Ok(buffer_to_return) => {
+                println!("nitro-root-enclave-server::main forwarding return buffer to other instance");
+                send_buffer(fd, &buffer_to_return).expect("Failed to return buffer to caller");
+            },
+            Err(err) => {
+                println!("Failed to receive buffer from enclave:{:?}", err);
+                fd = accept(socket_fd).expect("Failed to accept socket on recovery");
+                println!("recovery accept succeeded");
+            }
+        }
     }
 }
 
@@ -168,7 +174,7 @@ fn native_attestation(
     let return_buffer = nre_enclave.receive_buffer()?;
     let received_message =
         bincode::deserialize(&return_buffer).map_err(|err| NitroServerError::Bincode(*err))?;
-    let (token, _public_key) = match received_message {
+    let (att_doc, _public_key) = match received_message {
         NitroRootEnclaveMessage::TokenData(tok, pubkey) => (tok, pubkey),
         _ => return Err(NitroServerError::InvalidRootEnclaveMessage),
     };
@@ -176,7 +182,22 @@ fn native_attestation(
     println!(
         "nitro-root-enclave-server::native_attestation posting native_attestation_token to the proxy attestation server."
     );
-    post_native_attestation_token(proxy_attestation_server_url, &token, device_id)?;
+    let (re_cert, ca_cert) = post_native_attestation_token(proxy_attestation_server_url, &att_doc, device_id)?;
+
+    let message = NitroRootEnclaveMessage::SetCertChain(re_cert, ca_cert);
+    let message_buffer =
+        bincode::serialize(&message).map_err(|err| NitroServerError::Bincode(*err))?;
+    nre_enclave.send_buffer(&message_buffer)?;
+
+    // check the return
+    let return_buffer = nre_enclave.receive_buffer()?;
+    let received_message: NitroRootEnclaveMessage =
+        bincode::deserialize(&return_buffer).map_err(|err| NitroServerError::Bincode(*err))?;
+    match received_message {
+        NitroRootEnclaveMessage::Success => (),
+        _ => return Err(NitroServerError::InvalidRootEnclaveMessage),
+    }
+
     println!("nitro-root-enclave-server::native_attestation returning Ok");
     return Ok(nre_enclave);
 }
@@ -184,26 +205,37 @@ fn native_attestation(
 /// Send the native (AWS Nitro) attestation token to the proxy attestation server
 fn post_native_attestation_token(
     proxy_attestation_server_url: &str,
-    token: &Vec<u8>,
+    att_doc: &[u8],
     device_id: i32,
-) -> Result<(), NitroServerError> {
-    println!("nitro-root-enclave-server::post_native_attestation_token started");
-    let serialized_proxy_attestation_server_request =
-        transport_protocol::serialize_native_psa_attestation_token(token, device_id)
+) -> Result<(Vec<u8>, Vec<u8>), NitroServerError> {
+    let serialized_nitro_attestation_doc_request =
+        transport_protocol::serialize_nitro_attestation_doc(att_doc, device_id)
             .map_err(|err| NitroServerError::TransportProtocol(err))?;
-    let encoded_str = base64::encode(&serialized_proxy_attestation_server_request);
+    let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
     let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
     println!(
         "nitro-root-enclave-server::post_native_attestation_token posting to URL{:?}",
         url
     );
-    let response = post_buffer(&url, &encoded_str)?;
+    let received_body: String = post_buffer(&url, &encoded_str)?;
 
     println!(
         "nitro-root-enclave-server::post_psa_attestation_token received buffer:{:?}",
-        response
+        received_body
     );
-    return Ok(());
+
+    let body_vec =
+        base64::decode(&received_body).map_err(|err| NitroServerError::Base64Decode(err))?;
+    let response =
+        transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| NitroServerError::TransportProtocol(err))?;
+
+    let (re_cert, ca_cert) = if response.has_cert_chain() {
+        let cert_chain = response.get_cert_chain();
+        (cert_chain.get_enclave_cert(), cert_chain.get_root_cert())
+    } else {
+        return Err(NitroServerError::InvalidProtoBufMessage);
+    };
+    return Ok((re_cert.to_vec(), ca_cert.to_vec()));
 }
 
 /// Fetch the firmware version from the nitro-root-enclave

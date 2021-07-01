@@ -18,7 +18,7 @@ use psa_attestation::{
     t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
 };
 use rand::Rng;
-use std::{collections::HashMap, ffi::c_void, sync::Mutex};
+use std::{collections::HashMap, io::Read, ffi::c_void, sync::Mutex};
 
 // Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
 // will have the same public key. Yes, I'm embedding that key in the source
@@ -74,7 +74,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             "native_psa_attestation_token",
         ));
     }
-    let (token, device_id) =
+    let (token, csr, device_id) =
         transport_protocol::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
 
     let attestation_context = {
@@ -154,16 +154,18 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         });
     }
 
-    let pubkey_hash = &payload_vec[86..118]; // TODO: these indices are wrong
-                                             //let enclave_name_res = String::from_utf8(payload_vec[8..40].to_vec()); // TODO: These indices are wrong
-    let received_enclave_hash: Vec<u8> = payload_vec[47..79].to_vec(); // TODO: These indices are wrong
-    let enclave_name: String = "foo".to_string(); //= match enclave_name_res {
-                                                  //     Err(err) => {
-                                                  //         println!("Unable to convert payload contents to String:{:?}", err);
-                                                  //         return Response::empty_404();
-                                                  //     }
-                                                  //     Ok(name) => name
-                                                  // };
+    let received_csr_hash = &payload_vec[86..118];
+    let calculated_csr_hash = ring::digest::digest(&ring::digest::SHA256, &csr);
+    if received_csr_hash != calculated_csr_hash.as_ref() {
+        println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
+        return Err(ProxyAttestationServerError::MismatchError {
+            variable: "received_csr_hash",
+            expected: calculated_csr_hash.as_ref().to_vec(),
+            received: received_csr_hash.to_vec(),
+        });
+    }
+
+    let received_enclave_hash: Vec<u8> = payload_vec[47..79].to_vec();
 
     let expected_enclave_hash: Vec<u8> = {
         let connection = crate::orm::establish_connection()?;
@@ -181,13 +183,23 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             received: received_enclave_hash.to_vec(),
         });
     }
+    let cert = crate::attestation::convert_csr_to_certificate(&csr)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);
+            err
+        })?;
 
-    let connection = crate::orm::establish_connection()?;
-    crate::orm::update_or_create_device(
-        &connection,
-        device_id,
-        &pubkey_hash.to_vec(),
-        enclave_name,
-    )?;
-    Ok("Pass".to_string())
+    let root_cert_der = crate::attestation::get_ca_certificate()?;
+
+    let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
+        
+    let response_b64 = base64::encode(&response_bytes);
+
+    // clean up the Attestation Context by removing this context
+    {
+        let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+        ac_hash.remove(&device_id);
+    }
+
+    return Ok(response_b64);
 }

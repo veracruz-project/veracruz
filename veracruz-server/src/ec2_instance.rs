@@ -60,7 +60,7 @@ pub enum EC2Error {
     NoHostKeyError,
     /// A Veracruz-specific socket error was enountered
     #[error(display = "EC2: Veracruz Socket Error:{:?}", _0)]
-    VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    VeracruzSocketError(#[error(source)] veracruz_utils::io::error::SocketError),
     /// A call to a function was "successful" but it returned a non-zero status
     /// value. This typically happens with calls to libraries following the 
     /// Unix calling conventions.
@@ -161,7 +161,7 @@ impl EC2Instance {
         })
     }
 
-    /// Connect to the `socket_fd` socker on the EC2 instance
+    /// Connect to the `socket_fd` socket on the EC2 instance
     fn socket_connect(&mut self) -> Result<RawFd, EC2Error> {
         let sockaddr = self.get_private_sockaddr()?;
 
@@ -365,7 +365,7 @@ impl EC2Instance {
             Some(socket_fd) => socket_fd,
             None => self.socket_connect()?,
         };
-        veracruz_utils::send_buffer(socket_fd, buffer).expect("send buffer failed");
+        veracruz_utils::io::raw_fd::send_buffer(socket_fd, buffer).expect("send buffer failed");
         return Ok(());
     }
 
@@ -379,7 +379,7 @@ impl EC2Instance {
             }
         };
         let received_buffer =
-            veracruz_utils::receive_buffer(socket_fd).expect("Failed to receive buffer");
+            veracruz_utils::io::raw_fd::receive_buffer(socket_fd).expect("Failed to receive buffer");
         return Ok(received_buffer);
     }
 }

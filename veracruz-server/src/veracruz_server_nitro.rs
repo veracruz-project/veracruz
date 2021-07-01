@@ -12,14 +12,13 @@
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
     use crate::ec2_instance::EC2Instance;
-    use crate::veracruz_server::VeracruzServer;
-    use crate::veracruz_server::VeracruzServerError;
+    use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
     use lazy_static::lazy_static;
     use std::sync::Mutex;
-    use veracruz_utils::{
-        platform::{Platform, nitro::{RuntimeManagerMessage, NitroEnclave, NitroError, NitroStatus},
-        policy::policy::Policy,
-    };
+    use veracruz_utils::platform::Platform;
+    use veracruz_utils::platform::nitro::nitro::{NitroRootEnclaveMessage, RuntimeManagerMessage, NitroStatus};
+    use veracruz_utils::platform::nitro::nitro_enclave::{NitroEnclave, NitroError};
+    use veracruz_utils::policy::policy::Policy;
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
     const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "../nitro-root-enclave/nitro_root_enclave.eif";
@@ -48,8 +47,10 @@ pub mod veracruz_server_nitro {
                     let runtime_manager_hash = policy
                         .runtime_manager_hash(&Platform::Nitro)
                         .map_err(|err| VeracruzServerError::VeracruzUtilError(err))?;
+                    let ip_string = std::env::var("TABASCO_IP_ADDRESS").unwrap_or("127.0.0.1".to_string());
+                    let ip_addr = format!("{:}:3010", ip_string);
                     let nre_context =
-                        VeracruzServerNitro::native_attestation(&policy.proxy_attestation_server_url(), &runtime_manager_hash)?;
+                        VeracruzServerNitro::native_attestation(&ip_addr, &runtime_manager_hash)?;
                     *nre_guard = Some(nre_context);
                 }
             }
@@ -84,7 +85,28 @@ pub mod veracruz_server_nitro {
             println!("VeracruzServerNitro::new Runtime Manager instantiated. Calling initialize");
             std::thread::sleep(std::time::Duration::from_millis(10000));
 
-            let initialize: RuntimeManagerMessage = RuntimeManagerMessage::Initialize(policy_json.to_string());
+            // Send the StartProxy message, receive the ChallengeData message in response
+            let (challenge, challenge_id) = {
+                let start_proxy: NitroRootEnclaveMessage = NitroRootEnclaveMessage::StartProxy;
+                let encoded_buffer: Vec<u8> = bincode::serialize(&start_proxy)?;
+                let response_buffer = {
+                    let mut nre_guard = NRE_CONTEXT.lock()?;
+                    match &mut *nre_guard {
+                        Some(nre) => {
+                            nre.send_buffer(&encoded_buffer)?;
+                            nre.receive_buffer()?
+                        },
+                        None => return Err(VeracruzServerError::UninitializedEnclaveError),
+                    }
+                };
+                let message: NitroRootEnclaveMessage = bincode::deserialize(&response_buffer)?;
+                match message {
+                    NitroRootEnclaveMessage::ChallengeData(chall, id) => (chall, id),
+                    _ => return Err(VeracruzServerError::InvalidNitroRootEnclaveMessage(message)),
+                }
+            };
+
+            let initialize: RuntimeManagerMessage = RuntimeManagerMessage::Initialize(policy_json.to_string(), challenge, challenge_id);
 
             let encoded_buffer: Vec<u8> = bincode::serialize(&initialize)?;
             meta.enclave.send_buffer(&encoded_buffer)?;
@@ -105,79 +127,11 @@ pub mod veracruz_server_nitro {
             return Ok(meta);
         }
 
-        fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
-            let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
-
-            if parsed.has_request_proxy_psa_attestation_token() {
-                let rpat = parsed.get_request_proxy_psa_attestation_token();
-                let challenge = transport_protocol::parse_request_proxy_psa_attestation_token(rpat);
-                let (psa_attestation_token, pubkey, device_id) =
-                    self.proxy_psa_attestation_get_token(challenge)?;
-                let serialized_pat = transport_protocol::serialize_proxy_psa_attestation_token(
-                    &psa_attestation_token,
-                    &pubkey,
-                    device_id,
-                )?;
-                Ok(Some(serialized_pat))
-            } else {
-                return Err(VeracruzServerError::InvalidProtoBufMessage);
-            }
+        fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+            return Err(VeracruzServerError::UnimplementedError);
         }
 
-        // Note: this function will go away
-        fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
-            let certificate = {
-                let message = RuntimeManagerMessage::GetEnclaveCert;
-                let message_buffer = bincode::serialize(&message)?;
-                self.enclave.send_buffer(&message_buffer)?;
-                // Read the resulting data as the certificate
-                let received_buffer = self.enclave.receive_buffer()?;
-                let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
-                match received_message {
-                    RuntimeManagerMessage::EnclaveCert(cert) => cert,
-                    _ => return Err(VeracruzServerError::InvalidRuntimeManagerMessage(received_message))?,
-                }
-            };
-            return Ok(certificate);
-        }
-
-        // Note: This function will go away
-        fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError> {
-            let name: String = {
-                let message = RuntimeManagerMessage::GetEnclaveName;
-                let message_buffer = bincode::serialize(&message)?;
-                self.enclave.send_buffer(&message_buffer)?;
-                // Read the resulting data as the name
-                let received_buffer = self.enclave.receive_buffer()?;
-                let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
-                match received_message {
-                    RuntimeManagerMessage::EnclaveName(name) => name,
-                    _ => return Err(VeracruzServerError::InvalidRuntimeManagerMessage(received_message)),
-                }
-            };
-            return Ok(name);
-        }
-
-        fn proxy_psa_attestation_get_token(
-            &mut self,
-            challenge: Vec<u8>,
-        ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
-            let message = RuntimeManagerMessage::GetPSAAttestationToken(challenge);
-            let message_buffer = bincode::serialize(&message)?;
-            self.enclave.send_buffer(&message_buffer)?;
-
-            let received_buffer = self.enclave.receive_buffer()?;
-            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
-            let (token, public_key, device_id) = match received_message {
-                RuntimeManagerMessage::PSAAttestationToken(token, public_key, device_id) => {
-                    (token, public_key, device_id)
-                }
-                _ => return Err(VeracruzServerError::InvalidRuntimeManagerMessage(received_message)),
-            };
-            return Ok((token, public_key, device_id));
-        }
-
-        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerMessage::NewTLSSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;

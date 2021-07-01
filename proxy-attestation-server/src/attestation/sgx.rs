@@ -211,7 +211,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         println!("received data is incorrect. TODO: Handle this");
         return Err(ProxyAttestationServerError::NoSGXAttestationTokenError);
     }
-    let (msg3, msg3_quote, msg3_sig, pubkey_quote, pubkey_sig, device_id) =
+    let (msg3, msg3_quote, msg3_sig, collateral_quote, collateral_sig, csr, device_id) =
         transport_protocol::parse_attestation_tokens(&parsed)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::sgx::msg3 parse_attestation_tokens failed:{:?}", err);
@@ -219,19 +219,21 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         })?;
     {
         let attestation_context = {
-            let ac_hash = ATTESTATION_CONTEXT.lock()
+            let mut ac_hash = ATTESTATION_CONTEXT.lock()
                 .map_err(|err| {
                     println!("proxy-attestation-server::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                     err
                 })?;
+            // we are calling remove because after this, the context will no
+            // longer be needed
             let context = ac_hash
-                .get(&device_id)
+                .remove(&device_id)
                 .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
                     println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
                     err
                 })?;
-            (*context).clone()
+            context.clone()
         };
 
         let expected_enclave_hash = {
@@ -256,6 +258,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             })?
         };
 
+        // TODO: This function call needs to be reworked
         let msg3_epid_pseudonym = authenticate_msg3(
             &attestation_context
                 .msg1
@@ -291,7 +294,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             &expected_enclave_hash,
         )?;
 
-        let (pubkey_epid_pseudonym, pubkey_hash, enclave_name) = authenticate_pubkey_quote(
+        let (pubkey_epid_pseudonym, collateral_hash) = authenticate_pubkey_quote(
             &attestation_context
                 .pubkey_challenge
                 .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
@@ -299,9 +302,20 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
                     println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
                     err
                 })?,
-            &pubkey_quote,
-            &pubkey_sig,
+            &collateral_quote,
+            &collateral_sig,
         )?;
+
+        let calculated_collateral_hash = ring::digest::digest(&ring::digest::SHA256, &csr);
+        if calculated_collateral_hash.as_ref().to_vec() != collateral_hash {
+            // Something has changed the csr that came along with the token. This is bad.
+            return Err(ProxyAttestationServerError::MismatchError {
+                variable: "collateral_hash",
+                expected: collateral_hash,
+                received: calculated_collateral_hash.as_ref().to_vec(),
+            });
+        }
+
 
         if pubkey_epid_pseudonym != msg3_epid_pseudonym {
             // We cannot verify that msg3 and pubkey_quote came from the same SGX system
@@ -312,38 +326,31 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             });
         }
 
-        // check that the enclave that generated pubkey_quote has the same firmware as the enclave that
+        // check that the enclave that generated collateral_quote has the same firmware as the enclave that
         // generated msg3
-        if msg3_quote.report_body.mr_enclave.m != pubkey_quote.report_body.mr_enclave.m {
+        if msg3_quote.report_body.mr_enclave.m != collateral_quote.report_body.mr_enclave.m {
             // TODO: Even if this is true, does this eman that they are from the same enclave?
             // Or could they be different enclaves running the same firmware?
             // What is the consequence if they are?
-            println!("msg3 and pubkey_quote came from different enclaves");
+            println!("msg3 and collateral_quote came from different systems");
             return Err(ProxyAttestationServerError::MismatchError {
                 variable: "function msg3 msg3_quote.report_body.mr_enclave.m",
-                expected: pubkey_quote.report_body.mr_enclave.m.to_vec(),
+                expected: collateral_quote.report_body.mr_enclave.m.to_vec(),
                 received: msg3_quote.report_body.mr_enclave.m.to_vec(),
             });
         }
 
-        let connection = crate::orm::establish_connection()
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 establish_connection failed:{:?}", err);
-                err
-            })?;
-        crate::orm::update_or_create_device(&connection, device_id, &pubkey_hash, enclave_name)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg3 update_or_create_device failed:{:?}", err);
-                err
-            })?
-    }
+        // All's good. Generate a Certificate from the CSR...
+        let cert = crate::attestation::convert_csr_to_certificate(&csr)?;
 
-    // clean up the Attestation Context by removing this context
-    {
-        let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
-        ac_hash.remove(&device_id);
+        let root_cert_der = crate::attestation::get_ca_certificate()?;
+
+        let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
+        
+        let response_b64 = base64::encode(&response_bytes);
+
+        return Ok(response_b64);
     }
-    Ok("All's well that ends well".to_string())
 }
 
 fn generate_sgx_symmetric_keys(
@@ -571,6 +578,7 @@ fn authenticate_msg3(
 
     let expected_hash = sha_handle.get_hash()?;
     if expected_hash != msg3_quote.report_body.report_data.d[0..32] {
+        println!("proxy_attestation_server::attestation::sgx::authenticate_msg3 msg3_quote hash don't match");
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "msg3_quote.report_body.report_data.d[0..32]",
             expected: expected_hash.to_vec(),
@@ -579,6 +587,7 @@ fn authenticate_msg3(
     }
 
     if msg3_quote.report_body.mr_enclave.m != expected_enclave_hash[0..32] {
+        println!("proxy_attestation_server::attestation::sgx::authenticate_msg3 mr_enclave.m hash don't match");
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "function authenticate_msg3 msg3_quote.report_body.mr_enclave.m",
             expected: expected_enclave_hash[0..32].to_vec(),
@@ -700,7 +709,7 @@ fn authenticate_pubkey_quote(
     pubkey_challenge: &[u8; 16],
     pubkey_quote: &sgx_quote_t,
     pubkey_sig: &Vec<u8>,
-) -> Result<(String, Vec<u8>, String), ProxyAttestationServerError> {
+) -> Result<(String, Vec<u8>), ProxyAttestationServerError> {
     // verify the challge value value that is internal to the pubkey quote
     if *pubkey_challenge != pubkey_quote.report_body.report_data.d[0..16] {
         return Err(ProxyAttestationServerError::MismatchError {
@@ -711,13 +720,11 @@ fn authenticate_pubkey_quote(
     }
     // extract the pubkey hash value that is internal to the pubkey quote
     let pubkey_hash = &pubkey_quote.report_body.report_data.d[16..48];
-    let enclave_name_vec = &pubkey_quote.report_body.report_data.d[48..55];
-    let enclave_name = std::str::from_utf8(enclave_name_vec)?;
+
     // verify the pubkey quote with the attestation server
     let pubkey_epid_pseudonym = ias_verify_attestation_evidence(&pubkey_quote, &pubkey_sig)?;
     Ok((
         pubkey_epid_pseudonym,
         pubkey_hash.to_vec(),
-        enclave_name.to_string(),
     ))
 }

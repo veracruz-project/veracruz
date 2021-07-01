@@ -82,6 +82,9 @@ pub struct Policy {
     runtime_manager_hash_nitro: Option<String>,
     /// The URL of the proxy attestation service.
     proxy_attestation_server_url: String,
+    /// The PEM encoded certificate for the proxy service that matches the chosen
+    /// platform constraints for the policy
+    proxy_service_cert: String,
     /// The debug configuration flag.  This dictates whether the WASM program
     /// will be able to print debug configuration messages to *stdout* on the
     /// host's machine.
@@ -106,12 +109,14 @@ impl Policy {
         runtime_manager_hash_tz: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
         proxy_attestation_server_url: String,
+        proxy_service_cert: String,
         debug: bool,
         execution_strategy: ExecutionStrategy,
         std_streams_table: Vec<StandardStream>,
     ) -> Result<Self, PolicyError> {
         let policy = Self {
             identities,
+            proxy_service_cert,
             programs,
             veracruz_server_url,
             enclave_cert_expiry,
@@ -151,6 +156,10 @@ impl Policy {
         &self.veracruz_server_url
     }
 
+    /// Returns the proxy service certificate associated with this policy
+    pub fn proxy_service_cert(&self) -> &String {
+        &self.proxy_service_cert
+    }
     /// Returns the enclave certificate expiry moment associated with this
     /// policy.
     #[inline]

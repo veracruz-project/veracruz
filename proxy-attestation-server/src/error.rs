@@ -78,6 +78,12 @@ pub enum ProxyAttestationServerError {
     CborError(String),
     #[error(display = "ProxyAttestationServer: Mutex error {}.", _0)]
     MutexError(String),
+    #[error(display = "ProxyAttestationServer: CSR Verify failed")]
+    CsrVerifyError,
+    #[error(display = "ProxyAttestationServer: IOError {}.", _0)]
+    IOError(#[error(source)] std::io::Error),
+    #[error(display = "ProxyAttestationServer: BadState error")]
+    BadStateError,
 }
 
 #[cfg(feature = "sgx")]

@@ -254,6 +254,14 @@ pub fn parse_request_proxy_psa_attestation_token(
     proto.get_challenge().to_vec()
 }
 
+pub fn serialize_sgx_collateral(collateral: &transport_protocol::SgxCollateral) -> TransportProtocolResult {
+    return Ok(collateral.write_to_bytes()?);
+}
+
+pub fn parse_cert_chain(chain: &transport_protocol::CertChain) -> (std::vec::Vec<u8>, std::vec::Vec<u8>) {
+    return (chain.get_root_cert().to_vec(), chain.get_enclave_cert().to_vec())
+}
+
 pub fn serialize_proxy_psa_attestation_token(
     token: &[u8],
     pubkey: &[u8],
@@ -269,6 +277,24 @@ pub fn serialize_proxy_psa_attestation_token(
     Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
+pub fn serialize_nitro_attestation_doc(doc: &[u8], device_id: i32) -> TransportProtocolResult {
+    let mut nad_proto = transport_protocol::NitroAttestationDoc::new();
+    nad_proto.set_doc(doc.to_vec());
+    nad_proto.set_device_id(device_id);
+    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
+    proxy_attestation_server_request.set_nitro_attestation_doc(nad_proto);
+
+    Ok(proxy_attestation_server_request.write_to_bytes()?)
+}
+
+pub fn serialize_certificate(cert: &[u8]) -> TransportProtocolResult {
+    let mut proto_cert = transport_protocol::Cert::new();
+    proto_cert.set_data(cert.to_vec());
+    let mut rmr = transport_protocol::RuntimeManagerResponse::new();
+    rmr.set_cert(proto_cert);
+    return Ok(rmr.write_to_bytes()?);
+}
+
 pub fn parse_proxy_psa_attestation_token(
     proto: &transport_protocol::ProxyPsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
@@ -279,9 +305,10 @@ pub fn parse_proxy_psa_attestation_token(
     )
 }
 
-pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> TransportProtocolResult {
+pub fn serialize_native_psa_attestation_token(token: &[u8], csr: &[u8], device_id: i32) -> TransportProtocolResult {
     let mut pat_proto = transport_protocol::NativePsaAttestationToken::new();
     pat_proto.set_token(token.to_vec());
+    pat_proto.set_csr(csr.to_vec());
     pat_proto.set_device_id(device_id);
     let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_native_psa_attestation_token(pat_proto);
@@ -291,8 +318,14 @@ pub fn serialize_native_psa_attestation_token(token: &[u8], device_id: i32) -> T
 
 pub fn parse_native_psa_attestation_token(
     proto: &transport_protocol::NativePsaAttestationToken,
+) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
+    (proto.get_token().to_vec(), proto.get_csr().to_vec(), proto.get_device_id())
+}
+
+pub fn parse_nitro_attestation_doc(
+    proto: &transport_protocol::NitroAttestationDoc,
 ) -> (std::vec::Vec<u8>, i32) {
-    (proto.get_token().to_vec(), proto.get_device_id())
+    (proto.get_doc().to_vec(), proto.get_device_id())
 }
 
 pub fn parse_sgx_attestation_init(proto: &transport_protocol::SgxAttestationInit) -> (std::vec::Vec<u8>, i32) {
@@ -307,6 +340,15 @@ pub fn serialize_sgx_attestation_init(pubkey: &[u8], device_id: i32) -> Transpor
     transport_protocol.set_sgx_attestation_init(attest_init_proto);
 
     Ok(transport_protocol.write_to_bytes()?)
+}
+
+pub fn serialize_cert_chain(enclave_cert: &[u8], root_cert: &[u8]) -> TransportProtocolResult {
+    let mut cert_chain = transport_protocol::CertChain::new();
+    cert_chain.set_root_cert(root_cert.to_vec());
+    cert_chain.set_enclave_cert(enclave_cert.to_vec());
+    let mut response = transport_protocol::ProxyAttestationServerResponse::new();
+    response.set_cert_chain(cert_chain);
+    return Ok(response.write_to_bytes()?);
 }
 
 #[cfg(feature = "sgx_attestation")]
@@ -498,8 +540,8 @@ pub fn parse_result(
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn parse_msg3(abs: &transport_protocol::SgxAttestationTokens) -> (sgx_types::sgx_ra_msg3_t, i32) {
-    let proto = abs.get_msg3();
+fn parse_msg3(proto: &transport_protocol::SgxMsg3) -> (sgx_types::sgx_ra_msg3_t, i32) {
+    //let proto = abs.get_msg3();
     let device_id = proto.get_device_id();
     let mut msg3 = sgx_types::sgx_ra_msg3_t::default();
     msg3.mac.copy_from_slice(proto.get_mac());
@@ -516,34 +558,39 @@ pub fn parse_attestation_tokens(
     parsed: &transport_protocol::ProxyAttestationServerRequest,
 ) -> Result<
     (
-        sgx_types::sgx_ra_msg3_t,
-        sgx_types::sgx_quote_t,
-        std::vec::Vec<u8>,
-        sgx_types::sgx_quote_t,
-        std::vec::Vec<u8>,
-        i32,
+        sgx_types::sgx_ra_msg3_t, // msg3
+        sgx_types::sgx_quote_t,   // msg3_quote
+        std::vec::Vec<u8>,        // msg3_sig
+        sgx_types::sgx_quote_t,   // collateral_quote
+        std::vec::Vec<u8>,        // collateral_sig
+        std::vec::Vec<u8>,        // csr
+        i32,                      // device_id
     ),
     TransportProtocolError,
 > {
     let attest_tokens = parsed.get_sgx_attestation_tokens();
-    let (msg3, device_id) = parse_msg3(attest_tokens);
+    let (msg3, device_id) = parse_msg3(attest_tokens.get_msg3());
     let msg3_quote = parse_quote(&attest_tokens.get_msg3_quote())?;
     let msg3_sig = {
         let proto = attest_tokens.get_msg3_sig();
         proto.to_vec()
     };
-    let pubkey_quote = parse_quote(&attest_tokens.get_pubkey_quote())?;
-    let pubkey_sig = {
-        let sig = attest_tokens.get_pubkey_sig();
+    let collateral_quote = parse_quote(&attest_tokens.get_collateral_quote())?;
+    let collateral_sig = {
+        let sig = attest_tokens.get_collateral_sig();
         sig.to_vec()
     };
+
+    let collateral = attest_tokens.get_collateral();
+    let csr = collateral.get_csr();
 
     Ok((
         msg3,
         msg3_quote,
         msg3_sig,
-        pubkey_quote,
-        pubkey_sig,
+        collateral_quote,
+        collateral_sig,
+        csr.to_vec(),
         device_id,
     ))
 }
@@ -554,8 +601,9 @@ pub fn serialize_sgx_attestation_tokens(
     msg3: &sgx_types::sgx_ra_msg3_t,
     msg3_quote: &sgx_types::sgx_quote_t,
     msg3_sig: &std::vec::Vec<u8>,
-    pubkey_quote: &sgx_types::sgx_quote_t,
-    pubkey_sig: &std::vec::Vec<u8>,
+    collateral_quote: &sgx_types::sgx_quote_t,
+    collateral_sig: &std::vec::Vec<u8>,
+    csr: &std::vec::Vec<u8>,
     device_id: i32,
 ) -> TransportProtocolResult {
     let msg3_proto = {
@@ -589,10 +637,15 @@ pub fn serialize_sgx_attestation_tokens(
 
     attestation_tokens.set_msg3_sig(msg3_sig.to_vec());
 
-    let pubkey_quote_proto = serialize_quote(&pubkey_quote);
-    attestation_tokens.set_pubkey_quote(pubkey_quote_proto);
+    let collateral_quote_proto = serialize_quote(&collateral_quote);
+    attestation_tokens.set_collateral_quote(collateral_quote_proto);
 
-    attestation_tokens.set_pubkey_sig(pubkey_sig.to_vec());
+    attestation_tokens.set_collateral_sig(collateral_sig.to_vec());
+
+    let mut collateral = transport_protocol::SgxCollateral::new();
+    collateral.set_csr(csr.to_vec());
+
+    attestation_tokens.set_collateral(collateral);
 
     let mut transport_protocol = transport_protocol::ProxyAttestationServerRequest::new();
     transport_protocol.set_sgx_attestation_tokens(attestation_tokens);

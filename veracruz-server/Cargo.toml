@@ -13,7 +13,7 @@ debug = []
 
 [dependencies]
 dirs = "1.0.2"
-veracruz-utils = { path = "../veracruz-utils", features = ["std","tz"] }
+veracruz-utils = { path = "../veracruz-utils" }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 transport-protocol = { path = "../transport-protocol"}
 rouille = "3.0"

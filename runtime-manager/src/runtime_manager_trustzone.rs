@@ -15,10 +15,10 @@ use libc;
 #[cfg(feature = "tz")]
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
-    DifferentParameter, DifferentParameters, ErrorKind, ParamType, Parameters, Result, Session,
+    ErrorKind, Parameters, Result, 
 };
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     io::Write,
 };
 use veracruz_utils::platform::tz::runtime_manager_opcode::RuntimeManagerOpcode;
@@ -66,8 +66,9 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
     })?;
     match cmd {
         RuntimeManagerOpcode::Initialize => {
+            // p0 - policy input
             debug_message("runtime_manager_trustzone::invoke_command Initialize".to_string());
-            let mut input = unsafe {
+            let mut memref = unsafe {
                 params.0.as_memref().map_err(|e| {
                     print_error_and_return(format!(
                         "runtime_manager_trustzone::invoke_command Initialize failed to get param.0 as memref {:?}",
@@ -75,92 +76,18 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     ))
                 })?
             };
-            let input_buffer = input.buffer();
-            let input_str = std::str::from_utf8(input_buffer).map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command Initialize failed to convert from utf8 {:?}",
-                    e
-                ))
-            })?;
-            crate::managers::session_manager::init_session_manager(&input_str).map_err(|e| {
+            let buffer = memref.buffer();
+            let policy =
+                std::str::from_utf8(buffer).map_err(|e| {
+                    print_error_and_return(format!(
+                        "runtime_manager_trustzone::invoke_command Initialize failed to convert from utf8 {:?}",
+                        e
+                    ))
+                })?;
+
+            crate::managers::session_manager::init_session_manager(&policy).map_err(|e| {
                 print_error_and_return(format!(
                     "runtime_manager_trustzone::invoke_command Initialize {:?}",
-                    e
-                ))
-            })?;
-        }
-        RuntimeManagerOpcode::GetEnclaveCertSize => {
-            debug_message(
-                "runtime_manager_trustzone::invoke_command GetEnclaveCertSize".to_string(),
-            );
-            let mut values = unsafe {
-                params.0.as_value().map_err(|e| print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveCertSize failed to get param.0 as value {:?}",e)))?
-            };
-            let cert = managers::session_manager::get_enclave_cert_pem().map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetEnclaveCertSize {:?}",
-                    e
-                ))
-            })?;
-            values.set_a(cert.len() as u32);
-        }
-        RuntimeManagerOpcode::GetEnclaveCert => {
-            debug_message("runtime_manager_trustzone::invoke_command GetEnclaveCert".to_string());
-            let mut p0 = unsafe {
-                params.0.as_memref().map_err(|e| {
-                    print_error_and_return(format!(
-                        "runtime_manager_trustzone::invoke_command GetEnclaveCert failed to get param.0 as memref {:?}",
-                        e
-                    ))
-                })?
-            };
-            let cert = managers::session_manager::get_enclave_cert_pem().map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetEnclaveCert {:?}",
-                    e
-                ))
-            })?;
-            p0.buffer().write(&cert).map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetEnclaveCert failed to write buffer {:?}",
-                    e
-                ))
-            })?;
-        }
-        RuntimeManagerOpcode::GetEnclaveNameSize => {
-            debug_message(
-                "runtime_manager_trustzone::invoke_command GetEnclaveNameSize".to_string(),
-            );
-            let mut values = unsafe {
-                params.0.as_value().map_err(|e| print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetEnclaveNameSize failed to get param.0 as value {:?}",e)))?
-            };
-            let name = managers::session_manager::get_enclave_name().map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetEnclaveNameSize {:?}",
-                    e
-                ))
-            })?;
-            values.set_a(name.len() as u32);
-        }
-        RuntimeManagerOpcode::GetEnclaveName => {
-            debug_message("runtime_manager_trustzone::invoke_command GetEnclaveName".to_string());
-            let mut p0 = unsafe {
-                params.0.as_memref().map_err(|e| {
-                    print_error_and_return(format!(
-                        "runtime_manager_trustzone::invoke_command GetEnclaveName failed to get param.0 as memref {:?}",
-                        e
-                    ))
-                })?
-            };
-            let name = managers::session_manager::get_enclave_name().map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetEnclaveName {:?}",
-                    e
-                ))
-            })?;
-            p0.buffer().write(&name.as_bytes()).map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetEnclaveName failed to write buffer {:?}",
                     e
                 ))
             })?;
@@ -306,107 +233,73 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             p2.set_a(output_data.len() as u32);
             active_flag.set_a(if active_bool { 1 } else { 0 });
         }
-        RuntimeManagerOpcode::GetPSAAttestationToken => {
+        RuntimeManagerOpcode::GetCSR => {
             // p0 - challenge input
-            // p1 - device_id output
-            // p2 - token output
-            // p3 - pubkey output
+            // p1 - buffer for the CSR
             debug_message(
-                "runtime_manager_trustzone::invoke_command GetPSAAttestationToken".to_string(),
+                "runtime_manager_trustzone::invoke_command GetCSR".to_string(),
             );
 
-            let mut challenge = unsafe {
-                let mut memref = params.0.as_memref().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to get memref from params.0:{:?}", err))
-                })?;
+            // We don't currently have anything to do with the challenge value
+            // (since we are faking attestation on TrustZone platforms for now)
+            let mut _challenge = unsafe {
+                let mut memref = params.0.as_memref().map_err(|err|
+                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetCSR failed to get memref from params.0:{:?}", err))
+                )?;
                 memref.buffer().to_vec()
             };
-            let mut token_buffer = unsafe {
-                let mut memref = params.2.as_memref().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to get params.2 as memref:{:?}", err))
-                })?;
-                memref.buffer().to_vec()
-            };
-
-            let mut enclave_cert =
-                managers::session_manager::get_enclave_cert_pem().map_err(|err| {
+            let mut csr_buf = unsafe {
+                params.1.as_memref().map_err(|err| {
                     print_error_and_return(format!(
-                        "runtime_manager_trustzone::invoke_command::GetPSAAttestationToken {:?}",
+                        "runtime_manager_trustzone::invoke_command GetTLSData failed to get params.1 as memref:{:?}",
                         err
                     ))
-                })?;
+                })?
+            };
 
-            // Need to construct a parameter list for SgxRootEnclave::ProxyAttestation
-            // p0 - challenge input
-            // p1 - enclave_cert input / SGXRootEnclave Pubkey Output
-            // p2 - token output
-            // p3 - a: device_id output b:none
-            let mut sgx_root_enclave_parameters = {
-                let p0 = DifferentParameter::from_vec(&mut challenge, ParamType::MemrefInput).map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to create Parameter from challenge:{:?}", err))
-                })?;
-                let p1 = DifferentParameter::from_vec(&mut enclave_cert, ParamType::MemrefInout).map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to create Parameter from enclave_cert:{:?}", err))
-                })?;
-                let p2 = DifferentParameter::from_vec(&mut token_buffer, ParamType::MemrefOutput).map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to create parameter from token_buffer:{:?}", err))
-                })?;
-                let p3 = DifferentParameter::from_values(0, 0, ParamType::ValueOutput);
-                DifferentParameters(p0, p1, p2, p3)
-            };
-            let mut session = Session::new(
-                0x75bb9a28,
-                0x95f8,
-                0x11ea,
-                [0xbb, 0x37, 0x02, 0x42, 0xac, 0x13, 0x00, 0x02],
-            )?;
-            session.invoke_command(3, &mut sgx_root_enclave_parameters)?;
+            // Generate the CSR
+            // TODO: add challenge as an extension in CSR? Is that something
+            // we want to do?
+            let csr = managers::session_manager::generate_csr()
+                .map_err(|err| print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command PopulateCertificates generate_csr failed:{:?}",
+                    err
+                )))?;
 
-            let token = unsafe {
-                let mut memref = sgx_root_enclave_parameters.2.as_memref().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to get sgx_root_enclave_parameters.2 as memref:{:?}", err))
-                })?;
-                memref.buffer().to_vec()
-            };
-            let device_id = unsafe {
-                sgx_root_enclave_parameters.3.as_value().map_err(|err| {
-                print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to get sgx_root_enclave_parameters.3 as value:{:?}", err))
-            })?.a()
-            };
-            let pubkey = unsafe {
-                let mut memref = sgx_root_enclave_parameters.1.as_memref().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to get sgx_root_enclave_parameters.1 as memref:{:?}", err))
-                })?;
-                memref.buffer().to_vec()
-            };
-            unsafe {
-                let mut memref = params.2.as_memref().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to get params.2 as memref:{:?}", err))
-                })?;
-                memref.buffer().write(&token).map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to place token in token_buffer:{:?}", err))
-                })?;
-                (*memref.raw()).size = token.len().try_into().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to convert len into u32:{:?}", err))
-                })?;
-            };
-            unsafe {
-                params.1.as_value().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to get params.1 as value:{:?}", err))
-                })?.set_a(device_id);
-            }
-            unsafe {
-                let mut memref = params.3.as_memref().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetPSAAttestationToken failed to get params.3 as memref:{:?}", err))
-                })?;
-                memref.buffer().write(&pubkey).map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to place pubkey in params.3:{:?}", err))
-                })?;
-                (*memref.raw()).size = pubkey.len().try_into().map_err(|err| {
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command GetPSAAttestationToken failed to convert len into u32:{:?}", err))
-                })?;
-            }
+            csr_buf.buffer().write(&csr).map_err(|e| {
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command GetCSR failed to write buffer {:?}",
+                    e
+                ))
+            })?;
         }
+        RuntimeManagerOpcode::PopulateCertificates => {
+            // p0 - cert_chain_buffer - input
+            // p1 - cert_lengths as [u8]
+            debug_message("runtime_manager_trustzone::invoke_command::PopulateCertificates started".to_string());
+            let cert_chain_buffer = unsafe {
+                let mut memref = params.0.as_memref().map_err(|err|
+                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed to get memref from params.0:{:?}", err))
+                )?;
+                memref.buffer().to_vec()
+            };
+            // cert_lengths should be [u32], but optee-utee doesn't support that.
+            // So, we create cert_lengths_native, which is a [u8], and then
+            // transmute it to [u32]
+            let cert_lengths_native = unsafe {
+                let mut memref = params.1.as_memref().map_err(|err|
+                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed to get memref from params.1:{:?}", err))
+                )?;
+                memref.buffer().to_vec()
+            };
+            // Here's where we transmute the [u8] buffer into a [u32]
+            let cert_lengths = veracruz_utils::platform::tz::transmute_to_u32(&cert_lengths_native);
+            let certs: Vec<Vec<u8>> = crate::runtime_manager::break_up_cert_array(&cert_chain_buffer, &cert_lengths)
+                .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
+
+            managers::session_manager::load_cert_chain(certs)
+                .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
+        },
         RuntimeManagerOpcode::ResetEnclave => {
             debug_message("runtime_manager_trustzone::invoke_command::ResetEnclave".to_string());
         }

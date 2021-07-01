@@ -16,8 +16,11 @@ use nix;
 use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
+
+use veracruz_utils::csr::CertError;
+
 #[cfg(feature = "nitro")]
-use veracruz_utils::nitro::{NitroRootEnclaveMessage, VeracruzSocketError};
+use veracruz_utils::{platform::nitro::nitro::NitroRootEnclaveMessage, io::error::SocketError};
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {
@@ -59,7 +62,7 @@ pub enum RuntimeManagerError {
     SocketError(nix::Error),
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Veracruz Socket error:{:?}", _0)]
-    VeracruzSocketError(VeracruzSocketError),
+    VeracruzSocketError(SocketError),
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
     BincodeError(bincode::Error),
@@ -72,6 +75,12 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: wrong message type received:{:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
+    #[error(display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}", _0, _1, _2)]
+    DataWrongSizeForField(std::string::String, usize, usize),
+    #[error(display = "RuntimeManager: RingKeyRejected error:{:?}", _0)]
+    RingKeyRejected(ring::error::KeyRejected),
+    #[error(display = "RuntimeManager: Certificate error:{:?}", _0)]
+    CertError(CertError),
 }
 
 impl<T> From<PoisonError<T>> for RuntimeManagerError {

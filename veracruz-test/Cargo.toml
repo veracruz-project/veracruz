@@ -30,6 +30,8 @@ env_logger = "0.7"
 log = "=0.4.13"
 lazy_static = "1.4"
 err-derive = "0.2"
+local_ipaddress = "0.1.3"
+regex = "1.4"
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_alloc = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }

@@ -80,19 +80,19 @@ pub enum VeracruzServerError {
     BincodeError(bincode::ErrorKind),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
-    RuntimeManagerMessageStatus(veracruz_utils::RuntimeManagerMessage),
+    RuntimeManagerMessageStatus(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
-    NitroStatus(veracruz_utils::NitroStatus),
+    NitroStatus(veracruz_utils::platform::nitro::nitro::NitroStatus),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}", _0)]
-    InvalidRuntimeManagerMessage(veracruz_utils::RuntimeManagerMessage),
+    InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
         display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
         _0
     )]
-    InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
+    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
@@ -104,7 +104,7 @@ pub enum VeracruzServerError {
     SerdeError,
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Veracruz Socket Error:{:?}", _0)]
-    VeracruzSocketError(#[error(source)] veracruz_utils::VeracruzSocketError),
+    VeracruzSocketError(#[error(source)] veracruz_utils::io::error::SocketError),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),
@@ -169,6 +169,8 @@ pub enum VeracruzServerError {
     DirectStrError(&'static str),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
+    #[error(display = "VeracruzServer: Invalid runtime manager hash")]
+    InvalidRuntimeManagerHash,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
@@ -216,20 +218,9 @@ pub trait VeracruzServer {
     where
         Self: Sized;
 
-    fn proxy_psa_attestation_get_token(
-        &mut self,
-        challenge: Vec<u8>,
-    ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError>;
+    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
 
-    fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
-
-    // Note: this function will go away
-    fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError>;
-
-    // Note: This function will go away
-    fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError>;
-
-    fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError>;
+    fn new_tls_session(&self) -> Result<u32, VeracruzServerError>;
 
     fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError>;
 
@@ -299,7 +290,8 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerE
         lines.collect()
     };
     println!(
-        "veracruz_server::send_proxy_attestation_server_start received header:{:?}",
+        "veracruz_server::post_buffer received header (from url:{:?}):{:?}",
+        url,
         received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {

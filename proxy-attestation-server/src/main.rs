@@ -34,7 +34,7 @@ fn main() {
     SETUP.call_once(|| {
         thread::spawn(move || {
             let mut sys = System::new("test");
-            let server = server::server("127.0.0.1:3016".to_string()).unwrap();
+            let server = server::server("127.0.0.1:3016".to_string(), "../test-collateral/CACert.pem").unwrap();
             let _ = tx.send(server.clone());
             sys.block_on(server);
             println!("end of the daemon thread");

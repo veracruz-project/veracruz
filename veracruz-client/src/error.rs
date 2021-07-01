@@ -85,8 +85,16 @@ pub enum VeracruzClientError {
     ExcessiveIterationError(&'static str),
     #[error(display = "VeracruzClient: Unauthorized client certificate: {}.", _0)]
     InvalidClientCertificateError(String),
+    #[error(display = "VeracruzClient: No Peer certificates received")]
+    NoPeerCertificatesError,
+    #[error(display = "VeracruzClient: Runtime enclave hash extension is not present in the peer certificate")]
+    RuntimeHashExtensionMissingError,
     #[error(display = "VeracruzClient: Direct message: {}.", _0)]
     DirectMessage(String),
+    #[error(display = "VeracruzClient: Unable to read")]
+    UnableToReadError,
+    #[error(display = "VeracruzClient: No match found for runtime isolate hash")]
+    NoMatchingRuntimeIsolateHash,
 }
 
 impl From<x509_parser::error::PEMError> for VeracruzClientError {

@@ -29,7 +29,7 @@ use lazy_static::lazy_static;
 use execution_engine::{fs::FileSystem, execute};
 use veracruz_utils::policy::{
     policy::Policy,
-    principal::Principal,
+    principal::{ExecutionStrategy, Principal},
 };
 use wasi_types::ErrNo;
 

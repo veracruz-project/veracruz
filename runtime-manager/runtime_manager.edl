@@ -38,31 +38,9 @@ enclave {
                                              [out] size_t *output_data_size,
                                              [out] uint8_t *alive_flag);
 
-        public sgx_status_t psa_attestation_get_token_enc([in, size=challenge_size, readonly] const uint8_t *p_challenge,
-                                                          size_t challenge_size,
-                                                          [out, size=token_buf_size] uint8_t *token,
-                                                          size_t token_buf_size,
-                                                          [out] size_t *token_size,
-                                                          [out, size=pubkey_buf_size] uint8_t *p_pubkey,
-                                                          size_t pubkey_buf_size,
-                                                          [out] size_t *p_pubkey_size,
-                                                          [out] int32_t *p_device_id);
 
         public sgx_status_t tls_get_data_needed_enc(uint32_t session_id,
                                                     [out] uint8_t *needed);
-        public sgx_status_t get_enclave_name_len_enc([out] size_t *name_len);
-        public sgx_status_t get_enclave_name_enc([out, size=name_buf_size] uint8_t *name_buf,
-                                                 size_t name_buf_size);
-        public sgx_status_t get_enclave_cert_len_enc([out] size_t *cert_buf_len);
-        public sgx_status_t get_enclave_cert_enc([out, size=cert_buf_size] uint8_t *cert_buf,
-                                                 size_t cert_buf_size,
-                                                 [out] size_t *cert_buf_len);
-        
-        // public sgx_status_t init_remote_attestation_enc([in, size=pub_key_size, readonly] const uint8_t *p_pub_key, size_t pub_key_size, [out] sgx_ra_context_t *p_context);
-        // public sgx_status_t sgx_get_pubkey_report([in, size = pubkey_challenge_size, readonly] const uint8_t *p_pubkey_challenge,
-        //                                           size_t pubkey_challenge_size,
-        //                                           [in, readonly] const sgx_target_info_t *p_target_info,
-        //                                           [out] sgx_report_t *p_report);
     };
 
     untrusted {
@@ -71,20 +49,14 @@ enclave {
                                           [out] sgx_dh_msg2_t *dh_msg2,
                                           [out] uint64_t *sgx_root_enclave_session_id);
         uint32_t finish_local_attest_ocall([in, readonly] const sgx_dh_msg3_t *dh_msg3,
-                                           [in, size=challenge_size, readonly] const uint8_t *p_challenge,
-                                           size_t challenge_size,
-                                           [in, size=enclave_cert_hash_size, readonly] const uint8_t *enclave_cert_hash,
-                                           size_t enclave_cert_hash_size,
-                                           [in, size=enclave_name_size, readonly] const char *enclave_name,
-                                           size_t enclave_name_size,
+                                           [in, size=csr_size, readonly] const uint8_t *p_csr,
+                                           size_t csr_size,
                                            uint64_t sgx_root_enclave_session_id,
-                                           [out, size=token_buf_size] uint8_t *p_token,
-                                           size_t token_buf_size,
-                                           [out] size_t *p_token_size,
-                                           [out, size=pubkey_buf_size] uint8_t *p_pubkey,
-                                           size_t pubkey_buf_size,
-                                           [out] size_t *p_pubkey_size,
-                                           [out] int32_t *p_device_id);
+                                           [out, size=cert_buf_size] uint8_t *p_cert,
+                                           size_t cert_buf_size,
+                                           [out] size_t *p_cert_size,
+                                           [out, size=cert_lengths_size] uint32_t *cert_lengths,
+                                           size_t cert_lengths_size);
         uint32_t debug_and_error_output_ocall([in, string, readonly] const char *message,
                                               uint32_t error_code);
     };

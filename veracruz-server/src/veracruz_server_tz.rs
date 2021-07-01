@@ -45,8 +45,9 @@ pub mod veracruz_server_tz {
             let policy: Policy =
                 Policy::from_json(policy_json)?;
 
-            let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
-            {
+            if !TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.load(Ordering::SeqCst) {
+                let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
+
                 let runtime_manager_hash = {
                     match policy.runtime_manager_hash(&Platform::TrustZone) {
                         Ok(hash) => hash,
@@ -54,25 +55,20 @@ pub mod veracruz_server_tz {
                     }
                 };
 
-		if !TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.load(Ordering::SeqCst) {
-		    debug!("The SGX root enclave is not initialized.");
+                VeracruzServerTZ::native_attestation(
+                    &policy.proxy_attestation_server_url(),
+                    trustzone_root_enclave_uuid,
+                    &runtime_manager_hash,
+                )?;
 
-		    VeracruzServerTZ::native_attestation(
-			&policy.proxy_attestation_server_url(),
-			trustzone_root_enclave_uuid,
-			&runtime_manager_hash,
-		    )?;
-
-		    TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.store(true, Ordering::SeqCst);
-		}
+                TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.store(true, Ordering::SeqCst);
             }
 
-            let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
-            let p0 = ParamTmpRef::new_input(&policy_json.as_bytes());
-
-            let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-
             {
+                let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
+                let p0 = ParamTmpRef::new_input(&policy_json.as_bytes());
+
+                let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
                 let mut context_opt = CONTEXT.lock()?;
                 let context = context_opt
                     .as_mut()
@@ -81,132 +77,91 @@ pub mod veracruz_server_tz {
                 session.invoke_command(RuntimeManagerOpcode::Initialize as u32, &mut operation)?;
             }
 
+            // Get a 'challenge' value from the root enclave for the compute enclave to use for attestation
+            let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
+            let (challenge, challenge_id) = VeracruzServerTZ::start_local_attestation(trustzone_root_enclave_uuid)?;
+
+            let mut csr: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
+            {
+                let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
+                let p0 = ParamTmpRef::new_input(&challenge);
+                let p1 = ParamTmpRef::new_output(&mut csr);
+
+                let mut operation = Operation::new(0, p0, p1, ParamNone, ParamNone);
+                let mut context_opt = CONTEXT.lock()?;
+                let context = context_opt
+                    .as_mut()
+                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                let mut session = context.open_session(runtime_manager_uuid)?;
+                session.invoke_command(RuntimeManagerOpcode::GetCSR as u32, &mut operation)?;
+
+                let (_, p1_output, _, _) = operation.parameters();
+                unsafe {
+                    let new_len = p1_output.updated_size();
+                    csr.set_len(new_len);
+                }
+            }
+            let mut cert_chain_buffer: Vec<u8> = Vec::with_capacity(3 * 2048); //TODO: Don't do this
+            // cert lengths should be [u32] with 3 elements. But optee-utee doesn't
+            // support a way to pass this in as a parameter. We aren't using these
+            // values here, only passing them between OPTEE enclaves. So we're
+            // going to leave it as [u8] and let the enclaves handle it
+            let mut cert_lengths: Vec<u8> = Vec::with_capacity(3 * 4);// TODO: Unmagic these numbers
+            {
+                // call ProxyAttestation in the root enclave
+                let root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
+
+                let p0 = ParamTmpRef::new_input(&*csr);
+                let p1 = ParamValue::new(challenge_id, 0, ParamType::ValueInput);
+
+                let p2 = ParamTmpRef::new_output(&mut cert_chain_buffer);
+                let p3 = ParamTmpRef::new_output(&mut cert_lengths);
+                let mut operation = Operation::new(0, p0, p1, p2, p3);
+                let mut context_opt = CONTEXT.lock()?;
+                let context = context_opt
+                    .as_mut()
+                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                let mut session = context.open_session(root_enclave_uuid)?;
+                session.invoke_command(TrustZoneRootEnclaveOpcode::ProxyAttestation as u32, &mut operation)
+                    .map_err(|err| {
+                        println!("veracruz_server_tz::new failed to invoke session.invoke_command failed:{:?}", err);
+                        err
+                    })?;
+                let (_, _, p2_output, p3_output) = operation.parameters();
+                unsafe {
+                    let ccb_len = p2_output.updated_size();
+                    cert_chain_buffer.set_len(ccb_len);
+                    let cl_len = p3_output.updated_size();
+                    cert_lengths.set_len(cl_len);
+                }
+            }
+            {
+                // call PopulateCertificates in the runtime enclave
+                let runtime_manager_uuid = Uuid::parse_str(&RUNTIME_MANAGER_UUID.to_string())?;
+                let p0 = ParamTmpRef::new_input(&cert_chain_buffer);
+                let p1 = ParamTmpRef::new_input(&mut cert_lengths);
+
+                let mut operation = Operation::new(0, p0, p1, ParamNone, ParamNone);
+                let mut context_opt = CONTEXT.lock()?;
+                let context = context_opt
+                    .as_mut()
+                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                let mut session = context.open_session(runtime_manager_uuid)?;
+                session.invoke_command(RuntimeManagerOpcode::PopulateCertificates as u32, &mut operation)?;
+            }
+
             Ok(Self {
                 runtime_manager_uuid: RUNTIME_MANAGER_UUID.to_string(),
             })
         }
 
-        fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
-            if parsed.has_request_proxy_psa_attestation_token() {
-                let rpat = parsed.get_request_proxy_psa_attestation_token();
-                let challenge = transport_protocol::parse_request_proxy_psa_attestation_token(rpat);
-                let (psa_attestation_token, pubkey, device_id) =
-                    self.proxy_psa_attestation_get_token(challenge)?;
-                let serialized_pat = transport_protocol::serialize_proxy_psa_attestation_token(
-                    &psa_attestation_token,
-                    &pubkey,
-                    device_id,
-                )?;
-                Ok(Some(serialized_pat))
-            } else {
-                Err(VeracruzServerError::MissingFieldError(
-                    "plaintext_data proxy_psa_attestation_toke",
-                ))
-            }
+            unreachable!("Unimplemented");
         }
 
-        // Note: this function will go away
-        fn get_enclave_cert(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
-            let mut context_opt = CONTEXT.lock()?;
-            let context = context_opt
-                .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(runtime_manager_uuid)?;
-
-            // get the certificate size
-            let certificate_len = {
-                let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
-                let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-
-                session.invoke_command(RuntimeManagerOpcode::GetEnclaveCertSize as u32, &mut operation)?;
-                operation.parameters().0.a()
-            };
-
-            let certificate = {
-                let mut cert_vec = vec![0; certificate_len as usize];
-                let p0 = ParamTmpRef::new_output(&mut cert_vec);
-                let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                session.invoke_command(RuntimeManagerOpcode::GetEnclaveCert as u32, &mut operation)?;
-                cert_vec
-            };
-            Ok(certificate)
-        }
-
-        // Note: This function will go away
-        fn get_enclave_name(&mut self) -> Result<String, VeracruzServerError> {
-            let mut context_opt = CONTEXT.lock()?;
-            let context = context_opt
-                .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(runtime_manager_uuid)?;
-
-            // get the enclave name size
-            let name_len = {
-                let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
-                let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-
-                session.invoke_command(RuntimeManagerOpcode::GetEnclaveNameSize as u32, &mut operation)?;
-                operation.parameters().0.a()
-            };
-            let name: String = {
-                let mut name_vec = vec![0; name_len as usize];
-                //let mut name_vec = Vec::with_capacity(name_len as usize);
-                let p0 = ParamTmpRef::new_output(&mut name_vec);
-                let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                session.invoke_command(RuntimeManagerOpcode::GetEnclaveName as u32, &mut operation)?;
-                String::from_utf8(name_vec)?
-            };
-            Ok(name)
-        }
-
-        fn proxy_psa_attestation_get_token(
-            &mut self,
-            challenge: Vec<u8>,
-        ) -> Result<(Vec<u8>, Vec<u8>, i32), VeracruzServerError> {
-            let mut token: Vec<u8> = Vec::with_capacity(2 * 8192); // TODO: Don't do
-            let mut pubkey = Vec::with_capacity(256); // TODO: Don't do this
-
-            let mut context_opt = CONTEXT.lock()?;
-            let context = context_opt
-                .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
-            let mut session = context.open_session(runtime_manager_uuid)?;
-
-            // Get the token, public key and device_id
-            // p0 - challenge input
-            // p1 - device_id output
-            // p2 - token output
-            // p3 - pubkey output
-            let p0 = ParamTmpRef::new_input(&challenge);
-
-            let p1 = ParamValue::new(0, 0, ParamType::ValueOutput);
-
-            //let p1 = ParamValue::new(token.capacity() as u32, 0 as u32, ParamType::ValueInout); // a = token_len, b=device_id
-            let p2 = ParamTmpRef::new_output(&mut token);
-            let p3 = ParamTmpRef::new_output(&mut pubkey);
-
-            let mut operation = Operation::new(0, p0, p1, p2, p3);
-            session.invoke_command(RuntimeManagerOpcode::GetPSAAttestationToken as u32, &mut operation)?;
-
-            let (_, p1_output, p2_output, p3_output) = operation.parameters();
-            let device_id: i32 = p1_output.a().try_into()?;
-            unsafe {
-                let token_len = p2_output.updated_size();
-                token.set_len(token_len);
-            }
-            unsafe {
-                let pubkey_len = p3_output.updated_size();
-                pubkey.set_len(pubkey_len);
-            }
-            Ok((token, pubkey, device_id))
-        }
-
-        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
@@ -346,36 +301,65 @@ pub mod veracruz_server_tz {
                 trustzone_root_enclave_session
                     .invoke_command(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
             }
-	    let (challenge, device_id) =
+            let (challenge, device_id) =
                 VeracruzServerTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
 
             let p0 = ParamValue::new(device_id.try_into()?, 0, ParamType::ValueInout);
             let p1 = ParamTmpRef::new_input(&challenge);
             let mut token: Vec<u8> = vec![0; 1024]; //Vec::with_capacity(1024); // TODO: Don't do this
             let p2 = ParamTmpRef::new_output(&mut token);
-            let mut public_key: Vec<u8> = Vec::with_capacity(128); // TODO: Don't do this
-            let p3 = ParamTmpRef::new_output(&mut public_key);
+            let mut csr: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
+            let p3 = ParamTmpRef::new_output(&mut csr);
             let mut na_operation = Operation::new(0, p0, p1, p2, p3);
             trustzone_root_enclave_session
                 .invoke_command(TrustZoneRootEnclaveOpcode::NativeAttestation as u32, &mut na_operation)?;
-            let token_size = na_operation.parameters().0.b();
-            let public_key_size = na_operation.parameters().0.a();
-            let token_vec: Vec<u8> = token[0..token_size as usize].to_vec();
-            unsafe { public_key.set_len(public_key_size as usize) };
+            let token_size = na_operation.parameters().0.a();
+            let csr_size = na_operation.parameters().0.b();
+            unsafe { token.set_len(token_size as usize) };
+            unsafe { csr.set_len(csr_size as usize) };
 
-            VeracruzServerTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token_vec, device_id)?;
+            let (root_enclave_certificate, root_certificate) = VeracruzServerTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token, &csr, device_id)?;
+
+            let p0 = ParamTmpRef::new_input(&root_certificate);
+            let p1 = ParamTmpRef::new_input(&root_enclave_certificate);
+            let mut cc_operation = Operation::new(0, p0, p1, ParamNone, ParamNone);
+            trustzone_root_enclave_session
+                .invoke_command(TrustZoneRootEnclaveOpcode::CertificateChain as u32, &mut cc_operation)
+                .map_err(|err| {
+                    println!("VeracruzServerTZ::native_attestation call to CertificateChain on root enclave failed:{:?}", err);
+                    err
+                })?;
+
             debug!("veracruz_server_tz::native_attestation returning Ok");
             return Ok(());
+        }
+
+        fn start_local_attestation(trustzone_root_enclave_uuid: Uuid) -> Result<(Vec<u8>, u32), VeracruzServerError> {
+            let mut context_opt = CONTEXT.lock()?;
+            let context = context_opt
+                .as_mut()
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            let mut trustzone_root_enclave_session = context.open_session(trustzone_root_enclave_uuid)?;
+
+            let mut challenge = vec![0; 16];
+            let p0 = ParamTmpRef::new_output(&mut challenge);
+            let p1 = ParamValue::new(0, 0, ParamType::ValueOutput);
+            let mut sla_operation = Operation::new(0, p0, p1, ParamNone, ParamNone);
+            trustzone_root_enclave_session
+                .invoke_command(TrustZoneRootEnclaveOpcode::StartLocalAttestation as u32, &mut sla_operation)?;
+            let challenge_id: u32 = sla_operation.parameters().1.a();
+            return Ok((challenge, challenge_id));
         }
 
         fn post_native_psa_attestation_token(
             proxy_attestation_server_url: &String,
             token: &Vec<u8>,
+            csr: &Vec<u8>,
             device_id: i32,
-        ) -> Result<(), VeracruzServerError> {
+        ) -> Result<(Vec<u8>, Vec<u8>), VeracruzServerError> {
             debug!("veracruz_server_tz::post_psa_attestation_token started");
             let proxy_attestation_server_request =
-                transport_protocol::serialize_native_psa_attestation_token(token, device_id)?;
+                transport_protocol::serialize_native_psa_attestation_token(token, csr, device_id)?;
             let encoded_str = base64::encode(&proxy_attestation_server_request);
             let url = format!("{:}/PSA/AttestationToken", proxy_attestation_server_url);
             let response = crate::post_buffer(&url, &encoded_str)?;
@@ -384,7 +368,15 @@ pub mod veracruz_server_tz {
                 "veracruz_server_tz::post_psa_attestation_token received buffer:{:?}",
                 response
             );
-            return Ok(());
+            let body_vec =
+                base64::decode(&response)?;
+            let pasr = transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| VeracruzServerError::TransportProtocolError(err))?;
+            let cert_chain = pasr.get_cert_chain();
+            let root_certificate = cert_chain.get_root_cert();
+            let root_enclave_certificate = cert_chain.get_enclave_cert();
+
+            // Pull data out of response buffer
+            return Ok((root_enclave_certificate.to_vec(), root_certificate.to_vec()));
         }
 
         fn fetch_firmware_version(session: &mut Session) -> Result<String, VeracruzServerError> {

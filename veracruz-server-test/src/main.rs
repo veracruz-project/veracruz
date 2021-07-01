@@ -14,14 +14,11 @@
 
 mod tests {
     use actix_rt::System;
-    use base64;
-    use curl::easy::{Easy, List};
     use env_logger;
     use lazy_static::lazy_static;
     use log::{debug, info, LevelFilter};
-    use rand;
-    use rand::Rng;
     use ring;
+
     use serde::Deserialize;
     use transport_protocol;
     use veracruz_server::veracruz_server::*;
@@ -48,8 +45,6 @@ mod tests {
         time::Instant,
         vec::Vec,
     };
-    #[cfg(feature = "sgx")]
-    use stringreader;
 
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "../test-collateral/one_data_source_policy.json";
@@ -125,16 +120,28 @@ mod tests {
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
 
         SETUP.call_once(|| {
-            info!("SETUP.call_once called");
+            println!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
+                #[cfg(feature = "nitro")]
+                let ip_addr = 
+                {
+                    let ip_string = local_ipaddress::get()
+                        .expect("Failed to get local ip address");
+                    let ip_port_string = format!("{:}:3010", ip_string);
+                    ip_port_string
+                };
+                #[cfg(not(feature = "nitro"))]
+                let ip_addr = {
+                    proxy_attestation_server_url
+                };
                 #[cfg(feature = "debug")]
                 let server =
-                    proxy_attestation_server::server::server(proxy_attestation_server_url, true)
+                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", true)
                         .unwrap();
                 #[cfg(not(feature = "debug"))]
                 let server =
-                    proxy_attestation_server::server::server(proxy_attestation_server_url, false)
+                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", false)
                         .unwrap();
                 sys.block_on(server).unwrap();
             });
@@ -205,14 +212,6 @@ mod tests {
         });
     }
 
-    /// Auxiliary function: self signed certificate for enclave
-    fn enclave_self_signed_cert(
-        veracruz_server: &mut VeracruzServerEnclave,
-    ) -> Result<rustls::Certificate, VeracruzServerError> {
-        let enclave_cert_vec = veracruz_server.get_enclave_cert()?;
-        Ok(rustls::Certificate(enclave_cert_vec))
-    }
-
     #[test]
     /// Load the Veracruz server and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
@@ -220,9 +219,8 @@ mod tests {
         iterate_over_policy("../test-collateral/", |policy_json| {
             let policy = Policy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
-            let result = VeracruzServerEnclave::new(&policy_json)
-                .and_then(|mut veracruz_server| enclave_self_signed_cert(&mut veracruz_server));
-            assert!(result.is_ok(), "error:{:?}", result);
+            let result = VeracruzServerEnclave::new(&policy_json);
+            assert!(result.is_ok());
         });
     }
 
@@ -234,22 +232,7 @@ mod tests {
 
         let ret = VeracruzServerEnclave::new(&policy_json);
 
-        let mut veracruz_server = ret.unwrap();
-
-        #[cfg(feature = "nitro")]
-        let test_target_platform: Platform = Platform::Nitro;
-        #[cfg(feature = "sgx")]
-        let test_target_platform: Platform = Platform::SGX;
-        #[cfg(feature = "tz")]
-        let test_target_platform: Platform = Platform::TrustZone;
-
-        let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        let enclave_cert_hash_ret = attestation_flow(
-            &policy.proxy_attestation_server_url(),
-            &runtime_manager_hash,
-            &mut veracruz_server,
-        );
-        assert!(enclave_cert_hash_ret.is_ok())
+        let _veracruz_server = ret.unwrap();
     }
 
     #[test]
@@ -278,18 +261,14 @@ mod tests {
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (mut veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
-        let enclave_cert = enclave_self_signed_cert(&mut veracruz_server).unwrap();
+        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
 
         let client_cert_filename = "../test-collateral/never_used_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
-        let cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
 
         let mut _client_session = create_client_test_session(
-            &mut veracruz_server,
             client_cert_filename,
             client_key_filename,
-            cert_hash.as_ref().to_vec(),
         );
     }
 
@@ -305,7 +284,6 @@ mod tests {
             Some(READ_FILE_WASM),
             &[("input.txt", STRING_1_DATA)],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -323,7 +301,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -338,7 +315,6 @@ mod tests {
             None,
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -353,7 +329,6 @@ mod tests {
             Some(STRING_EDIT_DISTANCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -368,7 +343,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -383,7 +357,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -398,7 +371,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -413,7 +385,6 @@ mod tests {
             Some(RANDOM_SOURCE_WASM),
             &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -441,7 +412,6 @@ mod tests {
             Some(LINEAR_REGRESSION_WASM),
             &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -456,7 +426,6 @@ mod tests {
             Some(LINEAR_REGRESSION_WASM),
             &[],
             &[],
-            false,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -486,7 +455,6 @@ mod tests {
                 ("input-0", INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
             ],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -504,7 +472,6 @@ mod tests {
             Some(STRING_EDIT_DISTANCE_WASM),
             &[("input-0", STRING_1_DATA), ("input-1", STRING_2_DATA)],
             &[],
-            false,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -525,7 +492,6 @@ mod tests {
             Some(LINEAR_REGRESSION_WASM),
             &[("input-0", LINEAR_REGRESSION_DATA)],
             &[],
-            true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -559,7 +525,6 @@ mod tests {
                 ("input-1", PERSON_SET_2_DATA),
             ],
             &[],
-            true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -578,7 +543,6 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[("input-0", SINGLE_F64_DATA)],
             &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
-            true,
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -593,7 +557,6 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[("input-0", SINGLE_F64_DATA)],
             &[("stream-0", VEC_F64_1_DATA)],
-            true,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -608,7 +571,6 @@ mod tests {
             Some(NUMBER_STREM_WASM),
             &[],
             &[("stream-0", VEC_F64_1_DATA), ("stream-1", VEC_F64_2_DATA)],
-            true,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -627,7 +589,6 @@ mod tests {
                 ("stream-1", VEC_F64_2_DATA),
                 ("stream-2", VEC_F64_1_DATA),
             ],
-            true,
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -648,8 +609,6 @@ mod tests {
                 Some(LOGISTICS_REGRESSION_WASM),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -673,8 +632,6 @@ mod tests {
                 Some(MACD_WASM),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -703,8 +660,6 @@ mod tests {
                 Some(MACD_DATA_PATH),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -728,8 +683,6 @@ mod tests {
                 Some(INTERSECTION_SET_SUM_WASM),
                 &[("input-0", data_path)],
                 &[],
-                // turn on attestation
-                true,
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -750,8 +703,6 @@ mod tests {
         // Each element contains the package id (u64) and the path to the data
         data_id_paths: &[(&str, &str)],
         stream_id_paths: &[(&str, &str)],
-        // if there is an attestation
-        attestation_flag: bool,
     ) -> Result<(), VeracruzServerError> {
         info!("### Step 0.  Initialise test configuration.");
         // initialise the pipe
@@ -791,27 +742,11 @@ mod tests {
         #[cfg(feature = "tz")]
         let test_target_platform: Platform = Platform::TrustZone;
 
-        let runtime_manager_hash = policy.runtime_manager_hash(&test_target_platform).unwrap();
-        let enclave_cert_hash = if attestation_flag {
-            attestation_flow(
-                &policy.proxy_attestation_server_url(),
-                &runtime_manager_hash,
-                &mut veracruz_server,
-            )?
-        } else {
-            let enclave_cert = enclave_self_signed_cert(&mut veracruz_server)?;
-            ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref())
-                .as_ref()
-                .to_vec()
-        };
-
         info!("             Enclave generated a self-signed certificate:");
 
         let mut client_session = create_client_test_session(
-            &mut veracruz_server,
             client_cert_path,
             client_key_path,
-            enclave_cert_hash,
         )?;
         info!(
             "             Initialasation time (μs): {}.",
@@ -877,6 +812,10 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+                check_runtime_manager_hash(&policy,
+                                           &client_session,
+                                           &test_target_platform)?;
+
                 let response = provision_program(
                     path,
                     client_session_id,
@@ -910,6 +849,9 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+                check_runtime_manager_hash(&policy,
+                                           &client_session,
+                                           &test_target_platform)?;
                 info!(
                     "             Data provider hash response time (μs): {}.",
                     time_data_hash.elapsed().as_micros()
@@ -952,6 +894,10 @@ mod tests {
                     // convert vec of raw stream packages to queue of them
                     stream_data_vec.push(decoded_data);
                 }
+
+                check_runtime_manager_hash(&policy,
+                                           &client_session,
+                                           &test_target_platform)?;
 
                 // Reverse the vec so we can use `pop` for the `first` element of the list.
                 // In each round of stream, the loop pops an element from the `stream_data_vec`
@@ -1024,6 +970,9 @@ mod tests {
                         &client_tls_tx,
                         &client_tls_rx,
                     )?;
+                    check_runtime_manager_hash(&policy,
+                                               &client_session,
+                                               &test_target_platform)?;
                     info!(
                         "             Result retriever hash response time (μs): {}.",
                         time_result_hash.elapsed().as_micros()
@@ -1091,6 +1040,10 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+
+                check_runtime_manager_hash(&policy,
+                                           &client_session,
+                                           &test_target_platform)?;
                 info!(
                     "             Result retriever hash response time (μs): {}.",
                     time_result_hash.elapsed().as_micros()
@@ -1220,10 +1173,14 @@ mod tests {
         // the policy files. so we need to replace it with the private IP of the current instance
         #[cfg(feature = "nitro")]
         {
-            let ip_string = local_ipaddress::get().expect("Failed to get local ip address");
-            let ip_address = format!("\"proxy_attestation_server_url\": \"{:}:3010\"", ip_string);
-            let re =
-                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#).unwrap();
+            let ip_string = std::env::var("TABASCO_IP_ADDRESS")
+                .expect("TABASCO_IP_ADDRESS environment variable not set");
+            let ip_address =
+                format!("\"proxy_attestation_server_url\": \"{:}:3010\"",
+                        ip_string);
+            let re = 
+                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#)
+                    .unwrap();
             let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
             let policy_hash =
@@ -1249,7 +1206,7 @@ mod tests {
     fn init_veracruz_server_and_tls_session(
         policy_json: &str,
     ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
-        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
 
         let one_tenth_sec = std::time::Duration::from_millis(100);
         std::thread::sleep(one_tenth_sec); // wait for the client to start
@@ -1324,6 +1281,58 @@ mod tests {
                 received: received_hash.as_bytes().to_vec(),
                 expected: expected_policy_hash.as_bytes().to_vec(),
             });
+        }
+    }
+
+    fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
+
+        let expected = match policy.runtime_manager_hash(platform) {
+            Err(_) => return false,
+            Ok(data) => data,
+        };
+        let expected_bytes = match hex::decode(expected) {
+            Err(_) => return false,
+            Ok(bytes) => bytes,
+        };
+
+        if &received[..] != expected_bytes.as_slice() {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    fn check_runtime_manager_hash(policy: &Policy,
+                                  client_session: &dyn rustls::Session,
+                                  test_target_platform: &Platform,
+    ) -> Result<(), VeracruzServerError> {
+        match client_session.get_peer_certificates() {
+            None => {
+                return Err(VeracruzServerError::MissingFieldError("NO PEER CERTIFICATES. WTF?"));
+            },
+            Some(certs) => {
+                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref()).unwrap();
+                let ues = ee_cert.unrecognized_extensions();
+                // check for OUR extension
+                static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
+                match ues.get(&OUR_EXTENSION_ID[..]) {
+                    None => {
+                        println!("Our extension is not present. This should be fatal");
+                        return Err(VeracruzServerError::MissingFieldError("MY CRAZY CUSTOM EXTENSION AIN'T TERE"));
+                    },
+                    Some(data) => {
+                        let extension_data = data.read_all(VeracruzServerError::MissingFieldError("CAN'T READ MY CRAZY CUSTOM EXTENSION"), |input| {
+                            Ok(input.read_bytes_to_end())
+                        })?;
+                        if !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, test_target_platform) {
+                               // The hashes didn't match
+                               println!("None of the hashes matched.");
+                               return Err(VeracruzServerError::InvalidRuntimeManagerHash);
+                        }
+                        return Ok(());
+                    }
+                }
+            }
         }
     }
 
@@ -1454,138 +1463,31 @@ mod tests {
     }
 
     fn create_client_test_session(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
         client_cert_filename: &str,
         client_key_filename: &str,
-        cert_hash: Vec<u8>,
     ) -> Result<rustls::ClientSession, VeracruzServerError> {
         let client_cert = read_cert_file(client_cert_filename)?;
 
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
-        let mut client_config = rustls::ClientConfig::new_self_signed();
+        let proxy_service_cert = {
+            let data = std::fs::read("../test-collateral/CACert.pem").unwrap();
+            let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
+            certs[0].clone()
+        };
+        let mut client_config = rustls::ClientConfig::new();
         let mut client_cert_vec = std::vec::Vec::new();
         client_cert_vec.push(client_cert);
         client_config.set_single_client_cert(client_cert_vec, client_priv_key);
         client_config
             .root_store
-            .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+            .add(&proxy_service_cert).unwrap();
 
-        client_config.pinned_cert_hashes.push(cert_hash);
-
-        let enclave_name = veracruz_server.get_enclave_name()?;
-        let dns_name = webpki::DNSNameRef::try_from_ascii_str(enclave_name.as_str())?;
+        let dns_name = webpki::DNSNameRef::try_from_ascii_str("ComputeEnclave.dev")?;
         Ok(rustls::ClientSession::new(
             &std::sync::Arc::new(client_config),
             dns_name,
         ))
-    }
-
-    fn post_buffer(url: &str, data: &str) -> Result<String, VeracruzServerError> {
-        let mut data_reader = stringreader::StringReader::new(&data);
-        let mut curl_request = Easy::new();
-        curl_request.url(url)?;
-
-        let mut headers = List::new();
-        headers.append("Content-Type: application/octet-stream")?;
-
-        curl_request.http_headers(headers)?;
-
-        curl_request.post(true)?;
-        curl_request.post_field_size(data.len() as u64)?;
-        curl_request.fail_on_error(true)?;
-
-        let mut received_body = std::string::String::new();
-        let mut received_header = std::string::String::new();
-        {
-            let mut transfer = curl_request.transfer();
-
-            transfer.read_function(|buf| Ok(data_reader.read(buf).unwrap_or(0)))?;
-
-            transfer.write_function(|buf| {
-                received_body.push_str(
-                    std::str::from_utf8(buf)
-                        .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                );
-                Ok(buf.len())
-            })?;
-            transfer.header_function(|buf| {
-                received_header.push_str(
-                    std::str::from_utf8(buf)
-                        .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                );
-                true
-            })?;
-
-            transfer.perform()?;
-        }
-
-        let header_lines: Vec<&str> = {
-            let lines = received_header.split("\n");
-            lines.collect()
-        };
-        let mut header_fields = std::collections::HashMap::new();
-        for this_line in header_lines.iter() {
-            let fields: Vec<&str> = this_line.split(":").collect();
-            if fields.len() == 2 {
-                header_fields.insert(fields[0], fields[1]);
-            }
-        }
-        Ok(received_body)
-    }
-
-    fn attestation_flow(
-        proxy_attestation_server_url: &String,
-        expected_enclave_hash: &String,
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let challenge = rand::thread_rng().gen::<[u8; 32]>();
-        info!(
-            "veracruz-server-test/attestation_flow: challenge:{:?}",
-            challenge
-        );
-        let serialized_pagt =
-            transport_protocol::serialize_request_proxy_psa_attestation_token(&challenge)?;
-        let pagt_ret = veracruz_server.plaintext_data(serialized_pagt)?;
-        let received_bytes = pagt_ret.ok_or(VeracruzServerError::MissingFieldError(
-            "attestation_flow pagt_ret",
-        ))?;
-
-        let encoded_token = base64::encode(&received_bytes);
-        let complete_proxy_attestation_server_url =
-            format!("{:}/VerifyPAT", proxy_attestation_server_url);
-        let received_buffer = post_buffer(&complete_proxy_attestation_server_url, &encoded_token)?;
-
-        let received_payload = base64::decode(&received_buffer)?;
-
-        if challenge != received_payload[8..40] {
-            return Err(VeracruzServerError::MismatchError {
-                variable: "attestation_flow challenge",
-                received: received_payload[8..40].to_vec(),
-                expected: challenge.to_vec(),
-            });
-        }
-        let hash_bin = hex::decode(expected_enclave_hash)?;
-        // specifying 0..32 because some platforms give us measurements in
-        // SHA384 (Nitro Enclaves, I'm talking about you)
-        // but the PSA attestation token only contains 32 bytes of it in order
-        // to keep the offsets the same
-        if hash_bin[0..32] != received_payload[47..79] {
-            #[cfg(all(feature = "debug", feature = "nitro"))]
-            {
-                println!("veracruz-server-test::attestation_flow expected_enclave_hash did not match the value from the PSA token. However, since you are running Nitro enclaves in debug mode, their PCRs are zeroed. This is probably what's happened");
-            }
-            #[cfg(not(feature = "debug"))]
-            {
-                return Err(VeracruzServerError::MismatchError {
-                    variable: "attestation_flow hash_bin",
-                    received: received_payload[47..79].to_vec(),
-                    expected: hash_bin.to_vec(),
-                });
-            }
-        }
-        let enclave_cert_hash = received_payload[86..118].to_vec();
-        Ok(enclave_cert_hash)
     }
 
     fn read_cert_file(filename: &str) -> Result<rustls::Certificate, VeracruzServerError> {

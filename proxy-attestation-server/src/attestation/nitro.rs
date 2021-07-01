@@ -102,7 +102,6 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
 
 /// Handle an attestation token passed to us in the `body_string` parameter
 pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder {
-
     let received_bytes = base64::decode(&body_string)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::nitro::attestation_token failed to decode base64:{:?}", err);
@@ -116,37 +115,38 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             let _ignore = std::io::stdout().flush();
             err
         })?;
-    if !parsed.has_native_psa_attestation_token() {
-        println!("proxy-attestation-server::attestation::psa::attestation_token received data is incorrect.");
+    if !parsed.has_nitro_attestation_doc() {
+        println!("proxy-attestation-server::attestation::nitro::attestation_token received data is incorrect.");
         let _ignore = std::io::stdout().flush();
         return Err(ProxyAttestationServerError::MissingFieldError(
-            "native_psa_attestation_token",
+            "nitro_attestation_doc",
         ));
     }
-    let (token, device_id) =
-        transport_protocol::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
+    let (att_doc, device_id) =
+        transport_protocol::parse_nitro_attestation_doc(&parsed.get_nitro_attestation_doc());
 
-    let attestation_document = NitroToken::authenticate_token(&token, &AWS_NITRO_ROOT_CERTIFICATE).map_err(|err| {
+    let attestation_document = NitroToken::authenticate_token(&att_doc, &AWS_NITRO_ROOT_CERTIFICATE).map_err(|err| {
         println!("proxy-attestation-server::nitro::attestation_token authenticate_token failed:{:?}", err);
         let _ignore = std::io::stdout().flush();
         ProxyAttestationServerError::CborError(format!("parse_nitro_token failed to parse token data:{:?}", err))
     })?;
 
     let attestation_context = {
-        let ac_hash = ATTESTATION_CONTEXT.lock()
+        let mut ac_hash = ATTESTATION_CONTEXT.lock()
             .map_err(|err| {
                 println!("proxy-attestation-server::nitro::attestation_token failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                 let _ignore = std::io::stdout().flush();
                 err
             })?;
         println!("ac_hash:{:?}", ac_hash[&device_id].firmware_version);
-        if ac_hash.contains_key(&device_id) {
-            let context = &ac_hash[&device_id];
-            context.clone()
-        } else {
-            println!("proxy-attestation-server::nitro::attestation_token device not found. device_id:{:?}", device_id);
-            let _ignore = std::io::stdout().flush();
-            return Err(ProxyAttestationServerError::NoDeviceError(device_id));
+        // remove because we are not going to need this context again
+        match ac_hash.remove(&device_id) {
+            Some(entry) => entry,
+            None => {
+                println!("proxy-attestation-server::nitro::attestation_token device not found. device_id:{:?}", device_id);
+                let _ignore = std::io::stdout().flush();
+                return Err(ProxyAttestationServerError::NoDeviceError(device_id));
+            }
         }
     };
 
@@ -169,7 +169,6 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             }
         },
     }
-    
 
     let expected_enclave_hash: Vec<u8> = {
         let connection = crate::orm::establish_connection()?;
@@ -194,8 +193,8 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     };
     let received_enclave_hash = &attestation_document.pcrs[0];
     if expected_enclave_hash != *received_enclave_hash {
+        println!("Comparison between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
         if crate::server::DEBUG_MODE.load(Ordering::Relaxed) {
-            println!("Comparison between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
             println!("This is debug mode, so this is expected, so we're not going to fail you, but you should feel bad.");
             let _ignore = std::io::stdout().flush();
         } else {
@@ -209,28 +208,31 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             });
         }
     }
-
-    let digest = match attestation_document.public_key {
-        Some(public_key) => ring::digest::digest(&ring::digest::SHA256, &public_key),
+    let mut csr = match attestation_document.user_data {
+        Some(data) => data,
         None => {
             return Err(ProxyAttestationServerError::MissingFieldError("public_key"));
         },
     };
-    let pubkey_hash = digest.as_ref();
+    unsafe { csr.set_len(csr.len() - 1) }
+    
 
-    // TODO: Get a real enclave name (or just get rid of the enclave names entirely)
-    let enclave_name: String = "bob".to_string();
+    // convert the CSR into a certificate
+    let re_cert = crate::attestation::convert_csr_to_certificate(&csr)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::nitro::attestation_token convert_to_certificate failed:{:?}", err);
+            err
+        })?;
 
-    let connection = crate::orm::establish_connection()?;
-    crate::orm::update_or_create_device(
-        &connection,
-        device_id,
-        &pubkey_hash.to_vec(),
-        enclave_name,
-    ).map_err(|err| {
-        println!("nitro:: failed to add device to database:{:?}", err);
-        let _ignore = std::io::stdout().flush();
-        err
-    })?;
-    Ok("Pass".to_string())
+    let root_cert_der = crate::attestation::get_ca_certificate()?;
+
+    let response_bytes = transport_protocol::serialize_cert_chain(&re_cert.to_der()?, &root_cert_der)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::nitro::attestation_token serialize_cert_chain failed:{:?}", err);
+            err
+        })?;
+        
+    let response_b64 = base64::encode(&response_bytes);
+
+    return Ok(response_b64);
 }

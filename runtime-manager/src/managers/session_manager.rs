@@ -13,6 +13,8 @@ use crate::managers::*;
 use ::session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::policy::policy::Policy;
+use rustls::PrivateKey;
+use veracruz_utils::csr;
 
 pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError> {
     let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
@@ -37,6 +39,21 @@ pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError
     }
 
     Ok(())
+}
+
+pub fn load_cert_chain(chain: Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> {
+    let mut sm_guard = MY_SESSION_MANAGER.lock()?;
+    match &mut *sm_guard {
+        Some(session_manager) => {
+            session_manager.set_cert_chain(&chain)?;
+        },
+        None => {
+            return Err(RuntimeManagerError::UninitializedSessionError(
+                "load_cert_chain",
+            ))
+        },
+    }
+    return Ok(());
 }
 
 pub fn new_session() -> Result<u32, RuntimeManagerError> {
@@ -123,29 +140,22 @@ pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
     }
 }
 
-pub fn get_enclave_cert_pem() -> Result<Vec<u8>, RuntimeManagerError> {
+fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(my_session_manager) => Ok(my_session_manager.server_certificate_buffer().clone()),
-        None => Err(RuntimeManagerError::UninitializedSessionError(
-            "get_enclave_cert_pem",
-        )),
+        Some(session_manager) => {
+            return Ok(session_manager.private_key());
+        },
+        None => {
+            return Err(RuntimeManagerError::UninitializedSessionError("get_enclave_private_key"));
+        },
     }
 }
 
-pub fn get_enclave_cert() -> Result<rustls::Certificate, RuntimeManagerError> {
-    match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(my_session_manager) => Ok(my_session_manager.server_certificate().clone()),
-        None => Err(RuntimeManagerError::UninitializedSessionError(
-            "get_enclave_cert",
-        )),
-    }
-}
-
-pub fn get_enclave_name() -> Result<std::string::String, RuntimeManagerError> {
-    match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(my_session_manager) => Ok(my_session_manager.name().clone()),
-        None => Err(RuntimeManagerError::UninitializedSessionError(
-            "get_enclave_name",
-        )),
-    }
+pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
+    let private_key_vec = get_enclave_private_key()?.0;
+    let private_key = ring::signature::EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec)
+        .map_err(|err| RuntimeManagerError::RingKeyRejected(err))?;
+    let csr = csr::generate_csr(&csr::COMPUTE_ENCLAVE_CSR_TEMPLATE, &private_key)
+        .map_err(|err| RuntimeManagerError::CertError(err))?;
+    return Ok(csr);
 }

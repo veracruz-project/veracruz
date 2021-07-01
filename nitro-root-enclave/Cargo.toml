@@ -17,5 +17,3 @@ nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", bran
 nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["nitro"]}
 nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main" }
-psa-attestation = { path = "../psa-attestation/", features =["nitro"]}
-
