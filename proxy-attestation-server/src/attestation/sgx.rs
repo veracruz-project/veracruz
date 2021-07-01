@@ -120,7 +120,7 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
         let mut pubkey_challenge: [u8; 16] = [0; 16];
         let mut rng = rand::thread_rng();
 
-        rng.fill(&mut pubkey_challenge)?;
+        rng.fill(&mut pubkey_challenge);
         let sgx_ecc_handle = SgxEccHandle::new();
         sgx_ecc_handle.open()
             .map_err(|err| {
@@ -219,7 +219,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         })?;
     {
         let attestation_context = {
-            let ac_hash = ATTESTATION_CONTEXT.lock()
+            let mut ac_hash = ATTESTATION_CONTEXT.lock()
                 .map_err(|err| {
                     println!("proxy-attestation-server::attestation::sgx::msg3 failed to obtain lock on ATTESTATION_CONTEXT:{:?}", err);
                     err
@@ -233,7 +233,7 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
                     println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
                     err
                 })?;
-            (*context).clone()
+            context.clone()
         };
 
         let expected_enclave_hash = {
