@@ -26,7 +26,8 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   private-set-intersection-sum \
 		   string-edit-distance \
  		   number-stream-accumulation \
-		   read-file
+		   read-file \
+ 		   image-processing
 RUST_EXAMPLE_DIR = rust-examples/
 # Navigate to the actual wasm programs.
 RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-wasi/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
@@ -43,7 +44,8 @@ DATA = hello-world-1.dat \
 	   number-stream-init.dat \
 	   idash2017/ \
 	   macd/ \
-	   private-set-inter-sum/
+	   private-set-inter-sum/ \
+	   image-processing.dat
 DATASET_PATH = datasets/
 RELATIVE_DATA = $(addprefix $(DATASET_PATH), $(DATA))
 # All data generators for `fmt` and `clean` targets.
@@ -54,7 +56,8 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 	              private-set-intersection-sum-generator \
 	              string-generator \
 	              linear-regression-generator \
-	   			  number-stream-generator
+	   	          number-stream-generator \
+	   	          image-processing-generator
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
@@ -82,6 +85,7 @@ $(DATASET_PATH)idash2017/: $$(addprefix $(DATA_GENERATORS_PATH)/idash2017-logist
 $(DATASET_PATH)macd/: $$(addprefix $(DATA_GENERATORS_PATH)/moving-average-convergence-divergence-generator/,Makefile src/main.rs)
 $(DATASET_PATH)private-set-inter-sum/: $$(addprefix $(DATA_GENERATORS_PATH)/private-set-intersection-sum-generator/,Makefile src/main.rs)
 $(addprefix $(DATASET_PATH),number-stream-1.dat number-stream-2.dat number-stream-init.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/number-stream-generator/,Makefile src/main.rs)
+$(addprefix $(DATASET_PATH),image-processing.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/image-processing-generator/,Makefile src/main.rs)
 
 # Call makefiles to generate datasets
 $(RELATIVE_DATA):

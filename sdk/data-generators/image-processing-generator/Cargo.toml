@@ -1,0 +1,15 @@
+[package]
+name = "image-processing-generator"
+version = "0.1.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "A utility for generating synthetic images for use with the `image-processing` example."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33"
+image = "0.23.14"
+
+# We use an old version of `downloader` because nightly-2020-05-07 can't compile the recent versions of `socket2`
+downloader = "=0.2.0"
