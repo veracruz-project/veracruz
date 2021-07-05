@@ -29,7 +29,7 @@ $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
 $(TARGET_DAT): 
-	cargo run -- --file_prefix $(TARGET_PREFIX) --width $(WIDTH) --height $(HEIGHT) --seed $(SEED); 
+	cargo run -- --file_prefix $(TARGET_PREFIX) --width $(WIDTH) --height $(HEIGHT); 
 
 clean:
 	cargo clean

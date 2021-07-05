@@ -59,16 +59,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                .validator(is_u64)
                .default_value("10")
        )
-       .arg(
-           Arg::with_name("seed")
-               .short("e")
-               .long("seed")
-               .value_name("NUBMER")
-               .help("The seed for the random number generator.")
-               .takes_value(true)
-               .validator(is_u64)
-               .default_value("0"),
-        )
         .get_matches();
 
     let file_prefix = matches
