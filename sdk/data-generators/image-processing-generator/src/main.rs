@@ -17,7 +17,7 @@
 use clap::{App, Arg};
 use downloader::{Download, Downloader};
 use image::{io::Reader, ImageFormat};
-use std::{error::Error, path::Path};
+use std::{error::Error, fs::remove_file, path::Path};
 
 /// Download a random JPEG image from https://picsum.photos/ and save it in a *.dat, then convert it
 /// to a PNG image under the same name.
@@ -81,13 +81,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .value_of("height")
         .ok_or("Failed to read the height")?;
 
+    let file_path = format!("{}.dat", file_prefix);
+
+    // Try to remove already existing image
+    let _result = remove_file(&file_path);
+
     // Download random image
     let mut downloader = Downloader::builder()
         .download_folder(std::path::Path::new("./"))
         .parallel_requests(1)
         .build()
         .expect("Failed to configure the downloader");
-    let file_path = format!("{}.dat", file_prefix);
     let dl =
         Download::new(format!("https://picsum.photos/{}/{}", image_width, image_height).as_str())
             .file_name(Path::new(&file_path));
