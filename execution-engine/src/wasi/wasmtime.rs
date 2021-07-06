@@ -105,7 +105,7 @@ impl<'a> MemoryHandler for Caller<'a> {
 fn check_main(tau: &ExternType) -> EntrySignature {
     match tau {
         ExternType::Func(tau) => {
-            let params = tau.params();
+            let params: Vec<ValType> = tau.params().collect();
 
             if params == &[ValType::I32, ValType::I32] {
                 EntrySignature::ArgvAndArgc
@@ -165,10 +165,10 @@ impl WasmtimeRuntimeState {
             if import.module() != WasiWrapper::WASI_SNAPSHOT_MODULE_NAME {
                 return Err(FatalEngineError::InvalidWASMModule);
             }
-
-            let host_call_body = match WasiAPIName::try_from(import.name()).map_err(|_| {
+            let import_name = import.name().unwrap_or("");
+            let host_call_body = match WasiAPIName::try_from(import_name).map_err(|_| {
                 FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
-                    import.name().to_string(),
+                    import_name.to_string(),
                 ))
             })? {
                 WasiAPIName::ARGS_GET => Func::wrap(&store, Self::wasi_arg_get),
