@@ -9,7 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk test_cases sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -83,7 +83,7 @@ veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/cs
 	cd veracruz-server-test && \
 		bash ../test-collateral/populate-test-database.sh
 
-sgx-veracruz-server-test: sgx test_cases veracruz-server-test/proxy-attestation-server.db
+sgx-veracruz-server-test: sgx sgx-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_debug --features sgx  -- --ignored --test-threads=1
@@ -92,7 +92,7 @@ sgx-veracruz-server-test-dry-run: sgx-test-collateral
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run 
 
-sgx-veracruz-server-performance: sgx-test-collateral sgx test_cases veracruz-server-test/proxy-attestation-server.db
+sgx-veracruz-server-performance: sgx-test-collateral sgx veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test test_performance_ --features sgx -- --ignored 
 
@@ -100,7 +100,7 @@ sgx-veracruz-test-dry-run: sgx-test-collateral
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx --no-run
 
-sgx-veracruz-test: sgx-test-collateral sgx test_cases veracruz-test/proxy-attestation-server.db
+sgx-veracruz-test: sgx-test-collateral sgx veracruz-test/proxy-attestation-server.db
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features sgx 
 
@@ -110,7 +110,7 @@ sgx-psa-attestation: sgx-env
 tz-psa-attestation: trustzone-env
 	cd psa-attestation && cargo build --target aarch64-unknown-linux-gnu --features tz
 
-trustzone-veracruz-server-test: trustzone-test-collateral trustzone test_cases trustzone-test-env veracruz-server-test/proxy-attestation-server.db
+trustzone-veracruz-server-test: trustzone-test-collateral trustzone trustzone-test-env veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
         && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
                 OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
@@ -119,7 +119,7 @@ trustzone-veracruz-server-test: trustzone-test-collateral trustzone test_cases t
 	chmod u+x run_veracruz_server_test_tz.sh
 	./run_veracruz_server_test_tz.sh
 
-trustzone-veracruz-test: trustzone-test-collateral trustzone test_cases trustzone-test-env veracruz-test/proxy-attestation-server.db
+trustzone-veracruz-test: trustzone-test-collateral trustzone trustzone-test-env veracruz-test/proxy-attestation-server.db
 	cd veracruz-test \
         && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
                 OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
@@ -131,7 +131,7 @@ trustzone-veracruz-test: trustzone-test-collateral trustzone test_cases trustzon
 trustzone-test-env: tz_test.sh run_tz_test.sh
 	chmod u+x $^
 
-nitro-veracruz-server-test: nitro test_cases veracruz-server-test/proxy-attestation-server.db
+nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
@@ -140,11 +140,11 @@ nitro-veracruz-server-test: nitro test_cases veracruz-server-test/proxy-attestat
 	cd ./veracruz-server-test \
 		&& ./nitro-ec2-terminate_root.sh
 
-nitro-veracruz-server-test-dry-run: nitro test_cases
+nitro-veracruz-server-test-dry-run: nitro nitro-test-collateral
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features sgx --no-run
 
-nitro-veracruz-server-performance: nitro test_cases veracruz-server-test/proxy-attestation-server.db
+nitro-veracruz-server-performance: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_performance_ --features nitro -- --ignored
 	cd veracruz-server-test \
@@ -152,11 +152,11 @@ nitro-veracruz-server-performance: nitro test_cases veracruz-server-test/proxy-a
 	cd ./veracruz-server-test \
 		&& ./nitro-ec2-terminate-root.sh
 
-nitro-veracruz-test-dry-run: nitro test_cases
+nitro-veracruz-test-dry-run: nitro nitro-test-collateral
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro --no-run
 
-nitro-veracruz-test: nitro test_cases  veracruz-test/proxy-attestation-server.db
+nitro-veracruz-test: nitro nitro-test-collateral veracruz-test/proxy-attestation-server.db
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro -- --test-threads=1
 	cd veracruz-server-test \
