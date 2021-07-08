@@ -228,9 +228,6 @@ clean:
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
-	cd proxy-attestation-server-cli && cargo clean
-	cd veracruz-server-cli && cargo clean
-	cd veracruz-client-cli && cargo clean
 	rm -rf bin
 
 # NOTE: this target deletes ALL cargo.lock.
@@ -253,6 +250,3 @@ fmt:
 	cd trustzone-root-enclave && cargo fmt
 	cd proxy-attestation-server && cargo fmt
 	$(MAKE) -C sdk fmt
-	cd proxy-attestation-server-cli && cargo fmt
-	cd veracruz-server-cli && cargo fmt
-	cd veracruz-client-cli && cargo fmt
