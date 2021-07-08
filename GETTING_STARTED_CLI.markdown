@@ -148,15 +148,15 @@ $ vc-pgen \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
     --css-file runtime-manager/css.bin \
-    --certificate example-program-cert.pem \
-    --capability "example-binary.wasm:wx" \
-    --certificate example-data0-cert.pem \
+    --certificate example/example-program-cert.pem \
+    --capability "example-binary.wasm:w" \
+    --certificate example/example-data0-cert.pem \
     --capability "input-0:w" \
-    --certificate example-data1-cert.pem \
+    --certificate example/example-data1-cert.pem \
     --capability "input-1:w" \
-    --certificate example-data2-cert.pem \
+    --certificate example/example-data2-cert.pem \
     --capability "input-2:w" \
-    --certificate example-result-cert.pem \
+    --certificate example/example-result-cert.pem \
     --capability "output:r" \
     --binary example-binary.wasm=example/example-binary.wasm \
     --capability "input-0:r,input-1:r,input-2:r,output:w" \
