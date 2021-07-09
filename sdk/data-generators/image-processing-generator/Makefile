@@ -10,6 +10,9 @@
 # and copyright information.
 
 
+# "Puerto de Veracruz" by Eduardo Pavon is licensed under CC BY-SA 2.0
+IMAGE_PATH = "./veracruz.jpg"
+
 WIDTH = 1024
 HEIGHT = 1024
 TARGET_PREFIX = image-processing
@@ -29,7 +32,7 @@ $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
 $(TARGET_DAT): 
-	cargo run -- --file_prefix $(TARGET_PREFIX) --width $(WIDTH) --height $(HEIGHT); 
+	cargo run -- --file_prefix $(TARGET_PREFIX) --image_path $(IMAGE_PATH) --width $(WIDTH) --height $(HEIGHT); 
 
 clean:
 	cargo clean
