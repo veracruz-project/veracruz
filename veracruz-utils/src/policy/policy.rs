@@ -47,11 +47,8 @@ use std::{
     collections::HashMap,
     string::{String, ToString},
     vec::Vec,
-    path,
     path::PathBuf,
 };
-#[cfg(feature = "std")]
-use std::fs;
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +94,10 @@ pub struct Policy {
     execution_strategy: ExecutionStrategy,
     /// The rights table of the standard streams.
     std_streams_table: Vec<StandardStream>,
+
+    /// Hash of the JSON representation if the Policy was parsed from a file.
+    #[serde(skip)]
+    policy_hash: Option<String>
 }
 
 impl Policy {
@@ -132,6 +133,8 @@ impl Policy {
             debug,
             execution_strategy,
             std_streams_table,
+
+            policy_hash: None,
         };
 
         policy.assert_valid()?;
@@ -143,8 +146,19 @@ impl Policy {
     /// validating the well-formedness of the resulting policy in the process.
     /// Returns `Ok(policy)` iff these well-formedness checks pass.
     pub fn from_json(json: &str) -> Result<Self, PolicyError> {
-        let policy: Self = serde_json::from_str(json)?;
+        // parse json
+        let mut policy: Self = serde_json::from_str(json)?;
         policy.assert_valid()?;
+
+        // include hash?
+        let hash = hex::encode(
+            ring::digest::digest(
+                &ring::digest::SHA256,
+                json.as_bytes()
+            )
+        );
+        policy.policy_hash = Some(hash);
+
         Ok(policy)
     }
 
@@ -242,6 +256,12 @@ impl Policy {
     #[inline]
     pub fn std_streams_table(&self) -> &Vec<StandardStream> {
         &self.std_streams_table
+    }
+
+    /// Returns the hash of the source JSON representation, if available
+    #[inline]
+    pub fn policy_hash<'a>(&'a self) -> Option<&'a str> {
+        self.policy_hash.as_ref().map(|s| s.as_str())
     }
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
@@ -369,36 +389,3 @@ impl Policy {
     }
 }
 
-/// Parses and hashes a Veracruz policy from the given file, validating
-/// the well-formedness of the resulting policy in the process.
-/// Returns `Ok((policy, policy_hash))` iff these well-formedness checks pass.
-#[cfg(feature = "std")]
-pub fn policy_and_hash_from_file<P>(
-    path: P
-) -> Result<(Policy, String), PolicyError>
-where
-    P: AsRef<path::Path>
-{
-    let policy_json = fs::read_to_string(path)?;
-    policy_and_hash_from_json(&policy_json)
-}
-
-/// Parses and hashes a Veracruz policy from a JSON-encoded string, `json`,
-/// validating the well-formedness of the resulting policy in the process.
-/// Returns `Ok((policy, policy_hash))` iff these well-formedness checks pass.
-#[cfg(feature = "std")]
-pub fn policy_and_hash_from_json(
-    json: &str
-) -> Result<(Policy, String), PolicyError> {
-    // hash
-    let hash_bytes = ring::digest::digest(
-        &ring::digest::SHA256,
-        json.as_bytes()
-    );
-    let hash = hex::encode(&hash_bytes);
-
-    // decode policy
-    let policy = Policy::from_json(json)?;
-
-    Ok((policy, hash))
-}

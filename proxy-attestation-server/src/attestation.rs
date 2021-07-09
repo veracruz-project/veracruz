@@ -20,17 +20,26 @@ use crate::error::*;
 use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::io::Read;
+use std::path;
 
 use openssl;
 
 lazy_static! {
     static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
-    static ref CA_CERT_DER: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
+    static ref CA_CERT_DER: std::sync::Mutex<Option<
+            Vec<u8>
+        >> = std::sync::Mutex::new(None);
+    static ref CA_KEY_PKEY: std::sync::Mutex<Option<
+            openssl::pkey::PKey<openssl::pkey::Private>
+        >> = std::sync::Mutex::new(None);
 }
 
 /// Reads a PEM certificate from `pem_cert_path`, converts it to DER format,
 /// and stores it in CA_CERT_DER for use by the service
-pub fn load_ca_certificate(pem_cert_path: &str) -> Result<(), ProxyAttestationServerError> {
+pub fn load_ca_certificate<P>(pem_cert_path: P) -> Result<(), ProxyAttestationServerError>
+where
+    P: AsRef<path::Path>
+{
     let mut f = std::fs::File::open(pem_cert_path)
         .map_err(|err| ProxyAttestationServerError::IOError(err))?;
     let mut buffer: Vec<u8> = Vec::new();
@@ -52,6 +61,35 @@ fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
     match &*ccd_guard {
         None => return Err(ProxyAttestationServerError::BadStateError),
         Some(der) => return Ok(der.clone()),
+    }
+}
+
+/// Reads a PEM keyificate from `pem_key_path`, converts it to DER format,
+/// and stores it in CA_CERT_DER for use by the service
+pub fn load_ca_key<P>(pem_key_path: P) -> Result<(), ProxyAttestationServerError>
+where
+    P: AsRef<path::Path>
+{
+    let mut f = std::fs::File::open(pem_key_path)
+        .map_err(|err| ProxyAttestationServerError::IOError(err))?;
+    let mut buffer: Vec<u8> = Vec::new();
+    f.read_to_end(&mut buffer)?;
+    let key = openssl::pkey::PKey::private_key_from_pem(&buffer)?;
+    let mut guard = CA_KEY_PKEY.lock()?;
+    match *guard {
+        Some(_) => return Err(ProxyAttestationServerError::BadStateError),
+        None => {
+            *guard = Some(key);
+        }
+    }
+    return Ok(());
+}
+
+fn get_ca_key() -> Result<openssl::pkey::PKey<openssl::pkey::Private>, ProxyAttestationServerError> {
+    let guard = CA_KEY_PKEY.lock()?;
+    match &*guard {
+        None => return Err(ProxyAttestationServerError::BadStateError),
+        Some(key) => return Ok(key.clone()),
     }
 }
 
@@ -216,24 +254,9 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
-    let key_pem = {
-        let mut f = std::fs::File::open("../test-collateral/CAKey.pem")
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::convert_csr_to_certificate open of file failed:{:?}", err);
-                err
-            })?;
-        let mut buffer: Vec<u8> = Vec::new();
-        f.read_to_end(&mut buffer)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::convert_csr_to_certificate read_to_end failed:{:?}", err);
-                err
-            })?;
-        buffer
-    };
-
-    let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem)
+    let private_key = get_ca_key()
         .map_err(|err| {
-            println!("proxy-attestation-server::attestation::convert_csr_to_certificate private_key_from_pem failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate get_ca_key failed:{:?}", err);
             err
         })?;
     // sign the certificate
@@ -242,6 +265,7 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate cert_builder.sign failed:{:?}", err);
             err
         })?;
+
     // build the final certificate and return it
     Ok(cert_builder.build())
 }

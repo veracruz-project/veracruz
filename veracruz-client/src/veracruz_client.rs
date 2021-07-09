@@ -163,18 +163,16 @@ impl VeracruzClient {
         P1: AsRef<path::Path>,
         P2: AsRef<path::Path>
     {
-        let policy_hash = hex::encode(ring::digest::digest(
-            &ring::digest::SHA256,
-            policy_json.as_bytes(),
-        ));
         let policy = Policy::from_json(&policy_json)?;
+        let policy_hash = policy.policy_hash()
+            .expect("policy did not hash json?")
+            .to_string();
 
         Self::with_policy_and_hash(
             client_cert_filename,
             client_key_filename,
             policy,
             policy_hash,
-            target_platform,
         )
     }
 
@@ -187,7 +185,6 @@ impl VeracruzClient {
         client_key_filename: P2,
         policy: Policy,
         policy_hash: String,
-        target_platform: &Platform
     ) -> Result<VeracruzClient, VeracruzClientError>
     where
         P1: AsRef<path::Path>,

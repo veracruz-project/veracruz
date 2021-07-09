@@ -137,12 +137,20 @@ mod tests {
                 };
                 #[cfg(feature = "debug")]
                 let server =
-                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", true)
-                        .unwrap();
+                    proxy_attestation_server::server::server(
+                        ip_addr,
+                        "../test-collateral/CACert.pem",
+                        "../test-collateral/CAKey.pem",
+                        true
+                    ).unwrap();
                 #[cfg(not(feature = "debug"))]
                 let server =
-                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", false)
-                        .unwrap();
+                    proxy_attestation_server::server::server(
+                        ip_addr,
+                        "../test-collateral/CACert.pem",
+                        "../test-collateral/CAKey.pem",
+                        false
+                    ).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
