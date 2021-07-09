@@ -235,6 +235,23 @@ clean-cargo-lock:
 	$(MAKE) clean -C sdk
 	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave runtime-manager-bind runtime-manager psa-attestation veracruz-server-test veracruz-server sgx-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
 
+# update dependencies, note does NOT change Cargo.toml, useful if
+# patched/github dependencies have changed without version bump
+update:
+	cd session-manager && cargo update
+	cd execution-engine && cargo update
+	cd transport-protocol && cargo update
+	cd veracruz-client && cargo update
+	cd sgx-root-enclave && cargo update
+	cd runtime-manager && cargo update
+	cd psa-attestation && cargo update
+	cd veracruz-server-test && cargo update
+	cd veracruz-server && cargo update
+	cd veracruz-test && cargo update
+	cd veracruz-utils && cargo update
+	cd trustzone-root-enclave && cargo update
+	cd proxy-attestation-server && cargo update
+
 fmt:
 	cd session-manager && cargo fmt
 	cd execution-engine && cargo fmt

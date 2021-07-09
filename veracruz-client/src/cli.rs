@@ -17,8 +17,9 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
-use veracruz_utils::platform::Platform;
 use veracruz_utils::policy::parsers;
+use veracruz_utils::policy::policy::Policy;
+use veracruz_utils::policy::error::PolicyError;
 
 
 #[derive(Debug, StructOpt)]
@@ -37,10 +38,6 @@ struct Opt {
     /// Note that unrecoverable errors will still be printed to stderr.
     #[structopt(short, long)]
     quiet: bool,
-
-    /// Target enclave platform
-    #[structopt(short, long)]
-    target: Platform,
 
     /// Path to client certificate file
     #[structopt(short, long, parse(from_os_str))]
@@ -136,16 +133,20 @@ fn main() {
     let opt = Opt::from_args();
 
     // load policy
-    let (policy, policy_hash) = match veracruz_utils::policy::policy::policy_and_hash_from_file(
-        &opt.policy_path
-    ) {
-        Ok((policy, policy_hash)) => (policy, policy_hash),
+    let policy = fs::read_to_string(&opt.policy_path)
+        .map_err(|err| PolicyError::from(err))
+        .and_then(|policy_json| Policy::from_json(&policy_json));
+    let policy = match policy {
+        Ok(policy) => policy,
         Err(err) => {
             eprintln!("{}", err);
             process::exit(1);
         }
     };
-    qprintln!(opt, "Loaded policy {} {}", opt.policy_path.to_string_lossy(), policy_hash);
+    qprintln!(opt, "Loaded policy {} {}",
+        opt.policy_path.to_string_lossy(),
+        policy.policy_hash().unwrap_or("???")
+    );
 
     // create Veracruz Client instance
     qprintln!(opt, "Connecting to {}", policy.veracruz_server_url());
@@ -153,8 +154,7 @@ fn main() {
         opt.identity,
         opt.key,
         policy.clone(),
-        policy_hash,
-        &opt.target,
+        policy.policy_hash().unwrap().to_string(),
     ) {
         Ok(veracruz_client) => veracruz_client,
         Err(err) => {

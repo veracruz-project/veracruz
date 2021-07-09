@@ -33,6 +33,7 @@ use psa_attestation::{
     t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
 };
 use std::{ffi::c_void, ptr::null};
+use std::path;
 
 async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
     if input_data.is_empty() {
@@ -195,13 +196,21 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> P
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
-pub fn server(url: String, ca_cert_path: &str, debug: bool) -> Result<Server, String> {
+pub fn server<P1, P2>(url: String, ca_cert_path: P1, ca_key_path: P2, debug: bool) -> Result<Server, String>
+where
+    P1: AsRef<path::Path>,
+    P2: AsRef<path::Path>
+{
     if debug {
         DEBUG_MODE.store(true, Ordering::SeqCst);
     }
     crate::attestation::load_ca_certificate(ca_cert_path)
         .map_err(|err| {
             format!("proxy-attestation-server::server::server load_ca_certificate returned an error:{:?}", err)
+        })?;
+    crate::attestation::load_ca_key(ca_key_path)
+        .map_err(|err| {
+            format!("proxy-attestation-server::server::server load_ca_key returned an error:{:?}", err)
         })?;
     let server = HttpServer::new(move || {
         App::new()

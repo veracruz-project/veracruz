@@ -66,9 +66,7 @@ We need to use Xargo to cross-compile this example into WebAssembly, fortunately
 this is all captured in the example's Makefile:
 
 ``` bash
-$ cd sdk/rust-examples/shamir-secret-sharing
-$ make
-...
+$ make -C sdk/rust-examples/shamir-secret-sharing
 ```
 
 You should now find the example compiled to WebAssembly in the `target/wasm32-wasi/release`
@@ -145,9 +143,10 @@ use localhost for now), and a hash of the WebAssembly file we plan to execute.
 ``` bash
 $ vc-pgen \
     --proxy-attestation-server-ip 127.0.0.1:3010 \
+    --proxy-attestation-server-cert test-collateral/CACert.pem \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
-    --css-file runtime-manager/css.bin \
+    --css-file runtime-manager/css-sgx.bin \
     --certificate example/example-program-cert.pem \
     --capability "example-binary.wasm:w" \
     --certificate example/example-data0-cert.pem \
@@ -170,22 +169,37 @@ $ ls example/example-policy.json
 example/example-policy.json
 ```
 
+NOTE! This command needs to be rerun after every recompile, since this will
+change the runtime hashes.
+
 ## Running the Proxy Attestation Server
 
 Veracruz's Proxy Attestation Server provides a frontend for a database of
 attested Veracruz instances populated by the native attestation server.
-This allows a client to test that a Veracruz instance is what it says it is.
+This allows a client to verify through the server's certificate chain that
+a Veracruz instance is what it says it is.
 
-The Proxy Attestation Server uses an SQLite database. As a part of compilation,
-the proxy-attestation-server crate generates an empty database with the correct
-tables we can use for this examples.
+Before we can launch the Proxy Attestation Server, we need to populate the
+database with the hashes of the Veracruz runtimes:
 
-You can launch the Proxy Attestation Server with the
+``` bash
+$ ./test-collateral/populate-test-database.sh example/example-pas.db
+```
+
+NOTE! This command needs to be rerun after every recompile, since this will
+change the runtime hashes.
+
+Now we can launch the Proxy Attestation Server with the
 `vc-pas`/`proxy-attestation-server` command. Note we are using the bash
 character `&` to launch the Proxy Attestation Server in the background:
 
+<!-- TODO generate ~~ca~cert/~~ca~key -->
+
 ``` bash
-$ vc-pas example/example-policy.json --database-url=proxy-attestation-server/proxy-attestation-server.db &
+$ vc-pas example/example-policy.json \
+    --database-url=example/example-pas.db \
+    --ca-cert=test-collateral/CACert.pem \
+    --ca-key=test-collateral/CAKey.pem &
 [2021-02-12T00:23:33Z INFO  proxy_attestation_server] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 [2021-02-12T00:23:33Z INFO  proxy_attestation_server] Using database "proxy-attestation-server/proxy-attestation-server.db"
 [2021-02-12T00:23:33Z INFO  actix_server::builder] Starting 12 workers
@@ -225,13 +239,10 @@ functionality, but in a CLI form.
 First lets send over the program to our Veracruz server, this requires an
 identity with the "PiProvider" role:
 
-<!-- TODO do we need - - target sgx? -->
-
 ``` bash
 $ vc-client example/example-policy.json \
-    --target sgx \
-    --key example/example-program-key.pem \
     --identity example/example-program-cert.pem \
+    --key example/example-program-key.pem \
     --program example-binary.wasm=example/example-binary.wasm
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
@@ -245,27 +256,24 @@ different devices:
 
 ``` bash
 $ vc-client example/example-policy.json \
-    --target sgx \
-    --key example/example-data0-key.pem \
     --identity example/example-data0-cert.pem \
+    --key example/example-data0-key.pem \
     --data input-0=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-0 from /dev/fd/63
 
 $ vc-client example/example-policy.json \
-    --target sgx \
-    --key example/example-data1-key.pem \
     --identity example/example-data1-cert.pem \
+    --key example/example-data1-key.pem \
     --data input-1=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-1 from /dev/fd/63
 
 $ vc-client example/example-policy.json \
-    --target sgx \
-    --key example/example-data2-key.pem \
     --identity example/example-data2-cert.pem \
+    --key example/example-data2-key.pem \
     --data input-2=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
@@ -277,10 +285,9 @@ And finally, we can request the result using an identity with the
 
 ``` bash
 $ vc-client example/example-policy.json \
-    --target sgx \
-    --key example/example-result-key.pem \
     --identity example/example-result-cert.pem \
-    --output example-binary.wasm=-
+    --key example/example-result-key.pem \
+    --result example-binary.wasm=-
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Reading <enclave>/example-binary.wasm into <stdout>
