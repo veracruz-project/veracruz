@@ -10,13 +10,13 @@
 //! and copyright information.
 
 use std::{
-    fs::{ File, read_to_string},
+    convert::TryFrom,
+    fs::{read_to_string, File},
     io::{Read, Write},
     net::SocketAddr,
     path::{Path, PathBuf},
     process::{exit, Command},
     str::FromStr,
-    convert::TryFrom,
 };
 
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
@@ -26,9 +26,9 @@ use log::{error, info, warn};
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
-    policy::Policy,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, Identity, Program, FileRights, StandardStream},
+    policy::Policy,
+    principal::{ExecutionStrategy, FileRights, Identity, Program, StandardStream},
 };
 use wasi_types::Rights;
 
@@ -109,7 +109,7 @@ struct Arguments {
     /// in the computation.
     certificates: Vec<PathBuf>,
     /// The capabilities associated to each principal and program in the computation.
-    /// Note that the length of this vector MUST match the total length of `certificates` and `program_binary` 
+    /// Note that the length of this vector MUST match the total length of `certificates` and `program_binary`
     /// as each principal and program has an accompanying capability table.
     certificate_capabilities: Vec<Vec<String>>,
     binary_capabilities: Vec<Vec<String>>,
@@ -188,18 +188,17 @@ fn check_execution_strategy(strategy: &str) {
 /// valid Veracruz capabilities: of the form "[FILE_NAME]:[Right_number]".
 fn check_capability(capabilities: &[Vec<String>]) {
     if !capabilities.iter().all(|v| {
-        v.iter()
-            .all(|s| {
-                let mut split = s.split(':'); 
-                //skip the filename
-                split.next();
-                let cap_check = match split.next() {
-                    None => false,
-                    Some(cap) => cap.parse::<u64>().is_ok(),
-                };
-                //The length must be 2 hence it must be none.
-                cap_check || split.next().is_none() 
-            })
+        v.iter().all(|s| {
+            let mut split = s.split(':');
+            //skip the filename
+            split.next();
+            let cap_check = match split.next() {
+                None => false,
+                Some(cap) => cap.parse::<u64>().is_ok(),
+            };
+            //The length must be 2 hence it must be none.
+            cap_check || split.next().is_none()
+        })
     }) {
         abort_with("Could not parse the capability command line arguments.");
     }
@@ -229,7 +228,7 @@ fn parse_command_line() -> Arguments {
                 .short("p")
                 .long("capability")
                 .value_name("CAPABILITIES")
-                .help("The capability table of a client or a program of the form 'output:rw,input-0:w,prorgam.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
+                .help("The capability table of a client or a program of the form 'output:rw,input-0:w,program.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
                 .required(true)
                 .multiple(true),
         )
@@ -529,7 +528,7 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 
     if Path::new(css_file).exists() {
         let mut dd_command = Command::new(DD_EXECUTABLE_NAME);
-        
+
         dd_command
             .arg("skip=960")
             .arg("count=32")
@@ -554,8 +553,7 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 
             info!("Invoking 'xxd' executable: {:?}.", xxd_command);
 
-            if let Ok(hash_hex) = xxd_command.output()
-            {
+            if let Ok(hash_hex) = xxd_command.output() {
                 if !hash_hex.status.success() {
                     abort_with("Invocation of 'xxd' command failed.");
                 }
@@ -587,7 +585,7 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 /// line argument.
 fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
     info!("Computing AWS Nitro Enclave hash.");
-    
+
     let pcr0_file = match &arguments.pcr0_file {
         None => return None,
         Some(pcr0_file) => pcr0_file,
@@ -619,9 +617,12 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
 /// a vec of VeracruzIdentity<String>.
 fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
     info!("Serializing identities of computation Principals.");
-    
-    assert_eq!(arguments.certificates.len(), arguments.certificate_capabilities.len());
-    
+
+    assert_eq!(
+        arguments.certificates.len(),
+        arguments.certificate_capabilities.len()
+    );
+
     let mut values = Vec::new();
 
     for (id, (cert, capability)) in arguments
@@ -636,16 +637,16 @@ fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
             file.read_to_string(&mut content)
                 .expect("Failed to read file.");
 
-            let certificates = content.replace("\n", "")
-                                 .replace("-----BEGIN CERTIFICATE-----", "-----BEGIN CERTIFICATE-----\n")
-                                 .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
+            let certificates = content
+                .replace("\n", "")
+                .replace(
+                    "-----BEGIN CERTIFICATE-----",
+                    "-----BEGIN CERTIFICATE-----\n",
+                )
+                .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
             let file_permissions = serialize_capability(capability);
 
-            values.push(Identity::new(
-                certificates,
-                id as u32,
-                file_permissions,
-            ));
+            values.push(Identity::new(certificates, id as u32, file_permissions));
         } else {
             abort_with("Could not open certificate file.");
         }
@@ -663,9 +664,12 @@ pub fn serialize_certificate(path: &PathBuf) -> String {
 /// a vec of VeracruzProgram.
 fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
     info!("Serializing programs.");
-    
-    assert_eq!(arguments.program_binaries.len(), arguments.binary_capabilities.len());
-    
+
+    assert_eq!(
+        arguments.program_binaries.len(),
+        arguments.binary_capabilities.len()
+    );
+
     let mut values = Vec::new();
 
     for (id, (program_file_name, capability)) in arguments
@@ -678,7 +682,11 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
         let file_permissions = serialize_capability(capability);
 
         values.push(Program::new(
-            program_file_name.to_str().expect(&format!("Failed to convert {:?} to str",program_file_name)).trim().to_string(),
+            program_file_name
+                .to_str()
+                .expect(&format!("Failed to convert {:?} to str", program_file_name))
+                .trim()
+                .to_string(),
             id as u32,
             pi_hash,
             file_permissions,
@@ -692,7 +700,7 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
 /// the current time.
 fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
     info!("Serializing enclave certificate expiry timepoint.");
-    
+
     let timepoint = arguments
         .certificate_expiry
         .expect("Internal invariant failed: certificate lifetime is missing.");
@@ -703,31 +711,31 @@ fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
         timepoint.day() as u8,
         timepoint.hour() as u8,
         timepoint.minute() as u8,
-    ).expect("Failed to instantiate a timepoint")
+    )
+    .expect("Failed to instantiate a timepoint")
 }
 
 #[inline]
-fn serialize_capability(cap_string : &[String]) -> Vec<FileRights> {
-    cap_string.iter().map(|c| serialize_capability_entry(c.as_str())).collect()
+fn serialize_capability(cap_string: &[String]) -> Vec<FileRights> {
+    cap_string
+        .iter()
+        .map(|c| serialize_capability_entry(c.as_str()))
+        .collect()
 }
 
-fn serialize_capability_entry(cap_string : &str) -> FileRights {
+fn serialize_capability_entry(cap_string: &str) -> FileRights {
     // common shorthand (r = read, w = write, rw = read + write)
     #[allow(non_snake_case)]
-    let READ_RIGHTS: Rights
-        = Rights::FD_READ
-        | Rights::FD_SEEK
-        | Rights::PATH_OPEN;
+    let READ_RIGHTS: Rights = Rights::FD_READ | Rights::FD_SEEK | Rights::PATH_OPEN;
 
     #[allow(non_snake_case)]
-    let WRITE_RIGHTS: Rights
-        = Rights::FD_WRITE
+    let WRITE_RIGHTS: Rights = Rights::FD_WRITE
         | Rights::PATH_CREATE_FILE
         | Rights::PATH_FILESTAT_SET_SIZE
         | Rights::FD_SEEK
         | Rights::PATH_OPEN;
 
-    let mut split = cap_string.split(':'); 
+    let mut split = cap_string.split(':');
     let file_name = split
         .next()
         .expect(&format!("Failed to parse {}, empty string", cap_string))
@@ -735,7 +743,10 @@ fn serialize_capability_entry(cap_string : &str) -> FileRights {
         .to_string();
     let string_number = split
         .next()
-        .expect(&format!("Failed to parse `{}`, contain no `:`", cap_string))
+        .expect(&format!(
+            "Failed to parse `{}`, contains no `:`",
+            cap_string
+        ))
         .trim();
 
     let rights = match string_number {
@@ -747,24 +758,27 @@ fn serialize_capability_entry(cap_string : &str) -> FileRights {
         // parse raw WASI rights
         _ => {
             let number = string_number
-                        .parse::<u32>()
-                        .expect(&format!("Failed to parse {}, not a u64", string_number));
+                .parse::<u32>()
+                .expect(&format!("Failed to parse {}, not a u64", string_number));
             // check if this is a valid number
-            Rights::from_bits(number as u64)
-                .expect(&format!("Failed to parse {}, not a u64 representing WASI Right", number))
+            Rights::from_bits(number as u64).expect(&format!(
+                "Failed to parse {}, not a u64 representing WASI Right",
+                number
+            ))
         }
     };
 
-    FileRights::new(file_name,
-        u32::try_from(rights.bits()).expect("capability could not fit into u32"))
+    FileRights::new(
+        file_name,
+        u32::try_from(rights.bits()).expect("capability could not fit into u32"),
+    )
 }
 
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
-    if strategy == "Interpretation"
-    { 
-        return ExecutionStrategy::Interpretation 
+    if strategy == "Interpretation" {
+        return ExecutionStrategy::Interpretation;
     } else if strategy == "JIT" {
-        return ExecutionStrategy::JIT
+        return ExecutionStrategy::JIT;
     } else {
         abort_with("Could not parse execution strategy argument.");
     }
@@ -774,7 +788,7 @@ fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
 /// a vec of StandardStream.
 fn serialize_std_streams(arguments: &Arguments) -> Vec<StandardStream> {
     info!("Serializing standard streams.");
-    
+
     let mut std_streams_table = Vec::new();
     if let Some(stdin) = &arguments.stdin {
         std_streams_table.push(StandardStream::Stdin(serialize_capability_entry(&stdin)));
@@ -801,19 +815,32 @@ fn serialize_json(arguments: &Arguments) -> Value {
     let policy = Policy::new(
         serialize_identities(arguments),
         serialize_binaries(arguments),
-        format!("{}", &arguments.veracruz_server_ip.as_ref().expect(&format!("Failed to get the veracruz server ip"))),
+        format!(
+            "{}",
+            &arguments
+                .veracruz_server_ip
+                .as_ref()
+                .expect(&format!("Failed to get the veracruz server ip"))
+        ),
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
         sgx_hash.clone(),
         // TODO should be tz_hash
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
-        format!("{}", &arguments.proxy_attestation_server_ip.as_ref().expect(&format!("Failed to get the proxy attestation server ip"))),
+        format!(
+            "{}",
+            &arguments
+                .proxy_attestation_server_ip
+                .as_ref()
+                .expect(&format!("Failed to get the proxy attestation server ip"))
+        ),
         serialize_certificate(&arguments.proxy_service_cert),
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
         serialize_std_streams(arguments),
-    ).expect("Failed to instantiate a (struct) policy");
+    )
+    .expect("Failed to instantiate a (struct) policy");
 
     json!(policy)
 }
