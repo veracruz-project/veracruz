@@ -18,8 +18,8 @@ use clap::{App, Arg};
 use image::{imageops::FilterType, io::Reader, ImageFormat};
 use std::error::Error;
 
-/// Load a JPEG image from disk and save it to a *.dat, then convert it
-/// to a PNG image of specific dimensions, under the same name.
+/// Load a JPEG image from disk and convert it to a PNG image of specific
+/// dimensions, under the same name.
 /// Parameters:
 /// * `file_prefix`, String, the prefix of the generated files.
 /// * `width`, u64, the image width, default is 10.
@@ -86,9 +86,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .parse::<u64>()
         .map_err(|_| "Failed to parse the height.")? as u32;
 
-    let output_filename = format!("{}.dat", file_prefix);
+    let output_filename = format!("{}.png", file_prefix);
 
-    // Read PNG image
+    // Read JPG image
     let mut reader =
         Reader::open(&image_path).map_err(|e| format!("Failed to open image: {}", e))?;
     reader.set_format(ImageFormat::Jpeg);
