@@ -180,7 +180,7 @@ fn shares_generate(secret: &[u8], n: usize, k: usize) -> Vec<Vec<u8>> {
     // we need to store x for each point somewhere, so just prepend
     // each array with it
     for i in 0..n {
-        shares[i].push(u8::try_from(i+1).unwrap());
+        shares[i].push(u8::try_from(i+1).expect("exceeded 255 shares"));
     }
 
     for x in secret {
@@ -189,7 +189,7 @@ fn shares_generate(secret: &[u8], n: usize, k: usize) -> Vec<Vec<u8>> {
 
         // assign each share a point at f(i)
         for i in 0..n {
-            shares[i].push(gf256_eval(&f, u8::try_from(i+1).unwrap()));
+            shares[i].push(gf256_eval(&f, u8::try_from(i+1).expect("exceeeded 255 shares")));
         }
     }
 
@@ -245,7 +245,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         opt.k.unwrap_or(opt.n)
     );
 
-    // sanity check that we can reconstruct our original secret
+    // check that we can reconstruct our original secret
     let secret = shares_reconstruct(&shares);
     assert!(secret == opt.secret.as_bytes());
 

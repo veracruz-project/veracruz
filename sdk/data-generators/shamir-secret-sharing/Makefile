@@ -1,4 +1,4 @@
-# Data generator for string-edit-distance
+# Data generator for Shamir's secret sharing
 #
 # AUTHORS
 #

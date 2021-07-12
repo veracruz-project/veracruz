@@ -2,7 +2,7 @@
 
 This document walks through running an example Veracruz program.
 
-It assumes you have walked through the steps in [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md).
+It assumes you have walked through the steps in [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown).
 
 So do that first and make sure the tests are passing! The rest of this
 walkthrough will assume you're in a docker container capable of building
@@ -13,7 +13,7 @@ Veracruz.
 First lets make sure we've built and installed the Veracruz binaries. For
 this part you need to specify which Trusted Execution Environment (TEE) you are
 using. So for example, if you are running Veracruz on SGX, you would
-run `make sgx-cli-install`, if you are using TrusteZone, you would
+run `make sgx-cli-install`, if you are using TrustZone, you would
 run `make trustzone-cli-install`.
 
 We're also going to need a WebAssembly toolchain to build our example binary.
@@ -94,7 +94,7 @@ Identities in Veracruz are specified by a private RSA key and signed
 x509 certificate.
 
 In practice, a single identity can have many roles, but for our example
-we're going to create a separate identity for the program provide, result
+we're going to create a separate identity for the program provider, result
 reader, and three data providers:
 
 ``` bash
@@ -148,7 +148,7 @@ $ openssl req -new -x509 -sha256 -nodes -days 3650 \
 
 Veracruz is governed by what is called a policy file. This is a json document
 agreed on by all parties that indicates who has permission to provide/access
-programs and datas involved in a given computation.
+programs and data involved in a given computation.
 
 Veracruz provides the `vc-pgen`/`generate-policy` tool to help create policy
 files.  We need to provide the identities and roles of all parties involved in
@@ -224,7 +224,7 @@ $ vc-pas example/example-policy.json \
 
 The Veracruz Server is the main frontend for the compute side of Veracruz. It
 launches the Root Enclave (the trusted core of Veracruz) inside the enclave and
-provides a Rest API to communicating into the enclave.
+provides a Rest API for communicating into the enclave.
 
 There is a lot of complexity underneath the hood, but launching the Veracruz
 Server requires only one command. Note again we are launching the Veracruz
@@ -250,7 +250,7 @@ example we'll use the Veracruz Client CLI interface. This provides the same
 functionality, but in a CLI form.
 
 First lets send over the program to our Veracruz server, this requires an
-identity with the "PiProvider" role:
+identity with the "ProgramProvider" role:
 
 ``` bash
 $ vc-client example/example-policy.json \
@@ -262,9 +262,9 @@ Connecting to 127.0.0.1:3017
 Submitting <enclave>/example-binary.wasm from example/example-binary.wasm
 ```
 
-Then lets send over our datas with identities with the "DataProvider" role.
+Then lets send over our data with identities with the "DataProvider" role.
 These are shares I've created that the example will use to reconstruct a
-secret message. Keep in mind most likely these datas will be coming from
+secret message. Keep in mind most likely this data will be coming from
 different devices:
 
 ``` bash
