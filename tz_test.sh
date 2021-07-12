@@ -5,7 +5,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 cd /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0
 ln -sf /work/rust-optee-trustzone-sdk/optee-qemuv8-3.7.0/outbr/images/rootfs.cpio.gz out/bin

@@ -6,7 +6,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
 # Terminates any EC2 instances that were started by the Veracruz server for the

@@ -38,7 +38,7 @@ Come along and meet the team, find out what everybody is working on, and discuss
 
 ## License
 
-This project's codebase is licensed under the [MIT license](LICENSE.markdown).
+This project's codebase is licensed under the [MIT license](LICENSE_MIT.markdown).
 
 The image [`Veracruz Puerto - Vista desde el Hotel Emporio`](sdk/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](https://creativecommons.org/licenses/by-sa/2.0/). [Link to the material](https://www.flickr.com/photos/tomateverde/6169756721/in/photostream)
 

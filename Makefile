@@ -6,7 +6,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
 .PHONY: all sdk sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
