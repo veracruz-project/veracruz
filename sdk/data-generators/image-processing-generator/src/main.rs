@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This is required by the example, as `image` uses threads to load JPG images,
     // which are not supported in WebAssembly
     let _result = img
-        .save_with_format(format!("{}", output_filename), ImageFormat::Png)
+        .save_with_format(output_filename, ImageFormat::Png)
         .map_err(|e| format!("Failed to save image: {}", e));
 
     Ok(())
