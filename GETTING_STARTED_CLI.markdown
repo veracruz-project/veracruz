@@ -129,6 +129,21 @@ $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -config test-collateral/cert.conf
 ```
 
+<!-- TODO generate CA cert?
+
+And since the Proxy Attestation Server acts as a certificate authority,
+we also need to provide it with its own identity:
+
+``` bash
+$ openssl genrsa -out example/example-ca-key.pem 2048
+$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+    -key example/example-ca-key.pem \
+    -out example/example-ca-cert.pem \
+    -config test-collateral/cert.conf
+```
+
+-->
+
 ## Creating a policy file
 
 Veracruz is governed by what is called a policy file. This is a json document
@@ -179,8 +194,8 @@ attested Veracruz instances populated by the native attestation server.
 This allows a client to verify through the server's certificate chain that
 a Veracruz instance is what it says it is.
 
-Before we can launch the Proxy Attestation Server, we need to populate the
-database with the hashes of the Veracruz runtimes:
+Before we can launch the Proxy Attestation Server,  we need to populate the
+Proxy Attestation Server's database with the hashes of the Veracruz runtimes:
 
 ``` bash
 $ ./test-collateral/populate-test-database.sh example/example-pas.db
@@ -192,8 +207,6 @@ change the runtime hashes.
 Now we can launch the Proxy Attestation Server with the
 `vc-pas`/`proxy-attestation-server` command. Note we are using the bash
 character `&` to launch the Proxy Attestation Server in the background:
-
-<!-- TODO generate ~~ca~cert/~~ca~key -->
 
 ``` bash
 $ vc-pas example/example-policy.json \
