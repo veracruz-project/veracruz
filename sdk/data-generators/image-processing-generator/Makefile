@@ -9,10 +9,7 @@
 # See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-
-# "Puerto de Veracruz" by Eduardo Pavon is licensed under CC BY-SA 2.0
 IMAGE_PATH = "./veracruz.jpg"
-
 WIDTH = 1024
 HEIGHT = 1024
 TARGET_PREFIX = image-processing
