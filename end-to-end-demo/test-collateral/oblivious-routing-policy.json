@@ -60,7 +60,28 @@
       "program_file_name": "oblivious-routing.wasm"
     }
   ],
+  "proxy_service_cert": "-----BEGIN CERTIFICATE-----\nMIICMzCCAdmgAwIBAgIUD4ChgtYHhO1aP16Oz4cwg+Tjd1owCgYIKoZIzj0EAwIw\nbzELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4x\nETAPBgNVBAoMCFZlcmFjcnV6MQ4wDAYDVQQLDAVQcm94eTEcMBoGA1UEAwwTVmVy\nYWNydXpQcm94eVNlcnZlcjAeFw0yMTA0MjMxNjU4NTdaFw0yMjA0MjMxNjU4NTda\nMG8xCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGlu\nMREwDwYDVQQKDAhWZXJhY3J1ejEOMAwGA1UECwwFUHJveHkxHDAaBgNVBAMME1Zl\ncmFjcnV6UHJveHlTZXJ2ZXIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARTflYX\nv3iRLGicm9GbRaQvOXECgH8ZUDdpA9PmHfbCoS2N090X8LbP8GwGmp/gDfkwXXLN\n7mlkjv1X2hAhnUXFo1MwUTAdBgNVHQ4EFgQUdkf63ZhkILBpe7BERAek4GtQ+TUw\nHwYDVR0jBBgwFoAUdkf63ZhkILBpe7BERAek4GtQ+TUwDwYDVR0TAQH/BAUwAwEB\n/zAKBggqhkjOPQQDAgNIADBFAiEAl30tQ+haf0ucyAGMHpt82HitY1ieSg46ebBA\nWN68AYUCIFc+BX+rOoOanh6LNDl84gIuiY6CNsqVDV/Bwm/RL1JH\n-----END CERTIFICATE-----\n",
   "proxy_attestation_server_url": "127.0.0.1:3010",
   "runtime_manager_hash_sgx": "8f5888771c488c32884432178ea79ee13555b0bd36df6ae1105c5cc2dafdb755",
-  "veracruz_server_url": "127.0.0.1:3019"
+  "veracruz_server_url": "127.0.0.1:3019",
+  "std_streams_table": [
+    {
+      "Stdin": {
+        "file_name": "stdin",
+        "rights": 8198
+      }
+    },
+    {
+      "Stdout": {
+        "file_name": "stdout",
+        "rights": 533572
+      }
+    },
+    {
+      "Stderr": {
+        "file_name": "stderr",
+        "rights": 533572
+      }
+    }
+  ]
 }
