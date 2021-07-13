@@ -22,7 +22,7 @@ TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
 all: $(TARGET_DIR_DAT)
 
 .SECONDEXPANSION:
-$(TARGET_DIR_DAT): %.dat : $$(notdir $$@) $(TARGET_DIR)
+$(TARGET_DIR_DAT): %.png : $$(notdir $$@) $(TARGET_DIR)
 	cp $< $@ 
 
 $(TARGET_DIR):
