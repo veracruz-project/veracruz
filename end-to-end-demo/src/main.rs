@@ -424,6 +424,7 @@ fn main() -> anyhow::Result<()> {
     let policy_hash = digest(&SHA256, policy_content.as_bytes());
     let hex_policy_hash = hex::encode(&policy_hash.as_ref().to_vec());
 
+
     println!(
         "Policy file read, and has SHA-256 hash: {}.",
         hex_policy_hash
@@ -463,10 +464,12 @@ fn main() -> anyhow::Result<()> {
 
     /* Bring up the Veracruz server. */
 
+    let vs_policy_content = policy_content.clone();
+
     let _veracruz_server_handle = spawn(move || {
         let mut sys = System::new("Veracruz Server");
 
-        let server = veracruz_server::server::server(&POLICY_PATH).unwrap();
+        let server = veracruz_server::server::server(&vs_policy_content).unwrap();
 
         let _result = sys.block_on(server).map_err(|e| {
             eprintln!(
