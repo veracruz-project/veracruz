@@ -84,7 +84,7 @@ const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-s
 /// Path of the public key for the mapping user/challenge provider.
 const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-user-key.pem";
 /// Path of the CA certificate for the proxy attestation server.
-const CA_CERTIFICATE_PATH: &'static str = "test-collateral/ca-cert.pem";
+const CA_CERTIFICATE_PATH: &'static str = "test-collateral/ca-certificate.pem";
 /// The path of the policy file describing the roles of various principals in
 /// the computation.
 const POLICY_PATH: &'static str = "test-collateral/oblivious-routing-policy.json";
