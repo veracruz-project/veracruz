@@ -39,12 +39,24 @@ pub mod veracruz_server_sgx {
         static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
     }
 
+    #[cfg(debug_assertions)]
     static RUNTIME_MANAGER_BINARY: &'static [u8] = include_bytes!(
         "../../runtime-manager-bind/target/debug/runtime_manager.signed.so"
     );
+    #[cfg(not(debug_assertions))]
+    static RUNTIME_MANAGER_BINARY: &'static [u8] = include_bytes!(
+        "../../runtime-manager-bind/target/release/runtime_manager.signed.so"
+    );
+
+    #[cfg(debug_assertions)]
     static SGX_ROOT_ENCLAVE_BINARY: &'static [u8] = include_bytes!(
         "../../sgx-root-enclave-bind/target/debug/sgx_root_enclave.signed.so"
     );
+    #[cfg(not(debug_assertions))]
+    static SGX_ROOT_ENCLAVE_BINARY: &'static [u8] = include_bytes!(
+        "../../sgx-root-enclave-bind/target/release/sgx_root_enclave.signed.so"
+    );
+
 
     pub struct VeracruzServerSGX {
         runtime_manager_enclave: SgxEnclave,
