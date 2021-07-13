@@ -6,7 +6,7 @@
 #
 # COPYRIGHT AND LICENSING
 #
-# See the `LICENSE.markdown` file in the Veracruz root directory for
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 # copyright and licensing information.
 
 OUT_DIR?=.

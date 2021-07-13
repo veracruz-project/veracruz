@@ -35,3 +35,10 @@ We also have a weekly open Zoom meeting that you are welcome to join which is he
 You can join with [this](https://armltd.zoom.us/j/95458320669?pwd=Uks2OFJ5TjROZURCdjlGKzJOTDI3UT09&from=addon) link.
 Come along and meet the team, find out what everybody is working on, and discuss ideas for improving Veracruz!
 
+
+## License
+
+This project's codebase is licensed under the [MIT license](LICENSE_MIT.markdown).
+
+The image [`Veracruz Puerto - Vista desde el Hotel Emporio`](sdk/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](https://creativecommons.org/licenses/by-sa/2.0/). [Link to the material](https://www.flickr.com/photos/tomateverde/6169756721/in/photostream)
+

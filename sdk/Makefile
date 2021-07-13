@@ -11,7 +11,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
 # All programs
@@ -45,7 +45,7 @@ DATA = hello-world-1.dat \
 	   idash2017/ \
 	   macd/ \
 	   private-set-inter-sum/ \
-	   image-processing.dat
+	   image-processing.png
 DATASET_PATH = datasets/
 RELATIVE_DATA = $(addprefix $(DATASET_PATH), $(DATA))
 # All data generators for `fmt` and `clean` targets.
@@ -85,7 +85,7 @@ $(DATASET_PATH)idash2017/: $$(addprefix $(DATA_GENERATORS_PATH)/idash2017-logist
 $(DATASET_PATH)macd/: $$(addprefix $(DATA_GENERATORS_PATH)/moving-average-convergence-divergence-generator/,Makefile src/main.rs)
 $(DATASET_PATH)private-set-inter-sum/: $$(addprefix $(DATA_GENERATORS_PATH)/private-set-intersection-sum-generator/,Makefile src/main.rs)
 $(addprefix $(DATASET_PATH),number-stream-1.dat number-stream-2.dat number-stream-init.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/number-stream-generator/,Makefile src/main.rs)
-$(addprefix $(DATASET_PATH),image-processing.dat): %.dat : $$(addprefix $(DATA_GENERATORS_PATH)/image-processing-generator/,Makefile src/main.rs)
+$(addprefix $(DATASET_PATH),image-processing.png): %.png : $$(addprefix $(DATA_GENERATORS_PATH)/image-processing-generator/,Makefile src/main.rs)
 
 # Call makefiles to generate datasets
 $(RELATIVE_DATA):

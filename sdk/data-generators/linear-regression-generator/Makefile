@@ -6,7 +6,7 @@
 #
 # COPYRIGHT
 #
-# See the file `LICENSE.markdown` in the Veracruz root directory for licensing
+# See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 # and copyright information.
 
 ROW = 10000

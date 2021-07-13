@@ -6,14 +6,14 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-
+IMAGE_PATH = "./veracruz.jpg"
 WIDTH = 1024
 HEIGHT = 1024
 TARGET_PREFIX = image-processing
-TARGET_DAT = $(addprefix $(TARGET_PREFIX), .dat)
+TARGET_DAT = $(addprefix $(TARGET_PREFIX), .png)
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
 
@@ -22,18 +22,18 @@ TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
 all: $(TARGET_DIR_DAT)
 
 .SECONDEXPANSION:
-$(TARGET_DIR_DAT): %.dat : $$(notdir $$@) $(TARGET_DIR)
+$(TARGET_DIR_DAT): %.png : $$(notdir $$@) $(TARGET_DIR)
 	cp $< $@ 
 
 $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
 $(TARGET_DAT): 
-	cargo run -- --file_prefix $(TARGET_PREFIX) --width $(WIDTH) --height $(HEIGHT) --seed $(SEED); 
+	cargo run -- --file_prefix $(TARGET_PREFIX) --image_path $(IMAGE_PATH) --width $(WIDTH) --height $(HEIGHT); 
 
 clean:
 	cargo clean
-	rm -f *.dat
+	rm -f *.png
 	rm -f $(TARGET_DIR_DAT)
 
 fmt:

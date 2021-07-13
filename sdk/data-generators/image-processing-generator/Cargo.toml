@@ -10,6 +10,3 @@ description = "A utility for generating synthetic images for use with the `image
 [dependencies]
 clap = "2.33"
 image = "0.23.14"
-
-# We use an old version of `downloader` because nightly-2020-05-07 can't compile the recent versions of `socket2`
-downloader = "=0.2.0"

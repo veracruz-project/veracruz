@@ -14,7 +14,7 @@ the full text of which is included below.
 # Project license, and developer certificate of origin
 
 The Veracruz codebase is licensed under the MIT open source license.
-Please see the `LICENSE.markdown` file in the Veracruz repository for the
+Please see the `LICENSE_MIT.markdown` file in the Veracruz repository for the
 full text of this license.  New contributions are expected to be lisensed
 under the MIT license.
 

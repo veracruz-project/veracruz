@@ -6,7 +6,7 @@
 //!
 //! ## Copyright notice
 //!
-//! See the `LICENSE.markdown` file in the Veracruz root director for licensing
+//! See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 //! and copyright information.
 
 extern crate bindgen;
