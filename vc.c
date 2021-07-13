@@ -93,7 +93,7 @@ int vc_attest(
     ssize_t pat_len = http_post(
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT,
-            "/sinaloa",
+            "/veracruz_server",
             request_buf,
             request_len,
             pat_buf,
@@ -270,7 +270,7 @@ static ssize_t vc_rawsend(void *p,
     ssize_t recv_len = http_post(
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT,
-            "/mexico_city",
+            "/runtime_manager",
             vc->send_buf,
             data_len,
             vc->recv_buf,

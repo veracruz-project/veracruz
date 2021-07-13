@@ -96,10 +96,10 @@ void main(void) {
     printf("\033[1;33mtimestamp:\033[m %u\n", CLAP_TIMESTAMP);
     k_sleep(Z_TIMEOUT_MS(DELAY*1000));
 
-    // Attest and connect to the Veracruz enclave
-    int err = vc_attest_and_connect(&vc);
+    // Connect to the Veracruz enclave and verify the enclave's hash
+    int err = vc_connect(&vc, "abcd", "abcd", 4);
     if (err) {
-        printf("vc_attest_and_connect failed (%d)\n", err);
+        printf("vc_connect failed (%d)\n", err);
         exit(1);
     }
     k_sleep(Z_TIMEOUT_MS(DELAY*1000));

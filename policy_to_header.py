@@ -70,14 +70,14 @@ def main(args):
             f.writeln('// various hashes')
             # TODO choose between platforms?
             f.writeln('extern const uint8_t _RUNTIME_MANAGER_HASH[%(size)d];',
-                size=len(policy['mexico_city_hash_sgx'])/2)
+                size=len(policy['runtime_manager_hash_sgx'])/2)
             f.writeln('#define RUNTIME_MANAGER_HASH _RUNTIME_MANAGER_HASH')
             f.writeln()
             f.writeln('// server info')
             f.writeln('#define VERACRUZ_SERVER_HOST "%(host)s"',
-                host=policy['sinaloa_url'].split(':')[0])
+                host=policy['veracruz_server_url'].split(':')[0])
             f.writeln('#define VERACRUZ_SERVER_PORT %(port)s',
-                port=policy['sinaloa_url'].split(':')[1])
+                port=policy['veracruz_server_url'].split(':')[1])
             f.writeln('#define PROXY_ATTESTATION_SERVER_HOST "%(host)s"',
                 host=policy['proxy_attestation_server_url'].split(':')[0])
             f.writeln('#define PROXY_ATTESTATION_SERVER_PORT %(port)s',
@@ -130,7 +130,7 @@ def main(args):
     #        f.writeln('};')
     #        f.writeln()
             f.writeln('const uint8_t _RUNTIME_MANAGER_HASH[32] = {')
-            runtime_manager_hash = policy['mexico_city_hash_sgx']
+            runtime_manager_hash = policy['runtime_manager_hash_sgx']
             for i in range(0, len(runtime_manager_hash)//2, 8):
                 f.writeln('    %(hash)s',
                     hash=' '.join('0x%02x,' % int(runtime_manager_hash[2*j:2*j+2], 16)

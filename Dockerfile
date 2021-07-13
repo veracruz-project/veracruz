@@ -73,6 +73,5 @@ RUN apt-get update && \
         net-tools \
         socat \
         tcpdump
-RUN make tunslip6
 
 WORKDIR /zephyr-workspace/$TARGET

@@ -47,7 +47,7 @@ docker: Dockerfile
 		-v $(DOCKER_ROOT):/zephyr-workspace/$(TARGET) \
 		--cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
 		--name $(DOCKER_CONTAINER) \
-		$(DOCKER_IMAGE) bash -c "./slip-setup.sh ; bash")
+		$(DOCKER_IMAGE) bash -c "./tap-setup.sh ; bash")
 
 # Zephyr west commands
 .PHONY: update
