@@ -6,7 +6,7 @@ edition = "2018"
 description = "A simple end-to-end demo of Veracruz, showing how to develop and deploy a computation with the framework."
 
 [features]
-std = ["veracruz-client/sgx","veracruz-server/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation"]
+std = ["veracruz-client/sgx", "veracruz-server/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation"]
 
 [dependencies]
 anyhow = "1.0.41"

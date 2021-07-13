@@ -45,18 +45,17 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{Display, Error as FormatError, Formatter},
     fs::File,
-    io::Read,
+    io::{Read, stdin},
+    process::exit,
     thread::{sleep, spawn},
     time::Duration,
 };
 
 use pinecone::{from_bytes, to_vec};
 use proxy_attestation_server;
-use std::io::stdin;
-use std::process::exit;
 use veracruz_client::VeracruzClient;
 use veracruz_server;
-use veracruz_utils::{platform::Platform, policy::policy::Policy};
+use veracruz_utils::policy::policy::Policy;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -84,6 +83,8 @@ const MAPPING_USER_CERTIFICATE_PATH: &'static str = "test-collateral/mapping-use
 const MAPPING_SERVICE_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-service-key.pem";
 /// Path of the public key for the mapping user/challenge provider.
 const MAPPING_USER_PUBLIC_KEY_PATH: &'static str = "test-collateral/mapping-user-key.pem";
+/// Path of the CA certificate for the proxy attestation server.
+const CA_CERTIFICATE_PATH: &'static str = "test-collateral/ca-cert.pem";
 /// The path of the policy file describing the roles of various principals in
 /// the computation.
 const POLICY_PATH: &'static str = "test-collateral/oblivious-routing-policy.json";
@@ -438,7 +439,7 @@ fn main() -> anyhow::Result<()> {
         let mut sys = System::new("Veracruz Proxy Attestation Server");
 
         let server =
-            proxy_attestation_server::server::server(proxy_attestation_server_url, false).unwrap();
+            proxy_attestation_server::server::server(proxy_attestation_server_url, CA_CERTIFICATE_PATH, false).unwrap();
 
         let _result = sys.block_on(server).map_err(|e| {
             eprintln!(
@@ -491,8 +492,7 @@ fn main() -> anyhow::Result<()> {
     let mut mapping_service_client = VeracruzClient::new(
         MAPPING_SERVICE_CERTIFICATE_PATH,
         MAPPING_SERVICE_PUBLIC_KEY_PATH,
-        &policy_content,
-        &Platform::SGX,
+        &policy_content
     )
     .map_err(|e| {
         eprintln!(
@@ -505,8 +505,7 @@ fn main() -> anyhow::Result<()> {
     let mut mapping_user_client = VeracruzClient::new(
         MAPPING_USER_CERTIFICATE_PATH,
         MAPPING_USER_PUBLIC_KEY_PATH,
-        &policy_content,
-        &Platform::SGX,
+        &policy_content
     )
     .map_err(|e| {
         eprintln!(
