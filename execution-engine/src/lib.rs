@@ -39,8 +39,13 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-use std::sync::Mutex;
 use std::{boxed::Box, string::ToString, sync::Arc};
+
+#[cfg(feature = "sgx")]
+use std::sync::SgxMutex as Mutex;
+#[cfg(not(feature = "sgx"))]
+use std::sync::Mutex;
+
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
 /// The top-level function executes program `program_name` on
@@ -61,7 +66,7 @@ pub fn execute(
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
-                if #[cfg(feature = "std")] {
+                if #[cfg(any(feature = "std", feature = "nitro"))] {
                     Box::new(WasmtimeRuntimeState::new(filesystem, program_name.to_string())?)
                 } else {
                     return Err(FatalEngineError::EngineIsNotReady);
