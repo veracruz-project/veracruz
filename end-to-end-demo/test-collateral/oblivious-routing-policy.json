@@ -1,0 +1,88 @@
+{
+  "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+  "debug": false,
+  "enclave_cert_expiry": {
+    "day": 26,
+    "hour": 11,
+    "minute": 8,
+    "month": 9,
+    "year": 2021
+  },
+  "execution_strategy": "Interpretation",
+  "identities": [
+    {
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUV1IHvUvh+cKvEwHl+0N+dex+4KcwDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5MjkzMloXDTMwMDkxNDE5MjkzMlowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv9pR8EG/QprMQ1CXRuKmvGvCETJcWlL4TlMgIPTvlvRCWIkFECBCm+/HTP6urtaQnADmsBt8APPVT5Ad6r3ieMl5IoCoYOLnBxr6+toi3Oa37a+hSqL5JdyS60IkMlp0M3y+ErN6oHPIpOJBIKZiohcPv1Y2XvXca+ULdXXudRiTDBJMl6HXuDD8vypL8y6AsDhR7t7RQi7yR5P6Z42cWjZGkv3aniM6CRVmh7Bt/H8YyBNBVUjmk+9jE7GiYWSpTteR0jBRsGJT2j9SXNNmqzhhw5XXBF36/GtCQtfNmFCvQWoP8PTEfFVi0OOStai5Ho7PhnLzYkC0KnGc9LNZrwIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEADtWV3cIiNSgBDC87qg2qFKtCEUEuRw8b0CpVO2B0dWM4xILRlHhrwZkLqxrtGZTk7rsIw2pH3vDv/1zg74+n5ECgcSZYpnMLuXYWi1NdF3w6IUNDoWDPkgzo7KKxz9MNlZPa9YpeJ7s0osjfJlNf/i2wEjTqj2hI0PalbPqtG15IpGAos1Y/UXbhouj4LVQMzO4h+dgzOWYwA8jGVXi9kP9bWafruqeBahyxNdNQIrD2/nfCrD3oNFbW6bvtR2UQw70DbLh5znkJe7Kzn4zPcfgTvT1S6Q8n28NK2sRtiLTYHMQBmUW9J/vzd1t9KTLD0SUj+PxWx03LveKMpbrBHA==\n-----END CERTIFICATE-----",
+      "file_rights": [
+        {
+          "file_name": "oblivious-routing.wasm",
+          "rights": 134217727
+        },
+        {
+          "file_name": "routing-graph.dat",
+          "rights": 134217727
+        }
+      ],
+      "id": 0
+    },
+    {
+      "certificate": "-----BEGIN CERTIFICATE-----\nMIIDwzCCAqugAwIBAgIUOnnAKBO+ORrhvZdTeVGqwTUXoN0wDQYJKoZIhvcNAQELBQAwgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMB4XDTIwMDkxNjE5NDkzMVoXDTMwMDkxNDE5NDkzMVowgYIxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGluMRYwFAYDVQQKDA1aaWJibGUgWmFiYmxlMSMwIQYJKoZIhvcNAQkBFhR6aWJibGVAemFiYmxlLnppYmJsZTEVMBMGA1UEAwwMemliYmxlemFiYmxlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsrLRYOlYMRADmM/sl3rYbKqm/hl/K1xGRQ/sBMDfa3tl+jSK68KxdOqXqFVXwYFNh8k+7WwCCsic/3gdTzvtCNDjoB5p8gaXxmqYBrxllRuUWRIAuAHVpdyUnuLAzwZ7VT6bUczbUi09qmnjB3u4zOg+9Tfv0wgxmyg4HSUNrRIUgWWe9DJKIOJphA1QyecGFpTIbcAFuBWyjP1Cuz6TOAof74O0KOkpEgB7tMfJuxCcEGuRSbZ5Y+m+gjsoy/UYInpLcIRuP2+cG6bFwUGlfKY+a+qzu6ViKvF+1R6YwHVORFl001qipcPpyp5ei2+AUCFgMiBFpiHnksCFHaWGDQIDAQABoy8wLTArBgNVHREEJDAigg16YWJibGUuemliYmxlghF3d3cuemFiYmxlLnppYmJsZTANBgkqhkiG9w0BAQsFAAOCAQEAeRU3kKyHu39O6NGcRtrcf5qOIQfgKlSReiVcEvv2EYLsFW/QuqpQE7HdsaHx9NmIJmdB4HTjjSI72RgIOYsddAjeuxuVyCurQMSTVgQSiIWy52yf/J3//3f7kS4MViiJtP5bWdK2ydThtjK1/byXzw4wpaYdX+zzZfUpLlK3f8DGas9gv+HZ83fcZH8rRiarpOVfhU0uANyD56rPLlg0LG65vLXF1ZX+huEywTuc6oh2/JXQpGrDvttpbiBNo3D5qQaFI4Jqf3yXjKvbQvs7EKrQj+GIP2Klzsv+btEF7UFcaSms1/C3Rg5AL7wxh9R9zNXsErFpeCM/nbGm5SluXA==\n-----END CERTIFICATE-----",
+      "file_rights": [
+        {
+          "file_name": "routing-challenge.dat",
+          "rights": 134217727
+        },
+        {
+          "file_name": "output",
+          "rights": 134217727
+        }
+      ],
+      "id": 1
+    }
+  ],
+  "programs": [
+    {
+      "file_rights": [
+        {
+          "file_name": "routing-graph.dat",
+          "rights": 134217727
+        },
+        {
+          "file_name": "routing-challenge.dat",
+          "rights": 134217727
+        },
+        {
+          "file_name": "output",
+          "rights": 134217727
+        }
+      ],
+      "id": 0,
+      "pi_hash": "2f60759397843d0bbd0ba6729d1f69b25d98fac5eccb17742caf69d7ffe09848",
+      "program_file_name": "oblivious-routing.wasm"
+    }
+  ],
+  "proxy_service_cert": "-----BEGIN CERTIFICATE-----\nMIICMzCCAdmgAwIBAgIUD4ChgtYHhO1aP16Oz4cwg+Tjd1owCgYIKoZIzj0EAwIw\nbzELMAkGA1UEBhMCVVMxDjAMBgNVBAgMBVRleGFzMQ8wDQYDVQQHDAZBdXN0aW4x\nETAPBgNVBAoMCFZlcmFjcnV6MQ4wDAYDVQQLDAVQcm94eTEcMBoGA1UEAwwTVmVy\nYWNydXpQcm94eVNlcnZlcjAeFw0yMTA0MjMxNjU4NTdaFw0yMjA0MjMxNjU4NTda\nMG8xCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVUZXhhczEPMA0GA1UEBwwGQXVzdGlu\nMREwDwYDVQQKDAhWZXJhY3J1ejEOMAwGA1UECwwFUHJveHkxHDAaBgNVBAMME1Zl\ncmFjcnV6UHJveHlTZXJ2ZXIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARTflYX\nv3iRLGicm9GbRaQvOXECgH8ZUDdpA9PmHfbCoS2N090X8LbP8GwGmp/gDfkwXXLN\n7mlkjv1X2hAhnUXFo1MwUTAdBgNVHQ4EFgQUdkf63ZhkILBpe7BERAek4GtQ+TUw\nHwYDVR0jBBgwFoAUdkf63ZhkILBpe7BERAek4GtQ+TUwDwYDVR0TAQH/BAUwAwEB\n/zAKBggqhkjOPQQDAgNIADBFAiEAl30tQ+haf0ucyAGMHpt82HitY1ieSg46ebBA\nWN68AYUCIFc+BX+rOoOanh6LNDl84gIuiY6CNsqVDV/Bwm/RL1JH\n-----END CERTIFICATE-----\n",
+  "proxy_attestation_server_url": "127.0.0.1:3010",
+  "runtime_manager_hash_sgx": "8f5888771c488c32884432178ea79ee13555b0bd36df6ae1105c5cc2dafdb755",
+  "veracruz_server_url": "127.0.0.1:3019",
+  "std_streams_table": [
+    {
+      "Stdin": {
+        "file_name": "stdin",
+        "rights": 8198
+      }
+    },
+    {
+      "Stdout": {
+        "file_name": "stdout",
+        "rights": 533572
+      }
+    },
+    {
+      "Stderr": {
+        "file_name": "stderr",
+        "rights": 533572
+      }
+    }
+  ]
+}
+
