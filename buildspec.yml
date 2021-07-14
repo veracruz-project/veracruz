@@ -21,6 +21,10 @@ phases:
       - make sgx-veracruz-client-test
       - make sgx-veracruz-server-test-dry-run
       - make sgx-veracruz-test-dry-run
+      # Compile veracruz-server-test and veracruz-test for AWS Nitro enclaves. To run would require
+      # a Nitro-enabled EC2 instance, which we are not currently running on
+      - make nitro-veracruz-server-test-dry-run
+      - make nitro-veracruz-test-dry-run
 
 
 
