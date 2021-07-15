@@ -23,9 +23,13 @@ echo 'set -euxo pipefail' >> GETTING_STARTED_CLI.markdown.sh
 
 # grab every bash code block, remove line continuation, and only keep lines
 # that start with '$' (of course removing that '$' in the process)
+#
+# GETTING_STARTED_CLI.markdown currently uses sgx, replace with requested TEE
+#
 sed -n '/``` bash/,/```/{/```/d; p}' GETTING_STARTED_CLI.markdown \
     | sed ':a; /\\$/{N; s/\\\n//; ta}' \
     | sed -n '/^\$/{s/^\$ \?//; p}' \
+    | sed "s/sgx/${1:-sgx}/g" \
     >> GETTING_STARTED_CLI.markdown.sh
 
 # run script

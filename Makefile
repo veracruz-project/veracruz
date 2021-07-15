@@ -103,8 +103,18 @@ trustzone-cli: trustzone-env
 	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC) OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	$(MAKE) -C trustzone-root-enclave trustzone OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	# build CLIs in top-level crates
-	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features tz --features cli
-	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features tz --features cli
+	cd proxy-attestation-server && \
+		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
+		OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) \
+		C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
+		cargo build --target aarch64-unknown-linux-gnu --features psa --features cli
+	cd veracruz-server && \
+		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
+		OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) \
+		C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
+		cargo build --target aarch64-unknown-linux-gnu --features tz --features cli
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features tz --features cli
 	# build CLIs in the SDK/test-collateral
 	$(MAKE) -C sdk/freestanding-execution-engine

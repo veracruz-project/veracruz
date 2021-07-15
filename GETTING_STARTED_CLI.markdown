@@ -217,6 +217,7 @@ $ vc-pas example/example-policy.json \
 [2021-02-12T00:23:33Z INFO  actix_server::builder] Starting 12 workers
 [2021-02-12T00:23:33Z INFO  actix_server::builder] Starting "actix-web-service-127.0.0.1:3010" service on 127.0.0.1:3010
 [2021-02-12T00:23:33Z INFO  proxy_attestation_server] Proxy Attestation Server running on 127.0.0.1:3010
+$ sleep 10
 ```
 
 ## Running the Veracruz Server
@@ -239,7 +240,7 @@ $ vc-server example/example-policy.json &
 [2021-02-12T00:55:45Z INFO  actix_server::builder] Starting 12 workers
 [2021-02-12T00:55:45Z INFO  actix_server::builder] Starting "actix-web-service-127.0.0.1:3017" service on 127.0.0.1:3017
 [2021-02-12T00:55:45Z INFO  veracruz_server] Veracruz Server running on 127.0.0.1:3017
-$ sleep 100
+$ sleep 10
 ```
 
 ## Running the Veracruz Client 
