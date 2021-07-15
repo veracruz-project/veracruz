@@ -135,6 +135,9 @@ struct Arguments {
     /// field is an internal invariant failure.
     certificate_expiry: Option<DateTime<FixedOffset>>,
     /// The filename of the WASM program.
+    ///
+    /// Note this is an array of string+path pairs, since a string enclave path
+    /// can be provided along with the local file path.
     program_binaries: Vec<(String, PathBuf)>,
     /// Whether the enclave will be started in debug mode, with reduced
     /// protections against snooping and interference, and with the ability to

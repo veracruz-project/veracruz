@@ -9,13 +9,15 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::error;
-use structopt::StructOpt;
+use hex;
 use rand;
 use rand::Rng;
-use std::iter;
-use std::convert::TryFrom;
-use hex;
+use std::{
+    convert::TryFrom,
+    error,
+    iter,
+};
+use structopt::StructOpt;
 
 
 // lookup tables for log and exp of polynomials in GF(256), 

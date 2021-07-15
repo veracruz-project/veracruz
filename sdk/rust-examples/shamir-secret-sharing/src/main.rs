@@ -25,9 +25,8 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::io;
-use std::fs;
 use anyhow;
+use std::{fs, io};
 
 // lookup tables for log and exp of polynomials in GF(256), 
 const GF256_LOG: [u8; 256] = [

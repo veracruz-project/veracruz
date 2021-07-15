@@ -58,7 +58,6 @@ sgx: sdk sgx-env
 	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
-# TODO add -cli to other TEEs
 sgx-cli: sgx-env
 	# enclave binaries needed for veracruz-server
 	cd runtime-manager-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
@@ -72,30 +71,26 @@ sgx-cli: sgx-env
 	$(MAKE) -C sdk/wasm-checker
 	$(MAKE) -C test-collateral/generate-policy
 
-sgx-cli-install: sgx-cli
-	# install to Cargo's bin directory
-	cp -f proxy-attestation-server/target/debug/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
-	cp -f veracruz-server/target/debug/veracruz-server $(BIN_DIR)/veracruz-server
-	cp -f veracruz-client/target/debug/veracruz-client $(BIN_DIR)/veracruz-client
-	# install CLIs in SDK/test-collateral
-	cp -f sdk/freestanding-execution-engine/target/release/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
-	cp -f sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
-	cp -f test-collateral/generate-policy/target/release/generate-policy $(BIN_DIR)/generate-policy
-	# symlink concise names
-	ln -sf $(BIN_DIR)/proxy-attestation-server      $(BIN_DIR)/vc-pas
-	ln -sf $(BIN_DIR)/veracruz-server               $(BIN_DIR)/vc-server
-	ln -sf $(BIN_DIR)/veracruz-client               $(BIN_DIR)/vc-client
-	ln -sf $(BIN_DIR)/freestanding-execution-engine $(BIN_DIR)/vc-fee
-	ln -sf $(BIN_DIR)/wasm-checker                  $(BIN_DIR)/vc-wc
-	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/vc-pgen
-	# symlink backwards compatible names
-	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/pgen
-
 nitro: sdk
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
+
+nitro-cli:
+	# enclave binaries needed for veracruz-server
+	pwd
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
+	# build CLIs in top-level crates
+	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	# build CLIs in the SDK/test-collateral
+	$(MAKE) -C sdk/freestanding-execution-engine
+	$(MAKE) -C sdk/wasm-checker
+	$(MAKE) -C test-collateral/generate-policy
 
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
@@ -116,7 +111,7 @@ trustzone-cli: trustzone-env
 	$(MAKE) -C sdk/wasm-checker
 	$(MAKE) -C test-collateral/generate-policy
 
-trustzone-cli-install: trustzone-cli
+%-cli-install: %-cli
 	# install to Cargo's bin directory
 	cp -f proxy-attestation-server/target/debug/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
 	cp -f veracruz-server/target/debug/veracruz-server $(BIN_DIR)/veracruz-server
