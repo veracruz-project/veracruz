@@ -16,7 +16,7 @@
 set -euo pipefail
 
 # start from scratch
-rm GETTING_STARTED_CLI.markdown.sh
+rm -f GETTING_STARTED_CLI.markdown.sh
 
 # make it so any error results in script failure
 echo 'set -euxo pipefail' >> GETTING_STARTED_CLI.markdown.sh
