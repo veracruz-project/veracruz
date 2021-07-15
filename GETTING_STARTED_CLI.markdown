@@ -308,6 +308,9 @@ Hello World!
 Shutting down enclave
 ```
 
+Note that `--result example-binary.wasm=-` indicates that the output
+of the `example-binary.wasm` binary should be written to stdout.
+
 And that's it! You've now completed a confidential computation. Only the
 original creator of the shares and the result reader had the permission and
 ability to observe this secret message.

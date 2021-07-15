@@ -10,16 +10,20 @@
 //! information on licensing and copyright.
 
 use structopt::StructOpt;
-use std::path;
-use std::process;
+use std::{
+    fs,
+    io,
+    io::Read,
+    io::Write,
+    path,
+    process,
+};
 use veracruz_client::VeracruzClient;
-use std::fs;
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use veracruz_utils::policy::parsers;
-use veracruz_utils::policy::policy::Policy;
-use veracruz_utils::policy::error::PolicyError;
+use veracruz_utils::policy::{
+    error::PolicyError,
+    parsers,
+    policy::Policy,
+};
 
 
 #[derive(Debug, StructOpt)]

@@ -9,16 +9,16 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use structopt::StructOpt;
-use std::path;
+use actix_rt;
 use env_logger;
 use log::{info, error};
-use std::fs;
-use std::process;
-use actix_rt;
+use std::{fs, path, process};
+use structopt::StructOpt;
 use veracruz_server;
-use veracruz_utils::policy::policy::Policy;
-use veracruz_utils::policy::error::PolicyError;
+use veracruz_utils::policy::{
+    error::PolicyError,
+    policy::Policy,
+};
 
 
 #[derive(Debug, StructOpt)]
