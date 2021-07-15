@@ -73,8 +73,8 @@ You should now find the example compiled to WebAssembly in the `target/wasm32-wa
 directory. This will be our program to execute inside a Veracruz enclave:
 
 ``` bash
-$ ls target/wasm32-wasi/release/shamir-secret-sharing.wasm
-target/wasm32-wasi/release/shamir-secret-sharing.wasm
+$ ls sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm
+sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm
 ```
 
 Lets go ahead and copy this to an example directory to make the paths a bit
@@ -82,7 +82,7 @@ easier to use:
 
 ``` bash
 $ cd /work/veracruz
-$ mkdir example
+$ mkdir -p example
 $ cp sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm example/example-binary.wasm
 ```
 
@@ -240,6 +240,7 @@ $ vc-server example/example-policy.json &
 [2021-02-12T00:55:45Z INFO  actix_server::builder] Starting 12 workers
 [2021-02-12T00:55:45Z INFO  actix_server::builder] Starting "actix-web-service-127.0.0.1:3017" service on 127.0.0.1:3017
 [2021-02-12T00:55:45Z INFO  veracruz_server] Veracruz Server running on 127.0.0.1:3017
+$ sleep 10
 ```
 
 ## Running the Veracruz Client 

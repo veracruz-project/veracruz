@@ -16,6 +16,7 @@ phases:
       - make trustzone-veracruz-client-test
       - make trustzone-veracruz-server-test
       - make trustzone-veracruz-test
+      - ./run_cli_test.sh
       # Compile and run veracruz-client tests on sgx; other tests require SGX enable machine.
       - make clean -C runtime-manager
       - make sgx-veracruz-client-test
