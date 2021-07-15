@@ -22,7 +22,7 @@ use std::{
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use clap::{App, Arg};
 use data_encoding::HEXLOWER;
-use log::{error, info, warn};
+use log::{info, warn};
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
