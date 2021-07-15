@@ -239,7 +239,7 @@ $ vc-server example/example-policy.json &
 [2021-02-12T00:55:45Z INFO  actix_server::builder] Starting 12 workers
 [2021-02-12T00:55:45Z INFO  actix_server::builder] Starting "actix-web-service-127.0.0.1:3017" service on 127.0.0.1:3017
 [2021-02-12T00:55:45Z INFO  veracruz_server] Veracruz Server running on 127.0.0.1:3017
-$ sleep 10
+$ sleep 100
 ```
 
 ## Running the Veracruz Client 
