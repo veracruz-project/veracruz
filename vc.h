@@ -16,6 +16,11 @@
 #include <stdlib.h>
 #include <mbedtls/ssl.h>
 
+
+#ifndef VC_RUNTIME_HASH_EXTENSION_ID
+#define VC_RUNTIME_HASH_EXTENSION_ID ((const uint8_t[3]){85, 30, 1})
+#endif
+
 #ifndef VC_SEND_BUFFER_SIZE
 #define VC_SEND_BUFFER_SIZE (2*1024)
 #endif

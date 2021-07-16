@@ -362,6 +362,110 @@ static ssize_t vc_rawrecv(void *p,
     return diff;
 }
 
+static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
+    printf("verifying runtime hash\n");
+//
+//    printf("extensions:\n");
+//    xxd(peer->v3_ext.p, peer->v3_ext.len);
+
+    // check each extension
+    uint8_t *ext_seq_ptr = peer->v3_ext.p;
+    uint8_t *ext_seq_end = ext_seq_ptr + peer->v3_ext.len;
+
+    // skip seq header
+    ext_seq_ptr++;
+    int err = mbedtls_asn1_get_len(&ext_seq_ptr, ext_seq_end, &(size_t){0});
+    if (err) {
+        printf("asn1 parsing failed (%d)\n", err);
+        return err;
+    }
+
+    while (ext_seq_ptr < ext_seq_end) {
+        uint8_t tag = *ext_seq_ptr++;
+        size_t len;
+        err = mbedtls_asn1_get_len(&ext_seq_ptr, ext_seq_end, &len);
+        if (err) {
+            printf("asn1 parsing failed (%d)\n", err);
+            return err;
+        }
+
+        if (tag == (MBEDTLS_ASN1_SEQUENCE | MBEDTLS_ASN1_CONSTRUCTED)) {
+            bool runtime_hash_found = false;
+
+            // search for our oid
+            uint8_t *ext_ptr = ext_seq_ptr;
+            uint8_t *ext_end = ext_ptr + len;
+            while (ext_ptr < ext_end) {
+                uint8_t tag = *ext_ptr++;
+                size_t len;
+                err = mbedtls_asn1_get_len(&ext_ptr, ext_end, &len);
+                if (err) {
+                    printf("asn1 parsing failed (%d)\n", err);
+                    return err;
+                }
+
+                if (tag == MBEDTLS_ASN1_OID) {
+                    // TODO move to constant
+                    if (memcmp(ext_ptr, VC_RUNTIME_HASH_EXTENSION_ID,
+                            sizeof(VC_RUNTIME_HASH_EXTENSION_ID)) == 0) {
+                        runtime_hash_found = true;
+                    }
+                    break;
+                }
+
+                ext_ptr += len;
+            }
+
+            // found oid for runtime hash, lookup actual hash value
+            if (runtime_hash_found) {
+                // search for runtime hash
+                uint8_t *ext_ptr = ext_seq_ptr;
+                uint8_t *ext_end = ext_ptr + len;
+                while (ext_ptr < ext_end) {
+                    uint8_t tag = *ext_ptr++;
+                    size_t len;
+                    err = mbedtls_asn1_get_len(&ext_ptr, ext_end, &len);
+                    if (err) {
+                        printf("asn1 parsing failed (%d)\n", err);
+                        return err;
+                    }
+
+                    if (tag == MBEDTLS_ASN1_OCTET_STRING) {
+                        // finally found our octet string, does it match?
+                        printf("found: ");
+                        hex(ext_ptr, len);
+                        printf("\n");
+                        printf("expected: ");
+                        hex(RUNTIME_MANAGER_HASH, sizeof(RUNTIME_MANAGER_HASH));
+                        printf("\n");
+
+                        if (len == sizeof(RUNTIME_MANAGER_HASH) &&
+                                memcmp(ext_ptr,
+                                    RUNTIME_MANAGER_HASH, len) == 0) {
+                            
+                            printf("\033[32mverified runtime hash:\033[m ");
+                            hex(RUNTIME_MANAGER_HASH,
+                                sizeof(RUNTIME_MANAGER_HASH));
+                            printf("\n");
+                            return 0;
+                        } else {
+                            printf("runtime hash mismatch\n");
+                            return -EBADE;
+                        }
+                    }
+
+                    ext_ptr += len;
+                }
+            }
+        }
+
+        ext_seq_ptr += len;
+    }
+
+    printf("no runtime hash?\n");
+    return -EBADE;
+}
+
 int vc_connect(vc_t *vc,
         // TODO need enclave name?
         const char *enclave_name,
@@ -496,6 +600,19 @@ int vc_connect(vc_t *vc,
     printf("\033[32mestablished TLS session with enclave{%s:%d}\033[m\n",
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT);
+
+    const mbedtls_x509_crt *peer = mbedtls_ssl_get_peer_cert(&vc->session);
+
+//    printf("enclave cert:\n");
+//    xxd(peer->raw.p, peer->raw.len);
+
+    // verify runtime hash
+    err = vc_verify_runtime_hash(vc, peer);
+    if (err) {
+        vc_close(vc);
+        return err;
+    }
+
     k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;
 }
