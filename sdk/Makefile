@@ -59,7 +59,8 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 	              private-set-intersection-sum-generator \
 	              string-generator \
 	              linear-regression-generator \
-	   			  number-stream-generator \
+	   	          number-stream-generator \
+	   	          image-processing-generator \
 				  shamir-secret-sharing
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))

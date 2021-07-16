@@ -18,7 +18,6 @@ use diesel::{
 };
 use dotenv::dotenv;
 use hex;
-use models::NewDevice;
 use schema::devices;
 use schema::firmware_versions;
 use std::env;
