@@ -1,3 +1,0 @@
-suppress-performance-statistics = false
-data-source-count = 3
-call-stack-size = 65536

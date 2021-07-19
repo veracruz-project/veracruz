@@ -18,9 +18,11 @@ pub mod nitro;
 
 use crate::error::*;
 use lazy_static::lazy_static;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::io::Read;
-use std::path;
+use std::{
+    io::Read,
+    path,
+    sync::atomic::{AtomicI32, Ordering},
+};
 
 use openssl;
 
