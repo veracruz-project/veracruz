@@ -97,7 +97,7 @@ void main(void) {
     k_sleep(Z_TIMEOUT_MS(DELAY*1000));
 
     // Connect to the Veracruz enclave and verify the enclave's hash
-    int err = vc_connect(&vc, "abcd", "abcd", 4);
+    int err = vc_connect(&vc);
     if (err) {
         printf("vc_connect failed (%d)\n", err);
         exit(1);

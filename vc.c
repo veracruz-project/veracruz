@@ -23,192 +23,6 @@
 #include "clap.h"
 
 
-//// attestation ////
-int vc_attest(
-        char *enclave_name, size_t enclave_name_len,
-        uint8_t *enclave_cert_hash, size_t *enclave_cert_hash_len) {
-    printf("attesting %s:%d\n",
-            VC_SERVER_HOST,
-            VC_SERVER_PORT);
-
-    // check buffer sizes here, with the current Veracruz implementation
-    // these are fixed sizes
-    if (enclave_name_len < 7+1 || *enclave_cert_hash_len < 32) {
-        return -EINVAL;
-    }
-
-    // get random challenge
-    // TODO Zephyr notes this is not cryptographically secure, is that an
-    // issue? This will be an area to explore
-    uint8_t challenge[32];
-    sys_rand_get(challenge, sizeof(challenge));
-
-    // TODO log? can we incrementally log?
-    // TODO VERACRUZ_POLICY_HASH should be raw bytes
-    printf("policy: %s\n", VC_POLICY_HASH);
-    printf("challenge: ");
-    hex(challenge, sizeof(challenge));
-    printf("\n");
-
-    // construct attestation token request
-    Tp_MexicoCityRequest request = {
-        .which_message_oneof = Tp_MexicoCityRequest_request_proxy_psa_attestation_token_tag
-    };
-    memcpy(request.message_oneof.request_proxy_psa_attestation_token.challenge,
-            challenge, sizeof(challenge));
-
-    // encode
-    // TODO this could be smaller, but instead could we tie protobuf encoding
-    // directly into our GET function?
-    uint8_t request_buf[256];
-    memset(request_buf, 0, sizeof(request_buf));
-    pb_ostream_t request_stream = pb_ostream_from_buffer(
-            request_buf, sizeof(request_buf));
-    bool success = pb_encode(&request_stream, &Tp_MexicoCityRequest_msg, &request);
-    if (!success) {
-        // TODO we can reduce code size by removing these error messages
-        printf("pb_encode failed (%s)\n", request_stream.errmsg);
-        return -EILSEQ;
-    }
-
-    // convert base64
-    ssize_t request_len = base64_encode(
-            request_buf, request_stream.bytes_written, 
-            request_buf, sizeof(request_buf));
-    if (request_len < 0) {
-        printf("base64_encode failed (%d)\n", request_len);
-        return request_len;
-    }
-
-//    printf("request:\n");
-//    xxd(request_buf, request_len);
-
-    // POST challenge
-//    printf("connecting to %s:%d...\n",
-//            VC_SERVER_HOST,
-//            VC_SERVER_PORT);
-    uint8_t pat_buf[1024];
-    memset(pat_buf, 0, sizeof(pat_buf));
-    printf("veracruz_server -> POST /veracruz_server, %d bytes\n", request_len);
-    ssize_t pat_len = http_post(
-            VC_SERVER_HOST,
-            VC_SERVER_PORT,
-            "/veracruz_server",
-            request_buf,
-            request_len,
-            pat_buf,
-            sizeof(pat_buf));
-    if (pat_len < 0) {
-        printf("http_post failed (%d)\n", pat_len);
-        return pat_len;
-    }
-    printf("veracruz_server <- 200 OK, %d bytes\n", pat_len);
-//    printf("attest: challenge response:\n");
-//    xxd(pat_buf, pat_len);
-
-    // forward to proxy attestation server
-//    printf("connecting to %s:%d...\n",
-//            VC_PAS_HOST,
-//            VC_PAS_PORT);
-    printf("forwarding challenge response to %s:%d\n",
-            VC_PAS_HOST,
-            VC_PAS_PORT);
-    uint8_t response_buf[256];
-    // TODO we shouldn't need to zero this, but we do, fix?
-    // TODO the issue is base64 decoding with no null-terminator
-    memset(response_buf, 0, sizeof(response_buf));
-    printf("proxy_attestation_server -> POST /VerifyPAT, %d bytes\n", pat_len);
-    ssize_t response_len = http_post(
-            VC_PAS_HOST,
-            VC_PAS_PORT,
-            "/VerifyPAT",
-            pat_buf,
-            pat_len,
-            response_buf,
-            sizeof(response_buf));
-    if (response_len < 0) {
-        printf("http_post failed (%d)\n", response_len);
-        return response_len;
-    }
-    printf("proxy_attestation_server <- 200 OK, %d bytes\n", response_len);
-
-//    printf("http_post -> %d\n", response_len);
-//    printf("attest: PAT response:\n");
-//    xxd(response_buf, response_len);
-
-    // decode base64
-    ssize_t verif_len = base64_decode(
-            response_buf, sizeof(response_buf),
-            response_buf, sizeof(response_buf));
-    if (verif_len < 0) {
-        printf("base64_decode failed (%d)\n", verif_len);
-        return verif_len;
-    }
-    
-//    printf("attest: PAT decoded response:\n");
-//    xxd(response_buf, verif_len);
-
-    if (verif_len < 131) {
-        printf("pat response too small\n");
-        return -EOVERFLOW;
-    }
-
-    // check that challenge matches
-    if (memcmp(challenge, &response_buf[8], 32) != 0) {
-        printf("challenge mismatch\n");
-        printf("expected: ");
-        for (int i = 0; i < sizeof(challenge); i++) {
-            printf("%02x", challenge[i]);
-        }
-        printf("\n");
-        printf("recieved: ");
-        for (int i = 0; i < 32; i++) {
-            printf("%02x", response_buf[8+i]);
-        }
-        printf("\n");
-        return -EBADE;
-    }
-
-    // check that enclave hash matches policy
-    if (memcmp(&response_buf[47], VC_RUNTIME_HASH,
-            sizeof(VC_RUNTIME_HASH)) != 0) {
-        printf("enclave hash mismatch\n");
-        printf("expected: ");
-        for (int i = 0; i < sizeof(VC_RUNTIME_HASH); i++) {
-            printf("%02x", VC_RUNTIME_HASH[i]);
-        }
-        printf("\n");
-        printf("recieved: ");
-        for (int i = 0; i < 32; i++) {
-            printf("%02x", response_buf[8+i]);
-        }
-        printf("\n");
-        return -EBADE;
-    }
-
-    // recieved values
-    // TODO why verify_iat response not a protobuf?
-    memcpy(enclave_name, &response_buf[124], 7);
-    enclave_name[7] = '\0';
-    memcpy(enclave_cert_hash, &response_buf[86], 32);
-    *enclave_cert_hash_len = 32;
-
-    printf("\033[32msuccessfully attested %s:%d\033[m\n",
-        VC_SERVER_HOST,
-        VC_SERVER_PORT);
-    printf("\033[32menclave name:\033[m %s\n", enclave_name);
-    printf("\033[32menclave hash:\033[m ");
-    hex(&response_buf[47], 32);
-    printf("\n");
-    printf("\033[32menclave cert hash:\033[m ");
-    hex(enclave_cert_hash, *enclave_cert_hash_len);
-    printf("\n");
-
-    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
-    return 0;
-}
-
-
 //// Veracruz session handling ////
 static void mbedtls_debug(void *ctx, int level,
         const char *file, int line,
@@ -466,10 +280,7 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
     return -EBADE;
 }
 
-int vc_connect(vc_t *vc,
-        // TODO need enclave name?
-        const char *enclave_name,
-        const uint8_t *enclave_cert_hash, size_t enclave_cert_hash_len) {
+int vc_connect(vc_t *vc) {
     // some setup
     vc->session_id = 0;
     vc->recv_len = 0;
@@ -546,9 +357,6 @@ int vc_connect(vc_t *vc,
         return err;
     }
 
-    // TODO fix this, is as is just for testing
-    //mbedtls_ssl_conf_authmode(&vc->session_cfg, MBEDTLS_SSL_VERIFY_NONE);
-
     // register the proxy attestation server as our CA
     mbedtls_ssl_conf_ca_chain(&vc->session_cfg, &vc->ca_cert, NULL);
 
@@ -568,7 +376,6 @@ int vc_connect(vc_t *vc,
         return err;
     }
 
-    // TODO remove debugging? hide behind logging?
     mbedtls_debug_set_threshold(4);
     mbedtls_ssl_conf_dbg(&vc->session_cfg, mbedtls_debug, vc);
 
@@ -643,27 +450,6 @@ int vc_close(vc_t *vc) {
     mbedtls_x509_crt_free(&vc->client_cert);
     free(vc->recv_buf);
     free(vc->send_buf);
-    return 0;
-}
-
-int vc_attest_and_connect(vc_t *vc) {
-    char enclave_name[7+1];
-    uint8_t enclave_cert_hash[32];
-    size_t enclave_cert_hash_len = 32;
-    int err = vc_attest(
-            enclave_name, 7+1,
-            enclave_cert_hash, &enclave_cert_hash_len);
-    if (err) {
-        return err;
-    }
-
-    err = vc_connect(vc,
-            enclave_name, 
-            enclave_cert_hash, enclave_cert_hash_len);
-    if (err) {
-        return err;
-    }
-
     return 0;
 }
 

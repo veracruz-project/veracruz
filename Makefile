@@ -54,7 +54,6 @@ docker: Dockerfile
 update:
 	west update
 
-# TODO move these into west?
 # Generate policy.h/c
 policy.h policy.c: policy_to_header.py
 policy.h policy.c: $(POLICY) $(CLIENT_CERT) $(CLIENT_KEY)
@@ -125,8 +124,3 @@ ram_report: build
 run:
 	/zephyr-workspace/mini-durango/build/zephyr/zephyr.exe
 
-# Network tracing
-.PHONY: tcpdump
-tcpdump:
-	tcpdump -i tap0 &
-	sleep 0.1
