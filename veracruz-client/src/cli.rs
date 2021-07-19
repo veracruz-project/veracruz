@@ -136,6 +136,9 @@ fn main() {
     // parse args
     let opt = Opt::from_args();
 
+    // setup logger
+    env_logger::init();
+
     // load policy
     let policy = fs::read_to_string(&opt.policy_path)
         .map_err(|err| PolicyError::from(err))
