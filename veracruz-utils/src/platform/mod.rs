@@ -20,8 +20,11 @@ pub mod tz;
 
 #[cfg(feature = "std")]
 use error::PlatformError;
-use std::fmt;
-use std::str::FromStr;
+#[cfg(feature = "std")]
+use std::{
+    fmt,
+    str::FromStr,
+};
 
 /// A type capturing the platform the enclave is running on.
 #[derive(Debug)]

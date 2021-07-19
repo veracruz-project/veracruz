@@ -32,8 +32,7 @@ use psa_attestation::{
     t_cose_sign1_verify, t_cose_sign1_verify_ctx, t_cose_sign1_verify_delete_public_key,
     t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
 };
-use std::{ffi::c_void, ptr::null};
-use std::path;
+use std::{ffi::c_void, path, ptr::null};
 
 async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
     if input_data.is_empty() {

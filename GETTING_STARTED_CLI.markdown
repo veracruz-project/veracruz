@@ -85,8 +85,6 @@ $ mkdir -p example
 $ cp sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm example/example-binary.wasm
 ```
 
-<!-- TODO run example with freestanding-execution-environment? -->
-
 ## Generating certificates
 
 Identities in Veracruz are specified by a private RSA key and signed
@@ -315,4 +313,14 @@ of the `example-binary.wasm` binary should be written to stdout.
 And that's it! You've now completed a confidential computation. Only the
 original creator of the shares and the result reader had the permission and
 ability to observe this secret message.
+
+## Cleanup
+
+If we are done running computations, we can take down the Veracruz servers
+with a pkill command:
+
+``` bash
+$ pkill vc-server
+$ pkill vc-pas
+```
 
