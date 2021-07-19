@@ -28,8 +28,8 @@ int vc_attest(
         char *enclave_name, size_t enclave_name_len,
         uint8_t *enclave_cert_hash, size_t *enclave_cert_hash_len) {
     printf("attesting %s:%d\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
 
     // check buffer sizes here, with the current Veracruz implementation
     // these are fixed sizes
@@ -45,7 +45,7 @@ int vc_attest(
 
     // TODO log? can we incrementally log?
     // TODO VERACRUZ_POLICY_HASH should be raw bytes
-    printf("policy: %s\n", VERACRUZ_POLICY_HASH);
+    printf("policy: %s\n", VC_POLICY_HASH);
     printf("challenge: ");
     hex(challenge, sizeof(challenge));
     printf("\n");
@@ -85,14 +85,14 @@ int vc_attest(
 
     // POST challenge
 //    printf("connecting to %s:%d...\n",
-//            VERACRUZ_SERVER_HOST,
-//            VERACRUZ_SERVER_PORT);
+//            VC_SERVER_HOST,
+//            VC_SERVER_PORT);
     uint8_t pat_buf[1024];
     memset(pat_buf, 0, sizeof(pat_buf));
     printf("veracruz_server -> POST /veracruz_server, %d bytes\n", request_len);
     ssize_t pat_len = http_post(
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT,
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
             "/veracruz_server",
             request_buf,
             request_len,
@@ -108,19 +108,19 @@ int vc_attest(
 
     // forward to proxy attestation server
 //    printf("connecting to %s:%d...\n",
-//            PROXY_ATTESTATION_SERVER_HOST,
-//            PROXY_ATTESTATION_SERVER_PORT);
+//            VC_PAS_HOST,
+//            VC_PAS_PORT);
     printf("forwarding challenge response to %s:%d\n",
-            PROXY_ATTESTATION_SERVER_HOST,
-            PROXY_ATTESTATION_SERVER_PORT);
+            VC_PAS_HOST,
+            VC_PAS_PORT);
     uint8_t response_buf[256];
     // TODO we shouldn't need to zero this, but we do, fix?
     // TODO the issue is base64 decoding with no null-terminator
     memset(response_buf, 0, sizeof(response_buf));
     printf("proxy_attestation_server -> POST /VerifyPAT, %d bytes\n", pat_len);
     ssize_t response_len = http_post(
-            PROXY_ATTESTATION_SERVER_HOST,
-            PROXY_ATTESTATION_SERVER_PORT,
+            VC_PAS_HOST,
+            VC_PAS_PORT,
             "/VerifyPAT",
             pat_buf,
             pat_len,
@@ -170,12 +170,12 @@ int vc_attest(
     }
 
     // check that enclave hash matches policy
-    if (memcmp(&response_buf[47], RUNTIME_MANAGER_HASH,
-            sizeof(RUNTIME_MANAGER_HASH)) != 0) {
+    if (memcmp(&response_buf[47], VC_RUNTIME_HASH,
+            sizeof(VC_RUNTIME_HASH)) != 0) {
         printf("enclave hash mismatch\n");
         printf("expected: ");
-        for (int i = 0; i < sizeof(RUNTIME_MANAGER_HASH); i++) {
-            printf("%02x", RUNTIME_MANAGER_HASH[i]);
+        for (int i = 0; i < sizeof(VC_RUNTIME_HASH); i++) {
+            printf("%02x", VC_RUNTIME_HASH[i]);
         }
         printf("\n");
         printf("recieved: ");
@@ -194,8 +194,8 @@ int vc_attest(
     *enclave_cert_hash_len = 32;
 
     printf("\033[32msuccessfully attested %s:%d\033[m\n",
-        VERACRUZ_SERVER_HOST,
-        VERACRUZ_SERVER_PORT);
+        VC_SERVER_HOST,
+        VC_SERVER_PORT);
     printf("\033[32menclave name:\033[m %s\n", enclave_name);
     printf("\033[32menclave hash:\033[m ");
     hex(&response_buf[47], 32);
@@ -263,13 +263,13 @@ static ssize_t vc_rawsend(void *p,
 
     // send data over HTTP POST
 //    printf("sending to %s:%d:\n",
-//            VERACRUZ_SERVER_HOST,
-//            VERACRUZ_SERVER_PORT);
+//            VC_SERVER_HOST,
+//            VC_SERVER_PORT);
 //    xxd(vc->send_buf, data_len);
     printf("veracruz_server -> POST /runtime_manager, %d bytes\n", data_len);
     ssize_t recv_len = http_post(
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT,
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
             "/runtime_manager",
             vc->send_buf,
             data_len,
@@ -436,16 +436,16 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
                         hex(ext_ptr, len);
                         printf("\n");
                         printf("expected: ");
-                        hex(RUNTIME_MANAGER_HASH, sizeof(RUNTIME_MANAGER_HASH));
+                        hex(VC_RUNTIME_HASH, sizeof(VC_RUNTIME_HASH));
                         printf("\n");
 
-                        if (len == sizeof(RUNTIME_MANAGER_HASH) &&
+                        if (len == sizeof(VC_RUNTIME_HASH) &&
                                 memcmp(ext_ptr,
-                                    RUNTIME_MANAGER_HASH, len) == 0) {
+                                    VC_RUNTIME_HASH, len) == 0) {
                             
                             printf("\033[32mverified runtime hash:\033[m ");
-                            hex(RUNTIME_MANAGER_HASH,
-                                sizeof(RUNTIME_MANAGER_HASH));
+                            hex(VC_RUNTIME_HASH,
+                                sizeof(VC_RUNTIME_HASH));
                             printf("\n");
                             return 0;
                         } else {
@@ -476,7 +476,7 @@ int vc_connect(vc_t *vc,
 
     // check that requested ciphersuite is available, this can fail if
     // the ciphersuite isn't enabled in mbedtls's configuration
-    if (mbedtls_ssl_ciphersuite_from_id(CIPHERSUITE) == NULL) {
+    if (mbedtls_ssl_ciphersuite_from_id(VC_CIPHERSUITE) == NULL) {
         printf("required ciphersuite unavailable, "
                 "is mbedtls configured correctly?\n");
         return -ENOSYS;
@@ -497,7 +497,7 @@ int vc_connect(vc_t *vc,
     // parse client cert/key
     mbedtls_x509_crt_init(&vc->client_cert);
     int err = mbedtls_x509_crt_parse_der(&vc->client_cert,
-            CLIENT_CERT_DER, sizeof(CLIENT_CERT_DER));
+            VC_CLIENT_CERT_DER, sizeof(VC_CLIENT_CERT_DER));
     if (err) {
         printf("failed to parse client cert (%d)\n", err);
         free(vc->recv_buf);
@@ -507,7 +507,7 @@ int vc_connect(vc_t *vc,
 
     mbedtls_pk_init(&vc->client_key);
     err = mbedtls_pk_parse_key(&vc->client_key,
-            CLIENT_KEY_DER, sizeof(CLIENT_KEY_DER),
+            VC_CLIENT_KEY_DER, sizeof(VC_CLIENT_KEY_DER),
             NULL, 0);
     if (err) {
         printf("failed to parse client key (%d)\n", err);
@@ -520,7 +520,7 @@ int vc_connect(vc_t *vc,
     // parse CA cert
     mbedtls_x509_crt_init(&vc->ca_cert);
     err = mbedtls_x509_crt_parse_der(&vc->ca_cert,
-            CA_CERT_DER, sizeof(CA_CERT_DER));
+            VC_CA_CERT_DER, sizeof(VC_CA_CERT_DER));
     if (err) {
         printf("failed to parse client cert (%d)\n", err);
         free(vc->recv_buf);
@@ -554,7 +554,7 @@ int vc_connect(vc_t *vc,
 
     // other configuration
     mbedtls_ssl_conf_rng(&vc->session_cfg, vc_rawrng, NULL);
-    mbedtls_ssl_conf_ciphersuites(&vc->session_cfg, CIPHERSUITES);
+    mbedtls_ssl_conf_ciphersuites(&vc->session_cfg, VC_CIPHERSUITES);
 
     err = mbedtls_ssl_conf_own_cert(&vc->session_cfg,
             &vc->client_cert, &vc->client_key);
@@ -592,11 +592,17 @@ int vc_connect(vc_t *vc,
 
     // perform SSL handshake
     printf("beginning TLS handshake with enclave{%s:%d}\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
-    printf("policy hash: %s\n", VERACRUZ_POLICY_HASH); 
-    printf("client cert hash: %s\n", CLIENT_CERT_HASH);
-    printf("CA cert hash: %s\n", CA_CERT_HASH);
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
+    printf("policy hash: ");
+    hex(VC_POLICY_HASH, sizeof(VC_POLICY_HASH));
+    printf("\n");
+    printf("client cert hash: ");
+    hex(VC_CLIENT_CERT_HASH, sizeof(VC_CLIENT_CERT_HASH));
+    printf("\n");
+    printf("CA cert hash: ");
+    hex(VC_CA_CERT_HASH, sizeof(VC_CA_CERT_HASH));
+    printf("\n");
     err = mbedtls_ssl_handshake(&vc->session);
     if (err) {
         printf("mbedtls_ssl_handshake failed (%d)\n", err);
@@ -611,8 +617,8 @@ int vc_connect(vc_t *vc,
 
     // success!
     printf("\033[32mestablished TLS session with enclave{%s:%d}\033[m\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
 
     const mbedtls_x509_crt *peer = mbedtls_ssl_get_peer_cert(&vc->session);
 
@@ -683,8 +689,8 @@ int vc_send_data(vc_t *vc,
         const uint8_t *data,
         size_t data_len) {
     printf("sending data to enclave{%s:%d}/%s, %d bytes\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT,
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
             name, data_len);
     // construct data protobuf
     Tp_MexicoCityRequest send_data = {
@@ -765,12 +771,12 @@ int vc_send_data(vc_t *vc,
     }
 
     printf("enclave{%s:%d} responded with success\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
     printf("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m\n",
             data_len,
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT,
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
             name);
     k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;

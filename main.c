@@ -138,7 +138,7 @@ void main(void) {
     }
 
     printf("\033[32mdone!\033[m audio uploaded to enclave{%s:%d}\n",
-            VERACRUZ_SERVER_HOST,
-            VERACRUZ_SERVER_PORT);
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
     exit(0);
 }
