@@ -517,6 +517,17 @@ int vc_connect(vc_t *vc,
         return err;
     }
 
+    // parse CA cert
+    mbedtls_x509_crt_init(&vc->ca_cert);
+    err = mbedtls_x509_crt_parse_der(&vc->ca_cert,
+            CA_CERT_DER, sizeof(CA_CERT_DER));
+    if (err) {
+        printf("failed to parse client cert (%d)\n", err);
+        free(vc->recv_buf);
+        free(vc->send_buf);
+        return err;
+    }
+
     // setup SSL connection
     mbedtls_ssl_init(&vc->session);
     mbedtls_ssl_config_init(&vc->session_cfg);
@@ -536,10 +547,13 @@ int vc_connect(vc_t *vc,
     }
 
     // TODO fix this, is as is just for testing
-    mbedtls_ssl_conf_authmode(&vc->session_cfg, MBEDTLS_SSL_VERIFY_NONE);
+    //mbedtls_ssl_conf_authmode(&vc->session_cfg, MBEDTLS_SSL_VERIFY_NONE);
 
+    // register the proxy attestation server as our CA
+    mbedtls_ssl_conf_ca_chain(&vc->session_cfg, &vc->ca_cert, NULL);
+
+    // other configuration
     mbedtls_ssl_conf_rng(&vc->session_cfg, vc_rawrng, NULL);
-
     mbedtls_ssl_conf_ciphersuites(&vc->session_cfg, CIPHERSUITES);
 
     err = mbedtls_ssl_conf_own_cert(&vc->session_cfg,
@@ -580,10 +594,9 @@ int vc_connect(vc_t *vc,
     printf("beginning TLS handshake with enclave{%s:%d}\n",
             VERACRUZ_SERVER_HOST,
             VERACRUZ_SERVER_PORT);
-    printf("enclave cert hash: "); 
-    hex(enclave_cert_hash, enclave_cert_hash_len);
-    printf("\n");
+    printf("policy hash: %s\n", VERACRUZ_POLICY_HASH); 
     printf("client cert hash: %s\n", CLIENT_CERT_HASH);
+    printf("CA cert hash: %s\n", CA_CERT_HASH);
     err = mbedtls_ssl_handshake(&vc->session);
     if (err) {
         printf("mbedtls_ssl_handshake failed (%d)\n", err);

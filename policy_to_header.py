@@ -23,6 +23,10 @@ def main(args):
         policy_hash = hashlib.sha256(policy_raw.encode('utf-8')).hexdigest()
         policy = json.loads(policy_raw)
 
+        # go ahead and grab CA cert
+        ca_cert_der = pem_to_der(policy['proxy_service_cert'])
+        ca_cert_hash = hashlib.sha256(ca_cert_der).hexdigest()
+
     if args.identity:
         print('loading identity %s' % args.identity)
         with open(args.identity) as f:
@@ -83,6 +87,14 @@ def main(args):
             f.writeln('#define PROXY_ATTESTATION_SERVER_PORT %(port)s',
                 port=policy['proxy_attestation_server_url'].split(':')[1])
             f.writeln()
+            f.writeln('// CA cert')
+            f.writeln('extern const uint8_t _CA_CERT_DER[%(len)d];',
+                len=len(ca_cert_der))
+            f.writeln('#define CA_CERT_DER _CA_CERT_DER')
+            # TODO these should be raw bytes
+            f.writeln('#define CA_CERT_HASH "%(hash)s"',
+                hash=ca_cert_hash)
+            f.writeln()
             f.writeln('// ciphersuite requested by the policy, as both a constant')
             f.writeln('// and mbedtls-friendly null-terminated array')
             f.writeln('#define CIPHERSUITE %(ciphersuite)s',
@@ -135,6 +147,14 @@ def main(args):
                 f.writeln('    %(hash)s',
                     hash=' '.join('0x%02x,' % int(runtime_manager_hash[2*j:2*j+2], 16)
                         for j in range(i, min(i+8, len(runtime_manager_hash)//2))))
+            f.writeln('};')
+            f.writeln()
+            f.writeln('const uint8_t _CA_CERT_DER[%(len)d] = {',
+                len=len(ca_cert_der))
+            for i in range(0, len(ca_cert_der), 8):
+                f.writeln('    %(der)s',
+                    der=' '.join('0x%02x,' % ca_cert_der[j]
+                        for j in range(i, min(i+8, len(ca_cert_der)))))
             f.writeln('};')
             f.writeln()
             f.writeln('const int _CIPHERSUITES[2] = {')

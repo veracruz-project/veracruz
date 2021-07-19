@@ -39,6 +39,7 @@ typedef struct vc {
     // TLS state
     mbedtls_ssl_context session;
     mbedtls_ssl_config session_cfg;
+    mbedtls_x509_crt ca_cert;
 
     mbedtls_x509_crt client_cert;
     mbedtls_pk_context client_key;
