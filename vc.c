@@ -30,16 +30,6 @@ static void mbedtls_debug(void *ctx, int level,
     if (level <= 1) {
         printf("%s", str);
     }
-
-    //k_sleep(Z_TIMEOUT_MS(1));
-//    const char *basename = file;
-//    for (int i = 0; file[i]; i++) {
-//        if (file[i] == '/') {
-//            basename = &file[i+1];
-//        }
-//    }
-//
-//    printf("%s:%d %s", basename, line, str);
 }
 
 static int vc_rawrng(void *p,
@@ -76,10 +66,12 @@ static ssize_t vc_rawsend(void *p,
     data_len += res;
 
     // send data over HTTP POST
-//    printf("sending to %s:%d:\n",
-//            VC_SERVER_HOST,
-//            VC_SERVER_PORT);
-//    xxd(vc->send_buf, data_len);
+    #ifdef VC_DUMP_INFO
+        printf("sending to %s:%d:\n",
+                VC_SERVER_HOST,
+                VC_SERVER_PORT);
+        xxd(vc->send_buf, data_len);
+    #endif
     printf("veracruz_server -> POST /runtime_manager, %d bytes\n", data_len);
     ssize_t recv_len = http_post(
             VC_SERVER_HOST,
@@ -95,15 +87,15 @@ static ssize_t vc_rawsend(void *p,
     }
     printf("veracruz_server <- 200 OK, %d bytes\n", recv_len);
 
-    //printf("http_post -> %d\n", recv_len);
-
     if (recv_len == 0) {
         // done, recieved nothing
         return len;
     }
 
-//    printf("ssl session: recv:\n");
-//    xxd(vc->recv_buf, recv_len);
+    #ifdef VC_DUMP_INFO
+        printf("ssl session: recv:\n");
+        xxd(vc->recv_buf, recv_len);
+    #endif
 
     // null terminate to make parsing a bit easier
     vc->recv_buf[recv_len] = '\0';
@@ -150,8 +142,10 @@ static ssize_t vc_rawsend(void *p,
     vc->recv_pos = vc->recv_buf;
     vc->recv_len = parsed - vc->recv_buf;
 
-//    printf("ssl session: parsed:\n");
-//    xxd(vc->recv_pos, vc->recv_len);
+    #ifdef VC_DUMP_INFO
+        printf("ssl session: parsed:\n");
+        xxd(vc->recv_pos, vc->recv_len);
+    #endif
 
     // done!
     return len;
@@ -178,9 +172,11 @@ static ssize_t vc_rawrecv(void *p,
 
 static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
     printf("verifying runtime hash\n");
-//
-//    printf("extensions:\n");
-//    xxd(peer->v3_ext.p, peer->v3_ext.len);
+
+    #ifdef VC_DUMP_INFO
+        printf("extensions:\n");
+        xxd(peer->v3_ext.p, peer->v3_ext.len);
+    #endif
 
     // check each extension
     uint8_t *ext_seq_ptr = peer->v3_ext.p;
@@ -219,7 +215,6 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
                 }
 
                 if (tag == MBEDTLS_ASN1_OID) {
-                    // TODO move to constant
                     if (memcmp(ext_ptr, VC_RUNTIME_HASH_EXTENSION_ID,
                             sizeof(VC_RUNTIME_HASH_EXTENSION_ID)) == 0) {
                         runtime_hash_found = true;
@@ -429,8 +424,10 @@ int vc_connect(vc_t *vc) {
 
     const mbedtls_x509_crt *peer = mbedtls_ssl_get_peer_cert(&vc->session);
 
-//    printf("enclave cert:\n");
-//    xxd(peer->raw.p, peer->raw.len);
+    #ifdef VC_DUMP_INFO
+        printf("enclave cert:\n");
+        xxd(peer->raw.p, peer->raw.len);
+    #endif
 
     // verify runtime hash
     err = vc_verify_runtime_hash(vc, peer);
@@ -507,15 +504,15 @@ int vc_send_data(vc_t *vc,
             proto_buf, proto_len);
     bool success = pb_encode(&proto_stream, &Tp_MexicoCityRequest_msg, &send_data);
     if (!success) {
-        // TODO we can reduce code size by removing these error messages
         printf("pb_encode failed (%s)\n", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
 
-    // TODO log? can we incrementally log?
-//    printf("send_data: %s:\n", name);
-//    xxd(proto_buf, proto_stream.bytes_written);
+    #ifdef VC_DUMP_INFO
+        printf("send_data: %s:\n", name);
+        xxd(proto_buf, proto_stream.bytes_written);
+    #endif
 
     // send to Veracruz
     int res = mbedtls_ssl_write(&vc->session,
@@ -534,8 +531,10 @@ int vc_send_data(vc_t *vc,
         return res;
     }
 
-//    printf("send_data: response:\n");
-//    xxd(proto_buf, res);
+    #ifdef VC_DUMP_INFO
+        printf("send_data: response:\n");
+        xxd(proto_buf, res);
+    #endif
 
     // parse
     Tp_MexicoCityResponse response;

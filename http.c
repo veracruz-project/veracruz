@@ -20,14 +20,6 @@ static void http_get_cb(
         struct http_response *rsp,
         enum http_final_call final,
         void *udata) {
-//    // TODO probably handle this?
-//    if (state != HTTP_DATA_MORE) {
-//        printf("http rsp state != HTTP_DATA_FINAL (%d), "
-//            "should handle this\n", state);
-//    }
-
-//    printf("rsp = %s (%d bytes)\n", rsp->http_status, rsp->data_len);
-
     struct http_get_state *state = udata;
     uint8_t *start = (rsp->body_start) ? rsp->body_start : rsp->recv_buf;
     size_t len = rsp->processed - state->pos;
@@ -44,12 +36,10 @@ static void http_get_cb(
 }
 
 // HTTP GET operation
-// TODO TLS? https_get?
 ssize_t http_get(
         const char *host,
         uint16_t port,
         const char *path,
-        // TODO headers?
         uint8_t *buf,
         size_t buf_len) {
     // setup address, TODO use DNS?

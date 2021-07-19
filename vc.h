@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <mbedtls/ssl.h>
 
+// define for more output
+//#define VC_DUMP_INFO
 
 #ifndef VC_RUNTIME_HASH_EXTENSION_ID
 #define VC_RUNTIME_HASH_EXTENSION_ID ((const uint8_t[3]){85, 30, 1})
