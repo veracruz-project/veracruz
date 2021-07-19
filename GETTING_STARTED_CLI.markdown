@@ -210,11 +210,7 @@ $ vc-pas example/example-policy.json \
     --database-url=example/example-pas.db \
     --ca-cert=test-collateral/CACert.pem \
     --ca-key=test-collateral/CAKey.pem &
-[2021-02-12T00:23:33Z INFO  proxy_attestation_server] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-[2021-02-12T00:23:33Z INFO  proxy_attestation_server] Using database "proxy-attestation-server/proxy-attestation-server.db"
-[2021-02-12T00:23:33Z INFO  actix_server::builder] Starting 12 workers
-[2021-02-12T00:23:33Z INFO  actix_server::builder] Starting "actix-web-service-127.0.0.1:3010" service on 127.0.0.1:3010
-[2021-02-12T00:23:33Z INFO  proxy_attestation_server] Proxy Attestation Server running on 127.0.0.1:3010
+Proxy Attestation Server running on 127.0.0.1:3010
 $ sleep 10
 ```
 
@@ -230,14 +226,7 @@ Server in the background:
 
 ``` bash
 $ vc-server example/example-policy.json &
-[2021-02-12T00:55:40Z INFO  veracruz_server] Loading policy "example/example-policy.json"
-[2021-02-12T00:55:40Z INFO  veracruz_server] Loaded policy 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
-[2021-02-12T00:55:44Z INFO  actix_web::middleware::logger] 127.0.0.1:54762 "POST /Start HTTP/1.1" 200 96 "-" "-" 0.000542
-[2021-02-12T00:55:44Z INFO  actix_web::middleware::logger] 127.0.0.1:54764 "POST /SGX/Msg1 HTTP/1.1" 200 312 "-" "-" 0.233101
-[2021-02-12T00:55:45Z INFO  actix_web::middleware::logger] 127.0.0.1:54768 "POST /SGX/Msg3 HTTP/1.1" 200 25 "-" "-" 0.695685
-[2021-02-12T00:55:45Z INFO  actix_server::builder] Starting 12 workers
-[2021-02-12T00:55:45Z INFO  actix_server::builder] Starting "actix-web-service-127.0.0.1:3017" service on 127.0.0.1:3017
-[2021-02-12T00:55:45Z INFO  veracruz_server] Veracruz Server running on 127.0.0.1:3017
+Veracruz Server running on 127.0.0.1:3017
 $ sleep 10
 ```
 

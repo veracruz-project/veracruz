@@ -11,7 +11,7 @@
 
 use actix_rt;
 use env_logger;
-use log::{info, error};
+use log::info;
 use proxy_attestation_server;
 use std::{env, fs, path, process};
 use structopt::StructOpt;
@@ -53,9 +53,7 @@ fn main() {
     let opt = Opt::from_args();
 
     // setup logger
-    env_logger::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
+    env_logger::init();
 
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
@@ -65,7 +63,7 @@ fn main() {
     let policy = match policy {
         Ok(policy) => policy,
         Err(err) => {
-            error!("{}", err);
+            eprintln!("{}", err);
             process::exit(1);
         }
     };
@@ -83,7 +81,7 @@ fn main() {
             info!("Using database {:?}", url);
         }
         Err(_) => {
-            error!("No database URL provided, need --database-url");
+            eprintln!("No database URL provided, need --database-url");
             process::exit(1);
         }
     }
@@ -100,19 +98,17 @@ fn main() {
     ) {
         Ok(proxy_attestation_server) => proxy_attestation_server,
         Err(err) => {
-            error!("{}", err);
+            eprintln!("{}", err);
             process::exit(1);
         }
     };
 
-    info!("Proxy Attestation Server running on {}", policy.proxy_attestation_server_url());
+    println!("Proxy Attestation Server running on {}", policy.proxy_attestation_server_url());
     match sys.block_on(proxy_attestation_server) {
         Ok(()) => {}
         Err(err) => {
-            error!("{}", err);
+            eprintln!("{}", err);
             process::exit(1);
         }
     }
-
-    info!("done");
 }
