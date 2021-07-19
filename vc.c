@@ -244,23 +244,21 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
                         printf("found: ");
                         hex(ext_ptr, len);
                         printf("\n");
-                        printf("expected: ");
-                        hex(VC_RUNTIME_HASH, sizeof(VC_RUNTIME_HASH));
-                        printf("\n");
 
-                        if (len == sizeof(VC_RUNTIME_HASH) &&
-                                memcmp(ext_ptr,
-                                    VC_RUNTIME_HASH, len) == 0) {
-                            
-                            printf("\033[32mverified runtime hash:\033[m ");
-                            hex(VC_RUNTIME_HASH,
-                                sizeof(VC_RUNTIME_HASH));
-                            printf("\n");
-                            return 0;
-                        } else {
-                            printf("runtime hash mismatch\n");
-                            return -EBADE;
+                        // check against known runtime hashes
+                        if (len == 32) {
+                            for (int i = 0; i < sizeof(VC_RUNTIME_HASHES)/32; i++) {
+                                if (memcmp(ext_ptr, VC_RUNTIME_HASHES[i], 32) == 0) {
+                                    printf("\033[32mverified runtime hash:\033[m ");
+                                    hex(ext_ptr, len);
+                                    printf("\n");
+                                    return 0;
+                                }
+                            }
                         }
+
+                        printf("runtime hash mismatch\n");
+                        return -EBADE;
                     }
 
                     ext_ptr += len;

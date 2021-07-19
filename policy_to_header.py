@@ -25,6 +25,11 @@ def main(args):
         ca_cert_der = pem_to_der(policy['proxy_service_cert'])
         ca_cert_hash = hashlib.sha256(ca_cert_der).hexdigest()
 
+        # grab hashes
+        runtime_hashes = [v for k, v in policy.items()
+            if k.startswith('runtime_manager_hash_')
+            if v]
+
     if args.identity:
         print('loading identity %s' % args.identity)
         with open(args.identity) as f:
@@ -64,15 +69,13 @@ def main(args):
             f.writeln('#include <mbedtls/ssl_ciphersuites.h>')
             f.writeln()
             f.writeln('// general policy things')
-            f.writeln('extern const uint8_t _VC_POLICY_HASH[%(len)d];',
-                len=len(policy_hash)//2)
+            f.writeln('extern const uint8_t _VC_POLICY_HASH[32];')
             f.writeln('#define VC_POLICY_HASH _VC_POLICY_HASH')
             f.writeln()
             f.writeln('// various hashes')
-            # TODO choose between platforms?
-            f.writeln('extern const uint8_t _VC_RUNTIME_HASH[%(size)d];',
-                size=len(policy['runtime_manager_hash_sgx'])/2)
-            f.writeln('#define VC_RUNTIME_HASH _VC_RUNTIME_HASH')
+            f.writeln('extern const uint8_t _VC_RUNTIME_HASHES[%(count)d][32];',
+                count=len(runtime_hashes))
+            f.writeln('#define VC_RUNTIME_HASHES _VC_RUNTIME_HASHES')
             f.writeln()
             f.writeln('// server info')
             f.writeln('#define VC_SERVER_HOST "%(host)s"',
@@ -88,8 +91,7 @@ def main(args):
             f.writeln('extern const uint8_t _VC_CA_CERT_DER[%(len)d];',
                 len=len(ca_cert_der))
             f.writeln('#define VC_CA_CERT_DER _VC_CA_CERT_DER')
-            f.writeln('extern const uint8_t _VC_CA_CERT_HASH[%(len)d];',
-                len=len(ca_cert_hash)//2)
+            f.writeln('extern const uint8_t _VC_CA_CERT_HASH[32];')
             f.writeln('#define VC_CA_CERT_HASH _VC_CA_CERT_HASH')
             f.writeln()
             f.writeln('// ciphersuite requested by the policy, as both a constant')
@@ -104,8 +106,7 @@ def main(args):
                 f.writeln('extern const uint8_t _VC_CLIENT_CERT_DER[%(len)d];',
                     len=len(identity_der))
                 f.writeln('#define VC_CLIENT_CERT_DER _VC_CLIENT_CERT_DER')
-                f.writeln('extern const uint8_t _VC_CLIENT_CERT_HASH[%(len)d];',
-                    len=len(identity_hash)//2)
+                f.writeln('extern const uint8_t _VC_CLIENT_CERT_HASH[32];')
                 f.writeln('#define VC_CLIENT_CERT_HASH _VC_CLIENT_CERT_HASH')
             if args.key:
                 f.writeln('extern const uint8_t _VC_CLIENT_KEY_DER[%(len)d];',
@@ -138,12 +139,15 @@ def main(args):
                         for j in range(i, min(i+8, len(policy_hash)//2))))
             f.writeln('};')
             f.writeln()
-            f.writeln('const uint8_t _VC_RUNTIME_HASH[32] = {')
-            runtime_manager_hash = policy['runtime_manager_hash_sgx']
-            for i in range(0, len(runtime_manager_hash)//2, 8):
-                f.writeln('    %(hash)s',
-                    hash=' '.join('0x%02x,' % int(runtime_manager_hash[2*j:2*j+2], 16)
-                        for j in range(i, min(i+8, len(runtime_manager_hash)//2))))
+            f.writeln('const uint8_t _VC_RUNTIME_HASHES[%(count)d][32] = {',
+                count=len(runtime_hashes))
+            for runtime_hash in runtime_hashes:
+                f.writeln('    {')
+                for i in range(0, len(runtime_hash)//2, 8):
+                    f.writeln('        %(hash)s',
+                        hash=' '.join('0x%02x,' % int(runtime_hash[2*j:2*j+2], 16)
+                            for j in range(i, min(i+8, len(runtime_hash)//2))))
+                f.writeln('    },')
             f.writeln('};')
             f.writeln()
             f.writeln('const uint8_t _VC_CA_CERT_DER[%(len)d] = {',
@@ -154,9 +158,8 @@ def main(args):
                         for j in range(i, min(i+8, len(ca_cert_der)))))
             f.writeln('};')
             f.writeln()
-            f.writeln('const uint8_t _VC_CA_CERT_HASH[%(len)d] = {',
-                len=len(ca_cert_hash))
-            for i in range(0, len(ca_cert_hash), 8):
+            f.writeln('const uint8_t _VC_CA_CERT_HASH[32] = {')
+            for i in range(0, len(ca_cert_hash)//2, 8):
                 f.writeln('    %(der)s',
                     der=' '.join('0x%02x,' % int(ca_cert_hash[2*j:2*j+2], 16)
                         for j in range(i, min(i+8, len(ca_cert_hash)//2))))
@@ -177,9 +180,8 @@ def main(args):
                             for j in range(i, min(i+8, len(identity_der)))))
                 f.writeln('};')
                 f.writeln()
-                f.writeln('const uint8_t _VC_CLIENT_CERT_HASH[%(len)d] = {',
-                    len=len(identity_hash))
-                for i in range(0, len(identity_hash), 8):
+                f.writeln('const uint8_t _VC_CLIENT_CERT_HASH[32] = {')
+                for i in range(0, len(identity_hash)//2, 8):
                     f.writeln('    %(der)s',
                         der=' '.join('0x%02x,' % int(identity_hash[2*j:2*j+2], 16)
                             for j in range(i, min(i+8, len(identity_hash)//2))))
