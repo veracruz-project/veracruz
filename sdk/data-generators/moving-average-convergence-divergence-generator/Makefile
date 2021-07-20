@@ -13,7 +13,8 @@
 
 
 SOURCE_FILES = apple_prices.csv
-RANGE = $(shell seq 40 20 1000)
+# The range of data
+RANGE ?= $(shell seq 1000 20 1000)
 INDICE_SUFFIX = $(addprefix -,$(addsuffix .dat,$(RANGE)))
 TARGET_DATS = $(foreach base_name,$(basename $(SOURCE_FILES)),$(addprefix $(base_name),$(INDICE_SUFFIX)) ) 
 TARGET_DIR = ../../datasets/macd/
