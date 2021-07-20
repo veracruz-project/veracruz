@@ -90,6 +90,10 @@ const INCOMING_ADDRESS: &'static str = "0.0.0.0";
 const INCOMING_PORT: &'static str = "5021";
 /// Socket backlog for incoming connections.
 const SOCKET_BACKLOG: i32 = 127;
+/// The "about" string for the command-line interface.
+const LINUX_ROOT_ENCLAVE_ABOUT: &'static str = "Root Enclave for Veracruz as a Linux process.";
+/// Author information for the command-line interface.
+const LINUX_ROOT_ENCLAVE_AUTHORS: &'static str = "The Veracruz Development Team.";
 /// Path to the Runtime Manager binary.
 const RUNTIME_MANAGER_ENCLAVE_PATH: &'static str =
     "../runtime-manager/target/x86_64-unknown-linux-gnu/release/runtime_manager_enclave";
