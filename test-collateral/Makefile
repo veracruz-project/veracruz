@@ -103,8 +103,11 @@ DATA_FILES = linear-regression.dat \
 			 number-stream-1.dat \
 			 number-stream-2.dat
 
+DATA_DIRS = idash2017 \
+			macd \
+			private-set-inter-sum
 
-all: pgen policy-files $(WASM_PROG_FILES) $(DATA_FILES)
+all: pgen policy-files $(WASM_PROG_FILES) $(DATA_FILES) $(DATA_DIRS)
 
 pgen: generate-policy/src/main.rs generate-policy/Cargo.toml generate-policy/Makefile 
 	$(MAKE) -C generate-policy
@@ -310,6 +313,9 @@ $(WASM_PROG_FILES) : %.wasm: ../sdk/rust-examples/%/target/wasm32-wasi/release/$
 
 $(DATA_FILES) : %.dat: ../sdk/datasets/%.dat 
 	cp $< $@
+
+$(DATA_DIRS) : %: ../sdk/datasets/% 
+	cp -r $< $@
 
 doc:
 	$(MAKE) -C generate-policy doc
