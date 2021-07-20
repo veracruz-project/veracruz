@@ -33,6 +33,7 @@
 
 use base64::{decode as base64decode, encode as base64encode};
 use bincode::{deserialize, serialize, Error as BincodeError};
+use clap::{App, Arg};
 use curl::{
     easy::{Easy, List},
     Error as CurlError,
@@ -57,7 +58,7 @@ use std::{
     fs::File,
     io::{Error as IOError, Read},
     path::Path,
-    process::{Child, Command},
+    process::{exit, Child, Command},
     str::from_utf8,
     sync::{
         atomic::{AtomicI32, AtomicU32, Ordering},
@@ -690,6 +691,8 @@ fn native_attestation(
 
     info!("Device ID {} saved.", device_id);
 
+    /* 3. Compute the attestation token. */
+
     let csr_hash = digest(&SHA256, &csr).as_ref().to_vec();
 
     info!("CSR hash computed: {:?}.", csr_hash);
@@ -729,12 +732,22 @@ fn native_attestation(
 
     info!("Native PSA attestation token successfully produced.");
 
+    /* 4. Send the attestation token to the Proxy Attestation Service, receiving the certificates
+     *    in response.
+     */
+
     info!("Sending native attesation token to Proxy Attestation Service.");
 
-    let (root_enclave_certificate, ca_certificate) =
-        post_native_attestation_token(proxy_attestation_server_base_url, &token_buffer, device_id)?;
+    let (root_enclave_certificate, ca_certificate) = post_native_attestation_token(
+        proxy_attestation_server_base_url,
+        &token_buffer,
+        &csr,
+        device_id,
+    )?;
 
     info!("Root Enclave Certificate and CA Certificate received from Proxy Attestation Service.");
+
+    /* 5. Install the certificate chain for use later. */
 
     let _result = install_certificate_chain(root_enclave_certificate, ca_certificate)?;
 
@@ -863,7 +876,7 @@ fn generate_private_key() -> Result<(), LinuxRootEnclaveError> {
 /// Entry point for the root enclave.  This sets up a TCP listener and processes
 /// messages, deserializing them using Bincode.  Can fail for a variety of
 /// reasons, all of which are captured in the `LinuxRootEnclaveError` type.
-fn entry_point() -> Result<(), LinuxRootEnclaveError> {
+fn entry_point(proxy_attestation_server_base_url: &str) -> Result<(), LinuxRootEnclaveError> {
     info!("Linux root enclave initializing.");
 
     generate_private_key()?;
@@ -1020,10 +1033,32 @@ fn entry_point() -> Result<(), LinuxRootEnclaveError> {
 fn main() {
     env_logger::init();
 
-    let _ignore = entry_point().map_err(|e| {
-        eprintln!(
-            "Linux root enclave runtime failure.  Error produced: {:?}.",
-            e
+    let matches = App::new("linux-root-enclave")
+        .about(LINUX_ROOT_ENCLAVE_ABOUT)
+        .author(LINUX_ROOT_ENCLAVE_AUTHORS)
+        .arg(
+            Arg::new("proxy-attestation-server")
+                .required(true)
+                .takes_value(true)
+                .about("URL for the Proxy Attestation Service."),
         )
-    });
+        .get_matches();
+
+    if let Some(proxy_attestation_server_base_url) = matches.value_of("proxy-attestation-server") {
+        info!(
+            "Starting Linux Root Enclave with Proxy Attestation Service URL: {}.",
+            proxy_attestation_server_base_url
+        );
+
+        let _ignore = entry_point(proxy_attestation_server_base_url).map_err(|e| {
+            eprintln!(
+                "Linux root enclave runtime failure.  Error produced: {:?}.",
+                e
+            )
+        });
+    } else {
+        eprintln!("No Proxy Attestation Service URL supplied.");
+
+        exit(1)
+    }
 }
