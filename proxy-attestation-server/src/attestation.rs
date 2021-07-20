@@ -198,15 +198,22 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
             err
         })?;
 
-    // construct and set the issuer name of the certificate
+    // construct and set the issuer name as the subject name of the CA cert
     let issuer_name = {
+        let ca_der = get_ca_certificate()
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::convert_csr_to_certificate get_ca_certificate failed:{:?}", err);
+                err
+            })?;
+        let ca_cert = openssl::x509::X509::from_der(&ca_der)?;
+
         let mut issuer_name_builder = openssl::x509::X509NameBuilder::new()?;
-        issuer_name_builder.append_entry_by_text("C", "US")?;
-        issuer_name_builder.append_entry_by_text("ST", "Texas")?;
-        issuer_name_builder.append_entry_by_text("L", "Austin")?;
-        issuer_name_builder.append_entry_by_text("O", "Veracruz")?;
-        issuer_name_builder.append_entry_by_text("OU", "Proxy")?;
-        issuer_name_builder.append_entry_by_text("CN", "VeracruzProxyServer")?;
+        for entry in ca_cert.subject_name().entries() {
+            issuer_name_builder.append_entry_by_nid(
+                entry.object().nid(),
+                &entry.data().as_utf8()?
+            )?;
+        }
         issuer_name_builder.build()
     };
     cert_builder.set_issuer_name(&issuer_name)

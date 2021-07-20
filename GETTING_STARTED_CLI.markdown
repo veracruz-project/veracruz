@@ -126,20 +126,18 @@ $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -config test-collateral/cert.conf
 ```
 
-<!-- TODO generate CA cert?
-
 And since the Proxy Attestation Server acts as a certificate authority,
 we also need to provide it with its own identity:
 
 ``` bash
-$ openssl genrsa -out example/example-ca-key.pem 2048
-$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+$ openssl ecparam -name prime256v1 -genkey -noout \
+    -out example/example-ca-key.pem
+$ openssl req -new -x509 -sha256 -nodes -days 1825 \
+    -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
     -key example/example-ca-key.pem \
     -out example/example-ca-cert.pem \
-    -config test-collateral/cert.conf
+    -config test-collateral/ca-cert.conf
 ```
-
--->
 
 ## Creating a policy file
 
@@ -155,7 +153,7 @@ use localhost for now), and a hash of the WebAssembly file we plan to execute.
 ``` bash
 $ vc-pgen \
     --proxy-attestation-server-ip 127.0.0.1:3010 \
-    --proxy-attestation-server-cert test-collateral/CACert.pem \
+    --proxy-attestation-server-cert example/example-ca-cert.pem \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
     --css-file runtime-manager/css-sgx.bin \
@@ -208,8 +206,8 @@ character `&` to launch the Proxy Attestation Server in the background:
 ``` bash
 $ vc-pas example/example-policy.json \
     --database-url=example/example-pas.db \
-    --ca-cert=test-collateral/CACert.pem \
-    --ca-key=test-collateral/CAKey.pem &
+    --ca-cert=example/example-ca-cert.pem \
+    --ca-key=example/example-ca-key.pem &
 Proxy Attestation Server running on 127.0.0.1:3010
 $ sleep 10
 ```
