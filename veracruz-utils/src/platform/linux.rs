@@ -55,12 +55,6 @@ pub enum LinuxRootEnclaveMessage {
     /// - A certificate signing request (CSR),
     /// - A challenge ID.
     GetProxyAttestation(Vec<u8>, i32),
-    /// A request to set the Linux root enclave's certificate chain, installing
-    /// a root enclave and a root certificate to be used as part of the
-    /// attestation process.  Fields in order are:
-    /// - The root enclave certificate,
-    /// - The root certificate.
-    SetCertificateChain(Vec<u8>, Vec<u8>),
     /// A request to shutdown the root enclave and any enclaves that it has
     /// launched.
     Shutdown,
@@ -78,8 +72,9 @@ pub enum LinuxRootEnclaveResponse {
     /// The firmware version of the software executing inside the runtime
     /// enclave.  For Linux, this is mocked up.
     FirmwareVersion(String),
-    /// The token produced by the native attestation process.
-    NativeAttestationToken(Vec<u8>),
+    /// The token produced by the native attestation process is now registered
+    /// with the Proxy Attestation Service.
+    NativeAttestationTokenRegistered,
     /// Returns a certificate chain in response to a proxy attestation request.
     /// Fields are, in order:
     /// - An encoding of the compute enclave certificate,

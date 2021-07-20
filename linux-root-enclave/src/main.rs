@@ -68,7 +68,8 @@ use std::{
 };
 use stringreader::StringReader;
 use transport_protocol::{
-    parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
+    parse_proxy_attestation_server_response, parse_psa_attestation_init,
+    serialize_native_psa_attestation_token, serialize_start_msg,
 };
 use veracruz_utils::{
     csr::{convert_csr_to_cert, COMPUTE_ENCLAVE_CERT_TEMPLATE},
@@ -448,6 +449,74 @@ fn send_proxy_attestation_server_start(
     }
 }
 
+fn post_native_attestation_token(
+    proxy_attestation_server_base_url: &str,
+    token_buffer: &[u8],
+    csr: &[u8],
+    device_id: i32,
+) -> Result<(Vec<u8>, Vec<u8>), LinuxRootEnclaveError> {
+    info!(
+        "Sending native attestation token ({} bytes) to Proxy Attestation Service.",
+        token_buffer.len()
+    );
+
+    let serialized_attestation_token =
+        serialize_native_psa_attestation_token(token_buffer, csr, device_id).map_err(|e| {
+            error!(
+                "Failed to serialize native PSA Attestation Token message.  Error produced: {:?}.",
+                e
+            );
+
+            LinuxRootEnclaveError::TransportProtocolError
+        })?;
+
+    let encoded_serialize_attestion_token = base64encode(&serialized_attestation_token);
+
+    let url = format!(
+        "{}/{}/AttestationToken",
+        proxy_attestation_server_base_url, PROXY_ATTESTATION_PROTOCOL
+    );
+
+    let received_buffer = post_buffer(&url, &encoded_serialize_attestion_token).map_err(|e| {
+        error!(
+            "Failed to transmit native PSA attestation token.  Error produced: {:?}.",
+            e
+        );
+
+        e
+    })?;
+
+    let received_body = base64decode(&received_buffer).map_err(|e| {
+        error!("Failed to Base 64 deserialize response from Proxy Attestation Service.  Error produced: {:?}.", e);
+
+        LinuxRootEnclaveError::Base64Error
+    })?;
+
+    let response = parse_proxy_attestation_server_response(&received_body).map_err(|e| {
+        error!(
+            "Failed to deserialize response from Proxy Attestation Service.  Error produced: {:?}.",
+            e
+        );
+
+        LinuxRootEnclaveError::TransportProtocolError
+    })?;
+
+    if response.has_cert_chain() {
+        let certificate_chain = response.get_cert_chain();
+
+        info!("Certificate chain received from Proxy Attestation Service.");
+
+        Ok((
+            certificate_chain.get_enclave_cert().to_vec(),
+            certificate_chain.get_root_cert().to_vec(),
+        ))
+    } else {
+        error!("Unexpected response from Proxy Attestation Service.");
+
+        Err(LinuxRootEnclaveError::AttestationError)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Responses to message stimuli.
 ////////////////////////////////////////////////////////////////////////////////
@@ -587,9 +656,13 @@ fn install_certificate_chain(
     Ok(())
 }
 
-/// Computes a native PSA attestation token from a challenge value, `challenge`,
-/// and the device ID.
-fn get_native_attestation_token(csr: Vec<u8>) -> Result<Vec<u8>, LinuxRootEnclaveError> {
+/// Computes a native PSA attestation token from a Certificate Signing Request and
+/// registers this with the Proxy Attestation Service.  Registers the resulting
+/// certificates returned from the Proxy Attestation Service.
+fn native_attestation(
+    proxy_attestation_server_base_url: &str,
+    csr: Vec<u8>,
+) -> Result<(), LinuxRootEnclaveError> {
     /* 1. Get the firmware version. */
 
     let firmware_version = get_firmware_version()?;
@@ -598,7 +671,10 @@ fn get_native_attestation_token(csr: Vec<u8>) -> Result<Vec<u8>, LinuxRootEnclav
      *    challenge.
      */
 
-    let (device_id, challenge) = send_proxy_attestation_server_start(&firmware_version)?;
+    info!("Initializing Proxy Attestation Service.");
+
+    let (device_id, challenge) =
+        send_proxy_attestation_server_start(proxy_attestation_server_base_url, &firmware_version)?;
 
     /* 2. Save the Device ID. */
 
@@ -653,7 +729,18 @@ fn get_native_attestation_token(csr: Vec<u8>) -> Result<Vec<u8>, LinuxRootEnclav
 
     info!("Native PSA attestation token successfully produced.");
 
-    Ok(token_buffer)
+    info!("Sending native attesation token to Proxy Attestation Service.");
+
+    let (root_enclave_certificate, ca_certificate) =
+        post_native_attestation_token(proxy_attestation_server_base_url, &token_buffer, device_id)?;
+
+    info!("Root Enclave Certificate and CA Certificate received from Proxy Attestation Service.");
+
+    let _result = install_certificate_chain(root_enclave_certificate, ca_certificate)?;
+
+    info!("Certificates successfully installed.");
+
+    Ok(())
 }
 
 /// Computes a proxy attestation certificate chain from a Certificate Signing
@@ -879,9 +966,9 @@ fn entry_point() -> Result<(), LinuxRootEnclaveError> {
             LinuxRootEnclaveMessage::GetNativeAttestation(csr) => {
                 info!("Computing a native attestation token.");
 
-                Ok(LinuxRootEnclaveResponse::NativeAttestationToken(
-                    get_native_attestation_token(csr)?,
-                ))
+                let _result = native_attestation(proxy_attestation_server_base_url, csr)?;
+
+                Ok(LinuxRootEnclaveResponse::NativeAttestationTokenRegistered)
             }
             LinuxRootEnclaveMessage::GetProxyAttestation(csr, challenge_id) => {
                 info!("Computing a proxy attestation certificate chain.");
@@ -894,16 +981,6 @@ fn entry_point() -> Result<(), LinuxRootEnclaveError> {
                     root_enclave_certificate,
                     root_certificate,
                 ))
-            }
-            LinuxRootEnclaveMessage::SetCertificateChain(
-                root_enclave_certificate,
-                root_certificate,
-            ) => {
-                info!("Installing certificate chain.");
-
-                install_certificate_chain(root_enclave_certificate, root_certificate)?;
-
-                Ok(LinuxRootEnclaveResponse::CertificateChainInstalled)
             }
             LinuxRootEnclaveMessage::StartProxyAttestation => {
                 info!("Generating challenge value and fresh challenge ID.");
