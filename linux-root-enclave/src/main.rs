@@ -31,7 +31,12 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
+use base64::{decode as base64decode, encode as base64encode};
 use bincode::{deserialize, serialize, Error as BincodeError};
+use curl::{
+    easy::{Easy, List},
+    Error as CurlError,
+};
 use env_logger;
 use err_derive::Error;
 use hex::encode;
@@ -53,12 +58,17 @@ use std::{
     io::{Error as IOError, Read},
     path::Path,
     process::{Child, Command},
+    str::from_utf8,
     sync::{
         atomic::{AtomicI32, AtomicU32, Ordering},
         Mutex,
     },
     thread::sleep,
     time::Duration,
+};
+use stringreader::StringReader;
+use transport_protocol::{
+    parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
 };
 use veracruz_utils::{
     csr::{convert_csr_to_cert, COMPUTE_ENCLAVE_CERT_TEMPLATE},
@@ -81,6 +91,8 @@ const SOCKET_BACKLOG: i32 = 127;
 /// Path to the Runtime Manager binary.
 const RUNTIME_MANAGER_ENCLAVE_PATH: &'static str =
     "../runtime-manager/target/x86_64-unknown-linux-gnu/release/runtime_manager_enclave";
+/// The attestation protocol to use when communicating with the Proxy Attestation Server.
+const PROXY_ATTESTATION_PROTOCOL: &'static str = "PSA";
 /// Seconds to wait after spawning an enclave before proceeding.
 const ENCLAVE_SPAWN_DELAY: u64 = 2;
 
@@ -129,14 +141,24 @@ enum LinuxRootEnclaveError {
     #[error(display = "PSA attestation process failed.")]
     /// Some aspect of the attestation process failed to complete correctly.
     AttestationError,
+    #[error(display = "Base 64 decoding error.")]
+    /// There was an error deserializing a message from Base 64 encoding.
+    Base64Error,
     #[error(display = "Cryptography key generation process failed.")]
     /// Some aspect of the key generation process failed to complete correctly.
     CryptographyError,
+    /// Interaction with the Proxy Attestation Server via Curl failed with
+    /// an error.
+    #[error(
+        display = "Failed to interact with Proxy Attestation Server via Curl.  Error produced: {:?}.",
+        _0
+    )]
+    CurlError(CurlError),
+    /// Bincode failed to serialize or deserialize a message or response.
     #[error(
         display = "Failed to serialize or deserialize a message or response.  Error produced: {}.",
         _0
     )]
-    /// Bincode failed to serialize or deserialize a message or response.
     BincodeError(BincodeError),
     #[error(
         display = "General IO error when reading or writing files.  Error produced: {}.",
@@ -145,6 +167,9 @@ enum LinuxRootEnclaveError {
     /// There was an error related to the reading or writing of files needed by
     /// the root enclave.
     GeneralIOError(IOError),
+    #[error(display = "HTTP non-success error code received.")]
+    /// A HTTP session ended in a non-successful state.
+    HttpSuccess,
     #[error(display = "An internal invariant failed.")]
     /// An internal invariant failed, i.e. something that was not initialized that
     /// should have been.
@@ -152,12 +177,13 @@ enum LinuxRootEnclaveError {
     #[error(display = "A lock on a global object could not be obtained.")]
     /// A lock on a global object could not be obtained.
     LockingError,
-    #[error(display = "Failed to set socket options.  Error produced: {}.", _0)]
-    /// We were unable to set suitable options on the TCP socket.
-    SetSocketOptionsError(NixError),
     #[error(display = "Socket IO error.  Error produced: {}.", _0)]
     /// There was an error either opening, or working with, sockets.
     SocketError(IOError),
+    #[error(display = "Transport Protocol (de)serialization error.")]
+    /// There was an error in serializing or deserializing a transport protocol
+    /// message.
+    TransportProtocolError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -219,6 +245,207 @@ fn get_root_enclave_hash() -> Result<Vec<u8>, LinuxRootEnclaveError> {
 #[inline]
 fn get_runtime_manager_hash() -> Result<Vec<u8>, LinuxRootEnclaveError> {
     measure_binary(RUNTIME_MANAGER_ENCLAVE_PATH)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Proxy Attestation Service interaction.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
+/// Curl session fails for any reason, or if a non-success HTTP code is
+/// returned.
+fn post_buffer(url: &str, buffer: &str) -> Result<String, LinuxRootEnclaveError> {
+    info!("Posting buffer of length {} to {}.", buffer.len(), url);
+
+    let mut curl_request = Easy::new();
+
+    curl_request.url(&url).map_err(|err| {
+        error!("Failed to set URL with Curl.  Error produced: {:?}.", err);
+
+        LinuxRootEnclaveError::CurlError(err)
+    })?;
+
+    let mut headers = List::new();
+    headers
+        .append("Content-Type: application/octet-stream")
+        .map_err(|err| {
+            error!(
+                "Failed to append `Content-Type` header.  Error produced: {:?}.",
+                err
+            );
+
+            LinuxRootEnclaveError::CurlError(err)
+        })?;
+
+    curl_request.http_headers(headers).map_err(|err| {
+        error!(
+            "Failed to set HTTP headers with Curl.  Error produced: {:?}.",
+            err
+        );
+
+        LinuxRootEnclaveError::CurlError(err)
+    })?;
+    curl_request.post(true).map_err(|err| {
+        error!(
+            "Failed to set post field to `true` with Curl.  Error produced: {:?}.",
+            err
+        );
+
+        LinuxRootEnclaveError::CurlError(err)
+    })?;
+    curl_request
+        .post_field_size(buffer.len() as u64)
+        .map_err(|err| {
+            error!(
+                "Failed to set post field size with Curl.  Error produced: {:?}.",
+                err
+            );
+
+            LinuxRootEnclaveError::CurlError(err)
+        })?;
+
+    let mut transfer = curl_request.transfer();
+    let mut buffer_reader = StringReader::new(buffer);
+
+    transfer
+        .read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))
+        .map_err(|err| {
+            error!(
+                "Failed to register read function with Curl.  Error produced: {:?}.",
+                err
+            );
+
+            LinuxRootEnclaveError::CurlError(err)
+        })?;
+
+    let mut received_body = String::new();
+
+    transfer
+        .write_function(|buf| {
+            received_body.push_str(from_utf8(buf).expect({
+                error!("Error converting data {:?} from UTF-8.", buf);
+
+                &format!("Error converting data {:?} from UTF-8.", buf)
+            }));
+
+            Ok(buf.len())
+        })
+        .map_err(|err| {
+            error!(
+                "Failed to register write function with Curl.  Error produced: {:?}.",
+                err
+            );
+
+            LinuxRootEnclaveError::CurlError(err)
+        })?;
+
+    info!("Received response body: {}.", received_body);
+
+    let mut received_header = String::new();
+
+    transfer
+        .header_function(|buf| {
+            received_header.push_str(from_utf8(buf).expect({
+                error!("Error converting data {:?} from UTF-8.", buf);
+
+                &format!("Error converting data {:?} from UTF-8", buf)
+            }));
+
+            true
+        })
+        .map_err(|err| {
+            error!(
+                "Failed to register header function with Curl.  Error produced: {:?}.",
+                err
+            );
+
+            LinuxRootEnclaveError::CurlError(err)
+        })?;
+
+    transfer.perform().map_err(|err| {
+        error!(
+            "Failed to perform data transfer with Curl.  Error produced: {:?}.",
+            err
+        );
+
+        LinuxRootEnclaveError::CurlError(err)
+    })?;
+
+    info!("Received response header: {}.", received_header);
+
+    if !received_header.contains("HTTP/1.1 200 OK\r") {
+        return Err(LinuxRootEnclaveError::HttpSuccess);
+    }
+
+    info!("Buffer successfully posted.");
+
+    Ok(received_body)
+}
+
+/// Sends the "Start" message to the Proxy Attestation Server via HTTP.
+/// Returns a device ID and a generated challenge from the Proxy Attestation
+/// Service, which is generated in response to the "Start" message, if the
+/// message is successfully sent.
+fn send_proxy_attestation_server_start(
+    proxy_attestation_server_url_base: &str,
+    firmware_version: &str,
+) -> Result<(i32, Vec<u8>), LinuxRootEnclaveError> {
+    info!("Sending Start message to Proxy Attestation Service.");
+
+    let start_msg =
+        serialize_start_msg(PROXY_ATTESTATION_PROTOCOL, firmware_version).map_err(|e| {
+            error!(
+                "Failed to serialize Start message.  Error produced: {:?}.",
+                e
+            );
+
+            LinuxRootEnclaveError::AttestationError
+        })?;
+
+    let encoded_start_msg = base64encode(&start_msg);
+
+    let url = format!("{}/Start", proxy_attestation_server_url_base);
+
+    let response = post_buffer(&url, &encoded_start_msg)?;
+
+    info!("Response received from Proxy Attestation Service.");
+
+    let response_body = base64decode(&response).map_err({
+        error!(
+            "Failed to deserialize response from Proxy Attestation Service.  Error produced: {:?}.",
+            e
+        );
+
+        LinuxRootEnclaveError::Base64Error
+    })?;
+
+    let response = parse_proxy_attestation_server_response(&response_body).map_err(|e| {
+        error!("Failed to parse response to Start message from Proxy Attestation Service.  Error produced: {:?}.", e);
+
+        LinuxRootEnclaveError::TransportProtocolError
+    })?;
+
+    info!("Response successfully parsed.");
+
+    if response.has_psa_attestation_init() {
+        let (challenge, device_id) =
+            parse_psa_attestation_init(response.get_psa_attestation_init()).map_err(|e| {
+                error!(
+                "Failed to parse PSA attestation initialization message.  Error produced: {:?}.",
+                e
+            );
+
+                LinuxRootEnclaveError::AttestationError
+            })?;
+
+        info!("Device ID and challenge successfully obtained from Proxy Attestation Service.");
+
+        Ok((device_id, challenge))
+    } else {
+        error!("Unexpected response from Proxy Attestation Service.  Expecting PSA attestation initialization message.");
+
+        Err(LinuxRootEnclaveError::AttestationError)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -362,12 +589,18 @@ fn install_certificate_chain(
 
 /// Computes a native PSA attestation token from a challenge value, `challenge`,
 /// and the device ID.
-fn get_native_attestation_token(
-    device_id: i32,
-    challenge: Vec<u8>,
-    csr: Vec<u8>,
-) -> Result<Vec<u8>, LinuxRootEnclaveError> {
-    /* 1. Save the Device ID. */
+fn get_native_attestation_token(csr: Vec<u8>) -> Result<Vec<u8>, LinuxRootEnclaveError> {
+    /* 1. Get the firmware version. */
+
+    let firmware_version = get_firmware_version()?;
+
+    /* 2. Send the Start message to the Proxy Attestation Service to obtain a device ID and
+     *    challenge.
+     */
+
+    let (device_id, challenge) = send_proxy_attestation_server_start(&firmware_version)?;
+
+    /* 2. Save the Device ID. */
 
     let mut device_id_lock = DEVICE_ID.lock().map_err(|e| {
         error!(
@@ -643,11 +876,11 @@ fn entry_point() -> Result<(), LinuxRootEnclaveError> {
 
                 Ok(LinuxRootEnclaveResponse::ShuttingDown)
             }
-            LinuxRootEnclaveMessage::GetNativeAttestation(device_id, challenge, csr) => {
+            LinuxRootEnclaveMessage::GetNativeAttestation(csr) => {
                 info!("Computing a native attestation token.");
 
                 Ok(LinuxRootEnclaveResponse::NativeAttestationToken(
-                    get_native_attestation_token(device_id, challenge, csr)?,
+                    get_native_attestation_token(csr)?,
                 ))
             }
             LinuxRootEnclaveMessage::GetProxyAttestation(csr, challenge_id) => {

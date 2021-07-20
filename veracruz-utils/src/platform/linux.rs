@@ -44,11 +44,9 @@ pub enum LinuxRootEnclaveMessage {
     /// A request to perform a native attestation of the runtime enclave.
     /// Note that we use PSA attestation for this step, but the attestation is
     /// "fake", offering no real value other than for demonstrative purposes.
-    /// The fields of the message are (in order):
-    /// - A device ID,
-    /// - A challenge value,
+    /// The fields of the message are:
     /// - A certificate signing request (CSR).
-    GetNativeAttestation(i32, Vec<u8>, Vec<u8>),
+    GetNativeAttestation(Vec<u8>),
     /// A request to perform a proxy attestation of the runtime enclave.
     /// Note that we use PSA attestation, again, for this step, but the
     /// attestation is "fake", offering no real value other than for
