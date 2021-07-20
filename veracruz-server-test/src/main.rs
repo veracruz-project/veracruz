@@ -67,6 +67,8 @@ mod tests {
         "../test-collateral/number-stream-accumulation.json";
     const BASIC_FILE_READ_WRITE_POLICY: &'static str =
         "../test-collateral/basic_file_read_write.json";
+    const CA_CERT: &'static str = "../test-collateral/CACert.pem";
+    const CA_KEY: &'static str = "../test-collateral/CAKey.pem";
     const CLIENT_CERT: &'static str = "../test-collateral/client_rsa_cert.pem";
     const CLIENT_KEY: &'static str = "../test-collateral/client_rsa_key.pem";
     const UNAUTHORIZED_CERT: &'static str = "../test-collateral/data_client_cert.pem";
@@ -137,12 +139,20 @@ mod tests {
                 };
                 #[cfg(feature = "debug")]
                 let server =
-                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", true)
-                        .unwrap();
+                    proxy_attestation_server::server::server(
+                        ip_addr,
+                        CA_CERT,
+                        CA_KEY,
+                        true
+                    ).unwrap();
                 #[cfg(not(feature = "debug"))]
                 let server =
-                    proxy_attestation_server::server::server(ip_addr, "../test-collateral/CACert.pem", false)
-                        .unwrap();
+                    proxy_attestation_server::server::server(
+                        ip_addr,
+                        CA_CERT,
+                        CA_KEY,
+                        false
+                    ).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -1471,7 +1481,7 @@ mod tests {
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
-            let data = std::fs::read("../test-collateral/CACert.pem").unwrap();
+            let data = std::fs::read(CA_CERT).unwrap();
             let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
             certs[0].clone()
         };

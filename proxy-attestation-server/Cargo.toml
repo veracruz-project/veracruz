@@ -7,8 +7,9 @@ build = "build.rs"
 description = "The Veracruz attestation web-service.  Maintains a database of enrolled isolates.  Can be used to authenticate or reject attestation tokens purporting to originate from these isolates."
 
 [[bin]]
-name = "proxy-attestation-server-bin"
-path = "src/main.rs"
+name = "proxy-attestation-server"
+path = "src/cli.rs"
+required-features = ["cli"]
 
 [lib]
 crate-type =["lib"]
@@ -19,6 +20,9 @@ path = "src/lib.rs"
 [features]
 # a feature to enable SGX native attestation. Only available on x64 platforms
 sgx = ["sgx_types", "sgx_ucrypto", "sgx_urts", "psa-attestation/sgx", "transport-protocol/sgx_attestation"]
+# a feature to enable CLI-only dependencies
+# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
+cli = ["structopt"]
 
 # a feature to enable PSA native attestation.
 # Note: Final attestation is always PSA. This is just to enable platforms
@@ -51,6 +55,7 @@ async-std = "1.5"
 # Force the version on async-io. This solves a dependency issue on socket2.
 async-io = "=1.3.1"
 env_logger = "0.7"
+log = "=0.4.13"
 err-derive = "0.2"
 serde_cbor = {version = "0.11", optional = true }
 nitro-enclave-token = { git = "https://github.com/veracruz-project/nitro-enclave-token.git", branch = "main", optional = true }
@@ -58,6 +63,7 @@ nb-connect = "=1.0.3"
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 
 [dev-dependencies]
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }

@@ -9,8 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::process::Command;
-
 fn main() {
-        println!("cargo:rustc-link-search=/usr/lib/aarch64-linux-gnu");
+    println!("cargo:rustc-link-search=/usr/lib/aarch64-linux-gnu");
 }

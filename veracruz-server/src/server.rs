@@ -136,9 +136,18 @@ pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
     let server_clone = server.clone();
     thread::spawn(move || {
         // wait for shutdown signal
-        shutdown_channel_rx.recv().unwrap();
-        // stop server gracefully
-        executor::block_on(server_clone.stop(true))
+        match shutdown_channel_rx.recv() {
+            // stop server gracefully
+            Ok(_) => {
+                executor::block_on(server_clone.stop(true));
+            }
+            // this CAN fail, in the case that the main thread has died,
+            // most likely from a user's ctrl-C, in either case we want to
+            // shutdown the server
+            Err(_) => {
+                return;
+            }
+        }
     });
     Ok(server)
 }
