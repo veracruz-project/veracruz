@@ -9,6 +9,7 @@ description = "An untrusted server/bridge that allows the outside world and the 
 sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "sgx-root-enclave-bind", "tempfile"]
 tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid"]
 nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2" ]
+linux = ["veracruz-utils/linux", "bincode"]
 debug = []
 
 [dependencies]
@@ -17,6 +18,7 @@ veracruz-utils = { path = "../veracruz-utils" }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 transport-protocol = { path = "../transport-protocol"}
 rouille = "3.0"
+env_logger = "0.8.3"
 base64 = "0.10.1"
 untrusted = "0.6.2"
 ring = "0.16"

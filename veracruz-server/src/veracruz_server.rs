@@ -1,6 +1,6 @@
 //! Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -19,6 +19,8 @@ use log::debug;
 use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
+#[cfg(feature = "linux")]
+use veracruz_utils::platform::linux::LinuxRootEnclaveResponse;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -75,18 +77,21 @@ pub enum VeracruzServerError {
     #[cfg(feature = "sgx")]
     #[error(display = "VeracruzServer: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
-    RuntimeManagerMessageStatus(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
-    #[cfg(feature = "nitro")]
-    #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
-    NitroStatus(veracruz_utils::platform::nitro::nitro::NitroStatus),
-    #[cfg(feature = "nitro")]
-    #[error(display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}", _0)]
-    InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
+    RuntimeManagerMessageStatus(veracruz_utils::platform::vm::RuntimeManagerMessage),
+    #[cfg(any(feature = "nitro", feature = "linux"))]
+    #[error(display = "VeracruzServer: VMStatus: {:?}", _0)]
+    VMStatus(veracruz_utils::platform::vm::VMStatus),
+    #[cfg(any(feature = "linux", feature = "nitro"))]
+    #[error(
+        display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}",
+        _0
+    )]
+    InvalidRuntimeManagerMessage(veracruz_utils::platform::vm::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
         display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
@@ -94,6 +99,8 @@ pub enum VeracruzServerError {
     )]
     InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
+    InvalidNitroRootEnclaveMessage(veracruz_utils::NitroRootEnclaveMessage),
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
     #[cfg(feature = "nitro")]
@@ -167,6 +174,12 @@ pub enum VeracruzServerError {
     DirectMessageError(String, StatusCode),
     #[error(display = "VeracruzServer: Error message {}.", _0)]
     DirectStrError(&'static str),
+    #[cfg(feature = "linux")]
+    #[error(
+        display = "VeracruzServer: Unexpected reply from Linux Root enclave {:?}.",
+        _0
+    )]
+    LinuxRootEnclaveUnexpectedResponse(LinuxRootEnclaveResponse),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
     #[error(display = "VeracruzServer: Invalid runtime manager hash")]
@@ -218,9 +231,9 @@ pub trait VeracruzServer {
     where
         Self: Sized;
 
-    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
+    fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
 
-    fn new_tls_session(&self) -> Result<u32, VeracruzServerError>;
+    fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError>;
 
     fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError>;
 
@@ -298,7 +311,10 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerE
         return Err(VeracruzServerError::ReceivedNonSuccessPostStatusError);
     }
 
-    debug!("veracruz_server::post_buffer header_lines:{:?}", header_lines);
+    debug!(
+        "veracruz_server::post_buffer header_lines:{:?}",
+        header_lines
+    );
 
     return Ok(received_body);
 }

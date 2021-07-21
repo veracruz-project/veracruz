@@ -74,6 +74,8 @@ pub struct Policy {
     /// The ciphersuite that will be used with the TLS connections between the
     /// principals of the computation and the enclave.
     ciphersuite: String,
+    /// The hash of the Veracruz trusted runtime for Linux applications.
+    runtime_manager_hash_linux: Option<String>,
     /// The hash of the Veracruz trusted runtime for SGX enclaves.
     runtime_manager_hash_sgx: Option<String>,
     /// The hash of the Veracruz trusted runtime for TrustZone TAs.
@@ -105,6 +107,7 @@ impl Policy {
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
+        runtime_manager_hash_linux: Option<String>,
         runtime_manager_hash_sgx: Option<String>,
         runtime_manager_hash_tz: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
@@ -121,6 +124,7 @@ impl Policy {
             veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
+            runtime_manager_hash_linux,
             runtime_manager_hash_sgx,
             runtime_manager_hash_tz,
             runtime_manager_hash_nitro,
@@ -179,6 +183,14 @@ impl Policy {
     #[inline]
     pub fn runtime_manager_hash(&self, platform: &Platform) -> Result<&String, PolicyError> {
         let hash = match platform {
+            Platform::Linux => match &self.runtime_manager_hash_linux {
+                Some(hash) => hash,
+                None => {
+                    return Err(PolicyError::MissingPolicyFieldError(
+                        "runtime_manager_hash_linux".to_string(),
+                    ))
+                }
+            },
             Platform::SGX => match &self.runtime_manager_hash_sgx {
                 Some(hash) => hash,
                 None => {

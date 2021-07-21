@@ -1,6 +1,6 @@
 //! Nitro-Enclave-specific material for the Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -127,11 +127,11 @@ pub mod veracruz_server_nitro {
             return Ok(meta);
         }
 
-        fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             return Err(VeracruzServerError::UnimplementedError);
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerMessage::NewTLSSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;

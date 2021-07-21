@@ -1,6 +1,6 @@
 //! The Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -10,6 +10,8 @@
 //! information on licensing and copyright.
 
 use crate::veracruz_server::*;
+#[cfg(feature = "linux")]
+use crate::veracruz_server_linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use crate::veracruz_server_nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 #[cfg(feature = "sgx")]

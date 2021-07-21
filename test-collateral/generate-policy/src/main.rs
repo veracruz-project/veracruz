@@ -824,8 +824,10 @@ fn serialize_json(arguments: &Arguments) -> Value {
         ),
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
+        // TODO: should be linux_hash
         sgx_hash.clone(),
-        // TODO should be tz_hash
+        sgx_hash.clone(),
+        // TODO: should be tz_hash
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
         format!(

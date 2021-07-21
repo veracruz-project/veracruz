@@ -155,13 +155,13 @@ pub mod veracruz_server_tz {
             })
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             unreachable!("Unimplemented");
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()

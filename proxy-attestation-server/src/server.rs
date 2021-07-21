@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::attestation;
-#[cfg(feature = "psa")]
+#[cfg(any(feature = "linux", feature = "tz"))]
 use crate::attestation::psa;
 #[cfg(feature = "sgx")]
 use crate::attestation::sgx;
@@ -169,13 +169,13 @@ async fn sgx_router(psa_request: web::Path<String>, input_data: String) -> Proxy
 
 #[allow(unused)]
 async fn psa_router(psa_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
-    #[cfg(feature = "psa")]
+    #[cfg(any(feature = "linux", feature = "tz"))]
     if psa_request.into_inner().as_str() == "AttestationToken" {
         psa::attestation_token(input_data)
     } else {
         Err(ProxyAttestationServerError::UnsupportedRequestError)
     }
-    #[cfg(not(feature = "psa"))]
+    #[cfg(not(any(feature = "tz", feature = "linux")))]
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 

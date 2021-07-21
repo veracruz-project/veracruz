@@ -3,7 +3,7 @@
 //! One of the main integration tests for Veracruz, as a lot of material is
 //! imported directly or indirectly via these tests.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -16,12 +16,16 @@ mod tests {
     use actix_rt::System;
     use env_logger;
     use lazy_static::lazy_static;
-    use log::{debug, info, LevelFilter};
+    use log::{debug, error, info, LevelFilter};
+    use rand;
+    use rand::Rng;
     use ring;
 
     use serde::Deserialize;
     use transport_protocol;
     use veracruz_server::veracruz_server::*;
+    #[cfg(feature = "linux")]
+    use veracruz_server::VeracruzServerLinux as VeracruzServerEnclave;
     #[cfg(feature = "nitro")]
     use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
     #[cfg(feature = "sgx")]
@@ -33,8 +37,7 @@ mod tests {
     use regex::Regex;
     use proxy_attestation_server;
     use std::{
-        collections::HashMap,
-        collections::HashSet,
+        collections::{HashMap, HashSet},
         io::{Read, Write},
         path::Path,
         sync::{
@@ -120,7 +123,8 @@ mod tests {
         let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
 
         SETUP.call_once(|| {
-            println!("SETUP.call_once called");
+            info!("SETUP.call_once called");
+
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 #[cfg(feature = "nitro")]
@@ -227,6 +231,8 @@ mod tests {
     #[test]
     /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
+        env_logger::init();
+        
         let (policy, policy_json, _) = read_policy(ONE_DATA_SOURCE_POLICY).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
 
@@ -594,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
@@ -735,6 +741,9 @@ mod tests {
                 Ok(id)
             }
         })?;
+
+        #[cfg(feature = "linux")]
+        let test_target_platform: Platform = Platform::Linux;
         #[cfg(feature = "nitro")]
         let test_target_platform: Platform = Platform::Nitro;
         #[cfg(feature = "sgx")]
@@ -749,7 +758,7 @@ mod tests {
             client_key_path,
         )?;
         info!(
-            "             Initialasation time (μs): {}.",
+            "             Initialization time (μs): {}.",
             time_init.elapsed().as_micros()
         );
 
@@ -804,6 +813,7 @@ mod tests {
             // if there is a program provided
             if let Some(path) = program_path.as_ref() {
                 let time_provosion_data = Instant::now();
+                info!("Checking policy hash...");
                 check_policy_hash(
                     &policy_hash,
                     client_session_id,
@@ -812,10 +822,13 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
+                
                 check_runtime_manager_hash(&policy,
                                            &client_session,
                                            &test_target_platform)?;
 
+                info!("Provisioning program...");
+                
                 let response = provision_program(
                     path,
                     client_session_id,
@@ -1206,7 +1219,7 @@ mod tests {
     fn init_veracruz_server_and_tls_session(
         policy_json: &str,
     ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
-        let veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
 
         let one_tenth_sec = std::time::Duration::from_millis(100);
         std::thread::sleep(one_tenth_sec); // wait for the client to start
@@ -1255,6 +1268,7 @@ mod tests {
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
     ) -> Result<(), VeracruzServerError> {
+        info!("AAA: Serializing policy hash request.");
         let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()?;
         let response = client_tls_send(
             client_tls_tx,
@@ -1264,18 +1278,23 @@ mod tests {
             ticket,
             &serialized_request_policy_hash[..],
         )?;
+        info!("AAA: Received response: {:?}.", response);
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
+            error!("Received non-Success status: {:?}.", status);
             return Err(VeracruzServerError::ResponseError(
                 "check_policy_hash parse_runtime_manager_response",
                 status,
             ));
         }
         let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
+        info!("Received {:?} as hash.", received_hash);
         if received_hash == expected_policy_hash {
+            info!("Hash matches expected hash ({:?}).", expected_policy_hash);
             return Ok(());
         } else {
+            error!("Hash does not match expected hash ({:?}).", expected_policy_hash);
             return Err(VeracruzServerError::MismatchError {
                 variable: "request_policy_hash",
                 received: received_hash.as_bytes().to_vec(),

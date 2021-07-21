@@ -24,7 +24,7 @@ use veracruz_utils::policy::principal::Principal;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    //TODO, wrap into a chihuahua management object.
+    // TODO: wrap into a runtime manager management object.
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
 }
 
@@ -46,6 +46,16 @@ fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
 fn response_not_ready() -> super::ProvisioningResult {
     let rst = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::FAILED_NOT_READY as i32,
+        None,
+    )?;
+    Ok(Some(rst))
+}
+
+/// Encodes an error code indicating that a principal with an invalid role tried
+/// to perform an action.
+fn response_invalid_role() -> super::ProvisioningResult {
+    let rst = transport_protocol::serialize_result(
+        transport_protocol::ResponseStatus::FAILED_INVALID_ROLE as i32,
         None,
     )?;
     Ok(Some(rst))

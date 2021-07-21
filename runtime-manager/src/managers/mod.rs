@@ -16,6 +16,7 @@ use sgx_types::sgx_status_t;
 use std::sync::Mutex;
 #[cfg(feature = "sgx")]
 use std::{ffi::CString};
+
 use std::{
     collections::HashMap,
     string::String,
@@ -311,6 +312,16 @@ fn print_message(message: String, code: u32) {
         trace_println!("Enclave debug message \"{}\"", message);
     } else {
         trace_println!(
+            "Enclave returns error code {} and message \"{}\"",
+            code,
+            message
+        );
+    }
+    #[cfg(feature = "linux")]
+    if code == 0 {
+        eprintln!("Enclave debug message \"{}\"", message);
+    } else {
+        eprintln!(
             "Enclave returns error code {} and message \"{}\"",
             code,
             message

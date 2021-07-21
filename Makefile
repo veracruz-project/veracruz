@@ -9,8 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
-
+.PHONY: all sdk sgx-test-collateral tz-test-collateral nitro-test-collateral linux-x86_64-test-collateral linux-aarch64-test-collateral sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone linux linux-x64 linux-aarch64 sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestation trustzone-veracruz-server-test-setting trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt linux-veracruz-server-test linux-veracruz-server-test-dry-run
  
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
@@ -22,7 +21,8 @@ OPENSSL_INCLUDE_DIR ?= /usr/include/aarch64-linux-gnu
 OPENSSL_LIB_DIR ?= /usr/lib/aarch64-linux-gnu
 TRUSTZONE_C_INCLUDE_PATH ?= /usr/include/aarch64-linux-gnu:/usr/include
 NITRO_RUST_FLAG ?= ""
- 
+LINUX_RUST_FLAG ?= ""
+
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
 
@@ -36,6 +36,12 @@ sgx-test-collateral:
 
 trustzone-test-collateral:
 	TEE=tz $(MAKE) -C test-collateral
+
+linux-x86_64-test-collateral:
+	TEE=linux-x86_64 $(MAKE) -C test-collateral
+
+linux-aarch64-test-collateral:
+	TEE=linux-aarch64 $(MAKE) -C test-collateral
 
 # Test veracruz-client for sgx, due to the use of a mocked server with a fixed port, these tests must run in a single thread
 sgx-veracruz-client-test: sgx sgx-test-collateral 
@@ -82,6 +88,20 @@ veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) 
 veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
 	cd veracruz-server-test && \
 		bash ../test-collateral/populate-test-database.sh
+linux: sdk
+	pwd
+	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C runtime-manager linux
+	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C linux-root-enclave linux
+
+linux-x64: sdk
+	pwd
+	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C runtime-manager linux-x64
+	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C linux-root-enclave linux-x64
+
+linux-aarch64: sdk
+	pwd
+	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C runtime-manager linux-aarch64
+	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C linux-root-enclave linux-aarch64
 
 sgx-veracruz-server-test: sgx sgx-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
@@ -140,6 +160,15 @@ nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/pro
 	cd ./veracruz-server-test \
 		&& ./nitro-ec2-terminate_root.sh
 
+linux-veracruz-server-test-dry-run: linux linux-x86_64-test-collateral
+	cd veracruz-server-test \
+		&& RUSTFLAGS=$(LINUX_RUST_FLAG) cargo test --features linux --no-run -- --nocapture
+
+linux-veracruz-server-test: linux linux-x86_64-test-collateral
+	cd veracruz-server-test \
+		&& RUSTFLAGS=$(LINUX_RUST_FLAG) cargo test --features linux -- --test-threads=1 --nocapture \
+		&& RUSTFLAGS=$(LINUX_RUST_FLAG) cargo test test_debug --features linux  -- --ignored --test-threads=1
+
 nitro-veracruz-server-test-dry-run: nitro nitro-test-collateral
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features sgx --no-run
@@ -193,6 +222,7 @@ clean:
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
+	$(MAKE) clean -C linux-root-enclave
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
@@ -213,4 +243,5 @@ fmt:
 	cd veracruz-utils && cargo fmt
 	cd trustzone-root-enclave && cargo fmt
 	cd proxy-attestation-server && cargo fmt
+	cd linux-root-enclave && cargo fmt
 	$(MAKE) -C sdk fmt

@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all policy-files sgx trustzone deprecated
+.PHONY: all policy-files sgx trustzone linux-aarch64 linux-x64 deprecated
 
 all: deprecated sgx
 
@@ -18,7 +18,7 @@ INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 
 deprecated:
-	@echo $(WARNING_COLOR)"The default target, compiling sgx, is deprecated. Please explicitly choose target, sgx or trustzone."$(RESET_COLOR)
+	@echo $(WARNING_COLOR)"The default target, compiling sgx, is deprecated. Please explicitly choose target, sgx, trustzone, linux-aarch64, or linux-x64."$(RESET_COLOR)
 
 ################## sgx ###################
 SGX_SDK ?= /work/sgxsdk
@@ -73,6 +73,16 @@ $(Veracruz_Server_Name): $(Veracruz_Server_SRC_Files) $(CUSTOM_LIBRARY_PATH)
 ################## trustzone ###################
 trustzone: $(Veracruz_Server_SRC_Files)
 	cargo build --features tz --target aarch64-unknown-linux-gnu --release 
+	@echo $(INFO_COLOR)"CARGO => $^"$(RESET_COLOR)
+
+################## Linux ###################
+
+linux-aarch64: $(Veracruz_Server_SRC_Files)
+	cargo build --features linux --target aarch64-unknown-linux-gnu --release
+	@echo $(INFO_COLOR)"CARGO => $^"$(RESET_COLOR)
+
+linux-x64: $(Veracruz_Server_SRC_Files)
+	cargo build --features linux --target x86_64-unknown-linux-gnu --release
 	@echo $(INFO_COLOR)"CARGO => $^"$(RESET_COLOR)
 
 .PHONY: clean

@@ -543,11 +543,11 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
                 unreachable!("Unimplemented");
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {

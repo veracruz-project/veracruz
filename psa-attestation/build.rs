@@ -19,11 +19,13 @@ use std::process::Command;
 fn main() {
     #[cfg(feature = "tz")]
     let cc = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc";
+    #[cfg(feature = "linux")]
+    let cc = "cc";
     #[cfg(feature = "sgx")]
     let cc = "gcc";
     #[cfg(feature = "nitro")]
     let cc = "musl-gcc";
-    #[cfg(not(any(feature = "tz", feature = "sgx", feature = "nitro")))]
+    #[cfg(not(any(feature = "tz", feature = "linux", feature = "sgx", feature = "nitro")))]
     let cc = "gcc";
 
     let project_dir = env::var("CARGO_MANIFEST_DIR").unwrap();

@@ -12,8 +12,10 @@
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use nix;
-#[cfg(any(feature = "tz", feature = "nitro"))]
+#[cfg(any(feature = "tz", feature = "linux", feature = "nitro"))]
 use std::sync::PoisonError;
+#[cfg(feature = "linux")]
+use std::io::{Error as IOError};
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
 
@@ -24,6 +26,9 @@ use veracruz_utils::{platform::nitro::nitro::NitroRootEnclaveMessage, io::error:
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {
+    #[cfg(feature = "linux")]
+    #[error(display = "RuntimeManager: CommandLineArguments")]
+    CommandLineArguments,
     #[error(display = "RuntimeManager: SessionManagerError: {:?}.", _0)]
     SessionManagerError(#[error(source)] session_manager::SessionManagerError),
     #[error(display = "RuntimeManager: TransportProtocolError: {:?}.", _0)]
@@ -60,20 +65,20 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Socket Error: {:?}", _0)]
     SocketError(nix::Error),
-    #[cfg(feature = "nitro")]
-    #[error(display = "RuntimeManager: Veracruz Socket error:{:?}", _0)]
-    VeracruzSocketError(SocketError),
-    #[cfg(feature = "nitro")]
-    #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
+    #[cfg(any(feature = "nitro"))]
+    #[error(display = "RuntimeManager: Veracruz Socket error: {:?}", _0)]
+    VeracruzSocketError(VeracruzSocketError),
+    #[cfg(any(feature = "linux", feature = "nitro"))]
+    #[error(display = "RuntimeManager: Bincode error: {:?}", _0)]
     BincodeError(bincode::Error),
     #[cfg(feature = "nitro")]
-    #[error(display = "RuntimeManager: NSM Lib error:{:?}", _0)]
+    #[error(display = "RuntimeManager: NSM Lib error: {:?}", _0)]
     NsmLibError(i32),
     #[cfg(feature = "nitro")]
-    #[error(display = "RuntimeManager: NSM Error code:{:?}", _0)]
+    #[error(display = "RuntimeManager: NSM Error code: {:?}", _0)]
     NsmErrorCode(nsm_io::ErrorCode),
     #[cfg(feature = "nitro")]
-    #[error(display = "RuntimeManager: wrong message type received:{:?}", _0)]
+    #[error(display = "RuntimeManager: wrong message type received: {:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
     #[error(display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}", _0, _1, _2)]
     DataWrongSizeForField(std::string::String, usize, usize),
@@ -81,6 +86,12 @@ pub enum RuntimeManagerError {
     RingKeyRejected(ring::error::KeyRejected),
     #[error(display = "RuntimeManager: Certificate error:{:?}", _0)]
     CertError(CertError),
+    #[cfg(feature = "linux")]
+    #[error(display = "RuntimeManager: IO error: {:?}", _0)]
+    IOError(IOError),
+    #[cfg(feature = "linux")]
+    #[error(display = "RuntimeManager: setsockopt call IO failed")]
+    SetSockOptFailed,
 }
 
 impl<T> From<PoisonError<T>> for RuntimeManagerError {
