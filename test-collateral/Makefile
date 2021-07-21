@@ -104,8 +104,8 @@ DATA_FILES = linear-regression.dat \
 			 number-stream-2.dat
 
 DATA_DIRS = idash2017 \
-			macd \
-			private-set-inter-sum
+            macd \
+            private-set-inter-sum
 
 all: pgen policy-files $(WASM_PROG_FILES) $(DATA_FILES) $(DATA_DIRS)
 
