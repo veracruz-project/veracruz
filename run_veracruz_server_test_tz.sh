@@ -13,3 +13,4 @@
 ./run_tz_test.sh "veracruz_server_test test_phase2"  30
 ./run_tz_test.sh "veracruz_server_test test_phase3"  30
 ./run_tz_test.sh "veracruz_server_test test_phase4"  50
+./run_tz_test.sh "veracruz_server_test test_pest_performance"  50

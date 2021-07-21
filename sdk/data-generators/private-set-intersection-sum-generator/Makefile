@@ -11,7 +11,9 @@
 
 BASENAME = data
 SAMPLE_NUMBER = 5
-RANGE = $(shell seq 2000 2000 10000) $(shell seq 20000 20000 100000) 5000 50000
+# The comment is the full run
+#RANGE = $(shell seq 2000 2000 10000) $(shell seq 20000 20000 100000) 5000 50000
+RANGE ?= $(shell seq 2000 2000 2000) 
 RANGE_SUFFIX = $(foreach index,$(shell seq 0 1 $(shell expr $(SAMPLE_NUMBER) - 1)),$(addsuffix -$(index),$(RANGE)))
 INDICE_SUFFIX = $(addprefix -,$(addsuffix .dat,$(RANGE_SUFFIX)))
 TARGET_DATS = $(foreach base_name,$(BASENAME),$(addprefix $(base_name),$(INDICE_SUFFIX)))
