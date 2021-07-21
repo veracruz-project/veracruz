@@ -1043,6 +1043,8 @@ fn main() {
         .arg(
             Arg::new("proxy-attestation-server")
                 .required(true)
+                .short('p')
+                .long("proxy-attestation-server")
                 .takes_value(true)
                 .about("URL for the Proxy Attestation Service."),
         )

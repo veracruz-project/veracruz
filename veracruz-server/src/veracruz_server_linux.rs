@@ -281,7 +281,7 @@ pub mod veracruz_server_linux {
 
             // TODO: add in dummy measurement and attestation token issuance here
             // which will use fields from the JSON policy file.
-            let _policy_json = Policy::from_json(policy).map_err(|e| {
+            let policy_json = Policy::from_json(policy).map_err(|e| {
                 error!(
                     "Failed to parse Veracruz policy file.  Error produced: {:?}.",
                     e
@@ -292,19 +292,28 @@ pub mod veracruz_server_linux {
 
             info!("Successfully parsed JSON policy file.");
 
+            let proxy_attestation_server_url =
+                policy_json.proxy_attestation_server_url();
+
             info!(
-                "Launching Linux Root enclave: {}.",
-                LINUX_ROOT_ENCLAVE_PATH
+                "Launching Linux Root enclave: {} with proxy attestation server URL: {}.",
+                LINUX_ROOT_ENCLAVE_PATH,
+                proxy_attestation_server_url
             );
 
             let mut linux_root_process =
-                Command::new(LINUX_ROOT_ENCLAVE_PATH).spawn().map_err(|e| {
-                    error!(
-                        "Failed to launch Linux Root enclave.  Error produced: {:?}.",
-                        e
-                    );
-                    VeracruzServerError::IOError(e)
-                })?;
+                Command::new(LINUX_ROOT_ENCLAVE_PATH)
+                    .arg("--proxy-attestation-server")
+                    .arg(proxy_attestation_server_url)
+                    .spawn()
+                    .map_err(|e| {
+                        error!(
+                            "Failed to launch Linux Root enclave.  Error produced: {:?}.",
+                            e
+                        );
+                    
+                        VeracruzServerError::IOError(e)
+                    })?;
 
             info!(
                 "Linux Root enclave spawned.  Waiting {:?} seconds...",
