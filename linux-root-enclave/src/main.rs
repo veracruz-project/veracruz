@@ -44,7 +44,6 @@ use hex::encode;
 use lazy_static::lazy_static;
 use log::{error, info};
 use net2::{unix::UnixTcpBuilderExt, TcpBuilder};
-use nix::Error as NixError;
 use psa_attestation::psa_initial_attest_get_token;
 use ring::rand::SecureRandom;
 use ring::{
@@ -310,72 +309,73 @@ fn post_buffer(url: &str, buffer: &str) -> Result<String, LinuxRootEnclaveError>
             LinuxRootEnclaveError::CurlError(err)
         })?;
 
-    let mut transfer = curl_request.transfer();
     let mut buffer_reader = StringReader::new(buffer);
-
-    transfer
-        .read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))
-        .map_err(|err| {
-            error!(
-                "Failed to register read function with Curl.  Error produced: {:?}.",
-                err
-            );
-
-            LinuxRootEnclaveError::CurlError(err)
-        })?;
-
     let mut received_body = String::new();
-
-    transfer
-        .write_function(|buf| {
-            received_body.push_str(from_utf8(buf).expect({
-                error!("Error converting data {:?} from UTF-8.", buf);
-
-                &format!("Error converting data {:?} from UTF-8.", buf)
-            }));
-
-            Ok(buf.len())
-        })
-        .map_err(|err| {
-            error!(
-                "Failed to register write function with Curl.  Error produced: {:?}.",
-                err
-            );
-
-            LinuxRootEnclaveError::CurlError(err)
-        })?;
-
-    info!("Received response body: {}.", received_body);
-
     let mut received_header = String::new();
 
-    transfer
-        .header_function(|buf| {
-            received_header.push_str(from_utf8(buf).expect({
-                error!("Error converting data {:?} from UTF-8.", buf);
+    {
+        let mut transfer = curl_request.transfer();
 
-                &format!("Error converting data {:?} from UTF-8", buf)
-            }));
+        transfer
+            .read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))
+            .map_err(|err| {
+                error!(
+                    "Failed to register read function with Curl.  Error produced: {:?}.",
+                    err
+                );
 
-            true
-        })
-        .map_err(|err| {
+                LinuxRootEnclaveError::CurlError(err)
+            })?;
+
+        transfer
+            .write_function(|buf| {
+                received_body.push_str(from_utf8(buf).expect({
+                    error!("Error converting data {:?} from UTF-8.", buf);
+
+                    &format!("Error converting data {:?} from UTF-8.", buf)
+                }));
+
+                Ok(buf.len())
+            })
+            .map_err(|err| {
+                error!(
+                    "Failed to register write function with Curl.  Error produced: {:?}.",
+                    err
+                );
+
+                LinuxRootEnclaveError::CurlError(err)
+            })?;
+
+        info!("Received response body.");
+
+        transfer
+            .header_function(|buf| {
+                received_header.push_str(from_utf8(buf).expect({
+                    error!("Error converting data {:?} from UTF-8.", buf);
+
+                    &format!("Error converting data {:?} from UTF-8", buf)
+                }));
+
+                true
+            })
+            .map_err(|err| {
+                error!(
+                    "Failed to register header function with Curl.  Error produced: {:?}.",
+                    err
+                );
+
+                LinuxRootEnclaveError::CurlError(err)
+            })?;
+
+        transfer.perform().map_err(|err| {
             error!(
-                "Failed to register header function with Curl.  Error produced: {:?}.",
+                "Failed to perform data transfer with Curl.  Error produced: {:?}.",
                 err
             );
 
             LinuxRootEnclaveError::CurlError(err)
         })?;
-
-    transfer.perform().map_err(|err| {
-        error!(
-            "Failed to perform data transfer with Curl.  Error produced: {:?}.",
-            err
-        );
-
-        LinuxRootEnclaveError::CurlError(err)
-    })?;
+    }
 
     info!("Received response header: {}.", received_header);
 
@@ -416,7 +416,7 @@ fn send_proxy_attestation_server_start(
 
     info!("Response received from Proxy Attestation Service.");
 
-    let response_body = base64decode(&response).map_err({
+    let response_body = base64decode(&response).map_err(|e| {
         error!(
             "Failed to deserialize response from Proxy Attestation Service.  Error produced: {:?}.",
             e
@@ -670,7 +670,7 @@ fn native_attestation(
 ) -> Result<(), LinuxRootEnclaveError> {
     /* 1. Get the firmware version. */
 
-    let firmware_version = get_firmware_version()?;
+    let firmware_version = get_firmware_version();
 
     /* 2. Send the Start message to the Proxy Attestation Service to obtain a device ID and
      *    challenge.
