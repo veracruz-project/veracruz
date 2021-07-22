@@ -1,0 +1,6 @@
+# Options for internal representation of protobufs
+
+# use smaller prefix for whole proto
+transport_protocol.proto			package:"Tp"
+# efficiency tweaks to C representation
+Tp.RequestProxyPsaAttestationToken.challenge	max_size:32 fixed_length:true

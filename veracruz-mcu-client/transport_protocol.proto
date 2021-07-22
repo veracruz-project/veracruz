@@ -1,0 +1,233 @@
+//! Colima, protocol buffer for Veracruz
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+
+syntax = "proto3";
+package colima;
+
+message SgxEc256Public {
+  bytes gx = 1;
+  bytes gy = 2;
+}
+message SgxEc256Signature {
+  repeated uint32 x = 1;
+  repeated uint32 y = 2;
+}
+
+message StartMsg {
+  string protocol = 1;
+  string firmware_version = 2;
+}
+
+message SgxMsg1 {
+  SgxEc256Public g_a = 1;
+  bytes gid = 2;
+  int32 device_id = 3;
+}
+
+message SgxMsg2 {
+  SgxEc256Public g_b = 1;
+  bytes spid = 2;
+  uint32 quote_type = 3;
+  uint32 kdf_id = 4;
+  SgxEc256Signature sign_gb_ga = 5;
+  bytes mac = 6;
+  uint32 sig_rl_size = 7;
+}
+
+message SgxMsg3 {
+  bytes mac = 1;
+  SgxEc256Public g_a = 2;
+  bytes ps_sec_prop = 3;
+  int32 device_id = 4;
+}
+
+message SgxAttributes {
+  uint64 flags = 1;
+  uint64 xfrm = 2;
+}
+message SgxReportBody {
+  bytes cpu_svn = 1;
+  uint32 misc_select = 2;
+  bytes reserve1 = 3;
+  bytes isv_ext_prod_id = 4;
+  SgxAttributes attributes = 5;
+  bytes mr_enclave = 6;
+  bytes reserved2 = 7;
+  bytes mr_signer = 8;
+  bytes reserved3 = 9;
+  bytes config_id = 10;
+  uint32 isv_prod_id = 11;
+  uint32 isv_svn = 12;
+  uint32 config_svn = 13;
+  bytes reserved4 = 14;
+  bytes isv_family_id = 15;
+  bytes report_data = 16;
+}
+
+message SgxQuote {
+  uint32 version = 1;
+  uint32 sign_type = 2;
+  bytes epid_group_id = 3;
+  uint32 qe_svn = 4;
+  uint32 pce_svn = 5;
+  uint32 xeid = 6;
+  bytes basename = 7;
+  SgxReportBody report_body = 8;
+  uint32 signature_len = 9;
+}
+
+message Program {
+  string file_name = 1;
+  bytes code = 2;
+}
+
+message Data {
+  string file_name = 1;
+  bytes data = 2;
+}
+
+message SgxAttestationInit {
+  bytes public_key = 1;
+  int32 device_id = 2;
+}
+
+message SgxAttestationChallenge {
+  SgxMsg2 msg2 = 1;
+  bytes challenge = 2;
+}
+
+message SgxAttestationTokens {
+  SgxMsg3 msg3 = 1;
+  SgxQuote msg3_quote = 2;
+  bytes msg3_sig = 3;
+  SgxQuote pubkey_quote = 4;
+  bytes pubkey_sig = 5;
+}
+
+message PsaAttestationInit {
+  bytes challenge = 1;
+  int32 device_id = 2;
+}
+
+enum ResponseStatus {
+  UNSET = 0;
+  SUCCESS = 1;
+  FAILED_INVALID_ROLE = 2;
+  FAILED_NOT_READY = 3;
+  FAILED_GENERIC = 4;
+  FAILED_VM_ERROR = 5;
+  FAILED_ERROR_CODE_RETURNED = 6;
+  FAILED_INVALID_REQUEST = 7;
+}
+
+message Result {
+  bytes data = 1;
+}
+
+message ErrorCode {
+  bytes error = 1;
+}
+
+message PiHash {
+  bytes data = 1;
+}
+
+message State {
+  bytes state = 1;
+}
+
+message RequestPiHash {
+  string file_name = 1;
+}
+
+message RequestResult {
+  string file_name = 1;
+}
+
+message RequestProxyPsaAttestationToken {
+  bytes challenge = 1;
+}
+
+message NativePsaAttestationToken {
+  bytes token = 1;
+  int32 device_id = 2;
+}
+
+message ProxyPsaAttestationToken {
+  bytes token = 1;
+  bytes pubkey = 2;
+  int32 device_id = 3;
+}
+message RequestShutdown {
+}
+
+message RequestNextRound {
+}
+
+message RequestState {
+}
+
+message RequestPolicyHash {
+}
+
+message PolicyHash {
+  bytes data = 1;
+}
+
+
+message ProxyAttestationServerRequest {
+  oneof message_oneof {
+    StartMsg start_msg = 2;
+    NativePsaAttestationToken native_psa_attestation_token = 3;
+    ProxyPsaAttestationToken proxy_psa_attestation_token = 4;
+    SgxMsg1 msg1 = 5;
+    SgxAttestationTokens sgx_attestation_tokens = 6;
+  }
+  uint32 context = 1;
+}
+
+message ProxyAttestationServerResponse {
+  oneof message_oneof {
+    PsaAttestationInit psa_attestation_init = 2;
+    SgxAttestationInit sgx_attestation_init = 3;
+    SgxAttestationChallenge sgx_attestation_challenge = 4;
+  }
+  uint32 context = 1;
+}
+
+message MexicoCityRequest {
+  oneof message_oneof {
+    Data data = 2;
+    Program program = 3;
+    RequestPiHash request_pi_hash = 4;
+    RequestResult request_result = 5;
+    RequestProxyPsaAttestationToken request_proxy_psa_attestation_token = 6;
+    RequestState request_state = 7;
+    RequestShutdown request_shutdown = 8;
+    PsaAttestationInit psa_attestation_init = 9;
+    RequestPolicyHash request_policy_hash = 10;
+    Data stream = 11;
+    RequestNextRound request_next_round = 12;
+  }
+  uint32 context = 1;
+}
+
+message MexicoCityResponse {
+  ResponseStatus status = 1;
+  oneof message_oneof {
+    Result result = 4;
+    PiHash pi_hash = 5;
+    ErrorCode error = 6;
+    State state = 10;
+    PolicyHash policy_hash = 11;
+  }
+  uint32 context = 8;
+}
