@@ -9,11 +9,3 @@ target_sources(app PRIVATE ${SRC})
 target_include_directories(app PRIVATE nanopb)
 
 include(${ZEPHYR_BASE}/samples/net/common/common.cmake)
-
-set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
-generate_inc_file_for_target(
-    app
-    globalsign_r2.der
-    ${gen_dir}/globalsign_r2.der.inc
-    )
-
