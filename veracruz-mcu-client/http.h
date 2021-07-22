@@ -29,12 +29,10 @@
 #endif
 
 // HTTP GET operation
-// TODO TLS? https_get?
 ssize_t http_get(
         const char *host,
         uint16_t port,
         const char *path,
-        // TODO headers?
         uint8_t *buf,
         size_t buf_len);
 
@@ -43,7 +41,6 @@ ssize_t http_post(
         const char *host,
         uint16_t port,
         const char *path,
-        // TODO headers?
         const uint8_t *payload_buf,
         size_t payload_buf_len,
         uint8_t *resp_buf,
