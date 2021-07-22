@@ -73,9 +73,6 @@ mod tests {
     use proxy_attestation_server;
     use veracruz_utils::policy::policy::Policy;
 
-    #[cfg(feature = "nitro")]
-    use regex::Regex;
-
     #[derive(Debug, Error)]
     pub enum VeracruzTestError {
         #[error(display = "VeracruzTest: IOError: {:?}.", _0)]
@@ -101,24 +98,14 @@ mod tests {
             info!("SETUP.call_once called");
             std::env::set_var("RUST_LOG", "debug,actix_server=info,actix_web=info,tokio_reactor=info,hyper=info,reqwest=info,rustls=info");
 
-            #[cfg(feature = "nitro")]
-            let actual_server_url = {
-                let ip_string = local_ipaddress::get()
-                    .expect("Failed to get local ip address");
-                format!("{:}:3010", ip_string)
-            };
-            #[cfg(not(feature = "nitro"))]
-            let actual_server_url = proxy_attestation_server_url;
-
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 let server = proxy_attestation_server::server::server(
-                    actual_server_url,
+                    proxy_attestation_server_url,
                     CA_CERT,
                     CA_KEY,
-                    false
-                ).unwrap();
+                    false).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -453,24 +440,7 @@ mod tests {
     fn read_policy(policy_filename: &str) -> Result<String, VeracruzTestError> {
         let policy_text =
             std::fs::read_to_string(policy_filename).expect(&format!("Cannot open file {}", policy_filename));
-        // Since we need to run the root enclave on another system for nitro enclaves
-        // we can't use localhost for the URL of the proxy attestation server (like we do in
-        // the policy files. so we need to replace it with the private IP of the current instance
-        #[cfg(feature = "nitro")]
-        {
-            let ip_string = std::env::var("TABASCO_IP_ADDRESS")
-                .expect("TABASCO_IP_ADDRESS environment variable not set");
-            let ip_address =
-                format!("\"proxy_attestation_server_url\": \"{:}:3010\"",
-                        ip_string);
-            let re = 
-                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#)
-                    .unwrap();
-            let policy_text_mod = re.replace_all(&policy_text, ip_address.as_str()).to_owned();
-            return Ok(policy_text_mod.to_string());
-        }
-        #[cfg(not(feature = "nitro"))]
-        {
+
             return Ok(policy_text);
         }
     }

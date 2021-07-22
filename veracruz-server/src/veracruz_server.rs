@@ -19,6 +19,8 @@ use log::debug;
 use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
+#[cfg(feature = "nitro")]
+use base64;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -171,6 +173,18 @@ pub enum VeracruzServerError {
     UnimplementedError,
     #[error(display = "VeracruzServer: Invalid runtime manager hash")]
     InvalidRuntimeManagerHash,
+    /// Transport protocol buffer handling returned an error
+    #[cfg(feature = "nitro")]
+    #[error(display = "NitroSVeracruzServererver: TransportProtocol error:{}", _0)]
+    TransportProtocol(transport_protocol::custom::TransportProtocolError),
+    /// A base64 decode error occurred
+    // #[cfg(feature = "nitro")]
+    #[error(display = "VeracruzServer: Base64 Decode error:{:?}", _0)]
+    Base64Decode(base64::DecodeError),
+    /// A remote http server returned a non-success (200) status
+    #[cfg(feature = "nitro")]
+    #[error(display = "NitroServer: Non-Success HTTP Response received")]
+    NonSuccessHttp,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {

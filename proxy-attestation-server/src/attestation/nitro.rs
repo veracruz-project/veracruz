@@ -170,44 +170,8 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         },
     }
 
-    let expected_enclave_hash: Vec<u8> = {
-        let connection = crate::orm::establish_connection()?;
-        let hash_option = crate::orm::get_firmware_version_hash(
-            &connection,
-            &"nitro".to_string(),
-            &attestation_context.firmware_version,
-        )
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::nitro::attestation_token get_firmware_version_hash failed:{:?}", err);
-                let _ignore = std::io::stdout().flush();
-                err
-            })?;
-        match hash_option {
-            None => {
-                println!("proxy-attestation-server::attestation::nitro_attestation_token firmware version hash not found in database");
-                let _ignore = std::io::stdout().flush();
-                return Err(ProxyAttestationServerError::MissingFieldError("firmware version"));
-            },
-            Some(hash) => hash,
-        }
-    };
     let received_enclave_hash = &attestation_document.pcrs[0];
-    if expected_enclave_hash != *received_enclave_hash {
-        println!("Comparison between expected_enclave_hash:{:02x?} and received_enclave_hash:{:02x?} failed", expected_enclave_hash, *received_enclave_hash);
-        if crate::server::DEBUG_MODE.load(Ordering::Relaxed) {
-            println!("This is debug mode, so this is expected, so we're not going to fail you, but you should feel bad.");
-            let _ignore = std::io::stdout().flush();
-        } else {
-            println!("proxy-attestation-server::attestation::nitro_attestation_token debug mode is off, so we're gonna return an error for this mismatch");
-            let _ignore = std::io::stdout().flush();
 
-            return Err(ProxyAttestationServerError::MismatchError {
-                variable: "received_enclave_hash",
-                expected: expected_enclave_hash,
-                received: received_enclave_hash.to_vec(),
-            });
-        }
-    }
     let mut csr = match attestation_document.user_data {
         Some(data) => data,
         None => {
@@ -218,9 +182,9 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     
 
     // convert the CSR into a certificate
-    let re_cert = crate::attestation::convert_csr_to_certificate(&csr)
+    let re_cert = crate::attestation::convert_csr_to_certificate(&csr, &received_enclave_hash)
         .map_err(|err| {
-            println!("proxy-attestation-server::attestation::nitro::attestation_token convert_to_certificate failed:{:?}", err);
+            println!("proxy-attestation-server::attestation::nitro::attestation_token convert_csr_to_certificate failed:{:?}", err);
             err
         })?;
 
