@@ -1,6 +1,8 @@
 //! An implementation of triangulation of audio event data
 //!
-//! TODO consistent documentation with other examples
+//! This demo takes in audio events in the form of a timestamp,
+//! GPS coordinates, and an analog rich audio sample, calculates the
+//! best effort triangulated location, returning the estimated location
 //!
 //! ## Authors
 //!
