@@ -18,3 +18,6 @@
 	path = docker
 	url = https://github.com/veracruz-project/veracruz-docker-image.git
     branch = main
+[submodule "veracruz-mcu-client/nanopb"]
+	path = veracruz-mcu-client/nanopb
+	url = https://github.com/nanopb/nanopb
