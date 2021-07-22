@@ -1,4 +1,14 @@
 #!/bin/bash
+#
+# ## Authors
+#
+# The Veracruz Development Team.
+#
+# ## Licensing and copyright notice
+#
+# See the `LICENSE.markdown` file in the Veracruz root directory for
+# information on licensing and copyright.
+#
 
 ip tuntap add zeth mode tap
 ip link set dev zeth up

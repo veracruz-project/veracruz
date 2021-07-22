@@ -2,6 +2,15 @@
  * HTTP convenience functions, these just wrap the low-level HTTP API
  * that Zephyr provides
  *
+ * ## Authors
+ * 
+ * The Veracruz Development Team.
+ *
+ * ## Licensing and copyright notice
+ *
+ * See the `LICENSE.markdown` file in the Veracruz root directory for
+ * information on licensing and copyright.
+ *
  */
 
 #include <stdio.h>
