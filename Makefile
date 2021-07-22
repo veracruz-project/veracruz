@@ -60,8 +60,6 @@ sgx: sdk sgx-env
 nitro: sdk
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
 
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
@@ -185,14 +183,12 @@ clean:
 	cd veracruz-utils && cargo clean
 	cd veracruz-server-test && cargo clean
 	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
-	cd nitro-root-enclave-server && cargo clean
 	$(MAKE) clean -C runtime-manager
 	$(MAKE) clean -C sgx-root-enclave
 	$(MAKE) clean -C veracruz-server
 	$(MAKE) clean -C test-collateral 
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
-	$(MAKE) clean -C nitro-root-enclave
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:

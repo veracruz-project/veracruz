@@ -16,7 +16,21 @@ use veracruz_utils::policy::policy::Policy;
 use rustls::PrivateKey;
 use veracruz_utils::csr;
 
-pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError> {
+pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
+    
+
+    //TODO: change the error type
+    let new_session_manager = SessionContext::new()?;
+
+    {
+        let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
+        *session_manager_state = Some(new_session_manager);
+    }
+
+    Ok(())
+}
+
+pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
     let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
     let policy = Policy::from_json(policy_json)?;
 
@@ -29,23 +43,23 @@ pub fn init_session_manager(policy_json: &str) -> Result<(), RuntimeManagerError
         let mut protocol_state = super::PROTOCOL_STATE.lock()?;
         *protocol_state = Some(state);
     }
-
-    //TODO: change the error type
-    let new_session_manager = SessionContext::new(policy)?;
-
     {
         let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
-        *session_manager_state = Some(new_session_manager);
+        match &mut *session_manager_state {
+            Some(state) => state.set_policy(policy)?,
+            None => return Err(RuntimeManagerError::UninitializedSessionError(
+                "session_manager_state",
+            )),
+        }
     }
-
-    Ok(())
+    return Ok(());
 }
 
-pub fn load_cert_chain(chain: Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> {
+pub fn load_cert_chain(chain: &Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> {
     let mut sm_guard = MY_SESSION_MANAGER.lock()?;
     match &mut *sm_guard {
         Some(session_manager) => {
-            session_manager.set_cert_chain(&chain)?;
+            session_manager.set_cert_chain(chain)?;
         },
         None => {
             return Err(RuntimeManagerError::UninitializedSessionError(
@@ -60,7 +74,7 @@ pub fn new_session() -> Result<u32, RuntimeManagerError> {
     let local_session_id = super::SESSION_COUNTER.fetch_add(1, Ordering::SeqCst);
 
     let session = match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(my_session_manager) => my_session_manager.create_session(),
+        Some(my_session_manager) => my_session_manager.create_session()?,
         None => {
             return Err(RuntimeManagerError::UninitializedSessionError(
                 "new_session",

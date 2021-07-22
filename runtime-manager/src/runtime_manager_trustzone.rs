@@ -85,9 +85,15 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     ))
                 })?;
 
-            crate::managers::session_manager::init_session_manager(&policy).map_err(|e| {
+            crate::managers::session_manager::init_session_manager().map_err(|e| {
                 print_error_and_return(format!(
                     "runtime_manager_trustzone::invoke_command Initialize {:?}",
+                    e
+                ))
+            })?;
+            crate::managers::session_manager::load_policy(&policy).map_err(|e| {
+                print_error_and_return(format!(
+                    "runtime_manager_trustzone::invoke_command load_policy {:?}",
                     e
                 ))
             })?;
@@ -297,7 +303,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             let certs: Vec<Vec<u8>> = crate::runtime_manager::break_up_cert_array(&cert_chain_buffer, &cert_lengths)
                 .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
 
-            managers::session_manager::load_cert_chain(certs)
+            managers::session_manager::load_cert_chain(&certs)
                 .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
         },
         RuntimeManagerOpcode::ResetEnclave => {
