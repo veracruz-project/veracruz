@@ -1,4 +1,4 @@
-//! Colima, protocol buffer for Veracruz
+//! Protocol buffers for Veracruz transport protocol messages
 //!
 //! ## Authors
 //!
@@ -6,11 +6,11 @@
 //!
 //! ## Licensing and copyright notice
 //!
-//! See the `LICENSE.markdown` file in the Veracruz root directory for
+//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
 syntax = "proto3";
-package colima;
+package transport_protocol;
 
 message SgxEc256Public {
   bytes gx = 1;
@@ -104,12 +104,22 @@ message SgxAttestationChallenge {
   bytes challenge = 2;
 }
 
+message SgxCollateral {
+  bytes csr = 1;
+}
+
 message SgxAttestationTokens {
   SgxMsg3 msg3 = 1;
   SgxQuote msg3_quote = 2;
   bytes msg3_sig = 3;
-  SgxQuote pubkey_quote = 4;
-  bytes pubkey_sig = 5;
+  SgxQuote collateral_quote = 4;
+  bytes collateral_sig = 5;
+  SgxCollateral collateral = 6;
+}
+
+message NitroAttestationDoc {
+  bytes doc = 1;
+  int32 device_id = 2;
 }
 
 message PsaAttestationInit {
@@ -156,9 +166,13 @@ message RequestProxyPsaAttestationToken {
   bytes challenge = 1;
 }
 
+message RequestCertificate {
+}
+
 message NativePsaAttestationToken {
   bytes token = 1;
   int32 device_id = 2;
+  bytes csr = 3;
 }
 
 message ProxyPsaAttestationToken {
@@ -182,6 +196,10 @@ message PolicyHash {
   bytes data = 1;
 }
 
+message Cert {
+  bytes data = 1;
+}
+
 
 message ProxyAttestationServerRequest {
   oneof message_oneof {
@@ -190,8 +208,14 @@ message ProxyAttestationServerRequest {
     ProxyPsaAttestationToken proxy_psa_attestation_token = 4;
     SgxMsg1 msg1 = 5;
     SgxAttestationTokens sgx_attestation_tokens = 6;
+    NitroAttestationDoc nitro_attestation_doc = 7;
   }
   uint32 context = 1;
+}
+
+message CertChain {
+  bytes root_cert = 1;
+  bytes enclave_cert = 2;
 }
 
 message ProxyAttestationServerResponse {
@@ -199,11 +223,12 @@ message ProxyAttestationServerResponse {
     PsaAttestationInit psa_attestation_init = 2;
     SgxAttestationInit sgx_attestation_init = 3;
     SgxAttestationChallenge sgx_attestation_challenge = 4;
+    CertChain cert_chain = 5;
   }
   uint32 context = 1;
 }
 
-message MexicoCityRequest {
+message RuntimeManagerRequest {
   oneof message_oneof {
     Data data = 2;
     Program program = 3;
@@ -220,7 +245,7 @@ message MexicoCityRequest {
   uint32 context = 1;
 }
 
-message MexicoCityResponse {
+message RuntimeManagerResponse {
   ResponseStatus status = 1;
   oneof message_oneof {
     Result result = 4;
@@ -228,6 +253,7 @@ message MexicoCityResponse {
     ErrorCode error = 6;
     State state = 10;
     PolicyHash policy_hash = 11;
+    Cert cert = 12;
   }
   uint32 context = 8;
 }
