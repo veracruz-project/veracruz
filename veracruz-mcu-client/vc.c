@@ -474,8 +474,8 @@ int vc_send_data(vc_t *vc,
             VC_SERVER_PORT,
             name, data_len);
     // construct data protobuf
-    Tp_MexicoCityRequest send_data = {
-        .which_message_oneof = Tp_MexicoCityRequest_data_tag,
+    Tp_RuntimeManagerRequest send_data = {
+        .which_message_oneof = Tp_RuntimeManagerRequest_data_tag,
         .message_oneof.data.file_name.funcs.encode = vc_encode_bytes,
         .message_oneof.data.file_name.arg = &(struct bytes){
             .buf = name,
@@ -492,7 +492,7 @@ int vc_send_data(vc_t *vc,
     // sent data + the response, response is fairly small and honestly could
     // be smaller
     size_t encoded_size = 0;
-    pb_get_encoded_size(&encoded_size, &Tp_MexicoCityRequest_msg, &send_data);
+    pb_get_encoded_size(&encoded_size, &Tp_RuntimeManagerRequest_msg, &send_data);
     size_t proto_len = (32 > encoded_size) ? 32 : encoded_size;
     // heh
     uint8_t *proto_buf = malloc(proto_len);
@@ -500,7 +500,7 @@ int vc_send_data(vc_t *vc,
     // encode
     pb_ostream_t proto_stream = pb_ostream_from_buffer(
             proto_buf, proto_len);
-    bool success = pb_encode(&proto_stream, &Tp_MexicoCityRequest_msg, &send_data);
+    bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &send_data);
     if (!success) {
         printf("pb_encode failed (%s)\n", proto_stream.errmsg);
         free(proto_buf);
@@ -535,10 +535,10 @@ int vc_send_data(vc_t *vc,
     #endif
 
     // parse
-    Tp_MexicoCityResponse response;
+    Tp_RuntimeManagerResponse response;
     pb_istream_t resp_stream = pb_istream_from_buffer(
             proto_buf, res);
-    success = pb_decode(&resp_stream, &Tp_MexicoCityResponse_msg, &response);
+    success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
     if (!success) {
         printf("pb_decode failed (%s)\n", proto_stream.errmsg);
         free(proto_buf);
