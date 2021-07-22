@@ -6,7 +6,7 @@ DOCKER_ROOT ?= $(abspath $(firstword $(MAKEFILE_LIST))/..)
 
 ELF_PATH ?= /zephyr-workspace/$(TARGET)/build/zephyr/zephyr.elf
 
-CLAP ?= 1
+CLAP ?= 0
 CLIENT_CERT ?= client_cert.pem
 CLIENT_KEY ?= client_key.pem
 POLICY ?= policy.json
@@ -54,15 +54,7 @@ docker: Dockerfile
 update:
 	west update
 
-# Generate policy.h/c
-policy.h policy.c: policy_to_header.py
-policy.h policy.c: $(POLICY) $(CLIENT_CERT) $(CLIENT_KEY)
-	$(strip ./policy_to_header.py $< \
-		--identity=$(word 2,$^) \
-		--key=$(word 3,$^) \
-		--header=policy.h \
-		--source=policy.c)
-
+# Generate clap data for demo
 clap.h clap.c: claps.wav claps_to_header.py
 	$(strip ./claps_to_header.py $< \
 		-b 100 \
@@ -96,7 +88,6 @@ build:
 .PHONY: clean
 clean:
 	rm -rf clap.h clap.c
-	rm -rf policy.h policy.c
 	rm -rf transport_protocol.pb.h transport_protocol.pb.c
 	rm -rf build
 
