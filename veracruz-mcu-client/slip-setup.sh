@@ -1,4 +1,14 @@
 #!/bin/bash
+#
+# ## Authors
+#
+# The Veracruz Development Team.
+#
+# ## Licensing and copyright notice
+#
+# See the `LICENSE.markdown` file in the Veracruz root directory for
+# information on licensing and copyright.
+#
 
 # setup slip/tap network
 nohup /zephyr-workspace/tools/net-tools/loop-socat.sh >/dev/null 2>&1 &
