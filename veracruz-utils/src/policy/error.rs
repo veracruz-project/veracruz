@@ -61,6 +61,8 @@ pub enum PolicyError {
     MissingPolicyFieldError(String),
     #[error(display = "VeracruzUtil: Policy has no program file: {:?}.", _0)]
     NoProgramFileError(String),
+    #[error(display = "VeracruzUtil: IOError: {:?}.", _0)]
+    IOError(#[error(source)] std::io::Error),
 }
 
 ////////////////////////////////////////////////////////////////////////////////

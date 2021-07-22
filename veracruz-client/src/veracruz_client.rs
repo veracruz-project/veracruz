@@ -163,11 +163,33 @@ impl VeracruzClient {
         P1: AsRef<path::Path>,
         P2: AsRef<path::Path>
     {
-        let policy_hash = hex::encode(ring::digest::digest(
-            &ring::digest::SHA256,
-            policy_json.as_bytes(),
-        ));
         let policy = Policy::from_json(&policy_json)?;
+        let policy_hash = policy.policy_hash()
+            .expect("policy did not hash json?")
+            .to_string();
+
+        Self::with_policy_and_hash(
+            client_cert_filename,
+            client_key_filename,
+            policy,
+            policy_hash,
+        )
+    }
+
+    /// Load the client certificate and key, and the global policy, which contains information
+    /// about the enclave. This takes the global policy as a VeracruzPolicy struct and
+    /// related hash.
+    /// Attest the enclave.
+    pub fn with_policy_and_hash<P1, P2>(
+        client_cert_filename: P1,
+        client_key_filename: P2,
+        policy: Policy,
+        policy_hash: String,
+    ) -> Result<VeracruzClient, VeracruzClientError>
+    where
+        P1: AsRef<path::Path>,
+        P2: AsRef<path::Path>
+    {
         let client_cert = Self::read_cert(&client_cert_filename)?;
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
@@ -212,7 +234,7 @@ impl VeracruzClient {
             tls_session: session,
             remote_session_id: None,
             policy: policy,
-            policy_hash: policy_hash.to_string(),
+            policy_hash: policy_hash,
             package_id: 0,
             client_cert: client_cert_string,
         })
@@ -452,7 +474,6 @@ impl VeracruzClient {
         enclave_session_id: u32,
         data: &Vec<u8>,
     ) -> Result<Option<(u32, Vec<Vec<u8>>)>, VeracruzClientError> {
-        println!("post_runtime_manager started");
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 

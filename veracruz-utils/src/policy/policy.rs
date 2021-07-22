@@ -40,6 +40,7 @@ use crate::{
         },
     },
 };
+use ring;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -93,6 +94,10 @@ pub struct Policy {
     execution_strategy: ExecutionStrategy,
     /// The rights table of the standard streams.
     std_streams_table: Vec<StandardStream>,
+
+    /// Hash of the JSON representation if the Policy was parsed from a file.
+    #[serde(skip)]
+    policy_hash: Option<String>
 }
 
 impl Policy {
@@ -128,6 +133,8 @@ impl Policy {
             debug,
             execution_strategy,
             std_streams_table,
+
+            policy_hash: None,
         };
 
         policy.assert_valid()?;
@@ -139,8 +146,19 @@ impl Policy {
     /// validating the well-formedness of the resulting policy in the process.
     /// Returns `Ok(policy)` iff these well-formedness checks pass.
     pub fn from_json(json: &str) -> Result<Self, PolicyError> {
-        let policy: Self = serde_json::from_str(json)?;
+        // parse json
+        let mut policy: Self = serde_json::from_str(json)?;
         policy.assert_valid()?;
+
+        // include hash?
+        let hash = hex::encode(
+            ring::digest::digest(
+                &ring::digest::SHA256,
+                json.as_bytes()
+            )
+        );
+        policy.policy_hash = Some(hash);
+
         Ok(policy)
     }
 
@@ -238,6 +256,12 @@ impl Policy {
     #[inline]
     pub fn std_streams_table(&self) -> &Vec<StandardStream> {
         &self.std_streams_table
+    }
+
+    /// Returns the hash of the source JSON representation, if available
+    #[inline]
+    pub fn policy_hash<'a>(&'a self) -> Option<&'a str> {
+        self.policy_hash.as_ref().map(|s| s.as_str())
     }
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
@@ -351,7 +375,7 @@ impl Policy {
         Ok(table)
     }
 
-    /// Extract the input filenames from a right_map. If a prorgam has rights call 
+    /// Extract the input filenames from a right_map. If a prorgam has rights call
     /// fd_read and path_open, it is considered as an input file.
     fn get_required_inputs(right_map: &HashMap<PathBuf, Rights>) -> Vec<PathBuf> {
         let mut rst = right_map.iter().fold(Vec::new(), |mut acc, (file_name, right)| {
@@ -364,3 +388,4 @@ impl Policy {
         rst
     }
 }
+

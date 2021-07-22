@@ -22,6 +22,7 @@ OPENSSL_INCLUDE_DIR ?= /usr/include/aarch64-linux-gnu
 OPENSSL_LIB_DIR ?= /usr/lib/aarch64-linux-gnu
 TRUSTZONE_C_INCLUDE_PATH ?= /usr/include/aarch64-linux-gnu:/usr/include
 NITRO_RUST_FLAG ?= ""
+BIN_DIR ?= /usr/local/cargo/bin
  
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
@@ -57,17 +58,87 @@ sgx: sdk sgx-env
 	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features sgx
 
+sgx-cli: sgx-env
+	# enclave binaries needed for veracruz-server
+	cd runtime-manager-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
+	cd sgx-root-enclave-bind && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build
+	# build CLIs in top-level crates
+	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features sgx --features cli
+	# build CLIs in the SDK/test-collateral
+	$(MAKE) -C sdk/freestanding-execution-engine
+	$(MAKE) -C sdk/wasm-checker
+	$(MAKE) -C test-collateral/generate-policy
+
 nitro: sdk
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
 
+nitro-cli:
+	# enclave binaries needed for veracruz-server
+	pwd
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
+	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
+	# build CLIs in top-level crates
+	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	# build CLIs in the SDK/test-collateral
+	$(MAKE) -C sdk/freestanding-execution-engine
+	$(MAKE) -C sdk/wasm-checker
+	$(MAKE) -C test-collateral/generate-policy
+
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
 	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC) OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	$(MAKE) -C trustzone-root-enclave trustzone OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
+
+trustzone-cli: trustzone-env
+	# enclave binaries needed for veracruz-server
+	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC) OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
+	$(MAKE) -C trustzone-root-enclave trustzone OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
+	# build CLIs in top-level crates
+	cd proxy-attestation-server && \
+		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
+		OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) \
+		C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
+		cargo build --target aarch64-unknown-linux-gnu --features psa --features cli
+	cd veracruz-server && \
+		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
+		OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) \
+		C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
+		cargo build --target aarch64-unknown-linux-gnu --features tz --features cli
+	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features tz --features cli
+	# build CLIs in the SDK/test-collateral
+	$(MAKE) -C sdk/freestanding-execution-engine
+	$(MAKE) -C sdk/wasm-checker
+	$(MAKE) -C test-collateral/generate-policy
+
+%-cli-install: %-cli
+	# install to Cargo's bin directory
+	cp -f proxy-attestation-server/target/debug/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
+	cp -f veracruz-server/target/debug/veracruz-server $(BIN_DIR)/veracruz-server
+	cp -f veracruz-client/target/debug/veracruz-client $(BIN_DIR)/veracruz-client
+	# install CLIs in SDK/test-collateral
+	cp -f sdk/freestanding-execution-engine/target/release/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
+	cp -f sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
+	cp -f test-collateral/generate-policy/target/release/generate-policy $(BIN_DIR)/generate-policy
+	# symlink concise names
+	ln -sf $(BIN_DIR)/proxy-attestation-server      $(BIN_DIR)/vc-pas
+	ln -sf $(BIN_DIR)/veracruz-server               $(BIN_DIR)/vc-server
+	ln -sf $(BIN_DIR)/veracruz-client               $(BIN_DIR)/vc-client
+	ln -sf $(BIN_DIR)/freestanding-execution-engine $(BIN_DIR)/vc-fee
+	ln -sf $(BIN_DIR)/wasm-checker                  $(BIN_DIR)/vc-wc
+	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/vc-pgen
+	# symlink backwards compatible names
+	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/pgen
 
 # Using wildcard in the dependencies because if they are there, and newer, it
 # should be rebuilt, but if they aren't there, they don't need to be built 
@@ -177,6 +248,11 @@ sgx-env:
 	unset CC
 
 clean:
+	# remove databases since these can easily fall out of date
+	rm -f proxy-attestation-server/proxy-attestation-server.db
+	rm -f veracruz-server-test/proxy-attestation-server.db
+	rm -f veracruz-test/proxy-attestation-server.db
+	# clean code
 	cd runtime-manager-bind && cargo clean 
 	cd sgx-root-enclave-bind && cargo clean
 	cd psa-attestation && cargo clean
@@ -193,11 +269,29 @@ clean:
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C nitro-root-enclave
+	rm -rf bin
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) clean -C sdk
 	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave runtime-manager-bind runtime-manager psa-attestation veracruz-server-test veracruz-server sgx-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
+
+# update dependencies, note does NOT change Cargo.toml, useful if
+# patched/github dependencies have changed without version bump
+update:
+	cd session-manager && cargo update
+	cd execution-engine && cargo update
+	cd transport-protocol && cargo update
+	cd veracruz-client && cargo update
+	cd sgx-root-enclave && cargo update
+	cd runtime-manager && cargo update
+	cd psa-attestation && cargo update
+	cd veracruz-server-test && cargo update
+	cd veracruz-server && cargo update
+	cd veracruz-test && cargo update
+	cd veracruz-utils && cargo update
+	cd trustzone-root-enclave && cargo update
+	cd proxy-attestation-server && cargo update
 
 fmt:
 	cd session-manager && cargo fmt

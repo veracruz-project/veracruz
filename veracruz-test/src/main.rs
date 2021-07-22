@@ -32,7 +32,9 @@ mod tests {
     const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str =
         "../test-collateral/quadruple_policy.json";
 
-    // Clients
+    // Identities
+    const CA_CERT: &'static str = "../test-collateral/CACert.pem";
+    const CA_KEY: &'static str = "../test-collateral/CAKey.pem";
     const PROGRAM_CLIENT_CERT: &'static str = "../test-collateral/program_client_cert.pem";
     const PROGRAM_CLIENT_KEY: &'static str = "../test-collateral/program_client_key.pem";
     const RESULT_CLIENT_CERT: &'static str = "../test-collateral/result_client_cert.pem";
@@ -111,7 +113,12 @@ mod tests {
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                let server = proxy_attestation_server::server::server(actual_server_url, "../test-collateral/CACert.pem", false).unwrap();
+                let server = proxy_attestation_server::server::server(
+                    actual_server_url,
+                    CA_CERT,
+                    CA_KEY,
+                    false
+                ).unwrap();
                 sys.block_on(server).unwrap();
             });
         });
