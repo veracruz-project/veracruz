@@ -89,8 +89,13 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
 
 /// Convert a Certificate Signing Request (CSR) to an X.509 Certificate and
 /// sign it
-fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
-    let csr = openssl::x509::X509Req::from_der(&csr_der)?;
+fn convert_csr_to_certificate(csr_der: &[u8], enclave_hash: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
+    println!("csr_der:{:02x?}", csr_der);
+    let csr = openssl::x509::X509Req::from_der(&csr_der)
+        .map_err(|err| {
+            print!("proxy-attestation-server::attestation::convert_csr_to_certificate failed to get csr from der:{:?}", err);
+            err
+        })?;
     // first, verify the signature on the CSR
     let public_key = csr.public_key()?;
     let verify_result = csr.verify(&public_key)
@@ -213,6 +218,22 @@ fn convert_csr_to_certificate(csr_der: &[u8]) -> Result<openssl::x509::X509, Pro
     cert_builder.append_extension(constraints_extension)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate append_extension failed:{:?}", err);
+            err
+        })?;
+
+    // Add our custom extension to the certificate that contains the hash of the enclave
+    static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
+    let extension_name = format!("{}.{}.{}", OUR_EXTENSION_ID[0], OUR_EXTENSION_ID[1], OUR_EXTENSION_ID[2]);
+    let extension_value = format!("DER:{}", hex::encode(enclave_hash));
+    let custom_extension = openssl::x509::X509Extension::new(None, None, &extension_name, &extension_value)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate X509Extension::new failed:{:?}", err);
+            err
+        })?;
+
+    cert_builder.append_extension(custom_extension)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::convert_csr_to_certificate append_extension for custom extension failed: {:?}", err);
             err
         })?;
 

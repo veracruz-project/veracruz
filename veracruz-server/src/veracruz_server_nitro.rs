@@ -11,24 +11,14 @@
 
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
-    use crate::ec2_instance::EC2Instance;
     use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
-    use lazy_static::lazy_static;
-    use std::sync::Mutex;
-    use veracruz_utils::platform::Platform;
-    use veracruz_utils::platform::nitro::nitro::{NitroRootEnclaveMessage, RuntimeManagerMessage, NitroStatus};
-    use veracruz_utils::platform::nitro::nitro_enclave::{NitroEnclave, NitroError};
+    use std::io::Read;
+    use veracruz_utils::platform::nitro::nitro::{RuntimeManagerMessage, NitroStatus};
+    use veracruz_utils::platform::nitro::nitro_enclave::NitroEnclave;
     use veracruz_utils::policy::policy::Policy;
+    use curl::easy::{Easy, List};
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
-    const NITRO_ROOT_ENCLAVE_EIF_PATH: &str = "../nitro-root-enclave/nitro_root_enclave.eif";
-    const NITRO_ROOT_ENCLAVE_SERVER_PATH: &str =
-        "../nitro-root-enclave-server/target/debug/nitro-root-enclave-server";
-
-    lazy_static! {
-        //static ref NRE_CONTEXT: Mutex<Option<NitroEnclave>> = Mutex::new(None);
-        static ref NRE_CONTEXT: Mutex<Option<EC2Instance>> = Mutex::new(None);
-    }
 
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
@@ -40,22 +30,9 @@ pub mod veracruz_server_nitro {
             let policy: Policy =
                 Policy::from_json(policy_json)?;
 
-            {
-                let mut nre_guard = NRE_CONTEXT.lock()?;
-                if nre_guard.is_none() {
-                    println!("NITRO ROOT ENCLAVE IS UNINITIALIZED.");
-                    let runtime_manager_hash = policy
-                        .runtime_manager_hash(&Platform::Nitro)
-                        .map_err(|err| VeracruzServerError::VeracruzUtilError(err))?;
-                    let ip_string = std::env::var("TABASCO_IP_ADDRESS").unwrap_or("127.0.0.1".to_string());
-                    let ip_addr = format!("{:}:3010", ip_string);
-                    let nre_context =
-                        VeracruzServerNitro::native_attestation(&ip_addr, &runtime_manager_hash)?;
-                    *nre_guard = Some(nre_context);
-                }
-            }
+            let (challenge, challenge_id) = send_attestation_start(policy.proxy_attestation_server_url())?;
 
-            println!("VeracruzServerNitro::new native_attestation complete. instantiating Runtime Manager");
+            println!("VeracruzServerNitro::new instantiating Runtime Manager");
             #[cfg(feature = "debug")]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in debug mode");
@@ -63,7 +40,6 @@ pub mod veracruz_server_nitro {
                     false,
                     RUNTIME_MANAGER_EIF_PATH,
                     true,
-                    Some(VeracruzServerNitro::veracruz_server_ocall_handler),
                 )
                 .map_err(|err| VeracruzServerError::NitroError(err))?
             };
@@ -74,7 +50,6 @@ pub mod veracruz_server_nitro {
                     false,
                     RUNTIME_MANAGER_EIF_PATH,
                     false,
-                    Some(VeracruzServerNitro::veracruz_server_ocall_handler),
                 )
                 .map_err(|err| VeracruzServerError::NitroError(err))?
             };
@@ -85,28 +60,20 @@ pub mod veracruz_server_nitro {
             println!("VeracruzServerNitro::new Runtime Manager instantiated. Calling initialize");
             std::thread::sleep(std::time::Duration::from_millis(10000));
 
-            // Send the StartProxy message, receive the ChallengeData message in response
-            let (challenge, challenge_id) = {
-                let start_proxy: NitroRootEnclaveMessage = NitroRootEnclaveMessage::StartProxy;
-                let encoded_buffer: Vec<u8> = bincode::serialize(&start_proxy)?;
-                let response_buffer = {
-                    let mut nre_guard = NRE_CONTEXT.lock()?;
-                    match &mut *nre_guard {
-                        Some(nre) => {
-                            nre.send_buffer(&encoded_buffer)?;
-                            nre.receive_buffer()?
-                        },
-                        None => return Err(VeracruzServerError::UninitializedEnclaveError),
-                    }
-                };
-                let message: NitroRootEnclaveMessage = bincode::deserialize(&response_buffer)?;
-                match message {
-                    NitroRootEnclaveMessage::ChallengeData(chall, id) => (chall, id),
-                    _ => return Err(VeracruzServerError::InvalidNitroRootEnclaveMessage(message)),
+            let attesstation_doc = {
+                let attestation = RuntimeManagerMessage::Attestation(challenge, challenge_id);
+                meta.enclave.send_buffer(&bincode::serialize(&attestation)?)?;
+                // read the response
+                let response = meta.enclave.receive_buffer()?;
+                match bincode::deserialize(&response[..])? {
+                    RuntimeManagerMessage::AttestationData(doc) => doc,
+                    response_message => return Err(VeracruzServerError::RuntimeManagerMessageStatus(response_message)),
                 }
             };
 
-            let initialize: RuntimeManagerMessage = RuntimeManagerMessage::Initialize(policy_json.to_string(), challenge, challenge_id);
+            let cert_chain = post_native_attestation_token(policy.proxy_attestation_server_url(), &attesstation_doc, challenge_id)?;
+
+            let initialize: RuntimeManagerMessage = RuntimeManagerMessage::Initialize(policy_json.to_string(), cert_chain);
 
             let encoded_buffer: Vec<u8> = bincode::serialize(&initialize)?;
             meta.enclave.send_buffer(&encoded_buffer)?;
@@ -240,33 +207,6 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServerNitro {
-        fn veracruz_server_ocall_handler(input_buffer: Vec<u8>) -> Result<Vec<u8>, NitroError> {
-            let return_buffer: Vec<u8> = {
-                let mut nre_guard = NRE_CONTEXT.lock().map_err(|_| NitroError::MutexError)?;
-                match &mut *nre_guard {
-                    Some(nre) => {
-                        nre.send_buffer(&input_buffer).map_err(|err| {
-                            println!(
-                                "VeracruzServerNitro::veracruz_server_ocall_handler send_buffer failed:{:?}",
-                                err
-                            );
-                            NitroError::EC2Error
-                        })?;
-                        let ret_buffer = nre.receive_buffer().map_err(|err| {
-                            println!(
-                                "VeracruzServerNitro::veracruz_server_ocall_handler receive_buffer failed:{:?}",
-                                err
-                            );
-                            NitroError::EC2Error
-                        })?;
-                        ret_buffer
-                    }
-                    None => return Err(NitroError::EC2Error),
-                }
-            };
-            return Ok(return_buffer);
-        }
-
         fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
             let gtdn_message = RuntimeManagerMessage::GetTLSDataNeeded(session_id);
             let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
@@ -282,52 +222,156 @@ pub mod veracruz_server_nitro {
             };
             return Ok(tls_data_needed);
         }
+    }
 
-        fn native_attestation(
-            proxy_attestation_server_url: &str,
-            _runtime_manager_hash: &str,
-            //) -> Result<NitroEnclave, VeracruzServerError> {
-        ) -> Result<EC2Instance, VeracruzServerError> {
-            println!("VeracruzServerNitro::native_attestation started");
+    /// Send the native (AWS Nitro) attestation token to the proxy attestation server
+    fn post_native_attestation_token(
+        proxy_attestation_server_url: &str,
+        att_doc: &[u8],
+        challenge_id: i32,
+    ) -> Result<Vec<Vec<u8>>, VeracruzServerError> {
+        let serialized_nitro_attestation_doc_request =
+            transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)
+                .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
+        let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
+        let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
+        println!(
+            "nitro-root-enclave-server::post_native_attestation_token posting to URL{:?}",
+            url
+        );
+        let received_body: String = post_buffer(&url, &encoded_str)?;
 
-            println!("Starting EC2 instance");
-            let nre_instance = EC2Instance::new().map_err(|err| VeracruzServerError::EC2Error(err))?;
+        println!(
+            "nitro-root-enclave-server::post_psa_attestation_token received buffer:{:?}",
+            received_body
+        );
 
-            nre_instance
-                .upload_file(
-                    NITRO_ROOT_ENCLAVE_EIF_PATH,
-                    "/home/ec2-user/nitro_root_enclave.eif",
-                )
-                .map_err(|err| VeracruzServerError::EC2Error(err))?;
-            nre_instance
-                .upload_file(
-                    NITRO_ROOT_ENCLAVE_SERVER_PATH,
-                    "/home/ec2-user/nitro-root-enclave-server",
-                )
-                .map_err(|err| VeracruzServerError::EC2Error(err))?;
+        let body_vec =
+            base64::decode(&received_body).map_err(|err| VeracruzServerError::Base64Decode(err))?;
+        let response =
+            transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| VeracruzServerError::TransportProtocol(err))?;
 
-            nre_instance
-                .execute_command("nitro-cli-config -t 2 -m 512")
-                .map_err(|err| VeracruzServerError::EC2Error(err))?;
-            #[cfg(feature = "debug")]
-            let server_command: String = format!(
-                "nohup /home/ec2-user/nitro-root-enclave-server --debug {:} &> nitro_server.log &",
-                proxy_attestation_server_url
-            );
-            #[cfg(not(feature = "debug"))]
-            let server_command: String = format!(
-                "nohup /home/ec2-user/nitro-root-enclave-server {:} &> nitro_server.log &",
-                proxy_attestation_server_url
-            );
-            nre_instance
-                .execute_command(&server_command)
-                .map_err(|err| VeracruzServerError::EC2Error(err))?;
+        let (re_cert, ca_cert) = if response.has_cert_chain() {
+            let cert_chain = response.get_cert_chain();
+            (cert_chain.get_enclave_cert(), cert_chain.get_root_cert())
+        } else {
+            return Err(VeracruzServerError::InvalidProtoBufMessage);
+        };
+        let mut cert_chain: Vec<Vec<u8>> = Vec::new();
+        cert_chain.push(re_cert.to_vec());
+        cert_chain.push(ca_cert.to_vec());
+        return Ok(cert_chain);
+    }
 
-            println!("Waiting for NRE Instance to authenticate.");
-            std::thread::sleep(std::time::Duration::from_millis(15000));
-
-            println!("veracruz_server_tz::native_attestation returning Ok");
-            return Ok(nre_instance);
+    /// Send the start message to the proxy attestation server (this triggers the server to
+    /// send the challenge) and then handle the response
+    fn send_attestation_start(
+        url_base: &str,
+    ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
+        let proxy_attestation_server_response = send_proxy_attestation_server_start(url_base)?;
+        if proxy_attestation_server_response.has_psa_attestation_init() {
+            let (challenge, device_id) =
+                transport_protocol::parse_psa_attestation_init(proxy_attestation_server_response.get_psa_attestation_init())
+                    .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
+            return Ok((challenge, device_id));
+        } else {
+            return Err(VeracruzServerError::InvalidProtoBufMessage);
         }
+    }
+
+    /// Send start to the proxy attestation server.
+    fn send_proxy_attestation_server_start(
+        url_base: &str,
+    ) -> Result<transport_protocol::ProxyAttestationServerResponse, VeracruzServerError> {
+        let serialized_start_msg = transport_protocol::serialize_start_msg("nitro", "0.0")
+            .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
+        let encoded_start_msg: String = base64::encode(&serialized_start_msg);
+        let url = format!("{:}/Start", url_base);
+
+        println!(
+            "nitro-root-enclave-server::send_proxy_attestation_server_start sending to url:{:?}",
+            url
+        );
+        let received_body: String = post_buffer(&url, &encoded_start_msg)?;
+        println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed post command");
+
+        let body_vec =
+            base64::decode(&received_body).map_err(|err| VeracruzServerError::Base64Decode(err))?;
+        let response =
+            transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| VeracruzServerError::TransportProtocol(err))?;
+        println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed. Returning.");
+        return Ok(response);
+    }
+
+    /// Post a buffer to a remote HTTP server
+    fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerError> {
+        let mut buffer_reader = stringreader::StringReader::new(buffer);
+
+        let mut curl_request = Easy::new();
+        curl_request
+            .url(&url)
+            .map_err(|err| VeracruzServerError::CurlError(err))?;
+        let mut headers = List::new();
+        headers
+            .append("Content-Type: application/octet-stream")
+            .map_err(|err| VeracruzServerError::CurlError(err))?;
+        curl_request
+            .http_headers(headers)
+            .map_err(|err| VeracruzServerError::CurlError(err))?;
+        curl_request
+            .post(true)
+            .map_err(|err| VeracruzServerError::CurlError(err))?;
+        curl_request
+            .post_field_size(buffer.len() as u64)
+            .map_err(|err| VeracruzServerError::CurlError(err))?;
+
+        let mut received_body = String::new();
+        let mut received_header = String::new();
+        {
+            let mut transfer = curl_request.transfer();
+
+            transfer
+                .read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))
+                .map_err(|err| VeracruzServerError::CurlError(err))?;
+            transfer
+                .write_function(|buf| {
+                    received_body.push_str(
+                        std::str::from_utf8(buf)
+                            .expect(&format!("Error converting data {:?} from UTF-8", buf)),
+                    );
+                    Ok(buf.len())
+                })
+                .map_err(|err| VeracruzServerError::CurlError(err))?;
+
+            transfer
+                .header_function(|buf| {
+                    received_header.push_str(
+                        std::str::from_utf8(buf)
+                            .expect(&format!("Error converting data {:?} from UTF-8", buf)),
+                    );
+                    true
+                })
+                .map_err(|err| VeracruzServerError::CurlError(err))?;
+
+            transfer
+                .perform()
+                .map_err(|err| VeracruzServerError::CurlError(err))?;
+        }
+        let header_lines: Vec<&str> = received_header.split("\n").collect();
+
+        println!(
+            "nitro-root-enclave-server::post_buffer received header:{:?}",
+            received_header
+        );
+        if !received_header.contains("HTTP/1.1 200 OK\r") {
+            return Err(VeracruzServerError::NonSuccessHttp);
+        }
+
+        println!(
+            "nitro-root-enclave-server::post_buffer header_lines:{:?}",
+            header_lines
+        );
+
+        return Ok(received_body);
     }
 }
