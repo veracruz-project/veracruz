@@ -10,6 +10,12 @@ and are familiar with running the Veracruz server.
 
 First we need to setup the Veracruz computation and server instances.
 
+Make sure the the Veracruz CLIs are built and installed:
+
+``` bash server
+$ make sdk sgx-cli-install
+```
+
 Build the demo computation:
 
 ``` bash server
@@ -98,7 +104,7 @@ And launch the Veracruz Server:
 
 ``` bash server
 $ pkill vc-server || true
-$ RUST_LOG=debug \
+$ RUST_LOG=debug,actix_http=off \
     vc-server veracruz-mcu-client/example/policy.json &
 $ sleep 10
 ```
@@ -106,13 +112,29 @@ $ sleep 10
 Once you see the Veracruz Server and Proxy Attestation Server running
 you can move on to running the demo
 
+## Run the controller
+
+The controller polls the Veracruz server until there is enough data to
+find a triangulated result. To simulate the controller, run the
+`poll_for_result.py` script inside the Veracruz docker:
+
+``` bash server
+$ PYTHONIOENCODING=utf-8 \
+    ./sdk/rust-examples/audio-event-triangulation/scripts/poll_for_result.py \
+        vc-client veracruz-mcu-client/example/policy.json \
+            --identity veracruz-mcu-client/example/controller-cert.pem \
+            --key veracruz-mcu-client/example/controller-key.pem \
+            --program audio-event-triangulation.wasm=veracruz-mcu-client/example/audio-event-triangulation.wasm \
+            --output audio-event-triangulation.wasm=-
+```
+
 
 ## Run the MCU client
 
 The MCU client runs inside its own docker container, which can be spun
 up using the MCU client's Makefile:
 
-``` bash
+``` bash docker
 $ make -C veracruz-mcu-client docker
 ```
 

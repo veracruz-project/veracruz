@@ -20,7 +20,7 @@ def dump_gps(location):
         (absx / (1024*1024/60/60/100)) % 100,
         'E' if location[1] >= 0 else 'W')
 
-def main():
+def main(*command):
     print('\033[0;32mstarting audio event triangulation service\033[m')
     print('veracruz_server: 172.17.0.2:3010')
     print('proxy_attestation_server: 172.17.0.2:3017')
@@ -28,14 +28,7 @@ def main():
 
     while True:
         try:
-            output = sp.check_output([
-                './bin/durango',
-                'example/example-policy.json',
-                '--target', 'sgx',
-                '--key', 'example/example-result-key.pem',
-                '--identity', 'example/example-result-cert.pem',
-                '--output', 'example-binary.wasm:-'],
-                stderr=sp.DEVNULL)
+            output = sp.check_output(command)
         except sp.CalledProcessError:
             time.sleep(5)
             continue 
@@ -50,11 +43,9 @@ def main():
         print('\033[1;33maudio event detected!\033[0m')
         print('\033[1;33mlocation:\033[0m %s' % dump_gps(location))
         print('\033[1;33mtimestamp:\033[0m %u' % int(time.time()))
+        print()
 
-        while True:
-            time.sleep(5)
-
-        return
+        break
 
 if __name__ == "__main__":
     import sys
