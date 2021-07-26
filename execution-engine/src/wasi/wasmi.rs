@@ -189,7 +189,7 @@ impl TypeCheck {
             WasiAPIName::ENVIRON_GET => vec![Self::POINTER, Self::POINTER],
             WasiAPIName::ENVIRON_SIZES_GET => vec![Self::POINTER, Self::POINTER],
             WasiAPIName::CLOCK_RES_GET => vec![Self::CLOCKID, Self::POINTER],
-            WasiAPIName::CLOCK_TIME_GET => vec![Self::CLOCKID, Self::TIMESTAMP, Self::TIMESTAMP],
+            WasiAPIName::CLOCK_TIME_GET => vec![Self::CLOCKID, Self::TIMESTAMP, Self::POINTER],
             WasiAPIName::FD_ADVISE => vec![Self::FD, Self::FILESIZE, Self::FILESIZE, Self::ADVICE],
             WasiAPIName::FD_ALLOCATE => vec![Self::FD, Self::FILESIZE, Self::FILESIZE],
             WasiAPIName::FD_CLOSE => vec![Self::FD],
