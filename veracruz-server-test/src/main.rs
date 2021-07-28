@@ -83,7 +83,7 @@ mod tests {
     const PERSON_SET_INTERSECTION_WASM: &'static str =
         "../test-collateral/private-set-intersection.wasm";
     const LOGISTICS_REGRESSION_WASM: &'static str =
-        "../test-collateral/private-set-intersection.wasm";
+        "../test-collateral/idash2017-logistic-regression.wasm";
     const MACD_WASM: &'static str = "../test-collateral/moving-average-convergence-divergence.wasm";
     const INTERSECTION_SET_SUM_WASM: &'static str =
         "../test-collateral/private-set-intersection-sum.wasm";
@@ -604,7 +604,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
@@ -625,7 +624,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
@@ -676,7 +674,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: intersection-sum, matching the setting in .
