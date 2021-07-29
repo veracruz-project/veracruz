@@ -129,7 +129,7 @@ impl FileSystem {
             rights_table,
             prestat_table: HashMap::new(),
         };
-        rst.install_prestat(&vec![""], std_streams_table);
+        rst.install_prestat::<&Path>(&Vec::new(), std_streams_table);
         rst
     }
 
