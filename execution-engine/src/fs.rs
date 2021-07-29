@@ -294,6 +294,10 @@ impl FileSystem {
     fn new_fd(&self) -> FileSystemResult<Fd> {
         loop {
             let new_fd = self.random_u32()?.into();
+
+            // Set upper limit to 2**31 - 1 (WASI requirement)
+            let new_fd = Fd(new_fd.0 >> 1);
+
             if !self.fd_table.contains_key(&new_fd) {
                 return Ok(new_fd);
             }
