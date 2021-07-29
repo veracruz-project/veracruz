@@ -1,0 +1,52 @@
+
+
+config VC
+    bool "Veracruz MCU Client"
+    default n
+    help
+        This option enables the Veracruz MCU Client
+
+if VC
+
+config VC_POLICY_PATH
+    string "Absolute path to the policy.json file"
+    default "policy.json"
+    help
+        This must be set to the absolute path to the policy.json
+        file that governs the computation.
+
+config VC_IDENTITY_PATH
+    string "Absolute path to the public key of the device"
+    default "cert.pem"
+    help
+        This must be set to the absolute path to the public key
+        that represents the identity of the device.
+
+config VC_KEY_PATH
+    string "Absolute path to the private key of the device"
+    default "key.pem"
+    help
+        This must be set to the absolute path to the private key
+        of the device.
+
+config VC_DUMP_INFO
+    bool "Enable hexdumps for debugging"
+    default n
+    help
+        Enables hexdumps of various bits of data, such as the client/peer
+        certificates, handshake messages, etc. Useful for debugging, but
+        may leak secrets if used in production.
+
+config VC_SEND_BUFFER_SIZE
+    int "Size of Veracruz's send buffer"
+    default 2048
+    help
+        The size of Veracruz's send buffer in bytes.
+
+config VC_RECV_BUFFER_SIZE
+    int "Size of Veracruz's recv buffer"
+    default 4096
+    help
+        The size of Veracruz's recv buffer in bytes.
+
+endif

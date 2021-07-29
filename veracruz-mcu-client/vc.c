@@ -29,7 +29,6 @@
 #include "xxd.h"
 #include "base64.h"
 #include "http.h"
-#include "clap.h"
 
 
 //// Veracruz session handling ////
@@ -443,7 +442,6 @@ int vc_connect(vc_t *vc) {
         return err;
     }
 
-    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;
 }
 
@@ -570,7 +568,6 @@ int vc_send_data(vc_t *vc,
             VC_SERVER_HOST,
             VC_SERVER_PORT,
             name);
-    k_sleep(Z_TIMEOUT_MS(DELAY*1000));
     return 0;
 }
 

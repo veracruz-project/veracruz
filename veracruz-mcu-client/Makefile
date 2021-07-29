@@ -6,11 +6,24 @@ DOCKER_ROOT ?= $(abspath $(firstword $(MAKEFILE_LIST))/..)
 
 ELF_PATH ?= /zephyr-workspace/$(TARGET)/build/zephyr/zephyr.elf
 
-CLAP ?= 0
-CLIENT_CERT ?= client_cert.pem
-CLIENT_KEY ?= client_key.pem
-POLICY ?= policy.json
-DELAY ?= 0
+VC_POLICY_PATH ?= policy.json
+VC_IDENTITY_PATH ?= client_cert.pem
+VC_KEY_PATH ?= client_key.pem
+
+AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER ?= 0
+AUDIO_EVENT_TRIANGULATION_DELAY ?= 0
+
+
+#build:
+#	$(strip west build -b native_posix \
+#			samples/audio-event-triangulation \
+#			-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
+#			-DCONFIG_VC_POLICY_PATH=\"/zephyr-workspace/mini-durango/example/policy.json\" \
+#			-DCONFIG_VC_IDENTITY_PATH=\"/zephyr-workspace/mini-durango/example/mcu0-cert.pem\" \
+#			-DCONFIG_VC_KEY_PATH=\"/zephyr-workspace/mini-durango/example/mcu0-key.pem\" \
+#			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
+#			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER=0 \
+#			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY=0 )
 
 ## QEMU configuration
 #QEMU ?= /opt/zephyr-sdk-0.11.4/sysroots/x86_64-pokysdk-linux/usr/bin/qemu-system-arm
@@ -55,8 +68,8 @@ update:
 	west update
 
 # Generate clap data for demo
-clap.h clap.c: claps.wav claps_to_header.py
-	$(strip ./claps_to_header.py $< \
+samples/audio-event-triangulation/clap.h samples/audio-event-triangulation/clap.c: samples/audio-event-triangulation/claps.wav samples/audio-event-triangulation/claps_to_header.py
+	$(strip ./samples/audio-event-triangulation/claps_to_header.py $< \
 		-b 100 \
 		-B 30 \
 		-A 170 \
@@ -79,16 +92,28 @@ transport_protocol.pb.h transport_protocol.pb.c: \
 
 .DEFAULT_GOAL :=
 .PHONY: build
-build: policy.h policy.c
-build: clap.h clap.c
-build: transport_protocol.pb.h transport_protocol.pb.c
+#build: policy.h policy.c
+#build: samples/audio-event-triangulation/clap.h samples/audio-event-triangulation/clap.c
+#build: transport_protocol.pb.h transport_protocol.pb.c
 build:
-	west build -b native_posix
+	$(strip west build -b native_posix \
+			samples/audio-event-triangulation \
+			-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
+			-DCONFIG_VC_POLICY_PATH=\"$(abspath $(VC_POLICY_PATH))\" \
+			-DCONFIG_VC_IDENTITY_PATH=\"$(abspath $(VC_IDENTITY_PATH))\" \
+			-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
+			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
+			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
+			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
+
+
+
 
 .PHONY: clean
 clean:
-	rm -rf clap.h clap.c
+	rm -rf samples/audio-event-triangulation/clap.h samples/audio-event-triangulation/clap.c
 	rm -rf transport_protocol.pb.h transport_protocol.pb.c
+	rm -rf policy.h policy.c
 	rm -rf build
 
 .PHONY: rom_report

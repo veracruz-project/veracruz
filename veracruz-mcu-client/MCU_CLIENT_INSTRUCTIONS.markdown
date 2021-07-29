@@ -141,42 +141,33 @@ $ make -C veracruz-mcu-client docker
 This sets up the Zephyr build system and necessary networking interfaces
 to simulate an MCU's IP stack.
 
-Before we run the MCU client, we need to generate the policy.h and policy.c
-files for our demo:
+Now we can build and run the MCU client demo. We just need to provide the
+paths to the policy.json and device certifcate/key so these can be built
+into the MCU image:
 
 ``` bash client
-$ ./policy_to_header.py example/policy.json \
-    --header=policy.h \
-    --source=policy.c \
-    --identity=example/mcu0-cert.pem \
-    --key=example/mcu0-key.pem
-```
-
-Now we can run the MCU client demo:
-
-``` bash client
-$ make clean build run
+$ make clean build run \
+    VC_POLICY_PATH=example/policy.json \
+    VC_IDENTITY_PATH=example/mcu0-cert.pem \
+    VC_KEY_PATH=example/mcu0-key.pem
 ```
 
 Of course, what is triangulation without at least three reference points. This
-demo includes a set of "clap" audio events which can be selected using
-the CLAP variable:
+demo includes a set of "clap" audio events which can be selected by the
+AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER variable:
 
 ``` bash client
-$ ./policy_to_header.py example/policy.json \
-    --header=policy.h \
-    --source=policy.c \
-    --identity=example/mcu1-cert.pem \
-    --key=example/mcu1-key.pem
-$ make clean build run CLAP=1
+$ make clean build run \
+    VC_POLICY_PATH=example/policy.json \
+    VC_IDENTITY_PATH=example/mcu1-cert.pem \
+    VC_KEY_PATH=example/mcu1-key.pem \
+    AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER=1
 ```
 
 ``` bash client
-$ ./policy_to_header.py example/policy.json \
-    --header=policy.h \
-    --source=policy.c \
-    --identity=example/mcu2-cert.pem \
-    --key=example/mcu2-key.pem
-$ make clean build run CLAP=2
+$ make clean build run \
+    VC_POLICY_PATH=example/policy.json \
+    VC_IDENTITY_PATH=example/mcu2-cert.pem \
+    VC_KEY_PATH=example/mcu2-key.pem \
+    AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER=2
 ```
-
