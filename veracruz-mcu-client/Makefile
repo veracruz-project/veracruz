@@ -13,6 +13,8 @@ VC_KEY_PATH ?= client_key.pem
 AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER ?= 0
 AUDIO_EVENT_TRIANGULATION_DELAY ?= 0
 
+SHAMIR_SECRET_SHARING_BINARY_PATH ?= binary.wasm
+
 
 #build:
 #	$(strip west build -b native_posix \
@@ -106,8 +108,15 @@ build:
 			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
 			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
 
-
-
+.PHONY: build-test
+build-test:
+	$(strip west build -b native_posix \
+			samples/shamir-secret-sharing \
+			-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
+			-DCONFIG_VC_POLICY_PATH=\"$(abspath $(VC_POLICY_PATH))\" \
+			-DCONFIG_VC_IDENTITY_PATH=\"$(abspath $(VC_IDENTITY_PATH))\" \
+			-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
+			-DCONFIG_VC_SHAMIR_SECRET_SHARING_BINARY_PATH=\"$(abspath $(SHAMIR_SECRET_SHARING_BINARY_PATH))\" )
 
 .PHONY: clean
 clean:

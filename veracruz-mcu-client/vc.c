@@ -68,6 +68,7 @@ static ssize_t vc_rawsend(void *p,
         buf, len,
         &vc->send_buf[data_len], VC_SEND_BUFFER_SIZE-data_len);
     if (res < 0) {
+        printf("hm %d\n", VC_SEND_BUFFER_SIZE-data_len);
         printf("base64_encode failed (%d)\n", res);
         return res;
     }
@@ -456,8 +457,13 @@ int vc_close(vc_t *vc) {
 }
 
 // helper for encoding dynamic-length bytes/strings
+struct const_bytes {
+    const uint8_t *buf;
+    size_t len;
+};
+
 struct bytes {
-    const void *buf;
+    uint8_t *buf;
     size_t len;
 };
 
@@ -468,8 +474,60 @@ static bool vc_encode_bytes(
     if (!pb_encode_tag_for_field(stream, field))
         return false;
 
-    struct bytes *b = *arg;
+    struct const_bytes *b = *arg;
     return pb_encode_string(stream, b->buf, b->len);
+}
+
+// Ok this is a weird one, but common enough to warrant its
+// own function. 
+//
+// vc_ssl_communicate handles the common send+recv loop found
+// in Veracruz. It takes a buffer which may be partially full of
+// data, sends it to the Veracruz instances over SSL, and retrieves
+// its response. Parsing is left up to the caller.
+//
+// To handle this there are three different sizes flying around, buf_len
+// is the length of data in the buffer to be sent, buf_cap is the capacity
+// of the buffer to recieve data, and returned is the amount of data actually
+// recieved from Veracruz.
+static ssize_t vc_ssl_communicate(vc_t *vc,
+        const char *func, const char *name,
+        uint8_t *buf, size_t buf_len, size_t buf_cap) {
+    #ifdef VC_DUMP_INFO
+        printf("%s: %s:\n", func, name);
+        xxd(buf, len);
+    #endif
+
+    // send to Veracruz
+    size_t written = 0;
+    while (written < buf_len) {
+        int res = mbedtls_ssl_write(&vc->session,
+                &buf[written], buf_len-written);
+        if (res < 0) {
+            printf("mbedtls_ssl_write failed (%d)\n", res);
+            return res;
+        }
+
+        // if send is fragmented, update with a progress message
+        if (written != 0) {
+            printf("%s: %d/%d bytes\n", func, written+res, buf_len);
+        }
+        written += res;
+    }
+
+    // get Veracruz's response
+    int res = mbedtls_ssl_read(&vc->session, buf, buf_cap);
+    if (res < 0) {
+        printf("mbedtls_ssl_read failed (%d)\n", res);
+        return res;
+    }
+
+    #ifdef VC_DUMP_INFO
+        printf("%s: response:\n", func);
+        xxd(buf, res);
+    #endif
+
+    return res;
 }
 
 int vc_send_data(vc_t *vc,
@@ -484,25 +542,27 @@ int vc_send_data(vc_t *vc,
     Tp_RuntimeManagerRequest send_data = {
         .which_message_oneof = Tp_RuntimeManagerRequest_data_tag,
         .message_oneof.data.file_name.funcs.encode = vc_encode_bytes,
-        .message_oneof.data.file_name.arg = &(struct bytes){
+        .message_oneof.data.file_name.arg = &(struct const_bytes){
             .buf = name,
             .len = strlen(name),
         },
         .message_oneof.data.data.funcs.encode = vc_encode_bytes,
-        .message_oneof.data.data.arg = &(struct bytes){
+        .message_oneof.data.data.arg = &(struct const_bytes){
             .buf = data,
             .len = data_len,
         },
     };
 
     // figure out how much of a buffer to allocate, this needs to hold our
-    // sent data + the response, response is fairly small and honestly could
-    // be smaller
+    // sent data + the response, response is fairly small
     size_t encoded_size = 0;
     pb_get_encoded_size(&encoded_size, &Tp_RuntimeManagerRequest_msg, &send_data);
     size_t proto_len = (32 > encoded_size) ? 32 : encoded_size;
-    // heh
+    // heh, proto_buf
     uint8_t *proto_buf = malloc(proto_len);
+    if (!proto_buf) {
+        return -ENOMEM;
+    }
 
     // encode
     pb_ostream_t proto_stream = pb_ostream_from_buffer(
@@ -514,32 +574,13 @@ int vc_send_data(vc_t *vc,
         return -EILSEQ;
     }
 
-    #ifdef VC_DUMP_INFO
-        printf("send_data: %s:\n", name);
-        xxd(proto_buf, proto_stream.bytes_written);
-    #endif
-
-    // send to Veracruz
-    int res = mbedtls_ssl_write(&vc->session,
-            proto_buf, proto_stream.bytes_written);
+    // communicate over SSL
+    ssize_t res = vc_ssl_communicate(vc, "vc_send_data", name,
+            proto_buf, proto_stream.bytes_written, proto_len);
     if (res < 0) {
-        printf("mbedtls_ssl_write failed (%d)\n", res);
         free(proto_buf);
         return res;
     }
-
-    // get Veracruz's response
-    res = mbedtls_ssl_read(&vc->session, proto_buf, proto_len);
-    if (res < 0) {
-        printf("mbedtls_ssl_read failed (%d)\n", res);
-        free(proto_buf);
-        return res;
-    }
-
-    #ifdef VC_DUMP_INFO
-        printf("send_data: response:\n");
-        xxd(proto_buf, res);
-    #endif
 
     // parse
     Tp_RuntimeManagerResponse response;
@@ -556,7 +597,7 @@ int vc_send_data(vc_t *vc,
 
     // did server send success?
     if (response.status != Tp_ResponseStatus_SUCCESS) {
-        printf("send_data successfully failed! (%d)\n", response.status);
+        printf("vc_send_data successfully failed! (%d)\n", response.status);
         return -EACCES;
     }
 
@@ -571,4 +612,262 @@ int vc_send_data(vc_t *vc,
     return 0;
 }
 
+int vc_send_program(vc_t *vc,
+        const char *name,
+        const uint8_t *program,
+        size_t program_len) {
+    printf("sending program to enclave{%s:%d}/%s, %d bytes\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
+            name, program_len);
+    // construct program protobuf
+    Tp_RuntimeManagerRequest send_program = {
+        .which_message_oneof = Tp_RuntimeManagerRequest_program_tag,
+        .message_oneof.program.file_name.funcs.encode = vc_encode_bytes,
+        .message_oneof.program.file_name.arg = &(struct const_bytes){
+            .buf = name,
+            .len = strlen(name),
+        },
+        .message_oneof.program.code.funcs.encode = vc_encode_bytes,
+        .message_oneof.program.code.arg = &(struct const_bytes){
+            .buf = program,
+            .len = program_len,
+        },
+    };
 
+    // figure out how much of a buffer to allocate, this needs to hold our
+    // sent program + the response, response is fairly small
+    size_t encoded_size = 0;
+    pb_get_encoded_size(&encoded_size, &Tp_RuntimeManagerRequest_msg, &send_program);
+    size_t proto_len = (32 > encoded_size) ? 32 : encoded_size;
+    // heh, proto_buf
+    uint8_t *proto_buf = malloc(proto_len);
+    if (!proto_buf) {
+        return -ENOMEM;
+    }
+
+    // encode
+    pb_ostream_t proto_stream = pb_ostream_from_buffer(
+            proto_buf, proto_len);
+    bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &send_program);
+    if (!success) {
+        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    // communicate over SSL
+    ssize_t res = vc_ssl_communicate(vc, "vc_send_program", name,
+            proto_buf, proto_stream.bytes_written, proto_len);
+    if (res < 0) {
+        free(proto_buf);
+        return res;
+    }
+
+    // parse
+    Tp_RuntimeManagerResponse response;
+    pb_istream_t resp_stream = pb_istream_from_buffer(
+            proto_buf, res);
+    success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
+    if (!success) {
+        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    free(proto_buf);
+
+    // did server send success?
+    if (response.status != Tp_ResponseStatus_SUCCESS) {
+        printf("vc_send_program successfully failed! (%d)\n", response.status);
+        return -EACCES;
+    }
+
+    printf("enclave{%s:%d} responded with success\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
+    printf("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m\n",
+            program_len,
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
+            name);
+    return 0;
+}
+
+static bool vc_request_result_decode(
+        pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    struct bytes *result = *arg;
+    if (stream->bytes_left > result->len) {
+        printf("result size exceeded buffer (%d > %d)\n",
+            stream->bytes_left, result->len);
+        return false;
+    }
+
+    result->len = stream->bytes_left;
+    return pb_read(stream, result->buf, result->len);
+}
+
+ssize_t vc_request_result(vc_t *vc,
+        const char *name,
+        uint8_t *result,
+        size_t result_len) {
+    printf("requesting result from enclave{%s:%d}/%s\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
+            name);
+    // construct program protobuf
+    Tp_RuntimeManagerRequest request_result = {
+        .which_message_oneof = Tp_RuntimeManagerRequest_request_result_tag,
+        .message_oneof.request_result.file_name.funcs.encode = vc_encode_bytes,
+        .message_oneof.request_result.file_name.arg = &(struct const_bytes){
+            .buf = name,
+            .len = strlen(name),
+        },
+    };
+
+    // figure out how much of a buffer to allocate, this needs to hold our
+    // sent program + the response, response is fairly small
+    size_t encoded_size = 0;
+    pb_get_encoded_size(&encoded_size, &Tp_RuntimeManagerRequest_msg, &request_result);
+    size_t proto_len = (VC_RECV_BUFFER_SIZE > encoded_size)
+            ? VC_RECV_BUFFER_SIZE : encoded_size;
+    // heh, proto_buf
+    uint8_t *proto_buf = malloc(proto_len);
+    if (!proto_buf) {
+        return -ENOMEM;
+    }
+
+    // encode
+    pb_ostream_t proto_stream = pb_ostream_from_buffer(
+            proto_buf, proto_len);
+    bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &request_result);
+    if (!success) {
+        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    // communicate over SSL
+    ssize_t res = vc_ssl_communicate(vc, "vc_request_result", name,
+            proto_buf, proto_stream.bytes_written, proto_len);
+    if (res < 0) {
+        free(proto_buf);
+        return res;
+    }
+
+    // parse
+    //
+    // note that RuntimeManagerResponse is configured to not use unions,
+    // this is due to a limitation in nanopb that requires no_union for callbacks
+    // to work, otherwise we would need more memory allocations
+    //
+    // https://github.com/nanopb/nanopb/issues/572
+    //
+    struct bytes result_bytes = {
+        .buf = result,
+        .len = result_len,
+    };
+    Tp_RuntimeManagerResponse response = {
+        .result.data.funcs.decode = vc_request_result_decode,
+        .result.data.arg = &result_bytes,
+    };
+    pb_istream_t resp_stream = pb_istream_from_buffer(
+            proto_buf, res);
+    success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
+    if (!success) {
+        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    free(proto_buf);
+    result_len = result_bytes.len;
+
+    // did server send success?
+    if (response.status != Tp_ResponseStatus_SUCCESS) {
+        printf("vc_request_result successfully failed! (%d)\n", response.status);
+        return -EACCES;
+    }
+
+    // did server send a result?
+    //if (response.which_message_oneof != Tp_RuntimeManagerResponse_result_tag) {
+    if (!response.has_result) {
+        printf("vc_request_result did not respond with a result\n");
+        return -EILSEQ;
+    }
+
+    printf("enclave{%s:%d} responded with success\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
+    printf("\033[32mdownloaded %d bytes from enclave{%s:%d}/%s\033[m\n",
+            result_len,
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
+            name);
+    return result_len;
+}
+
+ssize_t vc_request_shutdown(vc_t *vc) {
+    printf("requesting shutdown from enclave{%s:%d}\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
+    // construct program protobuf
+    Tp_RuntimeManagerRequest request_result = {
+        .which_message_oneof = Tp_RuntimeManagerRequest_request_shutdown_tag,
+    };
+
+    // figure out how much of a buffer to allocate
+    size_t encoded_size = 0;
+    pb_get_encoded_size(&encoded_size, &Tp_RuntimeManagerRequest_msg, &request_result);
+    size_t proto_len = encoded_size;
+    // heh, proto_buf
+    uint8_t *proto_buf = malloc(proto_len);
+    if (!proto_buf) {
+        return -ENOMEM;
+    }
+
+    // encode
+    pb_ostream_t proto_stream = pb_ostream_from_buffer(
+            proto_buf, proto_len);
+    bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &request_result);
+    if (!success) {
+        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    // communicate over SSL
+    ssize_t res = vc_ssl_communicate(vc, "vc_request_shutdown", "shutdown",
+            proto_buf, proto_stream.bytes_written, proto_len);
+    if (res < 0) {
+        free(proto_buf);
+        return res;
+    }
+
+    // parse
+    Tp_RuntimeManagerResponse response;
+    pb_istream_t resp_stream = pb_istream_from_buffer(
+            proto_buf, res);
+    success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
+    if (!success) {
+        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        free(proto_buf);
+        return -EILSEQ;
+    }
+
+    free(proto_buf);
+
+    // did server send success?
+    if (response.status != Tp_ResponseStatus_SUCCESS) {
+        printf("vc_request_shutdown successfully failed! (%d)\n", response.status);
+        return -EACCES;
+    }
+
+    printf("enclave{%s:%d} responded with success\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
+    printf("\033[32mshutdown enclave{%s:%d}\033[m\n",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT);
+    return 0;
+}

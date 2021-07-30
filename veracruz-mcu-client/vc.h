@@ -25,19 +25,32 @@
 #include <stdlib.h>
 #include <mbedtls/ssl.h>
 
-// define for more output
-//#define VC_DUMP_INFO
-
 #ifndef VC_RUNTIME_HASH_EXTENSION_ID
 #define VC_RUNTIME_HASH_EXTENSION_ID ((const uint8_t[3]){85, 30, 1})
 #endif
 
+// define for more output
+#ifndef VC_DUMP_INFO
+    #ifdef CONFIG_VC_DUMP_INFO
+    #define VC_DUMP_INFO
+    #endif
+#endif
+
+// other configuration variables, CONFIG_* is provided by Zephyr+Kconfig
 #ifndef VC_SEND_BUFFER_SIZE
-#define VC_SEND_BUFFER_SIZE (2*1024)
+    #ifdef CONFIG_VC_SEND_BUFFER_SIZE
+    #define VC_SEND_BUFFER_SIZE CONFIG_VC_SEND_BUFFER_SIZE
+    #else
+    #define VC_SEND_BUFFER_SIZE (2*1024)
+    #endif
 #endif
 
 #ifndef VC_RECV_BUFFER_SIZE
-#define VC_RECV_BUFFER_SIZE (4*1024)
+    #ifdef CONFIG_VC_RECV_BUFFER_SIZE
+    #define VC_RECV_BUFFER_SIZE CONFIG_VC_RECV_BUFFER_SIZE
+    #else
+    #define VC_RECV_BUFFER_SIZE (4*1024)
+    #endif
 #endif
 
 // Veracruz client state
@@ -77,6 +90,20 @@ int vc_send_data(vc_t *vc,
         const uint8_t *data,
         size_t data_len);
 
+// Send a program to a Veracruz instance
+int vc_send_program(vc_t *vc,
+        const char *name,
+        const uint8_t *program,
+        size_t program_len);
+
+// Request a result from a Veracruz instance
+ssize_t vc_request_result(vc_t *vc,
+        const char *name,
+        uint8_t *result,
+        size_t result_len);
+
+// Request the shutdown of a Veracruz instance
+ssize_t vc_request_shutdown(vc_t *vc);
 
 
 #endif

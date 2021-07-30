@@ -1,0 +1,9 @@
+
+
+source "Kconfig.zephyr"
+
+config VC_SHAMIR_SECRET_SHARING_BINARY_PATH
+    string "Absolute path to binary to use for Veracruz computation"
+    default "binary.wasm"
+    help
+        This binary is built into the image and uploaded to Veracruz

@@ -4,3 +4,5 @@
 transport_protocol.proto			package:"Tp"
 # efficiency tweaks to C representation
 Tp.RequestProxyPsaAttestationToken.challenge	max_size:32 fixed_length:true
+Tp.RuntimeManagerResponse                       no_unions:true
+
