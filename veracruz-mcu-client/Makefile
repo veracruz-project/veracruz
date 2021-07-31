@@ -160,7 +160,7 @@ clean:
 run:
 	/zephyr-workspace/mini-durango/build/zephyr/zephyr.exe
 
-rom_report:
+build-qemu-cortex-m3:
 	$(strip west build -b qemu_cortex_m3 \
 		samples/audio-event-triangulation \
 		-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
@@ -169,20 +169,15 @@ rom_report:
 		-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
 		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
 		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
-		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" \
+		-DCONFIG_TEST_RANDOM_GENERATOR=y)
+
+
+rom_report: build-qemu-cortex-m3
 	west build -b qemu_cortex_m3 -t rom_report > rom_report.txt
 	sed -i '/^Path/,$$!d' rom_report.txt
 
-static_ram_report:
-	$(strip west build -b qemu_cortex_m3 \
-		samples/audio-event-triangulation \
-		-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
-		-DCONFIG_VC_POLICY_PATH=\"$(abspath $(VC_POLICY_PATH))\" \
-		-DCONFIG_VC_IDENTITY_PATH=\"$(abspath $(VC_IDENTITY_PATH))\" \
-		-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
-		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
-		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
-		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
+static_ram_report: build-qemu-cortex-m3
 	west build -b qemu_cortex_m3 -t ram_report > static_ram_report.txt
 	sed -i '/^Path/,$$!d' static_ram_report.txt
 	

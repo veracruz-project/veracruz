@@ -42,8 +42,22 @@ static void mbedtls_debug(void *ctx, int level,
 
 static int vc_rawrng(void *p,
         uint8_t *buf, size_t len) {
-    // TODO use cryptographically secure rng?
-    sys_rand_get(buf, len);
+    // We fall back to non-cryptographic RNG if the test random number
+    // generator is defined, this is required for qemu-based simulations,
+    // but not for native_posix
+    //
+    // This may be a bug in the qemu-based implementations, since the
+    // documentation for CONFIG_TEST_RANDOM_GENERATOR warns it should only
+    // be used for testing purposes
+    //
+    // Don't worry, Zephyr already outputs warnings when this config is defined
+    //
+    #ifdef CONFIG_TEST_RANDOM_GENERATOR
+        sys_rand_get(buf, len);
+    #else
+        // this is Zephyr's cryptographically secure RNG
+        sys_csrand_get(buf, len);
+    #endif
     return 0;
 }
 
