@@ -70,19 +70,23 @@ ssize_t base64_encode(
     return e_len;
 }
 
-//static size_t strnlen(const char *s, size_t s_len) {
-//    for (size_t i = 0; i < s_len; i++) {
-//        if (s[i] == '\0') {
-//            return i;
-//        }
-//    }
+// custom strnlen, behaves as expected
 //
-//    return s_len;
-//}
+// this is needed since strnlen is not available on all platforms
+//
+static size_t base64_strnlen(const char *s, size_t s_len) {
+    for (size_t i = 0; i < s_len; i++) {
+        if (s[i] == '\0') {
+            return i;
+        }
+    }
+
+    return s_len;
+}
 
 // compute size after decoding
 size_t base64_decode_size(const char *in, size_t in_len) {
-    size_t e_len = strnlen(in, in_len);
+    size_t e_len = base64_strnlen(in, in_len);
 
     size_t x = 3*(e_len/4);
     for (size_t i = 0; i < e_len && in[e_len-i-1] == '='; i++) {
@@ -118,7 +122,7 @@ static bool base64_isvalid(char c) {
 ssize_t base64_decode(
         const char *in, size_t in_len,
         char *out, size_t out_len) {
-    size_t e_len = strnlen(in, in_len);
+    size_t e_len = base64_strnlen(in, in_len);
     if (e_len % 4 != 0) {
         return -EINVAL;
     }
