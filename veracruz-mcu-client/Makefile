@@ -126,13 +126,24 @@ clean:
 	rm -rf build
 
 .PHONY: rom_report
-rom_report: build
-	west build -t rom_report -b qemu_cortex_m3
-
-.PHONY: ram
-ram_report: build
-	west build -t ram_report -b qemu_cortex_m3
-
+#rom_report: build
+#	west build -t rom_report -b qemu_cortex_m3
+#
+#rom_report:
+#	$(strip west build -t rom_report -b qemu_cortex_m3 \
+#			samples/audio-event-triangulation \
+#			-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
+#			-DCONFIG_VC_POLICY_PATH=\"$(abspath $(VC_POLICY_PATH))\" \
+#			-DCONFIG_VC_IDENTITY_PATH=\"$(abspath $(VC_IDENTITY_PATH))\" \
+#			-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
+#			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
+#			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
+#			-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
+#
+#.PHONY: ram
+#ram_report: build
+#	west build -t ram_report -b qemu_cortex_m3
+#
 ## QEMU
 #.PHONY: run
 #run: build
@@ -148,4 +159,61 @@ ram_report: build
 
 run:
 	/zephyr-workspace/mini-durango/build/zephyr/zephyr.exe
+
+rom_report:
+	$(strip west build -b qemu_cortex_m3 \
+		samples/audio-event-triangulation \
+		-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
+		-DCONFIG_VC_POLICY_PATH=\"$(abspath $(VC_POLICY_PATH))\" \
+		-DCONFIG_VC_IDENTITY_PATH=\"$(abspath $(VC_IDENTITY_PATH))\" \
+		-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
+	west build -b qemu_cortex_m3 -t rom_report > rom_report.txt
+	sed -i '/^Path/,$$!d' rom_report.txt
+
+static_ram_report:
+	$(strip west build -b qemu_cortex_m3 \
+		samples/audio-event-triangulation \
+		-DZEPHYR_EXTRA_MODULES=/zephyr-workspace/mini-durango \
+		-DCONFIG_VC_POLICY_PATH=\"$(abspath $(VC_POLICY_PATH))\" \
+		-DCONFIG_VC_IDENTITY_PATH=\"$(abspath $(VC_IDENTITY_PATH))\" \
+		-DCONFIG_VC_KEY_PATH=\"$(abspath $(VC_KEY_PATH))\" \
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH=\"/zephyr-workspace/mini-durango/samples/audio-event-triangulation/claps.wav\" \
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER="$(AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER)" \
+		-DCONFIG_VC_AUDIO_EVENT_TRIANGULATION_DELAY="$(AUDIO_EVENT_TRIANGULATION_DELAY)" )
+	west build -b qemu_cortex_m3 -t ram_report > static_ram_report.txt
+	sed -i '/^Path/,$$!d' static_ram_report.txt
+	
+
+run_with_dyn_ram_report:
+	$(strip valgrind --tool=massif --stacks=yes --massif-out-file=massif.out \
+		/zephyr-workspace/mini-durango/build/zephyr/zephyr.exe)
+	ms_print massif.out > dyn_ram_report.txt
+
+run_with_memory_report: \
+		build run_with_dyn_ram_report \
+		rom_report \
+		static_ram_report
+	@echo
+	@printf "%7s %7s %7s %7s\n" code static heap stack
+	@awk 'END{printf "%7d ",$$1}' rom_report.txt
+	@awk 'END{printf "%7d ",$$1}' static_ram_report.txt
+	@awk '\
+		BEGIN{heap=0} \
+		/^[ 0-9,]*$$/{gsub(/,/,"",$$3); if ($$3 > heap) heap=$$3} \
+		END{printf "%7d ",heap}' dyn_ram_report.txt
+	@awk '\
+		BEGIN{stack=0} \
+		/^[ 0-9,]*$$/{gsub(/,/,"",$$6); if ($$6 > stack) stack=$$6} \
+		END{printf "%7d ",stack}' dyn_ram_report.txt
+	@echo
+	@echo
+	@echo "full reports written to: rom_report.txt static_ram_report.txt dyn_ram_report.txt"
+	@echo
+	
+
+
+	
 

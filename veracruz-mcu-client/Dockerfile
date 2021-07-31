@@ -23,7 +23,8 @@ RUN apt-get update && \
         cmake-data=3.18.4-0kitware1
 
 # Zephyr dependencies
-RUN apt-get update && \
+RUN dpkg --add-architecture i386 && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         ccache \
         device-tree-compiler \
@@ -34,6 +35,7 @@ RUN apt-get update && \
         gcc-multilib \
         git \
         gperf \
+        libc6-dbg:i386 \
         libsdl2-dev \
         make \
         ninja-build \
@@ -44,6 +46,7 @@ RUN apt-get update && \
         python3-setuptools \
         python3-tk \
         python3-wheel \
+        valgrind \
         wget \
         xz-utils
 
