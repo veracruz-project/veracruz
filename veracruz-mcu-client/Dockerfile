@@ -29,6 +29,7 @@ RUN dpkg --add-architecture i386 && \
         ccache \
         device-tree-compiler \
         dfu-util \
+        errno \
         file \
         g++-multilib \
         gcc \

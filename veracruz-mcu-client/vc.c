@@ -66,7 +66,9 @@ static ssize_t vc_rawsend(void *p,
     vc_t *vc = p;
 
     if (vc->recv_len != 0) {
-        printf("data left!?!?!?!? %d\n", vc->recv_len);
+        printf("attemped to send while %d bytes are unrecved, "
+            "this should not happen", vc->recv_len);
+        return -EBUSY;
     }
 
     // encode with base64 + id (0)
@@ -182,7 +184,7 @@ static ssize_t vc_rawrecv(void *p,
     if (vc->recv_len == 0) {
         // no data available? since we communicate over POSTs,
         // we'll never have data available
-        printf("recv timeout\n");
+        printf("attempted to recv with no data available, timeout\n");
         return MBEDTLS_ERR_SSL_TIMEOUT;
     }
 
