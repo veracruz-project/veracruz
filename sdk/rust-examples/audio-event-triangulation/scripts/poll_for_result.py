@@ -4,6 +4,7 @@ import subprocess as sp
 import re
 import struct
 import time
+import json
 
 def dump_gps(location):
     absy = abs(location[0])
@@ -20,15 +21,26 @@ def dump_gps(location):
         (absx / (1024*1024/60/60/100)) % 100,
         'E' if location[1] >= 0 else 'W')
 
-def main(*command):
+def main(args):
+    # grab server addresses from policy file
+    with open(args.policy) as f:
+        policy_json = json.load(f)
+
     print('\033[0;32mstarting audio event triangulation service\033[m')
-    print('veracruz_server: 172.17.0.2:3010')
-    print('proxy_attestation_server: 172.17.0.2:3017')
+    print('veracruz_server: %s' % policy_json['veracruz_server_url'])
+    print('proxy_attestation_server: %s' % policy_json['proxy_attestation_server_url'])
     print('waiting for triangulation results...')
 
+    # poll until Veracruz returns a successful computation
     while True:
         try:
-            output = sp.check_output(command)
+            output = sp.check_output([
+                'vc-client',
+                    args.policy,
+                    '--identity', args.identity,
+                    '--key', args.key,
+                    '--program', 'audio-event-triangulation.wasm=' + args.program,
+                    '--output', 'audio-event-triangulation.wasm=-'])
         except sp.CalledProcessError:
             time.sleep(5)
             continue 
@@ -49,4 +61,16 @@ def main(*command):
 
 if __name__ == "__main__":
     import sys
-    main(*sys.argv[1:])
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Poll for audio event triangulation results')
+    parser.add_argument('policy',
+        help='Veracruz policy file (.json)')
+    parser.add_argument('--identity', required=True,
+        help='Identity of client (.pem)')
+    parser.add_argument('--key', required=True,
+        help='Private key of client (.pem)')
+    parser.add_argument('--program', required=True,
+        help='Path to audio event triangulation binary (.wasm)')
+    args = parser.parse_args()
+    main(args)

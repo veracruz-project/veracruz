@@ -118,14 +118,14 @@ The controller polls the Veracruz server until there is enough data to
 find a triangulated result. To simulate the controller, run the
 `poll_for_result.py` script inside the Veracruz docker:
 
+<!-- TODO move PYTHONIOENCODING into Veracruz's dockerfile? -->
 ``` bash server
 $ PYTHONIOENCODING=utf-8 \
     ./sdk/rust-examples/audio-event-triangulation/scripts/poll_for_result.py \
-        vc-client veracruz-mcu-client/example/policy.json \
-            --identity veracruz-mcu-client/example/controller-cert.pem \
-            --key veracruz-mcu-client/example/controller-key.pem \
-            --program audio-event-triangulation.wasm=veracruz-mcu-client/example/audio-event-triangulation.wasm \
-            --output audio-event-triangulation.wasm=-
+        veracruz-mcu-client/example/policy.json \
+        --identity veracruz-mcu-client/example/controller-cert.pem \
+        --key veracruz-mcu-client/example/controller-key.pem \
+        --program veracruz-mcu-client/example/audio-event-triangulation.wasm
 ```
 
 
