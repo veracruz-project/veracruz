@@ -36,7 +36,7 @@ static void mbedtls_debug(void *ctx, int level,
         const char *file, int line,
         const char *str) {
     if (level <= 1) {
-        printf("%s", str);
+        VC_LOG("%s", str);
     }
 }
 
@@ -66,7 +66,7 @@ static ssize_t vc_rawsend(void *p,
     vc_t *vc = p;
 
     if (vc->recv_len != 0) {
-        printf("attemped to send while %d bytes are unrecved, "
+        VC_LOGLN("attemped to send while %d bytes are unrecved, "
             "this should not happen", vc->recv_len);
         return -EBUSY;
     }
@@ -76,7 +76,7 @@ static ssize_t vc_rawsend(void *p,
     ssize_t res = snprintf(vc->send_buf, VC_SEND_BUFFER_SIZE,
             "%d ", vc->session_id);
     if (res < 0) {
-        printf("formatting failed (%d)\n", res);
+        VC_LOGLN("formatting failed (%d)", res);
         return res;
     }
     data_len += res;
@@ -84,20 +84,18 @@ static ssize_t vc_rawsend(void *p,
         buf, len,
         &vc->send_buf[data_len], VC_SEND_BUFFER_SIZE-data_len);
     if (res < 0) {
-        printf("hm %d\n", VC_SEND_BUFFER_SIZE-data_len);
-        printf("base64_encode failed (%d)\n", res);
+        VC_LOGLN("base64_encode failed (%d)", res);
         return res;
     }
     data_len += res;
 
     // send data over HTTP POST
-    #ifdef VC_DUMP_INFO
-        printf("sending to %s:%d:\n",
-                VC_SERVER_HOST,
-                VC_SERVER_PORT);
-        xxd(vc->send_buf, data_len);
-    #endif
-    printf("veracruz_server -> POST /runtime_manager, %d bytes\n", data_len);
+    VC_LOGXXD("sending to %s:%d:",
+            VC_SERVER_HOST,
+            VC_SERVER_PORT,
+            vc->send_buf,
+            data_len);
+    VC_LOGLN("veracruz_server -> POST /runtime_manager, %d bytes", data_len);
     ssize_t recv_len = http_post(
             VC_SERVER_HOST,
             VC_SERVER_PORT,
@@ -107,20 +105,17 @@ static ssize_t vc_rawsend(void *p,
             vc->recv_buf,
             VC_RECV_BUFFER_SIZE);
     if (recv_len < 0) {
-        printf("http_post failed (%d)\n", recv_len);
+        VC_LOGLN("http_post failed (%d)", recv_len);
         return recv_len;
     }
-    printf("veracruz_server <- 200 OK, %d bytes\n", recv_len);
+    VC_LOGLN("veracruz_server <- 200 OK, %d bytes", recv_len);
 
     if (recv_len == 0) {
         // done, recieved nothing
         return len;
     }
 
-    #ifdef VC_DUMP_INFO
-        printf("ssl session: recv:\n");
-        xxd(vc->recv_buf, recv_len);
-    #endif
+    VC_LOGXXD("ssl session: recv:", vc->recv_buf, recv_len);
 
     // null terminate to make parsing a bit easier
     vc->recv_buf[recv_len] = '\0';
@@ -130,13 +125,13 @@ static ssize_t vc_rawsend(void *p,
     bool session_id_was_zero = vc->session_id == 0;
     vc->session_id = strtol(parsing, (char **)&parsing, 10);
     if (parsing == vc->recv_buf) {
-        printf("failed to parse session id\n");
+        VC_LOGLN("failed to parse session id");
         return -EILSEQ;
     }
     // skip space
     parsing += 1;
     if (session_id_was_zero) {
-        printf("\033[32mestablished session id:\033[m %d\n", vc->session_id);
+        VC_LOGLN("\033[32mestablished session id:\033[m %d", vc->session_id);
     }
 
     // parse out base64 blobs, shuffling to front of our buffer
@@ -151,7 +146,7 @@ static ssize_t vc_rawsend(void *p,
                 parsing, i,
                 parsed, &vc->recv_buf[recv_len]-parsed);
         if (res < 0) {
-            printf("base64_decode failed (%d)\n", res);
+            VC_LOGLN("base64_decode failed (%d)", res);
             return res;
         }
 
@@ -167,10 +162,7 @@ static ssize_t vc_rawsend(void *p,
     vc->recv_pos = vc->recv_buf;
     vc->recv_len = parsed - vc->recv_buf;
 
-    #ifdef VC_DUMP_INFO
-        printf("ssl session: parsed:\n");
-        xxd(vc->recv_pos, vc->recv_len);
-    #endif
+    VC_LOGXXD("ssl session: parsed:", vc->recv_pos, vc->recv_len);
 
     // done!
     return len;
@@ -184,7 +176,7 @@ static ssize_t vc_rawrecv(void *p,
     if (vc->recv_len == 0) {
         // no data available? since we communicate over POSTs,
         // we'll never have data available
-        printf("attempted to recv with no data available, timeout\n");
+        VC_LOGLN("attempted to recv with no data available, timeout");
         return MBEDTLS_ERR_SSL_TIMEOUT;
     }
 
@@ -196,12 +188,9 @@ static ssize_t vc_rawrecv(void *p,
 }
 
 static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
-    printf("verifying runtime hash\n");
+    VC_LOGLN("verifying runtime hash");
 
-    #ifdef VC_DUMP_INFO
-        printf("extensions:\n");
-        xxd(peer->v3_ext.p, peer->v3_ext.len);
-    #endif
+    VC_LOGXXD("extensions:", peer->v3_ext.p, peer->v3_ext.len);
 
     // check each extension
     uint8_t *ext_seq_ptr = peer->v3_ext.p;
@@ -211,7 +200,7 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
     ext_seq_ptr++;
     int err = mbedtls_asn1_get_len(&ext_seq_ptr, ext_seq_end, &(size_t){0});
     if (err) {
-        printf("asn1 parsing failed (%d)\n", err);
+        VC_LOGLN("asn1 parsing failed (%d)", err);
         return err;
     }
 
@@ -220,7 +209,7 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
         size_t len;
         err = mbedtls_asn1_get_len(&ext_seq_ptr, ext_seq_end, &len);
         if (err) {
-            printf("asn1 parsing failed (%d)\n", err);
+            VC_LOGLN("asn1 parsing failed (%d)", err);
             return err;
         }
 
@@ -235,7 +224,7 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
                 size_t len;
                 err = mbedtls_asn1_get_len(&ext_ptr, ext_end, &len);
                 if (err) {
-                    printf("asn1 parsing failed (%d)\n", err);
+                    VC_LOGLN("asn1 parsing failed (%d)", err);
                     return err;
                 }
 
@@ -260,29 +249,26 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
                     size_t len;
                     err = mbedtls_asn1_get_len(&ext_ptr, ext_end, &len);
                     if (err) {
-                        printf("asn1 parsing failed (%d)\n", err);
+                        VC_LOGLN("asn1 parsing failed (%d)", err);
                         return err;
                     }
 
                     if (tag == MBEDTLS_ASN1_OCTET_STRING) {
                         // finally found our octet string, does it match?
-                        printf("found: ");
-                        hex(ext_ptr, len);
-                        printf("\n");
+                        VC_LOGHEX("found:", ext_ptr, len);
 
                         // check against known runtime hashes
                         if (len == 32) {
                             for (int i = 0; i < sizeof(VC_RUNTIME_HASHES)/32; i++) {
                                 if (memcmp(ext_ptr, VC_RUNTIME_HASHES[i], 32) == 0) {
-                                    printf("\033[32mverified runtime hash:\033[m ");
-                                    hex(ext_ptr, len);
-                                    printf("\n");
+                                    VC_LOGHEX("\033[32mverified runtime hash:\033[m",
+                                            ext_ptr, len);
                                     return 0;
                                 }
                             }
                         }
 
-                        printf("runtime hash mismatch\n");
+                        VC_LOGLN("runtime hash mismatch");
                         return -EBADE;
                     }
 
@@ -294,7 +280,7 @@ static int vc_verify_runtime_hash(vc_t *vc, const mbedtls_x509_crt *peer) {
         ext_seq_ptr += len;
     }
 
-    printf("no runtime hash?\n");
+    VC_LOGLN("no runtime hash?");
     return -EBADE;
 }
 
@@ -306,8 +292,8 @@ int vc_connect(vc_t *vc) {
     // check that requested ciphersuite is available, this can fail if
     // the ciphersuite isn't enabled in mbedtls's configuration
     if (mbedtls_ssl_ciphersuite_from_id(VC_CIPHERSUITE) == NULL) {
-        printf("required ciphersuite unavailable, "
-                "is mbedtls configured correctly?\n");
+        VC_LOGLN("required ciphersuite unavailable, "
+                "is mbedtls configured correctly?");
         return -ENOSYS;
     }
 
@@ -328,7 +314,7 @@ int vc_connect(vc_t *vc) {
     int err = mbedtls_x509_crt_parse_der(&vc->client_cert,
             VC_CLIENT_CERT_DER, sizeof(VC_CLIENT_CERT_DER));
     if (err) {
-        printf("failed to parse client cert (%d)\n", err);
+        VC_LOGLN("failed to parse client cert (%d)", err);
         free(vc->recv_buf);
         free(vc->send_buf);
         return err;
@@ -339,7 +325,7 @@ int vc_connect(vc_t *vc) {
             VC_CLIENT_KEY_DER, sizeof(VC_CLIENT_KEY_DER),
             NULL, 0);
     if (err) {
-        printf("failed to parse client key (%d)\n", err);
+        VC_LOGLN("failed to parse client key (%d)", err);
         mbedtls_x509_crt_free(&vc->client_cert);
         free(vc->recv_buf);
         free(vc->send_buf);
@@ -351,7 +337,7 @@ int vc_connect(vc_t *vc) {
     err = mbedtls_x509_crt_parse_der(&vc->ca_cert,
             VC_CA_CERT_DER, sizeof(VC_CA_CERT_DER));
     if (err) {
-        printf("failed to parse client cert (%d)\n", err);
+        VC_LOGLN("failed to parse client cert (%d)", err);
         free(vc->recv_buf);
         free(vc->send_buf);
         return err;
@@ -366,7 +352,7 @@ int vc_connect(vc_t *vc) {
             MBEDTLS_SSL_TRANSPORT_STREAM,
             MBEDTLS_SSL_PRESET_DEFAULT);
     if (err) {
-        printf("failed to configure SSL (%d)\n", err);
+        VC_LOGLN("failed to configure SSL (%d)", err);
         mbedtls_ssl_config_free(&vc->session_cfg);
         mbedtls_pk_free(&vc->client_key);
         mbedtls_x509_crt_free(&vc->client_cert);
@@ -385,7 +371,7 @@ int vc_connect(vc_t *vc) {
     err = mbedtls_ssl_conf_own_cert(&vc->session_cfg,
             &vc->client_cert, &vc->client_key);
     if (err) {
-        printf("failed to setup SSL session (%d)\n", err);
+        VC_LOGLN("failed to setup SSL session (%d)", err);
         mbedtls_ssl_config_free(&vc->session_cfg);
         mbedtls_pk_free(&vc->client_key);
         mbedtls_x509_crt_free(&vc->client_cert);
@@ -399,7 +385,7 @@ int vc_connect(vc_t *vc) {
 
     err = mbedtls_ssl_setup(&vc->session, &vc->session_cfg);
     if (err) {
-        printf("failed to setup SSL session (%d)\n", err);
+        VC_LOGLN("failed to setup SSL session (%d)", err);
         mbedtls_ssl_config_free(&vc->session_cfg);
         mbedtls_pk_free(&vc->client_key);
         mbedtls_x509_crt_free(&vc->client_cert);
@@ -416,21 +402,15 @@ int vc_connect(vc_t *vc) {
             vc_rawrecv);
 
     // perform SSL handshake
-    printf("beginning TLS handshake with enclave{%s:%d}\n",
+    VC_LOGLN("beginning TLS handshake with enclave{%s:%d}",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
-    printf("policy hash: ");
-    hex(VC_POLICY_HASH, sizeof(VC_POLICY_HASH));
-    printf("\n");
-    printf("client cert hash: ");
-    hex(VC_CLIENT_CERT_HASH, sizeof(VC_CLIENT_CERT_HASH));
-    printf("\n");
-    printf("CA cert hash: ");
-    hex(VC_CA_CERT_HASH, sizeof(VC_CA_CERT_HASH));
-    printf("\n");
+    VC_LOGHEX("policy hash:", VC_POLICY_HASH, sizeof(VC_POLICY_HASH));
+    VC_LOGHEX("client cert hash:", VC_CLIENT_CERT_HASH, sizeof(VC_CLIENT_CERT_HASH));
+    VC_LOGHEX("CA cert hash:", VC_CA_CERT_HASH, sizeof(VC_CA_CERT_HASH));
     err = mbedtls_ssl_handshake(&vc->session);
     if (err) {
-        printf("mbedtls_ssl_handshake failed (%d)\n", err);
+        VC_LOGLN("mbedtls_ssl_handshake failed (%d)", err);
         mbedtls_ssl_free(&vc->session);
         mbedtls_ssl_config_free(&vc->session_cfg);
         mbedtls_pk_free(&vc->client_key);
@@ -441,16 +421,13 @@ int vc_connect(vc_t *vc) {
     }
 
     // success!
-    printf("\033[32mestablished TLS session with enclave{%s:%d}\033[m\n",
+    VC_LOGLN("\033[32mestablished TLS session with enclave{%s:%d}\033[m",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
 
     const mbedtls_x509_crt *peer = mbedtls_ssl_get_peer_cert(&vc->session);
 
-    #ifdef VC_DUMP_INFO
-        printf("enclave cert:\n");
-        xxd(peer->raw.p, peer->raw.len);
-    #endif
+    VC_LOGXXD("enclave cert:", peer->raw.p, peer->raw.len);
 
     // verify runtime hash
     err = vc_verify_runtime_hash(vc, peer);
@@ -509,10 +486,7 @@ static bool vc_encode_bytes(
 static ssize_t vc_ssl_communicate(vc_t *vc,
         const char *func, const char *name,
         uint8_t *buf, size_t buf_len, size_t buf_cap) {
-    #ifdef VC_DUMP_INFO
-        printf("%s: %s:\n", func, name);
-        xxd(buf, len);
-    #endif
+    VC_LOGXXD("%s: %s:", buf, len, func, name);
 
     // send to Veracruz
     size_t written = 0;
@@ -520,13 +494,13 @@ static ssize_t vc_ssl_communicate(vc_t *vc,
         int res = mbedtls_ssl_write(&vc->session,
                 &buf[written], buf_len-written);
         if (res < 0) {
-            printf("mbedtls_ssl_write failed (%d)\n", res);
+            VC_LOGLN("mbedtls_ssl_write failed (%d)", res);
             return res;
         }
 
         // if send is fragmented, update with a progress message
         if (written != 0) {
-            printf("%s: %d/%d bytes\n", func, written+res, buf_len);
+            VC_LOGLN("%s: %d/%d bytes", func, written+res, buf_len);
         }
         written += res;
     }
@@ -534,14 +508,11 @@ static ssize_t vc_ssl_communicate(vc_t *vc,
     // get Veracruz's response
     int res = mbedtls_ssl_read(&vc->session, buf, buf_cap);
     if (res < 0) {
-        printf("mbedtls_ssl_read failed (%d)\n", res);
+        VC_LOGLN("mbedtls_ssl_read failed (%d)", res);
         return res;
     }
 
-    #ifdef VC_DUMP_INFO
-        printf("%s: response:\n", func);
-        xxd(buf, res);
-    #endif
+    VC_LOGXXD("%s: response:", buf, res, func);
 
     return res;
 }
@@ -550,7 +521,7 @@ int vc_send_data(vc_t *vc,
         const char *name,
         const uint8_t *data,
         size_t data_len) {
-    printf("sending data to enclave{%s:%d}/%s, %d bytes\n",
+    VC_LOGLN("sending data to enclave{%s:%d}/%s, %d bytes",
             VC_SERVER_HOST,
             VC_SERVER_PORT,
             name, data_len);
@@ -585,7 +556,7 @@ int vc_send_data(vc_t *vc,
             proto_buf, proto_len);
     bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &send_data);
     if (!success) {
-        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_encode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -604,7 +575,7 @@ int vc_send_data(vc_t *vc,
             proto_buf, res);
     success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
     if (!success) {
-        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_decode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -613,14 +584,14 @@ int vc_send_data(vc_t *vc,
 
     // did server send success?
     if (response.status != Tp_ResponseStatus_SUCCESS) {
-        printf("vc_send_data successfully failed! (%d)\n", response.status);
+        VC_LOGLN("vc_send_data successfully failed! (%d)", response.status);
         return -EACCES;
     }
 
-    printf("enclave{%s:%d} responded with success\n",
+    VC_LOGLN("enclave{%s:%d} responded with success",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
-    printf("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m\n",
+    VC_LOGLN("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m",
             data_len,
             VC_SERVER_HOST,
             VC_SERVER_PORT,
@@ -632,7 +603,7 @@ int vc_send_program(vc_t *vc,
         const char *name,
         const uint8_t *program,
         size_t program_len) {
-    printf("sending program to enclave{%s:%d}/%s, %d bytes\n",
+    VC_LOGLN("sending program to enclave{%s:%d}/%s, %d bytes",
             VC_SERVER_HOST,
             VC_SERVER_PORT,
             name, program_len);
@@ -667,7 +638,7 @@ int vc_send_program(vc_t *vc,
             proto_buf, proto_len);
     bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &send_program);
     if (!success) {
-        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_encode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -686,7 +657,7 @@ int vc_send_program(vc_t *vc,
             proto_buf, res);
     success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
     if (!success) {
-        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_decode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -695,14 +666,14 @@ int vc_send_program(vc_t *vc,
 
     // did server send success?
     if (response.status != Tp_ResponseStatus_SUCCESS) {
-        printf("vc_send_program successfully failed! (%d)\n", response.status);
+        VC_LOGLN("vc_send_program successfully failed! (%d)", response.status);
         return -EACCES;
     }
 
-    printf("enclave{%s:%d} responded with success\n",
+    VC_LOGLN("enclave{%s:%d} responded with success",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
-    printf("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m\n",
+    VC_LOGLN("\033[32muploaded %d bytes to enclave{%s:%d}/%s\033[m",
             program_len,
             VC_SERVER_HOST,
             VC_SERVER_PORT,
@@ -714,7 +685,7 @@ static bool vc_request_result_decode(
         pb_istream_t *stream, const pb_field_t *field, void **arg) {
     struct bytes *result = *arg;
     if (stream->bytes_left > result->len) {
-        printf("result size exceeded buffer (%d > %d)\n",
+        VC_LOGLN("result size exceeded buffer (%d > %d)",
             stream->bytes_left, result->len);
         return false;
     }
@@ -727,7 +698,7 @@ ssize_t vc_request_result(vc_t *vc,
         const char *name,
         uint8_t *result,
         size_t result_len) {
-    printf("requesting result from enclave{%s:%d}/%s\n",
+    VC_LOGLN("requesting result from enclave{%s:%d}/%s",
             VC_SERVER_HOST,
             VC_SERVER_PORT,
             name);
@@ -758,7 +729,7 @@ ssize_t vc_request_result(vc_t *vc,
             proto_buf, proto_len);
     bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &request_result);
     if (!success) {
-        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_encode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -791,7 +762,7 @@ ssize_t vc_request_result(vc_t *vc,
             proto_buf, res);
     success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
     if (!success) {
-        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_decode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -801,21 +772,21 @@ ssize_t vc_request_result(vc_t *vc,
 
     // did server send success?
     if (response.status != Tp_ResponseStatus_SUCCESS) {
-        printf("vc_request_result successfully failed! (%d)\n", response.status);
+        VC_LOGLN("vc_request_result successfully failed! (%d)", response.status);
         return -EACCES;
     }
 
     // did server send a result?
     //if (response.which_message_oneof != Tp_RuntimeManagerResponse_result_tag) {
     if (!response.has_result) {
-        printf("vc_request_result did not respond with a result\n");
+        VC_LOGLN("vc_request_result did not respond with a result");
         return -EILSEQ;
     }
 
-    printf("enclave{%s:%d} responded with success\n",
+    VC_LOGLN("enclave{%s:%d} responded with success",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
-    printf("\033[32mdownloaded %d bytes from enclave{%s:%d}/%s\033[m\n",
+    VC_LOGLN("\033[32mdownloaded %d bytes from enclave{%s:%d}/%s\033[m",
             result_len,
             VC_SERVER_HOST,
             VC_SERVER_PORT,
@@ -824,7 +795,7 @@ ssize_t vc_request_result(vc_t *vc,
 }
 
 ssize_t vc_request_shutdown(vc_t *vc) {
-    printf("requesting shutdown from enclave{%s:%d}\n",
+    VC_LOGLN("requesting shutdown from enclave{%s:%d}",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
     // construct program protobuf
@@ -847,7 +818,7 @@ ssize_t vc_request_shutdown(vc_t *vc) {
             proto_buf, proto_len);
     bool success = pb_encode(&proto_stream, &Tp_RuntimeManagerRequest_msg, &request_result);
     if (!success) {
-        printf("pb_encode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_encode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -866,7 +837,7 @@ ssize_t vc_request_shutdown(vc_t *vc) {
             proto_buf, res);
     success = pb_decode(&resp_stream, &Tp_RuntimeManagerResponse_msg, &response);
     if (!success) {
-        printf("pb_decode failed (%s)\n", proto_stream.errmsg);
+        VC_LOGLN("pb_decode failed (%s)", proto_stream.errmsg);
         free(proto_buf);
         return -EILSEQ;
     }
@@ -875,14 +846,14 @@ ssize_t vc_request_shutdown(vc_t *vc) {
 
     // did server send success?
     if (response.status != Tp_ResponseStatus_SUCCESS) {
-        printf("vc_request_shutdown successfully failed! (%d)\n", response.status);
+        VC_LOGLN("vc_request_shutdown successfully failed! (%d)", response.status);
         return -EACCES;
     }
 
-    printf("enclave{%s:%d} responded with success\n",
+    VC_LOGLN("enclave{%s:%d} responded with success",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
-    printf("\033[32mshutdown enclave{%s:%d}\033[m\n",
+    VC_LOGLN("\033[32mshutdown enclave{%s:%d}\033[m",
             VC_SERVER_HOST,
             VC_SERVER_PORT);
     return 0;

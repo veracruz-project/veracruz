@@ -56,55 +56,55 @@ vc_t vc;
 
 // entry point
 void main(void) {
-    printf("system started\n");
+    VC_LOGLN("system started");
     int err;
 
     // upload shares
     for (int i = 0; i < sizeof(SHARES)/sizeof(SHARES[0]); i++) {
-        printf("uploading share %d to %s...\n", i+1, SHARES[i].name);
+        VC_LOGLN("uploading share %d to %s...", i+1, SHARES[i].name);
         err = vc_connect(&vc);
-        printf("vc_connect -> %d\n", err);
+        VC_LOGLN("vc_connect -> %d", err);
         if (err) {
             exit(1);
         }
 
         err = vc_send_data(&vc, SHARES[i].name, SHARES[i].data, SHARES[i].size);
-        printf("vc_send_data -> %d\n", err);
+        VC_LOGLN("vc_send_data -> %d", err);
         if (err) {
             exit(1);
         }
 
         err = vc_close(&vc);
-        printf("vc_close -> %d\n", err);
+        VC_LOGLN("vc_close -> %d", err);
         if (err) {
             exit(1);
         }
     }
 
     // upload the binary
-    printf("uploading binary test-binary.wasm...\n");
+    VC_LOGLN("uploading binary test-binary.wasm...");
     err = vc_connect(&vc);
-    printf("vc_connect -> %d\n", err);
+    VC_LOGLN("vc_connect -> %d", err);
     if (err) {
         exit(1);
     }
 
     err = vc_send_program(&vc, "test-binary.wasm", BINARY, sizeof(BINARY));
-    printf("vc_send_program -> %d\n", err);
+    VC_LOGLN("vc_send_program -> %d", err);
     if (err) {
         exit(1);
     }
 
     err = vc_close(&vc);
-    printf("vc_close -> %d\n", err);
+    VC_LOGLN("vc_close -> %d", err);
     if (err) {
         exit(1);
     }
 
     // download the result
-    printf("downloading result test-binary.wasm...\n");
+    VC_LOGLN("downloading result test-binary.wasm...");
     err = vc_connect(&vc);
-    printf("vc_connect -> %d\n", err);
+    VC_LOGLN("vc_connect -> %d", err);
     if (err) {
         exit(1);
     }
@@ -112,63 +112,63 @@ void main(void) {
     uint8_t result[256];
     memset(result, 0xcc, sizeof(result));
     ssize_t result_len = vc_request_result(&vc, "test-binary.wasm", result, sizeof(result));
-    printf("vc_request_result -> %d\n", err);
+    VC_LOGLN("vc_request_result -> %d", err);
     if (result_len < 0) {
         exit(1);
     }
 
     err = vc_close(&vc);
-    printf("vc_close -> %d\n", err);
+    VC_LOGLN("vc_close -> %d", err);
     if (err) {
         exit(1);
     }
 
     // initiate shutdown
-    printf("shutting down server...\n");
+    VC_LOGLN("shutting down server...");
     err = vc_connect(&vc);
-    printf("vc_connect -> %d\n", err);
+    VC_LOGLN("vc_connect -> %d", err);
     if (err) {
         exit(1);
     }
 
     err = vc_request_shutdown(&vc);
-    printf("vc_request_shutdown -> %d\n", err);
+    VC_LOGLN("vc_request_shutdown -> %d", err);
     if (err) {
         exit(1);
     }
 
     err = vc_close(&vc);
-    printf("vc_close -> %d\n", err);
+    VC_LOGLN("vc_close -> %d", err);
     if (err) {
         exit(1);
     }
 
     // check results are correct?
-    printf("computed: ");
+    VC_LOG("computed: ");
     for (int i = 0; i < result_len; i++) {
         if (result[i] >= ' ' && result[i] <= '~') {
-            printf("%c", result[i]);
+            VC_LOG("%c", result[i]);
         } else {
-            printf("\\x%02x", result[i]);
+            VC_LOG("\\x%02x", result[i]);
         }
     }
-    printf("\n");
-    printf("expected: ");
+    VC_LOG("\n");
+    VC_LOG("expected: ");
     for (int i = 0; i < result_len; i++) {
         if (RESULT[i] >= ' ' && RESULT[i] <= '~') {
-            printf("%c", RESULT[i]);
+            VC_LOG("%c", RESULT[i]);
         } else {
-            printf("\\x%02x", RESULT[i]);
+            VC_LOG("\\x%02x", RESULT[i]);
         }
     }
-    printf("\n");
+    VC_LOG("\n");
 
     if (result_len != sizeof(RESULT)
             || memcmp(result, RESULT, result_len) != 0) {
-        printf("does not match \"%s\"", RESULT);
+        VC_LOGLN("does not match \"%s\"", RESULT);
         exit(2);
     }
 
-    printf("done!\n");
+    VC_LOGLN("done!");
     exit(0);
 }

@@ -28,4 +28,5 @@ add_dependencies(app claps_to_header)
 file(GLOB SRC "*.c")
 target_sources(app PRIVATE ${SRC})
 target_sources(app PRIVATE clap.c)
+target_compile_options(app PRIVATE "-Wno-unused-variable")
 

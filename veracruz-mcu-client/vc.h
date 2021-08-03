@@ -29,13 +29,48 @@
 #define VC_RUNTIME_HASH_EXTENSION_ID ((const uint8_t[3]){85, 30, 1})
 #endif
 
-// define for more output
-#ifndef VC_DUMP_INFO
-    #ifdef CONFIG_VC_DUMP_INFO
-    #define VC_DUMP_INFO
+// define for log/logln
+#ifndef VC_LOG
+    #ifdef CONFIG_VC_LOG
+        #define VC_LOG_(fmt, ...)     printf(fmt "%s", __VA_ARGS__)
+        #define VC_LOG(...)           VC_LOG_(__VA_ARGS__, "")
+        #define VC_LOGLN_(fmt, ...)   printf(fmt "%s\n", __VA_ARGS__)
+        #define VC_LOGLN(...)         VC_LOGLN_(__VA_ARGS__, "")
+    #else
+        #define VC_LOG(...)
+        #define VC_LOGLN(...)
     #endif
 #endif
 
+// define for logging large hex strings
+#ifndef VC_LOGHEX
+    #ifdef CONFIG_VC_LOG
+        #define VC_LOGHEX_(fmt, buf, len, ...) \
+            do { \
+                VC_LOG(fmt "%s ", __VA_ARGS__); \
+                hex(buf, len); \
+                VC_LOG("\n"); \
+            } while(0)
+        #define VC_LOGHEX(...) VC_LOGHEX_(__VA_ARGS__, "")
+    #else
+        #define VC_LOGHEX(...)
+    #endif
+#endif
+
+// define for hex dumps of various internal state
+#ifndef VC_LOGXXD
+    #ifdef CONFIG_VC_LOG_HEXDUMPS
+        #define VC_LOGXXD_(fmt, buf, len, ...) \
+            do { \
+                VC_LOG(fmt "%s\n", __VA_ARGS__); \
+                xxd(buf, len); \
+            } while(0)
+        #define VC_LOGXXD(...) VC_LOGXXD_(__VA_ARGS__, "")
+    #else
+        #define VC_LOGXXD(...)
+    #endif
+#endif
+    
 // other configuration variables, CONFIG_* is provided by Zephyr+Kconfig
 #ifndef VC_SEND_BUFFER_SIZE
     #ifdef CONFIG_VC_SEND_BUFFER_SIZE

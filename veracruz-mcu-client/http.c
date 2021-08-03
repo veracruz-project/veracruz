@@ -14,6 +14,7 @@
  */
 
 #include "http.h"
+#include "vc.h"
 
 #include <net/socket.h>
 #include <net/http_client.h>
@@ -34,7 +35,7 @@ static void http_get_cb(
     size_t len = rsp->processed - state->pos;
 
     if (state->pos + len > state->buf_len) {
-        printf("http get buffer overflow! truncating (%d > %d)\n",
+        VC_LOGLN("http get buffer overflow! truncating (%d > %d)",
             state->pos + len, state->buf_len);
 
         len = state->buf_len - state->pos;
@@ -62,7 +63,7 @@ ssize_t http_get(
     void *pbuf = malloc(256);
     size_t pbuf_len = 256;
     if (!pbuf) {
-        printf("http malloc failed (-ENOMEM)\n");
+        VC_LOGLN("http malloc failed (-ENOMEM)");
         return -ENOMEM;
     }
 
@@ -71,14 +72,14 @@ ssize_t http_get(
     // DNS? Take in a string more useful API?
     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0) {
-        printf("http socket open failed (%d)\n", -errno);
+        VC_LOGLN("http socket open failed (%d)", -errno);
         free(pbuf);
         return -errno;
     }
 
     int res = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
     if (res < 0) {
-        printf("http connect failed (%d)\n", -errno);
+        VC_LOGLN("http connect failed (%d)", -errno);
         free(pbuf);
         close(sock);
         return -errno;
@@ -104,7 +105,7 @@ ssize_t http_get(
 
     int err = http_client_req(sock, &req, HTTP_TIMEOUT, &state);
     if (err < 0) {
-        printf("http req failed (%d)\n", err);
+        VC_LOGLN("http req failed (%d)", err);
         free(pbuf);
         close(sock);
         return err;
@@ -138,7 +139,7 @@ ssize_t http_post(
     void *pbuf = malloc(256);
     size_t pbuf_len = 256;
     if (!pbuf) {
-        printf("http malloc failed (-ENOMEM)\n");
+        VC_LOGLN("http malloc failed (-ENOMEM)");
         return -ENOMEM;
     }
 
@@ -147,14 +148,14 @@ ssize_t http_post(
     // DNS? Take in a string more useful API?
     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0) {
-        printf("http socket open failed (%d)\n", -errno);
+        VC_LOGLN("http socket open failed (%d)", -errno);
         free(pbuf);
         return -errno;
     }
 
     int res = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
     if (res < 0) {
-        printf("http connect failed (%d)\n", -errno);
+        VC_LOGLN("http connect failed (%d)", -errno);
         free(pbuf);
         close(sock);
         return -errno;
@@ -182,7 +183,7 @@ ssize_t http_post(
 
     int err = http_client_req(sock, &req, HTTP_TIMEOUT, &state);
     if (err < 0) {
-        printf("http req failed (%d)\n", err);
+        VC_LOGLN("http req failed (%d)", err);
         free(pbuf);
         close(sock);
         return err;

@@ -29,8 +29,17 @@ config VC_KEY_PATH
         This must be set to the absolute path to the private key
         of the device.
 
-config VC_DUMP_INFO
-    bool "Enable hexdumps for debugging"
+config VC_LOG
+    bool "Enable logging"
+    default y
+    help
+        Enables log output of Veracruz's internal state, by default
+        this is fairly readable. More info can be printed via
+        the VC_LOG_HEXDUMPS option.
+
+config VC_LOG_HEXDUMPS
+    bool "Enable hexdump logging"
+    depends on VC_LOG
     default n
     help
         Enables hexdumps of various bits of data, such as the client/peer
