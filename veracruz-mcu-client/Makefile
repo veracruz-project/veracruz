@@ -22,6 +22,14 @@ SHAMIR_SECRET_SHARING_BINARY_PATH ?= binary.wasm
 # launch docker
 .PHONY: docker
 docker: Dockerfile
+	# copy over transport_protocol.proto, since we need this in the workspace,
+	# note that we can't use a Docker COPY since this file is technically
+	# outside of the build context
+	$(strip cp -f \
+		../transport-protocol/protos/transport_protocol.proto \
+		transport_protocol.proto)
+
+	# build and run the docker image
 	$(strip docker build \
 		--build-arg TARGET=$(TARGET) \
 		--build-arg USER=$(USER) \
