@@ -6,7 +6,6 @@ cd $(dirname $0)
 
 # run Shamir's Secret Sharing to test all of the program/data/result
 # Veracruz interactions
-
 make clean build-test run \
     VC_POLICY_PATH=test-data/test-policy.json \
     VC_IDENTITY_PATH=test-data/test-cert.pem \
