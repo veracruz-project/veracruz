@@ -7,8 +7,8 @@ transport_protocol.pb.c
 transport_protocol.pb.h
 policy.c
 policy.h
-audio-event-triangulation/clap.c
-clap.h
+samples/audio-event-triangulation/clap.c
+samples/audio-event-triangulation/clap.h
 samples/shamir-secret-sharing/binary.h
 samples/shamir-secret-sharing/binary.c
 # output from reports
