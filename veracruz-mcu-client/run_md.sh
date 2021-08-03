@@ -16,7 +16,7 @@
 set -euo pipefail
 
 DOC="$1"
-TERM="${2:-bash}"
+TERM="${2:-}"
 
 # start from scratch
 rm -f $DOC.sh
@@ -27,7 +27,7 @@ echo 'set -euxo pipefail' >> $DOC.sh
 # grab every bash code block, remove line continuation, and only keep lines
 # that start with '$' (of course removing that '$' in the process)
 #
-sed -n '/``` '"$TERM"'/,/```/{/```/d; p}' $DOC \
+sed -n '/``` bash *'"$TERM"'/,/```/{/```/d; p}' $DOC \
     | sed ':a; /\\$/{N; s/\\\n//; ta}' \
     | sed -n '/^\$/{s/^\$ \?//; p}' \
     >> $DOC.sh
