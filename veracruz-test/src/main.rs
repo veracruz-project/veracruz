@@ -441,7 +441,6 @@ mod tests {
         let policy_text =
             std::fs::read_to_string(policy_filename).expect(&format!("Cannot open file {}", policy_filename));
 
-            return Ok(policy_text);
-        }
+        return Ok(policy_text);
     }
 }
