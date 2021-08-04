@@ -23,6 +23,7 @@ use std::{
     path,
     sync::atomic::{AtomicI32, Ordering},
 };
+use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 use openssl;
 
@@ -274,8 +275,10 @@ fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) 
         })?;
 
     // Add our custom extension to the certificate that contains the hash of the enclave
-    static OUR_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];
-    let extension_name = format!("{}.{}.{}.{}", OUR_EXTENSION_ID[0], OUR_EXTENSION_ID[1], OUR_EXTENSION_ID[2], OUR_EXTENSION_ID[3]);
+    let extension_name = format!("{}.{}.{}.{}", VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0], 
+                                                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                                                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                                                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]);
     let extension_value = format!("DER:{}", hex::encode(enclave_hash));
     let custom_extension = openssl::x509::X509Extension::new(None, None, &extension_name, &extension_value)
         .map_err(|err| {

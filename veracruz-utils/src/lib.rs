@@ -37,3 +37,5 @@ pub use self::io::vsocket::*;
 pub use self::platform::nitro::nitro_enclave::*;
 
 pub mod csr;
+
+pub static VERACRUZ_RUNTIME_HASH_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];

@@ -9,8 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#[cfg(feature = "nitro")]
-use crate::ec2_instance::EC2Error;
 use actix_http::ResponseBuilder;
 use actix_web::{error, http::StatusCode, HttpResponse};
 use curl::easy::{Easy, List};
@@ -110,9 +108,6 @@ pub enum VeracruzServerError {
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),
-    #[cfg(feature = "nitro")]
-    #[error(display = "VeracruzServer: EC2 Error:{:?}", _0)]
-    EC2Error(#[error(source)] EC2Error),
     #[cfg(feature = "tz")]
     #[error(display = "VeracruzServer: UUIDError: {:?}.", _0)]
     UUIDError(#[error(source)] uuid::parser::ParseError),

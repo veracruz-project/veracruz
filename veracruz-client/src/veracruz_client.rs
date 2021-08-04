@@ -18,7 +18,7 @@ use std::{
     str::from_utf8,
 };
 use veracruz_utils::policy::policy::Policy;
-use veracruz_utils::platform::Platform;
+use veracruz_utils::{platform::Platform, VERACRUZ_RUNTIME_HASH_EXTENSION_ID};
 use webpki;
 
 // Use Mockall for testing
@@ -348,8 +348,9 @@ impl VeracruzClient {
                 let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
-                static OUR_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];
-                encoded_extension_id: [u8, 3] = [OUR_EXTENSION_ID[0] * 40 + OUR_EXTENSION_ID[1], OUR_EXTENSION_ID[2], OUR_EXTENSION_ID[3]];
+                encoded_extension_id: [u8, 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                                                 VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                                                 VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];
                 match ues.get(&encoded_extension_id[..]) {
                     None => {
                         println!("Our extension is not present. This should be fatal");

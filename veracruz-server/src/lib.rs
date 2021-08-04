@@ -30,5 +30,3 @@ pub mod veracruz_server_nitro;
 #[cfg(feature = "nitro")]
 pub use self::veracruz_server_nitro::veracruz_server_nitro::*;
 
-#[cfg(feature = "nitro")]
-mod ec2_instance;
