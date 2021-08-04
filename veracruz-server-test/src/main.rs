@@ -1254,20 +1254,27 @@ mod tests {
     }
 
     fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
-
-        let expected = match policy.runtime_manager_hash(platform) {
-            Err(_) => return false,
-            Ok(data) => data,
-        };
-        let expected_bytes = match hex::decode(expected) {
-            Err(_) => return false,
-            Ok(bytes) => bytes,
-        };
-
-        if &received[..] != expected_bytes.as_slice() {
-            return false;
-        } else {
+        #[cfg(feature = "debug")]
+        {
+            // don't check hash because the received hash might be zeros (for nitro, for example)
             return true;
+        }
+        #[cfg(not(feature = "debug"))]
+        {
+            let expected = match policy.runtime_manager_hash(platform) {
+                Err(_) => return false,
+                Ok(data) => data,
+            };
+            let expected_bytes = match hex::decode(expected) {
+                Err(_) => return false,
+                Ok(bytes) => bytes,
+            };
+    
+            if &received[..] != expected_bytes.as_slice() {
+                return false;
+            } else {
+                return true;
+            }
         }
     }
 

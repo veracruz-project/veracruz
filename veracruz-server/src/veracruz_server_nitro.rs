@@ -185,15 +185,7 @@ pub mod veracruz_server_nitro {
 
             self.enclave.send_buffer(&re_buffer)?;
 
-            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
-            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
-            return match received_message {
-                RuntimeManagerMessage::Status(status) => match status {
-                    NitroStatus::Success => Ok(true),
-                    _ => Err(VeracruzServerError::NitroStatus(status)),
-                },
-                _ => Err(VeracruzServerError::InvalidRuntimeManagerMessage(received_message)),
-            };
+            return Ok(true);
         }
     }
 
@@ -236,13 +228,13 @@ pub mod veracruz_server_nitro {
         let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
         let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
         println!(
-            "nitro-root-enclave-server::post_native_attestation_token posting to URL{:?}",
+            "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
             url
         );
         let received_body: String = post_buffer(&url, &encoded_str)?;
 
         println!(
-            "nitro-root-enclave-server::post_psa_attestation_token received buffer:{:?}",
+            "veracruz-server-nitro::post_psa_attestation_token received buffer:{:?}",
             received_body
         );
 
