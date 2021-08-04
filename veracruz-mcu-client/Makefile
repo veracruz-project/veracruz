@@ -114,7 +114,7 @@ static-ram-report: build-qemu-cortex-m3
 	west build -b qemu_cortex_m3 -t ram_report > static_ram_report.txt
 	sed -i '/^Path/,$$!d' static_ram_report.txt
 
-run-with-dyn-ram-report: build-no-log
+run-with-dyn-ram-report: build-demo-no-log
 	valgrind --tool=massif --stacks=yes --massif-out-file=massif.out $(EXE_PATH)
 	ms_print massif.out > dyn_ram_report.txt
 
@@ -123,18 +123,7 @@ run-with-memory-report: \
 		rom-report \
 		static-ram-report
 	@echo
-	@printf "%7s %7s %7s %7s\n" code static heap stack
-	@awk 'END{printf "%7d ",$$1}' rom_report.txt
-	@awk 'END{printf "%7d ",$$1}' static_ram_report.txt
-	@awk '\
-		BEGIN{heap=0} \
-		/^[ 0-9,]*$$/{gsub(/,/,"",$$3); if ($$3 > heap) heap=$$3} \
-		END{printf "%7d ",heap}' dyn_ram_report.txt
-	@awk '\
-		BEGIN{stack=0} \
-		/^[ 0-9,]*$$/{gsub(/,/,"",$$6); if ($$6 > stack) stack=$$6} \
-		END{printf "%7d ",stack}' dyn_ram_report.txt
-	@echo
+	@./find_memory_breakdown.py rom_report.txt static_ram_report.txt dyn_ram_report.txt
 	@echo
 	@echo "full reports written to: rom_report.txt static_ram_report.txt dyn_ram_report.txt"
 	@echo
