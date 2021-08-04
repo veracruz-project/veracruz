@@ -138,7 +138,6 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
                 let _ignore = std::io::stdout().flush();
                 err
             })?;
-        println!("ac_hash:{:?}", ac_hash[&device_id].firmware_version);
         // remove because we are not going to need this context again
         match ac_hash.remove(&device_id) {
             Some(entry) => entry,
@@ -178,11 +177,10 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             return Err(ProxyAttestationServerError::MissingFieldError("public_key"));
         },
     };
-    unsafe { csr.set_len(csr.len() - 1) }
     
 
     // convert the CSR into a certificate
-    let re_cert = crate::attestation::convert_csr_to_certificate(&csr, &received_enclave_hash)
+    let re_cert = crate::attestation::convert_csr_to_certificate(&csr, false, &received_enclave_hash[0..32])
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::nitro::attestation_token convert_csr_to_certificate failed:{:?}", err);
             err

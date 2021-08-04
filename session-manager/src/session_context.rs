@@ -152,7 +152,10 @@ impl SessionContext {
             let cert: rustls::Certificate = rustls::Certificate(this_chain_data.clone());
             cert_chain.push(cert);
         }
-        self.server_config()?.set_single_cert(cert_chain, self.server_private_key.clone())?;
+        match &mut self.server_config {
+            Some(config) => config.set_single_cert(cert_chain, self.server_private_key.clone())?,
+            None => return Err(SessionManagerError::InvalidStateError),
+        }
         return Ok(());
     }
 

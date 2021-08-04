@@ -10,14 +10,6 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
-use nix::{
-    sys::socket::{
-        accept, bind, listen, setsockopt, shutdown, socket,
-        sockopt::{ReuseAddr, ReusePort},
-        AddressFamily, Shutdown, SockAddr, SockFlag, SockType,
-    },
-    unistd::close,
-};
 use serde_json::Value;
 use std::{os::unix::io::AsRawFd, process::Command};
 

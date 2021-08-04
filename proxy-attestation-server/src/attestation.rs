@@ -129,8 +129,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
 
 /// Convert a Certificate Signing Request (CSR) to an X.509 Certificate and
 /// sign it
-fn convert_csr_to_certificate(csr_der: &[u8], enclave_hash: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
-    println!("csr_der:{:02x?}", csr_der);
+fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
     let csr = openssl::x509::X509Req::from_der(&csr_der)
         .map_err(|err| {
             print!("proxy-attestation-server::attestation::convert_csr_to_certificate failed to get csr from der:{:?}", err);
@@ -243,7 +242,7 @@ fn convert_csr_to_certificate(csr_der: &[u8], enclave_hash: &[u8]) -> Result<ope
     // The alt-name extension is required by our client. It basically sets the
     // URL that the certificat is valid for.
     let mut alt_name_extension = openssl::x509::extension::SubjectAlternativeName::new();
-    alt_name_extension.dns("RootEnclave.dev");
+    alt_name_extension.dns("ComputeEnclave.dev");
     let built_extension = alt_name_extension.build(&cert_builder.x509v3_context(None, None))
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate alt_name_extension.build failed:{:?}", err);
@@ -257,20 +256,26 @@ fn convert_csr_to_certificate(csr_der: &[u8], enclave_hash: &[u8]) -> Result<ope
 
     // setting the basic constraints extension to 'critical' - meaning required,
     // to 'ca' meaning the certificate is a CA certificate
-    let constraints_extension = openssl::x509::extension::BasicConstraints::new().critical().ca().pathlen(1).build()
+    let mut constraints_extension = openssl::x509::extension::BasicConstraints::new();
+    constraints_extension.critical();
+    constraints_extension.pathlen(1);
+    if is_ca {
+        constraints_extension.ca();
+    }
+    let built_constraints_extension = constraints_extension.build()
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate BasicConstraints::new failed:{:?}", err);
             err
         })?;
-    cert_builder.append_extension(constraints_extension)
+    cert_builder.append_extension(built_constraints_extension)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate append_extension failed:{:?}", err);
             err
         })?;
 
     // Add our custom extension to the certificate that contains the hash of the enclave
-    static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
-    let extension_name = format!("{}.{}.{}", OUR_EXTENSION_ID[0], OUR_EXTENSION_ID[1], OUR_EXTENSION_ID[2]);
+    static OUR_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];
+    let extension_name = format!("{}.{}.{}.{}", OUR_EXTENSION_ID[0], OUR_EXTENSION_ID[1], OUR_EXTENSION_ID[2], OUR_EXTENSION_ID[3]);
     let extension_value = format!("DER:{}", hex::encode(enclave_hash));
     let custom_extension = openssl::x509::X509Extension::new(None, None, &extension_name, &extension_value)
         .map_err(|err| {
