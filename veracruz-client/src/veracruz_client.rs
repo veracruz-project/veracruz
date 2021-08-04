@@ -348,9 +348,9 @@ impl VeracruzClient {
                 let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
-                encoded_extension_id: [u8, 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                                                 VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                                                 VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];
+                let encoded_extension_id: [u8; 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];
                 match ues.get(&encoded_extension_id[..]) {
                     None => {
                         println!("Our extension is not present. This should be fatal");
