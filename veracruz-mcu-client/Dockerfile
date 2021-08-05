@@ -70,9 +70,6 @@ RUN pip3 install west && \
     pip3 install -r zephyr/scripts/requirements.txt
 
 # Get the Zephyr SDK
-#
-# TODO we don't need all the compilers in this package... can we reduce
-# this to just arm-none-eabi-gcc?
 RUN wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.11.4/zephyr-sdk-0.11.4-setup.run -O /tmp/zephyr-sdk-0.11.4-setup.run 2>/dev/null && \
     chmod +x /tmp/zephyr-sdk-0.11.4-setup.run && \
     /tmp/zephyr-sdk-0.11.4-setup.run -- -d /opt/zephyr-sdk-0.11.4

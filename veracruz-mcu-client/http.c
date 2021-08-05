@@ -138,12 +138,10 @@ ssize_t http_get(
 // - resp_buf_len     Size of response buffer in bytes
 //
 // Returns the number of bytes recieved, or a negative error code
-// TODO deduplicate?
 ssize_t http_post(
         const char *host,
         uint16_t port,
         const char *path,
-        // TODO headers?
         const uint8_t *payload_buf,
         size_t payload_buf_len,
         uint8_t *resp_buf,
