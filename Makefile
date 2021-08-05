@@ -72,7 +72,6 @@ sgx-cli: sgx-env
 	$(MAKE) -C test-collateral/generate-policy
 
 nitro: sdk
-	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 
 nitro-cli:
@@ -141,14 +140,14 @@ trustzone-cli: trustzone-env
 # Using wildcard in the dependencies because if they are there, and newer, it
 # should be rebuilt, but if they aren't there, they don't need to be built 
 # (they are optional)
-veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
+veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin)
 	cd veracruz-test && \
 		bash ../test-collateral/populate-test-database.sh
 
 # Using wildcard in the dependencies because if they are there, and newer, it
 # should be rebuilt, but if they aren't there, they don't need to be built 
 # (they are optional)
-veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
+veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin)
 	cd veracruz-server-test && \
 		bash ../test-collateral/populate-test-database.sh
 
