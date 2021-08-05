@@ -281,17 +281,17 @@ pub mod veracruz_server_nitro {
         let url = format!("{:}/Start", url_base);
 
         println!(
-            "nitro-root-enclave-server::send_proxy_attestation_server_start sending to url:{:?}",
+            "veracruz-server-nitro::send_proxy_attestation_server_start sending to url:{:?}",
             url
         );
         let received_body: String = post_buffer(&url, &encoded_start_msg)?;
-        println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed post command");
+        println!("veracruz-server-nitro::send_proxy_attestation_server_start completed post command");
 
         let body_vec =
             base64::decode(&received_body).map_err(|err| VeracruzServerError::Base64Decode(err))?;
         let response =
             transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| VeracruzServerError::TransportProtocol(err))?;
-        println!("nitro-root-enclave-server::send_proxy_attestation_server_start completed. Returning.");
+        println!("veracruz-server-nitro::send_proxy_attestation_server_start completed. Returning.");
         return Ok(response);
     }
 
@@ -352,7 +352,7 @@ pub mod veracruz_server_nitro {
         let header_lines: Vec<&str> = received_header.split("\n").collect();
 
         println!(
-            "nitro-root-enclave-server::post_buffer received header:{:?}",
+            "veracruz-server-nitro::post_buffer received header:{:?}",
             received_header
         );
         if !received_header.contains("HTTP/1.1 200 OK\r") {
@@ -360,7 +360,7 @@ pub mod veracruz_server_nitro {
         }
 
         println!(
-            "nitro-root-enclave-server::post_buffer header_lines:{:?}",
+            "veracruz-server-nitro::post_buffer header_lines:{:?}",
             header_lines
         );
 
