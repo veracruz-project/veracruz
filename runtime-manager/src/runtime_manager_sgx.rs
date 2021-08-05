@@ -71,7 +71,7 @@ pub extern "C" fn init_session_manager_enc(
         println!("runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
         return sgx_status_t::SGX_ERROR_UNEXPECTED
     }
-    let ret = crate::managers::session_manager::load_policy(&policy_str)?;
+    let ret = crate::managers::session_manager::load_policy(&policy_str);
     if ret.is_err() {
         println!("runtime_manager_sgx::load_policy failed: {:?}", ret);
         return sgx_status_t::SGX_ERROR_UNEXPECTED;
