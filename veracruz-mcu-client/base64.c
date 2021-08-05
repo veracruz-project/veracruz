@@ -1,5 +1,5 @@
 /*
- * Base64 utilities
+ * base64 utilities
  *
  * ## Authors
  *
@@ -25,17 +25,29 @@ static inline uint32_t base64_alignup(uint32_t a, uint32_t alignment) {
     return base64_aligndown(a + alignment-1, alignment);
 }
 
-// compute size after encoding
+// Find what the size would be after base64 encoding
+size_t base64_encode_size(size_t in_len);
+
 size_t base64_encode_size(size_t in_len) {
     return 4*(base64_alignup(in_len, 3) / 3);
 }
 
+// mapping from int to base64 character
 static const char BASE64_ENCODE[] = (
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789+/");
 
-// encode base64
+// Encode base64
+//
+// Note that base64_encode encodes from back to front, allowing
+// the in and out buffers to be set to the same buffer
+//
+// Returns the number of bytes written, or a negative error code
+ssize_t base64_encode(
+        const uint8_t *in, size_t in_len,
+        char *out, size_t out_len);
+
 ssize_t base64_encode(
         const uint8_t *in, size_t in_len,
         char *out, size_t out_len) {
@@ -70,7 +82,7 @@ ssize_t base64_encode(
     return e_len;
 }
 
-// custom strnlen, behaves as expected
+// custom strnlen, behaves the same as strnlen
 //
 // this is needed since strnlen is not available on all platforms
 //
@@ -84,7 +96,10 @@ static size_t base64_strnlen(const char *s, size_t s_len) {
     return s_len;
 }
 
-// compute size after decoding
+// Find what the size would be after base64 decoding
+//
+// Note that base64_decode_size needs the in buffer in order
+// to check for padding symbols
 size_t base64_decode_size(const char *in, size_t in_len) {
     size_t e_len = base64_strnlen(in, in_len);
 
@@ -96,6 +111,8 @@ size_t base64_decode_size(const char *in, size_t in_len) {
     return x;
 }
 
+// mapping from base64 character - '+' (the first base64 character) to 
+// its int value, with -1 indicating the given character is invalid
 static const int8_t BASE64_DECODE[] = {
     62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
     -1, -1, -1, -1, -1, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
@@ -104,6 +121,7 @@ static const int8_t BASE64_DECODE[] = {
     36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
 };
 
+// checks that a given character is valid base64 (including padding symbols)
 static bool base64_isvalid(char c) {
     if (c >= '0' && c <= '9') {
         return true;
@@ -119,6 +137,11 @@ static bool base64_isvalid(char c) {
 }
 
 // decode base64
+//
+// Note that base64_decode decodes from front to back, allowing
+// the in and out buffers to be set to the same buffer
+//
+// Returns the number of bytes written, or a negative error code
 ssize_t base64_decode(
         const char *in, size_t in_len,
         char *out, size_t out_len) {

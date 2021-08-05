@@ -1,3 +1,18 @@
+#!/bin/bash
+#
+# Run and accumulate memory reports on the execution of the Veracruz MCU Client demo
+#
+# Note that this requires that run_mcu_demo_server.sh to have been run in order
+# to set up the necessary servers
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
 
 set -euxo pipefail
 

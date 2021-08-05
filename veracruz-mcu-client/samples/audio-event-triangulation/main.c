@@ -1,5 +1,15 @@
 /*
- * A Veracruz client targetting microcontroller devices
+ * Audio Event Triangulation demo for the Veracruz MCU Client
+ *
+ * This example application contains an audio sample of a "clap", an
+ * audio event with an associated location and timestamp. It connects
+ * to the configured Veracruz server in order to contribute its audio
+ * recording to the confidential computation.
+ *
+ * With enough audio events (>3), the triangulated source of the audio
+ * event can be calculated in the enclave, and retrieved without leaking
+ * any of the sensitive data used in the computation, such as the audio
+ * signal itself, or the device's locations.
  *
  * ## Authors
  *
@@ -23,7 +33,7 @@
 #include "clap.h"
 #include "policy.h"
 
-// display audio samples in terminal
+// Render audio samples as ascii
 void dump_samples(const int16_t *samples, size_t len,
         size_t width, size_t height) {
     int32_t global_min = 0;
@@ -68,6 +78,7 @@ void dump_samples(const int16_t *samples, size_t len,
     }
 }
 
+// Display GPS coordinates in a human readable form
 void dump_gps(int32_t y, int32_t x) {
     int32_t absy = y >= 0 ? y : -y; 
     int32_t absx = x >= 0 ? x : -x; 

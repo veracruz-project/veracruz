@@ -1,3 +1,13 @@
+# Veracruz MCU Client example CMakeList.txt
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
 
 # Zephyr project
 cmake_minimum_required(VERSION 3.13.1)

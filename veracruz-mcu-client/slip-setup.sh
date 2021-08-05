@@ -1,5 +1,9 @@
 #!/bin/bash
 #
+# Sets up a SLIP based network interfaces connected to a local NAT, this
+# can then be used by the qemu_cortex_m3 board in Zephyr to emulate IP
+# traffic over a serial connection
+#
 # ## Authors
 #
 # The Veracruz Development Team.

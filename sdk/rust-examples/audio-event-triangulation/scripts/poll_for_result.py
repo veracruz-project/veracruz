@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
+#
+# Poll for audio event triangulation results
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
 
-import subprocess as sp
+import argparse
+import json
 import re
 import struct
+import subprocess as sp
+import sys
 import time
-import json
 
+# Convert pair of signed 32-bit latitude+longitude coordinates into
+# a human readable representation
 def dump_gps(location):
     absy = abs(location[0])
     absx = abs(location[1])
@@ -46,7 +61,6 @@ def main(args):
             continue 
 
         # strip debug info
-        #output = re.sub(rb'\[.*?\n', b'', output)
         output = re.sub(rb'post.*?\n', b'', output)
 
         # decode found coordinates
@@ -60,8 +74,6 @@ def main(args):
         break
 
 if __name__ == "__main__":
-    import sys
-    import argparse
     parser = argparse.ArgumentParser(
         description='Poll for audio event triangulation results')
     parser.add_argument('policy',

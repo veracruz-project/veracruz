@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 #
+# Generate header file containing a binary
+#
 # ## Authors
 #
 # The Veracruz Development Team.
@@ -10,7 +12,9 @@
 # information on licensing and copyright.
 #
 
+import argparse
 import os.path
+import sys
 
 def main(args):
     print('Generating %s/%s from %s' % (args.header, args.source, args.binary))
@@ -71,8 +75,6 @@ def main(args):
             f.writeln()
 
 if __name__ == "__main__":
-    import sys
-    import argparse
     parser = argparse.ArgumentParser(
         description='Convert a binary into a header+source file')
     parser.add_argument('binary',

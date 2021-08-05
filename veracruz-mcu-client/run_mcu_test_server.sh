@@ -1,3 +1,15 @@
+#!/bin/bash
+#
+# Run the server-side commands needed test the Veracruz MCU Client
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
 
 set -euxo pipefail
 

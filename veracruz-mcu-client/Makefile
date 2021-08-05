@@ -1,3 +1,17 @@
+# Veracruz MCU Client Makefile
+#
+# These values can be overridden by applications that include this module
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
+
 # Project name/paths, used for docker image
 TARGET ?= veracruz-mcu-client
 DOCKER_IMAGE ?= $(TARGET)

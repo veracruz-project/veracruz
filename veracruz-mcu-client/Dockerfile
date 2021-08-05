@@ -1,3 +1,14 @@
+# Veracruz MCU Client Dockerfile
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
 FROM ubuntu:18.04
 
 ARG TARGET

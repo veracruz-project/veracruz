@@ -1,3 +1,14 @@
+# Veracruz MCU Client CMakeList.txt
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
 if(CONFIG_VC)
 
 zephyr_interface_library_named(VC)

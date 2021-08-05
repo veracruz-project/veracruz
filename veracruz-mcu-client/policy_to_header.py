@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 #
+# Generate a C-friend policy.h and policy.c file from a given policy.json,
+# this results in a set of static declarations that contains the necessary
+# policy info for the veracruz-mcu-client. For more info see vc.c.
+#
 # ## Authors
 #
 # The Veracruz Development Team.
@@ -10,15 +14,19 @@
 # information on licensing and copyright.
 #
 
-import json
-import hashlib
+import argparse
 import base64
+import hashlib
+import json
+import sys
 
+# list of support certificates
 # TODO fully populate this?
 CIPHERSUITES = {
     'TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256': 'MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256',
 }
 
+# convert from a base64 encoded string (.pem) to raw bytes (.der)
 def pem_to_der(pem):
     lines = pem.strip().split('\n')
     lines = ''.join(line.strip() for line in lines[1:-1])
@@ -207,8 +215,6 @@ def main(args):
                 f.writeln('};')
 
 if __name__ == "__main__":
-    import sys
-    import argparse
     parser = argparse.ArgumentParser(
         description='Generate header file from Veracruz policy')
     parser.add_argument('policy',

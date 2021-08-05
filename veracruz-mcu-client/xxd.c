@@ -14,7 +14,7 @@
 
 #include "xxd.h"
 
-// hexdump
+// printfs a full xxd style hexdump
 void xxd(const void *pbuf, size_t len) {
     const uint8_t *buf = pbuf;
 
@@ -47,7 +47,10 @@ void xxd(const void *pbuf, size_t len) {
     }
 }
 
-// bytes to hex, no newline at the end
+// printfs the provided buffer as a hex string
+//
+// Note this does not output a trailing newline, allowing
+// the output to be interleaved with other printf calls
 void hex(const void *pbuf, size_t len) {
     const uint8_t *buf = pbuf;
     for (int i = 0; i < len; i++) {

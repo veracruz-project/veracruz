@@ -1,5 +1,9 @@
 #!/bin/bash
 #
+# Sets up a TAP network interface connected to a local NAT, this
+# can then be used by Zephyr to emulate a network connection at the
+# eth packet level
+#
 # ## Authors
 #
 # The Veracruz Development Team.

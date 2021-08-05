@@ -20,14 +20,21 @@ use std::{
     io,
 };
 
+/// An individual audio event
 struct AudioEvent {
+    /// Timestamp of when even occured (currently unused)
     #[allow(dead_code)]
     timestamp: u32,
+    /// Location in 32-bit signed GPS coordinates
     location: (i32, i32),
+    /// Samples in signed 16-bit PCM, bitrate is assumed to be
+    /// consistent for all samples
     samples: Vec<i16>,
 }
 
 impl AudioEvent {
+    /// Compute the power of the audio event, larger+closer audio
+    /// events result in higher power
     fn power(&self) -> f64 {
         // compute as avg per single sample, assumes common bitrate
         let mut p: f64 = 0.0;
@@ -39,6 +46,17 @@ impl AudioEvent {
     }
 }
 
+/// Decode an audio event from raw little-endian bytes
+///
+/// This uses a simple fixed encoding scheme:
+/// [ u32 timestamp          ]
+/// [ i32 device X GPS coord ]
+/// [ i32 device Y GPS coord ]
+/// [ i16 PCM audio window   ]
+/// [ i16                    ]
+/// [ i16                    ]
+/// [ ...                    ]
+///
 fn decode_audio_event(event: &[u8]) -> AudioEvent {
     AudioEvent{
         timestamp: u32::from_le_bytes(event[0..4].try_into().unwrap()),
@@ -52,6 +70,14 @@ fn decode_audio_event(event: &[u8]) -> AudioEvent {
     }
 }
 
+/// Find the best effort triangulation of audio events
+/// using measured signal power to estimate distance
+///
+/// Note! This is a fairly naive solution, using only 3 events
+/// leaves us with farily low confidence. We also don't take
+/// things like the curvature of the earth into account, so
+/// this should only be used for demo purposes
+///
 fn triangulate(events: &[AudioEvent]) -> (i32, i32) {
     // solving
     // (x−x1)^2 + (y−y1)^2 = d1^2
@@ -93,6 +119,8 @@ fn triangulate(events: &[AudioEvent]) -> (i32, i32) {
     (y as i32, x as i32)
 }
 
+/// Encode a pair of latitude/longitude GPS coordinates into
+/// little-endian bytes
 fn encode_location(location: (i32, i32)) -> Vec<u8> {
     location.0.to_le_bytes().iter()
         .chain(location.1.to_le_bytes().iter())

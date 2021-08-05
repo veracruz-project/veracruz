@@ -1,5 +1,12 @@
 /*
- * A Veracruz client targetting microcontroller devices
+ * Shamir's Secret Sharing example for the Veracruz MCU Client
+ *
+ * This example uses a GF(256) based Shamir's secret sharing scheme to
+ * construct a secret message from a set of independently-useless shares.
+ *
+ * It also provides the binary directly from the device, retrieves the
+ * result to the device, test that the message is as expected, and shuts
+ * down the server, making it a decent test of the Veracruz MCU Client API.
  *
  * ## Authors
  *

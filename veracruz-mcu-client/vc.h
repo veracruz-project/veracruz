@@ -2,10 +2,10 @@
  * Veracruz client aimed at microcontrollers, built in Zephyr OS
  *
  * Note that there are very few arguments to these functions, the Veracruz
- * client is based on a static policy file that is expected preprocessed into
+ * client uses a static policy.json file that is expected preprocessed into
  * a policy.h file (see policy_to_header.py).
  *
- * TODO config struct?
+ * TODO provide a config struct as an alternative to static configuration?
  *
  * ## Authors
  *
@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <mbedtls/ssl.h>
 
+// Veracruz's custom extension field containing the runtime hash
 #ifndef VC_RUNTIME_HASH_EXTENSION_ID
 #define VC_RUNTIME_HASH_EXTENSION_ID ((const uint8_t[3]){85, 30, 1})
 #endif
@@ -109,36 +110,75 @@ typedef struct vc {
 } vc_t;
 
 
-// Connect to a Veracruz enclave and verify the attestation via its
-// certificate chain
+// Connect and verify attestation of a Veracruz enclave
+//
+// Connect, and verify that the certificate chain of our enclave was signed
+// by the PAS root CA. This implies that the PAS has succesfully attested the
+// enclave running on the server.
+//
+// Once the server has been attested, we then establish a TLS connection directly
+// into the runtime inside the enclave. Through this we can send/recv data
+// to/from the computation
+//
+// vc - Veracruz client state
+//
+// Returns 0 on success, or a negative error code on failure
 int vc_connect(vc_t *vc);
 
 // Disconnect and clean up memory
 //
-// Note even if an error is returned, memory is still cleaned up
+// vc - Veracruz client state
 //
+// Note, even if an error is returned, memory is still cleaned up
+//
+// Returns 0 on success, or a negative error code on failure
 int vc_close(vc_t *vc);
 
-// Send data to a Veracruz instance
+// Send data to a Veracruz instance over the tunneled TLS session
+//
+// vc       - Veracruz client state
+// name     - The name of the file to write to in the enclave
+// data     - Buffer containing the data to send
+// data_len - Size of the data buffer
+//
+// Returns 0 on success, or a negative error code on failure
 int vc_send_data(vc_t *vc,
         const char *name,
         const uint8_t *data,
         size_t data_len);
 
-// Send a program to a Veracruz instance
+// Send a program to a Veracruz instance over the tunneled TLS session
+//
+// vc          - Veracruz client state
+// name        - The name of the file to write to in the enclave
+// program     - Buffer containing the program to send
+// program_len - Size of the program buffer
+//
+// Returns 0 on success, or a negative error code on failure
 int vc_send_program(vc_t *vc,
         const char *name,
         const uint8_t *program,
         size_t program_len);
 
-// Request a result from a Veracruz instance
+// Request a result from a Veracruz instance over the tunneled TLS session
+//
+// vc         - Veracruz client state
+// name       - The name of the file to read from the enclave
+// result     - Buffer to be filled with the result
+// result_len - Size of the result buffer
+//
+// Returns the number of bytes written, or a negative error code on failure
 ssize_t vc_request_result(vc_t *vc,
         const char *name,
         uint8_t *result,
         size_t result_len);
 
 // Request the shutdown of a Veracruz instance
-ssize_t vc_request_shutdown(vc_t *vc);
+//
+// vc - Veracruz client state
+//
+// Returns 0 on succes, or a negative error code on failure
+int vc_request_shutdown(vc_t *vc);
 
 
 #endif

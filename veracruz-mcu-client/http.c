@@ -20,12 +20,14 @@
 #include <net/http_client.h>
 
 
+// a struct to maintain the state of the current HTTP request
 struct http_get_state {
     uint8_t *buf;
     size_t buf_len;
     size_t pos;
 };
 
+// HTTP GET callback, this is call by Zephyr's networking stack
 static void http_get_cb(
         struct http_response *rsp,
         enum http_final_call final,
@@ -46,6 +48,14 @@ static void http_get_cb(
 }
 
 // HTTP GET operation
+//
+// - host     Hostname or url of server to access
+// - port     Port of server to access
+// - path     Path on the server to access
+// - buf      Buffer to write response into
+// - buf_len  Size of response buffer in bytes
+//
+// Returns the number of bytes recieved, or a negative error code
 ssize_t http_get(
         const char *host,
         uint16_t port,
@@ -118,6 +128,16 @@ ssize_t http_get(
 }
 
 // HTTP POST operation
+//
+// - host             Hostname or url of server to access
+// - port             Port of server to access
+// - path             Path on the server to access
+// - payload_buf      Buffer of data to send with POST message
+// - payload_buf_len  Size of payload buffer in bytes
+// - resp_buf         Buffer to write response into
+// - resp_buf_len     Size of response buffer in bytes
+//
+// Returns the number of bytes recieved, or a negative error code
 // TODO deduplicate?
 ssize_t http_post(
         const char *host,

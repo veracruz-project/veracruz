@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 #
+# Summarize breakdown of rom/ram in memory reports
+#
 # ## Authors
 #
 # The Veracruz Development Team.
@@ -10,9 +12,11 @@
 # information on licensing and copyright.
 #
 
-import re
-import itertools as it
+import argparse
 import collections as co
+import itertools as it
+import re
+import sys
 
 # note the order matters here, earlier groups are matched first so
 # should be more specific
@@ -28,6 +32,7 @@ GROUPS = [
 ]
 
 
+# parse static reports for group-level memory usage
 def find_static_groups(report_path):
     with open(report_path, encoding="utf-8") as report:
         # skip lines before ====
@@ -80,7 +85,7 @@ def find_static_groups(report_path):
 
     return groups, total
 
-
+# parse dynamic reports for group-level memory usage
 def find_dyn_groups(report_path):
     with open(report_path) as report:
         # first we should find the peak index
@@ -153,14 +158,9 @@ def main(args):
         heap_total,
         stack_total))
 
-
-            
-
 if __name__ == "__main__":
-    import sys
-    import argparse
     parser = argparse.ArgumentParser(
-        description='Summarize breakdown of rom/ram in reports')
+        description='Summarize breakdown of rom/ram in memory reports')
     parser.add_argument('rom_report',
         help='ROM report output from Zephyr')
     parser.add_argument('static_ram_report',

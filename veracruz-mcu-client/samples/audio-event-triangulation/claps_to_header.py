@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 #
+# Generate header file containing clap audio samples
+#
 # ## Authors
 #
 # The Veracruz Development Team.
@@ -10,11 +12,15 @@
 # information on licensing and copyright.
 #
 
-import struct
+import argparse
 import collections as co
+import struct
 import sys
 
+# an arbitrary timestamp to tag clap audio with
 TIMESTAMP = 1619580492
+
+# arbitrary GPS locations to tag clap audio with
 LOCATIONS = [
     (30.245633363333095, -97.75153437304053),
     (30.222367321649394, -97.84045833888852),
@@ -25,6 +31,8 @@ LOCATIONS = [
     (30.457328895861682, -97.82552717096148),
 ]
 
+# write an ascii rendering of the downsampled clap audio for
+# debugging purposes
 def dump_samples(samples, width=76, height=16):
     max_ = max(samples)
     min_ = min(samples)
@@ -48,6 +56,7 @@ def dump_samples(samples, width=76, height=16):
                 sys.stdout.write(' ')
         print()
 
+# find the average of a list of samples
 def avg(xs):
     return sum(xs) // len(xs)
 
@@ -84,8 +93,6 @@ def main(args):
     # downsample?
     if args.bitrate:
         slice = bitrate // args.bitrate
-#        samples = [samples[i]
-#            for i in range(0, len(samples), slice)]
         samples = [avg(samples[i:i+slice])
             for i in range(0, len(samples), slice)]
         old_bitrate, bitrate = bitrate, args.bitrate
@@ -174,8 +181,6 @@ def main(args):
             f.writeln('};')
 
 if __name__ == "__main__":
-    import sys
-    import argparse
     parser = argparse.ArgumentParser(
         description='Generate header file containing clap audio samples')
     parser.add_argument('claps',
