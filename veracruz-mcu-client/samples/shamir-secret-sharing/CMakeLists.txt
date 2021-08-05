@@ -33,5 +33,5 @@ add_dependencies(app app_veracruz_binary)
 
 file(GLOB SRC "*.c")
 target_sources(app PRIVATE ${SRC})
-target_sources(app PRIVATE clap.c)
+target_sources(app PRIVATE binary.c)
 
