@@ -19,6 +19,7 @@ use std::{
     fs,
     io,
 };
+use thiserror::Error;
 
 /// An individual audio event
 struct AudioEvent {
@@ -30,6 +31,12 @@ struct AudioEvent {
     /// Samples in signed 16-bit PCM, bitrate is assumed to be
     /// consistent for all samples
     samples: Vec<i16>,
+}
+
+#[derive(Error, Debug)]
+pub enum AudioEventError {
+    #[error("Unable to decode audio event")]
+    InvalidAudioEvent,
 }
 
 impl AudioEvent {
@@ -57,8 +64,12 @@ impl AudioEvent {
 /// [ i16                    ]
 /// [ ...                    ]
 ///
-fn decode_audio_event(event: &[u8]) -> AudioEvent {
-    AudioEvent{
+fn decode_audio_event(event: &[u8]) -> anyhow::Result<AudioEvent> {
+    if event.len() < 12 || event.len() % 2 != 0 {
+        Err(AudioEventError::InvalidAudioEvent)?;
+    }
+
+    Ok(AudioEvent{
         timestamp: u32::from_le_bytes(event[0..4].try_into().unwrap()),
         location: (
             i32::from_le_bytes(event[4.. 8].try_into().unwrap()),
@@ -67,7 +78,7 @@ fn decode_audio_event(event: &[u8]) -> AudioEvent {
         samples: (12..event.len()).step_by(2)
             .map(|i| i16::from_le_bytes(event[i..i+2].try_into().unwrap()))
             .collect::<Vec<_>>()
-    }
+    })
 }
 
 /// Find the best effort triangulation of audio events
@@ -152,7 +163,7 @@ fn main() -> anyhow::Result<()> {
     // decode
     let events = raw_events.iter()
         .map(|raw_event| decode_audio_event(&raw_event[..]))
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()?;
 
     // triangulate
     let location = triangulate(&events);

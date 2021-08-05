@@ -7,6 +7,7 @@ description = "Triangulation via audio events"
 
 [dependencies]
 anyhow = "1.0.14"
+thiserror = "1.0.26"
 
 [profile.release]
 opt-level = 3
