@@ -59,7 +59,7 @@ config VC_LOG_HEXDUMPS
 
 config VC_SEND_BUFFER_SIZE
     int "Size of Veracruz's send buffer"
-    default 2048
+    default 4096
     help
         The size of Veracruz's send buffer in bytes.
 
