@@ -1,0 +1,18 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      # Clean the repostory, which automatically downloads the rust toolchain specified in the repostory
+      - make clean
+  build:
+    commands:
+      # Compile and run veracruz-client tests on sgx; other tests require SGX enable machine.
+      - make sgx-veracruz-client-test
+      - make sgx-veracruz-server-test-dry-run
+      - make sgx-veracruz-test-dry-run
+      - make sgx-cli # compile only
+
