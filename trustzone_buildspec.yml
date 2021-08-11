@@ -1,0 +1,19 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      # Set up the environment for trustzone backend
+      - pushd /work/rust-optee-trustzone-sdk && source environment && popd
+      # Clean the repostory, which automatically downloads the rust toolchain specified in the repostory
+      - make clean
+  build:
+    commands:
+      # Compile and run tests on trustzone
+      - make trustzone-veracruz-client-test
+      - make trustzone-veracruz-server-test
+      - make trustzone-veracruz-test
+      - make trustzone-cli # compile only
