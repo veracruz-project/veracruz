@@ -1,0 +1,72 @@
+# Veracruz MCU Client Kconfig configuration
+#
+# These values can be overridden by applications that include this module
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
+config VC
+    bool "Veracruz MCU Client"
+    default n
+    help
+        This option enables the Veracruz MCU Client
+
+if VC
+
+config VC_POLICY_PATH
+    string "Absolute path to the policy.json file"
+    default "policy.json"
+    help
+        This must be set to the absolute path to the policy.json
+        file that governs the computation.
+
+config VC_IDENTITY_PATH
+    string "Absolute path to the public key of the device"
+    default "cert.pem"
+    help
+        This must be set to the absolute path to the public key
+        that represents the identity of the device.
+
+config VC_KEY_PATH
+    string "Absolute path to the private key of the device"
+    default "key.pem"
+    help
+        This must be set to the absolute path to the private key
+        of the device.
+
+config VC_LOG
+    bool "Enable logging"
+    default y
+    help
+        Enables log output of Veracruz's internal state, by default
+        this is fairly readable. More info can be printed via
+        the VC_LOG_HEXDUMPS option.
+
+config VC_LOG_HEXDUMPS
+    bool "Enable hexdump logging"
+    depends on VC_LOG
+    default n
+    help
+        Enables hexdumps of various bits of data, such as the client/peer
+        certificates, handshake messages, etc. Useful for debugging, but
+        may leak secrets if used in production.
+
+config VC_SEND_BUFFER_SIZE
+    int "Size of Veracruz's send buffer"
+    default 4096
+    help
+        The size of Veracruz's send buffer in bytes.
+
+config VC_RECV_BUFFER_SIZE
+    int "Size of Veracruz's recv buffer"
+    default 4096
+    help
+        The size of Veracruz's recv buffer in bytes.
+
+endif

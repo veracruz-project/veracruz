@@ -1,0 +1,54 @@
+# Veracruz MCU Client example Kconfig configuration
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
+
+source "Kconfig.zephyr"
+
+config VC_AUDIO_EVENT_TRIANGULATION_CLAPS_PATH
+    string "Absolute path to a .wav file containing clap audio"
+    default "claps.wav"
+    help
+        Absolute path to a .wav file containing clap audio, this file can
+        contain multiple claps which will get sliced up according to the
+        VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER configuration option.
+
+config VC_AUDIO_EVENT_TRIANGULATION_CLAP_BITRATE
+    int "Bitrate of the audio sample to use for storing clap audio"
+    default 100
+    help
+        Bitrate of the audio sample to use for storing clap audio. A naive
+        downsampling algorithm is used to reduce the bitrate of the given
+        wave file before storing on the device. Larger values give more audio
+        information but take up more space.
+
+        It's worth noting that a high bitrate is not required to determine
+        peak amplitude/distance
+
+config VC_AUDIO_EVENT_TRIANGULATION_CLAP_SAMPLES_BEFORE
+    int "Number of samples before clap to include in window"
+    default 30
+
+config VC_AUDIO_EVENT_TRIANGULATION_CLAP_SAMPLES_AFTER
+    int "Number of samples after clap to include in window"
+    default 170
+
+config VC_AUDIO_EVENT_TRIANGULATION_CLAP_NUMBER
+    int "Integer index of which clap to use"
+    default 0
+    help
+        Integer index of which clap to use out of claps.wav, these are
+        found by naive peak detection after downsampling, clap 0 indicates
+        the strongest peak, clap 1, indicates the second strongest peak, etc.
+
+config VC_AUDIO_EVENT_TRIANGULATION_DELAY
+    int "Artificial delay to introduce for demo purposes"
+    default 0
+    help
+        Artificial delay to introduce for demo purposes, given in seconds.
