@@ -14,3 +14,4 @@ serde = { version = "1.0.103", features = ["derive"] }
 rand = "0.7"
 rand_distr = "0.3"
 clap = "2.33"
+bitflags = "=1.2.1"

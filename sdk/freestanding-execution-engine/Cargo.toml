@@ -11,6 +11,7 @@ description = "A freestanding WASM execution engine implementing the Veracruz AB
 execution-engine = { path = "../../execution-engine", features = ["std"] }
 veracruz-utils = { path = "../../veracruz-utils", features = ["std"] }
 clap = "2.33.3"
+bitflags = "=1.2.1"
 env_logger = "0.7.1"
 log = "0.4.8"
 serde = { version = "1.0.103", features = ["derive"] }
