@@ -18,5 +18,6 @@ transport-protocol = { path = "../transport-protocol"}
 stringreader = "0.1"
 curl = "=0.4.35"
 clap = "2.33"
+bitflags = "=1.2.1"
 local_ipaddress = "0.1.3"
 

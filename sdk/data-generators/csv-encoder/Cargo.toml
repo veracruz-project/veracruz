@@ -8,6 +8,7 @@ description = "A utility for encoding CSV-structured data into the binary `pinec
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bitflags   = "=1.2.1"
 clap       = "2.33.0"
 csv        = "1.0"
 env_logger = "0.7.1"

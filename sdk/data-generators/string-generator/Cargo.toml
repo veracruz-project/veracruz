@@ -11,3 +11,4 @@ description = "A utility for generating synthetic strings for use with various e
 pinecone = "0.2"
 serde = { version = "1.0.103", features = ["derive"] }
 clap = "2.33"
+bitflags = "=1.2.1"

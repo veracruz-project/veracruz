@@ -9,3 +9,4 @@ description = "Automatically-generated C bindings for the Runtime Manager enclav
 
 [build-dependencies]
 bindgen = "0.53.1"
+bitflags = "=1.2.1"

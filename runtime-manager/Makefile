@@ -152,7 +152,7 @@ $(OUT_DIR)/stripped_ta: $(OUT_DIR)/runtime_manager_enclave
 
 $(OUT_DIR)/runtime_manager_enclave: $(TZ_Src)
 	@echo $(INFO_COLOR)"CARGO <=  $(TZ_Src)" $(RESET_COLOR)
-	@OPTEE_OS_DIR=$(OPTEE_OS_DIR) xargo build --target $(TZ_TARGET) --features tz --release --verbose --out-dir $(OUT_DIR) -Z unstable-options
+	OPTEE_OS_DIR=$(OPTEE_OS_DIR) xargo build --target $(TZ_TARGET) --features tz --release --verbose --out-dir $(OUT_DIR) -Z unstable-options
 	@echo $(INFO_COLOR)"GEN   =>  runtime_manager_enclave" $(RESET_COLOR)
 
 

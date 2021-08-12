@@ -25,6 +25,7 @@ optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-s
 veracruz-utils = { path = "../veracruz-utils", features = ["tz"] }
 lazy_static = {version = "1.4.0", features=["spin_no_std"] }
 ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz" }
+bitflags = "=1.2.1"
 
 [build-dependencies]
 uuid = { version = "=0.7.4", features = ["v4"] }

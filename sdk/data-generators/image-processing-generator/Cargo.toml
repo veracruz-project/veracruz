@@ -9,4 +9,5 @@ description = "A utility for generating synthetic images for use with the `image
 
 [dependencies]
 clap = "2.33"
+bitflags = "=1.2.1"
 image = "0.23.14"
