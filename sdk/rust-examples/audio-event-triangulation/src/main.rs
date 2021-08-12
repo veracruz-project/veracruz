@@ -49,7 +49,7 @@ impl AudioEvent {
             p += x.abs() as f64;
         }
 
-        p / (self.samples.len() as f64)
+        p.checked_div(self.samples.len() as f64).unwrap_or(0)
     }
 }
 
