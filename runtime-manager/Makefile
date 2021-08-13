@@ -34,7 +34,7 @@ $(FINAL_DIR)/$(Signed_RustEnclave_RootName): $(Signed_RustEnclave_Name)
 
 .PHONY: all clean format
 
-sgx: $(FINAL_DIR)/$(Signed_RustEnclave_RootName) $(SGX_Enclave_Name) $(Signed_RustEnclave_Name) $(Untrusted_Lib_Name)
+sgx: $(FINAL_DIR)/$(Signed_RustEnclave_RootName) $(Untrusted_Lib_Name)
 
 # Note: css-sgx.bin will be generated as a side effect of the dependency $(Signed_RustEnclave_Name)
 css-sgx.bin: $(Signed_RustEnclave_Name)
@@ -98,7 +98,7 @@ $(RustEnclave_Name): $(OUT_DIR)/runtime_manager_t.o $(SGX_Enclave_Name)
 	@$(CXX) $(OUT_DIR)/runtime_manager_t.o -o $@ -L$(OUT_DIR) $(RustEnclave_Link_Flags)
 	@echo $(INFO_COLOR) "LINK =>  $@" $(RESET_COLOR)
 
-$(Signed_RustEnclave_Name): $(RustEnclave_Name) $(SGX_Enclave_Name)
+$(Signed_RustEnclave_Name): $(RustEnclave_Name)
 	@$(SGX_ENCLAVE_SIGNER) sign -key ./Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config ./Enclave.config.xml -cssfile css-sgx.bin
 	@echo $(INFO_COLOR) "SIGN =>  $@" $(RESET_COLOR)
 

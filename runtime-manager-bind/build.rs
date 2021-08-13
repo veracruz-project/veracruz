@@ -31,7 +31,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=runtime_manager_u");
     println!("cargo:rerun-if-changed=.");
     println!("cargo:rerun-if-changed=../runtime-manager/");
-    println!("cargo:rerun-if-changed=../runtime-manager/Makefile");
+    println!("cargo:rerun-if-changed=../runtime-manager/src");
 
     let make_result = Command::new("make")
         .arg("sgx")
