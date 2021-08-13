@@ -58,8 +58,6 @@ const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUT
                                the Veracruz root directory for detailed authorship information.";
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
-/// Application version number.
-const OUTPUT_FILE: &'static str = "/output";
 
 /// The default dump status of `stdout`, if no alternative is provided on the
 /// command line.
@@ -389,7 +387,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Manually create the Right table for the VFS.
     // Add read and readdir permissions to root dir
-    file_table.insert(Path::new("/").to_path_buf(), read_right | Rights::FD_READDIR);
+    file_table.insert(Path::new("/").to_path_buf(), read_right | Rights::FD_READDIR | Rights::PATH_CREATE_DIRECTORY);
     // Add read permission to program
     file_table.insert(prog_file_abs_path.clone(), read_right);
     // Add read permission to input file
