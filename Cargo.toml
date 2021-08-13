@@ -1,0 +1,59 @@
+[workspace]
+members = [
+    "execution-engine",
+    "nitro-root-enclave-server",
+    "platform-services",
+    "proxy-attestation-server",
+    "psa-attestation",
+    "runtime-manager-bind",
+    "sdk/data-generators/*",
+    "sdk/freestanding-execution-engine",
+    "session-manager",
+    "sgx-root-enclave-bind",
+    "test-collateral/generate-policy",
+    "transport-protocol",
+    "veracruz-client",
+    "veracruz-server",
+    "veracruz-server-test",
+    "veracruz-test",
+    "veracruz-utils",
+]
+exclude = [
+    # we exclude rust-examples as these are actually WebAssembly programs
+    "sdk/rust-examples",
+    # we also exclude all enclaves as these require special build rules
+    "nitro-root-enclave",
+    "runtime-manager",
+    "sgx-root-enclave",
+    "trustzone-root-enclave",
+    # and other non-native dependendencies
+    "incubator-teaclave-sgx-sdk",
+    "third-party",
+]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+# patches for SGX
+[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
+sgx_ucrypto.git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git"
+sgx_ucrypto.branch = "veracruz"
+sgx_ucrypto.optional = true
+
+sgx_types.git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git"
+sgx_types.branch = "veracruz"
+sgx_types.optional = true
+
+sgx_alloc.git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git"
+sgx_alloc.branch = "veracruz"
+sgx_alloc.optional = true
+
+[patch.crates-io]
+rustls.git = "https://github.com/veracruz-project/rustls.git"
+rustls.branch = "veracruz"
+
+serde.git = "https://github.com/veracruz-project/serde.git"
+serde.features = ["derive"]
+serde.branch = "veracruz"

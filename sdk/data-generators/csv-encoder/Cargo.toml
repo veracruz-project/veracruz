@@ -12,13 +12,8 @@ bitflags   = "=1.2.1"
 clap       = "2.33.0"
 csv        = "1.0"
 env_logger = "0.7.1"
-log        = "0.4.8"
+log = "=0.4.13"
 pinecone   = "*"
 serde      = { version = "1.0.103", features = ["derive"] }
 toml       = "0.5.6"
-
-[profile.release]
-lto           = true
-codegen-units = 1
-opt-level     = 3
 

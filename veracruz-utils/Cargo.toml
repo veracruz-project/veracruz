@@ -33,8 +33,3 @@ ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }
 
-[patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed", optional = true }
-
-[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }

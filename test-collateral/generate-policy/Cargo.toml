@@ -13,7 +13,7 @@ chrono = "0.4.19"
 clap = "2.33.3"
 data-encoding = "2.3.2"
 env_logger = "0.8.2"
-log = "0.4.14"
+log = "=0.4.13"
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
 veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
 serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
