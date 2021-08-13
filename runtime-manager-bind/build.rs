@@ -29,8 +29,8 @@ fn main() {
     println!("cargo:rustc-link-search=../runtime-manager/bin");
     println!("{:}", out_dir_link_search);
     println!("cargo:rustc-link-lib=static=runtime_manager_u");
-    println!("cargo:rerun-if-changed=.");
-    println!("cargo:rerun-if-changed=../runtime-manager/");
+    println!("cargo:rerun-if-changed=src/");
+    println!("cargo:rerun-if-changed=../runtime-manager/src/");
     println!("cargo:rerun-if-changed=../runtime-manager/Makefile");
 
     let make_result = Command::new("make")
