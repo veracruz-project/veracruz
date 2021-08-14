@@ -132,3 +132,14 @@ clean:
 	done
 	$(MAKE) -C freestanding-execution-engine/ clean
 	$(MAKE) -C wasm-checker/ clean
+
+quick-clean:
+	for data in $(RELATIVE_DATA_GEN); do \
+		$(MAKE) -C $$data clean; \
+	done
+	rm -rf datasets
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
+		$(MAKE) -C $$example clean; \
+	done
+	$(MAKE) -C freestanding-execution-engine/ clean
+	#$(MAKE) -C wasm-checker/ clean
