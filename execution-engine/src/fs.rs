@@ -449,7 +449,7 @@ impl FileSystem {
         Ok(())
     }
 
-    /// Install a dir of `inode` and attatch it under the parent inode `parent`.
+    /// Install a dir with inode `new_inode` and attatch it under the parent inode `parent`.
     fn add_dir<T: AsRef<Path>>(&mut self, parent: Inode, path: T, new_inode: Inode) -> FileSystemResult<()> {
         let file_stat = FileStat {
             device: (0u64).into(),
@@ -464,7 +464,7 @@ impl FileSystem {
         let path = path.as_ref().to_path_buf();
         let node = InodeEntry {
             current: new_inode.clone(),
-            parent: Self::ROOT_DIRECTORY_INODE,
+            parent,
             file_stat,
             path: path.clone(),
             data: InodeImpl::new_directory(new_inode.clone(),parent.clone()),
@@ -479,8 +479,40 @@ impl FileSystem {
         Ok(())
     }
 
+    /// Create all dir in the path.
+    fn add_all_dir<T: AsRef<Path>>(&mut self, mut parent: Inode, path: T) -> FileSystemResult<()> { 
+        for component in path.as_ref().components() {
+            if let Component::Normal(c) = component {
+                let new_parent = match self.get_inode_by_inode_path(&parent, c) {
+                    Ok((o,_)) => o,
+                    Err(ErrNo::NoEnt) => {
+                        let new_inode = self.new_inode()?;
+                        self.add_dir(parent.clone(), c, new_inode.clone())?;
+                        new_inode
+                    }
+                    Err(e) => return Err(e),
+                };
+                parent = new_parent;
+            } else {
+                return Err(ErrNo::Inval);
+            }
+        }
+        Ok(())
+    }
+
     /// Install a file with content `raw_file_data` and attatch it to `inode`.
+    /// Return Err if any directory in the path does not exist.
     fn add_file<T: AsRef<Path>>(&mut self, parent: Inode, path: T, new_inode: Inode, raw_file_data: &[u8]) -> FileSystemResult<()> {
+        let path = path.as_ref();
+        info!("call add_file with parent {:?} and path {:?}", parent, path);
+        // modify/shadow the `parent` inode if the path contains directory.
+        let (parent,path) = if let Some(parent_path) = path.parent() {
+            let file_path = path.file_name().map(|s| s.as_ref()).ok_or(ErrNo::Inval)?;
+            (self.get_inode_by_inode_path(&parent,parent_path)?.0, file_path)
+        } else {
+            (parent,path)
+        };
+        info!("call add_file with new parent {:?} and path {:?}", parent, path);
         let file_size = raw_file_data.len();
         let file_stat = FileStat {
             device: 0u64.into(),
@@ -496,7 +528,7 @@ impl FileSystem {
             current: new_inode.clone(),
             parent,
             file_stat,
-            path: path.as_ref().to_path_buf(),
+            path: path.to_path_buf(),
             data: InodeImpl::File(raw_file_data.to_vec()),
         };
         // Add the map from the new inode to inode implementation.
@@ -591,8 +623,14 @@ impl FileSystem {
     }
 
     /// Get the the inode related to path in the Fd
-    fn get_inode_by_path(&self, fd: &Fd, path: impl AsRef<Path>) -> FileSystemResult<(Inode, &InodeEntry)> {
+    fn get_inode_by_fd_path<T: AsRef<Path>>(&self, fd: &Fd, path: T) -> FileSystemResult<(Inode, &InodeEntry)> {
         let (parent_inode, _) = self.get_inode_by_fd(&fd)?;
+        self.get_inode_by_inode_path(&parent_inode,path)
+    }
+
+    /// Get the the inode related to path in the parent inode
+    fn get_inode_by_inode_path<T: AsRef<Path>>(&self, parent_inode: &Inode, path: T) -> FileSystemResult<(Inode, &InodeEntry)> {
+        let parent_inode = parent_inode.clone();
         let inode = path.as_ref().components().fold(Ok(parent_inode), |last, component|{
             // If there is an error
             let last = last?;
@@ -926,7 +964,7 @@ impl FileSystem {
             return Err(ErrNo::NotDir);
         }
         // The path exists
-        if self.get_inode_by_path(&fd, path.as_ref()).is_ok() {
+        if self.get_inode_by_fd_path(&fd, path.as_ref()).is_ok() {
             return Err(ErrNo::Exist)
         }
         info!("call path_create_directory starts creating dir");
@@ -963,7 +1001,7 @@ impl FileSystem {
         if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
-        let (inode, _) = self.get_inode_by_path(&fd, path)?;
+        let (inode, _) = self.get_inode_by_fd_path(&fd, path)?;
         Ok(self
             .inode_table
             .get(&inode)
@@ -992,7 +1030,7 @@ impl FileSystem {
             return Err(ErrNo::NotDir);
         }
 
-        let (inode, _) = self.get_inode_by_path(&fd, path)?;
+        let (inode, _) = self.get_inode_by_fd_path(&fd, path)?;
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
             inode_impl.file_stat.atime = current_time;
@@ -1068,7 +1106,7 @@ impl FileSystem {
             rights_base, rights_inheriting
         );
         // Several oflags logic, inc. `create`, `excl` and `directory`.
-        let inode = match self.get_inode_by_path(&fd, path) {
+        let inode = match self.get_inode_by_fd_path(&fd, path) {
             Ok((inode, inode_entry)) => {
                 // If file exists and `excl` is set, return `Exist` error.
                 if oflags.contains(OpenFlags::EXCL) {
@@ -1273,6 +1311,10 @@ impl FileSystem {
             } else {
                 OpenFlags::empty()
             };
+        // create the dir if necessary
+        if let Some(parent_path) = file_name.parent() {
+            self.add_all_dir(Self::ROOT_DIRECTORY_INODE,parent_path)?;
+        }
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,

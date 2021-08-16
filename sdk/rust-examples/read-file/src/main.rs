@@ -26,11 +26,24 @@ fn main() -> anyhow::Result<()> {
     input_string.append(&mut "read_dir on ROOT:\"".as_bytes().to_vec());
     println!("hello");
     fs::create_dir_all("/a/b/c/d")?;
+    fs::write("/a/b/c/d/e.txt","hello")?;
     for file in fs::read_dir("/")? {
         input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
     }
     input_string.append(&mut "\"read_dir on '/a':".as_bytes().to_vec());
     for file in fs::read_dir("/a")? {
+        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
+    }
+    input_string.append(&mut "\"read_dir on '/a/b':".as_bytes().to_vec());
+    for file in fs::read_dir("/a/b")? {
+        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
+    }
+    input_string.append(&mut "\"read_dir on '/a/b/c':".as_bytes().to_vec());
+    for file in fs::read_dir("/a/b/c")? {
+        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
+    }
+    input_string.append(&mut "\"read_dir on '/a/b/c/d':".as_bytes().to_vec());
+    for file in fs::read_dir("/a/b/c/d")? {
         input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
     }
     input_string.append(&mut "\"".as_bytes().to_vec());

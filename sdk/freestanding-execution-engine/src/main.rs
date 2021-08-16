@@ -480,8 +480,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Path::new("/").join(file_path)
             );
         info!("{}: {:?}", file_path, output);
+        let msg = &output?;
         //TODO REMOVE
-        let output : String = pinecone::from_bytes(&output?).unwrap();
+        let output : String = match pinecone::from_bytes(msg) {
+            Ok(o) => o,
+            Err(_) => match std::str::from_utf8(msg) {
+                Ok(oo) => oo.to_string(),
+                Err(_) => "(Cannot Parse)".to_string(),
+            }
+        };
         info!("{}: {:?}",file_path, output);
     }
     Ok(())
