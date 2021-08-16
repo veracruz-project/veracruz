@@ -808,7 +808,7 @@ impl FileSystem {
         Ok(rst)
     }
 
-    /// The stub implementation of `fd_readdir`. Return unsupported error `NoSys`.
+    /// The implementation of `fd_readdir`.
     #[inline]
     pub(crate) fn fd_readdir(
         &mut self,
@@ -1143,7 +1143,6 @@ impl FileSystem {
     }
 
     /// The stub implementation of `path_remove_directory`. Return unsupported error `NoSys`.
-    /// We only support the searching from the root Fd.
     #[inline]
     pub(crate) fn path_remove_directory<T: AsRef<Path>>(
         &mut self,
