@@ -31,10 +31,9 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     error::Error,
-    fs::File,
-    io::Read,
+    fs::{File, create_dir_all},
+    io::{Read, Write},
     path::{Path, PathBuf},
-    str::FromStr,
     sync::{Arc, Mutex},
     time::Instant,
     vec::Vec,
@@ -143,15 +142,13 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             Arg::with_name("dump-stdout")
                 .short("d")
                 .long("dump-stdout")
-                .help("Whether the contents of stdout should be dumped before exiting.")
-                .value_name("BOOLEAN"),
+                .help("Whether the contents of stdout should be dumped before exiting"),
         )
         .arg(
             Arg::with_name("dump-stderr")
                 .short("e")
                 .long("dump-stderr")
-                .help("Whether the contents of stderr should be dumped before exiting.")
-                .value_name("BOOLEAN"),
+                .help("Whether the contents of stderr should be dumped before exiting"),
         )
         .arg(
             Arg::with_name("enable-clock")
@@ -230,34 +227,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         Vec::new()
     };
 
-    let dump_stdout = {
-        let dump_stdout = matches
-            .value_of("dump-stdout")
-            .unwrap_or(DEFAULT_DUMP_STDOUT);
-        if let Ok(dump_stdout) = bool::from_str(dump_stdout) {
-            if dump_stdout {
-                info!("stdout configured to be dumped before exiting.");
-            }
-            dump_stdout
-        } else {
-            return Err(format!("Expecting a boolean, but found {}", dump_stdout).into());
-        }
-    };
-
-    let dump_stderr = {
-        let dump_stderr = matches
-            .value_of("dump-stderr")
-            .unwrap_or(DEFAULT_DUMP_STDERR);
-        if let Ok(dump_stderr) = bool::from_str(dump_stderr) {
-            if dump_stderr {
-                info!("stderr configured to be dumped before exiting.");
-            }
-            dump_stderr
-        } else {
-            return Err(format!("Expecting a boolean, but found {}", dump_stderr).into());
-        }
-    };
-
     let enable_clock = {
         let enable_clock = matches
             .value_of("enable-clock")
@@ -270,6 +239,16 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         } else {
             return Err(format!("Expecting a boolean, but found {}", enable_clock).into());
         }
+    let dump_stdout = if matches.is_present("dump-stdout") {
+        true
+    } else {
+        DEFAULT_DUMP_STDOUT
+    };
+
+    let dump_stderr = if matches.is_present("dump-stderr") {
+        true
+    } else {
+        DEFAULT_DUMP_STDERR
     };
 
     let environment_variables = match matches.values_of("env") {
@@ -329,13 +308,19 @@ fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
 fn load_input_sources(
-    cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>,
+    input_sources: &Vec<String>, vfs: Arc<Mutex<FileSystem>>,
 ) -> Result<(), Box<dyn Error>> {
-    for (id, file_path) in cmdline.input_sources.iter().enumerate() {
-        info!(
-            "Loading data source '{}' with id {} for reading.",
-            file_path, id
-        );
+    for file_path in input_sources.iter() {
+        let file_path = Path::new(file_path);
+        load_input_source(&file_path,vfs.clone())?;
+    }
+    Ok(())
+}
+
+fn load_input_source<T: AsRef<Path>>(file_path: T, vfs: Arc<Mutex<FileSystem>>) -> Result<(), Box<dyn Error>> {
+    let file_path = file_path.as_ref();
+    info!( "Loading data source '{:?}'.", file_path);
+    if file_path.is_file() {
         let mut file = File::open(file_path)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -344,7 +329,13 @@ fn load_input_sources(
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
             .write_file_by_absolute_path(&Principal::InternalSuperUser, &Path::new("/").join(file_path), &buffer, false)?;
 
-        info!("Loading '{}' into vfs.", file_path);
+        info!("Loading '{:?}' into vfs.", file);
+    } else if file_path.is_dir() {
+        for dir in file_path.read_dir()? {
+            load_input_source(&dir?.path(), vfs.clone())?;
+        }
+    } else {
+        return Err(format!("Error on load {:?}", file_path).into())
     }
     Ok(())
 }
@@ -362,12 +353,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
-    let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK;
-    let write_right = Rights::PATH_OPEN
+    let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
+    let write_right = read_right
         | Rights::FD_WRITE
-        | Rights::FD_SEEK
         | Rights::PATH_CREATE_FILE
-        | Rights::PATH_FILESTAT_SET_SIZE;
+        | Rights::PATH_FILESTAT_SET_SIZE
+        | Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
     let std_streams_table = vec![
@@ -387,7 +378,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Manually create the Right table for the VFS.
     // Add read and readdir permissions to root dir
-    file_table.insert(Path::new("/").to_path_buf(), read_right | Rights::FD_READDIR | Rights::PATH_CREATE_DIRECTORY);
+    file_table.insert(Path::new("/").to_path_buf(), read_right | Rights::PATH_CREATE_DIRECTORY);
     // Add read permission to program
     file_table.insert(prog_file_abs_path.clone(), read_right);
     // Add read permission to input file
@@ -424,7 +415,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    load_input_sources(&cmdline, vfs.clone())?;
+    load_input_sources(&cmdline.input_sources, vfs.clone())?;
     info!("Data sources loaded.");
 
     info!("Invoking main.");
@@ -473,23 +464,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     for file_path in cmdline.output_sources.iter() {
-        let output = vfs.lock()
+        for (output_path, buf) in vfs.lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_absolute_path(
+            .read_all_files_by_absolute_path(
                 &Principal::InternalSuperUser,
                 Path::new("/").join(file_path)
-            );
-        info!("{}: {:?}", file_path, output);
-        let msg = &output?;
-        //TODO REMOVE
-        let output : String = match pinecone::from_bytes(msg) {
-            Ok(o) => o,
-            Err(_) => match std::str::from_utf8(msg) {
-                Ok(oo) => oo.to_string(),
-                Err(_) => "(Cannot Parse)".to_string(),
+            )?.iter() {
+            let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
+            if let Some(parent_path) = output_path.parent() {
+                if parent_path != Path::new("") {
+                    create_dir_all(parent_path)?;
+                }
             }
-        };
-        info!("{}: {:?}",file_path, output);
+            let mut to_write = File::create(output_path)?;
+            to_write.write_all(&buf)?;
+
+            //Try to decode 
+            let decode : String = match pinecone::from_bytes(buf) {
+                Ok(o) => o,
+                Err(_) => match std::str::from_utf8(buf) {
+                    Ok(oo) => oo.to_string(),
+                    Err(_) => "(Cannot Parse)".to_string(),
+                }
+            };
+            info!("{:?}: {:?}",output_path, decode);
+        }
     }
     Ok(())
 }

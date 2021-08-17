@@ -26,7 +26,8 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
-use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
+use std::ffi::OsString;
 use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -508,6 +509,7 @@ impl FileSystem {
         // modify/shadow the `parent` inode if the path contains directory.
         let (parent,path) = if let Some(parent_path) = path.parent() {
             let file_path = path.file_name().map(|s| s.as_ref()).ok_or(ErrNo::Inval)?;
+            self.add_all_dir(parent, parent_path)?;
             (self.get_inode_by_inode_path(&parent,parent_path)?.0, file_path)
         } else {
             (parent,path)
@@ -1343,7 +1345,7 @@ impl FileSystem {
         Ok(())
     }
 
-    /// Read from a file on path `file_name`.
+    /// Read a file on path `file_name`.
     /// The `principal` must have the right on `path_open`,
     /// `fd_read` and `fd_seek`.
     pub fn read_file_by_absolute_path<T: AsRef<Path>>(
@@ -1376,6 +1378,37 @@ impl FileSystem {
         let file_stat = self.fd_filestat_get(fd)?;
         let rst = self.fd_read(fd, file_stat.file_size as usize)?;
         self.fd_close(fd)?;
+        Ok(rst)
+    }
+
+    /// Read all files recursively on path `path`.
+    /// The `principal` must have the right on `path_open`,
+    /// `fd_read` and `fd_seek`.
+    pub fn read_all_files_by_absolute_path<T: AsRef<Path>>(
+        &mut self,
+        principal: &Principal,
+        path: T,
+    ) -> Result<Vec<(PathBuf,Vec<u8>)>, ErrNo> {
+        let path = path.as_ref();
+        info!("read_all_files_by_filename: {:?}", path);
+        // Convert the absolute path to relative path and then find the inode
+        let (_, inode_impl) = self.get_inode_by_inode_path(&Self::ROOT_DIRECTORY_INODE,path.strip_prefix("/").map_err(|_|ErrNo::NoEnt)?.clone())?;
+        let mut rst = Vec::new();
+        if inode_impl.is_dir() {
+            for (_, sub_relative_path) in inode_impl.read_dir(&self)?.iter() {
+                let sub_relative_path = PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
+                // Ignore the path for current and parent directories.
+                if sub_relative_path != PathBuf::from(".") && sub_relative_path != PathBuf::from("..") {
+                    let mut sub_absolute_path = path.to_path_buf();
+                    sub_absolute_path.push(sub_relative_path);
+                    rst.append(&mut self.read_all_files_by_absolute_path(principal,sub_absolute_path)?);
+                }
+            }
+        } else {
+            let buf = self.read_file_by_absolute_path(principal, path)?;
+            rst.push((path.to_path_buf(), buf));
+        }
+
         Ok(rst)
     }
 
