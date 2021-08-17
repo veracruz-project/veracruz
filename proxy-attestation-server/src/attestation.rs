@@ -67,8 +67,8 @@ fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
     }
 }
 
-/// Reads a PEM keyificate from `pem_key_path`, converts it to DER format,
-/// and stores it in CA_CERT_DER for use by the service
+/// Reads a PEM key from `pem_key_path`, converts it to DER format,
+/// and stores it in CA_KEY_PKEY for use by the service
 pub fn load_ca_key<P>(pem_key_path: P) -> Result<(), ProxyAttestationServerError>
 where
     P: AsRef<path::Path>
@@ -131,7 +131,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
 /// Convert a Certificate Signing Request (CSR) to an X.509 Certificate and
 /// sign it
 fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
-    let csr = openssl::x509::X509Req::from_der(&csr_der)
+    let csr = openssl::x509::X509Req::from_der(csr_der)
         .map_err(|err| {
             print!("proxy-attestation-server::attestation::convert_csr_to_certificate failed to get csr from der:{:?}", err);
             err
@@ -292,26 +292,8 @@ fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) 
             err
         })?;
 
-    let key_pem = {
-        let mut f = std::fs::File::open("../test-collateral/CAKey.pem")
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::convert_csr_to_certificate open of file failed:{:?}", err);
-                err
-            })?;
-        let mut buffer: Vec<u8> = Vec::new();
-        f.read_to_end(&mut buffer)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::convert_csr_to_certificate read_to_end failed:{:?}", err);
-                err
-            })?;
-        buffer
-    };
+    let private_key = get_ca_key()?;
 
-    let private_key = openssl::pkey::PKey::private_key_from_pem(&key_pem)
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::convert_csr_to_certificate get_ca_key failed:{:?}", err);
-            err
-        })?;
     // sign the certificate
     cert_builder.sign(&private_key, openssl::hash::MessageDigest::sha256())
         .map_err(|err| {
