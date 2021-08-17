@@ -74,7 +74,7 @@ pub struct SessionContext {
 }
 
 impl SessionContext {
-    /// Creates a new context using the global Veracruz policy, `policy`.
+    /// Creates a new context
     pub fn new() -> Result<Self, SessionManagerError> {
         let (server_private_key, server_public_key) = {
             let rng = SystemRandom::new();

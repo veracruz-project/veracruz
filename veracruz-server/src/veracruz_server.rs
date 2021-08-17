@@ -170,7 +170,7 @@ pub enum VeracruzServerError {
     InvalidRuntimeManagerHash,
     /// Transport protocol buffer handling returned an error
     #[cfg(feature = "nitro")]
-    #[error(display = "NitroSVeracruzServererver: TransportProtocol error:{}", _0)]
+    #[error(display = "VeracruzServer: TransportProtocol error:{}", _0)]
     TransportProtocol(transport_protocol::custom::TransportProtocolError),
     /// A base64 decode error occurred
     // #[cfg(feature = "nitro")]

@@ -17,9 +17,6 @@ use rustls::PrivateKey;
 use veracruz_utils::csr;
 
 pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
-    
-
-    //TODO: change the error type
     let new_session_manager = SessionContext::new()?;
 
     {

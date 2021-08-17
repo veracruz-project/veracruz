@@ -201,12 +201,10 @@ trustzone-test-env: tz_test.sh run_tz_test.sh
 
 nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
-		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro,debug -- --test-threads=1\
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
 	cd veracruz-server-test \
 		&& ./nitro-terminate.sh
-	cd ./veracruz-server-test \
-		&& ./nitro-ec2-terminate_root.sh
 
 nitro-veracruz-server-test-dry-run: nitro nitro-test-collateral
 	cd veracruz-server-test \
