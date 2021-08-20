@@ -348,6 +348,11 @@ impl VeracruzClient {
                 let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
+                // The Extension is encoded using DER, which puts the first two
+                // elements in the ID in 1 byte, and the rest get their own bytes
+                // This encoding is specified in ITU Recommendation x.690, 
+                // which is available here: https://www.itu.int/rec/T-REC-X.690-202102-I/en
+                // but it's deep inside a PDF...
                 let encoded_extension_id: [u8; 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
                                                      VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
                                                      VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];

@@ -170,9 +170,9 @@ impl SessionContext {
 
     /// Returns the principals associated with the server.
     #[inline]
-    pub fn principals(&self) -> Result<Vec<Principal>, SessionManagerError> {
+    pub fn principals(&self) -> Result<&Vec<Principal>, SessionManagerError> {
         match &self.principals {
-            Some(principals) => return Ok(principals.clone()),
+            Some(principals) => return Ok(&principals),
             None => return Err(SessionManagerError::InvalidStateError),
         }
     }
@@ -197,6 +197,6 @@ impl SessionContext {
     /// of the new session fails.
     #[inline]
     pub fn create_session(&self) -> Result<Session, SessionManagerError> {
-        Ok(Session::new(self.server_config()?, self.principals()?.to_vec()))
+        Ok(Session::new(self.server_config()?, self.principals()?))
     }
 }

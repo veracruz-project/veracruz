@@ -72,6 +72,7 @@ sgx-cli: sgx-env
 	$(MAKE) -C test-collateral/generate-policy
 
 nitro: sdk
+	rustup target add x86_64-unknown-linux-musl
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 
 nitro-cli:
@@ -200,7 +201,6 @@ trustzone-test-env: tz_test.sh run_tz_test.sh
 	chmod u+x $^
 
 nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
-	rustup target add x86_64-unknown-linux-musl
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro,debug -- --test-threads=1\
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
@@ -208,12 +208,10 @@ nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/pro
 		&& ./nitro-terminate.sh
 
 nitro-veracruz-server-test-dry-run: nitro nitro-test-collateral
-	rustup target add x86_64-unknown-linux-musl
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features sgx --no-run
 
 nitro-veracruz-server-performance: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
-	rustup target add x86_64-unknown-linux-musl
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_performance_ --features nitro -- --ignored
 	cd veracruz-server-test \
@@ -222,12 +220,10 @@ nitro-veracruz-server-performance: nitro nitro-test-collateral veracruz-server-t
 		&& ./nitro-ec2-terminate-root.sh
 
 nitro-veracruz-test-dry-run: nitro nitro-test-collateral
-	rustup target add x86_64-unknown-linux-musl
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro --no-run
 
 nitro-veracruz-test: nitro nitro-test-collateral veracruz-test/proxy-attestation-server.db
-	rustup target add x86_64-unknown-linux-musl
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro -- --test-threads=1
 	cd veracruz-server-test \

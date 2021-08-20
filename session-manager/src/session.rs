@@ -43,7 +43,7 @@ pub struct Session {
 impl Session {
     /// Creates a new session from a server configuration and a list of
     /// principals.
-    pub fn new(config: rustls::ServerConfig, principals: Vec<Principal>) -> Self {
+    pub fn new(config: rustls::ServerConfig, principals: &Vec<Principal>) -> Self {
         let tls_session = ServerSession::new(&std::sync::Arc::new(config));
 
         Session {
