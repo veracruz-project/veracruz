@@ -47,8 +47,8 @@ impl Session {
         let tls_session = ServerSession::new(&std::sync::Arc::new(config));
 
         Session {
-            tls_session,
-            principals.to_vec(),
+            tls_session: tls_session,
+            principals: principals.to_vec(),
         }
     }
 
