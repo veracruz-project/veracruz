@@ -48,7 +48,7 @@ impl Session {
 
         Session {
             tls_session,
-            principals,
+            principals.to_vec(),
         }
     }
 
