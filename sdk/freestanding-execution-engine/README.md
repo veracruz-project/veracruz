@@ -5,7 +5,7 @@ This document provides a walkthrough of how to load files from the host and into
 IMPORTANT: This exercise assume some familiarity with reading **Rust syntax** and **Rust's package manager named Cargo**. Both these areas are well explained at this [link](https://doc.rust-lang.org/book/title-page.html).
 
 # Steps:
-1. Install [Rust](https://www.rust-lang.org/tools/install) and [wasmtime](https://wasmtime.dev/).
+1. Install [Rust](https://www.rust-lang.org/tools/install).
 2. Clone the Veracruz repository from [Github](https://github.com/veracruz-project/veracruz)
 3. Open the project in VS code for ease of visualising the project file structure
 4. Open up a terminal and go to the directory `veracruz/sdk/rust-examples`. In this example we will be focusing on the `read-file` directory
