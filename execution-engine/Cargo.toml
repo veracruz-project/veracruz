@@ -28,10 +28,6 @@ anyhow = { version = "1.0", default-features = false }
 byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch = "veracruz" }
 cfg-if = "1"
 err-derive = "0.2"
-lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-num = { version = "0.4", default-features = false }
-num-derive = { version = "0.3", default-features = false }
-num-traits = { version = "0.2", default-features = false }
 pinecone = "0.2"
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
