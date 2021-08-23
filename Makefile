@@ -273,8 +273,9 @@ clean:
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
-	$(MAKE) clean -C sdk
-	rm -f $(addsuffix /Cargo.lock,session-manager execution-engine transport-protocol veracruz-client sgx-root-enclave runtime-manager-bind runtime-manager psa-attestation veracruz-server-test veracruz-server sgx-root-enclave-bind trustzone-root-enclave proxy-attestation-server veracruz-test veracruz-util)
+	$(MAKE) -C sdk clean
+	$(MAKE) -C test-collateral clean
+	rm -f $(addsuffix /Cargo.lock,execution-engine nitro-root-enclave nitro-root-enclave-server platform-services proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager sgx-root-enclave sgx-root-enclave-bind transport-protocol trustzone-root-enclave veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
