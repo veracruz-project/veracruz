@@ -73,4 +73,7 @@ pub enum SessionManagerError {
     /// A cryptographic certificate was missing.
     #[error(display = "Session manager: no certificate was found.")]
     NoCertificateError,
+    /// Invalid state (an Option was None when it should not be, for example)
+    #[error(display = "Session manager: invalid state")]
+    InvalidStateError,
 }

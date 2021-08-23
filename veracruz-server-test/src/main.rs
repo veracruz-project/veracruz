@@ -28,9 +28,7 @@ mod tests {
     use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
     #[cfg(feature = "tz")]
     use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
-    use veracruz_utils::{platform::Platform, policy::policy::Policy};
-    #[cfg(feature = "nitro")]
-    use regex::Regex;
+    use veracruz_utils::{platform::Platform, policy::policy::Policy, VERACRUZ_RUNTIME_HASH_EXTENSION_ID};
     use proxy_attestation_server;
     use std::{
         collections::HashMap,
@@ -125,37 +123,28 @@ mod tests {
             println!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                #[cfg(feature = "nitro")]
-                let ip_addr = 
-                {
-                    let ip_string = local_ipaddress::get()
-                        .expect("Failed to get local ip address");
-                    let ip_port_string = format!("{:}:3010", ip_string);
-                    ip_port_string
-                };
-                #[cfg(not(feature = "nitro"))]
-                let ip_addr = {
-                    proxy_attestation_server_url
-                };
+                println!("spawned thread calling server with url:{:?}", proxy_attestation_server_url);
                 #[cfg(feature = "debug")]
                 let server =
                     proxy_attestation_server::server::server(
-                        ip_addr,
+                        proxy_attestation_server_url,
                         CA_CERT,
                         CA_KEY,
-                        true
-                    ).unwrap();
+                        true)
+                        .unwrap();
                 #[cfg(not(feature = "debug"))]
                 let server =
                     proxy_attestation_server::server::server(
-                        ip_addr,
+                        proxy_attestation_server_url,
                         CA_CERT,
                         CA_KEY,
-                        false
-                    ).unwrap();
+                        false)
+                        .unwrap();
                 sys.block_on(server).unwrap();
             });
         });
+        // sleep to wait for the proxy attestation server to start
+        std::thread::sleep(std::time::Duration::from_millis(100));
         rst
     }
 
@@ -1175,38 +1164,11 @@ mod tests {
         let policy_json =
             std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname));
 
-        // Since we need to run the root enclave on another system for nitro enclaves
-        // we can't use localhost for the URL of the proxy attestation server (like we do in
-        // the policy files. so we need to replace it with the private IP of the current instance
-        #[cfg(feature = "nitro")]
-        {
-            let ip_string = std::env::var("TABASCO_IP_ADDRESS")
-                .expect("TABASCO_IP_ADDRESS environment variable not set");
-            let ip_address =
-                format!("\"proxy_attestation_server_url\": \"{:}:3010\"",
-                        ip_string);
-            let re = 
-                Regex::new(r#""proxy_attestation_server_url": "\d+\.\d+.\d+.\d+:\d+""#)
-                    .unwrap();
-            let policy_json_cow = re.replace_all(&policy_json, ip_address.as_str()).to_owned();
 
-            let policy_hash =
-                ring::digest::digest(&ring::digest::SHA256, policy_json_cow.as_ref().as_bytes());
-            let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
-            let policy = Policy::from_json(policy_json_cow.as_ref())?;
-            Ok((
-                policy,
-                policy_json_cow.as_ref().to_string(),
-                policy_hash_str,
-            ))
-        }
-        #[cfg(not(feature = "nitro"))]
-        {
-            let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
-            let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
-            let policy = Policy::from_json(policy_json.as_ref())?;
-            Ok((policy, policy_json.to_string(), policy_hash_str))
-        }
+        let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
+        let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
+        let policy = Policy::from_json(policy_json.as_ref())?;
+        Ok((policy, policy_json.to_string(), policy_hash_str))
     }
 
     /// Auxiliary function: initialise the Veracruz server from policy and open a tls session
@@ -1292,20 +1254,27 @@ mod tests {
     }
 
     fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
-
-        let expected = match policy.runtime_manager_hash(platform) {
-            Err(_) => return false,
-            Ok(data) => data,
-        };
-        let expected_bytes = match hex::decode(expected) {
-            Err(_) => return false,
-            Ok(bytes) => bytes,
-        };
-
-        if &received[..] != expected_bytes.as_slice() {
-            return false;
-        } else {
+        #[cfg(feature = "debug")]
+        {
+            // don't check hash because the received hash might be zeros (for nitro, for example)
             return true;
+        }
+        #[cfg(not(feature = "debug"))]
+        {
+            let expected = match policy.runtime_manager_hash(platform) {
+                Err(_) => return false,
+                Ok(data) => data,
+            };
+            let expected_bytes = match hex::decode(expected) {
+                Err(_) => return false,
+                Ok(bytes) => bytes,
+            };
+    
+            if &received[..] != expected_bytes.as_slice() {
+                return false;
+            } else {
+                return true;
+            }
         }
     }
 
@@ -1321,8 +1290,10 @@ mod tests {
                 let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref()).unwrap();
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
-                static OUR_EXTENSION_ID: [u8; 3] = [85, 30, 1];
-                match ues.get(&OUR_EXTENSION_ID[..]) {
+                let encoded_extension_id: [u8; 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];
+                match ues.get(&encoded_extension_id[..]) {
                     None => {
                         println!("Our extension is not present. This should be fatal");
                         return Err(VeracruzServerError::MissingFieldError("MY CRAZY CUSTOM EXTENSION AIN'T TERE"));

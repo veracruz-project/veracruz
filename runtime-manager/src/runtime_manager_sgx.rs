@@ -66,10 +66,15 @@ pub extern "C" fn init_session_manager_enc(
         Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
     };
 
-    let ret = crate::managers::session_manager::init_session_manager(&policy_str);
+    let ret = crate::managers::session_manager::init_session_manager();
     if ret.is_err() {
         println!("runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
         return sgx_status_t::SGX_ERROR_UNEXPECTED
+    }
+    let ret = crate::managers::session_manager::load_policy(&policy_str);
+    if ret.is_err() {
+        println!("runtime_manager_sgx::load_policy failed: {:?}", ret);
+        return sgx_status_t::SGX_ERROR_UNEXPECTED;
     }
 
     debug_message(format!("init_session_manager_enc getting csr"));
@@ -91,7 +96,7 @@ pub extern "C" fn init_session_manager_enc(
         }
     };
 
-    match managers::session_manager::load_cert_chain(certs) {
+    match managers::session_manager::load_cert_chain(&certs) {
         Ok(_) => (),
         Err(e) => {
             println!("runtime_manager_sgx::init_session_manager_enc call to load_cert_chain failed:{:?}", e);

@@ -37,3 +37,9 @@ pub use self::io::vsocket::*;
 pub use self::platform::nitro::nitro_enclave::*;
 
 pub mod csr;
+
+/// The ID of the Veracruz Runtime Hash Extension.
+/// This value was made up, and can be changed to pretty much any valid
+/// ID as long as it doesn't collide with the ID of an extension in our
+/// certificates.
+pub static VERACRUZ_RUNTIME_HASH_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];

@@ -72,10 +72,8 @@ sgx-cli: sgx-env
 	$(MAKE) -C test-collateral/generate-policy
 
 nitro: sdk
-	pwd
+	rustup target add x86_64-unknown-linux-musl
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
 
 nitro-cli:
 	# enclave binaries needed for veracruz-server
@@ -143,14 +141,14 @@ trustzone-cli: trustzone-env
 # Using wildcard in the dependencies because if they are there, and newer, it
 # should be rebuilt, but if they aren't there, they don't need to be built 
 # (they are optional)
-veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
+veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin)
 	cd veracruz-test && \
 		bash ../test-collateral/populate-test-database.sh
 
 # Using wildcard in the dependencies because if they are there, and newer, it
 # should be rebuilt, but if they aren't there, they don't need to be built 
 # (they are optional)
-veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin) $(wildcard nitro-root-enclave/PCR0)
+veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin)
 	cd veracruz-server-test && \
 		bash ../test-collateral/populate-test-database.sh
 
@@ -204,12 +202,10 @@ trustzone-test-env: tz_test.sh run_tz_test.sh
 
 nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
-		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro \
+		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro,debug -- --test-threads=1\
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
 	cd veracruz-server-test \
 		&& ./nitro-terminate.sh
-	cd ./veracruz-server-test \
-		&& ./nitro-ec2-terminate_root.sh
 
 nitro-veracruz-server-test-dry-run: nitro nitro-test-collateral
 	cd veracruz-server-test \
@@ -261,14 +257,12 @@ clean:
 	cd veracruz-utils && cargo clean
 	cd veracruz-server-test && cargo clean
 	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
-	cd nitro-root-enclave-server && cargo clean
 	$(MAKE) clean -C runtime-manager
 	$(MAKE) clean -C sgx-root-enclave
 	$(MAKE) clean -C veracruz-server
 	$(MAKE) clean -C test-collateral 
 	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
-	$(MAKE) clean -C nitro-root-enclave
 	rm -rf bin
 
 # NOTE: this target deletes ALL cargo.lock.

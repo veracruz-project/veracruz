@@ -60,13 +60,13 @@ where
 /// and server configuration options, for managing a server session.
 pub struct SessionContext {
     /// The configuration options for the server.
-    server_config: ServerConfig,
+    server_config: Option<ServerConfig>,
     /// The global policy associated with the Veracruz computation, detailing
     /// identities and roles for all principals, amongst other things.
-    policy: Policy,
+    policy: Option<Policy>,
     /// The set of principals, as specified in the Veracruz global policy, with
     /// their identifying certificates and roles.
-    principals: Vec<Principal>,
+    principals: Option<Vec<Principal>>,
     /// The private key used by the server
     server_private_key: PrivateKey,
     /// The public key used by the server (as a Vec<u8> for convenience)
@@ -74,8 +74,31 @@ pub struct SessionContext {
 }
 
 impl SessionContext {
-    /// Creates a new context using the global Veracruz policy, `policy`.
-    pub fn new(policy: Policy) -> Result<Self, SessionManagerError> {
+    /// Creates a new context
+    pub fn new() -> Result<Self, SessionManagerError> {
+        let (server_private_key, server_public_key) = {
+            let rng = SystemRandom::new();
+            // ECDSA prime256r1 generation.
+            let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
+                &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+                &rng,
+            )?;
+            (
+                rustls::PrivateKey(pkcs8_bytes.as_ref().to_vec()),
+                pkcs8_bytes.as_ref()[70..138].to_vec(),
+            )
+        };
+
+        Ok(Self {
+            server_config: None,
+            principals: None,
+            policy: None,
+            server_public_key: server_public_key,
+            server_private_key: server_private_key,
+        })
+    }
+
+    pub fn set_policy(&mut self, policy: Policy) -> Result<(), SessionManagerError> {
         // create the root_cert_store that contains all of the certs of the clients that can connect
         // Note: We are not using a CA here, so each client that needs to connect must have it's
         // cert directly in the RootCertStore
@@ -90,23 +113,9 @@ impl SessionContext {
 
             principals.push(principal);
         }
-
-        let (server_private_key, server_public_key) = {
-            let rng = SystemRandom::new();
-            // ECDSA prime256r1 generation.
-            let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
-                &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-                &rng,
-            )?;
-            (
-                rustls::PrivateKey(pkcs8_bytes.as_ref().to_vec()),
-                pkcs8_bytes.as_ref()[70..138].to_vec(),
-            )
-        };
-
-        // create the configuration
-        let mut server_config =
-            ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
+         // create the configuration
+         let mut server_config =
+         ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
 
         // Set the supported ciphersuites in the server to the one specified in
         // the policy.  This is a dumb way to do this, but I leave it up to the
@@ -130,13 +139,11 @@ impl SessionContext {
         server_config.ciphersuites = vec![supported_ciphersuite];
         server_config.versions = vec![rustls::ProtocolVersion::TLSv1_2];
 
-        Ok(Self {
-            server_config,
-            principals,
-            policy,
-            server_public_key,
-            server_private_key,
-        })
+        self.server_config = Some(server_config);
+        self.principals = Some(principals);
+        self.policy = Some(policy);
+
+        return Ok(());
     }
 
     pub fn set_cert_chain(&mut self, chain_data: &Vec<Vec<u8>>) -> Result<(), SessionManagerError> {
@@ -145,20 +152,29 @@ impl SessionContext {
             let cert: rustls::Certificate = rustls::Certificate(this_chain_data.clone());
             cert_chain.push(cert);
         }
-        self.server_config.set_single_cert(cert_chain, self.server_private_key.clone())?;
+        match &mut self.server_config {
+            Some(config) => config.set_single_cert(cert_chain, self.server_private_key.clone())?,
+            None => return Err(SessionManagerError::InvalidStateError),
+        }
         return Ok(());
     }
 
     /// Returns the configuration associated with the server.
     #[inline]
-    pub fn server_config(&self) -> &ServerConfig {
-        &self.server_config
+    pub fn server_config(&self) -> Result<ServerConfig, SessionManagerError> {
+        match &self.server_config {
+            Some(config) => return Ok(config.clone()),
+            None => return Err(SessionManagerError::InvalidStateError), 
+        }
     }
 
     /// Returns the principals associated with the server.
     #[inline]
-    pub fn principals(&self) -> &Vec<Principal> {
-        &self.principals
+    pub fn principals(&self) -> Result<&Vec<Principal>, SessionManagerError> {
+        match &self.principals {
+            Some(principals) => return Ok(&principals),
+            None => return Err(SessionManagerError::InvalidStateError),
+        }
     }
 
     /// Returns the public key (as a Vec<u8>) of the server
@@ -180,7 +196,7 @@ impl SessionContext {
     /// the principals that are stored in this context.  Fails iff the creation
     /// of the new session fails.
     #[inline]
-    pub fn create_session(&self) -> Session {
-        Session::new(self.server_config().clone(), self.principals().clone())
+    pub fn create_session(&self) -> Result<Session, SessionManagerError> {
+        Ok(Session::new(self.server_config()?, self.principals()?))
     }
 }

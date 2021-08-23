@@ -153,7 +153,7 @@ pub const COMPUTE_ENCLAVE_CSR_TEMPLATE: CsrTemplate = CsrTemplate {
     signature_location: (237, 237 + 71),
     signature_range: (4, 222),
     overall_length_field_location: (2, 4),
-    overall_length_initial_value: 233,
+    overall_length_initial_value: 237 - 4,
     signature_length_field_location: (235, 236),
     signature_length_initial_value: 1,
 };

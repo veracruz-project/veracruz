@@ -69,7 +69,8 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
         let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)
             .map_err(|err| RuntimeManagerError::BincodeError(err))?;
         let return_message = match received_message {
-            RuntimeManagerMessage::Initialize(policy_json, challenge, challenge_id) => initialize(&policy_json, &challenge, challenge_id)?,
+            RuntimeManagerMessage::Attestation(challenge, challenge_id) => attestation(&challenge, challenge_id)?,
+            RuntimeManagerMessage::Initialize(policy_json, certificate_chain) => initialize(&policy_json, &certificate_chain)?,
             RuntimeManagerMessage::NewTLSSession => {
                 println!("runtime_manager_nitro::main NewTLSSession");
                 let ns_result = managers::session_manager::new_session();
@@ -136,11 +137,9 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
     }
 }
 
-/// Handler for the RuntimeManagerMessage::Initialize message
-fn initialize(policy_json: &str, challenge: &[u8], challenge_id: i32) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
-    println!("runtime_manager_nitro::initialize started");
-    managers::session_manager::init_session_manager(policy_json)?;
-    
+fn attestation(challenge: &[u8], challenge_id: i32) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+    println!("runtime_manager_nitro::attestation started");
+    managers::session_manager::init_session_manager()?;
     // generate the csr
     let csr: Vec<u8> = managers::session_manager::generate_csr()?;
     // generate the attestation document
@@ -174,25 +173,13 @@ fn initialize(policy_json: &str, challenge: &[u8], challenge_id: i32) -> Result<
         buffer.clone()
     };
 
-    let proxy_attestation_message = NitroRootEnclaveMessage::ProxyAttestation(att_doc, challenge_id);
-    let pam_message_buffer =
-        bincode::serialize(&proxy_attestation_message).map_err(|err| RuntimeManagerError::BincodeError(err))?;
+    return Ok(RuntimeManagerMessage::AttestationData(att_doc));
+}
 
-    // send the attestation message to the root enclave via an ocall
-    let vsocksocket = vsocket::VsockSocket::connect(HOST_CID, OCALL_PORT)
-        .map_err(|err| RuntimeManagerError::SocketError(err))?;
-    send_buffer(vsocksocket.as_raw_fd(), &pam_message_buffer)
-        .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-    let received_buffer = receive_buffer(vsocksocket.as_raw_fd())
-        .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-    let received_message: NitroRootEnclaveMessage = bincode::deserialize(&received_buffer)
-        .map_err(|err| RuntimeManagerError::BincodeError(err))?;
-
-    let cert_chain = match received_message {
-        NitroRootEnclaveMessage::CertChain(chain) => chain,
-        _ => return Err(RuntimeManagerError::WrongMessageTypeError(received_message)),
-    };
-
+/// Handler for the RuntimeManagerMessage::Initialize message
+fn initialize(policy_json: &str, cert_chain: &Vec<Vec<u8>>) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+    managers::session_manager::load_policy(policy_json)?;
+    println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;
 
     return Ok(RuntimeManagerMessage::Status(NitroStatus::Success));
