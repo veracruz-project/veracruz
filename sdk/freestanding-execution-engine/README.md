@@ -1,6 +1,6 @@
 # Getting started with the Veracruz freestanding execution engine
 
-This document provides a walkthrough of how to load files from the host and into the Veracruz freestanding execution engine. The freestanding execution engine is allows programs to be executed and is used for debugging and development outside of a real Veracruz instance.
+This document provides a walkthrough of how to load files from the host and into the Veracruz freestanding execution engine. The freestanding execution engine allows programs to be executed and is used for debugging and development outside of a real Veracruz instance.
 
 IMPORTANT: This exercise assume some familiarity with reading **Rust syntax** and **Rust's package manager named Cargo**. Both these areas are well explained at this [link](https://doc.rust-lang.org/book/title-page.html).
 
