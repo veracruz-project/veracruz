@@ -1,6 +1,6 @@
 # Goal of the exercise
 
-The purpose of this exercise is to get familiarised with how to load files from the host and into the Veracruz freestanding execution engine.
+The purpose of this exercise is to get familiarised with how to load files from the host and into the Veracruz freestanding execution engine. The freestanding execution engine inside of the Veracruz instance allows a user's program to be executed.
 
 IMPORTANT: This exercise assume some familiarity with reading **Rust syntax** and **Rust's package manager named Cargo**. Both these areas are well explained at this [link](https://doc.rust-lang.org/book/title-page.html).
 
