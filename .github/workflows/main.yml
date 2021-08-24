@@ -1,38 +1,95 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
+name: Veracruz-CI
 
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [ main ]
+    branches: [ main, github-action ]
   pull_request:
     branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  check-repo-and-compile-sdk:
     runs-on: ubuntu-latest
+    container: 
+      image: ghcr.io/veracruz-project/veracruz/veracruz:dev
+      volumes: 
+        - ${{ github.workspace }}:/work/veracruz 
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      - uses: docker://ghcr.io/veracruz-project/veracruz/veracruz:dev
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # Check out the repo
+      - name: Check out the repo
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      
+      # Compile all examples and data sources in the sdk
+      - name: Compile SDK
+        id: sdk
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          cd /work/veracruz
+          make sdk
+
+     # Update the repo and sdk artifact
+      - name: Upload repo and SDK artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: veracruz-artifact
+          path: /work/veracruz/ 
+      
+
+  sgx:
+    runs-on: ubuntu-latest
+    container: 
+      image: ghcr.io/veracruz-project/veracruz/veracruz:dev
+      volumes: 
+        - ${{ github.workspace }}:/work/veracruz 
+    needs: [check-repo-and-compile-sdk]
+
+    steps:
+        
+      # Directly use the artifact containing repo and sdk artifact
+      - name: Download repo and SDK artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: veracruz-artifact
+      
+      # Run the sgx test
+      - name: Running sgx test script
+        id: sgx-test
+        run: |
+            cd /work/veracruz
+            make sgx
+            make sgx-veracruz-server-test-dry-run
+            make sgx-veracruz-test-dry-run
+            make sgx-veracruz-client-test
+  tz:
+    runs-on: ubuntu-latest
+    container: 
+      image: ghcr.io/veracruz-project/veracruz/veracruz:dev
+      volumes: 
+        - ${{ github.workspace }}:/work/veracruz 
+    needs: [check-repo-and-compile-sdk]
+
+    steps:
+        
+      # Directly use the artifact containing repo and sdk artifact
+      - name: Download repo and SDK artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: veracruz-artifact
+      
+      - name: Running trustzone test script
+        id: tz-test
+        run: |
+            cd /work/veracruz
+            pushd /work/rust-optee-trustzone-sdk && source environment && popd
+            make trustzone
+            make trustzone-veracruz-server-test
+            make trustzone-veracruz-test
+            make trustzone-veracruz-client-test
 
