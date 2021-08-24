@@ -18,7 +18,9 @@ use policy_utils::principal::{Principal, RightsTable, StandardStream};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryInto},
-    path::{Path, PathBuf, Component},
+    ffi::OsString,
+    os::unix::ffi::{OsStrExt, OsStringExt},
+    path::{Component, Path, PathBuf},
     vec::Vec,
 };
 use wasi_types::{
@@ -26,8 +28,6 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
-use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::ffi::OsString;
 use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,9 +49,9 @@ pub type FileSystemResult<T> = Result<T, ErrNo>;
 #[derive(Clone, Debug)]
 struct InodeEntry {
     /// The current inode.
-    current: Inode, 
+    current: Inode,
     /// The parent inode.
-    parent: Inode, 
+    parent: Inode,
     /// The path of this inode relative to the parent.
     path: PathBuf,
     /// The status of this file.
@@ -61,7 +61,7 @@ struct InodeEntry {
 }
 
 impl InodeEntry {
-    /// Resize a file to `size`, and fill with `fill_byte` if it grows
+    /// Resize a file to `size`, fill with `fill_byte` if it grows,
     /// and update the file status.
     /// Return ErrNo::IsDir, if it is not a file
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemResult<()> {
@@ -75,7 +75,6 @@ impl InodeEntry {
     pub(self) fn read_file(&self, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
         self.data.read_file(max, offset)
     }
-
 
     /// Write `buf` to the file from the offset `offset`,
     /// update the file status and return the number of written bytes.
@@ -101,11 +100,12 @@ impl InodeEntry {
     }
 
     /// Return the inode of `path`.
+    /// Return ErrNo:: NotDir if `self` is not a directory.
     pub(self) fn get_inode_by_path<T: AsRef<Path>>(&self, path: T) -> FileSystemResult<Inode> {
         self.data.get_inode_by_path(path)
     }
 
-    /// Return the absolute path
+    /// Return the absolute path of this inode.
     pub(self) fn absolute_path(&self, fs: &FileSystem) -> FileSystemResult<PathBuf> {
         if self.current == self.parent {
             Ok(self.path.clone())
@@ -121,7 +121,7 @@ impl InodeEntry {
         self.data.is_dir()
     }
 
-    /// Read metadata of files in the dir and return a vec of DirEnt,
+    /// Read metadata of all files and sub-dirs in the dir and return a vec of DirEnt,
     /// or return NotDir if `self` is not a dir
     pub(self) fn read_dir(&self, fs: &FileSystem) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
         self.data.read_dir(fs)
@@ -133,13 +133,12 @@ impl InodeEntry {
 enum InodeImpl {
     /// A file
     File(Vec<u8>),
-    /// A directory. The `PathBuf` key must  match to the name inside the `Inode`.
-    /// TODO May change to BTREE for the ordering
+    /// A directory. The `PathBuf` key is the relative path and must match to the name inside the `Inode`.
     Directory(HashMap<PathBuf, Inode>),
 }
 
 impl InodeImpl {
-    /// Return a new Directory with current and parent paths
+    /// Return a new Directory InodeImpl containing only current and parent paths
     pub(crate) fn new_directory(current: Inode, parent: Inode) -> Self {
         let mut dir = HashMap::new();
         dir.insert(PathBuf::from("."), current);
@@ -151,15 +150,18 @@ impl InodeImpl {
     /// Otherwise, return ErrNo::IsDir if it is not a file.
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemResult<()> {
         match self {
-            Self::File(file) => { file.resize(size as usize, fill_byte); Ok(()) },
-            Self::Directory(_) => Err(ErrNo::IsDir)
+            Self::File(file) => {
+                file.resize(size as usize, fill_byte);
+                Ok(())
+            }
+            Self::Directory(_) => Err(ErrNo::IsDir),
         }
     }
 
     /// Read maximum `max` bytes from the offset `offset`.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
     pub(self) fn read_file(&self, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
-        let bytes =  match self {
+        let bytes = match self {
             Self::File(b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
         };
@@ -188,7 +190,7 @@ impl InodeImpl {
     /// Write `buf` to the file from the offset `offset` and return the number of written bytes.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
     pub(self) fn write_file(&mut self, buf: Vec<u8>, offset: FileSize) -> FileSystemResult<Size> {
-        let bytes =  match self {
+        let bytes = match self {
             Self::File(b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
         };
@@ -220,7 +222,10 @@ impl InodeImpl {
     /// Return ErrNo::IsDir if it is not a file.
     pub(self) fn truncate_file(&mut self) -> FileSystemResult<()> {
         match self {
-            Self::File(b) => { b.clear() ; Ok(())},
+            Self::File(b) => {
+                b.clear();
+                Ok(())
+            }
             Self::Directory(_) => Err(ErrNo::IsDir),
         }
     }
@@ -229,7 +234,9 @@ impl InodeImpl {
     /// Return ErrNo:: NotDir if `self` is not a directory.
     pub(self) fn insert<T: AsRef<Path>>(&mut self, path: T, inode: Inode) -> FileSystemResult<()> {
         match self {
-            InodeImpl::Directory(path_table) => path_table.insert(path.as_ref().to_path_buf(), inode.clone()),
+            InodeImpl::Directory(path_table) => {
+                path_table.insert(path.as_ref().to_path_buf(), inode.clone())
+            }
             _otherwise => return Err(ErrNo::NotDir),
         };
         Ok(())
@@ -239,12 +246,14 @@ impl InodeImpl {
     /// Return ErrNo:: NotDir if `self` is not a directory.
     pub(self) fn get_inode_by_path<T: AsRef<Path>>(&self, path: T) -> FileSystemResult<Inode> {
         match self {
-            InodeImpl::Directory(path_table) => Ok(path_table.get(path.as_ref()).ok_or(ErrNo::NoEnt)?.clone()),
+            InodeImpl::Directory(path_table) => {
+                Ok(path_table.get(path.as_ref()).ok_or(ErrNo::NoEnt)?.clone())
+            }
             _otherwise => return Err(ErrNo::NotDir),
         }
     }
 
-    /// Return the number of the bytes, if it is a file, 
+    /// Return the number of the bytes, if it is a file,
     /// or the number of inodes, if it it is a directory.
     pub(self) fn len(&self) -> FileSystemResult<FileSize> {
         let rst = match self {
@@ -270,7 +279,7 @@ impl InodeImpl {
             _otherwise => return Err(ErrNo::NotDir),
         };
         let mut rst = Vec::new();
-        for (index,(path,inode)) in dir.iter().enumerate() {
+        for (index, (path, inode)) in dir.iter().enumerate() {
             let path = path.as_os_str().as_bytes().to_vec();
             let dir_ent = DirEnt {
                 next: (index as u64 + 1u64).into(),
@@ -349,7 +358,8 @@ impl FileSystem {
     /// Creates a new, empty filesystem.
     ///
     /// NOTE: the file descriptors 0, 1, and 2 are pre-allocated for stdin and
-    /// similar.  Rust programs are going to expect that this is true, so we
+    /// similar with respect to the parameter `std_streams_table`.  
+    /// Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
     pub fn new(
@@ -367,7 +377,7 @@ impl FileSystem {
         rst.install_prestat::<&Path>(&Vec::new(), std_streams_table)?;
         Ok(rst)
     }
-    
+
     /// Create a dummy filesystem
     pub(crate) fn new_dummy() -> Self {
         Self {
@@ -397,7 +407,12 @@ impl FileSystem {
                 StandardStream::Stdout(file_rights) => (file_rights.file_name(), 1, 1),
                 StandardStream::Stderr(file_rights) => (file_rights.file_name(), 2, 2),
             };
-            self.add_file(Self::ROOT_DIRECTORY_INODE, &path, Inode(inode_number), "".as_bytes())?;
+            self.add_file(
+                Self::ROOT_DIRECTORY_INODE,
+                &path,
+                Inode(inode_number),
+                "".as_bytes(),
+            )?;
             self.install_fd(
                 Fd(fd_number),
                 Inode(inode_number),
@@ -415,9 +430,12 @@ impl FileSystem {
         dir_paths: &[T],
         std_streams_table: &Vec<StandardStream>,
     ) -> FileSystemResult<()> {
-
         // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
-        self.add_dir(Self::ROOT_DIRECTORY_INODE, Path::new(Self::ROOT_DIRECTORY), Self::ROOT_DIRECTORY_INODE)?;
+        self.add_dir(
+            Self::ROOT_DIRECTORY_INODE,
+            Path::new(Self::ROOT_DIRECTORY),
+            Self::ROOT_DIRECTORY_INODE,
+        )?;
         self.install_fd(
             Self::ROOT_DIRECTORY_FD,
             Self::ROOT_DIRECTORY_INODE,
@@ -426,7 +444,7 @@ impl FileSystem {
         );
         self.prestat_table
             .insert(Self::ROOT_DIRECTORY_FD, PathBuf::from(Self::ROOT_DIRECTORY));
-        
+
         // Pre open the standard streams.
         self.install_standard_streams(std_streams_table)?;
 
@@ -450,8 +468,14 @@ impl FileSystem {
         Ok(())
     }
 
-    /// Install a dir with inode `new_inode` and attatch it under the parent inode `parent`.
-    fn add_dir<T: AsRef<Path>>(&mut self, parent: Inode, path: T, new_inode: Inode) -> FileSystemResult<()> {
+    /// Install a directory with inode `new_inode` and attatch it under the parent inode `parent`.
+    /// The `new_inode` MUST be fresh.
+    fn add_dir<T: AsRef<Path>>(
+        &mut self,
+        parent: Inode,
+        path: T,
+        new_inode: Inode,
+    ) -> FileSystemResult<()> {
         let file_stat = FileStat {
             device: (0u64).into(),
             inode: new_inode.clone(),
@@ -468,24 +492,32 @@ impl FileSystem {
             parent,
             file_stat,
             path: path.clone(),
-            data: InodeImpl::new_directory(new_inode.clone(),parent.clone()),
+            data: InodeImpl::new_directory(new_inode.clone(), parent.clone()),
         };
-        // Add the map from the new inode to inode implementation.
-        self.inode_table.insert(new_inode.clone(), node);
+        // NOTE: first add the inode to its parent inode, in the case of parent is not a directory,
+        // it causes error and no side effect will be made to the file system, i.e no island inode.
         // If parent is not equal to new_inode, it means `new_inode` is not a ROOT,
         // Hence, add the new inode into the parent inode dir.
         if parent != new_inode {
-            self.inode_table.get_mut(&parent).ok_or(ErrNo::NoEnt)?.insert(path.clone(), new_inode.clone())?;
+            self.inode_table
+                .get_mut(&parent)
+                .ok_or(ErrNo::NoEnt)?
+                .insert(path.clone(), new_inode.clone())?;
         }
+        // Add the map from the new inode to inode implementation.
+        self.inode_table.insert(new_inode.clone(), node);
         Ok(())
     }
 
-    /// Create all dir in the path.
-    fn add_all_dir<T: AsRef<Path>>(&mut self, mut parent: Inode, path: T) -> FileSystemResult<()> { 
+    /// Create all directories in the `path`, if necessary, e.g. `/path/to/a/new/dir`.
+    /// The last component in `path` will be treated a directory rather a file.
+    fn add_all_dir<T: AsRef<Path>>(&mut self, mut parent: Inode, path: T) -> FileSystemResult<()> {
+        // iterate over the path and create the directory if necessary.
         for component in path.as_ref().components() {
             if let Component::Normal(c) = component {
                 let new_parent = match self.get_inode_by_inode_path(&parent, c) {
-                    Ok((o,_)) => o,
+                    Ok((o, _)) => o,
+                    // Directory is not exist, hence create it.
                     Err(ErrNo::NoEnt) => {
                         let new_inode = self.new_inode()?;
                         self.add_dir(parent.clone(), c, new_inode.clone())?;
@@ -502,19 +534,32 @@ impl FileSystem {
     }
 
     /// Install a file with content `raw_file_data` and attatch it to `inode`.
-    /// Return Err if any directory in the path does not exist.
-    fn add_file<T: AsRef<Path>>(&mut self, parent: Inode, path: T, new_inode: Inode, raw_file_data: &[u8]) -> FileSystemResult<()> {
+    /// Create any missing directory in the path.
+    fn add_file<T: AsRef<Path>>(
+        &mut self,
+        parent: Inode,
+        path: T,
+        new_inode: Inode,
+        raw_file_data: &[u8],
+    ) -> FileSystemResult<()> {
         let path = path.as_ref();
         info!("call add_file with parent {:?} and path {:?}", parent, path);
-        // modify/shadow the `parent` inode if the path contains directory.
-        let (parent,path) = if let Some(parent_path) = path.parent() {
+        // Create missing directories in the `parent` inode if the path contains directory,
+        // and shift the `parent` to the direct parent of the new file.
+        let (parent, path) = if let Some(parent_path) = path.parent() {
             let file_path = path.file_name().map(|s| s.as_ref()).ok_or(ErrNo::Inval)?;
             self.add_all_dir(parent, parent_path)?;
-            (self.get_inode_by_inode_path(&parent,parent_path)?.0, file_path)
+            (
+                self.get_inode_by_inode_path(&parent, parent_path)?.0,
+                file_path,
+            )
         } else {
-            (parent,path)
+            (parent, path)
         };
-        info!("call add_file with new parent {:?} and path {:?}", parent, path);
+        info!(
+            "call add_file with new parent {:?} and path {:?}",
+            parent, path
+        );
         let file_size = raw_file_data.len();
         let file_stat = FileStat {
             device: 0u64.into(),
@@ -536,7 +581,10 @@ impl FileSystem {
         // Add the map from the new inode to inode implementation.
         self.inode_table.insert(new_inode.clone(), node);
         // Add the new inode into the parent inode dir.
-        self.inode_table.get_mut(&parent).ok_or(ErrNo::NoEnt)?.insert(path, new_inode.clone())?;
+        self.inode_table
+            .get_mut(&parent)
+            .ok_or(ErrNo::NoEnt)?
+            .insert(path, new_inode.clone())?;
         Ok(())
     }
 
@@ -613,34 +661,47 @@ impl FileSystem {
         }
     }
 
-    /// Return the inode entry related to `inode`
+    /// Return the inode entry associated to `inode`
     fn get_inode(&self, inode: &Inode) -> FileSystemResult<&InodeEntry> {
         self.inode_table.get(&inode).ok_or(ErrNo::NoEnt)
     }
 
-    /// Get the inode related to a Fd
+    /// Return the inode and the associated inode entry, contained in file descriptor `fd`
     fn get_inode_by_fd(&self, fd: &Fd) -> FileSystemResult<(Inode, &InodeEntry)> {
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
-        Ok((inode,self.get_inode(&inode)?))
+        Ok((inode, self.get_inode(&inode)?))
     }
 
-    /// Get the the inode related to path in the Fd
-    fn get_inode_by_fd_path<T: AsRef<Path>>(&self, fd: &Fd, path: T) -> FileSystemResult<(Inode, &InodeEntry)> {
+    /// Return the inode and the associated inode entry at the relative `path` in the file
+    /// descriptor `fd`. Return Error if `fd` is not a directory.
+    fn get_inode_by_fd_path<T: AsRef<Path>>(
+        &self,
+        fd: &Fd,
+        path: T,
+    ) -> FileSystemResult<(Inode, &InodeEntry)> {
         let (parent_inode, _) = self.get_inode_by_fd(&fd)?;
-        self.get_inode_by_inode_path(&parent_inode,path)
+        self.get_inode_by_inode_path(&parent_inode, path)
     }
 
-    /// Get the the inode related to path in the parent inode
-    fn get_inode_by_inode_path<T: AsRef<Path>>(&self, parent_inode: &Inode, path: T) -> FileSystemResult<(Inode, &InodeEntry)> {
+    /// Return the inode and the associated inode entry at the relative `path` in the parent
+    /// inode `parent_inode`. Return Error if `fd` is not a directory.
+    fn get_inode_by_inode_path<T: AsRef<Path>>(
+        &self,
+        parent_inode: &Inode,
+        path: T,
+    ) -> FileSystemResult<(Inode, &InodeEntry)> {
         let parent_inode = parent_inode.clone();
-        let inode = path.as_ref().components().fold(Ok(parent_inode), |last, component|{
-            // If there is an error
-            let last = last?;
-            // Find the next inode
-            self.get_inode(&last)?.get_inode_by_path(component)
-        })?;
+        let inode = path
+            .as_ref()
+            .components()
+            .fold(Ok(parent_inode), |last, component| {
+                // If there is an error
+                let last = last?;
+                // Find the next inode
+                self.get_inode(&last)?.get_inode_by_path(component)
+            })?;
         //let inode = parent_inode_entry.get_inode_by_path(path.as_ref())?;
-        Ok((inode,self.get_inode(&inode)?))
+        Ok((inode, self.get_inode(&inode)?))
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -743,7 +804,10 @@ impl FileSystem {
             .map(|FdEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
 
-        self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?.resize_file(size, 0)
+        self.inode_table
+            .get_mut(&inode)
+            .ok_or(ErrNo::NoEnt)?
+            .resize_file(size, 0)
     }
 
     /// Change the time of the open file pointed by the file descriptor, `fd`. If `fst_flags`
@@ -790,12 +854,14 @@ impl FileSystem {
         buffer_len: usize,
         offset: FileSize,
     ) -> FileSystemResult<Vec<u8>> {
-        info!("call fd_pread: fd {:?}, buffer_len {}, offset {}",fd,buffer_len, offset);
+        info!(
+            "call fd_pread: fd {:?}, buffer_len {}, offset {}",
+            fd, buffer_len, offset
+        );
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        self
-            .inode_table
+        self.inode_table
             .get(&inode)
             .ok_or(ErrNo::NoEnt)?
             .read_file(buffer_len, offset)
@@ -830,11 +896,19 @@ impl FileSystem {
         buf: &[u8],
         offset: FileSize,
     ) -> FileSystemResult<Size> {
-        info!("call fd_pread: fd {:?}, buffer_len {}, offset {}",fd,buf.len(), offset);
+        info!(
+            "call fd_pread: fd {:?}, buffer_len {}, offset {}",
+            fd,
+            buf.len(),
+            offset
+        );
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?.write_file(buf.to_vec(),offset)
+        self.inode_table
+            .get_mut(&inode)
+            .ok_or(ErrNo::NoEnt)?
+            .write_file(buf.to_vec(), offset)
     }
 
     /// A rust-style base implementation for `fd_read`. It directly calls `fd_pread` with the
@@ -854,13 +928,13 @@ impl FileSystem {
         &mut self,
         fd: Fd,
         cookie: DirCookie,
-    ) -> FileSystemResult<Vec<(DirEnt,Vec<u8>)>> {
+    ) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
         info!("call fd_readdir on {:?} and cookie {:?}", fd, cookie);
         self.check_right(&fd, Rights::FD_READDIR)?;
         //TODO REMOVE DEBUG CODE
         let mut dirs = self.get_inode_by_fd(&fd)?.1.read_dir(self)?;
         let cookie = cookie.0 as usize;
-        if dirs.len() <  cookie {
+        if dirs.len() < cookie {
             return Err(ErrNo::Inval);
         }
         let rst = dirs.split_off(cookie);
@@ -951,14 +1025,18 @@ impl FileSystem {
         Ok(rst)
     }
 
-    /// The implementation of `path_create_directory`. 
+    /// The implementation of `path_create_directory`.
     #[inline]
     pub(crate) fn path_create_directory<T: AsRef<Path>>(
         &mut self,
         fd: Fd,
         path: T,
     ) -> FileSystemResult<()> {
-        info!("call path_create_directory with fd {:?} and path {:?}", fd, path.as_ref());
+        info!(
+            "call path_create_directory with fd {:?} and path {:?}",
+            fd,
+            path.as_ref()
+        );
         self.check_right(&fd, Rights::PATH_CREATE_DIRECTORY)?;
         info!("call path_create_directory capability check passes");
         let (parent_inode, parent_inode_entry) = self.get_inode_by_fd(&fd)?;
@@ -967,25 +1045,31 @@ impl FileSystem {
         }
         // The path exists
         if self.get_inode_by_fd_path(&fd, path.as_ref()).is_ok() {
-            return Err(ErrNo::Exist)
+            return Err(ErrNo::Exist);
         }
         info!("call path_create_directory starts creating dir");
         // Create ALL missing dir in the path
         // In each round, the `last` carries the current parent inode or an error
         // and component is the next component in the path.
-        path.as_ref().components().fold(Ok(parent_inode), |last: FileSystemResult<Inode>, component| {
-            // If there is an error
-            let last = last?;
-            info!("call path_create_directory last {:?} and components {:?}", last, component);
-            let component_path = match component {
-                Component::Normal(p) => Ok(p),
-                _otherwise => Err(ErrNo::Inval),
-            }?;
-            let new_inode = self.new_inode()?;
-            self.add_dir(last, component_path, new_inode)?;
-            // return the next inode, preparing for the next round.
-            Ok(new_inode)
-        })?;
+        path.as_ref().components().fold(
+            Ok(parent_inode),
+            |last: FileSystemResult<Inode>, component| {
+                // If there is an error
+                let last = last?;
+                info!(
+                    "call path_create_directory last {:?} and components {:?}",
+                    last, component
+                );
+                let component_path = match component {
+                    Component::Normal(p) => Ok(p),
+                    _otherwise => Err(ErrNo::Inval),
+                }?;
+                let new_inode = self.new_inode()?;
+                self.add_dir(last, component_path, new_inode)?;
+                // return the next inode, preparing for the next round.
+                Ok(new_inode)
+            },
+        )?;
         info!("call path_create_directory done");
         Ok(())
     }
@@ -1074,10 +1158,13 @@ impl FileSystem {
         let (parent_inode, parent_inode_entry) = self.get_inode_by_fd(&fd)?;
         let mut absolute_path = parent_inode_entry.absolute_path(&self)?;
         absolute_path.push(path.clone());
-        // Manually convert to the canonicalize form. 
+        // Manually convert to the canonicalize form.
         // NOTE that the canonicalize function call in pathbuf seems require some sys info.
         let absolute_path: PathBuf = absolute_path.iter().map(|c| c.clone()).collect();
-        info!("call path_open on abs path {:?} and dir: {:?}",absolute_path, parent_inode_entry.data);
+        info!(
+            "call path_open on abs path {:?} and dir: {:?}",
+            absolute_path, parent_inode_entry.data
+        );
         if !parent_inode_entry.is_dir() {
             return Err(ErrNo::NotDir);
         }
@@ -1139,7 +1226,10 @@ impl FileSystem {
             if !principal_right.contains(Rights::PATH_FILESTAT_SET_SIZE) {
                 return Err(ErrNo::Access);
             }
-            self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?.truncate_file()?;
+            self.inode_table
+                .get_mut(&inode)
+                .ok_or(ErrNo::NoEnt)?
+                .truncate_file()?;
         }
         let new_fd = self.new_fd()?;
         let FileStat {
@@ -1305,7 +1395,11 @@ impl FileSystem {
         data: &[u8],
         is_append: bool,
     ) -> Result<(), ErrNo> {
-        let file_name = file_name.as_ref().strip_prefix("/").map_err(|_|ErrNo::NoEnt)?.clone();
+        let file_name = file_name
+            .as_ref()
+            .strip_prefix("/")
+            .map_err(|_| ErrNo::NoEnt)?
+            .clone();
         info!("write_file_by_filename: {:?}", file_name);
         let oflag = OpenFlags::CREATE
             | if !is_append {
@@ -1315,7 +1409,7 @@ impl FileSystem {
             };
         // create the dir if necessary
         if let Some(parent_path) = file_name.parent() {
-            self.add_all_dir(Self::ROOT_DIRECTORY_INODE,parent_path)?;
+            self.add_all_dir(Self::ROOT_DIRECTORY_INODE, parent_path)?;
         }
         let fd = self.path_open(
             principal,
@@ -1353,7 +1447,11 @@ impl FileSystem {
         principal: &Principal,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
-        let file_name = file_name.as_ref().strip_prefix("/").map_err(|_|ErrNo::NoEnt)?.clone();
+        let file_name = file_name
+            .as_ref()
+            .strip_prefix("/")
+            .map_err(|_| ErrNo::NoEnt)?
+            .clone();
         info!("read_file_by_filename: {:?}", file_name);
         let fd = self.path_open(
             principal,
@@ -1388,20 +1486,28 @@ impl FileSystem {
         &mut self,
         principal: &Principal,
         path: T,
-    ) -> Result<Vec<(PathBuf,Vec<u8>)>, ErrNo> {
+    ) -> Result<Vec<(PathBuf, Vec<u8>)>, ErrNo> {
         let path = path.as_ref();
         info!("read_all_files_by_filename: {:?}", path);
         // Convert the absolute path to relative path and then find the inode
-        let (_, inode_impl) = self.get_inode_by_inode_path(&Self::ROOT_DIRECTORY_INODE,path.strip_prefix("/").map_err(|_|ErrNo::NoEnt)?.clone())?;
+        let (_, inode_impl) = self.get_inode_by_inode_path(
+            &Self::ROOT_DIRECTORY_INODE,
+            path.strip_prefix("/").map_err(|_| ErrNo::NoEnt)?.clone(),
+        )?;
         let mut rst = Vec::new();
         if inode_impl.is_dir() {
             for (_, sub_relative_path) in inode_impl.read_dir(&self)?.iter() {
-                let sub_relative_path = PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
+                let sub_relative_path =
+                    PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
                 // Ignore the path for current and parent directories.
-                if sub_relative_path != PathBuf::from(".") && sub_relative_path != PathBuf::from("..") {
+                if sub_relative_path != PathBuf::from(".")
+                    && sub_relative_path != PathBuf::from("..")
+                {
                     let mut sub_absolute_path = path.to_path_buf();
                     sub_absolute_path.push(sub_relative_path);
-                    rst.append(&mut self.read_all_files_by_absolute_path(principal,sub_absolute_path)?);
+                    rst.append(
+                        &mut self.read_all_files_by_absolute_path(principal, sub_absolute_path)?,
+                    );
                 }
             }
         } else {
@@ -1419,11 +1525,9 @@ impl FileSystem {
         file_name: T,
     ) -> FileSystemResult<Rights> {
         let file_name = file_name.as_ref();
-        let principal_rights_table = self.rights_table
-            .get(principal)
-            .ok_or(ErrNo::Access)?;
+        let principal_rights_table = self.rights_table.get(principal).ok_or(ErrNo::Access)?;
         for ancestor in file_name.ancestors() {
-            if let Some(o) =  principal_rights_table.get(ancestor) {
+            if let Some(o) = principal_rights_table.get(ancestor) {
                 return Ok(o.clone());
             }
         }

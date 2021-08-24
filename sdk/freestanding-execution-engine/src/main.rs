@@ -31,7 +31,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     error::Error,
-    fs::{File, create_dir_all},
+    fs::{create_dir_all, File},
     io::{Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -108,7 +108,9 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("i")
                 .long("input-source")
                 .value_name("FILES OR DIRECTORIES")
-                .help("Space-separated paths to the input data source files or directories on disk.")
+                .help(
+                    "Space-separated paths to the input data source files or directories on disk.",
+                )
                 .multiple(true),
         )
         .arg(
@@ -312,14 +314,16 @@ fn load_input_sources(
 ) -> Result<(), Box<dyn Error>> {
     for file_path in input_sources.iter() {
         let file_path = Path::new(file_path);
-        load_input_source(&file_path,vfs.clone())?;
+        load_input_source(&file_path, vfs.clone())?;
     }
     Ok(())
 }
 
-fn load_input_source<T: AsRef<Path>>(file_path: T, vfs: Arc<Mutex<FileSystem>>) -> Result<(), Box<dyn Error>> {
+fn load_input_source<T: AsRef<Path>>(
+    file_path: T, vfs: Arc<Mutex<FileSystem>>,
+) -> Result<(), Box<dyn Error>> {
     let file_path = file_path.as_ref();
-    info!( "Loading data source '{:?}'.", file_path);
+    info!("Loading data source '{:?}'.", file_path);
     if file_path.is_file() {
         let mut file = File::open(file_path)?;
         let mut buffer = Vec::new();
@@ -327,7 +331,12 @@ fn load_input_source<T: AsRef<Path>>(file_path: T, vfs: Arc<Mutex<FileSystem>>) 
 
         vfs.lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .write_file_by_absolute_path(&Principal::InternalSuperUser, &Path::new("/").join(file_path), &buffer, false)?;
+            .write_file_by_absolute_path(
+                &Principal::InternalSuperUser,
+                &Path::new("/").join(file_path),
+                &buffer,
+                false,
+            )?;
 
         info!("Loading '{:?}' into vfs.", file);
     } else if file_path.is_dir() {
@@ -335,7 +344,7 @@ fn load_input_source<T: AsRef<Path>>(file_path: T, vfs: Arc<Mutex<FileSystem>>) 
             load_input_source(&dir?.path(), vfs.clone())?;
         }
     } else {
-        return Err(format!("Error on load {:?}", file_path).into())
+        return Err(format!("Error on load {:?}", file_path).into());
     }
     Ok(())
 }
@@ -378,7 +387,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Manually create the Right table for the VFS.
     // Add read and readdir permissions to root dir
-    file_table.insert(Path::new("/").to_path_buf(), read_right | Rights::PATH_CREATE_DIRECTORY);
+    file_table.insert(
+        Path::new("/").to_path_buf(),
+        read_right | Rights::PATH_CREATE_DIRECTORY,
+    );
     // Add read permission to program
     file_table.insert(prog_file_abs_path.clone(), read_right);
     // Add read permission to input file
@@ -401,10 +413,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), write_right);
     }
-    right_table.insert(Principal::Program(prog_file_abs_path.to_str().ok_or("Failed to convert program path to a string.")?.to_string()), file_table);
-    info!("The final right tables: {:?}",right_table);
+    right_table.insert(
+        Principal::Program(
+            prog_file_abs_path
+                .to_str()
+                .ok_or("Failed to convert program path to a string.")?
+                .to_string(),
+        ),
+        file_table,
+    );
+    info!("The final right tables: {:?}", right_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)?));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(
+        right_table,
+        &std_streams_table,
+    )?));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_absolute_path(
@@ -420,6 +443,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("Invoking main.");
     let main_time = Instant::now();
+<<<<<<< HEAD
     let options = Options {
         environment_variables: cmdline.environment_variables,
         program_arguments: cmdline.program_arguments,
@@ -429,7 +453,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let return_code = execute(
         &cmdline.execution_strategy,
         vfs.clone(),
-        prog_file_abs_path.to_str().ok_or("Failed to convert program path to a string.")?,
+        prog_file_abs_path
+            .to_str()
+            .ok_or("Failed to convert program path to a string.")?,
         options,
     )?;
     info!("return code: {:?}", return_code);
@@ -440,13 +466,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let buf = vfs
             .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_absolute_path(
-                &Principal::InternalSuperUser,
-                "/stdout",
-            )?;
+            .read_file_by_absolute_path(&Principal::InternalSuperUser, "/stdout")?;
         let stdout_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        print!("---- stdout dump ----\n{}---- stdout dump end ----\n", stdout_dump);
+        print!(
+            "---- stdout dump ----\n{}---- stdout dump end ----\n",
+            stdout_dump
+        );
     }
 
     // Dump contents of stderr
@@ -454,22 +480,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         let buf = vfs
             .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_absolute_path(
-                &Principal::InternalSuperUser,
-                "/stderr",
-            )?;
+            .read_file_by_absolute_path(&Principal::InternalSuperUser, "/stderr")?;
         let stderr_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        eprint!("---- stderr dump ----\n{}---- stderr dump end ----\n", stderr_dump);
+        eprint!(
+            "---- stderr dump ----\n{}---- stderr dump end ----\n",
+            stderr_dump
+        );
     }
 
     for file_path in cmdline.output_sources.iter() {
-        for (output_path, buf) in vfs.lock()
+        for (output_path, buf) in vfs
+            .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
             .read_all_files_by_absolute_path(
                 &Principal::InternalSuperUser,
-                Path::new("/").join(file_path)
-            )?.iter() {
+                Path::new("/").join(file_path),
+            )?
+            .iter()
+        {
             let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
             if let Some(parent_path) = output_path.parent() {
                 if parent_path != Path::new("") {
@@ -479,15 +508,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut to_write = File::create(output_path)?;
             to_write.write_all(&buf)?;
 
-            //Try to decode 
-            let decode : String = match pinecone::from_bytes(buf) {
+            // Try to decode
+            let decode: String = match pinecone::from_bytes(buf) {
                 Ok(o) => o,
-                Err(_) => match std::str::from_utf8(buf) {
-                    Ok(oo) => oo.to_string(),
-                    Err(_) => "(Cannot Parse)".to_string(),
-                }
+                Err(_) =>
+                    match std::str::from_utf8(buf) {
+                        Ok(oo) => oo.to_string(),
+                        Err(_) => "(Cannot Parse)".to_string(),
+                    },
             };
-            info!("{:?}: {:?}",output_path, decode);
+            info!("{:?}: {:?}", output_path, decode);
         }
     }
     Ok(())

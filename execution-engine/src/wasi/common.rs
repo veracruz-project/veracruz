@@ -24,6 +24,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
 use policy_utils::principal::Principal;
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
@@ -35,7 +36,6 @@ use wasi_types::{
     Signal, Subscription, SubscriptionClock, SubscriptionFdReadwrite, SubscriptionUnion, Timestamp,
     Whence,
 };
-use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common constants.
@@ -407,7 +407,7 @@ impl WasiWrapper {
     #[inline]
     pub(crate) fn read_file_by_filename(&mut self, file_name: &str) -> FileSystemResult<Vec<u8>> {
         let mut fs = self.filesystem.lock().map_err(|_| ErrNo::Busy)?;
-        fs. read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
+        fs.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
     }
 
     /// Return the exit code from `proc_exit` call.
@@ -810,7 +810,7 @@ impl WasiWrapper {
         let mut written = 0;
         for (dir, path) in dir_entries {
             //NOTE: `buf_len` is the number of bytes dir entries can store.
-            //      If there is not enough space, stop writing and filling the last entry 
+            //      If there is not enough space, stop writing and filling the last entry
             //      with random bytes.
             let require_len = (size_of::<DirEnt>() + path.len()) as u32;
             if written + require_len > buf_len {
@@ -821,7 +821,7 @@ impl WasiWrapper {
             buf_ptr += size_of::<DirEnt>() as u32;
             memory_ref.write_buffer(buf_ptr, &path)?;
             buf_ptr += path.len() as u32;
-            written += require_len ;
+            written += require_len;
         }
         memory_ref.write_u32(result_ptr, written as u32)
     }
