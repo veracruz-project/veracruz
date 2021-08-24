@@ -9,8 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use execution_engine::{execute, fs::FileSystem, Options};
-use lazy_static::lazy_static;
 #[cfg(feature = "tz")]
 use optee_utee::trace_println;
 use policy_utils::{policy::Policy, principal::Principal};
@@ -29,6 +27,8 @@ use std::{
     },
     vec::Vec,
 };
+use lazy_static::lazy_static;
+use execution_engine::{fs::FileSystem, execute};
 use wasi_types::ErrNo;
 
 pub mod error;
@@ -156,9 +156,12 @@ impl ProtocolState {
         }
         // Set the modified flag
         self.is_modified = true;
-        self.vfs
-            .lock()?
-            .write_file_by_filename(client_id, file_name, data, false)?;
+        self.vfs.lock()?.write_file_by_absolute_path(
+            client_id,
+            file_name,
+            data,
+            false,
+        )?;
         Ok(())
     }
 
@@ -183,8 +186,11 @@ impl ProtocolState {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
         self.is_modified = true;
-        self.vfs.lock()?.write_file_by_filename(
-            client_id, file_name, data, // set the append flag to true
+        self.vfs.lock()?.write_file_by_absolute_path(
+            client_id,
+            file_name,
+            data,
+            // set the append flag to true
             true,
         )?;
         Ok(())
@@ -196,10 +202,10 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        let rst = self
-            .vfs
-            .lock()?
-            .read_file_by_filename(client_id, file_name)?;
+        let rst = self.vfs.lock()?.read_file_by_absolute_path(
+            client_id,
+            file_name,
+        )?;
         if rst.len() == 0 {
             return Ok(None);
         }
