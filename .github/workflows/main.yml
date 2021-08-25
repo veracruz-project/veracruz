@@ -21,7 +21,7 @@ jobs:
 
     steps:
 
-      # Check out the repo
+      # Check out the repo, using the action from github
       - name: Check out the repo
         uses: actions/checkout@v2
         with:
@@ -32,15 +32,23 @@ jobs:
         id: sdk
         run: |
           cd /work/veracruz
-          make sdk
+          #make sdk
 
-     # Update the repo and sdk artifact
-      - name: Upload repo and SDK artifact
+      # Pack cache
+      - name: Pack cache
+        id: pack-cache
+        run: |
+          cd /work/veracruz
+          tar -cvf veracruz.tar --exclude=./veracruz.tar .
+          mv veracruz.tar /
+
+     # Update the repo and sdk artifact, using the action from github
+      - name: Upload veracruz cache artifact
         uses: actions/upload-artifact@v2
         with:
-          name: veracruz-artifact
-          path: /work/veracruz/ 
-      
+          name: veracruz.tar
+          path: /veracruz.tar 
+          if-no-files-found: error
 
   sgx:
     runs-on: ubuntu-latest
@@ -52,11 +60,22 @@ jobs:
 
     steps:
         
-      # Directly use the artifact containing repo and sdk artifact
-      - name: Download repo and SDK artifact
+      # Download the artifact containing repo and sdk artifact, using the action from github
+      - name: Download veracruz cache artifact
         uses: actions/download-artifact@v2
         with:
-          name: veracruz-artifact
+          name: veracruz.tar
+          path: /
+      # Unpack
+      - name: Unpack veracruz cache artifact
+        id: sgx-unpack
+        run: |
+            cd /
+            mkdir -p /work/veracruz
+            mv veracruz.tar /work/veracruz
+            cd /work/veracruz
+            tar -xvf veracruz.tar
+            rm veracruz.tar
       
       # Run the sgx test
       - name: Running sgx test script
@@ -77,17 +96,29 @@ jobs:
 
     steps:
         
-      # Directly use the artifact containing repo and sdk artifact
-      - name: Download repo and SDK artifact
+      # Download the artifact containing repo and sdk artifact, using the action from github
+      - name: Download veracruz cache artifact
         uses: actions/download-artifact@v2
         with:
-          name: veracruz-artifact
+          name: veracruz.tar
+          path: /
+      # Unpack
+      - name: Unpack veracruz cache artifact
+        id: tz-unpack
+        run: |
+            cd /
+            mkdir -p /work/veracruz
+            mv veracruz.tar /work/veracruz
+            cd /work/veracruz
+            tar -xvf veracruz.tar
+            rm veracruz.tar
       
       - name: Running trustzone test script
         id: tz-test
         run: |
+            cd /work/rust-optee-trustzone-sdk
+            . ./environment
             cd /work/veracruz
-            pushd /work/rust-optee-trustzone-sdk && source environment && popd
             make trustzone
             make trustzone-veracruz-server-test
             make trustzone-veracruz-test
