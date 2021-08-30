@@ -871,8 +871,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         POLICY_CIPHERSUITE.to_string(),
         linux_hash.clone(),
         sgx_hash.clone(),
-        // TODO: should be tz_hash
-        sgx_hash.clone(),
+        Some(HEXLOWER.encode(&veracruz_utils::platform::tz::TRUSTZONE_RUNTIME_MANAGER_HASH)),
         compute_nitro_enclave_hash(arguments),
         compute_icecap_enclave_hash(arguments),
         format!(

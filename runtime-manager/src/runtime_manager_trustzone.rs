@@ -15,11 +15,16 @@ use libc;
 #[cfg(feature = "tz")]
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
-    ErrorKind, Parameters, Result, 
+    ErrorKind, Parameters, Result as OpteeResult, 
 };
 use std::{
     convert::TryFrom,
+    convert::TryInto,
     io::Write,
+};
+
+use psa_attestation::{
+    psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
 use veracruz_utils::platform::tz::runtime_manager_opcode::RuntimeManagerOpcode;
 
@@ -28,16 +33,29 @@ fn print_error_and_return(message: String) -> ErrorKind {
     ErrorKind::Unknown
 }
 
+use ring::digest;
+
+// Yes, I'm doing what you think I'm doing here. Each instance of the TrustZone root enclave
+// will have the same private key. Yes, I'm embedding that key in the source
+// code. I could come up with a complicated system for auto generating a key
+// for each instance, and then populate the device database with they key.
+// That's what needs to be done if you want to productize this.
+// That's not what I'm going to do for this research project
+static ROOT_PRIVATE_KEY: [u8; 32] = [
+    0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe, 0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54, 0xd0,
+    0xba, 0x94, 0xbf, 0xb5, 0x47, 0x67, 0x2c, 0x31, 0xc1, 0xd4, 0xee, 0x1c, 0x05, 0x76, 0xa1, 0x44,
+];
+
 #[ta_create]
 #[cfg(feature = "tz")]
-fn create() -> Result<()> {
+fn create() -> OpteeResult<()> {
     debug_message("runtime_manager_trustzone:create".to_string());
     Ok(())
 }
 
 #[ta_open_session]
 #[cfg(feature = "tz")]
-fn open_session(_params: &mut Parameters) -> Result<()> {
+fn open_session(_params: &mut Parameters) -> OpteeResult<()> {
     debug_message("runtime_manager_trustzone:Open_session".to_string());
     Ok(())
 }
@@ -56,7 +74,7 @@ fn destroy() {
 
 #[ta_invoke_command]
 #[cfg(feature = "tz")]
-fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
+fn invoke_command(cmd_id: u32, params: &mut Parameters) -> OpteeResult<()> {
     debug_message("runtime_manager_trustzone:invoke_command".to_string());
     let cmd = RuntimeManagerOpcode::try_from(cmd_id).map_err(|err| {
         print_error_and_return(format!(
@@ -97,6 +115,113 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
                     e
                 ))
             })?;
+        }
+        RuntimeManagerOpcode::Attestation => {
+            // p0 - input: a: device_id, output: a: token Length output, b: CSR length
+            // p1 - challenge
+            // p2 - token buffer
+            // p3 - CSR buffer
+            debug_message("trustzone-root-enclave::invoke_command NativeAttestation Opcode started".to_string());
+
+            let mut values = unsafe {
+                params.0.as_value().map_err(|err| {
+                    print_error_and_return(format!(
+                        "RuntimeManagerOpcode::Attestation failed to extract values from parameters:{:?}",
+                        err
+                    ))
+                })?
+            };
+            let _device_id: i32 = values.a().try_into().map_err(|err| {
+                print_error_and_return(format!(
+                    "RuntimeManagerOpcode::Attestation failed to convert a into i32:{:?}",
+                    err
+                ))
+            })?;
+
+            let challenge = unsafe {
+                let mut memref = params.1.as_memref().map_err(|err| {
+                    print_error_and_return(format!(
+                        "RuntimeManagerOpcode::Attestation failed to get params.1 as mem_ref:{:?}",
+                        err
+                    ))
+                })?;
+                memref.buffer().to_vec()
+            };
+
+            let mut token_buf = unsafe {
+                params.2.as_memref().map_err(|err| {
+                    print_error_and_return(format!(
+                        "RuntimeManagerOpcode::Attestation failed to extract token_buf from parameters:{:?}",
+                        err
+                    ))
+                })?
+            };
+
+            let mut csr_buf = unsafe {
+                params.3.as_memref().map_err(|err| {
+                    print_error_and_return(format!(
+                        "RuntimeManagerOpcode::Attestation failed to extrac public key buffer from parameters:{:?}",
+                        err
+                    ))
+                })?
+            };
+
+            let csr = crate::managers::session_manager::generate_csr()
+                .map_err(|err| {
+                    print_error_and_return(format!(
+                        "RuntimeManagerOpcode::Attestation failed to generate csr:{:?}",
+                        err
+                    ))
+                })?;
+
+            debug_message(format!("trustzone-root-enclave::invoke_command calling native_attestation function"));
+            let token = native_attestation(&challenge, &csr).map_err(|err| {
+                print_error_and_return(format!(
+                    "RuntimeManagerOpcode::Attestation call to native_attestation failed:{:?}",
+                    err
+                ))
+            })?;
+            debug_message(format!("trustzone-root-enclave::invoke_command returned from native_attestation function"));
+            token_buf.buffer().write(&token).map_err(|err| {
+                print_error_and_return(format!(
+                    "RuntimeManagerOpcode::Attestation failed to place token in token_buf:{:?}",
+                    err
+                ))
+            })?;
+
+            debug_message(format!("trustzone-root-enclave::invoke_command setting token.len:{:}", token.len()));
+            values.set_a(token.len() as u32);
+
+            csr_buf.buffer().write(&csr).map_err(|err| {
+                print_error_and_return(format!(
+                    "RuntimeManagerOpcode::Attestation failed to place CSR in csr_buf:{:?}",
+                    err
+                ))
+            })?;
+            values.set_b(csr.len() as u32);
+        }
+        RuntimeManagerOpcode::CertificateChain => {
+            // p0 - root certificate
+            // p1 - compute_enclave_certificate
+            debug_message("runtime_manager_trustzone::invoke_command::CertificateChain started".to_string());
+            let root_cert_buffer = unsafe {
+                let mut memref = params.0.as_memref().map_err(|err|
+                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::CertificateChain failed to get memref from params.0:{:?}", err))
+                )?;
+                memref.buffer().to_vec()
+            };
+            let compute_cert_buffer = unsafe {
+                let mut memref = params.1.as_memref().map_err(|err|
+                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::CertificateChain failed to get memref from params.1:{:?}", err))
+                )?;
+                memref.buffer().to_vec()
+            };
+            
+            let mut certs: Vec<Vec<u8>> = Vec::new();
+            certs.push(compute_cert_buffer);
+            certs.push(root_cert_buffer);
+            managers::session_manager::load_cert_chain(&certs)
+                .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::CertificateChain failed on call to load_cert_chain:{:?}", err)))?;
         }
         RuntimeManagerOpcode::NewTLSSession => {
             debug_message("runtime_manager_trustzone::invoke_command NewTLSSession".to_string());
@@ -239,78 +364,70 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             p2.set_a(output_data.len() as u32);
             active_flag.set_a(if active_bool { 1 } else { 0 });
         }
-        RuntimeManagerOpcode::GetCSR => {
-            // p0 - challenge input
-            // p1 - buffer for the CSR
-            debug_message(
-                "runtime_manager_trustzone::invoke_command GetCSR".to_string(),
-            );
-
-            // We don't currently have anything to do with the challenge value
-            // (since we are faking attestation on TrustZone platforms for now)
-            let mut _challenge = unsafe {
-                let mut memref = params.0.as_memref().map_err(|err|
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::GetCSR failed to get memref from params.0:{:?}", err))
-                )?;
-                memref.buffer().to_vec()
-            };
-            let mut csr_buf = unsafe {
-                params.1.as_memref().map_err(|err| {
-                    print_error_and_return(format!(
-                        "runtime_manager_trustzone::invoke_command GetTLSData failed to get params.1 as memref:{:?}",
-                        err
-                    ))
-                })?
-            };
-
-            // Generate the CSR
-            // TODO: add challenge as an extension in CSR? Is that something
-            // we want to do?
-            let csr = managers::session_manager::generate_csr()
-                .map_err(|err| print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command PopulateCertificates generate_csr failed:{:?}",
-                    err
-                )))?;
-
-            csr_buf.buffer().write(&csr).map_err(|e| {
-                print_error_and_return(format!(
-                    "runtime_manager_trustzone::invoke_command GetCSR failed to write buffer {:?}",
-                    e
-                ))
-            })?;
-        }
-        RuntimeManagerOpcode::PopulateCertificates => {
-            // p0 - cert_chain_buffer - input
-            // p1 - cert_lengths as [u8]
-            debug_message("runtime_manager_trustzone::invoke_command::PopulateCertificates started".to_string());
-            let cert_chain_buffer = unsafe {
-                let mut memref = params.0.as_memref().map_err(|err|
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed to get memref from params.0:{:?}", err))
-                )?;
-                memref.buffer().to_vec()
-            };
-            // cert_lengths should be [u32], but optee-utee doesn't support that.
-            // So, we create cert_lengths_native, which is a [u8], and then
-            // transmute it to [u32]
-            let cert_lengths_native = unsafe {
-                let mut memref = params.1.as_memref().map_err(|err|
-                    print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed to get memref from params.1:{:?}", err))
-                )?;
-                memref.buffer().to_vec()
-            };
-            // Here's where we transmute the [u8] buffer into a [u32]
-            let cert_lengths = veracruz_utils::platform::tz::transmute_to_u32(&cert_lengths_native);
-            let certs: Vec<Vec<u8>> = crate::runtime_manager::break_up_cert_array(&cert_chain_buffer, &cert_lengths)
-                .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
-
-            managers::session_manager::load_cert_chain(&certs)
-                .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
-        },
         RuntimeManagerOpcode::ResetEnclave => {
             debug_message("runtime_manager_trustzone::invoke_command::ResetEnclave".to_string());
         }
     }
     Ok(())
+}
+
+fn native_attestation(challenge: &Vec<u8>, csr: &Vec<u8>) -> Result<Vec<u8>, String> {
+    let mut root_key_handle: u16 = 0;
+    let status = unsafe {
+        psa_initial_attest_load_key(
+            ROOT_PRIVATE_KEY.as_ptr(),
+            ROOT_PRIVATE_KEY.len() as u64,
+            &mut root_key_handle,
+        )
+    };
+    if status != 0 {
+        return Err(format!(
+            "trustzone-root-enclave::create psa_initial_attest_load key failed with code:{:}",
+            status
+        ))?;
+    }
+
+    let csr_hash: Vec<u8> = digest::digest(&digest::SHA256, csr).as_ref().to_vec();
+
+    let mut trustzone_root_enclave_hash: [u8; 32] = [0; 32];
+    trustzone_root_enclave_hash.clone_from_slice(&veracruz_utils::platform::tz::TRUSTZONE_RUNTIME_MANAGER_HASH[0..32]);
+    let mut token_buffer: Vec<u8> = Vec::with_capacity(1024); // TODO: Don't do this
+    let mut token_size: u64 = 0;
+    let status = unsafe {
+        psa_initial_attest_get_token(
+            &trustzone_root_enclave_hash as *const u8,
+            trustzone_root_enclave_hash.len() as u64,
+            csr_hash.as_ptr() as *const u8,
+            csr_hash.len() as u64,
+            std::ptr::null() as *const u8,
+            0,
+            challenge.as_ptr() as *const u8,
+            challenge.len() as u64,
+            token_buffer.as_mut_ptr() as *mut u8,
+            token_buffer.capacity() as u64,
+            &mut token_size as *mut u64,
+        )
+    };
+    if status != 0 {
+        return Err(format!(
+            "trustzone-root-enclave::native_attestation psa_initial_attest_get_token failed with error code:{:}",
+            status
+        ));
+    }
+    unsafe { token_buffer.set_len(token_size as usize) };
+
+    let status = unsafe {
+        psa_initial_attest_remove_key(
+            root_key_handle,
+        )
+    };
+    if status != 0 {
+        return Err(format!(
+            "trustzone-root-enclave::native_attestation psa_initial_attest_remove_key failed with error code:{:?}",
+            status
+        ));
+    }
+    Ok(token_buffer.clone())
 }
 
 // TA configurations

@@ -18,4 +18,5 @@ policy-utils = { path = "../../policy-utils", features = ["std"] }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
 serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", features = ["std"] }
+veracruz-utils = {path = "../../veracruz-utils", features = ["std", "tz"]}
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz", features = ['std'] }

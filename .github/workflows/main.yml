@@ -114,6 +114,7 @@ jobs:
         run: |
             cd /work/rust-optee-trustzone-sdk
             . ./environment
+            export CC_x86_64_unknown_linux_gnu=gcc
             cd /work/veracruz
             make trustzone
             make trustzone-veracruz-server-test

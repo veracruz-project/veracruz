@@ -88,6 +88,7 @@ tz = [
   "optee-utee",
   "serde_json/alloc",
   "wasi-types/std",
+  "psa-attestation/tz"
 ]
 
 [dependencies]
@@ -130,6 +131,7 @@ wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branc
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 
 [build-dependencies]
+libloading = "=0.5.2"
 uuid = { version = "0.7", features = ["v4"] }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]

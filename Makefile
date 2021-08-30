@@ -101,13 +101,11 @@ nitro-cli:
 # Compile for trustzone, note: source the rust-optee-trustzone-sdk/environment first, however assume `unset CC`.
 trustzone: sdk trustzone-env
 	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC) OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
-	$(MAKE) -C trustzone-root-enclave trustzone OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --lib --features tz
 
 trustzone-cli: trustzone-env
 	# enclave binaries needed for veracruz-server
 	$(MAKE) -C runtime-manager trustzone CC=$(AARCH64_GCC) OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
-	$(MAKE) -C trustzone-root-enclave trustzone OPTEE_DIR=$(OPTEE_DIR) OPTEE_OS_DIR=$(OPTEE_OS_DIR)
 	# build CLIs in top-level crates
 	cd proxy-attestation-server && \
 		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
@@ -300,7 +298,6 @@ clean:
 	$(MAKE) clean -C runtime-manager
 	$(MAKE) clean -C sgx-root-enclave
 	$(MAKE) clean -C test-collateral 
-	$(MAKE) clean -C trustzone-root-enclave
 	$(MAKE) clean -C sdk
 	$(MAKE) clean -C linux-root-enclave
 	rm -rf bin
@@ -309,7 +306,7 @@ clean:
 clean-cargo-lock:
 	$(MAKE) -C sdk clean
 	$(MAKE) -C test-collateral clean
-	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager sgx-root-enclave sgx-root-enclave-bind transport-protocol trustzone-root-enclave veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
+	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager sgx-root-enclave sgx-root-enclave-bind transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
@@ -325,7 +322,6 @@ update:
 	cd veracruz-server && cargo update
 	cd veracruz-test && cargo update
 	cd veracruz-utils && cargo update
-	cd trustzone-root-enclave && cargo update
 	cd proxy-attestation-server && cargo update
 
 fmt:
@@ -340,7 +336,6 @@ fmt:
 	cd veracruz-server && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
-	cd trustzone-root-enclave && cargo fmt
 	cd proxy-attestation-server && cargo fmt
 	cd linux-root-enclave && cargo fmt
 	$(MAKE) -C sdk fmt
