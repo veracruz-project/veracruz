@@ -797,14 +797,15 @@ fn serialize_capability(cap_string: &[String]) -> Vec<FileRights> {
 fn serialize_capability_entry(cap_string: &str) -> FileRights {
     // common shorthand (r = read, w = write, rw = read + write)
     #[allow(non_snake_case)]
-    let READ_RIGHTS: Rights = Rights::FD_READ | Rights::FD_SEEK | Rights::PATH_OPEN;
+    let READ_RIGHTS = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
 
     #[allow(non_snake_case)]
     let WRITE_RIGHTS: Rights = Rights::FD_WRITE
         | Rights::PATH_CREATE_FILE
         | Rights::PATH_FILESTAT_SET_SIZE
         | Rights::FD_SEEK
-        | Rights::PATH_OPEN;
+        | Rights::PATH_OPEN
+        | Rights::PATH_CREATE_DIRECTORY;
 
     let mut split = cap_string.split(':');
     let file_name = split

@@ -50,7 +50,7 @@ lazy_static! {
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
-const OUTPUT_FILE: &'static str = "output";
+const OUTPUT_FILE: &'static str = "/output";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.

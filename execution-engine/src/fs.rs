@@ -1395,10 +1395,10 @@ impl FileSystem {
         data: &[u8],
         is_append: bool,
     ) -> Result<(), ErrNo> {
+        let file_name = file_name.as_ref();
         let file_name = file_name
-            .as_ref()
             .strip_prefix("/")
-            .map_err(|_| ErrNo::NoEnt)?
+            .unwrap_or(file_name)
             .clone();
         info!("write_file_by_filename: {:?}", file_name);
         let oflag = OpenFlags::CREATE
@@ -1447,10 +1447,10 @@ impl FileSystem {
         principal: &Principal,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
+        let file_name = file_name.as_ref();
         let file_name = file_name
-            .as_ref()
             .strip_prefix("/")
-            .map_err(|_| ErrNo::NoEnt)?
+            .unwrap_or(file_name)
             .clone();
         info!("read_file_by_filename: {:?}", file_name);
         let fd = self.path_open(
@@ -1492,7 +1492,7 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let (_, inode_impl) = self.get_inode_by_inode_path(
             &Self::ROOT_DIRECTORY_INODE,
-            path.strip_prefix("/").map_err(|_| ErrNo::NoEnt)?.clone(),
+            path.strip_prefix("/").unwrap_or(path).clone(),
         )?;
         let mut rst = Vec::new();
         if inode_impl.is_dir() {
