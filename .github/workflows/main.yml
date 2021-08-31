@@ -15,7 +15,7 @@ jobs:
   check-repo-and-compile-sdk:
     runs-on: ubuntu-latest
     container: 
-      image: ghcr.io/veracruz-project/veracruz/veracruz:dev
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
       volumes: 
         - ${{ github.workspace }}:/work/veracruz 
 
@@ -53,7 +53,7 @@ jobs:
   sgx:
     runs-on: ubuntu-latest
     container: 
-      image: ghcr.io/veracruz-project/veracruz/veracruz:dev
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
       volumes: 
         - ${{ github.workspace }}:/work/veracruz 
     needs: [check-repo-and-compile-sdk]
@@ -89,7 +89,7 @@ jobs:
   tz:
     runs-on: ubuntu-latest
     container: 
-      image: ghcr.io/veracruz-project/veracruz/veracruz:dev
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
       volumes: 
         - ${{ github.workspace }}:/work/veracruz 
     needs: [check-repo-and-compile-sdk]
