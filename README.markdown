@@ -1,6 +1,6 @@
 # Veracruz: privacy-preserving collaborative compute
 
-![CI build status](https://codebuild.eu-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoibDJ2ckFtVmtjcC9hSkZTV05LUHdON3hQeFRuMmFMN0RQZ0U0RTV6aVJFZVFZOHpOcHk0K3dodmhmNjk0aGN4SERjV08rRER3UURCWjFaVndOTFRHY1pVPSIsIml2UGFyYW1ldGVyU3BlYyI6ImVZRlB2aTdNcDJxQ3lsSUEiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
+![CI build status](https://github.com/veracruz-project/veracruz/actions/workflows/main.yml/badge.svg)
 
 <img src = "https://confidentialcomputing.io/wp-content/uploads/sites/85/2019/08/cc_consortium-color.svg" width=192>
 
