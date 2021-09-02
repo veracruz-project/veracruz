@@ -127,7 +127,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 )
                 .required(false)
                 .multiple(false)
-                .default_value("interp"),
+                .default_value("jit"),
         )
         .arg(
             Arg::with_name("dump-stdout")
@@ -166,7 +166,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             .into());
         }
     } else {
-        return Err("Default 'interp' value is not loaded correctly".into());
+        return Err("Default 'jit' value is not loaded correctly".into());
     };
 
     let binary = if let Some(binary) = matches.value_of("program") {
