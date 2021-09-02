@@ -358,7 +358,7 @@ pub struct WasiWrapper {
     ///            ----------------      
     ///       As there is no 'sharable' and 'mutable' reference in Rust,
     ///       we can either use `Arc` or use `unsafe`. Here we choose `Arc`.
-    filesystem: Arc<Mutex<FileSystem>>,
+    filesystem: FileSystem,
     /// The environment variables that have been passed to this program from the
     /// global policy file.  These are stored as a key-value mapping from
     /// variable name to value.
@@ -386,17 +386,18 @@ impl WasiWrapper {
     // Creating and modifying runtime states.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Creates a new initial `WasiWrapper`.
+    /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
+    /// `principal` from `filesystem`
     #[inline]
-    pub fn new(filesystem: Arc<Mutex<FileSystem>>, principal: Principal) -> Self {
-        Self {
+    pub fn new(filesystem: &FileSystem, principal: Principal) -> FileSystemResult<Self> {
+        let filesystem = filesystem.spawn(&principal)?;
+        Ok( Self {
             filesystem,
             environment_variables: Vec::new(),
             program_arguments: Vec::new(),
             principal,
             exit_code: None,
-            enable_clock: false,
-        }
+        })
     }
 
     ///////////////////////////////////////////////////////
@@ -406,8 +407,9 @@ impl WasiWrapper {
     /// An internal function for the execution engine to directly read the file.
     #[inline]
     pub(crate) fn read_file_by_filename(&mut self, file_name: &str) -> FileSystemResult<Vec<u8>> {
-        let mut fs = self.filesystem.lock().map_err(|_| ErrNo::Busy)?;
-        fs.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
+        //let mut fs = self.filesystem.lock().map_err(|_| ErrNo::Busy)?;
+        //fs.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
+        self.filesystem.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
     }
 
     /// Return the exit code from `proc_exit` call.
@@ -515,17 +517,10 @@ impl WasiWrapper {
         clock_id: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let result = if !self.enable_clock {
-            Err(ErrNo::Access)
-        } else {
-            let clock_id = clock_id as u8;
-            match getclockres(clock_id) {
-                result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
-                result::Result::Unavailable => Err(ErrNo::NoSys),
-                _ => Err(ErrNo::Inval),
-            }
-        }?;
-        memory_ref.write_u64(address, result.as_nanos())
+        let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
+        
+        let time = self.filesystem.clock_res_get(clock_id)?;
+        memory_ref.write_u64(address, time.as_nanos())
     }
 
     /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
@@ -537,17 +532,10 @@ impl WasiWrapper {
         _precision: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let result = if !self.enable_clock {
-            Err(ErrNo::Access)
-        } else {
-            let clock_id = clock_id as u8;
-            match getclocktime(clock_id) {
-                result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
-                result::Result::Unavailable => Err(ErrNo::NoSys),
-                _ => Err(ErrNo::Inval),
-            }
-        }?;
-        memory_ref.write_u64(address, result.as_nanos())
+        let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
+        
+        let time = self.filesystem.clock_time_get(clock_id, precision.into())?;
+        memory_ref.write_u64(address, time.as_nanos())
     }
 
     /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
@@ -561,8 +549,8 @@ impl WasiWrapper {
         advice: u8,
     ) -> FileSystemResult<()> {
         let advice: Advice = Self::decode_wasi_arg(advice)?;
-        let mut fs = self.lock_vfs()?;
-        fs.fd_advise(fd.into(), offset, len, advice)
+        
+        self.filesystem.fd_advise(fd.into(), offset, len, advice)
     }
 
     /// The implementation of the WASI `fd_allocate` function. It requires an extra `memory_ref` to
@@ -574,8 +562,8 @@ impl WasiWrapper {
         offset: u64,
         len: u64,
     ) -> FileSystemResult<()> {
-        let mut fs = self.lock_vfs()?;
-        fs.fd_allocate(fd.into(), offset, len)
+        
+        self.filesystem.fd_allocate(fd.into(), offset, len)
     }
 
     /// The implementation of the WASI `fd_close` function. It requires an extra `memory_ref` to
@@ -586,8 +574,8 @@ impl WasiWrapper {
         _memory_ref: &T,
         fd: u32,
     ) -> FileSystemResult<()> {
-        let mut fs = self.lock_vfs()?;
-        fs.fd_close(fd.into())
+        
+        self.filesystem.fd_close(fd.into())
     }
 
     /// The implementation of the WASI `fd_datasync` function. It requires an extra `memory_ref` to
@@ -598,8 +586,8 @@ impl WasiWrapper {
         _: &mut T,
         fd: u32,
     ) -> FileSystemResult<()> {
-        let mut fs = self.lock_vfs()?;
-        fs.fd_datasync(fd.into())
+        
+        self.filesystem.fd_datasync(fd.into())
     }
 
     /// The implementation of the WASI `fd_fdstat_get` function. It requires an extra `memory_ref` to
@@ -610,8 +598,8 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let fs = self.lock_vfs()?;
-        let stat = fs.fd_fdstat_get(fd.into())?;
+        
+        let stat = self.filesystem.fd_fdstat_get(fd.into())?;
         memory_ref.write_struct(address, &stat)
     }
 
@@ -624,8 +612,8 @@ impl WasiWrapper {
         flags: u16,
     ) -> FileSystemResult<()> {
         let flags: FdFlags = Self::decode_wasi_arg(flags)?;
-        let mut fs = self.lock_vfs()?;
-        fs.fd_fdstat_set_flags(fd.into(), flags)
+        
+        self.filesystem.fd_fdstat_set_flags(fd.into(), flags)
     }
 
     /// The implementation of the WASI `fd_fdstat_set_rights` function. It requires an extra `memory_ref` to
@@ -639,8 +627,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let rights_base: Rights = Self::decode_wasi_arg(rights_base)?;
         let rights_inheriting: Rights = Self::decode_wasi_arg(rights_inheriting)?;
-        let mut fs = self.lock_vfs()?;
-        fs.fd_fdstat_set_rights(fd.into(), rights_base, rights_inheriting)
+        
+        self.filesystem.fd_fdstat_set_rights(fd.into(), rights_base, rights_inheriting)
     }
 
     /// The implementation of the WASI `fd_filestat_get` function. It requires an extra `memory_ref` to
@@ -651,8 +639,8 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let fs = self.lock_vfs()?;
-        let stat = fs.fd_filestat_get(fd.into());
+        
+        let stat = self.filesystem.fd_filestat_get(fd.into());
         memory_ref.write_struct(address, &stat)
     }
 
@@ -665,8 +653,8 @@ impl WasiWrapper {
         fd: u32,
         size: u64,
     ) -> FileSystemResult<()> {
-        let mut fs = self.lock_vfs()?;
-        fs.fd_filestat_set_size(fd.into(), size)
+        
+        self.filesystem.fd_filestat_set_size(fd.into(), size)
     }
 
     /// The implementation of the WASI `fd_filestat_set_times` function. It requires an extra `memory_ref` to
@@ -680,14 +668,8 @@ impl WasiWrapper {
         fst_flag: u16,
     ) -> FileSystemResult<()> {
         let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
-        let mut fs = self.lock_vfs()?;
-        fs.fd_filestat_set_times(
-            fd.into(),
-            atime.into(),
-            mtime.into(),
-            fst_flag,
-            self.filestat_time(),
-        )
+        
+        self.filesystem.fd_filestat_set_times(fd.into(), atime.into(), mtime.into(), fst_flag)
     }
 
     /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
@@ -705,8 +687,8 @@ impl WasiWrapper {
 
         let mut size_read = 0;
         for iovec in iovecs.iter() {
-            let fs = self.lock_vfs()?;
-            let to_write = fs.fd_pread(fd.into(), iovec.len as usize, offset)?;
+            
+            let to_write = self.filesystem.fd_pread(fd.into(), iovec.len as usize, offset)?;
             offset = offset + (to_write.len() as u64);
             memory_ref.write_buffer(iovec.buf, &to_write)?;
             size_read += to_write.len() as u32;
@@ -724,8 +706,8 @@ impl WasiWrapper {
         address: u32,
     ) -> FileSystemResult<()> {
         let fd = Fd(fd);
-        let mut fs = self.lock_vfs()?;
-        let pre = fs.fd_prestat_get(fd.into())?;
+        
+        let pre = self.filesystem.fd_prestat_get(fd.into())?;
         memory_ref.write_struct(address, &pre)
     }
 
@@ -739,8 +721,8 @@ impl WasiWrapper {
         size: u32,
     ) -> FileSystemResult<()> {
         let size = size as usize;
-        let mut fs = self.lock_vfs()?;
-        let result = fs.fd_prestat_dir_name(fd.into())?.into_os_string();
+        
+        let result = self.filesystem.fd_prestat_dir_name(fd.into())?.into_os_string();
         if result.len() > size as usize {
             return Err(ErrNo::NameTooLong);
         }
@@ -764,8 +746,8 @@ impl WasiWrapper {
 
         let mut size_written = 0;
         for buf in bufs.iter() {
-            let mut fs = self.lock_vfs()?;
-            size_written += fs.fd_pwrite(fd.into(), buf, offset + (size_written as u64))?;
+            
+            size_written += self.filesystem.fd_pwrite(fd.into(), buf, offset + (size_written as u64))?;
         }
         memory_ref.write_u32(address, size_written)
     }
@@ -784,8 +766,8 @@ impl WasiWrapper {
 
         let mut size_read = 0;
         for iovec in iovecs.iter() {
-            let mut fs = self.lock_vfs()?;
-            let to_write = fs.fd_read(fd.into(), iovec.len as usize)?;
+            
+            let to_write = self.filesystem.fd_read(fd.into(), iovec.len as usize)?;
             memory_ref.write_buffer(iovec.buf, &to_write)?;
             size_read += to_write.len() as u32;
         }
@@ -804,8 +786,8 @@ impl WasiWrapper {
         result_ptr: u32,
     ) -> FileSystemResult<()> {
         info!("call fd_readdir lenth {:?}", buf_len);
-        let mut fs = self.lock_vfs()?;
-        let dir_entries = fs.fd_readdir(fd.into(), cookie.into())?;
+        
+        let dir_entries = self.filesystem.fd_readdir(fd.into(), cookie.into())?;
 
         let mut written = 0;
         for (dir, path) in dir_entries {
@@ -835,8 +817,8 @@ impl WasiWrapper {
         old_fd: u32,
         new_fd: u32,
     ) -> FileSystemResult<()> {
-        let mut fs = self.lock_vfs()?;
-        fs.fd_renumber(old_fd.into(), new_fd.into())
+        
+        self.filesystem.fd_renumber(old_fd.into(), new_fd.into())
     }
 
     /// The implementation of the WASI `fd_seek` function.
@@ -849,8 +831,8 @@ impl WasiWrapper {
         address: u32,
     ) -> FileSystemResult<()> {
         let whence: Whence = Self::decode_wasi_arg(whence)?;
-        let mut fs = self.lock_vfs()?;
-        let new_offset = fs.fd_seek(fd.into(), offset, whence)?;
+        
+        let new_offset = self.filesystem.fd_seek(fd.into(), offset, whence)?;
         memory_ref.write_u64(address, new_offset)
     }
 
@@ -858,8 +840,8 @@ impl WasiWrapper {
     /// interact with the execution engine.                  
     #[inline]
     pub(crate) fn fd_sync<T: MemoryHandler>(&mut self, _: &mut T, fd: u32) -> FileSystemResult<()> {
-        let mut fs = self.lock_vfs()?;
-        fs.fd_sync(fd.into())
+        
+        self.filesystem.fd_sync(fd.into())
     }
 
     /// The implementation of the WASI `fd_tell` function. It requires an extra `memory_ref` to
@@ -870,8 +852,8 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let fs = self.lock_vfs()?;
-        let offset = fs.fd_tell(fd.into())?;
+        
+        let offset = self.filesystem.fd_tell(fd.into())?;
         memory_ref.write_u64(address, offset)
     }
 
@@ -890,8 +872,8 @@ impl WasiWrapper {
 
         let mut size_written = 0;
         for buf in bufs.iter() {
-            let mut fs = self.lock_vfs()?;
-            size_written += fs.fd_write(fd.into(), buf)?;
+            
+            size_written += self.filesystem.fd_write(fd.into(), buf)?;
         }
         memory_ref.write_u32(address, size_written)
     }
@@ -906,8 +888,8 @@ impl WasiWrapper {
         path_length: u32,
     ) -> FileSystemResult<()> {
         let path = memory_ref.read_cstring(path_address, path_length)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_create_directory(fd.into(), path)
+        
+        self.filesystem.path_create_directory(fd.into(), path)
     }
 
     /// The implementation of the WASI `path_filestat_get` function. It requires an extra `memory_ref` to
@@ -923,8 +905,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let path = memory_ref.read_cstring(path_address, path_length)?;
         let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
-        let mut fs = self.lock_vfs()?;
-        let stat = fs.path_filestat_get(fd.into(), flags, path)?;
+        
+        let stat = self.filesystem.path_filestat_get(fd.into(), flags, path)?;
         memory_ref.write_struct(address, &stat)
     }
 
@@ -944,16 +926,8 @@ impl WasiWrapper {
         let path = memory_ref.read_cstring(path_address, path_length)?;
         let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
         let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_filestat_set_times(
-            fd.into(),
-            flags,
-            path,
-            atime.into(),
-            mtime.into(),
-            fst_flag,
-            self.filestat_time(),
-        )
+        
+        self.filesystem.path_filestat_set_times(fd.into(), flags, path, atime.into(), mtime.into(), fst_flag)
     }
 
     /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
@@ -972,8 +946,8 @@ impl WasiWrapper {
         let old_flags: LookupFlags = Self::decode_wasi_arg(old_flags)?;
         let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
         let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_link(old_fd.into(), old_flags, old_path, new_fd.into(), new_path)
+        
+        self.filesystem.path_link(old_fd.into(), old_flags, old_path, new_fd.into(), new_path)
     }
 
     /// The implementation of the WASI `path_open` function. It requires an extra `memory_ref` to
@@ -998,8 +972,8 @@ impl WasiWrapper {
         let fs_rights_base: Rights = Self::decode_wasi_arg(fs_rights_base)?;
         let fs_rights_inheriting: Rights = Self::decode_wasi_arg(fs_rights_inheriting)?;
         let fd_flags: FdFlags = Self::decode_wasi_arg(fd_flags)?;
-        let mut fs = self.lock_vfs()?;
-        let new_fd = fs.path_open(
+        
+        let new_fd = self.filesystem.path_open(
             &self.principal,
             fd,
             dir_flags,
@@ -1025,8 +999,8 @@ impl WasiWrapper {
         address: u32,
     ) -> FileSystemResult<()> {
         let path = memory_ref.read_cstring(path_address, path_length)?;
-        let mut fs = self.lock_vfs()?;
-        let mut rst = fs.path_readlink(fd.into(), path)?;
+        
+        let mut rst = self.filesystem.path_readlink(fd.into(), path)?;
         let buf_len = buf_len as usize;
         let to_write = if buf_len < rst.len() {
             buf_len
@@ -1049,8 +1023,8 @@ impl WasiWrapper {
         path_length: u32,
     ) -> FileSystemResult<()> {
         let path = memory_ref.read_cstring(path_address, path_length)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_remove_directory(fd.into(), path)
+        
+        self.filesystem.path_remove_directory(fd.into(), path)
     }
 
     /// The implementation of the WASI `path_rename` function. It requires an extra `memory_ref` to
@@ -1067,8 +1041,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
         let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_rename(old_fd.into(), old_path, new_fd.into(), new_path)
+        
+        self.filesystem.path_rename(old_fd.into(), old_path, new_fd.into(), new_path)
     }
 
     /// The implementation of the WASI `path_symlink` function. It requires an extra `memory_ref` to
@@ -1084,8 +1058,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
         let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_symlink(old_path, fd.into(), new_path)
+        
+        self.filesystem.path_symlink(old_path, fd.into(), new_path)
     }
 
     /// The implementation of the WASI `path_unlink_file` function. It requires an extra `memory_ref` to
@@ -1098,8 +1072,8 @@ impl WasiWrapper {
         path_len: u32,
     ) -> FileSystemResult<()> {
         let path = memory_ref.read_cstring(path_address, path_len)?;
-        let mut fs = self.lock_vfs()?;
-        fs.path_unlink_file(fd.into(), path)
+        
+        self.filesystem.path_unlink_file(fd.into(), path)
     }
 
     /// The implementation of the WASI `poll_oneoff` function. It requires an extra `memory_ref` to
@@ -1114,8 +1088,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let subscriptions = memory_ref.unpack_array::<Subscription>(subscriptions, size)?;
         let events = memory_ref.unpack_array::<Event>(events, size)?;
-        let mut fs = self.lock_vfs()?;
-        let rst = fs.poll_oneoff(subscriptions, events)?;
+        
+        let rst = self.filesystem.poll_oneoff(subscriptions, events)?;
         memory_ref.write_u32(address, rst.into())
     }
 
@@ -1151,12 +1125,9 @@ impl WasiWrapper {
         buf_ptr: u32,
         length: u32,
     ) -> FileSystemResult<()> {
-        let mut bytes = vec![0; length as usize];
-        if getrandom(&mut bytes).is_success() {
-            memory_ref.write_buffer(buf_ptr, &bytes)
-        } else {
-            Err(ErrNo::NoSys)
-        }
+        
+        let bytes = self.filesystem.random_get(length)?;
+        memory_ref.write_buffer(buf_ptr, &bytes)
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
@@ -1177,9 +1148,9 @@ impl WasiWrapper {
         let mut size_read = 0;
         let mut ro_rst = RoFlags::empty();
         for iovec in iovecs.iter() {
-            let mut fs = self.lock_vfs()?;
+            
             let (to_write, next_ro_rst) =
-                fs.sock_recv(socket.into(), iovec.len as usize, ri_flag)?;
+                self.filesystem.sock_recv(socket.into(), iovec.len as usize, ri_flag)?;
             memory_ref.write_buffer(iovec.buf, &to_write)?;
             size_read += to_write.len() as u32;
             ro_rst = ro_rst | next_ro_rst;
@@ -1205,8 +1176,8 @@ impl WasiWrapper {
 
         let mut size_written = 0;
         for buf in bufs.iter() {
-            let mut fs = self.lock_vfs()?;
-            size_written += fs.sock_send(socket.into(), buf, si_flag)?;
+            
+            size_written += self.filesystem.sock_send(socket.into(), buf, si_flag)?;
         }
         memory_ref.write_u32(address, size_written)
     }
@@ -1220,19 +1191,19 @@ impl WasiWrapper {
         sd_flag: u8,
     ) -> FileSystemResult<()> {
         let sd_flag: SdFlags = Self::decode_wasi_arg(sd_flag)?;
-        let mut fs = self.lock_vfs()?;
-        fs.sock_shutdown(socket.into(), sd_flag)
+        
+        self.filesystem.sock_shutdown(socket.into(), sd_flag)
     }
 
     ///////////////////////////////////////
     // Internal methods
     ///////////////////////////////////////
-    /// Lock the VFS in WASIWrapper.
-    /// If the locks fails, it returns Busy error code.
-    #[inline]
-    fn lock_vfs(&self) -> FileSystemResult<MutexGuard<'_, FileSystem>> {
-        self.filesystem.lock().map_err(|_| ErrNo::Busy)
-    }
+    ///// Lock the VFS in WASIWrapper.
+    ///// If the locks fails, it returns Busy error code.
+    //#[inline]
+    //fn lock_vfs(&self) -> FileSystemResult<MutexGuard<'_, FileSystem>> {
+        //self.filesystem.lock().map_err(|_| ErrNo::Busy)
+    //}
     /// Converts `arg` of type `R` to type `T`,
     /// or returns from the function with the `Inval` error code.
     #[inline]

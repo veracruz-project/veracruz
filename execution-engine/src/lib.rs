@@ -41,7 +41,7 @@ use crate::{
 };
 use policy_utils::principal::ExecutionStrategy;
 use std::sync::Mutex;
-use std::{boxed::Box, string::String, string::ToString, sync::Arc, vec::Vec};
+use std::{boxed::Box, string::ToString};
 
 pub struct Options {
     pub environment_variables: Vec<(String, String)>,
@@ -68,13 +68,13 @@ impl Default for Options {
 /// such as `freestanding-executuon-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    filesystem: Arc<Mutex<FileSystem>>,
+    filesystem: &FileSystem,
     program_name: &str,
     options: Options,
 ) -> Result<u32, FatalEngineError> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string()))
+            Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string())?)
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {

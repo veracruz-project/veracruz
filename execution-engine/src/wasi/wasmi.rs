@@ -498,13 +498,13 @@ impl Externals for WASMIRuntimeState {
 impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     #[inline]
-    pub fn new(filesystem: Arc<Mutex<FileSystem>>, program_name: std::string::String) -> Self {
-        Self {
-            vfs: WasiWrapper::new(filesystem, Principal::Program(program_name)),
-            program: Principal::NoCap,
+    pub fn new(filesystem: &FileSystem, program_name: std::string::String) -> FileSystemResult<Self> {
+        Ok(Self {
+            vfs: WasiWrapper::new(filesystem, Principal::Program(program_name.clone()))?,
+            program: Principal::Program(program_name),
             program_module: None,
             memory: None,
-        }
+        })
         //NOTE: cannot find a way to immediately call the load_program here,
         // therefore we might eliminate the Option on program_module and memory.
     }

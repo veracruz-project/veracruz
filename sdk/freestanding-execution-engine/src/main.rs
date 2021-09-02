@@ -34,7 +34,6 @@ use std::{
     fs::{create_dir_all, File},
     io::{Read, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
     time::Instant,
     vec::Vec,
 };
@@ -302,17 +301,17 @@ fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
 fn load_input_sources(
-    input_sources: &Vec<String>, vfs: Arc<Mutex<FileSystem>>,
+    input_sources: &Vec<String>, vfs: &mut FileSystem,
 ) -> Result<(), Box<dyn Error>> {
     for file_path in input_sources.iter() {
         let file_path = Path::new(file_path);
-        load_input_source(&file_path, vfs.clone())?;
+        load_input_source(&file_path, vfs)?;
     }
     Ok(())
 }
 
 fn load_input_source<T: AsRef<Path>>(
-    file_path: T, vfs: Arc<Mutex<FileSystem>>,
+    file_path: T, vfs: &mut FileSystem,
 ) -> Result<(), Box<dyn Error>> {
     let file_path = file_path.as_ref();
     info!("Loading data source '{:?}'.", file_path);
@@ -321,9 +320,7 @@ fn load_input_source<T: AsRef<Path>>(
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        vfs.lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .write_file_by_absolute_path(
+        vfs.write_file_by_absolute_path(
                 &Principal::InternalSuperUser,
                 &Path::new("/").join(file_path),
                 &buffer,
@@ -333,7 +330,7 @@ fn load_input_source<T: AsRef<Path>>(
         info!("Loading '{:?}' into vfs.", file);
     } else if file_path.is_dir() {
         for dir in file_path.read_dir()? {
-            load_input_source(&dir?.path(), vfs.clone())?;
+            load_input_source(&dir?.path(), vfs)?;
         }
     } else {
         return Err(format!("Error on load {:?}", file_path).into());
@@ -416,13 +413,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     info!("The final right tables: {:?}", right_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(
+    let mut vfs = FileSystem::new(
         right_table,
-        &std_streams_table,
-    )?));
-    vfs.lock()
-        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-        .write_file_by_absolute_path(
+    )?;
+    vfs.write_file_by_absolute_path(
             &Principal::InternalSuperUser,
             &prog_file_abs_path,
             &program,
@@ -430,7 +424,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?;
     info!("WASM program {} loaded into VFS.", prog_file_name);
 
-    load_input_sources(&cmdline.input_sources, vfs.clone())?;
+    load_input_sources(&cmdline.input_sources, &mut vfs)?;
     info!("Data sources loaded.");
 
     info!("Invoking main.");
@@ -443,7 +437,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let return_code = execute(
         &cmdline.execution_strategy,
-        vfs.clone(),
+        &vfs,
         prog_file_abs_path
             .to_str()
             .ok_or("Failed to convert program path to a string.")?,
@@ -452,38 +446,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("return code: {:?}", return_code);
     info!("time: {} micro seconds", main_time.elapsed().as_micros());
 
+    //TODO MODIFY
     // Dump contents of stdout
-    if cmdline.dump_stdout {
-        let buf = vfs
-            .lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_absolute_path(&Principal::InternalSuperUser, "/stdout")?;
-        let stdout_dump = std::str::from_utf8(&buf)
-            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        print!(
-            "---- stdout dump ----\n{}---- stdout dump end ----\n",
-            stdout_dump
-        );
-    }
+    //if cmdline.dump_stdout {
+        //let buf = vfs
+            //.lock()
+            //.map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+            //.read_file_by_absolute_path(&Principal::InternalSuperUser, "/stdout")?;
+        //let stdout_dump = std::str::from_utf8(&buf)
+            //.map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        //print!(
+            //"---- stdout dump ----\n{}---- stdout dump end ----\n",
+            //stdout_dump
+        //);
+    //}
 
-    // Dump contents of stderr
-    if cmdline.dump_stderr {
-        let buf = vfs
-            .lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_absolute_path(&Principal::InternalSuperUser, "/stderr")?;
-        let stderr_dump = std::str::from_utf8(&buf)
-            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        eprint!(
-            "---- stderr dump ----\n{}---- stderr dump end ----\n",
-            stderr_dump
-        );
-    }
+    //// Dump contents of stderr
+    //if cmdline.dump_stderr {
+        //let buf = vfs
+            //.lock()
+            //.map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
+            //.read_file_by_absolute_path(&Principal::InternalSuperUser, "/stderr")?;
+        //let stderr_dump = std::str::from_utf8(&buf)
+            //.map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        //eprint!(
+            //"---- stderr dump ----\n{}---- stderr dump end ----\n",
+            //stderr_dump
+        //);
+    //}
 
     for file_path in cmdline.output_sources.iter() {
         for (output_path, buf) in vfs
-            .lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
             .read_all_files_by_absolute_path(
                 &Principal::InternalSuperUser,
                 Path::new("/").join(file_path),

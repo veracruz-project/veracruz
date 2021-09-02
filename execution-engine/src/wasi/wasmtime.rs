@@ -29,8 +29,8 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, V
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new_dummy())), Principal::NoCap));
+    // The initial value has NO use. The unwrap should NOT fail.
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(&FileSystem::new_dummy(), Principal::NoCap).unwrap());
 }
 
 /// A macro for lock the global VFS and store the result in the variable,
@@ -132,11 +132,11 @@ pub struct WasmtimeRuntimeState {}
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
-        filesystem: Arc<Mutex<FileSystem>>,
+        filesystem: &FileSystem,
         program_name: String,
     ) -> Result<Self, FatalEngineError> {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, Principal::Program(program_name));
+        *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, Principal::Program(program_name))?;
         Ok(Self {})
     }
 
