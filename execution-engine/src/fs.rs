@@ -22,6 +22,7 @@ use std::{
     os::unix::ffi::{OsStrExt, OsStringExt},
     path::{Component, Path, PathBuf},
     vec::Vec,
+    sync::{Arc, Mutex, MutexGuard},
 };
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
@@ -39,6 +40,41 @@ use log::info;
 /// returned from a filesystem function.  The result `Err(ErrNo::Success)`
 /// should never be returned.
 pub type FileSystemResult<T> = Result<T, ErrNo>;
+
+/// Internal shared inode table.
+type SharedInodeTable = Arc<Mutex<InodeTable>>;
+
+////////////////////////////////////////////////////////////////////////////////
+// Global functions.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Get random bytes
+fn getrandom_to_buffer(buf_len: Size) -> FileSystemResult<Vec<u8>> {
+    let mut buf = vec![0; buf_len as usize];
+    if let result::Result::Success = getrandom(&mut buf) {
+        Ok(buf)
+    } else {
+        Err(ErrNo::NoSys)
+    }
+}
+
+/// Return a random u32
+fn random_u32() -> FileSystemResult<u32> {
+    let result: [u8; 4] = getrandom_to_buffer(4)?
+        .as_slice()
+        .try_into()
+        .map_err(|_| ErrNo::Inval)?;
+    Ok(u32::from_le_bytes(result))
+}
+
+/// Return a random u64
+fn random_u64() -> FileSystemResult<u64> {
+    let result: [u8; 8] = getrandom_to_buffer(8)? 
+        .as_slice()
+        .try_into()
+        .map_err(|_| ErrNo::Inval)?;
+    Ok(u64::from_le_bytes(result))
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // INodes.
@@ -106,11 +142,11 @@ impl InodeEntry {
     }
 
     /// Return the absolute path of this inode.
-    pub(self) fn absolute_path(&self, fs: &FileSystem) -> FileSystemResult<PathBuf> {
+    pub(self) fn absolute_path(&self, inode_table: &InodeTable) -> FileSystemResult<PathBuf> {
         if self.current == self.parent {
             Ok(self.path.clone())
         } else {
-            let mut parent_path = fs.get_inode(&self.parent)?.absolute_path(fs)?;
+            let mut parent_path = inode_table.get(&self.parent)?.absolute_path(inode_table)?;
             parent_path.push(self.path.as_path());
             Ok(parent_path)
         }
@@ -123,8 +159,8 @@ impl InodeEntry {
 
     /// Read metadata of all files and sub-dirs in the dir and return a vec of DirEnt,
     /// or return NotDir if `self` is not a dir
-    pub(self) fn read_dir(&self, fs: &FileSystem) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
-        self.data.read_dir(fs)
+    pub(self) fn read_dir(&self, inode_table: &InodeTable) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
+        self.data.read_dir(inode_table)
     }
 }
 
@@ -273,7 +309,7 @@ impl InodeImpl {
 
     /// Read metadata of files in the dir and return a vec of DirEnt,
     /// or return NotDir if `self` is not a dir
-    pub(self) fn read_dir(&self, fs: &FileSystem) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
+    pub(self) fn read_dir(&self, inode_table: &InodeTable) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
         let dir = match self {
             InodeImpl::Directory(d) => d,
             _otherwise => return Err(ErrNo::NotDir),
@@ -285,7 +321,7 @@ impl InodeImpl {
                 next: (index as u64 + 1u64).into(),
                 inode: inode.clone(),
                 name_len: path.len() as u32,
-                file_type: fs.get_inode(&inode)?.file_stat.file_type,
+                file_type: inode_table.get(&inode)?.file_stat.file_type,
             };
             rst.push((dir_ent, path))
         }
@@ -293,180 +329,68 @@ impl InodeImpl {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// File-table entries.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Each file table entry contains an index into the inode table, pointing to an
-/// `InodeEntry`, where the static file data is stored.
-#[derive(Clone, Debug)]
-struct FdEntry {
-    /// The index to `inode_table` in FileSystem.
-    inode: Inode,
-    /// Metadata for the file descriptor.
-    fd_stat: FdStat,
-    /// The current offset of the file descriptor.
-    offset: FileSize,
-    /// Advice on how regions of the file are to be used.
-    advice: Vec<(FileSize, FileSize, Advice)>,
+struct InodeTable {
+    table: HashMap<Inode, InodeEntry>,
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Filesystems.
-////////////////////////////////////////////////////////////////////////////////
-
-/// The filesystem proper, which collects together various tables and bits of
-/// meta-data.
-#[derive(Clone)]
-pub struct FileSystem {
-    /// A table of file descriptor table entries.  This is indexed by file
-    /// descriptors.  
-    fd_table: HashMap<Fd, FdEntry>,
-    /// In order to quickly allocate file descriptors, we keep track of a monotonically increasing
-    /// candidate, starting just above the reserved values. With this approach, file descriptors
-    /// can not be re-allocated after being freed, imposing an artificial limit of 2^31 file
-    /// descriptor allocations over the course of a program's execution.
-    next_fd_candidate: Fd,
-    /// The inode table, which points to the actual data associated with a file
-    /// and other metadata.  This table is indexed by the Inode.
-    inode_table: HashMap<Inode, InodeEntry>,
-    /// We allocate inodes in the same way as we allocate file descriptors. Inode's are 64 bits
-    /// rather than 31 bits, so the artificial limit on inode allocations is 2^64.
-    next_inode_candidate: Inode,
-    /// The Right table for Principal, including participants and programs.
-    /// It will be used in, e.g.  `path_open` function,
-    /// to constrain the `Right` of file descriptors.
-    rights_table: RightsTable,
-    /// Preopen FD table. Mapping the FD to dir name.
-    prestat_table: HashMap<Fd, PathBuf>,
-}
-
-impl FileSystem {
-    ////////////////////////////////////////////////////////////////////////////
-    // Creating filesystems.
-    ////////////////////////////////////////////////////////////////////////////
-    /// The root directory name. It will be pre-opened for any wasm program.
-    pub const ROOT_DIRECTORY: &'static str = "/";
-    /// The root directory inode. It will be pre-opened for any wasm program.
-    /// File descriptors 0 to 2 are reserved for the standard streams.
-    pub const ROOT_DIRECTORY_INODE: Inode = Inode(3);
-    /// The root directory file descriptor. It will be pre-opened for any wasm program.
-    pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
-    /// The default initial rights on a newly created file.
-    pub const DEFAULT_RIGHTS: Rights = Rights::all();
-
-    /// Creates a new, empty filesystem.
-    ///
-    /// NOTE: the file descriptors 0, 1, and 2 are pre-allocated for stdin and
-    /// similar with respect to the parameter `std_streams_table`.  
-    /// Rust programs are going to expect that this is true, so we
-    /// need to preallocate some files corresponding to those, here.
-    #[inline]
-    pub fn new(
-        rights_table: RightsTable,
-        std_streams_table: &Vec<StandardStream>,
-    ) -> FileSystemResult<Self> {
-        let mut rst = Self {
-            fd_table: HashMap::new(),
-            next_fd_candidate: Fd(u32::from(Self::ROOT_DIRECTORY_FD) + 1),
-            inode_table: HashMap::new(),
-            next_inode_candidate: Inode(u64::from(Self::ROOT_DIRECTORY_INODE) + 1),
-            rights_table,
-            prestat_table: HashMap::new(),
-        };
-        rst.install_prestat::<&Path>(&Vec::new(), std_streams_table)?;
-        Ok(rst)
-    }
-
-    /// Create a dummy filesystem
-    pub(crate) fn new_dummy() -> Self {
-        Self {
-            fd_table: HashMap::new(),
-            inode_table: HashMap::new(),
-            rights_table: HashMap::new(),
-            prestat_table: HashMap::new(),
+impl InodeTable {
+    fn new() -> Self {
+        Self{
+            table: HashMap::new()
         }
     }
 
-    ////////////////////////////////////////////////////////////////////////
-    // Internal auxiliary methods
-    ////////////////////////////////////////////////////////////////////////
-
-    /// Install standard streams (`stdin`, `stdout`, `stderr`).
-    fn install_standard_streams(
-        &mut self,
-        std_streams_table: &Vec<StandardStream>,
-    ) -> FileSystemResult<()> {
-        for std_stream in std_streams_table {
-            // Map each standard stream to an fd and inode.
-            // Rights are assumed to be already configured by the execution engine in the rights table
-            // at that point.
-            // Base rights are ignored and replaced with the default rights
-            let (path, fd_number, inode_number) = match std_stream {
-                StandardStream::Stdin(file_rights) => (file_rights.file_name(), 0, 0),
-                StandardStream::Stdout(file_rights) => (file_rights.file_name(), 1, 1),
-                StandardStream::Stderr(file_rights) => (file_rights.file_name(), 2, 2),
-            };
-            self.add_file(
-                Self::ROOT_DIRECTORY_INODE,
-                &path,
-                Inode(inode_number),
-                "".as_bytes(),
-            )?;
-            self.install_fd(
-                Fd(fd_number),
-                Inode(inode_number),
-                &Self::DEFAULT_RIGHTS,
-                &Self::DEFAULT_RIGHTS,
-            );
-        }
+    fn insert(&mut self, inode: Inode, entry : InodeEntry) -> FileSystemResult<()> {
+        self.table.insert(inode, entry);
         Ok(())
     }
 
-    /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
-    /// and then pre-open them.
-    fn install_prestat<T: AsRef<Path> + Sized>(
-        &mut self,
-        dir_paths: &[T],
-        std_streams_table: &Vec<StandardStream>,
-    ) -> FileSystemResult<()> {
-        // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
-        self.add_dir(
-            Self::ROOT_DIRECTORY_INODE,
-            Path::new(Self::ROOT_DIRECTORY),
-            Self::ROOT_DIRECTORY_INODE,
-        )?;
-        self.install_fd(
-            Self::ROOT_DIRECTORY_FD,
-            Self::ROOT_DIRECTORY_INODE,
-            &Self::DEFAULT_RIGHTS,
-            &Self::DEFAULT_RIGHTS,
-        );
-        self.prestat_table
-            .insert(Self::ROOT_DIRECTORY_FD, PathBuf::from(Self::ROOT_DIRECTORY));
-
-        // Pre open the standard streams.
-        self.install_standard_streams(std_streams_table)?;
-
-        // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
-        let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
-        let root_inode_number = Self::ROOT_DIRECTORY_INODE.0;
-        for (index, path) in dir_paths.iter().enumerate() {
-            let new_inode = Inode(index as u64 + root_inode_number + 1);
-            let new_fd = Fd(index as u32 + root_fd_number + 1);
-            self.add_dir(Self::ROOT_DIRECTORY_INODE, path, new_inode)?;
-            self.install_fd(
-                new_fd,
-                new_inode,
-                &Self::DEFAULT_RIGHTS,
-                &Self::DEFAULT_RIGHTS,
-            );
-            self.prestat_table
-                .insert(new_fd, path.as_ref().to_path_buf());
-        }
-
-        Ok(())
+    /// Return the inode entry associated to `inode`
+    fn get(&self, inode: &Inode) -> FileSystemResult<&InodeEntry> {
+        self.table.get(&inode).ok_or(ErrNo::NoEnt)
     }
+
+    /// Return the inode entry associated to `inode`
+    fn get_mut(&mut self, inode: &Inode) -> FileSystemResult<&mut InodeEntry> {
+        self.table.get_mut(&inode).ok_or(ErrNo::NoEnt)
+    }
+
+    fn is_dir(&self, inode: &Inode) -> bool {
+        self.get(inode).map(|i| i.is_dir()).unwrap_or(false)
+    }
+
+
+    /// Return the inode and the associated inode entry at the relative `path` in the parent
+    /// inode `parent_inode`. Return Error if `fd` is not a directory.
+    fn get_inode_by_inode_path<T: AsRef<Path>>(
+        &self,
+        parent_inode: &Inode,
+        path: T,
+    ) -> FileSystemResult<(Inode, &InodeEntry)> {
+        let parent_inode = parent_inode.clone();
+        let inode = path
+            .as_ref()
+            .components()
+            .fold(Ok(parent_inode), |last, component| {
+                // If there is an error
+                let last = last?;
+                // Find the next inode
+                self.get(&last)?.get_inode_by_path(component)
+            })?;
+        //let inode = parent_inode_entry.get_inode_by_path(path.as_ref())?;
+        Ok((inode, self.get(&inode)?))
+    }
+
+    /// Pick a fresh inode randomly.
+    fn new_inode(&self) -> FileSystemResult<Inode> {
+        loop {
+            let new_inode = Inode(random_u64()?);
+            if !self.table.contains_key(&new_inode) {
+                return Ok(new_inode);
+            }
+        }
+    }
+
 
     /// Install a directory with inode `new_inode` and attatch it under the parent inode `parent`.
     /// The `new_inode` MUST be fresh.
@@ -499,13 +423,13 @@ impl FileSystem {
         // If parent is not equal to new_inode, it means `new_inode` is not a ROOT,
         // Hence, add the new inode into the parent inode dir.
         if parent != new_inode {
-            self.inode_table
+            self.table
                 .get_mut(&parent)
                 .ok_or(ErrNo::NoEnt)?
                 .insert(path.clone(), new_inode.clone())?;
         }
         // Add the map from the new inode to inode implementation.
-        self.inode_table.insert(new_inode.clone(), node);
+        self.insert(new_inode.clone(), node)?;
         Ok(())
     }
 
@@ -579,14 +503,317 @@ impl FileSystem {
             data: InodeImpl::File(raw_file_data.to_vec()),
         };
         // Add the map from the new inode to inode implementation.
-        self.inode_table.insert(new_inode.clone(), node);
+        self.insert(new_inode.clone(), node)?;
         // Add the new inode into the parent inode dir.
-        self.inode_table
+        self.table
             .get_mut(&parent)
             .ok_or(ErrNo::NoEnt)?
             .insert(path, new_inode.clone())?;
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// File-table entries.
+////////////////////////////////////////////////////////////////////////////////
+
+/// Each file table entry contains an index into the inode table, pointing to an
+/// `InodeEntry`, where the static file data is stored.
+#[derive(Clone, Debug)]
+struct FdEntry {
+    /// The index to `inode_table` in FileSystem.
+    inode: Inode,
+    /// Metadata for the file descriptor.
+    fd_stat: FdStat,
+    /// The current offset of the file descriptor.
+    offset: FileSize,
+    /// Advice on how regions of the file are to be used.
+    advice: Vec<(FileSize, FileSize, Advice)>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Filesystems.
+////////////////////////////////////////////////////////////////////////////////
+
+/// The filesystem proper, which collects together various tables and bits of
+/// meta-data.
+#[derive(Clone)]
+pub struct FileSystem {
+    /// A table of file descriptor table entries.  This is indexed by file
+    /// descriptors.  
+    fd_table: HashMap<Fd, FdEntry>,
+    /// In order to quickly allocate file descriptors, we keep track of a monotonically increasing
+    /// candidate, starting just above the reserved values. With this approach, file descriptors
+    /// can not be re-allocated after being freed, imposing an artificial limit of 2^31 file
+    /// descriptor allocations over the course of a program's execution.
+    next_fd_candidate: Fd,
+    /// The inode table, which points to the actual data associated with a file
+    /// and other metadata.  This table is indexed by the Inode.
+    inode_table: SharedInodeTable,
+    /// We allocate inodes in the same way as we allocate file descriptors. Inode's are 64 bits
+    /// rather than 31 bits, so the artificial limit on inode allocations is 2^64.
+    next_inode_candidate: Inode,
+    /// The Right table for Principal, including participants and programs.
+    /// It will be used in, e.g.  `path_open` function,
+    /// to constrain the `Right` of file descriptors.
+    rights_table: RightsTable,
+    /// Preopen FD table. Mapping the FD to dir name.
+    prestat_table: HashMap<Fd, PathBuf>,
+}
+
+impl FileSystem {
+    ////////////////////////////////////////////////////////////////////////////
+    // Creating filesystems.
+    ////////////////////////////////////////////////////////////////////////////
+    /// The root directory name. It will be pre-opened for any wasm program.
+    pub const ROOT_DIRECTORY: &'static str = "/";
+    /// The root directory inode. It will be pre-opened for any wasm program.
+    /// File descriptors 0 to 2 are reserved for the standard streams.
+    pub const ROOT_DIRECTORY_INODE: Inode = Inode(3);
+    /// The root directory file descriptor. It will be pre-opened for any wasm program.
+    pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
+    /// The default initial rights on a newly created file.
+    pub const DEFAULT_RIGHTS: Rights = Rights::all();
+
+    /// Creates a new, empty filesystem.
+    ///
+    /// NOTE: the file descriptors 0, 1, and 2 are pre-allocated for stdin and
+    /// similar with respect to the parameter `std_streams_table`.  
+    /// Rust programs are going to expect that this is true, so we
+    /// need to preallocate some files corresponding to those, here.
+    #[inline]
+    pub fn new(
+        rights_table: RightsTable,
+        std_streams_table: &Vec<StandardStream>,
+    ) -> FileSystemResult<Self> {
+        let mut rst = Self {
+            fd_table: HashMap::new(),
+            next_fd_candidate: Fd(u32::from(Self::ROOT_DIRECTORY_FD) + 1),
+            inode_table: Arc::new(Mutex::new(InodeTable::new())),
+            next_inode_candidate: Inode(u64::from(Self::ROOT_DIRECTORY_INODE) + 1),
+            rights_table,
+            prestat_table: HashMap::new(),
+        };
+        rst.install_prestat::<&Path>(&Vec::new(), std_streams_table)?;
+        Ok(rst)
+    }
+
+    /// Create a dummy filesystem
+    pub(crate) fn new_dummy() -> Self {
+        Self {
+            fd_table: HashMap::new(),
+            inode_table: Arc::new(Mutex::new(InodeTable::new())),
+            rights_table: HashMap::new(),
+            prestat_table: HashMap::new(),
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////
+    // Internal auxiliary methods
+    ////////////////////////////////////////////////////////////////////////
+    
+    /// Lock the inode table
+    fn lock_inode_table(&self) -> FileSystemResult<MutexGuard<InodeTable>> {
+        self.inode_table.lock().map_err(|_| ErrNo::Busy)
+    }
+
+    /// Install standard streams (`stdin`, `stdout`, `stderr`).
+    fn install_standard_streams(
+        &mut self,
+        std_streams_table: &Vec<StandardStream>,
+    ) -> FileSystemResult<()> {
+        for std_stream in std_streams_table {
+            // Map each standard stream to an fd and inode.
+            // Rights are assumed to be already configured by the execution engine in the rights table
+            // at that point.
+            // Base rights are ignored and replaced with the default rights
+            let (path, fd_number, inode_number) = match std_stream {
+                StandardStream::Stdin(file_rights) => (file_rights.file_name(), 0, 0),
+                StandardStream::Stdout(file_rights) => (file_rights.file_name(), 1, 1),
+                StandardStream::Stderr(file_rights) => (file_rights.file_name(), 2, 2),
+            };
+            self.lock_inode_table()?
+                .add_file(
+                Self::ROOT_DIRECTORY_INODE,
+                &path,
+                Inode(inode_number),
+                "".as_bytes(),
+            )?;
+            self.install_fd(
+                Fd(fd_number),
+                Inode(inode_number),
+                &Self::DEFAULT_RIGHTS,
+                &Self::DEFAULT_RIGHTS,
+            );
+        }
+        Ok(())
+    }
+
+    /// Install `stdin`, `stdout`, `stderr`, `$ROOT`, and all dir in `dir_paths`,
+    /// and then pre-open them.
+    fn install_prestat<T: AsRef<Path> + Sized>(
+        &mut self,
+        dir_paths: &[T],
+        std_streams_table: &Vec<StandardStream>,
+    ) -> FileSystemResult<()> {
+        // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
+        self.lock_inode_table()?
+        .add_dir(
+            Self::ROOT_DIRECTORY_INODE,
+            Path::new(Self::ROOT_DIRECTORY),
+            Self::ROOT_DIRECTORY_INODE,
+        )?;
+        self.install_fd(
+            Self::ROOT_DIRECTORY_FD,
+            Self::ROOT_DIRECTORY_INODE,
+            &Self::DEFAULT_RIGHTS,
+            &Self::DEFAULT_RIGHTS,
+        );
+        self.prestat_table
+            .insert(Self::ROOT_DIRECTORY_FD, PathBuf::from(Self::ROOT_DIRECTORY));
+
+        // Pre open the standard streams.
+        self.install_standard_streams(std_streams_table)?;
+
+        // Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
+        let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
+        let root_inode_number = Self::ROOT_DIRECTORY_INODE.0;
+        for (index, path) in dir_paths.iter().enumerate() {
+            let new_inode = Inode(index as u64 + root_inode_number + 1);
+            let new_fd = Fd(index as u32 + root_fd_number + 1);
+            self.lock_inode_table()?.add_dir(Self::ROOT_DIRECTORY_INODE, path, new_inode)?;
+            self.install_fd(
+                new_fd,
+                new_inode,
+                &Self::DEFAULT_RIGHTS,
+                &Self::DEFAULT_RIGHTS,
+            );
+            self.prestat_table
+                .insert(new_fd, path.as_ref().to_path_buf());
+        }
+
+        Ok(())
+    }
+
+    ///// Install a directory with inode `new_inode` and attatch it under the parent inode `parent`.
+    ///// The `new_inode` MUST be fresh.
+    //fn add_dir<T: AsRef<Path>>(
+        //&mut self,
+        //parent: Inode,
+        //path: T,
+        //new_inode: Inode,
+    //) -> FileSystemResult<()> {
+        //let file_stat = FileStat {
+            //device: (0u64).into(),
+            //inode: new_inode.clone(),
+            //file_type: FileType::Directory,
+            //num_links: 0,
+            //file_size: 0u64,
+            //atime: Timestamp::from_nanos(0),
+            //mtime: Timestamp::from_nanos(0),
+            //ctime: Timestamp::from_nanos(0),
+        //};
+        //let path = path.as_ref().to_path_buf();
+        //let node = InodeEntry {
+            //current: new_inode.clone(),
+            //parent,
+            //file_stat,
+            //path: path.clone(),
+            //data: InodeImpl::new_directory(new_inode.clone(), parent.clone()),
+        //};
+        //// NOTE: first add the inode to its parent inode, in the case of parent is not a directory,
+        //// it causes error and no side effect will be made to the file system, i.e no island inode.
+        //// If parent is not equal to new_inode, it means `new_inode` is not a ROOT,
+        //// Hence, add the new inode into the parent inode dir.
+        //if parent != new_inode {
+            //self.lock_inode_table()?
+                //.get_mut(&parent)
+                //.ok_or(ErrNo::NoEnt)?
+                //.insert(path.clone(), new_inode.clone())?;
+        //}
+        //// Add the map from the new inode to inode implementation.
+        //self.lock_inode_table()?.insert(new_inode.clone(), node);
+        //Ok(())
+    //}
+
+    ///// Create all directories in the `path`, if necessary, e.g. `/path/to/a/new/dir`.
+    ///// The last component in `path` will be treated a directory rather a file.
+    //fn add_all_dir<T: AsRef<Path>>(&mut self, mut parent: Inode, path: T) -> FileSystemResult<()> {
+        //// iterate over the path and create the directory if necessary.
+        //for component in path.as_ref().components() {
+            //if let Component::Normal(c) = component {
+                //let new_parent = match self.get_inode_by_inode_path(&parent, c) {
+                    //Ok((o, _)) => o,
+                    //// Directory is not exist, hence create it.
+                    //Err(ErrNo::NoEnt) => {
+                        //let new_inode = self.new_inode()?;
+                        //self.add_dir(parent.clone(), c, new_inode.clone())?;
+                        //new_inode
+                    //}
+                    //Err(e) => return Err(e),
+                //};
+                //parent = new_parent;
+            //} else {
+                //return Err(ErrNo::Inval);
+            //}
+        //}
+        //Ok(())
+    //}
+
+    ///// Install a file with content `raw_file_data` and attatch it to `inode`.
+    ///// Create any missing directory in the path.
+    //fn add_file<T: AsRef<Path>>(
+        //&mut self,
+        //parent: Inode,
+        //path: T,
+        //new_inode: Inode,
+        //raw_file_data: &[u8],
+    //) -> FileSystemResult<()> {
+        //let path = path.as_ref();
+        //info!("call add_file with parent {:?} and path {:?}", parent, path);
+        //// Create missing directories in the `parent` inode if the path contains directory,
+        //// and shift the `parent` to the direct parent of the new file.
+        //let (parent, path) = if let Some(parent_path) = path.parent() {
+            //let file_path = path.file_name().map(|s| s.as_ref()).ok_or(ErrNo::Inval)?;
+            //self.add_all_dir(parent, parent_path)?;
+            //(
+                //self.get_inode_by_inode_path(&parent, parent_path)?.0,
+                //file_path,
+            //)
+        //} else {
+            //(parent, path)
+        //};
+        //info!(
+            //"call add_file with new parent {:?} and path {:?}",
+            //parent, path
+        //);
+        //let file_size = raw_file_data.len();
+        //let file_stat = FileStat {
+            //device: 0u64.into(),
+            //inode: new_inode.clone(),
+            //file_type: FileType::RegularFile,
+            //num_links: 0,
+            //file_size: file_size as u64,
+            //atime: Timestamp::from_nanos(0),
+            //mtime: Timestamp::from_nanos(0),
+            //ctime: Timestamp::from_nanos(0),
+        //};
+        //let node = InodeEntry {
+            //current: new_inode.clone(),
+            //parent,
+            //file_stat,
+            //path: path.to_path_buf(),
+            //data: InodeImpl::File(raw_file_data.to_vec()),
+        //};
+        //// Add the map from the new inode to inode implementation.
+        //self.lock_inode_table()?.insert(new_inode.clone(), node);
+        //// Add the new inode into the parent inode dir.
+        //self.lock_inode_table()?
+            //.get_mut(&parent)
+            //.ok_or(ErrNo::NoEnt)?
+            //.insert(path, new_inode.clone())?;
+        //Ok(())
+    //}
 
     /// Install a `fd` to the file system. The fd will be of type RegularFile.
     fn install_fd(
@@ -661,15 +888,9 @@ impl FileSystem {
         }
     }
 
-    /// Return the inode entry associated to `inode`
-    fn get_inode(&self, inode: &Inode) -> FileSystemResult<&InodeEntry> {
-        self.inode_table.get(&inode).ok_or(ErrNo::NoEnt)
-    }
-
     /// Return the inode and the associated inode entry, contained in file descriptor `fd`
-    fn get_inode_by_fd(&self, fd: &Fd) -> FileSystemResult<(Inode, &InodeEntry)> {
-        let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
-        Ok((inode, self.get_inode(&inode)?))
+    fn get_inode_by_fd(&self, fd: &Fd) -> FileSystemResult<Inode> {
+        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode)
     }
 
     /// Return the inode and the associated inode entry at the relative `path` in the file
@@ -678,30 +899,9 @@ impl FileSystem {
         &self,
         fd: &Fd,
         path: T,
-    ) -> FileSystemResult<(Inode, &InodeEntry)> {
-        let (parent_inode, _) = self.get_inode_by_fd(&fd)?;
-        self.get_inode_by_inode_path(&parent_inode, path)
-    }
-
-    /// Return the inode and the associated inode entry at the relative `path` in the parent
-    /// inode `parent_inode`. Return Error if `fd` is not a directory.
-    fn get_inode_by_inode_path<T: AsRef<Path>>(
-        &self,
-        parent_inode: &Inode,
-        path: T,
-    ) -> FileSystemResult<(Inode, &InodeEntry)> {
-        let parent_inode = parent_inode.clone();
-        let inode = path
-            .as_ref()
-            .components()
-            .fold(Ok(parent_inode), |last, component| {
-                // If there is an error
-                let last = last?;
-                // Find the next inode
-                self.get_inode(&last)?.get_inode_by_path(component)
-            })?;
-        //let inode = parent_inode_entry.get_inode_by_path(path.as_ref())?;
-        Ok((inode, self.get_inode(&inode)?))
+    ) -> FileSystemResult<Inode> {
+        let parent_inode = self.get_inode_by_fd(&fd)?;
+        Ok(self.lock_inode_table()?.get_inode_by_inode_path(&parent_inode, path)?.0)
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -787,9 +987,8 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?;
 
         Ok(self
-            .inode_table
-            .get(&inode)
-            .ok_or(ErrNo::NoEnt)?
+            .lock_inode_table()?
+            .get(&inode)?
             .file_stat
             .clone())
     }
@@ -804,9 +1003,8 @@ impl FileSystem {
             .map(|FdEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
 
-        self.inode_table
-            .get_mut(&inode)
-            .ok_or(ErrNo::NoEnt)?
+        self.lock_inode_table()?
+            .get_mut(&inode)?
             .resize_file(size, 0)
     }
 
@@ -827,7 +1025,10 @@ impl FileSystem {
             .get(&fd)
             .map(|FdEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
-        let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
+        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
+
+        let mut inode_table = self.lock_inode_table()?;
+        let mut inode_impl = inode_table.get_mut(&inode)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
             inode_impl.file_stat.atime = current_time;
         } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
@@ -861,9 +1062,8 @@ impl FileSystem {
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        self.inode_table
-            .get(&inode)
-            .ok_or(ErrNo::NoEnt)?
+        self.lock_inode_table()?
+            .get(&inode)?
             .read_file(buffer_len, offset)
     }
 
@@ -905,9 +1105,8 @@ impl FileSystem {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        self.inode_table
-            .get_mut(&inode)
-            .ok_or(ErrNo::NoEnt)?
+        self.lock_inode_table()?
+            .get_mut(&inode)?
             .write_file(buf.to_vec(), offset)
     }
 
@@ -932,7 +1131,12 @@ impl FileSystem {
         info!("call fd_readdir on {:?} and cookie {:?}", fd, cookie);
         self.check_right(&fd, Rights::FD_READDIR)?;
         //TODO REMOVE DEBUG CODE
-        let mut dirs = self.get_inode_by_fd(&fd)?.1.read_dir(self)?;
+        let dir_inode = self.get_inode_by_fd(&fd)?;
+        // limit lock scope
+        let mut dirs = {
+            let inode_table = self.lock_inode_table()?;
+            inode_table.get(&dir_inode)?.read_dir(&inode_table)?
+        };
         let cookie = cookie.0 as usize;
         if dirs.len() < cookie {
             return Err(ErrNo::Inval);
@@ -966,9 +1170,8 @@ impl FileSystem {
         self.check_right(&fd, Rights::FD_SEEK)?;
         let FdEntry { inode, offset, .. } = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?;
         let file_size = self
-            .inode_table
-            .get(inode)
-            .ok_or(ErrNo::NoEnt)?
+            .lock_inode_table()?
+            .get(inode)?
             .file_stat
             .file_size;
 
@@ -1039,8 +1242,8 @@ impl FileSystem {
         );
         self.check_right(&fd, Rights::PATH_CREATE_DIRECTORY)?;
         info!("call path_create_directory capability check passes");
-        let (parent_inode, parent_inode_entry) = self.get_inode_by_fd(&fd)?;
-        if !parent_inode_entry.is_dir() {
+        let parent_inode = self.get_inode_by_fd(&fd)?;
+        if !self.lock_inode_table()?.is_dir(&parent_inode) {
             return Err(ErrNo::NotDir);
         }
         // The path exists
@@ -1064,8 +1267,8 @@ impl FileSystem {
                     Component::Normal(p) => Ok(p),
                     _otherwise => Err(ErrNo::Inval),
                 }?;
-                let new_inode = self.new_inode()?;
-                self.add_dir(last, component_path, new_inode)?;
+                let new_inode = self.lock_inode_table()?.new_inode()?;
+                self.lock_inode_table()?.add_dir(last, component_path, new_inode)?;
                 // return the next inode, preparing for the next round.
                 Ok(new_inode)
             },
@@ -1087,11 +1290,10 @@ impl FileSystem {
         if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
-        let (inode, _) = self.get_inode_by_fd_path(&fd, path)?;
+        let inode = self.get_inode_by_fd_path(&fd, path)?;
         Ok(self
-            .inode_table
-            .get(&inode)
-            .ok_or(ErrNo::BadF)?
+            .lock_inode_table()?
+            .get(&inode)?
             .file_stat
             .clone())
     }
@@ -1116,8 +1318,9 @@ impl FileSystem {
             return Err(ErrNo::NotDir);
         }
 
-        let (inode, _) = self.get_inode_by_fd_path(&fd, path)?;
-        let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
+        let inode = self.get_inode_by_fd_path(&fd, path)?;
+        let mut inode_table = self.lock_inode_table()?;
+        let mut inode_impl = inode_table.get_mut(&inode)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
             inode_impl.file_stat.atime = current_time;
         } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
@@ -1155,17 +1358,21 @@ impl FileSystem {
         info!("call path_open, on behalf of fd {:?} and principal {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
             fd, principal, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
         // Read the parent inode.
-        let (parent_inode, parent_inode_entry) = self.get_inode_by_fd(&fd)?;
-        let mut absolute_path = parent_inode_entry.absolute_path(&self)?;
+        let parent_inode = self.get_inode_by_fd(&fd)?;
+        // NOTE: limit the lock space
+        let mut absolute_path = {
+            let inode_table = self.lock_inode_table()?;
+            inode_table.get(&parent_inode)?.absolute_path(&inode_table)?
+        };
         absolute_path.push(path.clone());
         // Manually convert to the canonicalize form.
         // NOTE that the canonicalize function call in pathbuf seems require some sys info.
         let absolute_path: PathBuf = absolute_path.iter().map(|c| c.clone()).collect();
         info!(
-            "call path_open on abs path {:?} and dir: {:?}",
-            absolute_path, parent_inode_entry.data
+            "call path_open on abs path {:?}",
+            absolute_path
         );
-        if !parent_inode_entry.is_dir() {
+        if !self.lock_inode_table()?.is_dir(&parent_inode) {
             return Err(ErrNo::NotDir);
         }
         // Read the right related to the principal.
@@ -1196,12 +1403,12 @@ impl FileSystem {
         );
         // Several oflags logic, inc. `create`, `excl` and `directory`.
         let inode = match self.get_inode_by_fd_path(&fd, path) {
-            Ok((inode, inode_entry)) => {
+            Ok(inode) => {
                 // If file exists and `excl` is set, return `Exist` error.
                 if oflags.contains(OpenFlags::EXCL) {
                     return Err(ErrNo::Exist);
                 }
-                if oflags.contains(OpenFlags::DIRECTORY) && !inode_entry.is_dir() {
+                if oflags.contains(OpenFlags::DIRECTORY) && !self.lock_inode_table()?.is_dir(&inode) {
                     return Err(ErrNo::NotDir);
                 }
                 inode
@@ -1215,8 +1422,8 @@ impl FileSystem {
                 if !principal_right.contains(Rights::PATH_CREATE_FILE) {
                     return Err(ErrNo::Access);
                 }
-                let new_inode = self.new_inode()?;
-                self.add_file(parent_inode, path, new_inode, &vec![])?;
+                let new_inode = self.lock_inode_table()?.new_inode()?;
+                self.lock_inode_table()?.add_file(parent_inode, path, new_inode, &vec![])?;
                 new_inode
             }
         };
@@ -1226,9 +1433,8 @@ impl FileSystem {
             if !principal_right.contains(Rights::PATH_FILESTAT_SET_SIZE) {
                 return Err(ErrNo::Access);
             }
-            self.inode_table
-                .get_mut(&inode)
-                .ok_or(ErrNo::NoEnt)?
+            self.lock_inode_table()?
+                .get_mut(&inode)?
                 .truncate_file()?;
         }
         let new_fd = self.new_fd()?;
@@ -1236,7 +1442,7 @@ impl FileSystem {
             file_type,
             file_size,
             ..
-        } = self.inode_table.get(&inode).ok_or(ErrNo::BadF)?.file_stat;
+        } = self.lock_inode_table()?.get(&inode)?.file_stat;
         let fd_stat = FdStat {
             file_type,
             flags,
@@ -1299,6 +1505,12 @@ impl FileSystem {
         self.check_right(&old_fd, Rights::PATH_RENAME_SOURCE)?;
         self.check_right(&new_fd, Rights::PATH_RENAME_TARGET)?;
         Err(ErrNo::NoSys)
+    }
+
+    /// Get random bytes.
+    #[inline]
+    pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemResult<Vec<u8>> {
+        getrandom_to_buffer(buf_len)
     }
 
     /// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
@@ -1409,7 +1621,7 @@ impl FileSystem {
             };
         // create the dir if necessary
         if let Some(parent_path) = file_name.parent() {
-            self.add_all_dir(Self::ROOT_DIRECTORY_INODE, parent_path)?;
+            self.lock_inode_table()?.add_all_dir(Self::ROOT_DIRECTORY_INODE, parent_path)?;
         }
         let fd = self.path_open(
             principal,
@@ -1490,13 +1702,18 @@ impl FileSystem {
         let path = path.as_ref();
         info!("read_all_files_by_filename: {:?}", path);
         // Convert the absolute path to relative path and then find the inode
-        let (_, inode_impl) = self.get_inode_by_inode_path(
+        let inode = self.lock_inode_table()?.get_inode_by_inode_path(
             &Self::ROOT_DIRECTORY_INODE,
             path.strip_prefix("/").unwrap_or(path).clone(),
-        )?;
+        )?.0;
         let mut rst = Vec::new();
-        if inode_impl.is_dir() {
-            for (_, sub_relative_path) in inode_impl.read_dir(&self)?.iter() {
+        if self.lock_inode_table()?.is_dir(&inode) {
+            // Limit the lock scope
+            let all_dir = {
+                let inode_table = self.lock_inode_table()?;
+                inode_table.get(&inode)?.read_dir(&inode_table)?
+            };
+            for (_, sub_relative_path) in all_dir.iter() {
                 let sub_relative_path =
                     PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
                 // Ignore the path for current and parent directories.
