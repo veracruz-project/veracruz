@@ -38,9 +38,8 @@ jobs:
       - name: Pack cache
         id: pack-cache
         run: |
-          cd /work/veracruz
-          tar -cvf veracruz.tar --exclude=./veracruz.tar .
-          mv veracruz.tar /
+          cd /
+          tar -cvf veracruz.tar -C /work/veracruz --exclude=./veracruz.tar --exclude-vcs --exclude-backups .
 
      # Update the repo and sdk artifact, using the action from github
       - name: Upload veracruz cache artifact
@@ -72,9 +71,7 @@ jobs:
         run: |
             cd /
             mkdir -p /work/veracruz
-            mv veracruz.tar /work/veracruz
-            cd /work/veracruz
-            tar -xvf veracruz.tar
+            tar -C /work/veracruz -xvf veracruz.tar
             rm veracruz.tar
       
       # Run the sgx test
@@ -108,9 +105,7 @@ jobs:
         run: |
             cd /
             mkdir -p /work/veracruz
-            mv veracruz.tar /work/veracruz
-            cd /work/veracruz
-            tar -xvf veracruz.tar
+            tar -C /work/veracruz -xvf veracruz.tar
             rm veracruz.tar
       
       - name: Running trustzone test script
