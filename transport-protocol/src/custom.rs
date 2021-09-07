@@ -171,11 +171,11 @@ pub fn serialize_quote(quote: &sgx_types::sgx_quote_t) -> transport_protocol::Sg
 
 /// Serialize a program binary.
 pub fn serialize_program(program_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
-    let mut program = transport_protocol::Program::new();
+    let mut program = transport_protocol::Data::new();
+    program.set_data(program_buffer.to_vec());
     program.set_file_name(file_name.to_string());
-    program.set_code(program_buffer.to_vec());
     let mut abs = transport_protocol::RuntimeManagerRequest::new();
-    abs.set_program(program);
+    abs.set_write_file(program);
 
     Ok(abs.write_to_bytes()?)
 }
@@ -186,18 +186,19 @@ pub fn serialize_program_data(data_buffer: &[u8], file_name: &str) -> TransportP
     data.set_data(data_buffer.to_vec());
     data.set_file_name(file_name.to_string());
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
-    transport_protocol.set_data(data);
+    transport_protocol.set_write_file(data);
 
     Ok(transport_protocol.write_to_bytes()?)
 }
 
-/// Serialize the request for querying enclave state.
-pub fn serialize_request_enclave_state() -> TransportProtocolResult {
-    let command = transport_protocol::RequestState::new();
-    let mut request = transport_protocol::RuntimeManagerRequest::new();
-    request.set_request_state(command);
+/// Serialize a (static) data package and its package ID.
+pub fn serialize_read_file(file_name: &str) -> TransportProtocolResult {
+    let mut data = transport_protocol::Read::new();
+    data.set_file_name(file_name.to_string());
+    let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
+    transport_protocol.set_read_file(data);
 
-    Ok(request.write_to_bytes()?)
+    Ok(transport_protocol.write_to_bytes()?)
 }
 
 /// Serialize a stream data package and its package ID.
@@ -206,7 +207,7 @@ pub fn serialize_stream(data_buffer: &[u8], file_name: &str) -> TransportProtoco
     data.set_data(data_buffer.to_vec());
     data.set_file_name(file_name.to_string());
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
-    transport_protocol.set_stream(data);
+    transport_protocol.set_append_file(data);
 
     Ok(transport_protocol.write_to_bytes()?)
 }
@@ -235,15 +236,6 @@ pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> Transp
     rpat.set_challenge(challenge.to_vec());
     let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_proxy_psa_attestation_token(rpat);
-
-    Ok(request.write_to_bytes()?)
-}
-
-/// Serialize the request for signalling the next round of computation.
-pub fn serialize_request_next_round() -> TransportProtocolResult {
-    let command = transport_protocol::RequestNextRound::new();
-    let mut request = transport_protocol::RuntimeManagerRequest::new();
-    request.set_request_next_round(command);
 
     Ok(request.write_to_bytes()?)
 }

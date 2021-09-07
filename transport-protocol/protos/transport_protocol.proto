@@ -94,6 +94,10 @@ message Data {
   bytes data = 2;
 }
 
+message Read {
+  string file_name = 1;
+}
+
 message SgxAttestationInit {
   bytes public_key = 1;
   int32 device_id = 2;
@@ -230,17 +234,16 @@ message ProxyAttestationServerResponse {
 
 message RuntimeManagerRequest {
   oneof message_oneof {
-    Data data = 2;
-    Program program = 3;
+    Data write_file = 2;
+    Data append_file = 3;
     RequestPiHash request_pi_hash = 4;
     RequestResult request_result = 5;
     RequestProxyPsaAttestationToken request_proxy_psa_attestation_token = 6;
-    RequestState request_state = 7;
+    Data append = 7;
     RequestShutdown request_shutdown = 8;
     PsaAttestationInit psa_attestation_init = 9;
     RequestPolicyHash request_policy_hash = 10;
-    Data stream = 11;
-    RequestNextRound request_next_round = 12;
+    Read read_file = 11;
   }
   uint32 context = 1;
 }

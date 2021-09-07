@@ -329,6 +329,7 @@ mod tests {
                     .as_str(),
             )],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -351,6 +352,7 @@ mod tests {
             ),
             &[],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -365,6 +367,7 @@ mod tests {
             None,
             &[],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -385,6 +388,7 @@ mod tests {
             ),
             &[],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -405,6 +409,7 @@ mod tests {
             ),
             &[],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -425,6 +430,7 @@ mod tests {
             ),
             &[],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -445,6 +451,7 @@ mod tests {
             ),
             &[],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -471,6 +478,7 @@ mod tests {
                     .as_str(),
             )],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -502,6 +510,7 @@ mod tests {
                     .as_str(),
             )],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -521,6 +530,7 @@ mod tests {
             ),
             &[],
             &[],
+            &["/output"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -568,6 +578,7 @@ mod tests {
                 ),
             ],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -605,6 +616,7 @@ mod tests {
                 ),
             ],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -636,6 +648,7 @@ mod tests {
                     .as_str(),
             )],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -674,6 +687,7 @@ mod tests {
                 ),
             ],
             &[],
+            &["/output"],
         )
         .unwrap();
     }
@@ -689,35 +703,11 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(NUMBER_STREM_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[(
-                "input-0",
-                data_dir(SINGLE_F64_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
-            &[
-                (
-                    "stream-0",
-                    data_dir(VEC_F64_1_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "stream-1",
-                    data_dir(VEC_F64_2_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-            ],
+            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
+            &[("input-0", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
+            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
+                            ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            &["/output"],
         )
         .unwrap();
     }
@@ -729,26 +719,10 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(NUMBER_STREM_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[(
-                "input-0",
-                data_dir(SINGLE_F64_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
-            &[(
-                "stream-0",
-                data_dir(VEC_F64_1_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
+            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
+            &[("input-0", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
+            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str())],
+            &["/output"],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -767,22 +741,9 @@ mod tests {
                     .as_str(),
             ),
             &[],
-            &[
-                (
-                    "stream-0",
-                    data_dir(VEC_F64_1_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "stream-1",
-                    data_dir(VEC_F64_2_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-            ],
+            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
+                            ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            &["/output"],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -824,6 +785,7 @@ mod tests {
                         .as_str(),
                 ),
             ],
+            &["/output"],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -834,26 +796,19 @@ mod tests {
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn test_performance_idash2017_with_attestation() {
-        iterate_over_data(
-            data_dir(LOGISTICS_REGRESSION_DATA_PATH).as_path(),
-            |data_path| {
-                info!("Data path: {}", data_path.to_string_lossy());
-                let result = test_template(
-                    policy_path(IDASH2017_POLICY).as_path(),
-                    trust_path(CLIENT_CERT).as_path(),
-                    trust_path(CLIENT_KEY).as_path(),
-                    Some(
-                        program_path(LOGISTICS_REGRESSION_WASM)
-                            .to_string_lossy()
-                            .into_owned()
-                            .as_str(),
-                    ),
-                    &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
-                    &[],
-                );
-                assert!(result.is_ok(), "error:{:?}", result);
-            },
-        );
+        iterate_over_data(data_dir(LOGISTICS_REGRESSION_DATA_PATH).as_path(), |data_path| {
+            info!("Data path: {}", data_path.to_string_lossy());
+            let result = test_template::<(Vec<f64>, f64, f64)>(
+                policy_path(IDASH2017_POLICY).as_path(),
+                trust_path(CLIENT_CERT).as_path(),
+                trust_path(CLIENT_KEY).as_path(),
+                Some(program_path(LOGISTICS_REGRESSION_WASM).to_string_lossy().into_owned().as_str()),
+                &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
+                &[],
+                &["/output"],
+            );
+            assert!(result.is_ok(), "error:{:?}", result);
+        });
     }
 
     #[test]
@@ -878,6 +833,7 @@ mod tests {
                 ),
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
+                &["/output"],
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -911,6 +867,7 @@ mod tests {
                 ),
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
+                &["/output"],
             );
             assert!(result.is_ok(), "error:{:?}", result);
         });
@@ -938,6 +895,7 @@ mod tests {
                 ),
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
+                &["/output"],
             );
 
             assert!(result.is_ok(), "error:{:?}", result);
@@ -959,6 +917,7 @@ mod tests {
         // Each element contains the package id (u64) and the path to the data
         data_id_paths: &[(&str, &str)],
         stream_id_paths: &[(&str, &str)],
+        output_files: &[&str],
     ) -> Result<(), VeracruzServerError> {
         info!("### Step 0.  Initialise test configuration.");
         // initialise the pipe
@@ -1041,6 +1000,10 @@ mod tests {
         let stream_id_paths: Vec<_> = stream_id_paths
             .iter()
             .map(|(number, path)| (number.to_string(), path.to_string()))
+            .collect();
+        let output_files: Vec<_> = output_files
+            .iter()
+            .map(|path| path.to_string())
             .collect();
 
         // This is a closure, containing instructions from clients.
@@ -1235,25 +1198,6 @@ mod tests {
                     );
                     let time_result = Instant::now();
                     info!("             Result retrievers request result.");
-                    // NOTE: Fetch result twice on purpose.
-                    client_tls_send(
-                        &client_tls_tx,
-                        &client_tls_rx,
-                        client_session_id,
-                        &mut client_session,
-                        ticket,
-                        &transport_protocol::serialize_request_result(program_file_name)?
-                            .as_slice(),
-                    )
-                    .and_then(|response| {
-                        // decode the result
-                        let response =
-                            transport_protocol::parse_runtime_manager_response(&response)?;
-                        let response = transport_protocol::parse_result(&response)?;
-                        response.ok_or(VeracruzServerError::MissingFieldError(
-                            "Result retrievers response",
-                        ))
-                    })?;
                     let response = client_tls_send(
                         &client_tls_tx,
                         &client_tls_rx,
@@ -1262,25 +1206,33 @@ mod tests {
                         ticket,
                         &transport_protocol::serialize_request_result(program_file_name)?
                             .as_slice(),
-                    )
-                    .and_then(|response| {
-                        // decode the result
+                    )?;
+                    info!(
+                        "             Computation result time (μs): {} with return code (undecoded) {:?}.",
+                        time_result.elapsed().as_micros(), response
+                    );
+
+                    info!("### Step 9.  Client read and decodes the result.");
+                    for remote_file_name in &output_files {
+                        info!("             Read {}.", remote_file_name);
+                        let response = read_file(
+                                client_session_id,
+                                &mut client_session,
+                                ticket,
+                                &client_tls_tx,
+                                &client_tls_rx,
+                                &remote_file_name,
+                            )?;
                         let response =
                             transport_protocol::parse_runtime_manager_response(&response)?;
                         let response = transport_protocol::parse_result(&response)?;
-                        response.ok_or(VeracruzServerError::MissingFieldError(
+                        let response = response.ok_or(VeracruzServerError::MissingFieldError(
                             "Result retrievers response",
-                        ))
-                    })?;
-                    info!(
-                        "             Computation result time (μs): {}.",
-                        time_result.elapsed().as_micros()
-                    );
-                    info!("### Step 9.  Client decodes the result.");
-                    info!(
-                        "             Client received {} bytes as result.",
-                        response.len()
-                    );
+                        ))?;
+                        let result: T = pinecone::from_bytes(&response.as_slice())?;
+                        info!("             Client received result: {:?},", result);
+                    }
+
                 }
                 info!("------------ Stream-Result-Next End  ------------");
             } else {
@@ -1313,25 +1265,32 @@ mod tests {
                     &mut client_session,
                     ticket,
                     &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
-                )
-                .and_then(|response| {
-                    // decode the result
-                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                )?;
+                info!(
+                    "             Computation result time (μs): {} with return code (undecoded) {:?}.",
+                    time_result.elapsed().as_micros(), response
+                );
+                info!("### Step 9.  Client read and decodes the result.");
+                for remote_file_name in &output_files {
+                    info!("             Read {}.", remote_file_name);
+                    let response = read_file(
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &client_tls_tx,
+                            &client_tls_rx,
+                            &remote_file_name,
+                        )?;
+                    let response =
+                        transport_protocol::parse_runtime_manager_response(&response)?;
                     let response = transport_protocol::parse_result(&response)?;
-                    response.ok_or(VeracruzServerError::MissingFieldError(
+                    let response = response.ok_or(VeracruzServerError::MissingFieldError(
                         "Result retrievers response",
-                    ))
-                })?;
-                info!(
-                    "             Computation result time (μs): {}.",
-                    time_result.elapsed().as_micros()
-                );
-                info!("### Step 9.  Client decodes the result.");
-                info!(
-                    "             Client received {} bytes as result.",
-                    response.len()
-                );
-            };
+                    ))?;
+                    let result: T = pinecone::from_bytes(&response.as_slice())?;
+                    info!("             Client received result: {:?},", result);
+                }
+            }
 
             info!("### Step 10. Client shuts down Veracruz.");
             let time_shutdown = Instant::now();
@@ -1681,6 +1640,26 @@ mod tests {
             client_session,
             ticket,
             &serialized_stream[..],
+        )
+    }
+
+    fn read_file(
+        client_session_id: u32,
+        client_session: &mut rustls::ClientSession,
+        ticket: u32,
+        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
+        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
+        remote_file_name: &str,
+    ) -> Result<Vec<u8>, VeracruzServerError> {
+        // The client also sends the associated data
+        let serialized_read = transport_protocol::serialize_read_file(remote_file_name)?;
+        client_tls_send(
+            client_tls_tx,
+            client_tls_rx,
+            client_session_id,
+            client_session,
+            ticket,
+            &serialized_read[..],
         )
     }
 

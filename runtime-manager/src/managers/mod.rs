@@ -50,8 +50,6 @@ lazy_static! {
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
-const OUTPUT_FILE: &'static str = "/output";
-
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,11 +66,6 @@ pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 /// Veracruz platform, containing information that must be persisted across the
 /// different rounds of the provisioning process and the fixed global policy.
 pub(crate) struct ProtocolState {
-    /// This flag indicates if new data or program is arrived since last execution.
-    /// It decides if it is necessary to run a program when result retriever requests reading
-    /// result.
-    /// TODO: more defined tracking, e.g. flag per available program in the policy?
-    is_modified: bool,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
     global_policy: Policy,
@@ -108,15 +101,7 @@ impl ProtocolState {
             expected_shutdown_sources,
             vfs,
             digest_table,
-            is_modified: true,
         })
-    }
-
-    /// Force re-execute the program even if there is no new data coming from participants.
-    #[inline]
-    pub fn reload(&mut self) -> Result<(), RuntimeManagerError> {
-        self.is_modified = true;
-        Ok(())
     }
 
     /// Returns the global policy associated with the protocol state.
@@ -154,8 +139,6 @@ impl ProtocolState {
                 }
             }
         }
-        // Set the modified flag
-        self.is_modified = true;
         self.vfs.lock()?.write_file_by_absolute_path(
             client_id,
             file_name,
@@ -185,7 +168,6 @@ impl ProtocolState {
         if self.digest_table.contains_key(file_name) {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
-        self.is_modified = true;
         self.vfs.lock()?.write_file_by_absolute_path(
             client_id,
             file_name,
@@ -232,24 +214,8 @@ impl ProtocolState {
         };
         let return_code = execute(&execution_strategy, self.vfs.clone(), file_name, options)?;
 
-        let response = if return_code == 0 {
-            let result = self.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
-            Self::response_success(result)
-        } else {
-            Self::response_error_code_returned(return_code)
-        };
-
-        self.is_modified = false;
+        let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))
-    }
-
-    #[inline]
-    fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
-        transport_protocol::serialize_result(
-            transport_protocol::ResponseStatus::SUCCESS as i32,
-            result,
-        )
-        .unwrap_or_else(|err| panic!(err))
     }
 
     #[inline]
@@ -259,11 +225,6 @@ impl ProtocolState {
             Some(error_code.to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!(err))
-    }
-
-    #[inline]
-    fn is_modified(&self) -> bool {
-        self.is_modified
     }
 }
 
