@@ -19,9 +19,9 @@ use sgx_trts::trts;
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
 /// random number source.  Uses the SGX trusted RTS library from the Rust SGX
 /// SDK to implement this.
-pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result {
+pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
     if let Ok(_) = trts::rsgx_read_rand(buffer) {
-        return result::Result::Success;
+        return result::Result::Success(());
     }
     result::Result::UnknownError
 }
