@@ -20,9 +20,9 @@
 
 //! Error codes describing the result of a platform service function.
 #[derive(Debug)]
-pub enum Result {
+pub enum Result<T> {
     /// The operation completed successfully.
-    Success,
+    Success(T),
     /// The operation is unavailable on this platform.
     Unavailable,
     /// An unknown error occurred during the execution of the operation.

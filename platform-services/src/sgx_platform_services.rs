@@ -25,3 +25,15 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result {
     }
     result::Result::UnknownError
 }
+
+/// Returns the clock resolution in nanoseconds.
+/// TODO: implement it
+pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
+    result::Result::Unavailable
+}
+
+/// Returns the clock time in nanoseconds.
+/// TODO: implement it
+pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
+    result::Result::Unavailable
+}

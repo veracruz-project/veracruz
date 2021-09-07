@@ -14,7 +14,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use platform_services::{getrandom, result};
+use platform_services::{getclockres, getclocktime, getrandom, result};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryInto},
@@ -334,20 +334,28 @@ impl FileSystem {
     // Operations on the filesystem. Rust style implementation of WASI API
     ////////////////////////////////////////////////////////////////////////////
 
-    /// The stub implementation of `clock_res_get`. Return unsupported error `NoSys`.
+    /// Get clock resolution from platform services. Return error `NoSys` in case of failure.
     #[inline]
-    pub(crate) fn clock_res_get(&self, _clock_id: ClockId) -> FileSystemResult<Timestamp> {
-        Err(ErrNo::NoSys)
+    pub(crate) fn clock_res_get(&self, clock_id: ClockId) -> FileSystemResult<Timestamp> {
+        let clock_id = u32::from(clock_id) as u8;
+        match getclockres(clock_id) {
+            result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
+            _ => Err(ErrNo::NoSys),
+        }
     }
 
-    /// The stub implementation of `clock_time_get`. Return unsupported error `NoSys`.
+    /// Get clock time from platform services. Return error `NoSys` in case of failure.
     #[inline]
     pub(crate) fn clock_time_get(
         &self,
-        _clock_id: ClockId,
+        clock_id: ClockId,
         _precision: Timestamp,
     ) -> FileSystemResult<Timestamp> {
-        Err(ErrNo::NoSys)
+        let clock_id = u32::from(clock_id) as u8;
+        match getclocktime(clock_id) {
+            result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
+            _ => Err(ErrNo::NoSys),
+        }
     }
 
     /// Allows the programmer to declare how they intend to use various parts of
@@ -912,7 +920,7 @@ impl FileSystem {
     #[inline]
     pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemResult<Vec<u8>> {
         let mut buf = vec![0; buf_len as usize];
-        if let result::Result::Success = getrandom(&mut buf) {
+        if let result::Result::Success(_) = getrandom(&mut buf) {
             Ok(buf)
         } else {
             Err(ErrNo::NoSys)
