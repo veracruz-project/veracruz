@@ -2,6 +2,8 @@
 //!
 //! Implements the `getrandom` platform service using the Rust `getrandom::getrandom()`
 //! function.
+//! Implements the `getclockres` and `getclocktime` platform services using
+//! functions provided by `nix::time`.
 //!
 //! ## Authors
 //!
