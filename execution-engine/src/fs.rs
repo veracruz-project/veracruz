@@ -370,11 +370,6 @@ impl InodeTable {
         Ok(rst)
     }
 
-    fn install_new_rights_table(&mut self, rights_table: RightsTable)  -> FileSystemResult<()> {
-        self.rights_table = rights_table;
-        Ok(())
-    }
-
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
     fn install_standard_streams_inode(
         &mut self,
@@ -671,9 +666,8 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////////
     // Creating filesystems.
     ////////////////////////////////////////////////////////////////////////////
-    //// TODO FIRST_FD???
-    /// The root directory file descriptor. It will be pre-opened for any wasm program.
-    pub const ROOT_DIRECTORY_FD: Fd = Fd(3);
+    /// The first file descriptor. It will be pre-opened for any wasm program.
+    pub const FIRST_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
     pub const DEFAULT_RIGHTS: Rights = Rights::all();
 
@@ -753,12 +747,6 @@ impl FileSystem {
         }
     }
 
-    /// install a new rights table for the file system. This function should only be called INSIDE
-    /// this crate.
-    pub(crate) fn install_new_rights_table(&mut self, rights_table: RightsTable) -> FileSystemResult<()> {
-        self.lock_inode_table()?.install_new_rights_table(rights_table)
-    }
-
     ////////////////////////////////////////////////////////////////////////
     // Internal auxiliary methods
     ////////////////////////////////////////////////////////////////////////
@@ -781,25 +769,17 @@ impl FileSystem {
             // Base rights are ignored and replaced with the default rights
 
             let (rights, fd_number, inode_number) = match std_stream {
-                // TODO USE RANDOM INODE
                 StandardStream::Stdin(file_rights) => (file_rights.rights(), 0, self.lock_inode_table()?.stdin()),
                 StandardStream::Stdout(file_rights) => (file_rights.rights(), 1, self.lock_inode_table()?.stdout()),
                 StandardStream::Stderr(file_rights) => (file_rights.rights(), 2, self.lock_inode_table()?.stderr()),
             };
-            //self.lock_inode_table()?
-                //.add_file(
-                //Self::ROOT_DIRECTORY_INODE,
-                //&path,
-                //Inode(inode_number),
-                //"".as_bytes(),
-            //)?;
+            let rights = Rights::from_bits(*rights as u64).ok_or(ErrNo::Inval)?;
             self.install_fd(
                 Fd(fd_number),
                 FileType::RegularFile,
                 inode_number,
-                //TODO use the actual rights
-                &Self::DEFAULT_RIGHTS,
-                &Self::DEFAULT_RIGHTS,
+                &rights,
+                &rights,
             );
         }
         Ok(())
@@ -811,26 +791,6 @@ impl FileSystem {
         &mut self,
         rights_table: &HashMap<T, Rights>,
     ) -> FileSystemResult<()> {
-        // Install ROOT_DIRECTORY_FD is the first FD prestat will open.
-        // TODO move to inode_table ??
-        //self.lock_inode_table()?
-        //.add_dir(
-            //Self::ROOT_DIRECTORY_INODE,
-            //Path::new(Self::ROOT_DIRECTORY),
-            //Self::ROOT_DIRECTORY_INODE,
-        //)?;
-        // TODO we no longer need this ?
-        self.install_fd(
-            Self::ROOT_DIRECTORY_FD,
-            FileType::Directory,
-            InodeTable::ROOT_DIRECTORY_INODE,
-            &Self::DEFAULT_RIGHTS,
-            &Self::DEFAULT_RIGHTS,
-        );
-        // TODO we no longer need this ?
-        self.prestat_table
-            .insert(Self::ROOT_DIRECTORY_FD, PathBuf::from(InodeTable::ROOT_DIRECTORY));
-        
         // contrusct the rights for stdin stdout and stderr.
         let std_streams_table = rights_table.iter().filter_map(|(k,v)|{
             let file : &Path = k.as_ref();
@@ -857,8 +817,8 @@ impl FileSystem {
         // Pre open the standard streams.
         self.install_standard_streams_fd(&std_streams_table)?;
 
-        // TODO: REMOVE ??? Assume the ROOT_DIRECTORY_FD is the first FD prestat will open.
-        let root_fd_number = Self::ROOT_DIRECTORY_FD.0;
+        // TODO: REMOVE ??? Assume the FIRST_FD is the first FD prestat will open.
+        let first_fd = Self::FIRST_FD.0;
         //let root_inode_number = InodeTable::ROOT_DIRECTORY_INODE.0;
 
         // Load all pre-opened directories. Create directories if necessary.
@@ -868,9 +828,7 @@ impl FileSystem {
             && k != Path::new("stdout")
             && k != Path::new("stderr")
         }).enumerate() {
-            //Inode(index as u64 + root_inode_number + 1);
-            // TODO CHANGE TO NOT +1
-            let new_fd = Fd(index as u32 + root_fd_number + 1);
+            let new_fd = Fd(index as u32 + first_fd);
             let path = path.as_ref();
             // strip off the root
             let relative_path = path.strip_prefix("/").unwrap_or(path).clone();
@@ -1372,10 +1330,6 @@ impl FileSystem {
     ) -> FileSystemResult<FileStat> {
         let path = path.as_ref();
         self.check_right(&fd, Rights::PATH_FILESTAT_GET)?;
-        // ONLY allow search on the root for now.
-        if fd != Self::ROOT_DIRECTORY_FD {
-            return Err(ErrNo::NotDir);
-        }
         let inode = self.get_inode_by_fd_path(&fd, path)?;
         Ok(self
             .lock_inode_table()?
@@ -1399,10 +1353,7 @@ impl FileSystem {
     ) -> FileSystemResult<()> {
         let path = path.as_ref();
         self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
-        // ONLY allow search on the root for now.
-        if fd != Self::ROOT_DIRECTORY_FD {
-            return Err(ErrNo::NotDir);
-        }
+        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
 
         let inode = self.get_inode_by_fd_path(&fd, path)?;
         let mut inode_table = self.lock_inode_table()?;
@@ -1430,7 +1381,6 @@ impl FileSystem {
     /// * if `DIRECTORY` is set, `path_open` fails if the path is not a directory.
     pub(crate) fn path_open<T: AsRef<Path>>(
         &mut self,
-        principal: &Principal,
         // The parent fd for searching
         fd: Fd,
         dirflags: LookupFlags,
@@ -1441,8 +1391,10 @@ impl FileSystem {
         flags: FdFlags,
     ) -> FileSystemResult<Fd> {
         let path = path.as_ref();
-        info!("call path_open, on behalf of fd {:?} and principal {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
-            fd, principal, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
+        info!("call path_open, on fd {:?}, dirflag {:?}, path {:?} with open_flag {:?}, right_base {:?}, rights_inheriting {:?} and fd_flag {:?}",
+            fd, dirflags.bits(), path, oflags, rights_base, rights_inheriting, flags);
+        // Check the right of the program on path_open
+        self.check_right(&fd, Rights::PATH_OPEN)?;
         // Read the parent inode.
         let parent_inode = self.get_inode_by_fd(&fd)?;
         // NOTE: limit the lock space
@@ -1461,14 +1413,6 @@ impl FileSystem {
         if !self.lock_inode_table()?.is_dir(&parent_inode) {
             return Err(ErrNo::NotDir);
         }
-        // Read the right related to the principal.
-        // NOTE: A correct and better way to control capability is to
-        // separate the Fd space of of different participants.
-        let principal_right = if *principal != Principal::InternalSuperUser {
-            self.get_right(&principal, absolute_path.as_path())?
-        } else {
-            Rights::all()
-        };
         // Intersect with the inheriting right from `fd`
         let fd_inheriting = self
             .fd_table
@@ -1476,13 +1420,8 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?
             .fd_stat
             .rights_inheriting;
-        let principal_right = principal_right & fd_inheriting;
-        // Check the right of the program on path_open
-        if !principal_right.contains(Rights::PATH_OPEN) {
-            return Err(ErrNo::Access);
-        }
-        let rights_base = rights_base & principal_right;
-        let rights_inheriting = rights_inheriting & principal_right;
+        let rights_base = rights_base & fd_inheriting;
+        let rights_inheriting = rights_inheriting & fd_inheriting;
         info!(
             "call path_open, the actually right {:?} and inheriting right {:?}",
             rights_base, rights_inheriting
@@ -1506,9 +1445,7 @@ impl FileSystem {
                     return Err(e);
                 }
                 // Check the right of the program on create file
-                if !principal_right.contains(Rights::PATH_CREATE_FILE) {
-                    return Err(ErrNo::Access);
-                }
+                self.check_right(&fd, Rights::PATH_CREATE_FILE)?;
                 let new_inode = self.lock_inode_table()?.new_inode()?;
                 self.lock_inode_table()?.add_file(parent_inode, path, new_inode, &vec![])?;
                 new_inode
@@ -1517,9 +1454,7 @@ impl FileSystem {
         // Truncate the file if `trunc` flag is set.
         if oflags.contains(OpenFlags::TRUNC) {
             // Check the right of the program on truacate
-            if !principal_right.contains(Rights::PATH_FILESTAT_SET_SIZE) {
-                return Err(ErrNo::Access);
-            }
+            self.check_right(&fd, Rights::PATH_FILESTAT_SET_SIZE)?;
             self.lock_inode_table()?
                 .get_mut(&inode)?
                 .truncate_file()?;
@@ -1558,10 +1493,6 @@ impl FileSystem {
         _path: T,
     ) -> FileSystemResult<Vec<u8>> {
         self.check_right(&fd, Rights::PATH_READLINK)?;
-        // ONLY allow search on the root for now.
-        if fd != Self::ROOT_DIRECTORY_FD {
-            return Err(ErrNo::NotDir);
-        }
         Err(ErrNo::NoSys)
     }
 
@@ -1573,10 +1504,6 @@ impl FileSystem {
         _path: T,
     ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::PATH_REMOVE_DIRECTORY)?;
-        // ONLY allow search on the root for now.
-        if fd != Self::ROOT_DIRECTORY_FD {
-            return Err(ErrNo::NotDir);
-        }
         Err(ErrNo::NoSys)
     }
 
@@ -1684,35 +1611,47 @@ impl FileSystem {
     // It will be used by the veracruz runtime.
     ////////////////////////////////////////////////////////////////////////
 
+    /// Return an appropriate prestat fd for the path
+    fn find_prestat<T: AsRef<Path>>(&self, path: T) -> Result<(Fd,PathBuf), ErrNo> {
+        let path = path.as_ref();
+        let (fd, parent_path) = path.ancestors().find_map(|parent_path|{
+            self.prestat_table.iter().find_map(|(prestat_fd, prestat_path)|{
+                if prestat_path == parent_path {
+                    Some((prestat_fd.clone(), parent_path))
+                } else {
+                    None
+                }
+            })
+        }).ok_or(ErrNo::Access)?;
+
+        let path = path
+            .strip_prefix(parent_path)
+            .map_err(|_| ErrNo::Inval)?;
+        Ok((fd,path.to_path_buf()))
+    }
+
     /// Write to a file on path `file_name`. If `is_append` is set, `data` will be append to `file_name`.
     /// Otherwise this file will be truncated. The `principal` must have the right on `path_open`,
     /// `fd_write` and `fd_seek`.
     pub fn write_file_by_absolute_path<T: AsRef<Path>>(
         &mut self,
-        principal: &Principal,
         file_name: T,
         data: &[u8],
         is_append: bool,
     ) -> Result<(), ErrNo> {
         let file_name = file_name.as_ref();
-        let file_name = file_name
-            .strip_prefix("/")
-            .unwrap_or(file_name)
-            .clone();
         info!("write_file_by_filename: {:?}", file_name);
+        let (fd, file_name) = self.find_prestat(file_name)?;
+
+        info!("write_file_by_absolute_path relative path {:?}", file_name);
         let oflag = OpenFlags::CREATE
             | if !is_append {
                 OpenFlags::TRUNC
             } else {
                 OpenFlags::empty()
             };
-        // create the dir if necessary
-        if let Some(parent_path) = file_name.parent() {
-            self.lock_inode_table()?.add_all_dir(InodeTable::ROOT_DIRECTORY_INODE, parent_path)?;
-        }
         let fd = self.path_open(
-            principal,
-            FileSystem::ROOT_DIRECTORY_FD,
+            fd,
             LookupFlags::empty(),
             file_name,
             oflag,
@@ -1743,18 +1682,13 @@ impl FileSystem {
     /// `fd_read` and `fd_seek`.
     pub fn read_file_by_absolute_path<T: AsRef<Path>>(
         &mut self,
-        principal: &Principal,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
         let file_name = file_name.as_ref();
-        let file_name = file_name
-            .strip_prefix("/")
-            .unwrap_or(file_name)
-            .clone();
-        info!("read_file_by_absolute_path: {:?}", file_name);
+        info!("read_file_by_filename: {:?}", file_name);
+        let (fd, file_name) = self.find_prestat(file_name)?;
         let fd = self.path_open(
-            principal,
-            FileSystem::ROOT_DIRECTORY_FD,
+            fd,
             LookupFlags::empty(),
             file_name,
             OpenFlags::empty(),
@@ -1783,7 +1717,6 @@ impl FileSystem {
     /// `fd_read` and `fd_seek`.
     pub fn read_all_files_by_absolute_path<T: AsRef<Path>>(
         &mut self,
-        principal: &Principal,
         path: T,
     ) -> Result<Vec<(PathBuf, Vec<u8>)>, ErrNo> {
         let path = path.as_ref();
@@ -1810,40 +1743,15 @@ impl FileSystem {
                     let mut sub_absolute_path = path.to_path_buf();
                     sub_absolute_path.push(sub_relative_path);
                     rst.append(
-                        &mut self.read_all_files_by_absolute_path(principal, sub_absolute_path)?,
+                        &mut self.read_all_files_by_absolute_path(sub_absolute_path)?,
                     );
                 }
             }
         } else {
-            let buf = self.read_file_by_absolute_path(principal, path)?;
+            let buf = self.read_file_by_absolute_path(path)?;
             rst.push((path.to_path_buf(), buf));
         }
 
         Ok(rst)
-    }
-
-    //TODO REMOVE
-    /// Get the maximum right associated to the principal on the file
-    fn get_right<T: AsRef<Path>>(
-        &self,
-        principal: &Principal,
-        file_name: T,
-    ) -> FileSystemResult<Rights> {
-        let file_name = file_name.as_ref();
-        let rights_table = self.lock_inode_table()?;
-        let principal_rights_table = rights_table.get_rights(principal)?;
-        for ancestor in file_name.ancestors() {
-            if let Some(o) = principal_rights_table.get(ancestor) {
-                return Ok(o.clone());
-            }
-        }
-        Err(ErrNo::Access)
-    }
-
-
-    /// Return the type of the inode pointed by `fd`
-    fn get_inode_type(&self, fd: &Fd) -> FileSystemResult<FileType>{
-        let inode = self.get_inode_by_fd(fd)?;
-        Ok(self.lock_inode_table()?.get(&inode)?.file_stat.file_type)
     }
 }

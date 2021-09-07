@@ -18,8 +18,6 @@ use crate::{
     Options,
 };
 use num::FromPrimitive;
-use policy_utils::principal::Principal;
-use std::sync::{Arc, Mutex};
 use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{

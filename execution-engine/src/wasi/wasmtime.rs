@@ -18,8 +18,7 @@ use crate::{
     Options,
 };
 use lazy_static::lazy_static;
-use policy_utils::principal::Principal;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::{convert::TryFrom, vec::Vec};
 use wasi_types::ErrNo;
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};

@@ -106,9 +106,9 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             Arg::with_name("input")
                 .short("i")
                 .long("input-source")
-                .value_name("FILES OR DIRECTORIES")
+                .value_name("DIRECTORIES")
                 .help(
-                    "Space-separated paths to the input data source files or directories on disk.",
+                    "Space-separated paths to the input directories on disk. The directories are copied into the root directory in Veracruz space. The program is granted with read capabilities.",
                 )
                 .multiple(true),
         )
@@ -116,8 +116,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             Arg::with_name("output")
                 .short("o")
                 .long("output-source")
-                .value_name("FILES")
-                .help("Space-separated paths to the output data source files on disk.")
+                .value_name("DIRECTORIES")
+                .help("Space-separated paths to the output directories. The directories are copied into disk on the host. The program is granted with write capabilities.")
                 .multiple(true),
         )
         .arg(
@@ -125,7 +125,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("p")
                 .long("program")
                 .value_name("FILE")
-                .help("Path to the WASM binary on disk.")
+                .help("Path to the WASM binary to be executed.")
                 .multiple(false)
                 .required(true),
         )
@@ -271,31 +271,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     })
 }
 
-/// Reads a WASM file from disk (actually, will read any file, but we only need
-/// it for WASM here) and return a collection of bytes corresponding to that
-/// file.  Will abort the program if anything goes wrong.
-fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
-    info!("Opening file '{}' for reading.", file_path);
-
-    let mut file = File::open(file_path)?;
-    let mut contents = Vec::new();
-
-    file.read_to_end(&mut contents)?;
-
-    Ok((
-        Path::new(file_path)
-            .file_name()
-            .ok_or(format!("Failed to obtain file name on {}", file_path))?
-            .to_str()
-            .ok_or(format!(
-                "Failed to convert file name to string on {}",
-                file_path
-            ))?
-            .to_string(),
-        contents,
-    ))
-}
-
 /// Loads the specified data sources, as provided on the command line, for
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
@@ -321,13 +296,10 @@ fn load_input_source<T: AsRef<Path>>(
         file.read_to_end(&mut buffer)?;
 
         vfs.write_file_by_absolute_path(
-                &Principal::InternalSuperUser,
                 &Path::new("/").join(file_path),
                 &buffer,
                 false,
             )?;
-
-        info!("Loading '{:?}' into vfs.", file);
     } else if file_path.is_dir() {
         for dir in file_path.read_dir()? {
             load_input_source(&dir?.path(), vfs)?;
@@ -346,8 +318,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
-    let (prog_file_name, program) = load_file(&cmdline.binary)?;
-    let prog_file_abs_path = Path::new("/").join(prog_file_name.clone());
+    let program_path = &cmdline.binary;
+    let prog_file_abs_path = Path::new("/").join(program_path.clone());
 
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
@@ -374,15 +346,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         )),
     ];
 
-    // Manually create the Right table for the VFS.
-    // Add read and readdir permissions to root dir
-    file_table.insert(
-        Path::new("/").to_path_buf(),
-        read_right | Rights::PATH_CREATE_DIRECTORY,
-    );
-    // Add read permission to program
-    file_table.insert(prog_file_abs_path.clone(), read_right);
-    // Add read permission to input file
     for file_path in cmdline.input_sources.iter() {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), read_right);
@@ -416,18 +379,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut vfs = FileSystem::new(
         right_table,
     )?;
-    vfs.write_file_by_absolute_path(
-            &Principal::InternalSuperUser,
-            &prog_file_abs_path,
-            &program,
-            false,
-        )?;
-    info!("WASM program {} loaded into VFS.", prog_file_name);
 
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
     info!("Data sources loaded.");
 
-    info!("Invoking main.");
+    info!("Invoking main on {:?}.", prog_file_abs_path);
     let main_time = Instant::now();
     let options = Options {
         environment_variables: cmdline.environment_variables,
@@ -478,7 +434,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     for file_path in cmdline.output_sources.iter() {
         for (output_path, buf) in vfs
             .read_all_files_by_absolute_path(
-                &Principal::InternalSuperUser,
                 Path::new("/").join(file_path),
             )?
             .iter()

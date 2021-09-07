@@ -39,8 +39,6 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-use policy_utils::principal::ExecutionStrategy;
-use std::sync::Mutex;
 use std::{boxed::Box, string::ToString};
 
 pub struct Options {

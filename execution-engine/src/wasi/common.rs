@@ -26,7 +26,6 @@ use platform_services::{getclockres, getclocktime, getrandom, result};
 use policy_utils::principal::Principal;
 use log::info;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
     convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
 };
@@ -366,8 +365,6 @@ pub struct WasiWrapper {
     /// The array of program arguments that have been passed to this program,
     /// again from the global policy file.
     pub program_arguments: Vec<String>,
-    /// The principal that accesses the filesystem. This information is used in path_open.
-    principal: Principal,
     /// The exit code, if program calls proc_exit.
     exit_code: Option<u32>,
     /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.
@@ -395,7 +392,6 @@ impl WasiWrapper {
             filesystem,
             environment_variables: Vec::new(),
             program_arguments: Vec::new(),
-            principal,
             exit_code: None,
         })
     }
@@ -409,7 +405,7 @@ impl WasiWrapper {
     pub(crate) fn read_file_by_filename(&mut self, file_name: &str) -> FileSystemResult<Vec<u8>> {
         //let mut fs = self.filesystem.lock().map_err(|_| ErrNo::Busy)?;
         //fs.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
-        self.filesystem.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
+        self.filesystem.read_file_by_absolute_path(file_name)
     }
 
     /// Return the exit code from `proc_exit` call.
@@ -974,7 +970,6 @@ impl WasiWrapper {
         let fd_flags: FdFlags = Self::decode_wasi_arg(fd_flags)?;
         
         let new_fd = self.filesystem.path_open(
-            &self.principal,
             fd,
             dir_flags,
             &path,
