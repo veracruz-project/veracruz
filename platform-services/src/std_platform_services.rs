@@ -24,8 +24,6 @@ use nix::{
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the random number
 /// source provided by the host operating system, as provided by `getrandom`.
-///
-/// This is for use with "freestanding-execution-engine".
 pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
     if let Ok(_) = getrandom::getrandom(buffer) {
         return result::Result::Success(());
@@ -34,8 +32,6 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
 }
 
 /// Returns the clock resolution in nanoseconds.
-///
-/// This is for use with "freestanding-execution-engine".
 pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
     let clock_id = time::ClockId::from_raw(clock_id.into());
     let timespec = match time::clock_getres(clock_id) {
@@ -52,8 +48,6 @@ pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
 }
 
 /// Returns the clock time in nanoseconds.
-///
-/// This is for use with "freestanding-execution-engine".
 pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
     let clock_id = time::ClockId::from_raw(clock_id.into());
     let timespec = match time::clock_gettime(clock_id) {
