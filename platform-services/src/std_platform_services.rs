@@ -38,13 +38,7 @@ pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
         Ok(t) => t,
         Err(_) => return result::Result::Unavailable,
     };
-
-    // Catch overflow
-    if timespec.tv_sec() == 0 {
-        result::Result::UnknownError
-    } else {
-        result::Result::Success(timespec.num_nanoseconds() as u64)
-    }
+    result::Result::Success(timespec.num_nanoseconds() as u64)
 }
 
 /// Returns the clock time in nanoseconds.
