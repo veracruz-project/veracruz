@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
  
-.PHONY: all sdk sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
+.PHONY: all sdk setup-githooks sgx-veracruz-client-test trustzone-veracruz-client-test nitro-veracruz-client-test sgx trustzone sgx-veracruz-server-test sgx-veracruz-server-performance sgx-veracruz-test sgx-psa-attestation tz-psa-attestationtrustzone-veracruz-server-test-setting  trustzone-veracruz-test-setting trustzone-env sgx-env trustzone-test-env clean clean-cargo-lock fmt 
 
  
 WARNING_COLOR := "\e[1;33m"
@@ -26,6 +26,10 @@ BIN_DIR ?= /usr/local/cargo/bin
  
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
+
+setup-githooks:
+	rustup component add rustfmt
+	git config core.hooksPath githooks
 
 # Build all of the SDK and examples
 sdk:

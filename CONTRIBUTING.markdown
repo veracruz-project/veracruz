@@ -53,7 +53,11 @@ into the main Veracruz codebase by issuing a pull request through Github.
 Before submitting any pull request, please ensure that:
 1. You have run `cargo fmt` on any changes.  A project-wide `cargo fmt`
    can be executed by building the `fmt` target in the main project
-   Makefile.
+   Makefile.  A Git pre-commit hook is available in the `githooks`
+   directory can be used to automatically check Rust files are formatted
+   correctly before they are committed.  To enable this hook, run the
+   `make setup-githooks` command which will automatically install
+   `rustfmt`, if needed, and set the Git hooks directory to `githooks`.
 2. The new changes are clearly commented using `rustdoc` markup, for
    Rust code, or similar for whatever language your changes are written
    in.

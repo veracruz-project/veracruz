@@ -1,0 +1,39 @@
+#! /bin/bash
+#
+# A pre-commit Git hook.
+#
+# Currently checks the formatting of all Rust files staged for commit,
+# failing if any need to be reformatted using `rustfmt`.  Note that the
+# hook does not modify any file.
+#
+# Authors
+#
+# The Veracruz Development Team.
+#
+# Copyright and licensing
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz repository root
+# directory for copyright and licensing information.
+
+HAS_ISSUES=0
+
+echo "Checking code formatting of files staged for commit."
+
+for file in $(git diff --name-only --staged \*.rs); do
+    RUSTFMT="$(rustfmt --check --skip-children --unstable-features $file)"
+    if [ "$RUSTFMT" != "" ]; then
+        printf "[ERROR]: $file\n"
+        HAS_ISSUES=1
+    else
+        printf "[   OK]: $file\n"
+    fi
+done
+
+if [ $HAS_ISSUES -eq 0 ]; then
+    echo "Code formatting style is OK."
+    exit 0
+fi
+
+echo "There are formatting issues in all of the files marked with ERROR above (if any)."
+echo "First format your code with \`make fmt\` or call \`rustfmt\` manually before committing."
+exit 1
