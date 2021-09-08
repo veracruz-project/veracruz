@@ -64,10 +64,10 @@ const OUTPUT_FILE: &'static str = "output";
 
 /// The default dump status of `stdout`, if no alternative is provided on the
 /// command line.
-const DEFAULT_DUMP_STDOUT: bool = false;
+const DEFAULT_DUMP_STDOUT: &'static str = "false";
 /// The default dump status of `stderr`, if no alternative is provided on the
 /// command line.
-const DEFAULT_DUMP_STDERR: bool = false;
+const DEFAULT_DUMP_STDERR: &'static str = "false";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -91,9 +91,6 @@ struct CommandLineOptions {
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
-
-    let default_dump_stdout = DEFAULT_DUMP_STDOUT.to_string();
-    let default_dump_stderr = DEFAULT_DUMP_STDERR.to_string();
 
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
@@ -124,49 +121,44 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .help(
                     "Selects the execution strategy to use: interpretation or JIT (defaults to \
                      interpretation).",
-                )
-                .required(false)
-                .multiple(false)
-                .default_value("jit"),
+                ),
         )
         .arg(
             Arg::with_name("dump-stdout")
                 .short("o")
                 .long("dump-stdout")
                 .help("Whether the contents of stdout should be dumped before exiting")
-                .required(true)
-                .value_name("BOOLEAN")
-                .default_value(&default_dump_stdout),
+                .value_name("BOOLEAN"),
         )
         .arg(
             Arg::with_name("dump-stderr")
                 .short("e")
                 .long("dump-stderr")
                 .help("Whether the contents of stderr should be dumped before exiting")
-                .required(true)
-                .value_name("BOOLEAN")
-                .default_value(&default_dump_stderr),
+                .value_name("BOOLEAN"),
         )
         .get_matches();
 
     info!("Parsed command line.");
 
-    let execution_strategy = if let Some(strategy) = matches.value_of("execution-strategy") {
-        if strategy == "interp" {
-            info!("Selecting interpretation as the execution strategy.");
-            ExecutionStrategy::Interpretation
-        } else if strategy == "jit" {
-            info!("Selecting JITting as the execution strategy.");
-            ExecutionStrategy::JIT
-        } else {
-            return Err(format!(
-                "Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",
-                strategy
-            )
-            .into());
+    let execution_strategy = {
+        let strategy = matches.value_of("execution-strategy").unwrap_or("jit");
+        match strategy {
+            "interp" => {
+                info!("Selecting interpretation as the execution strategy.");
+                ExecutionStrategy::Interpretation
+            }
+            "jit" => {
+                info!("Selecting JITting as the execution strategy.");
+                ExecutionStrategy::JIT
+            }
+            _ => {
+                return Err(format!(
+                    "Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",
+                    strategy
+                ).into());
+            }
         }
-    } else {
-        return Err("Default 'jit' value is not loaded correctly".into());
     };
 
     let binary = if let Some(binary) = matches.value_of("program") {
@@ -186,7 +178,9 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         Vec::new()
     };
 
-    let dump_stdout = if let Some(dump_stdout) = matches.value_of("dump-stdout") {
+    let dump_stdout = {
+        let dump_stdout = matches.value_of("dump-stdout")
+            .unwrap_or(DEFAULT_DUMP_STDOUT);
         if let Ok(dump_stdout) = bool::from_str(dump_stdout) {
             if dump_stdout { info!("stdout configured to be dumped before exiting."); }
             dump_stdout
@@ -194,11 +188,11 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             return Err(format!("Expecting a boolean, but found {}", dump_stdout)
             .into());
         }
-    } else {
-        return Err("Default 'dump-stdout' value is not loaded correctly".into());
     };
 
-    let dump_stderr = if let Some(dump_stderr) = matches.value_of("dump-stderr") {
+    let dump_stderr = {
+        let dump_stderr = matches.value_of("dump-stderr")
+            .unwrap_or(DEFAULT_DUMP_STDERR);
         if let Ok(dump_stderr) = bool::from_str(dump_stderr) {
             if dump_stderr { info!("stderr configured to be dumped before exiting."); }
             dump_stderr
@@ -206,8 +200,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             return Err(format!("Expecting a boolean, but found {}", dump_stderr)
             .into());
         }
-    } else {
-        return Err("Default 'dump-stderr' value is not loaded correctly".into());
     };
 
     Ok(CommandLineOptions {
