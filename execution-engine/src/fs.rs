@@ -920,7 +920,7 @@ impl FileSystem {
     #[inline]
     pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemResult<Vec<u8>> {
         let mut buf = vec![0; buf_len as usize];
-        if let result::Result::Success(_) = getrandom(&mut buf) {
+        if getrandom(&mut buf).is_success() {
             Ok(buf)
         } else {
             Err(ErrNo::NoSys)

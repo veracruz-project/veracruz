@@ -28,3 +28,12 @@ pub enum Result<T> {
     /// An unknown error occurred during the execution of the operation.
     UnknownError,
 }
+
+impl<T> Result<T> {
+    pub fn is_success(&self) -> bool {
+        match self {
+            Self::Success(_) => true,
+            _ => false,
+        }
+    }
+}
