@@ -402,34 +402,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("return code: {:?}", return_code);
     info!("time: {} micro seconds", main_time.elapsed().as_micros());
 
-    //TODO MODIFY
     // Dump contents of stdout
-    //if cmdline.dump_stdout {
-        //let buf = vfs
-            //.lock()
-            //.map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            //.read_file_by_absolute_path(&Principal::InternalSuperUser, "/stdout")?;
-        //let stdout_dump = std::str::from_utf8(&buf)
-            //.map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        //print!(
-            //"---- stdout dump ----\n{}---- stdout dump end ----\n",
-            //stdout_dump
-        //);
-    //}
+    if cmdline.dump_stdout {
+        let buf = vfs
+            .read_stdout()?;
+        let stdout_dump = std::str::from_utf8(&buf)
+            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        print!(
+            "---- stdout dump ----\n{}---- stdout dump end ----\n",
+            stdout_dump
+        );
+    }
 
-    //// Dump contents of stderr
-    //if cmdline.dump_stderr {
-        //let buf = vfs
-            //.lock()
-            //.map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            //.read_file_by_absolute_path(&Principal::InternalSuperUser, "/stderr")?;
-        //let stderr_dump = std::str::from_utf8(&buf)
-            //.map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        //eprint!(
-            //"---- stderr dump ----\n{}---- stderr dump end ----\n",
-            //stderr_dump
-        //);
-    //}
+    // Dump contents of stderr
+    if cmdline.dump_stderr {
+        let buf = vfs
+            .read_stderr()?;
+        let stderr_dump = std::str::from_utf8(&buf)
+            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        eprint!(
+            "---- stderr dump ----\n{}---- stderr dump end ----\n",
+            stderr_dump
+        );
+    }
 
     for file_path in cmdline.output_sources.iter() {
         for (output_path, buf) in vfs

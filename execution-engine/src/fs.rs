@@ -162,6 +162,12 @@ impl InodeEntry {
     pub(self) fn read_dir(&self, inode_table: &InodeTable) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
         self.data.read_dir(inode_table)
     }
+
+    /// Return the number of the bytes, if it is a file,
+    /// or the number of inodes, if it it is a directory.
+    pub(self) fn len(&self) -> FileSystemResult<FileSize> {
+        self.data.len()
+    }
 }
 
 /// The actual data of an inode, either a file or a directory.
@@ -1141,7 +1147,7 @@ impl FileSystem {
         offset: FileSize,
     ) -> FileSystemResult<Size> {
         info!(
-            "call fd_pread: fd {:?}, buffer_len {}, offset {}",
+            "call fd_pwrite: fd {:?}, buffer_len {}, offset {}",
             fd,
             buf.len(),
             offset
@@ -1753,5 +1759,24 @@ impl FileSystem {
         }
 
         Ok(rst)
+    }
+
+    pub fn write_stdin(&mut self, buf: &[u8])  -> FileSystemResult<Size> {
+        self.fd_write(Fd(0), buf)
+    }
+
+    pub fn read_stdout(&mut self) -> FileSystemResult<Vec<u8>>  {
+        self.read_std_stream(Fd(1))
+    }
+
+    pub fn read_stderr(&mut self) -> FileSystemResult<Vec<u8>>  {
+        self.read_std_stream(Fd(2))
+    }
+
+    fn read_std_stream(&mut self, fd: Fd) -> FileSystemResult<Vec<u8>> {
+        // read the length of a stream
+        let inode = self.get_inode_by_fd(&fd)?;
+        let len = self.lock_inode_table()?.get(&inode)?.len()?;
+        self.fd_read(fd, len as usize)
     }
 }
