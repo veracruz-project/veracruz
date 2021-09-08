@@ -78,6 +78,7 @@ pub fn getrandom(buffer: &mut [u8]) -> result::Result<()> {
 ///     - `result::Result::Unavailable` if the specified clock is not available
 ///       on this platform.
 ///     - `result::Result::UnknownError` if a runtime error occurred.
+#[inline]
 pub fn getclockres(clock_id: u8) -> result::Result<u64> {
     imp::platform_getclockres(clock_id)
 }
@@ -90,6 +91,7 @@ pub fn getclockres(clock_id: u8) -> result::Result<u64> {
 ///     - `result::Result::Unavailable` if the specified clock is not available
 ///       on this platform.
 ///     - `result::Result::UnknownError` if a runtime error occurred.
+#[inline]
 pub fn getclocktime(clock_id: u8) -> result::Result<u64> {
     imp::platform_getclocktime(clock_id)
 }
