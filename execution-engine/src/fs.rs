@@ -96,6 +96,8 @@ pub struct FileSystem {
     rights_table: RightsTable,
     /// Preopen FD table. Mapping the FD to dir name.
     prestat_table: HashMap<Fd, PathBuf>,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.
+    enable_clock: bool,
 }
 
 impl FileSystem {
@@ -121,6 +123,7 @@ impl FileSystem {
     pub fn new(
         rights_table: RightsTable,
         std_streams_table: &Vec<StandardStream>,
+        enable_clock: bool,
     ) -> Self {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -128,6 +131,7 @@ impl FileSystem {
             inode_table: HashMap::new(),
             rights_table,
             prestat_table: HashMap::new(),
+            enable_clock,
         };
         rst.install_prestat::<&Path>(&Vec::new(), std_streams_table);
         rst
@@ -337,6 +341,10 @@ impl FileSystem {
     /// Get clock resolution from platform services. Return error `NoSys` in case of failure.
     #[inline]
     pub(crate) fn clock_res_get(&self, clock_id: ClockId) -> FileSystemResult<Timestamp> {
+        if !self.enable_clock {
+            return Err(ErrNo::NoSys);
+        }
+
         let clock_id = u32::from(clock_id) as u8;
         match getclockres(clock_id) {
             result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
@@ -351,6 +359,10 @@ impl FileSystem {
         clock_id: ClockId,
         _precision: Timestamp,
     ) -> FileSystemResult<Timestamp> {
+        if !self.enable_clock {
+            return Err(ErrNo::NoSys);
+        }
+
         let clock_id = u32::from(clock_id) as u8;
         match getclocktime(clock_id) {
             result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),

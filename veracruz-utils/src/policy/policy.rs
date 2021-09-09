@@ -16,6 +16,9 @@
 //!   to execute the WASM binary, as well as a debug configuration flag which
 //!   allows the WASM binary to write data to `stdout` on the untrusted host's
 //!   machine,
+//! - The rights table of the standard streams (`stdin`, `stdout`, `stderr`),
+//! - A clock flag which allows the the WASM binary to call clock functions to
+//!   e.g. get a clock's time or resolution,
 //! - The order in which data inputs provisioned into the enclave will be placed
 //!   which is important for the program provider to understand in order to
 //!   write software for Veracruz.
@@ -87,13 +90,16 @@ pub struct Policy {
     /// platform constraints for the policy
     proxy_service_cert: String,
     /// The debug configuration flag.  This dictates whether the WASM program
-    /// will be able to print debug configuration messages to *stdout* on the
+    /// will be able to print debug configuration messages to `stdout` on the
     /// host's machine.
     debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
-    /// The rights table of the standard streams.
+    /// The rights table of the standard streams (`stdin`, `stdout`, `stderr`).
     std_streams_table: Vec<StandardStream>,
+    /// The clock flag.  This dictates whether the WASM program will be able to
+    /// call clock functions to e.g. get a clock's time or resolution.
+    enable_clock: bool,
 
     /// Hash of the JSON representation if the Policy was parsed from a file.
     #[serde(skip)]
@@ -118,6 +124,7 @@ impl Policy {
         debug: bool,
         execution_strategy: ExecutionStrategy,
         std_streams_table: Vec<StandardStream>,
+        enable_clock: bool,
     ) -> Result<Self, PolicyError> {
         let policy = Self {
             identities,
@@ -133,6 +140,7 @@ impl Policy {
             debug,
             execution_strategy,
             std_streams_table,
+            enable_clock,
 
             policy_hash: None,
         };
@@ -256,6 +264,12 @@ impl Policy {
     #[inline]
     pub fn std_streams_table(&self) -> &Vec<StandardStream> {
         &self.std_streams_table
+    }
+
+    /// Returns the clock flag associated with this policy.
+    #[inline]
+    pub fn enable_clock(&self) -> &bool {
+        &self.enable_clock
     }
 
     /// Returns the hash of the source JSON representation, if available

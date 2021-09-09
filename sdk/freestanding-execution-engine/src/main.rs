@@ -69,6 +69,10 @@ const DEFAULT_DUMP_STDOUT: &'static str = "false";
 /// command line.
 const DEFAULT_DUMP_STDERR: &'static str = "false";
 
+/// The default value of the clock flag, if no alternative is provided on the
+/// command line.
+const DEFAULT_ENABLE_CLOCK: bool = false;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
 ////////////////////////////////////////////////////////////////////////////////
@@ -81,10 +85,13 @@ struct CommandLineOptions {
     binary: String,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
-    /// Whether the contents of `stdout` should be dumped before exiting
+    /// Whether the contents of `stdout` should be dumped before exiting.
     dump_stdout: bool,
-    /// Whether the contents of `stderr` should be dumped before exiting
+    /// Whether the contents of `stderr` should be dumped before exiting.
     dump_stderr: bool,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
+    /// enabled.
+    enable_clock: bool,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
@@ -127,15 +134,22 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             Arg::with_name("dump-stdout")
                 .short("o")
                 .long("dump-stdout")
-                .help("Whether the contents of stdout should be dumped before exiting")
+                .help("Whether the contents of stdout should be dumped before exiting.")
                 .value_name("BOOLEAN"),
         )
         .arg(
             Arg::with_name("dump-stderr")
                 .short("e")
                 .long("dump-stderr")
-                .help("Whether the contents of stderr should be dumped before exiting")
+                .help("Whether the contents of stderr should be dumped before exiting.")
                 .value_name("BOOLEAN"),
+        )
+        .arg(
+            Arg::with_name("enable-clock")
+                .short("c")
+                .long("enable-clock")
+                .help("Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.")
+                .value_name("BOOLEAN")
         )
         .get_matches();
 
@@ -202,12 +216,25 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         }
     };
 
+    let enable_clock = if let Some(enable_clock) = matches.value_of("enable-clock") {
+        if let Ok(enable_clock) = bool::from_str(enable_clock) {
+            if enable_clock { info!("Clock functions are enabled."); }
+            enable_clock
+        } else {
+            return Err(format!("Expecting a boolean, but found {}", enable_clock)
+            .into());
+        }
+    } else {
+        return Err("Default 'enable-clock' value is not loaded correctly".into());
+    };
+
     Ok(CommandLineOptions {
         data_sources,
         binary,
         execution_strategy,
         dump_stdout,
         dump_stderr,
+        enable_clock,
     })
 }
 
@@ -305,7 +332,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table, cmdline.enable_clock)));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(

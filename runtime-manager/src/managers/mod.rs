@@ -101,8 +101,9 @@ impl ProtocolState {
 
         let rights_table = global_policy.get_rights_table();
         let std_streams_table = global_policy.std_streams_table();
+        let enable_clock = global_policy.enable_clock();
         let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)));
+        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table, enable_clock)));
 
         Ok(ProtocolState {
             global_policy,

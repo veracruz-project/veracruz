@@ -629,9 +629,7 @@ impl WASMIRuntimeState {
         ))
     }
 
-    /// The implementation of the WASI `clock_res_get` function.  This is not
-    /// supported by Veracruz.  We write `0` as the resolution and return
-    /// `ErrNo::NoSys`.
+    /// The implementation of the WASI `clock_res_get` function.
     fn wasi_clock_res_get(&mut self, args: RuntimeArgs) -> WasiResult {
         TypeCheck::check_args_number(&args, WasiAPIName::CLOCK_RES_GET)?;
         let clock_id = args.nth_checked::<u32>(0)?;

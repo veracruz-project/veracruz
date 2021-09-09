@@ -98,6 +98,8 @@ const DEFAULT_DEBUG_STATUS: bool = false;
 /// The default execution strategy for the WASM binary, if no alternative is
 /// provided on the command line.
 const DEFAULT_EXECUTION_STRATEGY: &'static str = "Interpretation";
+/// The default clock flag, if no alternative is provided on the command line.
+const DEFAULT_ENABLE_CLOCK: bool = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parsing.
@@ -149,6 +151,9 @@ struct Arguments {
     stdin: Option<String>,
     stdout: Option<String>,
     stderr: Option<String>,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
+    /// enabled.
+    enable_clock: bool,
 }
 
 impl Arguments {
@@ -174,6 +179,7 @@ impl Arguments {
             stdin: None,
             stdout: None,
             stderr: None,
+            enable_clock: None,
         }
     }
 }
@@ -347,6 +353,18 @@ binary.",
                 .help("The configuration of the standard error in the form 'path:rights'")
                 .required(false),
         )
+        .arg(
+            Arg::with_name("enable-clock")
+                .short("c")
+                .long("enable-clock")
+                .help(
+                    "Specifies whether the Veracruz trusted runtime should allow the WASM \
+binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
+                )
+                .required(true)
+                .value_name("BOOLEAN")
+                .default_value(&default_enable_clock),
+        )
         .get_matches();
 
     info!("Parsed command line.");
@@ -500,6 +518,18 @@ command-line parameter.",
     } else {
         info!("No stderr configuration was passed as command line parameters.");
     }
+
+    if let Some(enable_clock) = matches.value_of("enable-clock") {
+        if let Ok(enable_clock) = bool::from_str(enable_clock) {
+            arguments.enable_clock = enable_clock;
+        } else {
+            abort_with("The clock flag could not be parsed.");
+        }
+    } else {
+        info!("No clock flag passed as an argument.  Using a default.");
+        arguments.enable_clock = DEFAULT_ENABLE_CLOCK;
+    }
+
     info!("Successfully extracted command line arguments.");
 
     arguments
@@ -843,6 +873,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
         serialize_std_streams(arguments),
+        arguments.enable_clock,
     )
     .expect("Failed to instantiate a (struct) policy");
 
