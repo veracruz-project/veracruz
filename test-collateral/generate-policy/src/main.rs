@@ -179,7 +179,7 @@ impl Arguments {
             stdin: None,
             stdout: None,
             stderr: None,
-            enable_clock: None,
+            enable_clock: false,
         }
     }
 }
