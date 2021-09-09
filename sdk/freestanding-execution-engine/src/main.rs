@@ -68,10 +68,9 @@ const DEFAULT_DUMP_STDOUT: &'static str = "false";
 /// The default dump status of `stderr`, if no alternative is provided on the
 /// command line.
 const DEFAULT_DUMP_STDERR: &'static str = "false";
-
 /// The default value of the clock flag, if no alternative is provided on the
 /// command line.
-const DEFAULT_ENABLE_CLOCK: bool = false;
+const DEFAULT_ENABLE_CLOCK: &'static str = "false";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -216,7 +215,9 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         }
     };
 
-    let enable_clock = if let Some(enable_clock) = matches.value_of("enable-clock") {
+    let enable_clock = {
+        let enable_clock = matches.value_of("enable-clock")
+            .unwrap_or(DEFAULT_ENABLE_CLOCK);
         if let Ok(enable_clock) = bool::from_str(enable_clock) {
             if enable_clock { info!("Clock functions are enabled."); }
             enable_clock
@@ -224,8 +225,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             return Err(format!("Expecting a boolean, but found {}", enable_clock)
             .into());
         }
-    } else {
-        return Err("Default 'enable-clock' value is not loaded correctly".into());
     };
 
     Ok(CommandLineOptions {
