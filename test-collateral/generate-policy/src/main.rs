@@ -361,9 +361,7 @@ binary.",
                     "Specifies whether the Veracruz trusted runtime should allow the WASM \
 binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                 )
-                .required(true)
                 .value_name("BOOLEAN")
-                .default_value(&default_enable_clock),
         )
         .get_matches();
 
