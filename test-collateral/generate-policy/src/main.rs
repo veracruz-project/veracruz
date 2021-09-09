@@ -212,8 +212,6 @@ fn check_capability(capabilities: &[Vec<String>]) {
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Arguments {
-    let default_debug = DEFAULT_DEBUG_STATUS.to_string();
-
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -281,8 +279,6 @@ fn parse_command_line() -> Arguments {
                 .long("output-policy-file")
                 .value_name("FILE")
                 .help("Filename of the generated policy file.")
-                .default_value(DEFAULT_OUTPUT_FILENAME)
-                .required(true),
         )
         .arg(
             Arg::with_name("certificate-expiry")
@@ -315,24 +311,21 @@ list of files may be provided.")
                     "Specifies whether the Veracruz trusted runtime should allow debugging \
 information to be produced by the executing WASM binary.",
                 )
-                .required(true)
                 .value_name("BOOLEAN")
-                .default_value(&default_debug),
         )
         .arg(
             Arg::with_name("execution-strategy")
                 .short("e")
                 .long("execution-strategy")
+                .value_name("Interpretation | JIT")
                 .help(
                     "Specifies whether to use interpretation or JIT execution for the WASM \
 binary.",
                 )
-                .required(true)
-                .default_value(DEFAULT_EXECUTION_STRATEGY),
         )
         .arg(
             Arg::with_name("stdin")
-                .short("si")
+                .short("I")
                 .long("stdin")
                 .value_name("STDIN")
                 .help("The configuration of the standard input in the form 'path:rights'")
@@ -340,7 +333,7 @@ binary.",
         )
         .arg(
             Arg::with_name("stdout")
-                .short("so")
+                .short("O")
                 .long("stdout")
                 .value_name("STDOUT")
                 .help("The configuration of the standard output in the form 'path:rights'")
@@ -348,7 +341,7 @@ binary.",
         )
         .arg(
             Arg::with_name("stderr")
-                .short("se")
+                .short("E")
                 .long("stderr")
                 .value_name("STDERR")
                 .help("The configuration of the standard error in the form 'path:rights'")
@@ -368,12 +361,10 @@ binary.",
 
     if let Some(binaries) = matches.values_of_os("binary") {
         arguments.program_binaries = binaries
-            .map(|b| {
-                match parse_renamable_paths(b) {
-                    Ok(paths) => paths,
-                    Err(err) => {
-                        abort_with(err.to_string_lossy());
-                    }
+            .map(|b| match parse_renamable_paths(b) {
+                Ok(paths) => paths,
+                Err(err) => {
+                    abort_with(err.to_string_lossy());
                 }
             })
             .flatten()
