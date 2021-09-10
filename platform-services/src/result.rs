@@ -29,6 +29,7 @@ pub enum Result<T> {
     UnknownError,
 }
 
+/// Returns whether the result is a success.
 impl<T> Result<T> {
     pub fn is_success(&self) -> bool {
         match self {
