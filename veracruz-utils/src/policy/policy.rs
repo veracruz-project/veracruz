@@ -37,10 +37,7 @@ use crate::{
     policy::{
         error::PolicyError,
         expiry::Timepoint,
-        principal::{
-            RightsTable, ExecutionStrategy, Identity, Principal, StandardStream,
-            Program,
-        },
+        principal::{ExecutionStrategy, Identity, Principal, Program, RightsTable, StandardStream},
     },
 };
 use ring;
@@ -48,9 +45,9 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
     collections::HashMap,
+    path::PathBuf,
     string::{String, ToString},
     vec::Vec,
-    path::PathBuf,
 };
 use wasi_types::Rights;
 
@@ -103,7 +100,7 @@ pub struct Policy {
 
     /// Hash of the JSON representation if the Policy was parsed from a file.
     #[serde(skip)]
-    policy_hash: Option<String>
+    policy_hash: Option<String>,
 }
 
 impl Policy {
@@ -159,12 +156,7 @@ impl Policy {
         policy.assert_valid()?;
 
         // include hash?
-        let hash = hex::encode(
-            ring::digest::digest(
-                &ring::digest::SHA256,
-                json.as_bytes()
-            )
-        );
+        let hash = hex::encode(ring::digest::digest(&ring::digest::SHA256, json.as_bytes()));
         policy.policy_hash = Some(hash);
 
         Ok(policy)
@@ -392,14 +384,15 @@ impl Policy {
     /// Extract the input filenames from a right_map. If a prorgam has rights call
     /// fd_read and path_open, it is considered as an input file.
     fn get_required_inputs(right_map: &HashMap<PathBuf, Rights>) -> Vec<PathBuf> {
-        let mut rst = right_map.iter().fold(Vec::new(), |mut acc, (file_name, right)| {
-            if right.contains(Rights::FD_READ | Rights::PATH_OPEN) {
-                acc.push(file_name.into());
-            }
-            acc
-        });
+        let mut rst = right_map
+            .iter()
+            .fold(Vec::new(), |mut acc, (file_name, right)| {
+                if right.contains(Rights::FD_READ | Rights::PATH_OPEN) {
+                    acc.push(file_name.into());
+                }
+                acc
+            });
         rst.sort();
         rst
     }
 }
-

@@ -142,10 +142,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////
 
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
-    fn install_standard_streams(
-        &mut self,
-        std_streams_table: &Vec<StandardStream>,
-    ) {
+    fn install_standard_streams(&mut self, std_streams_table: &Vec<StandardStream>) {
         for std_stream in std_streams_table {
             // Map each standard stream to an fd and inode.
             // Rights are assumed to be already configured by the execution engine in the rights table

@@ -25,9 +25,7 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
     }
     let mut buffer_len = buffer.len();
 
-    let status = unsafe {
-        nsm_lib::nsm_get_random(nsm_fd, buffer.as_mut_ptr(), &mut buffer_len)
-    };
+    let status = unsafe { nsm_lib::nsm_get_random(nsm_fd, buffer.as_mut_ptr(), &mut buffer_len) };
     return match status {
         nsm_io::ErrorCode::Success => result::Result::Success(()),
         _ => result::Result::UnknownError,

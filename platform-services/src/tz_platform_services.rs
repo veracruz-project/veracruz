@@ -14,7 +14,7 @@
 
 use super::result;
 
-use optee_utee::{Random};
+use optee_utee::Random;
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
 /// random number source.  Uses the Optee trusted RTS library from the Rust TZ

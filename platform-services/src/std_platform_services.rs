@@ -17,10 +17,7 @@
 use super::result;
 
 use getrandom;
-use nix::{
-    time,
-    sys::time::TimeValLike,
-};
+use nix::{sys::time::TimeValLike, time};
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the random number
 /// source provided by the host operating system, as provided by `getrandom`.
