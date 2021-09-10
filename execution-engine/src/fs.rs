@@ -339,13 +339,14 @@ impl FileSystem {
     #[inline]
     pub(crate) fn clock_res_get(&self, clock_id: ClockId) -> FileSystemResult<Timestamp> {
         if !self.enable_clock {
-            return Err(ErrNo::NoSys);
+            return Err(ErrNo::Access);
         }
 
         let clock_id = u32::from(clock_id) as u8;
         match getclockres(clock_id) {
             result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
-            _ => Err(ErrNo::NoSys),
+            result::Result::Unavailable => Err(ErrNo::NoSys),
+            _ => Err(ErrNo::Inval),
         }
     }
 
@@ -357,13 +358,14 @@ impl FileSystem {
         _precision: Timestamp,
     ) -> FileSystemResult<Timestamp> {
         if !self.enable_clock {
-            return Err(ErrNo::NoSys);
+            return Err(ErrNo::Access);
         }
 
         let clock_id = u32::from(clock_id) as u8;
         match getclocktime(clock_id) {
             result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
-            _ => Err(ErrNo::NoSys),
+            result::Result::Unavailable => Err(ErrNo::NoSys),
+            _ => Err(ErrNo::Inval),
         }
     }
 

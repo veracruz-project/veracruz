@@ -17,7 +17,7 @@
 use super::result;
 
 use getrandom;
-use nix::{sys::time::TimeValLike, time};
+use nix::{errno::Errno, sys::time::TimeValLike, time};
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the random number
 /// source provided by the host operating system, as provided by `getrandom`.
@@ -33,7 +33,10 @@ pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
     let clock_id = time::ClockId::from_raw(clock_id.into());
     let timespec = match time::clock_getres(clock_id) {
         Ok(t) => t,
-        Err(_) => return result::Result::Unavailable,
+        Err(errno) => match errno {
+            Errno::EINVAL => return result::Result::Unavailable,
+            _ => return result::Result::UnknownError,
+        },
     };
     result::Result::Success(timespec.num_nanoseconds() as u64)
 }
@@ -43,7 +46,10 @@ pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
     let clock_id = time::ClockId::from_raw(clock_id.into());
     let timespec = match time::clock_gettime(clock_id) {
         Ok(t) => t,
-        Err(_) => return result::Result::Unavailable,
+        Err(errno) => match errno {
+            Errno::EINVAL => return result::Result::Unavailable,
+            _ => return result::Result::UnknownError,
+        },
     };
     result::Result::Success(timespec.num_nanoseconds() as u64)
 }
