@@ -1,0 +1,26 @@
+cargo-features = ["resolver"]
+
+[workspace]
+resolver = "2"
+members = [
+    # "crates/sdk/rust-examples/audio-event-triangulation",
+    "crates/sdk/rust-examples/idash2017-logistic-regression",
+    "crates/sdk/rust-examples/image-processing",
+    "crates/sdk/rust-examples/intersection-set-sum",
+    "crates/sdk/rust-examples/linear-regression",
+    "crates/sdk/rust-examples/logistic-regression",
+    "crates/sdk/rust-examples/moving-average-convergence-divergence",
+    "crates/sdk/rust-examples/nop",
+    "crates/sdk/rust-examples/number-stream-accumulation",
+    "crates/sdk/rust-examples/private-set-intersection",
+    "crates/sdk/rust-examples/private-set-intersection-sum",
+    "crates/sdk/rust-examples/random-source",
+    "crates/sdk/rust-examples/read-file",
+    "crates/sdk/rust-examples/shamir-secret-sharing",
+    "crates/sdk/rust-examples/string-edit-distance",
+]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
