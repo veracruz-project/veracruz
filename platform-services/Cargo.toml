@@ -7,7 +7,7 @@ description = "An abstraction layer for various isolation technologies.  Exposes
 
 [features]
 default = []
-std = ["getrandom"]
+std = ["getrandom", "nix"]
 sgx = ["sgx_trts"]
 tz = ["optee-utee"]
 nitro = ["nsm_io", "nsm_lib"]
@@ -19,7 +19,7 @@ path = "./src/lib.rs"
 [dependencies]
 cfg-if = "0.1.10"
 getrandom = { version = "0.1.14", optional = true }
-nix = "0.22"
+nix = { version = "0.22", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package="nsm-lib", optional = true }
 nsm_io =  { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
 sgx_trts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
