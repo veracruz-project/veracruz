@@ -11,8 +11,11 @@
 
 .PHONY: all doc clean fmt
 
-all:
+all: crates/sdk/wasm-checker/bin/wasm-checker
 	cargo build --release
+
+crates/sdk/wasm-checker/bin/wasm-checker:
+	$(MAKE) -C crates/sdk/wasm-checker
 
 doc:
 	cargo doc
@@ -23,4 +26,3 @@ fmt:
 clean:
 	cargo clean
 	rm -f Cargo.lock
-

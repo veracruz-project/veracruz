@@ -10,17 +10,22 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-OUT_DIR ?= .
-SRC_DIR ?= crates/runtime-manager
-FINAL_DIR ?= .
+OUT_DIR ?= $(abspath .)
+FINAL_DIR ?= $(abspath .)
+WORKSPACE_DIR = $(abspath ..)
+
+all: sgx wasm-files policy-files
+
+include $(WORKSPACE_DIR)/shared.mk
+
+MEASUREMENT_FILE = $(abspath css-sgx.bin)
+MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 
 .PHONY: all sgx clean
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
-
-all: sgx
 
 ############# SGX #################
 Signed_RustEnclave_RootName := runtime_manager.signed.so
@@ -31,7 +36,6 @@ SGX_Enclave_Name ?= $(OUT_DIR)/libruntime_manager_enclave.a
 $(FINAL_DIR)/$(Signed_RustEnclave_RootName): $(Signed_RustEnclave_Name)
 	cp $< $@
 
-
 # TODO: Bring the rest of the SGX compilation
 
 sgx: $(FINAL_DIR)/$(Signed_RustEnclave_RootName) $(SGX_Enclave_Name) $(Signed_RustEnclave_Name) $(Untrusted_Lib_Name)
@@ -40,7 +44,7 @@ sgx: $(FINAL_DIR)/$(Signed_RustEnclave_RootName) $(SGX_Enclave_Name) $(Signed_Ru
 css-sgx.bin: $(Signed_RustEnclave_Name)
 
 ############# Source code #################
-
+SRC_DIR = $(abspath crates/runtime-manager)
 COMMON_Src = $(SRC_DIR)/src/managers/*.rs
 
 ############# Files generated from the EDL File ###############
@@ -130,4 +134,4 @@ clean:
 	@rm -f $(SGX_Enclave_Name)
 	@rm -f $(RustEnclave_Name)
 	@rm -rf bin/
-	@rm -f css-*.bin
+	@rm -f css-*.bin *.wasm *.json

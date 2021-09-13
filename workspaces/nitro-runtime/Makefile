@@ -9,25 +9,29 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-OUT_DIR?=.
-FINAL_DIR?=.
+OUT_DIR ?= $(abspath .)
+FINAL_DIR ?= $(abspath .)
+WORKSPACE_DIR = $(abspath ..)
+
+all: nitro wasm-files policy-files
+
+include $(WORKSPACE_DIR)/shared.mk
+
+MEASUREMENT_FILE = $(abspath PCR0)
+MEASUREMENT_PARAMETER = --pcr-file $(MEASUREMENT_FILE)
 
 .PHONY: all clean nitro
-
-all: nitro
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 
 ############# Source code #################
-
-COMMON_Src = crates/runtime-manager/src/managers/*.rs
-
+SRC_DIR = $(abspath crates/runtime-manager)
+COMMON_Src = $(SRC_DIR)/src/managers/*.rs
 
 ############# AWS Nitro Enclaves ###################
-Nitro_Src = $(COMMON_Src) crates/runtime-manager/src/runtime_manager_nitro.rs \
-	crates/runtime-manager/src/main.rs
+Nitro_Src = $(COMMON_Src) $(SRC_DIR)/src/runtime_manager_nitro.rs $(SRC_DIR)/src/main.rs
 
 nitro: runtime_manager.eif
 
@@ -40,9 +44,10 @@ runtime_manager.eif: target/x86_64-unknown-linux-musl/release/runtime_manager_en
 	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
 
 target/x86_64-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
+	rustup target add x86_64-unknown-linux-musl
 	cargo build -Z package-features -Z unstable-options --bin runtime_manager_enclave \
-	--target x86_64-unknown-linux-musl --release --features nitro \
-	-p runtime_manager_enclave --verbose
+	  --target x86_64-unknown-linux-musl --release --features nitro \
+	  -p runtime_manager_enclave --verbose
 
 clean:
 	@cargo clean

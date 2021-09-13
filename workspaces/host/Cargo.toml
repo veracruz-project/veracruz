@@ -3,8 +3,10 @@ cargo-features = ["resolver"]
 [workspace]
 resolver = "2"
 members = [
-    "crates/proxy-attestation-server",
     "crates/test-collateral/generate-policy",
+    "crates/sdk/freestanding-execution-engine",
+
+    # Data generators
     "crates/sdk/data-generators/csv-encoder",
     "crates/sdk/data-generators/idash2017-logistic-regression-generator",
     "crates/sdk/data-generators/image-processing-generator",
