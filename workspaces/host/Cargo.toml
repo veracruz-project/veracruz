@@ -1,0 +1,39 @@
+cargo-features = ["resolver"]
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/proxy-attestation-server",
+    "crates/test-collateral/generate-policy",
+    "crates/sdk/data-generators/csv-encoder",
+    "crates/sdk/data-generators/idash2017-logistic-regression-generator",
+    "crates/sdk/data-generators/image-processing-generator",
+    "crates/sdk/data-generators/intersection-set-sum-generator",
+    "crates/sdk/data-generators/linear-regression-generator",
+    "crates/sdk/data-generators/moving-average-convergence-divergence-generator",
+    "crates/sdk/data-generators/number-stream-generator",
+    "crates/sdk/data-generators/private-set-intersection-generator",
+    "crates/sdk/data-generators/private-set-intersection-sum-generator",
+    "crates/sdk/data-generators/shamir-secret-sharing",
+    "crates/sdk/data-generators/string-generator",
+]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+# patches for SGX
+[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
+sgx_alloc = { path = "crates/third-party/rust-sgx-sdk/sgx_alloc", optional = true }
+sgx_libc = { path = "crates/third-party/rust-sgx-sdk/sgx_libc", optional = true }
+sgx_tcrypto = { path = "crates/third-party/rust-sgx-sdk/sgx_tcrypto", optional = true }
+sgx_tdh = { path = "crates/third-party/rust-sgx-sdk/sgx_tdh", optional = true }
+sgx_trts = { path = "crates/third-party/rust-sgx-sdk/sgx_trts", optional = true }
+sgx_tstd = { path = "crates/third-party/rust-sgx-sdk/sgx_tstd", optional = true }
+sgx_types = { path = "crates/third-party/rust-sgx-sdk/sgx_types", optional = true }
+sgx_ucrypto = { path = "crates/third-party/rust-sgx-sdk/sgx_ucrypto", optional = true }
+
+[patch.crates-io]
+serde = { git = "https://github.com/veracruz-project/serde.git", features=["derive"], branch = "veracruz" }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
