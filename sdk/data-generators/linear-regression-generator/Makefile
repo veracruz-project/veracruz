@@ -14,6 +14,7 @@ TARGET_DAT = linear-regression.dat
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
 SEED = 0
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean fmt fmt-check
 
@@ -27,7 +28,7 @@ $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
 $(TARGET_DAT):
-	cargo run -- --file_name $(basename $@) --size $(ROW) --seed $(SEED)
+	$(RUN_COMMAND) --file_name $(basename $@) --size $(ROW) --seed $(SEED)
 
 clean:
 	cargo clean
