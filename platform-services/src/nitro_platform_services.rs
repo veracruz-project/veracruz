@@ -18,20 +18,28 @@ use nsm_lib;
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
 /// random number source.  Uses the AWS Nitro RNG
-pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result {
+pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
     let nsm_fd = nsm_lib::nsm_lib_init();
     if nsm_fd < 0 {
         return result::Result::UnknownError;
     }
     let mut buffer_len = buffer.len();
 
-    let status = unsafe {
-        nsm_lib::nsm_get_random(nsm_fd, buffer.as_mut_ptr(), &mut buffer_len)
-    };
+    let status = unsafe { nsm_lib::nsm_get_random(nsm_fd, buffer.as_mut_ptr(), &mut buffer_len) };
     return match status {
-        nsm_io::ErrorCode::Success => result::Result::Success,
+        nsm_io::ErrorCode::Success => result::Result::Success(()),
         _ => result::Result::UnknownError,
     };
 }
 
+/// Returns the clock resolution in nanoseconds.
+/// TODO: implement it
+pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
+    result::Result::Unavailable
+}
 
+/// Returns the clock time in nanoseconds.
+/// TODO: implement it
+pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
+    result::Result::Unavailable
+}

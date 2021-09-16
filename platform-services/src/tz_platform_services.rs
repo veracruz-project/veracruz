@@ -14,12 +14,24 @@
 
 use super::result;
 
-use optee_utee::{Random};
+use optee_utee::Random;
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
 /// random number source.  Uses the Optee trusted RTS library from the Rust TZ
 /// SDK to implement this.
-pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result {
+pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
     Random::generate(buffer);
-    result::Result::Success
+    result::Result::Success(())
+}
+
+/// Returns the clock resolution in nanoseconds.
+/// TODO: implement it
+pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
+    result::Result::Unavailable
+}
+
+/// Returns the clock time in nanoseconds.
+/// TODO: implement it
+pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
+    result::Result::Unavailable
 }

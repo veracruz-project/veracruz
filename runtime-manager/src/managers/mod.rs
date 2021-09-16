@@ -9,13 +9,15 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use execution_engine::{execute, fs::FileSystem};
+use lazy_static::lazy_static;
 #[cfg(feature = "tz")]
 use optee_utee::trace_println;
 #[cfg(feature = "sgx")]
 use sgx_types::sgx_status_t;
-use std::sync::Mutex;
 #[cfg(feature = "sgx")]
-use std::{ffi::CString};
+use std::ffi::CString;
+use std::sync::Mutex;
 use std::{
     collections::HashMap,
     string::String,
@@ -25,8 +27,6 @@ use std::{
     },
     vec::Vec,
 };
-use lazy_static::lazy_static;
-use execution_engine::{fs::FileSystem, execute};
 use veracruz_utils::policy::{
     policy::Policy,
     principal::{ExecutionStrategy, Principal},
@@ -101,8 +101,13 @@ impl ProtocolState {
 
         let rights_table = global_policy.get_rights_table();
         let std_streams_table = global_policy.std_streams_table();
+        let enable_clock = *global_policy.enable_clock();
         let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)));
+        let vfs = Arc::new(Mutex::new(FileSystem::new(
+            rights_table,
+            std_streams_table,
+            enable_clock,
+        )));
 
         Ok(ProtocolState {
             global_policy,
@@ -144,7 +149,6 @@ impl ProtocolState {
         file_name: &str,
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
-
         // Check the digest, if necessary
         if let Some(digest) = self.digest_table.get(file_name) {
             let incoming_digest = Self::sha_256_digest(data);
@@ -157,14 +161,11 @@ impl ProtocolState {
                 }
             }
         }
-        // Set the modified flag 
+        // Set the modified flag
         self.is_modified = true;
-        self.vfs.lock()?.write_file_by_filename(
-            client_id,
-            file_name,
-            data,
-            false,
-        )?;
+        self.vfs
+            .lock()?
+            .write_file_by_filename(client_id, file_name, data, false)?;
         Ok(())
     }
 
@@ -183,17 +184,14 @@ impl ProtocolState {
         file_name: &str,
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
-        // If a file must match a digest, e.g. a program, 
+        // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
         if self.digest_table.contains_key(file_name) {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
         self.is_modified = true;
         self.vfs.lock()?.write_file_by_filename(
-            client_id,
-            file_name,
-            data,
-            // set the append flag to true
+            client_id, file_name, data, // set the append flag to true
             true,
         )?;
         Ok(())
@@ -205,10 +203,10 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        let rst = self.vfs.lock()?.read_file_by_filename(
-            client_id,
-            file_name,
-        )?;
+        let rst = self
+            .vfs
+            .lock()?
+            .read_file_by_filename(client_id, file_name)?;
         if rst.len() == 0 {
             return Ok(None);
         }

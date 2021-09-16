@@ -14,7 +14,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use platform_services::{getrandom, result};
+use platform_services::{getclockres, getclocktime, getrandom, result};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryInto},
@@ -96,6 +96,8 @@ pub struct FileSystem {
     rights_table: RightsTable,
     /// Preopen FD table. Mapping the FD to dir name.
     prestat_table: HashMap<Fd, PathBuf>,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.
+    enable_clock: bool,
 }
 
 impl FileSystem {
@@ -121,6 +123,7 @@ impl FileSystem {
     pub fn new(
         rights_table: RightsTable,
         std_streams_table: &Vec<StandardStream>,
+        enable_clock: bool,
     ) -> Self {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -128,6 +131,7 @@ impl FileSystem {
             inode_table: HashMap::new(),
             rights_table,
             prestat_table: HashMap::new(),
+            enable_clock,
         };
         rst.install_prestat::<&Path>(&Vec::new(), std_streams_table);
         rst
@@ -138,10 +142,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////
 
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
-    fn install_standard_streams(
-        &mut self,
-        std_streams_table: &Vec<StandardStream>,
-    ) {
+    fn install_standard_streams(&mut self, std_streams_table: &Vec<StandardStream>) {
         for std_stream in std_streams_table {
             // Map each standard stream to an fd and inode.
             // Rights are assumed to be already configured by the execution engine in the rights table
@@ -334,20 +335,38 @@ impl FileSystem {
     // Operations on the filesystem. Rust style implementation of WASI API
     ////////////////////////////////////////////////////////////////////////////
 
-    /// The stub implementation of `clock_res_get`. Return unsupported error `NoSys`.
+    /// Get clock resolution from platform services. Return error `NoSys` in case of failure.
     #[inline]
-    pub(crate) fn clock_res_get(&self, _clock_id: ClockId) -> FileSystemResult<Timestamp> {
-        Err(ErrNo::NoSys)
+    pub(crate) fn clock_res_get(&self, clock_id: ClockId) -> FileSystemResult<Timestamp> {
+        if !self.enable_clock {
+            return Err(ErrNo::Access);
+        }
+
+        let clock_id = u32::from(clock_id) as u8;
+        match getclockres(clock_id) {
+            result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
+            result::Result::Unavailable => Err(ErrNo::NoSys),
+            _ => Err(ErrNo::Inval),
+        }
     }
 
-    /// The stub implementation of `clock_time_get`. Return unsupported error `NoSys`.
+    /// Get clock time from platform services. Return error `NoSys` in case of failure.
     #[inline]
     pub(crate) fn clock_time_get(
         &self,
-        _clock_id: ClockId,
+        clock_id: ClockId,
         _precision: Timestamp,
     ) -> FileSystemResult<Timestamp> {
-        Err(ErrNo::NoSys)
+        if !self.enable_clock {
+            return Err(ErrNo::Access);
+        }
+
+        let clock_id = u32::from(clock_id) as u8;
+        match getclocktime(clock_id) {
+            result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
+            result::Result::Unavailable => Err(ErrNo::NoSys),
+            _ => Err(ErrNo::Inval),
+        }
     }
 
     /// Allows the programmer to declare how they intend to use various parts of
@@ -912,7 +931,7 @@ impl FileSystem {
     #[inline]
     pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemResult<Vec<u8>> {
         let mut buf = vec![0; buf_len as usize];
-        if let result::Result::Success = getrandom(&mut buf) {
+        if getrandom(&mut buf).is_success() {
             Ok(buf)
         } else {
             Err(ErrNo::NoSys)

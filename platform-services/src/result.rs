@@ -1,7 +1,7 @@
 //! Error codes for platform services
 //!
 //! A platform service can end in one of three ways:
-//! 
+//!
 //! 1. *Success*, in which the platform service successfully executed,
 //! 2. *Unavailable*, in which the service in question is not available on
 //!    the current platfrom.  For example: a trusted time source may not be
@@ -20,11 +20,21 @@
 
 //! Error codes describing the result of a platform service function.
 #[derive(Debug)]
-pub enum Result {
+pub enum Result<T> {
     /// The operation completed successfully.
-    Success,
+    Success(T),
     /// The operation is unavailable on this platform.
     Unavailable,
     /// An unknown error occurred during the execution of the operation.
     UnknownError,
+}
+
+/// Returns whether the result is a success.
+impl<T> Result<T> {
+    pub fn is_success(&self) -> bool {
+        match self {
+            Self::Success(_) => true,
+            _ => false,
+        }
+    }
 }

@@ -32,12 +32,11 @@ use std::{
     error::Error,
     fs::File,
     io::Read,
-    path::Path,
-    sync::{Arc, Mutex},
+    path::{Path, PathBuf},
     str::FromStr,
+    sync::{Arc, Mutex},
     time::Instant,
     vec::Vec,
-    path::PathBuf,
 };
 use veracruz_utils::policy::principal::{ExecutionStrategy, FileRights, Principal, StandardStream};
 use wasi_types::Rights;
@@ -68,6 +67,9 @@ const DEFAULT_DUMP_STDOUT: &'static str = "false";
 /// The default dump status of `stderr`, if no alternative is provided on the
 /// command line.
 const DEFAULT_DUMP_STDERR: &'static str = "false";
+/// The default value of the clock flag, if no alternative is provided on the
+/// command line.
+const DEFAULT_ENABLE_CLOCK: &'static str = "false";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -81,17 +83,19 @@ struct CommandLineOptions {
     binary: String,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
-    /// Whether the contents of `stdout` should be dumped before exiting
+    /// Whether the contents of `stdout` should be dumped before exiting.
     dump_stdout: bool,
-    /// Whether the contents of `stderr` should be dumped before exiting
+    /// Whether the contents of `stderr` should be dumped before exiting.
     dump_stderr: bool,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
+    /// enabled.
+    enable_clock: bool,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
-
     let matches = App::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
@@ -127,14 +131,24 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             Arg::with_name("dump-stdout")
                 .short("o")
                 .long("dump-stdout")
-                .help("Whether the contents of stdout should be dumped before exiting")
+                .help("Whether the contents of stdout should be dumped before exiting.")
                 .value_name("BOOLEAN"),
         )
         .arg(
             Arg::with_name("dump-stderr")
                 .short("e")
                 .long("dump-stderr")
-                .help("Whether the contents of stderr should be dumped before exiting")
+                .help("Whether the contents of stderr should be dumped before exiting.")
+                .value_name("BOOLEAN"),
+        )
+        .arg(
+            Arg::with_name("enable-clock")
+                .short("c")
+                .long("enable-clock")
+                .help(
+                    "Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
+                     enabled.",
+                )
                 .value_name("BOOLEAN"),
         )
         .get_matches();
@@ -156,7 +170,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 return Err(format!(
                     "Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",
                     strategy
-                ).into());
+                )
+                .into());
             }
         }
     };
@@ -179,26 +194,44 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     };
 
     let dump_stdout = {
-        let dump_stdout = matches.value_of("dump-stdout")
+        let dump_stdout = matches
+            .value_of("dump-stdout")
             .unwrap_or(DEFAULT_DUMP_STDOUT);
         if let Ok(dump_stdout) = bool::from_str(dump_stdout) {
-            if dump_stdout { info!("stdout configured to be dumped before exiting."); }
+            if dump_stdout {
+                info!("stdout configured to be dumped before exiting.");
+            }
             dump_stdout
         } else {
-            return Err(format!("Expecting a boolean, but found {}", dump_stdout)
-            .into());
+            return Err(format!("Expecting a boolean, but found {}", dump_stdout).into());
         }
     };
 
     let dump_stderr = {
-        let dump_stderr = matches.value_of("dump-stderr")
+        let dump_stderr = matches
+            .value_of("dump-stderr")
             .unwrap_or(DEFAULT_DUMP_STDERR);
         if let Ok(dump_stderr) = bool::from_str(dump_stderr) {
-            if dump_stderr { info!("stderr configured to be dumped before exiting."); }
+            if dump_stderr {
+                info!("stderr configured to be dumped before exiting.");
+            }
             dump_stderr
         } else {
-            return Err(format!("Expecting a boolean, but found {}", dump_stderr)
-            .into());
+            return Err(format!("Expecting a boolean, but found {}", dump_stderr).into());
+        }
+    };
+
+    let enable_clock = {
+        let enable_clock = matches
+            .value_of("enable-clock")
+            .unwrap_or(DEFAULT_ENABLE_CLOCK);
+        if let Ok(enable_clock) = bool::from_str(enable_clock) {
+            if enable_clock {
+                info!("Clock functions are enabled.");
+            }
+            enable_clock
+        } else {
+            return Err(format!("Expecting a boolean, but found {}", enable_clock).into());
         }
     };
 
@@ -208,6 +241,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         execution_strategy,
         dump_stdout,
         dump_stderr,
+        enable_clock,
     })
 }
 
@@ -282,9 +316,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Set up standard streams table
     let std_streams_table = vec![
-        StandardStream::Stdin(FileRights::new(String::from("stdin"), u64::from(read_right) as u32)),
-        StandardStream::Stdout(FileRights::new(String::from("stdout"), u64::from(write_right) as u32)),
-        StandardStream::Stderr(FileRights::new(String::from("stderr"), u64::from(write_right) as u32)),
+        StandardStream::Stdin(FileRights::new(
+            String::from("stdin"),
+            u64::from(read_right) as u32,
+        )),
+        StandardStream::Stdout(FileRights::new(
+            String::from("stdout"),
+            u64::from(write_right) as u32,
+        )),
+        StandardStream::Stderr(FileRights::new(
+            String::from("stderr"),
+            u64::from(write_right) as u32,
+        )),
     ];
 
     // Manually create the Right table for the VFS.
@@ -305,7 +348,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(
+        right_table,
+        &std_streams_table,
+        cmdline.enable_clock,
+    )));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(
@@ -327,12 +374,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dump contents of stdout
     if cmdline.dump_stdout {
-        let buf = vfs.lock()
+        let buf = vfs
+            .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_filename(
-                &Principal::InternalSuperUser,
-                "stdout",
-            )?;
+            .read_file_by_filename(&Principal::InternalSuperUser, "stdout")?;
         let stdout_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
         print!("{}", stdout_dump);
@@ -340,12 +385,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dump contents of stderr
     if cmdline.dump_stderr {
-        let buf = vfs.lock()
+        let buf = vfs
+            .lock()
             .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_filename(
-                &Principal::InternalSuperUser,
-                "stderr",
-            )?;
+            .read_file_by_filename(&Principal::InternalSuperUser, "stderr")?;
         let stderr_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
         eprint!("{}", stderr_dump);
