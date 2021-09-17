@@ -15,6 +15,7 @@ use crate::{
         EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
         WasiAPIName, WasiWrapper,
     },
+    Options,
 };
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
@@ -29,7 +30,7 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, V
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new(), &vec![], false))), Principal::NoCap));
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new(), &vec![]))), Principal::NoCap));
 }
 
 /// A macro for lock the global VFS and store the result in the variable,
@@ -767,7 +768,12 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<u32, FatalEngineError> {
+    fn invoke_entry_point(
+        &mut self,
+        file_name: &str,
+        options: Options,
+    ) -> Result<u32, FatalEngineError> {
+        VFS_INSTANCE.lock()?.enable_clock = options.enable_clock;
         let program = VFS_INSTANCE.lock()?.read_file_by_filename(file_name)?;
         Self::invoke_entry_point(program.to_vec())
     }

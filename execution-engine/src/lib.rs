@@ -43,6 +43,18 @@ use std::sync::Mutex;
 use std::{boxed::Box, string::ToString, sync::Arc};
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
+pub struct Options {
+    pub enable_clock: bool,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options {
+            enable_clock: false,
+        }
+    }
+}
+
 /// The top-level function executes program `program_name` on
 /// the `filesystem` handler, in which inputs, outputs and programs are stored.
 /// The function requires execution `strategy`.
@@ -54,6 +66,7 @@ pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: Arc<Mutex<FileSystem>>,
     program_name: &str,
+    options: Options,
 ) -> Result<u32, FatalEngineError> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
@@ -69,5 +82,5 @@ pub fn execute(
             }
         }
     };
-    engine.invoke_entry_point(program_name)
+    engine.invoke_entry_point(program_name, options)
 }

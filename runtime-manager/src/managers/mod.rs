@@ -9,7 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use execution_engine::{execute, fs::FileSystem};
+use execution_engine::{execute, fs::FileSystem, Options};
 use lazy_static::lazy_static;
 #[cfg(feature = "tz")]
 use optee_utee::trace_println;
@@ -27,10 +27,7 @@ use std::{
     },
     vec::Vec,
 };
-use veracruz_utils::policy::{
-    policy::Policy,
-    principal::{ExecutionStrategy, Principal},
-};
+use veracruz_utils::policy::{policy::Policy, principal::Principal};
 use wasi_types::ErrNo;
 
 pub mod error;
@@ -101,13 +98,8 @@ impl ProtocolState {
 
         let rights_table = global_policy.get_rights_table();
         let std_streams_table = global_policy.std_streams_table();
-        let enable_clock = *global_policy.enable_clock();
         let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(
-            rights_table,
-            std_streams_table,
-            enable_clock,
-        )));
+        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)));
 
         Ok(ProtocolState {
             global_policy,
@@ -227,7 +219,11 @@ impl ProtocolState {
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
     pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
-        let return_code = execute(&execution_strategy, self.vfs.clone(), file_name)?;
+        let options = Options {
+            enable_clock: *self.global_policy.enable_clock(),
+            ..Default::default()
+        };
+        let return_code = execute(&execution_strategy, self.vfs.clone(), file_name, options)?;
 
         let response = if return_code == 0 {
             let result = self.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
