@@ -204,7 +204,7 @@ Now we can launch the Proxy Attestation Server with the
 character `&` to launch the Proxy Attestation Server in the background:
 
 ``` bash
-$ vc-pas example/example-policy.json \
+$ vc-pas :3010 \
     --database-url=example/example-pas.db \
     --ca-cert=example/example-ca-cert.pem \
     --ca-key=example/example-ca-key.pem &
