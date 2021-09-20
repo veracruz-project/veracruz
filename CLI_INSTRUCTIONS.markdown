@@ -1,6 +1,7 @@
-# Getting started with Veracruz
+# Getting started with the Veracruz command-line interface
 
-This document walks through running an example Veracruz program.
+This document walks through running an example Veracruz program using
+the Veracruz command-line interface.
 
 It assumes you have walked through the steps in [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown).
 
