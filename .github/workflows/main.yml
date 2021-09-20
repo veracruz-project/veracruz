@@ -118,4 +118,37 @@ jobs:
             make trustzone-veracruz-server-test
             make trustzone-veracruz-test
             make trustzone-veracruz-client-test
+  nitro:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
+      volumes: 
+        - ${{ github.workspace }}:/work/veracruz 
+    needs: [check-repo-and-compile-sdk]
+
+    steps:
+        
+      # Download the artifact containing repo and sdk artifact, using the action from github
+      - name: Download veracruz cache artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: veracruz.tar
+          path: /
+      # Unpack
+      - name: Unpack veracruz cache artifact
+        id: tz-unpack
+        run: |
+            cd /
+            mkdir -p /work/veracruz
+            tar -C /work/veracruz -xvf veracruz.tar
+            rm veracruz.tar
+      
+      - name: Running Nitro test script
+        id: tz-test
+        run: |
+            cd /work/veracruz
+            make nitro
+            make nitro-veracruz-server-test
+            make nitro-veracruz-test
+
 
