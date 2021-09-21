@@ -20,8 +20,7 @@ use std::sync::Mutex;
 
 use std::{
     collections::HashMap,
-    option::Option,
-    string::String,
+    string::{String, ToString},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Arc,
@@ -75,8 +74,8 @@ pub(crate) struct ProtocolState {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    /// The ref to the VFS.
-    vfs: Arc<Mutex<FileSystem>>,
+    /// The ref to the VFS, this is a FS handler with super user capability.
+    vfs: FileSystem,
     /// Digest table. Certain files must match the digest before writting to the filesystem.
     digest_table: HashMap<String, Vec<u8>>,
 }
@@ -92,9 +91,10 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let rights_table = global_policy.get_rights_table();
+        println!("right table: {:?}", rights_table);
         let std_streams_table = global_policy.std_streams_table();
         let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)?));
+        let vfs = FileSystem::new(rights_table)?;
 
         Ok(ProtocolState {
             global_policy,
@@ -140,8 +140,7 @@ impl ProtocolState {
                 }
             }
         }
-        self.vfs.lock()?.write_file_by_absolute_path(
-            client_id,
+        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
             file_name,
             data,
             false,
@@ -169,8 +168,7 @@ impl ProtocolState {
         if self.digest_table.contains_key(file_name) {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
-        self.vfs.lock()?.write_file_by_absolute_path(
-            client_id,
+        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
             file_name,
             data,
             // set the append flag to true
@@ -185,8 +183,7 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        let rst = self.vfs.lock()?.read_file_by_absolute_path(
-            client_id,
+        let rst = self.vfs.spawn(client_id)?.read_file_by_absolute_path(
             file_name,
         )?;
         if rst.len() == 0 {
@@ -207,13 +204,10 @@ impl ProtocolState {
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
-    pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
+    pub(crate) fn execute(&mut self, file_name: &str) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
-        let options = execution_engine::Options {
-            enable_clock: *self.global_policy.enable_clock(),
-            ..Default::default()
-        };
-        let return_code = execute(&execution_strategy, self.vfs.clone(), file_name, options)?;
+        println!("file_name: {}", file_name);
+        let return_code = execute(&execution_strategy, &self.vfs.spawn(&Principal::Program(file_name.to_string()))?, file_name)?;
 
         let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))

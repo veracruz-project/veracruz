@@ -13,7 +13,7 @@ use clap::{App, Arg};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::{error::Error, fs::File, io::prelude::*, path::Path, vec::Vec};
+use std::{error::Error, fs, path::Path, vec::Vec, io::Write};
 
 // pinecone does not support u128, so we use two u64 representing the id
 
@@ -100,10 +100,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut rng = StdRng::seed_from_u64(seed);
 
     for i in 0..iter {
-        let input = generate(&mut rng, size as usize);
-        let bytes = pinecone::to_vec(&input).unwrap();
-        let path = dir.join(format!("data-{}-{}.dat", size, i));
-        File::create(path)?.write(bytes.as_slice())?;
+        let (data, sample) = generate(&mut rng, size as usize);
+        let data = pinecone::to_vec(&data).unwrap();
+        let sample = pinecone::to_vec(&sample).unwrap();
+        let path = dir.join(format!("data-{}-{}", size, i));
+        println!("path: {:?}",path);
+        fs::create_dir_all(&path)?;
+        std::fs::OpenOptions::new().write(true).truncate(true).open(path.join("data.dat"))?.write(data.as_slice())?;
+        std::fs::OpenOptions::new().write(true).truncate(true).open(path.join("sample.dat"))?.write(sample.as_slice())?;
     }
     Ok(())
 }
@@ -142,7 +146,7 @@ impl Unique {
     }
 }
 
-fn generate(rng: &mut impl Rng, size: usize) -> Input {
+fn generate(rng: &mut impl Rng, size: usize) -> (Data, Sample) {
     let mut ids = Unique::with_capacity(size);
 
     let mut data = Vec::with_capacity(size);
@@ -160,5 +164,5 @@ fn generate(rng: &mut impl Rng, size: usize) -> Input {
     }
     sample.shuffle(rng);
 
-    Input { data, sample }
+    (data, sample)
 }

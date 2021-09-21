@@ -35,7 +35,7 @@ use anyhow;
 /// and fails with `return_code::ErrorCode::BadInput` if the input cannot be
 /// decoded from `pinecone` into a Rust vector of floating-point pairs.
 fn read_input() -> anyhow::Result<Vec<(f64, f64)>> {
-    let input = fs::read("/input-0")?;
+    let input = fs::read("/input/linear-regression.dat")?;
     Ok(pinecone::from_bytes(&input)?)
 }
 
@@ -93,6 +93,6 @@ fn main() -> anyhow::Result<()> {
     let data = read_input()?;
     let result = linear_regression(&data);
     let result_encode = pinecone::to_vec(&result)?;
-    fs::write("/output", result_encode)?;
+    fs::write("/output/linear-regression.dat", result_encode)?;
     Ok(())
 }

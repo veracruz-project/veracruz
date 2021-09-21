@@ -25,7 +25,7 @@ use anyhow;
 
 /// Write 32 random bytes to 'output'. The result is a Pinecone-encoded vector of u8.
 fn main() -> anyhow::Result<()> {
-    let output = "/output";
+    let output = "/output/random.dat";
     let bytes = rand::thread_rng().gen::<[u8; 32]>();
     let rst = pinecone::to_vec(&bytes.to_vec())?;
     fs::write(output, rst)?;

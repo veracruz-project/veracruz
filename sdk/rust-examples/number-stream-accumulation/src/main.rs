@@ -40,18 +40,18 @@ fn main() -> anyhow::Result<()> {
     let (stream1, stream2) = read_stream((count * 8) as u64)?;
     let result_encode =
         pinecone::to_vec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))?;
-    fs::write("/output", result_encode)?;
+    fs::write("/output/accumulation.dat", result_encode)?;
     Ok(())
 }
 
 /// Read 'output' if exists. Othewise read 'input-0'.
 fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
-    let mut file = match File::open("/output") {
+    let mut file = match File::open("/output/accumulation.dat") {
         Ok(o) => o,
         Err(e) => match e.kind() {
             // Not found the last result, read the init.
             ErrorKind::NotFound => {
-                let input = fs::read("/input-0")?;
+                let input = fs::read("/input/number-stream-init.dat")?;
                 let init = pinecone::from_bytes(&input)?;
                 return Ok((0, init));
             }
@@ -67,13 +67,13 @@ fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
 
 /// Read from 'stream-0' and 'stream-1' at `offset`
 fn read_stream(offset: u64) -> anyhow::Result<(f64, f64)> {
-    let mut stream0 = File::open("/stream-0")?;
+    let mut stream0 = File::open("/input/number-stream-1.dat")?;
     stream0.seek(SeekFrom::Start(offset))?;
     let mut data0 = Vec::new();
     stream0.read_to_end(&mut data0)?;
     let n1: f64 = pinecone::from_bytes(&data0)?;
 
-    let mut stream1 = File::open("/stream-1")?;
+    let mut stream1 = File::open("/input/number-stream-2.dat")?;
     stream1.seek(SeekFrom::Start(offset))?;
     let mut data1 = Vec::new();
     stream1.read_to_end(&mut data1)?;

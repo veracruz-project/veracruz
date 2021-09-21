@@ -192,6 +192,17 @@ pub fn serialize_program_data(data_buffer: &[u8], file_name: &str) -> TransportP
 }
 
 /// Serialize a (static) data package and its package ID.
+pub fn serialize_write_file(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
+    let mut data = transport_protocol::Data::new();
+    data.set_data(data_buffer.to_vec());
+    data.set_file_name(file_name.to_string());
+    let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
+    transport_protocol.set_write_file(data);
+
+    Ok(transport_protocol.write_to_bytes()?)
+}
+
+/// Serialize a (static) data package and its package ID.
 pub fn serialize_read_file(file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Read::new();
     data.set_file_name(file_name.to_string());

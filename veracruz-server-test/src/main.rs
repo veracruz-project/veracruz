@@ -315,23 +315,13 @@ mod tests {
             policy_path(BASIC_FILE_READ_WRITE_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(READ_FILE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[(
-                "input.txt",
-                data_dir(STRING_1_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
+            &[("/program/read-file.wasm",program_path(READ_FILE_WASM).to_string_lossy().into_owned().as_str())],
+            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA).to_string_lossy().into_owned().as_str())],
             &[],
-            &["/output"],
+            &["/output/hello-world-1.dat"],
         )
         .unwrap();
+        assert!(result.is_ok(), "error:{:?}", result);
     }
 
     #[test]
@@ -344,15 +334,10 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(RANDOM_SOURCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
             &[],
             &[],
-            &["/output"],
+            &["/output/random.dat"],
         )
         .unwrap();
     }
@@ -364,10 +349,10 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            None,
             &[],
             &[],
-            &["/output"],
+            &[],
+            &["/output/random.dat"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -380,15 +365,10 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(STRING_EDIT_DISTANCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str())],
             &[],
             &[],
-            &["/output"],
+            &["/output/random.dat"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -401,15 +381,10 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(UNAUTHORIZED_KEY).as_path(),
-            Some(
-                program_path(RANDOM_SOURCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
             &[],
             &[],
-            &["/output"],
+            &["/output/random.dat"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -422,15 +397,10 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(UNAUTHORIZED_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(RANDOM_SOURCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
             &[],
             &[],
-            &["/output"],
+            &["/output/random.dat"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -443,42 +413,10 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(UNAUTHORIZED_CERT).as_path(),
             trust_path(UNAUTHORIZED_KEY).as_path(),
-            Some(
-                program_path(RANDOM_SOURCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
             &[],
             &[],
-            &["/output"],
-        );
-
-        assert!(result.is_err(), "An error should occur");
-    }
-
-    #[test]
-    /// Attempt to provision more data than expected
-    fn test_phase2_random_source_one_data_no_attestation() {
-        let result = test_template(
-            policy_path(GET_RANDOM_POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(RANDOM_SOURCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[(
-                "input-0",
-                data_dir(LINEAR_REGRESSION_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
-            &[],
-            &["/output"],
+            &["/output/random.dat"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -496,21 +434,10 @@ mod tests {
             policy_path(LINEAR_REGRESSION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(LINEAR_REGRESSION_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[(
-                "input-0",
-                data_dir(LINEAR_REGRESSION_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
+            &[("input-0""/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
             &[],
-            &["/output"],
+            &["/output/linear-regression.dat"],
         )
         .unwrap();
     }
@@ -522,15 +449,10 @@ mod tests {
             policy_path(LINEAR_REGRESSION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(LINEAR_REGRESSION_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
             &[],
             &[],
-            &["/output"],
+            &["/output/linear-regression.dat"],
         );
 
         assert!(result.is_err(), "An error should occur");
@@ -554,31 +476,14 @@ mod tests {
             policy_path(TWO_DATA_SOURCE_INTERSECTION_SET_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str())],
             &[
                 // message sends out in the reversed order
-                (
-                    "input-1",
-                    data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "input-0",
-                    data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
+                ("/input/intersection-customer.dat", data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA).to_string_lossy().into_owned().as_str()),
+                ("/input/intersection-advertisement-viewer.dat", data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).to_string_lossy().into_owned().as_str()),
             ],
             &[],
-            &["/output"],
+            &["/output/intersection-set-sum.dat"],
         )
         .unwrap();
     }
@@ -593,30 +498,11 @@ mod tests {
             policy_path(TWO_DATA_SOURCE_STRING_EDIT_DISTANCE_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(STRING_EDIT_DISTANCE_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[
-                (
-                    "input-0",
-                    data_dir(STRING_1_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "input-1",
-                    data_dir(STRING_2_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-            ],
+            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str())],
+            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA).to_string_lossy().into_owned().as_str()),
+              ("/input/hello-world-2.dat", data_dir(STRING_2_DATA).to_string_lossy().into_owned().as_str())],
             &[],
-            &["/output"],
+            &["/output/string-edit-distance.dat"],
         )
         .unwrap();
     }
@@ -634,21 +520,10 @@ mod tests {
             policy_path(ONE_DATA_SOURCE_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(LINEAR_REGRESSION_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[(
-                "input-0",
-                data_dir(LINEAR_REGRESSION_DATA)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            )],
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
+            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
             &[],
-            &["/output"],
+            &["/output/linear-regression.dat"],
         )
         .unwrap();
     }
@@ -664,30 +539,13 @@ mod tests {
             policy_path(TWO_DATA_SOURCE_PRIVATE_SET_INTERSECTION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(PERSON_SET_INTERSECTION_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/private-set-intersection.wasm",program_path(PERSON_SET_INTERSECTION_WASM).to_string_lossy().into_owned().as_str())],
             &[
-                (
-                    "input-0",
-                    data_dir(PERSON_SET_1_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "input-1",
-                    data_dir(PERSON_SET_2_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
+                ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA).to_string_lossy().into_owned().as_str()),
+                ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA).to_string_lossy().into_owned().as_str()),
             ],
             &[],
-            &["/output"],
+            &["/output/private-set.dat"],
         )
         .unwrap();
     }
@@ -703,11 +561,11 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
-            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-                            ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
-            &["/output"],
+            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
+            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
+            &[("/input/number-stream-1.dat", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
+              ("/input/number-stream-2.dat", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            &["/output/accumulation.dat"],
         )
         .unwrap();
     }
@@ -719,10 +577,10 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
-            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str())],
-            &["/output"],
+            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
+            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
+            &[("/input/number-stream-1.dat", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str())],
+            &["/output/accumulation.dat"],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -734,58 +592,11 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(NUMBER_STREM_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
+            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
             &[],
-            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-                            ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
-            &["/output"],
-        );
-        assert!(result.is_err(), "An error should occur");
-    }
-
-    #[test]
-    /// Attempt to provision more stream data.
-    fn test_phase4_number_stream_accumulation_no_data_three_stream_with_attestation() {
-        let result = test_template(
-            policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            Some(
-                program_path(NUMBER_STREM_WASM)
-                    .to_string_lossy()
-                    .into_owned()
-                    .as_str(),
-            ),
-            &[],
-            &[
-                (
-                    "stream-0",
-                    data_dir(VEC_F64_1_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "stream-1",
-                    data_dir(VEC_F64_2_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-                (
-                    "stream-2",
-                    data_dir(VEC_F64_1_DATA)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
-            ],
-            &["/output"],
+            &[("/input/number-stream-1.dat", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
+              ("/input/number-stream-2.dat", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            &["/output/accumulation.dat"],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -795,6 +606,7 @@ mod tests {
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
+    /// TODO REWORK!!
     fn test_performance_idash2017_with_attestation() {
         iterate_over_data(data_dir(LOGISTICS_REGRESSION_DATA_PATH).as_path(), |data_path| {
             info!("Data path: {}", data_path.to_string_lossy());
@@ -802,7 +614,7 @@ mod tests {
                 policy_path(IDASH2017_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(program_path(LOGISTICS_REGRESSION_WASM).to_string_lossy().into_owned().as_str()),
+                &[("idash2017-logistic-regression.wasm",program_path(LOGISTICS_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
                 &["/output"],
@@ -816,6 +628,7 @@ mod tests {
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
+    /// TODO REWORK!!
     fn test_performance_macd_with_attestation() {
         iterate_over_data(data_dir(MACD_DATA_PATH).as_path(), |data_path| {
             info!("Data path: {}", data_path.to_string_lossy());
@@ -825,12 +638,7 @@ mod tests {
                 policy_path(MACD_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(
-                    program_path(MACD_WASM)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
+                &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM).to_string_lossy().into_owned().as_str())],
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
                 &["/output"],
@@ -851,6 +659,7 @@ mod tests {
     /// - Manually copy all *.dat to sdk/datasets/macd
     #[test]
     #[ignore]
+    /// TODO REWORK!!
     fn test_multiple_keys() {
         iterate_over_data(data_dir(MACD_DATA_PATH).as_path(), |data_path| {
             // call the test_template with info flag on,
@@ -859,12 +668,7 @@ mod tests {
                 policy_path(MULTIPLE_KEY_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(
-                    program_path(MACD_WASM)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
+                &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM).to_string_lossy().into_owned().as_str())],
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
                 &["/output"],
@@ -878,6 +682,7 @@ mod tests {
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: intersection-sum, matching the setting in .
     /// data sources: private-set-inter-sum/*.dat
+    /// TODO REWORK!!!
     fn test_performance_set_intersection_sum_with_attestation() {
         iterate_over_data(data_dir("private-set-inter-sum").as_path(), |data_path| {
             info!("Data path: {}", data_path.display());
@@ -887,12 +692,7 @@ mod tests {
                 policy_path(PRIVATE_SET_INTER_SUM_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(
-                    program_path(INTERSECTION_SET_SUM_WASM)
-                        .to_string_lossy()
-                        .into_owned()
-                        .as_str(),
-                ),
+                &[("/progra/private-set-intersection-sum.wasm",program_path(INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str())],
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
                 &["/output"],
@@ -910,7 +710,7 @@ mod tests {
         policy_path: &Path,
         client_cert_path: &Path,
         client_key_path: &Path,
-        program_path: Option<&str>,
+        program_path: &[(&str, &str)],
         // Assuming there is a single data provider,
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
@@ -988,18 +788,21 @@ mod tests {
 
         // Need to clone paths to concrete strings,
         // so the ownership can be transferred into a client thread.
-        let program_path: Option<String> = program_path.map(|p| p.to_string());
+        let program_path: Vec<_> = program_path
+            .iter()
+            .map(|(remote_path, path)| (remote_path.to_string(), path.to_string()))
+            .collect();
         // Assuming we are using single data provider,
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
         let data_id_paths: Vec<_> = data_id_paths
             .iter()
-            .map(|(number, path)| (number.to_string(), path.to_string()))
+            .map(|(remote_path, path)| (remote_path.to_string(), path.to_string()))
             .collect();
         let stream_id_paths: Vec<_> = stream_id_paths
             .iter()
-            .map(|(number, path)| (number.to_string(), path.to_string()))
+            .map(|(remote_path, path)| (remote_path.to_string(), path.to_string()))
             .collect();
         let output_files: Vec<_> = output_files
             .iter()
@@ -1017,17 +820,18 @@ mod tests {
             );
 
             //TODO: change to the actually remote filename
-            let program_file_name = if let Some(path) = program_path.as_ref() {
-                Path::new(path).file_name().unwrap().to_str().unwrap()
-            } else {
-                "no_program"
-            };
-            // if there is a program provided
-            if let Some(path) = program_path.as_ref() {
-                let time_provision_data = Instant::now();
-                info!("Checking policy hash...");
-                check_policy_hash(
+            //let program_file_name = if let Some(path) = program_path.as_ref() {
+                //Path::new(path).file_name().unwrap().to_str().unwrap()
+            //} else {
+                //"no_program"
+            //};
+            for (remote_file_name, data_path) in program_path.iter() {
+                let time_provosion_data = Instant::now();
+
+                check_hash(
+                    &policy,
                     &policy_hash,
+                    &test_target_platform,
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -1035,19 +839,14 @@ mod tests {
                     &client_tls_rx,
                 )?;
 
-                info!("Policy hash OK...");
-
-                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
-
-                info!("Provisioning program...");
-
-                let response = provision_program(
+                let response = provision_data(
                     Path::new(path),
                     client_session_id,
                     &mut client_session,
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
+                    &remote_file_name
                 )?;
                 info!(
                     "             Client received acknowledgement after sending program: {:?}",
@@ -1066,15 +865,16 @@ mod tests {
                     remote_file_name
                 );
                 let time_data_hash = Instant::now();
-                check_policy_hash(
+                check_hash(
+                    &policy,
                     &policy_hash,
+                    &test_target_platform,
                     client_session_id,
                     &mut client_session,
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
-                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
                 info!(
                     "             Data provider hash response time (μs): {}.",
                     time_data_hash.elapsed().as_micros()
@@ -1118,7 +918,16 @@ mod tests {
                     stream_data_vec.push(decoded_data);
                 }
 
-                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
+                check_hash(
+                    &policy,
+                    &policy_hash,
+                    &test_target_platform,
+                    client_session_id,
+                    &mut client_session,
+                    ticket,
+                    &client_tls_tx,
+                    &client_tls_rx,
+                )?;
 
                 // Reverse the vec so we can use `pop` for the `first` element of the list.
                 // In each round of stream, the loop pops an element from the `stream_data_vec`
@@ -1143,8 +952,10 @@ mod tests {
                     count += 1;
                     for (remote_file_name, data) in next_round_data.iter() {
                         let time_stream_hash = Instant::now();
-                        check_policy_hash(
+                        check_hash(
+                            &policy,
                             &policy_hash,
+                            &test_target_platform,
                             client_session_id,
                             &mut client_session,
                             ticket,
@@ -1178,39 +989,42 @@ mod tests {
                             time_stream.elapsed().as_micros()
                         );
                     }
-                    info!(
-                        "### Step 8.  Result retrievers request program {}.",
-                        program_file_name
-                    );
-                    let time_result_hash = Instant::now();
-                    check_policy_hash(
-                        &policy_hash,
-                        client_session_id,
-                        &mut client_session,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                    )?;
-                    check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
-                    info!(
-                        "             Result retriever hash response time (μs): {}.",
-                        time_result_hash.elapsed().as_micros()
-                    );
-                    let time_result = Instant::now();
-                    info!("             Result retrievers request result.");
-                    let response = client_tls_send(
-                        &client_tls_tx,
-                        &client_tls_rx,
-                        client_session_id,
-                        &mut client_session,
-                        ticket,
-                        &transport_protocol::serialize_request_result(program_file_name)?
-                            .as_slice(),
-                    )?;
-                    info!(
-                        "             Computation result time (μs): {} with return code (undecoded) {:?}.",
-                        time_result.elapsed().as_micros(), response
-                    );
+                    for (remote_file_name, _) in program_path.iter() {
+                        info!(
+                            "### Step 8.  Result retrievers request program {}.",
+                            remote_file_name
+                        );
+                        let time_result_hash = Instant::now();
+                        check_hash(
+                            &policy,
+                            &policy_hash,
+                            &test_target_platform,
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &client_tls_tx,
+                            &client_tls_rx,
+                        )?;
+                        info!(
+                            "             Result retriever hash response time (μs): {}.",
+                            time_result_hash.elapsed().as_micros()
+                        );
+                        let time_result = Instant::now();
+                        info!("             Result retrievers request result.");
+                        let response = client_tls_send(
+                            &client_tls_tx,
+                            &client_tls_rx,
+                            client_session_id,
+                            &mut client_session,
+                            ticket,
+                            &transport_protocol::serialize_request_result(remote_file_name)?
+                                .as_slice(),
+                        )?;
+                        info!(
+                            "             Computation result time (μs): {} with return code (undecoded) {:?}.",
+                            time_result.elapsed().as_micros(), response
+                        );
+                    }
 
                     info!("### Step 9.  Client read and decodes the result.");
                     for remote_file_name in &output_files {
@@ -1237,39 +1051,42 @@ mod tests {
                 info!("------------ Stream-Result-Next End  ------------");
             } else {
                 info!("### Step 7.  NOT in streaming mode.");
-                info!(
-                    "### Step 8.  Result retrievers request program {}.",
-                    program_file_name
-                );
-                let time_result_hash = Instant::now();
-                check_policy_hash(
-                    &policy_hash,
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
-
-                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
-                info!(
-                    "             Result retriever hash response time (μs): {}.",
-                    time_result_hash.elapsed().as_micros()
-                );
-                let time_result = Instant::now();
-                info!("             Result retrievers request result.");
-                let response = client_tls_send(
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &transport_protocol::serialize_request_result(program_file_name)?.as_slice(),
-                )?;
-                info!(
-                    "             Computation result time (μs): {} with return code (undecoded) {:?}.",
-                    time_result.elapsed().as_micros(), response
-                );
+                for (remote_file_name, _) in program_path.iter() {
+                    info!(
+                        "### Step 8.  Result retrievers request program {}.",
+                        remote_file_name
+                    );
+                    let time_result_hash = Instant::now();
+                    check_hash(
+                        &policy,
+                        &policy_hash,
+                        &test_target_platform,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                    )?;
+                    info!(
+                        "             Result retriever hash response time (μs): {}.",
+                        time_result_hash.elapsed().as_micros()
+                    );
+                    let time_result = Instant::now();
+                    info!("             Result retrievers request result.");
+                    let response = client_tls_send(
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &transport_protocol::serialize_request_result(remote_file_name)?
+                            .as_slice(),
+                    )?;
+                    info!(
+                        "             Computation result time (μs): {} with return code (undecoded) {:?}.",
+                        time_result.elapsed().as_micros(), response
+                    );
+                }
                 info!("### Step 9.  Client read and decodes the result.");
                 for remote_file_name in &output_files {
                     info!("             Read {}.", remote_file_name);
@@ -1413,32 +1230,62 @@ mod tests {
         })
     }
 
-    fn provision_program(
-        filename: &Path,
+    fn check_hash(
+        policy: &Policy,
+        policy_hash: &str,
+        test_target_platform: &Platform,
         client_session_id: u32,
         client_session: &mut dyn rustls::Session,
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let mut program_file = std::fs::File::open(filename)?;
-        let mut program_text = std::vec::Vec::new();
-
-        program_file.read_to_end(&mut program_text)?;
-
-        let serialized_program_text = transport_protocol::serialize_program(
-            &program_text,
-            Path::new(filename).file_name().unwrap().to_str().unwrap(),
-        )?;
-        client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
+    ) -> Result<(), VeracruzServerError> {
+        check_policy_hash(
+            policy_hash,
             client_session_id,
             client_session,
             ticket,
-            &serialized_program_text[..],
-        )
+            client_tls_tx,
+            client_tls_rx,
+        )?;
+        info!("Policy hash OK...");
+        check_runtime_manager_hash(policy,
+                                   client_session,
+                                   test_target_platform)?;
+        Ok(())
     }
+
+    //fn provision_program(
+        //filename: &Path,
+        //client_session_id: u32,
+        //client_session: &mut dyn rustls::Session,
+        //ticket: u32,
+        //client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
+        //client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
+    //) -> Result<Vec<u8>, VeracruzServerError> {
+        //let mut program_file = std::fs::File::open(filename)?;
+        //let mut program_text = std::vec::Vec::new();
+
+        //program_file.read_to_end(&mut program_text)?;
+        //// TODO remove
+        //let remote_file_name = 
+            //Path::new("/program").join(Path::new(filename).file_name().unwrap());
+        //let remote_file_name = remote_file_name.to_str().unwrap();
+        //info!("remote_file_name: {}",remote_file_name);
+
+        //let serialized_program_text = transport_protocol::serialize_write_file(
+            //&program_text,
+            //remote_file_name,
+        //)?;
+        //client_tls_send(
+            //client_tls_tx,
+            //client_tls_rx,
+            //client_session_id,
+            //client_session,
+            //ticket,
+            //&serialized_program_text[..],
+        //)
+    //}
 
     fn check_policy_hash(
         expected_policy_hash: &str,
@@ -1609,7 +1456,7 @@ mod tests {
             data_file.read_to_end(&mut data_buffer)?;
             data_buffer
         };
-        let serialized_data = transport_protocol::serialize_program_data(&data, remote_file_name)?;
+        let serialized_data = transport_protocol::serialize_write_file(&data, remote_file_name)?;
 
         client_tls_send(
             client_tls_tx,

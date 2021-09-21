@@ -30,14 +30,14 @@ use image::{GenericImageView, imageops, ImageFormat};
 fn main() -> anyhow::Result<()> {
     // Use the open function to load an image from a Path.
     // `open` returns a `DynamicImage` on success.
-    let mut img = image::open("/test.png")?;
+    let mut img = image::open("/input/image-processing.png")?;
 
     // Transform the image
     let subimg = imageops::crop(&mut img, 0, 0, 100, 100);
     println!("new dimensions: {:?}", subimg.dimensions());
 
     // Write the contents of this image to the Writer in PNG format.
-    subimg.to_image().save_with_format("/output", ImageFormat::Png)?;
+    subimg.to_image().save_with_format("/output/image-processing.png", ImageFormat::Png)?;
 
     Ok(())
 }

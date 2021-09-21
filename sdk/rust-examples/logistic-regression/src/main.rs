@@ -218,8 +218,8 @@ fn read_all_datasets(input: &[Vec<u8>]) -> anyhow::Result<Vec<Dataset>> {
 /// if the deserialization of any dataset fails for any reason, or if the
 /// datasets have differing dimensionalities.
 fn read_input() -> anyhow::Result<Dataset> {
-    let i0 = fs::read("/input-0")?;
-    let i1 = fs::read("/input-1")?;
+    let i0 = fs::read("/input/logistic-regression-0.dat")?;
+    let i1 = fs::read("/input/logistic-regression-1.dat")?;
     let datas = read_all_datasets(&vec![i0, i1])?;
     Ok(flatten(&datas))
 }
@@ -254,6 +254,6 @@ fn main() -> anyhow::Result<()> {
     let dataset = read_input()?;
     let model = train(&dataset)?;
     let result_encode = pinecone::to_vec::<Vec<f64>>(&model)?;
-    fs::write("/output", result_encode)?;
+    fs::write("/output/logistic-regression.dat", result_encode)?;
     Ok(())
 }

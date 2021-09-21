@@ -15,9 +15,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use serde::Deserialize;
-use std::{collections::HashSet, fs};
-use anyhow;
+use std::{collections::HashSet, fs, path::{PathBuf, Path}};
+use anyhow::anyhow;
 
 /// The identifier of each customer, a pair of `u64` values.
 type Id = (u64, u64);
@@ -33,22 +32,19 @@ type Sample = Vec<Id>;
 // Reading inputs.
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Deserialize, Debug, Eq, PartialEq)]
-struct Input {
-    /// The customers and the amount of money they spent.
-    data: Data,
-    /// The sample to test within the customer data set, above.  Note in a real
-    /// application this would be assumed to originate from a principal distinct
-    /// from the principal supplying the input data set.  Here, we simply assume
-    /// that the two are provided by the same principal.
-    sample: Sample,
-}
-
 /// Reads exactly one input, which is assumed to be a Pinecone-encoded `Input`
 /// struct, as above.
-fn read_inputs() -> anyhow::Result<Input> {
-    let input = fs::read("/input-0")?;
-    Ok(pinecone::from_bytes(input.as_slice())?)
+fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Data, Sample)> {
+    let mut sample_path = path.as_ref().to_path_buf();
+    sample_path.push("sample.dat");
+    let sample = fs::read(sample_path)?;
+    let sample = pinecone::from_bytes(sample.as_slice())?;
+
+    let mut data_path = path.as_ref().to_path_buf();
+    data_path.push("data.dat");
+    let data = fs::read(data_path)?;
+    let data = pinecone::from_bytes(data.as_slice())?;
+    Ok((data, sample))
 }
 
 /// Computes the set intersection-sum, returning the number of elements the sample and input
@@ -68,9 +64,14 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 /// The program entry point: reads exactly one input, decodes it and computes the set
 /// intersection-sum before re-encoding it into Pinecone and returning.
 fn main() -> anyhow::Result<()> {
-    let data = read_inputs()?;
-    let result = set_intersection_sum(data.data, data.sample);
-    let result_encode = pinecone::to_vec::<(usize, u64)>(&result)?;
-    fs::write("/output", result_encode)?;
+    for path in fs::read_dir("/input/private-set-inter-sum/")? {
+        let path = path?.path();
+        let (data, sample) = read_inputs(&path)?;
+        let result = set_intersection_sum(data, sample);
+        let result_encode = pinecone::to_vec::<(usize, u64)>(&result)?;
+        let mut output = PathBuf::from("/output/private-set-inter-sum/");
+        output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
+        fs::write(output, result_encode)?;
+    }
     Ok(())
 }

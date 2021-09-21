@@ -24,8 +24,8 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::fs;
-use anyhow;
+use std::{fs, path::{PathBuf, Path}};
+use anyhow::anyhow;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reading inputs.
@@ -33,8 +33,8 @@ use anyhow;
 
 /// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
 /// values.
-fn read_inputs() -> anyhow::Result<Vec<f64>> {
-    let input = fs::read("/input-0")?;
+fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<Vec<f64>> {
+    let input = fs::read(path.as_ref())?;
     Ok(pinecone::from_bytes(&input)?)
 }
 
@@ -161,10 +161,15 @@ fn dec_approx(data: &[f64], norm: f64) -> Vec<f64> {
 /// Entry point: reads the vector of floats, processes them, and writes back a new vector of
 /// floats as output.
 fn main() -> anyhow::Result<()> {
-    let dataset = read_inputs()?;
-    let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
-        computation(dataset.as_slice());
-    let result_encode = pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx)?;
-    fs::write("/output", result_encode)?;
+    for path in fs::read_dir("/input/macd/")? {
+        let path = path?.path();
+        let dataset = read_inputs(&path)?;
+        let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
+            computation(dataset.as_slice());
+        let result_encode = pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx)?;
+        let mut output = PathBuf::from("/output/macd/");
+        output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
+        fs::write(output, result_encode)?;
+    }
     Ok(())
 }

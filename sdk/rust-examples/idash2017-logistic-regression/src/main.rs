@@ -30,7 +30,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::fs;
+use std::{fs, path::{PathBuf, Path}};
 use anyhow::anyhow;
 ////////////////////////////////////////////////////////////////////////////////
 // Reading input
@@ -47,8 +47,8 @@ type Dataset = Vec<Vec<f64>>;
 ///   - [`return_code::ErrorCode::DataSourceCount`] if the number of inputs provided to the
 ///     program is not exactly 1.
 ///
-fn read_inputs() -> anyhow::Result<(Dataset, Dataset, u32, u32, i32, i32)> {
-    let input = fs::read("/input-0")?;
+fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Dataset, Dataset, u32, u32, i32, i32)> {
+    let input = fs::read(path.as_ref())?;
     Ok(pinecone::from_bytes(&input)?)
 }
 
@@ -280,17 +280,22 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> anyhow::Result<f64> {
 /// them together into a single compound dataset, then trains a logistic regressor on this new
 /// dataset.  Input and output are assumed to be encoded in Pinecone.
 fn main() -> anyhow::Result<()> {
-    let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
-        read_inputs()?;
-    let (w_data, correct, auc) = nlgd(
-        &mut train_set,
-        &mut test_set,
-        num_of_iter,
-        degree_of_sigmoid,
-        gamma_up,
-        gamma_down,
-    )?;
-    let result_encode = pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
-    fs::write("/output", result_encode)?;
+    for path in fs::read_dir("/input/idash2017/")? {
+        let path = path?.path();
+        let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
+            read_inputs(&path)?;
+        let (w_data, correct, auc) = nlgd(
+            &mut train_set,
+            &mut test_set,
+            num_of_iter,
+            degree_of_sigmoid,
+            gamma_up,
+            gamma_down,
+        )?;
+        let result_encode = pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
+        let mut output = PathBuf::from("/output/idash2017/");
+        output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
+        fs::write(output, result_encode)?;
+    }
     Ok(())
 }

@@ -18,8 +18,8 @@ use anyhow;
 
 /// Read from 'input.txt', encode then using pinecone and write to 'output'.
 fn main() -> anyhow::Result<()> {
-    let input = "/input/input.txt";
-    let output = "/output/output.txt";
+    let input = "/input/hello-world-1.dat";
+    let output = "/output/hello-world-1.dat";
 
     let mut input_string = fs::read(input)?;
 

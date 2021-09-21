@@ -29,8 +29,8 @@ use anyhow;
 ///   provided to the program is not exactly 2.
 ///
 fn read_inputs() -> anyhow::Result<(String, String)> {
-    let this = String::from_utf8(fs::read("/input-0")?)?;
-    let that = String::from_utf8(fs::read("/input-1")?)?;
+    let this = String::from_utf8(fs::read("/input/hello-world-1.dat")?)?;
+    let that = String::from_utf8(fs::read("/input/hello-world-2.dat")?)?;
 
     Ok((this, that))
 }
@@ -43,6 +43,6 @@ fn main() -> anyhow::Result<()> {
     let (left, right) = read_inputs()?;
     let distance = jaro_winkler(&left, &right);
     let result_encode = pinecone::to_vec::<f64>(&distance)?;
-    fs::write("/output", result_encode)?;
+    fs::write("/output/string-edit-distance.dat", result_encode)?;
     Ok(())
 }
