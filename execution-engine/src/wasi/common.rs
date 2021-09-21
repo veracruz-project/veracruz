@@ -18,8 +18,11 @@
 #![allow(non_camel_case_types)]
 
 use crate::fs::{FileSystem, FileSystemResult};
+use crate::Options;
+
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
+use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
@@ -29,7 +32,8 @@ use veracruz_utils::policy::principal::Principal;
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
     IoVec, LookupFlags, OpenFlags, RiFlags, Rights, RoFlags, SdFlags, SetTimeFlags, SiFlags,
-    Signal, Subscription, SubscriptionClock, SubscriptionFdReadwrite, SubscriptionUnion, Whence,
+    Signal, Subscription, SubscriptionClock, SubscriptionFdReadwrite, SubscriptionUnion, Timestamp,
+    Whence,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -365,6 +369,8 @@ pub struct WasiWrapper {
     principal: Principal,
     /// The exit code, if program calls proc_exit.
     exit_code: Option<u32>,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.
+    pub enable_clock: bool,
 }
 
 impl WasiWrapper {
@@ -388,6 +394,7 @@ impl WasiWrapper {
             program_arguments: Vec::new(),
             principal,
             exit_code: None,
+            enable_clock: false,
         }
     }
 
@@ -406,6 +413,20 @@ impl WasiWrapper {
     #[inline]
     pub(crate) fn exit_code(&self) -> Option<u32> {
         self.exit_code
+    }
+
+    /// Return a timestamp value for use by "filestat" functions,
+    /// which will be zero if the clock is not enabled.
+    fn filestat_time(&self) -> Timestamp {
+        let time0 = Timestamp::from_nanos(0);
+        if !self.enable_clock {
+            time0
+        } else {
+            match getclocktime(ClockId::RealTime as u8) {
+                result::Result::Success(timespec) => Timestamp::from_nanos(timespec),
+                _ => time0,
+            }
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -493,10 +514,17 @@ impl WasiWrapper {
         clock_id: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
-        let fs = self.lock_vfs()?;
-        let time = fs.clock_res_get(clock_id)?;
-        memory_ref.write_u64(address, time.as_nanos())
+        let result = if !self.enable_clock {
+            Err(ErrNo::Access)
+        } else {
+            let clock_id = clock_id as u8;
+            match getclockres(clock_id) {
+                result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
+                result::Result::Unavailable => Err(ErrNo::NoSys),
+                _ => Err(ErrNo::Inval),
+            }
+        }?;
+        memory_ref.write_u64(address, result.as_nanos())
     }
 
     /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
@@ -505,13 +533,20 @@ impl WasiWrapper {
         &mut self,
         memory_ref: &mut T,
         clock_id: u32,
-        precision: u64,
+        _precision: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
-        let fs = self.lock_vfs()?;
-        let time = fs.clock_time_get(clock_id, precision.into())?;
-        memory_ref.write_u64(address, time.as_nanos())
+        let result = if !self.enable_clock {
+            Err(ErrNo::Access)
+        } else {
+            let clock_id = clock_id as u8;
+            match getclocktime(clock_id) {
+                result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
+                result::Result::Unavailable => Err(ErrNo::NoSys),
+                _ => Err(ErrNo::Inval),
+            }
+        }?;
+        memory_ref.write_u64(address, result.as_nanos())
     }
 
     /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
@@ -645,7 +680,13 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
         let mut fs = self.lock_vfs()?;
-        fs.fd_filestat_set_times(fd.into(), atime.into(), mtime.into(), fst_flag)
+        fs.fd_filestat_set_times(
+            fd.into(),
+            atime.into(),
+            mtime.into(),
+            fst_flag,
+            self.filestat_time(),
+        )
     }
 
     /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
@@ -896,7 +937,15 @@ impl WasiWrapper {
         let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
         let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
         let mut fs = self.lock_vfs()?;
-        fs.path_filestat_set_times(fd.into(), flags, path, atime.into(), mtime.into(), fst_flag)
+        fs.path_filestat_set_times(
+            fd.into(),
+            flags,
+            path,
+            atime.into(),
+            mtime.into(),
+            fst_flag,
+            self.filestat_time(),
+        )
     }
 
     /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
@@ -1094,9 +1143,12 @@ impl WasiWrapper {
         buf_ptr: u32,
         length: u32,
     ) -> FileSystemResult<()> {
-        let fs = self.lock_vfs()?;
-        let bytes = fs.random_get(length)?;
-        memory_ref.write_buffer(buf_ptr, &bytes)
+        let mut bytes = vec![0; length as usize];
+        if getrandom(&mut bytes).is_success() {
+            memory_ref.write_buffer(buf_ptr, &bytes)
+        } else {
+            Err(ErrNo::NoSys)
+        }
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
@@ -1317,5 +1369,9 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<u32, FatalEngineError>;
+    fn invoke_entry_point(
+        &mut self,
+        file_name: &str,
+        options: Options,
+    ) -> Result<u32, FatalEngineError>;
 }

@@ -15,6 +15,7 @@ use crate::{
         EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
         WasiAPIName, WasiWrapper,
     },
+    Options,
 };
 use num::FromPrimitive;
 use std::sync::{Arc, Mutex};
@@ -1220,7 +1221,12 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, file_name: &str) -> Result<u32, FatalEngineError> {
+    fn invoke_entry_point(
+        &mut self,
+        file_name: &str,
+        options: Options,
+    ) -> Result<u32, FatalEngineError> {
+        self.vfs.enable_clock = options.enable_clock;
         let program = self.vfs.read_file_by_filename(file_name)?;
         self.load_program(program.as_slice())?;
         self.program = Principal::Program(file_name.to_string());

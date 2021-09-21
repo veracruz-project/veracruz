@@ -24,7 +24,7 @@
 //! and copyright information.
 
 use clap::{App, Arg};
-use execution_engine::{execute, fs::FileSystem};
+use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use std::{
     collections::HashMap,
@@ -348,11 +348,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
     right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(
-        right_table,
-        &std_streams_table,
-        cmdline.enable_clock,
-    )));
+    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)));
     vfs.lock()
         .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
         .write_file_by_filename(
@@ -368,7 +364,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("Invoking main.");
     let main_time = Instant::now();
-    let return_code = execute(&cmdline.execution_strategy, vfs.clone(), &prog_file_name)?;
+    let options = Options {
+        enable_clock: cmdline.enable_clock,
+        ..Default::default()
+    };
+    let return_code = execute(
+        &cmdline.execution_strategy,
+        vfs.clone(),
+        &prog_file_name,
+        options,
+    )?;
     info!("return code: {:?}", return_code);
     info!("time: {} micro seconds", main_time.elapsed().as_micros());
 
