@@ -33,6 +33,7 @@ x509-parser="0.6.0"
 curl = "=0.4.35"
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 hex = "=0.4.2"
+http = "=0.2.4"
 percent-encoding = "2.1.0"
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 stringreader = "0.1.1"

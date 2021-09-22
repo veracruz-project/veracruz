@@ -13,6 +13,7 @@ veracruz-utils = { path = "../../veracruz-utils", features = ["std"] }
 clap = "2.33.3"
 bitflags = "=1.2.1"
 env_logger = "0.7.1"
+http = "=0.2.4"
 log = "0.4.8"
 serde = { version = "1.0.103", features = ["derive"] }
 toml = "0.5.5"
