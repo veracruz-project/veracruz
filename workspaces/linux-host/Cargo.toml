@@ -5,7 +5,9 @@ resolver = "2"
 members = [
     "crates/proxy-attestation-server",
     "crates/veracruz-client",
-    "crates/veracruz-server"
+    "crates/veracruz-server",
+    "crates/veracruz-server-test",
+    "crates/veracruz-test",
 ]
 
 [profile.release]
