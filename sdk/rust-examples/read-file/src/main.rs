@@ -13,7 +13,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::fs;
+use std::{fs, io::Write};
 use anyhow;
 
 /// Read from 'input.txt', encode then using pinecone and write to 'output'.
@@ -24,25 +24,13 @@ fn main() -> anyhow::Result<()> {
     let mut input_string = fs::read(input)?;
 
     println!("hello");
-    fs::create_dir_all("/a/b/c/d")?;
-    fs::write("/a/b/c/d/e.txt","hello")?;
+    fs::create_dir_all("/output/test")?;
+        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open("/output/test/test.txt")?.write(b"hello")?;
     println!("rust");
 
-    input_string.append(&mut "\"read_dir on '/a':".as_bytes().to_vec());
-    for file in fs::read_dir("/a")? {
-        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
-    }
-    input_string.append(&mut "\"read_dir on '/a/b':".as_bytes().to_vec());
-    for file in fs::read_dir("/a/b")? {
-        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
-    }
-    input_string.append(&mut "\"read_dir on '/a/b/c':".as_bytes().to_vec());
-    for file in fs::read_dir("/a/b/c")? {
-        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
-    }
-    input_string.append(&mut "\"read_dir on '/a/b/c/d':".as_bytes().to_vec());
-    for file in fs::read_dir("/a/b/c/d")? {
-        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec())
+    input_string.append(&mut "\"read_dir on '/output':".as_bytes().to_vec());
+    for file in fs::read_dir("/output")? {
+        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec());
     }
     input_string.append(&mut "\"".as_bytes().to_vec());
 

@@ -17,7 +17,7 @@
 use policy_utils::principal::{FileRights, Principal, RightsTable, StandardStream};
 use std::{
     collections::HashMap,
-    convert::AsRef,
+    convert::{AsRef, TryInto},
     ffi::OsString,
     os::unix::ffi::{OsStrExt, OsStringExt},
     path::{Component, Path, PathBuf},
@@ -52,10 +52,10 @@ type SharedInodeTable = Arc<Mutex<InodeTable>>;
 /// Get random bytes
 fn getrandom_to_buffer(buf_len: Size) -> FileSystemResult<Vec<u8>> {
     let mut buf = vec![0; buf_len as usize];
-    if let result::Result::Success = getrandom(&mut buf) {
+    if getrandom(&mut buf).is_success() {
         Ok(buf)
     } else {
-        Err(ErrNo::NoSys)
+        Err(ErrNo::Inval)
     }
 }
 
@@ -1073,7 +1073,6 @@ impl FileSystem {
             .get(&fd)
             .map(|FdEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
-        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
 
         let mut inode_table = self.lock_inode_table()?;
         let mut inode_impl = inode_table.get_mut(&inode)?;
@@ -1360,7 +1359,6 @@ impl FileSystem {
     ) -> FileSystemResult<()> {
         let path = path.as_ref();
         self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
-        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
 
         let inode = self.get_inode_by_fd_path(&fd, path)?;
         let mut inode_table = self.lock_inode_table()?;

@@ -104,10 +104,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let data = pinecone::to_vec(&data).unwrap();
         let sample = pinecone::to_vec(&sample).unwrap();
         let path = dir.join(format!("data-{}-{}", size, i));
-        println!("path: {:?}",path);
         fs::create_dir_all(&path)?;
-        std::fs::OpenOptions::new().write(true).truncate(true).open(path.join("data.dat"))?.write(data.as_slice())?;
-        std::fs::OpenOptions::new().write(true).truncate(true).open(path.join("sample.dat"))?.write(sample.as_slice())?;
+        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(path.join("data.dat"))?.write(data.as_slice())?;
+        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(path.join("sample.dat"))?.write(sample.as_slice())?;
     }
     Ok(())
 }

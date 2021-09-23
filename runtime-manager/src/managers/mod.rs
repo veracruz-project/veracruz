@@ -204,10 +204,12 @@ impl ProtocolState {
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
-    pub(crate) fn execute(&mut self, file_name: &str) -> ProvisioningResult {
+    /// The client must have the right to read the program.
+    pub(crate) fn execute(&mut self, client_id: &Principal, file_name: &str) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
         println!("file_name: {}", file_name);
-        let return_code = execute(&execution_strategy, &self.vfs.spawn(&Principal::Program(file_name.to_string()))?, file_name)?;
+        let program = self.read_file(client_id, file_name)?.ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
+        let return_code = execute(&execution_strategy, &self.vfs.spawn(&Principal::Program(file_name.to_string()))?, file_name, program)?;
 
         let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))

@@ -365,13 +365,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), write_right);
     }
-    right_table.insert(
-        Principal::Program(
+    let program_id = Principal::Program(
             prog_file_abs_path
                 .to_str()
                 .ok_or("Failed to convert program path to a string.")?
                 .to_string(),
-        ),
+        );
+    right_table.insert(
+        program_id.clone(),
         file_table,
     );
     info!("The final right tables: {:?}", right_table);
@@ -391,12 +392,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         enable_clock: cmdline.enable_clock,
         ..Default::default()
     };
+    let program = vfs.read_file_by_absolute_path(prog_file_abs_path)?;
     let return_code = execute(
         &cmdline.execution_strategy,
-        &vfs,
-        prog_file_abs_path
-            .to_str()
-            .ok_or("Failed to convert program path to a string.")?,
+        vfs.spawn(&program_id)?,
+        program,
         options,
     )?;
     info!("return code: {:?}", return_code);

@@ -29,7 +29,7 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, V
 
 lazy_static! {
     // The initial value has NO use. The unwrap should NOT fail.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(&FileSystem::new_dummy(), Principal::NoCap).unwrap());
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(FileSystem::new_dummy(), false).unwrap());
 }
 
 /// A macro for lock the global VFS and store the result in the variable,
@@ -131,11 +131,11 @@ pub struct WasmtimeRuntimeState {}
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(
-        filesystem: &FileSystem,
-        program_name: String,
+        filesystem: FileSystem,
+        enable_clock: bool,
     ) -> Result<Self, FatalEngineError> {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, Principal::Program(program_name))?;
+        *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, enable_clock)?;
         Ok(Self {})
     }
 
@@ -769,13 +769,12 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     #[inline]
     fn invoke_entry_point(
         &mut self,
-        file_name: &str,
+        program: Vec<u8>,
         options: Options,
     ) -> Result<u32, FatalEngineError> {
         VFS_INSTANCE.lock()?.environment_variables = options.environment_variables;
         VFS_INSTANCE.lock()?.program_arguments = options.program_arguments;
         VFS_INSTANCE.lock()?.enable_clock = options.enable_clock;
-        let program = VFS_INSTANCE.lock()?.read_file_by_filename(file_name)?;
-        Self::invoke_entry_point(program.to_vec())
+        Self::invoke_entry_point(program)
     }
 }

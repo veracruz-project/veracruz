@@ -67,7 +67,7 @@ fn dispatch_on_result(
     protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.execute(&file_name)
+    protocol_state.execute(&Principal::Participant(client_id), &file_name)
 }
 
 

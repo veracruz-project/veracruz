@@ -22,8 +22,7 @@ use crate::Options;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
-use platform_services::{getclockres, getclocktime, getrandom, result};
-use policy_utils::principal::Principal;
+use platform_services::{getclockres, getclocktime, result};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -386,27 +385,19 @@ impl WasiWrapper {
     /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
     /// `principal` from `filesystem`
     #[inline]
-    pub fn new(filesystem: &FileSystem, principal: Principal) -> FileSystemResult<Self> {
-        let filesystem = filesystem.spawn(&principal)?;
+    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
         Ok( Self {
             filesystem,
             environment_variables: Vec::new(),
             program_arguments: Vec::new(),
             exit_code: None,
+            enable_clock,
         })
     }
 
     ///////////////////////////////////////////////////////
     //// Functions for the execution engine internal
     ///////////////////////////////////////////////////////
-
-    /// An internal function for the execution engine to directly read the file.
-    #[inline]
-    pub(crate) fn read_file_by_filename(&mut self, file_name: &str) -> FileSystemResult<Vec<u8>> {
-        //let mut fs = self.filesystem.lock().map_err(|_| ErrNo::Busy)?;
-        //fs.read_file_by_absolute_path(&Principal::InternalSuperUser, file_name)
-        self.filesystem.read_file_by_absolute_path(file_name)
-    }
 
     /// Return the exit code from `proc_exit` call.
     #[inline]
@@ -513,10 +504,17 @@ impl WasiWrapper {
         clock_id: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
-        
-        let time = self.filesystem.clock_res_get(clock_id)?;
-        memory_ref.write_u64(address, time.as_nanos())
+        let result = if !self.enable_clock {
+            Err(ErrNo::Access)
+        } else {
+            let clock_id = clock_id as u8;
+            match getclockres(clock_id) {
+                result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
+                result::Result::Unavailable => Err(ErrNo::NoSys),
+                _ => Err(ErrNo::Inval),
+            }
+        }?;
+        memory_ref.write_u64(address, result.as_nanos())
     }
 
     /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
@@ -528,10 +526,17 @@ impl WasiWrapper {
         _precision: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let clock_id: ClockId = Self::decode_wasi_arg(clock_id)?;
-        
-        let time = self.filesystem.clock_time_get(clock_id, precision.into())?;
-        memory_ref.write_u64(address, time.as_nanos())
+        let result = if !self.enable_clock {
+            Err(ErrNo::Access)
+        } else {
+            let clock_id = clock_id as u8;
+            match getclocktime(clock_id) {
+                result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
+                result::Result::Unavailable => Err(ErrNo::NoSys),
+                _ => Err(ErrNo::Inval),
+            }
+        }?;
+        memory_ref.write_u64(address, result.as_nanos())
     }
 
     /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
@@ -664,8 +669,13 @@ impl WasiWrapper {
         fst_flag: u16,
     ) -> FileSystemResult<()> {
         let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
-        
-        self.filesystem.fd_filestat_set_times(fd.into(), atime.into(), mtime.into(), fst_flag)
+        self.filesystem.fd_filestat_set_times(
+            fd.into(),
+            atime.into(),
+            mtime.into(),
+            fst_flag,
+            self.filestat_time(),
+        )
     }
 
     /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
@@ -923,7 +933,15 @@ impl WasiWrapper {
         let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
         let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
         
-        self.filesystem.path_filestat_set_times(fd.into(), flags, path, atime.into(), mtime.into(), fst_flag)
+        self.filesystem.path_filestat_set_times(
+            fd.into(),
+            flags,
+            path,
+            atime.into(),
+            mtime.into(),
+            fst_flag,
+            self.filestat_time(),
+        )
     }
 
     /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
@@ -1345,7 +1363,7 @@ pub trait ExecutionEngine: Send {
     /// returned by the WASM program entry point as an `i32` value.
     fn invoke_entry_point(
         &mut self,
-        file_name: &str,
+        program: Vec<u8>,
         options: Options,
     ) -> Result<u32, FatalEngineError>;
 }

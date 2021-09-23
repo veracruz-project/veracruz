@@ -1255,38 +1255,6 @@ mod tests {
         Ok(())
     }
 
-    //fn provision_program(
-        //filename: &Path,
-        //client_session_id: u32,
-        //client_session: &mut dyn rustls::Session,
-        //ticket: u32,
-        //client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        //client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    //) -> Result<Vec<u8>, VeracruzServerError> {
-        //let mut program_file = std::fs::File::open(filename)?;
-        //let mut program_text = std::vec::Vec::new();
-
-        //program_file.read_to_end(&mut program_text)?;
-        //// TODO remove
-        //let remote_file_name = 
-            //Path::new("/program").join(Path::new(filename).file_name().unwrap());
-        //let remote_file_name = remote_file_name.to_str().unwrap();
-        //info!("remote_file_name: {}",remote_file_name);
-
-        //let serialized_program_text = transport_protocol::serialize_write_file(
-            //&program_text,
-            //remote_file_name,
-        //)?;
-        //client_tls_send(
-            //client_tls_tx,
-            //client_tls_rx,
-            //client_session_id,
-            //client_session,
-            //ticket,
-            //&serialized_program_text[..],
-        //)
-    //}
-
     fn check_policy_hash(
         expected_policy_hash: &str,
         client_session_id: u32,

@@ -39,7 +39,8 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-use std::{boxed::Box, string::ToString};
+use std::{boxed::Box, vec::Vec};
+use policy_utils::policy::principal::ExecutionStrategy;
 
 pub struct Options {
     pub environment_variables: Vec<(String, String)>,
@@ -66,23 +67,24 @@ impl Default for Options {
 /// such as `freestanding-executuon-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    filesystem: &FileSystem,
-    program_name: &str,
+    filesystem: FileSystem,
+    //TODO change to principal
+    program: Vec<u8>,
     options: Options,
 ) -> Result<u32, FatalEngineError> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string())?)
+            Box::new(WASMIRuntimeState::new(filesystem, options.enable_clock)?)
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(feature = "std")] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, program_name.to_string())?)
+                    Box::new(WasmtimeRuntimeState::new(filesystem, options.enable_clock)?)
                 } else {
                     return Err(FatalEngineError::EngineIsNotReady);
                 }
             }
         }
     };
-    engine.invoke_entry_point(program_name, options)
+    engine.invoke_entry_point(program, options)
 }

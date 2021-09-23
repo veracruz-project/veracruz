@@ -73,8 +73,6 @@ pub(crate) struct WASMIRuntimeState {
     program_module: Option<ModuleRef>,
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<MemoryRef>,
-    /// Ref to the program that is executed
-    program: Principal,
 }
 pub(crate) type WasiResult = Result<ErrNo, FatalEngineError>;
 
@@ -496,10 +494,9 @@ impl Externals for WASMIRuntimeState {
 impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     #[inline]
-    pub fn new(filesystem: &FileSystem, program_name: std::string::String) -> FileSystemResult<Self> {
+    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
         Ok(Self {
-            vfs: WasiWrapper::new(filesystem, Principal::Program(program_name.clone()))?,
-            program: Principal::Program(program_name),
+            vfs: WasiWrapper::new(filesystem, enable_clock)?,
             program_module: None,
             memory: None,
         })
@@ -1219,17 +1216,11 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(
-        &mut self,
-        file_name: &str,
-        options: Options,
-    ) -> Result<u32, FatalEngineError> {
+    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32, FatalEngineError> {
         self.vfs.environment_variables = options.environment_variables;
         self.vfs.program_arguments = options.program_arguments;
+        self.load_program(&program)?;
         self.vfs.enable_clock = options.enable_clock;
-        let program = self.vfs.read_file_by_filename(file_name)?;
-        self.load_program(program.as_slice())?;
-        self.program = Principal::Program(file_name.to_string());
 
         let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
         let exit_code = self.vfs.exit_code();
