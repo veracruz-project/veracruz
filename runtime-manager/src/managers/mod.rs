@@ -20,6 +20,7 @@ use std::sync::Mutex;
 
 use std::{
     collections::HashMap,
+    option::Option,
     string::String,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -208,7 +209,7 @@ impl ProtocolState {
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
     pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
-        let options = Options {
+        let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
             ..Default::default()
         };
@@ -221,7 +222,7 @@ impl ProtocolState {
     #[inline]
     fn response_error_code_returned(error_code: u32) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(
-            transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
+            transport_protocol::ResponseStatus::SUCCESS as i32,
             Some(error_code.to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!(err))

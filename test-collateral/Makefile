@@ -140,7 +140,8 @@ get_random_policy.json: pgen pgen css-$(TEE).bin client_rsa_cert.pem random-sour
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) --proxy-attestation-server-cert ../test-collateral/CACert.pem
+		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
+	    --proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 one_data_source_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem linear-regression.wasm
 	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /linear-regression.wasm : $(WRITE_RIGHT)" \
@@ -320,6 +321,7 @@ number-stream-accumulation.json: pgen css-$(TEE).bin program_client_cert.pem dat
  		--binary number-stream-accumulation.wasm --capability "/stream-0 : $(READ_RIGHT), /stream-1 : $(READ_RIGHT), /input-0 : $(READ_RIGHT), /output : $(READ_WRITE_RIGHT)" \
 		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
+		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 

@@ -17,7 +17,7 @@
 use policy_utils::principal::{Principal, RightsTable, StandardStream};
 use std::{
     collections::HashMap,
-    convert::{AsRef, TryInto},
+    convert::AsRef,
     ffi::OsString,
     os::unix::ffi::{OsStrExt, OsStringExt},
     path::{Component, Path, PathBuf},
@@ -1452,7 +1452,7 @@ impl FileSystem {
             .strip_prefix("/")
             .unwrap_or(file_name)
             .clone();
-        info!("read_file_by_filename: {:?}", file_name);
+        info!("read_file_by_absolute_path: {:?}", file_name);
         let fd = self.path_open(
             principal,
             FileSystem::ROOT_DIRECTORY_FD,

@@ -300,11 +300,31 @@ impl VeracruzClient {
         }
     }
 
-    pub fn get_results(&mut self, file_name: &str) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn request_compute(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
         let serialized_read_result = transport_protocol::serialize_request_result(file_name)?;
+        let response = self.send(&serialized_read_result)?;
+
+        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let status = parsed_response.get_status();
+        if status != transport_protocol::ResponseStatus::SUCCESS {
+            return Err(VeracruzClientError::ResponseError("request_compute", status));
+        }
+        if !parsed_response.has_result() {
+            return Err(VeracruzClientError::VeracruzServerResponseNoResultError);
+        }
+        let response_data = &parsed_response.get_result().data;
+        return Ok(response_data.clone());
+    }
+
+
+    pub fn get_results(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
+        self.check_policy_hash()?;
+        self.check_runtime_hash()?;
+
+        let serialized_read_result = transport_protocol::serialize_read_file(file_name)?;
         let response = self.send(&serialized_read_result)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;

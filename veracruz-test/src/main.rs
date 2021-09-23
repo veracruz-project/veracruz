@@ -435,7 +435,8 @@ mod tests {
             let prog_path = program_path(LINEAR_REGRESSION_WASM);
             let program_filename = prog_path.as_path().file_name().unwrap().to_str().unwrap();
             info!("### data provider read result.");
-            client.get_results(program_filename)?;
+            client.request_compute(&program_filename)?;
+            client.get_results("/output")?;
             info!("### data provider request shutdown.");
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
@@ -503,12 +504,11 @@ mod tests {
                 .get_mut(program_provider_index)
                 .ok_or(VeracruzTestError::ClientIndexError(program_provider_index))?;
             let program_data = read_binary_file(program_path)?;
-            let program_name = Path::new(program_path)
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap();
-            program_provider_veracruz_client.send_program(&program_name, &program_data)?;
+            let mut program_name = Path::new(program_path).file_name().unwrap().to_str().unwrap().to_string();
+            // inject the absolute path
+            program_name.insert(0, '/');
+            info!("send {}", program_name);
+            program_provider_veracruz_client.send_program(&program_name,&program_data)?;
             info!("### Step 4. Provision data.");
             // provosion data
             for (data_provider_index, remote_filename, data_filename) in data_providers.iter() {
@@ -526,12 +526,17 @@ mod tests {
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
             // fetch result
+            // remove the absolute path
+            program_name.remove(0);
             for result_retriever_index in result_retrievers {
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
-                let result = result_retriever_veracruz_client.get_results(program_name)?;
-                info!("            Received {} bytes of result.", result.len());
+                info!("send {}", program_name);
+                let compute = result_retriever_veracruz_client.request_compute(&program_name)?;
+                let result = result_retriever_veracruz_client.get_results("/output")?;
+                let result: T = pinecone::from_bytes(&result)?;
+                info!("            Result: {:?}", result);
             }
 
             for client_index in 0..client_configs.len() {

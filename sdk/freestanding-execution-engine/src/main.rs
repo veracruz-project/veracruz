@@ -60,13 +60,13 @@ const VERSION: &'static str = "pre-alpha";
 
 /// The default dump status of `stdout`, if no alternative is provided on the
 /// command line.
-const DEFAULT_DUMP_STDOUT: &'static str = "false";
+const DEFAULT_DUMP_STDOUT: bool = false;
 /// The default dump status of `stderr`, if no alternative is provided on the
 /// command line.
-const DEFAULT_DUMP_STDERR: &'static str = "false";
+const DEFAULT_DUMP_STDERR: bool = false;
 /// The default value of the clock flag, if no alternative is provided on the
 /// command line.
-const DEFAULT_ENABLE_CLOCK: &'static str = "false";
+const DEFAULT_ENABLE_CLOCK: bool = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -159,8 +159,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .help(
                     "Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
                      enabled.",
-                )
-                .value_name("BOOLEAN"),
+                ),
         )
         .arg(
             Arg::with_name("arg")
@@ -229,18 +228,11 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         Vec::new()
     };
 
-    let enable_clock = {
-        let enable_clock = matches
-            .value_of("enable-clock")
-            .unwrap_or(DEFAULT_ENABLE_CLOCK);
-        if let Ok(enable_clock) = bool::from_str(enable_clock) {
-            if enable_clock {
-                info!("Clock functions are enabled.");
-            }
-            enable_clock
-        } else {
-            return Err(format!("Expecting a boolean, but found {}", enable_clock).into());
-        }
+    let enable_clock = if matches.is_present("dump-stdout") {
+        true
+    } else {
+        DEFAULT_ENABLE_CLOCK
+    };
     let dump_stdout = if matches.is_present("dump-stdout") {
         true
     } else {
@@ -443,7 +435,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("Invoking main.");
     let main_time = Instant::now();
-<<<<<<< HEAD
     let options = Options {
         environment_variables: cmdline.environment_variables,
         program_arguments: cmdline.program_arguments,
