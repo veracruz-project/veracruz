@@ -15,7 +15,9 @@ pub mod veracruz_server_linux {
     use log::{error, info};
 
     use std::{
+        env,
         net::{Shutdown, TcpStream},
+        path::PathBuf,
         process::{Child, Command},
         thread::sleep,
         time::Duration,
@@ -283,12 +285,14 @@ pub mod veracruz_server_linux {
 
             let proxy_attestation_server_url = policy_json.proxy_attestation_server_url();
 
+            let linux_root_enclave_path = PathBuf::from(env::var("LINUX_ROOT_ENCLAVE_PATH").
+                unwrap_or(LINUX_ROOT_ENCLAVE_PATH.to_string()));
             info!(
                 "Launching Linux Root enclave: {} with proxy attestation server URL: {}.",
-                LINUX_ROOT_ENCLAVE_PATH, proxy_attestation_server_url
+                linux_root_enclave_path.to_string_lossy(), proxy_attestation_server_url
             );
 
-            let mut linux_root_process = Command::new(LINUX_ROOT_ENCLAVE_PATH)
+            let mut linux_root_process = Command::new(linux_root_enclave_path)
                 .arg("--proxy-attestation-server")
                 .arg(proxy_attestation_server_url)
                 .spawn()
