@@ -18,7 +18,7 @@ use psa_attestation::{
     t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
 };
 use rand::Rng;
-use std::{collections::HashMap, io::Read, ffi::c_void, sync::Mutex};
+use std::{collections::HashMap, ffi::c_void, sync::Mutex};
 
 // Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
 // will have the same public key. Yes, I'm embedding that key in the source
@@ -74,8 +74,9 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             "native_psa_attestation_token",
         ));
     }
-    let (token, csr, device_id) =
-        transport_protocol::parse_native_psa_attestation_token(&parsed.get_native_psa_attestation_token());
+    let (token, csr, device_id) = transport_protocol::parse_native_psa_attestation_token(
+        &parsed.get_native_psa_attestation_token(),
+    );
 
     let attestation_context = {
         let ac_hash = ATTESTATION_CONTEXT.lock()?;
@@ -174,7 +175,9 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             &"psa".to_string(),
             &attestation_context.firmware_version,
         )?
-        .ok_or(ProxyAttestationServerError::MissingFieldError("firmware version"))?
+        .ok_or(ProxyAttestationServerError::MissingFieldError(
+            "firmware version",
+        ))?
     };
     if expected_enclave_hash != received_enclave_hash {
         return Err(ProxyAttestationServerError::MismatchError {
@@ -192,7 +195,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     let root_cert_der = crate::attestation::get_ca_certificate()?;
 
     let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
-        
+
     let response_b64 = base64::encode(&response_bytes);
 
     // clean up the Attestation Context by removing this context

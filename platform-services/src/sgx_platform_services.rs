@@ -20,7 +20,7 @@ use sgx_trts::trts;
 /// random number source.  Uses the SGX trusted RTS library from the Rust SGX
 /// SDK to implement this.
 pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
-    if let Ok(_) = trts::rsgx_read_rand(buffer) {
+    if trts::rsgx_read_rand(buffer).is_ok() {
         return result::Result::Success(());
     }
     result::Result::UnknownError
@@ -28,12 +28,14 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
 
 /// Returns the clock resolution in nanoseconds.
 /// TODO: implement it
-pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
+#[inline]
+pub fn platform_getclockres(_clock_id: u8) -> result::Result<u64> {
     result::Result::Unavailable
 }
 
 /// Returns the clock time in nanoseconds.
 /// TODO: implement it
-pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
+#[inline]
+pub fn platform_getclocktime(_clock_id: u8) -> result::Result<u64> {
     result::Result::Unavailable
 }

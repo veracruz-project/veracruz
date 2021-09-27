@@ -64,7 +64,7 @@ cfg_if! {
 ///       `buffer` are undefined.
 pub fn getrandom(buffer: &mut [u8]) -> result::Result<()> {
     if buffer.is_empty() {
-        return Result::Success(());
+        Result::Success(())
     } else {
         imp::platform_getrandom(buffer)
     }

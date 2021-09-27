@@ -63,11 +63,7 @@ const VERACRUZ_PORT: u32 = 5005;
 
 impl NitroEnclave {
     /// create a new Nitro enclave, started with the file in eif_path
-    pub fn new(
-        nitro_sbin: bool,
-        eif_path: &str,
-        debug: bool,
-    ) -> Result<Self, NitroError> {
+    pub fn new(nitro_sbin: bool, eif_path: &str, debug: bool) -> Result<Self, NitroError> {
         let mut args = vec![
             "run-enclave",
             "--eif-path",
@@ -87,10 +83,7 @@ impl NitroEnclave {
             }
         };
         let stdout = loop {
-            let enclave_result = Command::new(nitro_cli_path)
-                .args(&args)
-                .output()
-                .map_err(|err| err);
+            let enclave_result = Command::new(nitro_cli_path).args(&args).output();
             match enclave_result {
                 Err(err) => {
                     println!("NitroEnclave::new failed to start enclave:{:?}", err);
@@ -130,19 +123,21 @@ impl NitroEnclave {
             vsocksocket: crate::io::vsocket::VsockSocket::connect(cid, VERACRUZ_PORT)?,
             nitro_cli_path: nitro_cli_path.to_string(),
         };
-        return Ok(enclave);
+        Ok(enclave)
     }
 
     /// send a buffer of data to the enclave
-    pub fn send_buffer(&self, buffer: &Vec<u8>) -> Result<(), NitroError> {
+    #[inline]
+    pub fn send_buffer(&self, buffer: &[u8]) -> Result<(), NitroError> {
         crate::io::raw_fd::send_buffer(self.vsocksocket.as_raw_fd(), buffer)
-            .map_err(|err| NitroError::VeracruzSocketError(err))
+            .map_err(NitroError::VeracruzSocketError)
     }
 
     /// receive a buffer of data from the enclave
+    #[inline]
     pub fn receive_buffer(&self) -> Result<Vec<u8>, NitroError> {
         crate::io::raw_fd::receive_buffer(self.vsocksocket.as_raw_fd())
-            .map_err(|err| NitroError::VeracruzSocketError(err))
+            .map_err(NitroError::VeracruzSocketError)
     }
 }
 

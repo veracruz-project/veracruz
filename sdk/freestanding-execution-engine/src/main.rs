@@ -46,20 +46,19 @@ use wasi_types::Rights;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// About freestanding-execution-engine/Veracruz.
-const ABOUT: &'static str = "Veracruz: a platform for practical secure multi-party \
-                             computations.\nThis is freestanding-execution-engine, an offline \
-                             counterpart of the Veracruz execution engine that is part of the \
-                             Veracruz platform.  This can be used to test and develop WASM \
-                             programs before deployment on the platform.";
+const ABOUT: &str = "Veracruz: a platform for practical secure multi-party computations.\nThis is \
+                     freestanding-execution-engine, an offline counterpart of the Veracruz \
+                     execution engine that is part of the Veracruz platform.  This can be used to \
+                     test and develop WASM programs before deployment on the platform.";
 /// The name of the application.
-const APPLICATION_NAME: &'static str = "freestanding-execution-engine";
+const APPLICATION_NAME: &str = "freestanding-execution-engine";
 /// The authors list.
-const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in \
-                               the Veracruz root directory for detailed authorship information.";
+const AUTHORS: &str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in the \
+                       Veracruz root directory for detailed authorship information.";
 /// Application version number.
-const VERSION: &'static str = "pre-alpha";
+const VERSION: &str = "pre-alpha";
 /// Application version number.
-const OUTPUT_FILE: &'static str = "output";
+const OUTPUT_FILE: &str = "output";
 
 /// The default dump status of `stdout`, if no alternative is provided on the
 /// command line.

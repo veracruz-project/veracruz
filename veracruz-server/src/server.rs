@@ -11,21 +11,20 @@
 
 use crate::veracruz_server::*;
 #[cfg(feature = "nitro")]
-use crate::veracruz_server_nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
+use crate::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 #[cfg(feature = "sgx")]
-use crate::veracruz_server_sgx::veracruz_server_sgx::VeracruzServerSGX as VeracruzServerEnclave;
+use crate::veracruz_server_sgx::VeracruzServerSGX as VeracruzServerEnclave;
 #[cfg(feature = "tz")]
-use crate::veracruz_server_tz::veracruz_server_tz::VeracruzServerTZ as VeracruzServerEnclave;
+use crate::veracruz_server_tz::VeracruzServerTZ as VeracruzServerEnclave;
 
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
-use base64;
 use futures::executor;
 use std::{
     sync::mpsc,
     sync::{Arc, Mutex},
     thread,
 };
-use veracruz_utils::policy::policy::Policy;
+use veracruz_utils::policy::Policy;
 
 type EnclaveHandlerServer = Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
@@ -37,10 +36,12 @@ async fn veracruz_server_request(
     input_data: String,
 ) -> VeracruzServerResponder {
     let input_data_decoded = base64::decode(&input_data)?;
-    
+
     let mut enclave_handler_locked = enclave_handler.lock()?;
 
-    let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+    let enclave = enclave_handler_locked
+        .as_mut()
+        .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
     let result = enclave.plaintext_data(input_data_decoded)?;
 
@@ -48,7 +49,7 @@ async fn veracruz_server_request(
         Some(return_data) => base64::encode(&return_data),
         None => String::new(),
     };
-    
+
     Ok(result_string)
 }
 
@@ -67,10 +68,12 @@ async fn runtime_manager_request(
         0 => {
             let mut enclave_handler_locked = enclave_handler.lock()?;
 
-            let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            let enclave = enclave_handler_locked
+                .as_mut()
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
             enclave.new_tls_session()?
-        }    
+        }
         n @ 1u32..=std::u32::MAX => n,
     };
 
@@ -80,7 +83,9 @@ async fn runtime_manager_request(
     let (active_flag, output_data_option) = {
         let mut enclave_handler_locked = enclave_handler.lock()?;
 
-        let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+        let enclave = enclave_handler_locked
+            .as_mut()
+            .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
         enclave.tls_data(session_id, received_data_decoded)?
     };
@@ -112,9 +117,9 @@ async fn runtime_manager_request(
 pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
     let policy: Policy = serde_json::from_str(policy_json)?;
     #[allow(non_snake_case)]
-    let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(VeracruzServerEnclave::new(
-        &policy_json,
-    )?))));
+    let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(
+        VeracruzServerEnclave::new(&policy_json)?,
+    ))));
 
     // create a channel for stop server
     let (shutdown_channel_tx, shutdown_channel_rx) = mpsc::channel::<()>();
@@ -136,17 +141,8 @@ pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
     let server_clone = server.clone();
     thread::spawn(move || {
         // wait for shutdown signal
-        match shutdown_channel_rx.recv() {
-            // stop server gracefully
-            Ok(_) => {
-                executor::block_on(server_clone.stop(true));
-            }
-            // this CAN fail, in the case that the main thread has died,
-            // most likely from a user's ctrl-C, in either case we want to
-            // shutdown the server
-            Err(_) => {
-                return;
-            }
+        if shutdown_channel_rx.recv().is_ok() {
+            executor::block_on(server_clone.stop(true));
         }
     });
     Ok(server)

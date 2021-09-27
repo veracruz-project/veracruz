@@ -12,8 +12,7 @@
 
 use super::{ProtocolState, ProvisioningResult, RuntimeManagerError, OUTPUT_FILE};
 use lazy_static::lazy_static;
-use std::sync::Mutex;
-use std::{collections::HashMap, result::Result, vec::Vec};
+use std::{borrow::ToOwned, collections::HashMap, result::Result, sync::Mutex, vec::Vec};
 use transport_protocol::transport_protocol::{
     RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
 };
@@ -24,7 +23,7 @@ use veracruz_utils::policy::principal::Principal;
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    //TODO, wrap into a chihuahua management object.
+    // TODO: wrap into a runtime manager management object.
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
 }
 
@@ -38,17 +37,6 @@ lazy_static! {
 fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
     transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
         .unwrap_or_else(|err| panic!(err))
-}
-
-/// Encodes an error code indicating that the enclace is not ready to receive a
-/// particular type of message.
-#[deprecated]
-fn response_not_ready() -> super::ProvisioningResult {
-    let rst = transport_protocol::serialize_result(
-        transport_protocol::ResponseStatus::FAILED_NOT_READY as i32,
-        None,
-    )?;
-    Ok(Some(rst))
 }
 
 /// Encodes an error code indicating that somebody sent an invalid or malformed
@@ -177,9 +165,7 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         MESSAGE::request_result(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
         }
-        MESSAGE::request_state(_) => {
-            Ok(Some(transport_protocol::serialize_machine_state(u8::from(0))?))
-        },
+        MESSAGE::request_state(_) => Ok(Some(transport_protocol::serialize_machine_state(0u8)?)),
         MESSAGE::request_shutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
             if is_dead {
@@ -246,9 +232,9 @@ fn parse_incoming_buffer(
 pub fn dispatch_on_incoming_data(
     tls_session_id: u32,
     client_id: u64,
-    input: &Vec<u8>,
+    input: &[u8],
 ) -> ProvisioningResult {
-    match parse_incoming_buffer(tls_session_id, input.clone())? {
+    match parse_incoming_buffer(tls_session_id, input.to_owned())? {
         None => Ok(None),
         Some(REQUEST {
             message_oneof: None,

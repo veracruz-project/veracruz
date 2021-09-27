@@ -28,8 +28,8 @@ use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::policy::{
     expiry::Timepoint,
     parsers::parse_renamable_paths,
-    policy::Policy,
     principal::{ExecutionStrategy, FileRights, Identity, Program, StandardStream},
+    Policy,
 };
 use wasi_types::Rights;
 
@@ -49,7 +49,7 @@ where
 /// Pretty-prints a `PathBuf`, aborting if this cannot be done.
 fn pretty_pathbuf(buf: PathBuf) -> String {
     if let Ok(s) = buf.into_os_string().into_string() {
-        return s.clone();
+        s
     } else {
         abort_with("Failed to pretty-print path.");
     }
@@ -57,8 +57,8 @@ fn pretty_pathbuf(buf: PathBuf) -> String {
 
 /// Pretty-prints the SHA256 digest of the input `buf` into a lowercase
 /// hex-formatted string.
-fn pretty_digest(mut buf: &[u8]) -> String {
-    let digest = digest(&SHA256, &mut buf);
+fn pretty_digest(buf: &[u8]) -> String {
+    let digest = digest(&SHA256, &buf);
 
     HEXLOWER.encode(digest.as_ref())
 }
@@ -68,36 +68,36 @@ fn pretty_digest(mut buf: &[u8]) -> String {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// About the utility..
-const ABOUT: &'static str = "A utility for generating Veracruz JSON policy \
+const ABOUT: &str = "A utility for generating Veracruz JSON policy \
 files from a series of command line arguments.";
 /// The name of the application.
-const APPLICATION_NAME: &'static str = "generate-policy";
+const APPLICATION_NAME: &str = "generate-policy";
 /// The authors list.
-const AUTHORS: &'static str = "The Veracruz Development Team.  See the file \
+const AUTHORS: &str = "The Veracruz Development Team.  See the file \
 `AUTHORS.markdown` in the Veracruz root directory for detailed authorship \
 information.";
 /// The application's version information.
-const VERSION: &'static str = "0.1.0";
+const VERSION: &str = "0.1.0";
 
 /// The single supported ciphersuite embedded in the policy file.
-const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256";
+const POLICY_CIPHERSUITE: &str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256";
 
 /// The name of the 'dd' executable to call when computing the hash of the
 /// Runtime Manager enclave for SGX.
-const DD_EXECUTABLE_NAME: &'static str = "dd";
+const DD_EXECUTABLE_NAME: &str = "dd";
 /// The name of the 'xxd' executable to call when computing the hash of the
 /// Runtime Manager enclave for SGX.
-const XXD_EXECUTABLE_NAME: &'static str = "xxd";
+const XXD_EXECUTABLE_NAME: &str = "xxd";
 
 /// The default filename of the output JSON policy file, if no alternative is
 /// provided on the command line.
-const DEFAULT_OUTPUT_FILENAME: &'static str = "output.json";
+const DEFAULT_OUTPUT_FILENAME: &str = "output.json";
 /// The default debug status of the Veracruz enclave, if no alternative is
 /// provided on the command line.
 const DEFAULT_DEBUG_STATUS: bool = false;
 /// The default execution strategy for the WASM binary, if no alternative is
 /// provided on the command line.
-const DEFAULT_EXECUTION_STRATEGY: &'static str = "Interpretation";
+const DEFAULT_EXECUTION_STRATEGY: &str = "Interpretation";
 /// The default clock flag, if no alternative is provided on the command line.
 const DEFAULT_ENABLE_CLOCK: bool = false;
 
@@ -187,9 +187,7 @@ impl Arguments {
 /// Checks that the string `strategy` matches either "Interpretation" or "JIT",
 /// and if not prints an error message and aborts.
 fn check_execution_strategy(strategy: &str) {
-    if strategy == "Interpretation" || strategy == "JIT" {
-        return;
-    } else {
+    if strategy != "Interpretation" && strategy != "JIT" {
         abort_with("Could not parse execution strategy argument.");
     }
 }
@@ -370,7 +368,7 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
     let mut arguments = Arguments::new();
 
     if let Some(certificates) = matches.values_of("certificate") {
-        arguments.certificates = certificates.map(|c| PathBuf::from(c)).collect();
+        arguments.certificates = certificates.map(PathBuf::from).collect();
     } else {
         abort_with("No certificates were passed as command line parameters.");
     }
@@ -391,7 +389,7 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
 
     if let Some(capabilities) = matches.values_of("capability") {
         let mut capabilities = capabilities
-            .map(|s| s.split(",").map(|s| String::from(s)).collect::<Vec<_>>())
+            .map(|s| s.split(',').map(String::from).collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
         check_capability(&capabilities);
@@ -543,9 +541,11 @@ fn compute_program_hash(argument: &PathBuf) -> String {
     if let Ok(mut file) = File::open(argument) {
         let mut buffer = vec![];
 
-        file.read_to_end(&mut buffer).expect("Failed to read file.");
+        file.read_to_end(&mut buffer).unwrap_or_else(|e| {
+            abort_with(format!("Failed to read file.  Error produced: {}.", e));
+        });
 
-        return pretty_digest(&mut buffer);
+        pretty_digest(&buffer)
     } else {
         abort_with("Failed to open WASM program binary.");
     }
@@ -591,7 +591,7 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 
             if let Ok(hash_hex) = xxd_command.output() {
                 if !hash_hex.status.success() {
-                    abort_with("Invocation of 'xxd' command failed.");
+                    abort_with("Invocation of 'xxd' command failed.")
                 }
 
                 if let Ok(mut hash_hex) = String::from_utf8(hash_hex.stdout) {
@@ -599,15 +599,15 @@ fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
 
                     info!("Hash successfully computed, {}.", hash_hex);
 
-                    return Some(hash_hex);
+                    Some(hash_hex)
                 } else {
-                    abort_with("Failed to parse output of 'xxd'.");
+                    abort_with("Failed to parse output of 'xxd'.")
                 }
             } else {
-                abort_with("Invocation of 'xxd' command failed.");
+                abort_with("Invocation of 'xxd' command failed.")
             }
         } else {
-            abort_with("Invocation of 'dd' command failed.");
+            abort_with("Invocation of 'dd' command failed.")
         }
     } else {
         warn!("Runtime Manager CSS.bin file cannot be opened.");
@@ -692,8 +692,13 @@ fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
 
 /// Serializes the proxy attestation service certificate (basically reads the
 /// string from the file and returns that
-pub fn serialize_certificate(path: &PathBuf) -> String {
-    return read_to_string(path.to_str().unwrap()).unwrap();
+#[inline]
+fn serialize_certificate(path: &PathBuf) -> String {
+    read_to_string(
+        path.to_str()
+            .expect("Failed to convert filepath to string."),
+    )
+    .expect("Failed to serialize certificate to string.")
 }
 
 /// Serializes the identities of all principals in the Veracruz computation into
@@ -770,15 +775,22 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
     let mut split = cap_string.split(':');
     let file_name = split
         .next()
-        .expect(&format!("Failed to parse {}, empty string", cap_string))
+        .unwrap_or_else(|| {
+            abort_with(format!(
+                "Failed to parse {}.  The string is empty.",
+                cap_string
+            ))
+        })
         .trim()
         .to_string();
     let string_number = split
         .next()
-        .expect(&format!(
-            "Failed to parse `{}`, contains no `:`",
-            cap_string
-        ))
+        .unwrap_or_else(|| {
+            abort_with(format!(
+                "Failed to parse '{}'.  It contains no ':' character.",
+                cap_string
+            ))
+        })
         .trim();
 
     let rights = match string_number {
@@ -789,14 +801,20 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         "wr" => READ_RIGHTS | WRITE_RIGHTS,
         // parse raw WASI rights
         _ => {
-            let number = string_number
-                .parse::<u32>()
-                .expect(&format!("Failed to parse {}, not a u64", string_number));
+            let number = string_number.parse::<u32>().unwrap_or_else(|_e| {
+                abort_with(format!(
+                    "Failed to parse '{}'. Not a u64 value.",
+                    string_number
+                ))
+            });
+
             // check if this is a valid number
-            Rights::from_bits(number as u64).expect(&format!(
-                "Failed to parse {}, not a u64 representing WASI Right",
-                number
-            ))
+            Rights::from_bits(number as u64).unwrap_or_else(|| {
+                abort_with(&format!(
+                    "Failed to parse '{}'.  Not a u64 representing a valid WASI Right",
+                    number
+                ))
+            })
         }
     };
 
@@ -808,11 +826,11 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
 
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
     if strategy == "Interpretation" {
-        return ExecutionStrategy::Interpretation;
+        ExecutionStrategy::Interpretation
     } else if strategy == "JIT" {
-        return ExecutionStrategy::JIT;
+        ExecutionStrategy::JIT
     } else {
-        abort_with("Could not parse execution strategy argument.");
+        abort_with("Could not parse execution strategy argument.")
     }
 }
 
@@ -843,37 +861,49 @@ fn serialize_std_streams(arguments: &Arguments) -> Vec<StandardStream> {
 fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
-    let sgx_hash = compute_sgx_enclave_hash(arguments);
-    let policy = Policy::new(
-        serialize_identities(arguments),
-        serialize_binaries(arguments),
+    let mut policy = Policy::new(
         format!(
             "{}",
             &arguments
                 .veracruz_server_ip
                 .as_ref()
-                .expect(&format!("Failed to get the veracruz server ip"))
+                .expect("Failed to get the Veracruz server IP")
         ),
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
-        sgx_hash.clone(),
-        // TODO should be tz_hash
-        sgx_hash.clone(),
-        compute_nitro_enclave_hash(arguments),
         format!(
             "{}",
             &arguments
                 .proxy_attestation_server_ip
                 .as_ref()
-                .expect(&format!("Failed to get the proxy attestation server ip"))
+                .expect("Failed to get the proxy attestation server IP")
         ),
         serialize_certificate(&arguments.proxy_service_cert),
-        arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
-        serialize_std_streams(arguments),
-        arguments.enable_clock,
     )
-    .expect("Failed to instantiate a (struct) policy");
+    .unwrap_or_else(|e| {
+        abort_with(format!(
+            "Failed to instantiate the Veracruz policy.  Error produced: {}.",
+            e
+        ));
+    });
+
+    policy
+        .set_identities(serialize_identities(arguments))
+        .set_programs(serialize_binaries(arguments))
+        .set_std_streams_table(serialize_std_streams(arguments))
+        .set_debug(arguments.enclave_debug_mode)
+        .set_enable_clock(arguments.enable_clock);
+
+    if let Some(sgx_hash) = compute_sgx_enclave_hash(arguments) {
+        policy
+            .set_runtime_manager_hash_sgx(sgx_hash.clone())
+            .set_runtime_manager_hash_tz(sgx_hash);
+    }
+
+    if let Some(nitro_hash) = compute_nitro_enclave_hash(arguments) {
+        policy.set_runtime_manager_hash_nitro(nitro_hash);
+    }
 
     json!(policy)
 }
@@ -898,7 +928,7 @@ fn main() {
         if let Ok(json) = to_string_pretty(&serialize_json(&arguments)) {
             println!(
                 "Writing JSON policy file with SHA256 hash {}.",
-                pretty_digest(&mut json.as_bytes())
+                pretty_digest(json.as_bytes())
             );
             write!(file, "{}", json).expect("Failed to write file.");
             info!("JSON file written successfully.");
@@ -909,7 +939,7 @@ fn main() {
     } else {
         abort_with(format!(
             "Could not open file {}.",
-            pretty_pathbuf(arguments.output_policy_file.clone())
+            pretty_pathbuf(arguments.output_policy_file)
         ));
     }
 }

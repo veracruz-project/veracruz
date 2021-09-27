@@ -27,7 +27,7 @@ use std::{
     },
     vec::Vec,
 };
-use veracruz_utils::policy::{policy::Policy, principal::Principal};
+use veracruz_utils::policy::{principal::Principal, Policy};
 use wasi_types::ErrNo;
 
 pub mod error;
@@ -96,10 +96,15 @@ impl ProtocolState {
     ) -> Result<Self, RuntimeManagerError> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let rights_table = global_policy.get_rights_table();
+        let rights_table = global_policy.rights_table();
         let std_streams_table = global_policy.std_streams_table();
-        let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)));
+        let enable_clock = *global_policy.enable_clock();
+        let digest_table = global_policy.digest_table()?;
+        let vfs = Arc::new(Mutex::new(FileSystem::new(
+            rights_table,
+            std_streams_table,
+            enable_clock,
+        )));
 
         Ok(ProtocolState {
             global_policy,
@@ -116,12 +121,6 @@ impl ProtocolState {
     pub fn reload(&mut self) -> Result<(), RuntimeManagerError> {
         self.is_modified = true;
         Ok(())
-    }
-
-    /// Returns the global policy associated with the protocol state.
-    #[inline]
-    pub(crate) fn get_policy(&self) -> &Policy {
-        &self.global_policy
     }
 
     /// Returns the global policy's hash, a hex-encoded string.
@@ -199,9 +198,11 @@ impl ProtocolState {
             .vfs
             .lock()?
             .read_file_by_filename(client_id, file_name)?;
-        if rst.len() == 0 {
+
+        if rst.is_empty() {
             return Ok(None);
         }
+
         Ok(Some(rst))
     }
 

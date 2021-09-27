@@ -32,8 +32,7 @@ mod tests {
         "permuted_triple_parties_two_data_sources_sum_policy.json";
     const STRING_EDIT_DISTANCE_TRIPLE_POLICY: &'static str =
         "triple_parties_two_data_sources_string_edit_distance_policy.json";
-    const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str =
-        "quadruple_policy.json";
+    const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str = "quadruple_policy.json";
 
     // Identities
     const CA_CERT: &'static str = "CACert.pem";
@@ -58,21 +57,22 @@ mod tests {
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str = "intersection-customer.dat";
-    const INTERSECTION_SET_SUM_ADVERTISEMENT_DATA: &'static str = "intersection-advertisement-viewer.dat";
+    const INTERSECTION_SET_SUM_ADVERTISEMENT_DATA: &'static str =
+        "intersection-advertisement-viewer.dat";
     const STRING_1_DATA: &'static str = "hello-world-1.dat";
     const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
     use actix_rt::System;
     use async_std::task;
-    use veracruz_client;
     use env_logger;
     use err_derive::Error;
     use log::info;
-    use serde::Deserialize;
-    use veracruz_server;
-    use std::{env, io::Read, sync::Once, path::{Path, PathBuf}};
     use proxy_attestation_server;
-    use veracruz_utils::policy::policy::Policy;
+    use serde::Deserialize;
+    use std::{io::Read, path::Path, sync::Once};
+    use veracruz_client;
+    use veracruz_server;
+    use veracruz_utils::policy::Policy;
 
     pub fn policy_path(filename: &str) -> PathBuf {
         PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
@@ -144,8 +144,11 @@ mod tests {
     async fn veracruz_phase1_get_random_one_client() {
         let result = test_template::<Vec<u8>>(
             policy_path(GET_RANDOM_POLICY).as_path(),
-            &vec![(trust_path(CLIENT_CERT).as_path(), trust_path(CLIENT_KEY).as_path())],
-            0, 
+            &vec![(
+                trust_path(CLIENT_CERT).as_path(),
+                trust_path(CLIENT_KEY).as_path(),
+            )],
+            0,
             &Path::new(&"random-source.wasm".to_string()), // FIXME: should this be program_path(RANDOM_SOURCE_WASM).as_path()?
             &vec![],
             &vec![0],
@@ -172,10 +175,17 @@ mod tests {
         let result = test_template::<LinearRegression>(
             policy_path(LINEAR_REGRESSION_DUAL_POLICY).as_path(),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path()),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                ),
             ],
-            0, program_path(LINEAR_REGRESSION_WASM).as_path(),
+            0,
+            program_path(LINEAR_REGRESSION_WASM).as_path(),
             &vec![(1, "input-0", data_path(LINEAR_REGRESSION_DATA).as_path())],
             &vec![1],
         )
@@ -193,11 +203,21 @@ mod tests {
         let result = test_template::<LinearRegression>(
             policy_path(LINEAR_REGRESSION_TRIPLE_POLICY).as_path(),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path()),
-                (trust_path(RESULT_CLIENT_CERT).as_path(), trust_path(RESULT_CLIENT_KEY).as_path()),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(RESULT_CLIENT_CERT).as_path(),
+                    trust_path(RESULT_CLIENT_KEY).as_path(),
+                ),
             ],
-            0, program_path(LINEAR_REGRESSION_WASM).as_path(),
+            0,
+            program_path(LINEAR_REGRESSION_WASM).as_path(),
             &vec![(1, "input-0", data_path(LINEAR_REGRESSION_DATA).as_path())],
             &vec![1, 2],
         )
@@ -216,14 +236,32 @@ mod tests {
         let result = test_template::<f64>(
             policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY).as_path(),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path()),
-                (trust_path(RESULT_CLIENT_CERT).as_path(), trust_path(RESULT_CLIENT_KEY).as_path()),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(RESULT_CLIENT_CERT).as_path(),
+                    trust_path(RESULT_CLIENT_KEY).as_path(),
+                ),
             ],
-            0, program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path(),
+            0,
+            program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path(),
             &vec![
-                (1, "input-0", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path()),
-                (2, "input-1", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path()),
+                (
+                    1,
+                    "input-0",
+                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path(),
+                ),
+                (
+                    2,
+                    "input-1",
+                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path(),
+                ),
             ],
             &vec![2],
         )
@@ -242,14 +280,32 @@ mod tests {
         let result = test_template::<f64>(
             policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY).as_path(),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path()),
-                (trust_path(RESULT_CLIENT_CERT).as_path(), trust_path(RESULT_CLIENT_KEY).as_path()),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(RESULT_CLIENT_CERT).as_path(),
+                    trust_path(RESULT_CLIENT_KEY).as_path(),
+                ),
             ],
-            0, program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path(),
+            0,
+            program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path(),
             &vec![
-                (2, "input-1", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path()),
-                (1, "input-0", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path()),
+                (
+                    2,
+                    "input-1",
+                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path(),
+                ),
+                (
+                    1,
+                    "input-0",
+                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path(),
+                ),
             ],
             &vec![2],
         )
@@ -264,11 +320,21 @@ mod tests {
         let result = test_template::<usize>(
             policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY).as_path(),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path()),
-                (trust_path(RESULT_CLIENT_CERT).as_path(), trust_path(RESULT_CLIENT_KEY).as_path()),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(RESULT_CLIENT_CERT).as_path(),
+                    trust_path(RESULT_CLIENT_KEY).as_path(),
+                ),
             ],
-            0, program_path(STRING_EDIT_DISTANCE_WASM).as_path(),
+            0,
+            program_path(STRING_EDIT_DISTANCE_WASM).as_path(),
             &vec![
                 (1, "input-0", data_path(STRING_1_DATA).as_path()),
                 (2, "input-1", data_path(STRING_2_DATA).as_path()),
@@ -290,13 +356,29 @@ mod tests {
         let result = test_template::<usize>(
             policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY).as_path(),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path()),
-                (trust_path(DATA_CLIENT_SECOND_CERT).as_path(), trust_path(DATA_CLIENT_SECOND_KEY).as_path()),
-                (trust_path(RESULT_CLIENT_CERT).as_path(), trust_path(RESULT_CLIENT_KEY).as_path()),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                ),
+                (
+                    trust_path(DATA_CLIENT_SECOND_CERT).as_path(),
+                    trust_path(DATA_CLIENT_SECOND_KEY).as_path(),
+                ),
+                (
+                    trust_path(RESULT_CLIENT_CERT).as_path(),
+                    trust_path(RESULT_CLIENT_KEY).as_path(),
+                ),
             ],
-            0, program_path(STRING_EDIT_DISTANCE_WASM).as_path(),
-            &vec![(1, "input-0", data_path(STRING_1_DATA).as_path()), (2, "input-1", data_path(STRING_2_DATA).as_path())],
+            0,
+            program_path(STRING_EDIT_DISTANCE_WASM).as_path(),
+            &vec![
+                (1, "input-0", data_path(STRING_1_DATA).as_path()),
+                (2, "input-1", data_path(STRING_2_DATA).as_path()),
+            ],
             &vec![3],
         )
         .await;
@@ -311,7 +393,8 @@ mod tests {
     /// (one for program, one for data sending and retrieving)
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
-        let policy_json = read_policy(policy_path(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
+        let policy_json =
+            read_policy(policy_path(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
         let policy = Policy::from_json(&policy_json).unwrap();
 
         setup(policy.proxy_attestation_server_url().clone());
@@ -323,9 +406,11 @@ mod tests {
         let program_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(10000)).await;
             info!("### program provider start.");
-            let mut client =
-                veracruz_client::VeracruzClient::new(trust_path(PROGRAM_CLIENT_CERT).as_path(), trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                                      &policy_json)?;
+            let mut client = veracruz_client::VeracruzClient::new(
+                trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                &policy_json,
+            )?;
             let prog_path = program_path(LINEAR_REGRESSION_WASM);
             let program_filename = prog_path.as_path().file_name().unwrap().to_str().unwrap();
             info!("### program provider read binary.");
@@ -339,14 +424,17 @@ mod tests {
         let data_provider_handle = async {
             task::sleep(std::time::Duration::from_millis(15000)).await;
             info!("### data provider start.");
-            let mut client =
-                veracruz_client::VeracruzClient::new(trust_path(DATA_CLIENT_CERT).as_path(), trust_path(DATA_CLIENT_KEY).as_path(), &policy_json)?;
+            let mut client = veracruz_client::VeracruzClient::new(
+                trust_path(DATA_CLIENT_CERT).as_path(),
+                trust_path(DATA_CLIENT_KEY).as_path(),
+                &policy_json,
+            )?;
 
             let data_filename = data_path(LINEAR_REGRESSION_DATA);
             info!("### data provider read input.");
             let data = read_binary_file(&data_filename.as_path())?;
             info!("### data provider send input.");
-            client.send_data("input-0",&data)?;
+            client.send_data("input-0", &data)?;
             let prog_path = program_path(LINEAR_REGRESSION_WASM);
             let program_filename = prog_path.as_path().file_name().unwrap().to_str().unwrap();
             info!("### data provider read result.");
@@ -384,7 +472,10 @@ mod tests {
         let policy_json = read_policy(policy_path)?;
         let policy = Policy::from_json(&policy_json)?;
         setup(policy.proxy_attestation_server_url().clone());
-        info!("### Step 0. Read the policy file {}.", policy_path.to_string_lossy());
+        info!(
+            "### Step 0. Read the policy file {}.",
+            policy_path.to_string_lossy()
+        );
 
         // Wait the setup
         task::sleep(std::time::Duration::from_millis(5000)).await;
@@ -398,32 +489,42 @@ mod tests {
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
-                clients.push(veracruz_client::VeracruzClient::new(cert, key, &policy_json)?);
+                clients.push(veracruz_client::VeracruzClient::new(
+                    cert,
+                    key,
+                    &policy_json,
+                )?);
             }
 
             info!(
                 "### Step 3. Client #{} provisions program {}.",
-                program_provider_index, program_path.to_string_lossy()
+                program_provider_index,
+                program_path.to_string_lossy()
             );
             // provision program
             let program_provider_veracruz_client = clients
                 .get_mut(program_provider_index)
                 .ok_or(VeracruzTestError::ClientIndexError(program_provider_index))?;
             let program_data = read_binary_file(program_path)?;
-            let program_name = Path::new(program_path).file_name().unwrap().to_str().unwrap();
-            program_provider_veracruz_client.send_program(&program_name,&program_data)?;
+            let program_name = Path::new(program_path)
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap();
+            program_provider_veracruz_client.send_program(&program_name, &program_data)?;
             info!("### Step 4. Provision data.");
             // provosion data
             for (data_provider_index, remote_filename, data_filename) in data_providers.iter() {
                 info!(
                     "            Client #{} provisions program {}.",
-                    data_provider_index, data_filename.to_string_lossy()
+                    data_provider_index,
+                    data_filename.to_string_lossy()
                 );
                 let data_provider_veracruz_client = clients
                     .get_mut(*data_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*data_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                data_provider_veracruz_client.send_data(remote_filename,&data)?;
+                data_provider_veracruz_client.send_data(remote_filename, &data)?;
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
@@ -459,10 +560,16 @@ mod tests {
     }
 
     fn read_policy(policy_filename: &Path) -> Result<String, VeracruzTestError> {
-        let policy_text =
-            std::fs::read_to_string(policy_filename)
-                .expect(&format!("Cannot open file {}", policy_filename.to_string_lossy()));
-
-        return Ok(policy_text);
+        let policy_text = std::fs::read_to_string(policy_filename).unwrap_or_else(|e| {
+            panic!(
+                "Cannot open file {}.  Error produced: {}.",
+                policy_filename.to_string_lossy(),
+                e
+            )
+        });
+        Ok(policy_text)
     }
 }
+
+// NB: dummy main function to satisfy Clippy, which raises a hard error otherwise.
+fn main() {}

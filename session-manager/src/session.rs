@@ -43,12 +43,12 @@ pub struct Session {
 impl Session {
     /// Creates a new session from a server configuration and a list of
     /// principals.
-    pub fn new(config: rustls::ServerConfig, principals: &Vec<Principal>) -> Self {
+    pub fn new(config: rustls::ServerConfig, principals: Vec<Principal>) -> Self {
         let tls_session = ServerSession::new(&std::sync::Arc::new(config));
 
         Session {
-            tls_session: tls_session,
-            principals: principals.to_vec(),
+            tls_session,
+            principals,
         }
     }
 
@@ -84,9 +84,7 @@ impl Session {
     /// Reads data via the established TLS session, returning the unique client
     /// ID and the set of roles associated with the principal that sent the
     /// data.
-    pub fn read_plaintext_data(
-        &mut self,
-    ) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
+    pub fn read_plaintext_data(&mut self) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
         let num_bytes = self.tls_session.read_to_end(&mut received_buffer)?;
 
@@ -104,7 +102,7 @@ impl Session {
 
             for principal in self.principals.iter() {
                 if principal.certificate() == &peer_certs[0] {
-                    client_id = principal.id().clone();
+                    client_id = *principal.id();
                 }
             }
 

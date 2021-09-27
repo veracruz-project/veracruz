@@ -12,13 +12,13 @@
 pub use crate::managers;
 pub use crate::managers::RuntimeManagerError;
 
+use crate::managers::debug_message;
 use sgx_tdh::{SgxDhMsg1, SgxDhMsg2, SgxDhMsg3, SgxDhResponder};
 use sgx_types::{
     c_char, sgx_dh_msg1_t, sgx_dh_msg2_t, sgx_dh_msg3_t, sgx_dh_session_enclave_identity_t,
     sgx_key_128bit_t, sgx_status_t,
 };
 use std::mem;
-use crate::managers::debug_message;
 
 extern "C" {
     pub fn start_local_attest_ocall(
@@ -57,10 +57,12 @@ pub extern "C" fn init_session_manager_enc(
     if policy_buf_size == 0 && policy_buf.is_null() {
         return sgx_status_t::SGX_ERROR_UNEXPECTED;
     }
+
     let policy_vec = unsafe { std::slice::from_raw_parts(policy_buf, policy_buf_size) };
-    if policy_vec.len() == 0 {
+    if policy_vec.is_empty() {
         return sgx_status_t::SGX_ERROR_UNEXPECTED;
     }
+
     let policy_str = match std::str::from_utf8(policy_vec) {
         Ok(policy_str) => policy_str,
         Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
@@ -68,8 +70,11 @@ pub extern "C" fn init_session_manager_enc(
 
     let ret = crate::managers::session_manager::init_session_manager();
     if ret.is_err() {
-        println!("runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}", ret);
-        return sgx_status_t::SGX_ERROR_UNEXPECTED
+        println!(
+            "runtime_manager_sgx::init_session_manager_enc failed session_manager:{:?}",
+            ret
+        );
+        return sgx_status_t::SGX_ERROR_UNEXPECTED;
     }
     let ret = crate::managers::session_manager::load_policy(&policy_str);
     if ret.is_err() {
@@ -83,14 +88,17 @@ pub extern "C" fn init_session_manager_enc(
     let csr = match csr_result {
         Ok(val) => val,
         Err(err) => {
-            println!("runtime_manager_sgx::init_session_manager_enc call to get_csr failed:{:?}", err);
-            return sgx_status_t::SGX_ERROR_UNEXPECTED; 
+            println!(
+                "runtime_manager_sgx::init_session_manager_enc call to get_csr failed:{:?}",
+                err
+            );
+            return sgx_status_t::SGX_ERROR_UNEXPECTED;
         }
     };
 
     let certs = match local_attestation_get_cert_enc(&csr) {
         Ok(data) => data,
-        Err(e)  => {
+        Err(e) => {
             println!("runtime_manager_sgx::init_session_manager_enc call to local_attestation_get_cert_enc failed:{:?}", e);
             return sgx_status_t::SGX_ERROR_UNEXPECTED;
         }
@@ -99,12 +107,15 @@ pub extern "C" fn init_session_manager_enc(
     match managers::session_manager::load_cert_chain(&certs) {
         Ok(_) => (),
         Err(e) => {
-            println!("runtime_manager_sgx::init_session_manager_enc call to load_cert_chain failed:{:?}", e);
+            println!(
+                "runtime_manager_sgx::init_session_manager_enc call to load_cert_chain failed:{:?}",
+                e
+            );
             return sgx_status_t::SGX_ERROR_UNEXPECTED;
         }
     }
 
-    return sgx_status_t::SGX_SUCCESS;
+    sgx_status_t::SGX_SUCCESS
 }
 
 #[no_mangle]
@@ -112,9 +123,7 @@ pub extern "C" fn init_session_manager_enc(
 pub extern "C" fn new_session_enc(session_id: *mut u32) -> sgx_status_t {
     match managers::session_manager::new_session() {
         Ok(local_session_id) => {
-            unsafe {
-                *session_id = local_session_id;
-            }
+            unsafe { *session_id = local_session_id };
             sgx_status_t::SGX_SUCCESS
         }
         Err(_) => sgx_status_t::SGX_ERROR_UNEXPECTED,
@@ -182,7 +191,7 @@ fn local_attestation_get_cert_enc(
     // The certificate_lengths vec, which on return will contain the lengths of
     // each of the certificates. This will allow us to break `cert_array` on
     // the certificate boundaries.
-    let mut certificate_lengths: std::vec::Vec<u32> = vec!(0, 0, 0);
+    let mut certificate_lengths: std::vec::Vec<u32> = vec![0, 0, 0];
 
     let ocall_status = unsafe {
         finish_local_attest_ocall(
@@ -209,7 +218,7 @@ fn local_attestation_get_cert_enc(
     // Set the length of cert_array according to what the ocall told us
     unsafe { cert_array.set_len(cert_array_size) };
 
-    let certs: std::vec::Vec< std::vec::Vec<u8> > = 
+    let certs: std::vec::Vec<std::vec::Vec<u8>> =
         crate::runtime_manager::break_up_cert_array(&cert_array, &certificate_lengths)?;
 
     return Ok(certs);
@@ -250,6 +259,7 @@ pub extern "C" fn tls_get_data_enc(
             let output_buf_slice =
                 unsafe { std::slice::from_raw_parts_mut(output_buf, output_buf_size) };
             output_buf_slice[..output_data.len()].copy_from_slice(&output_data[..]);
+
             if output_data.len() < output_buf_size {
                 *output_data_size = output_data.len();
                 *active_flag = if active_bool { 1 } else { 0 };
@@ -277,4 +287,3 @@ pub extern "C" fn tls_get_data_needed_enc(session_id: u32, needed: *mut u8) -> s
         Err(_) => sgx_status_t::SGX_ERROR_UNEXPECTED,
     }
 }
-

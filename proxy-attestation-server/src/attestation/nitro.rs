@@ -12,9 +12,7 @@
 use crate::error::*;
 use lazy_static::lazy_static;
 use rand::Rng;
-use std::{collections::HashMap, sync::Mutex};
-use std::io::Write;
-use std::sync::atomic::Ordering;
+use std::{collections::HashMap, io::Write, sync::Mutex};
 
 use nitro_enclave_attestation_document::AttestationDocument;
 
@@ -72,7 +70,7 @@ struct NitroAttestationContext {
 }
 
 lazy_static! {
-    /// A hash map containing a `NitroAttestationContext` for each of the 
+    /// A hash map containing a `NitroAttestationContext` for each of the
     /// Nitro Root enclaves that we have started native attestation for
     static ref ATTESTATION_CONTEXT: Mutex<HashMap<i32, NitroAttestationContext>> =
         Mutex::new(HashMap::new());
@@ -89,7 +87,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
 
     let attestation_context = NitroAttestationContext {
         firmware_version: firmware_version.to_string(),
-        challenge: challenge.clone(),
+        challenge,
     };
     {
         let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
@@ -125,11 +123,20 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     let (att_doc_data, device_id) =
         transport_protocol::parse_nitro_attestation_doc(&parsed.get_nitro_attestation_doc());
 
-    let attestation_document = AttestationDocument::authenticate(&att_doc_data, &AWS_NITRO_ROOT_CERTIFICATE).map_err(|err| {
-        println!("proxy-attestation-server::nitro::attestation_token authenticate_token failed:{:?}", err);
-        let _ignore = std::io::stdout().flush();
-        ProxyAttestationServerError::CborError(format!("parse_nitro_token failed to parse token data:{:?}", err))
-    })?;
+    let attestation_document =
+        AttestationDocument::authenticate(&att_doc_data, &AWS_NITRO_ROOT_CERTIFICATE).map_err(
+            |err| {
+                println!(
+            "proxy-attestation-server::nitro::attestation_token authenticate_token failed:{:?}",
+            err
+        );
+                let _ignore = std::io::stdout().flush();
+                ProxyAttestationServerError::CborError(format!(
+                    "parse_nitro_token failed to parse token data:{:?}",
+                    err
+                ))
+            },
+        )?;
 
     let attestation_context = {
         let mut ac_hash = ATTESTATION_CONTEXT.lock()
@@ -155,10 +162,13 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             println!("proxy-attestation-server::attestation::nitro::attestation_token attestation document did not contain a nonce. We require it.");
             let _ignore = std::io::stdout().flush();
             return Err(ProxyAttestationServerError::MissingFieldError("nonce"));
-        },
+        }
         Some(nonce) => {
             if nonce != attestation_context.challenge {
-                println!("Challenge failed to match. Wanted:{:02x?}, got:{:02x?}", nonce, attestation_context.challenge);
+                println!(
+                    "Challenge failed to match. Wanted:{:02x?}, got:{:02x?}",
+                    nonce, attestation_context.challenge
+                );
                 let _ignore = std::io::stdout().flush();
                 return Err(ProxyAttestationServerError::MismatchError {
                     variable: "nonce/challenge",
@@ -166,18 +176,17 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
                     received: nonce,
                 });
             }
-        },
+        }
     }
 
     let received_enclave_hash = &attestation_document.pcrs[0];
 
-    let mut csr = match attestation_document.user_data {
+    let csr = match attestation_document.user_data {
         Some(data) => data,
         None => {
             return Err(ProxyAttestationServerError::MissingFieldError("public_key"));
-        },
+        }
     };
-    
 
     // convert the CSR into a certificate
     let re_cert = crate::attestation::convert_csr_to_certificate(&csr, false, &received_enclave_hash[0..32])
@@ -193,8 +202,8 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             println!("proxy-attestation-server::attestation::nitro::attestation_token serialize_cert_chain failed:{:?}", err);
             err
         })?;
-        
+
     let response_b64 = base64::encode(&response_bytes);
 
-    return Ok(response_b64);
+    Ok(response_b64)
 }

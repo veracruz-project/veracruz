@@ -14,10 +14,7 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "std")]
-use std::{
-    ffi,
-    path,
-};
+use std::{ffi, path};
 
 /// parser for a single file path either in the form of
 /// --program a.wasm or --program b=a.wasm if a file should
@@ -28,21 +25,14 @@ use std::{
 /// sort of mistakes should still be caught by a later
 /// "file-not-found" error.
 #[cfg(feature = "std")]
-pub fn parse_renamable_path(
-    s: &ffi::OsStr
-) -> Result<(String, path::PathBuf), ffi::OsString> {
-    let s = s.to_str()
+pub fn parse_renamable_path(s: &ffi::OsStr) -> Result<(String, path::PathBuf), ffi::OsString> {
+    let s = s
+        .to_str()
         .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
-    match s.splitn(2, "=").collect::<Vec<_>>().as_slice() {
-        [name, path] => Ok((
-            String::from(*name),
-            path::PathBuf::from(*path)
-        )),
-        [path] => Ok((
-            String::from(*path),
-            path::PathBuf::from(*path)
-        )),
+    match s.splitn(2, '=').collect::<Vec<_>>().as_slice() {
+        [name, path] => Ok((String::from(*name), path::PathBuf::from(*path))),
+        [path] => Ok((String::from(*path), path::PathBuf::from(*path))),
         _ => unreachable!(),
     }
 }
@@ -59,13 +49,13 @@ pub fn parse_renamable_path(
 /// "file-not-found" error.
 #[cfg(feature = "std")]
 pub fn parse_renamable_paths(
-    s: &ffi::OsStr
+    s: &ffi::OsStr,
 ) -> Result<Vec<(String, path::PathBuf)>, ffi::OsString> {
-    let s = s.to_str()
+    let s = s
+        .to_str()
         .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
-    s.split(",")
+    s.split(',')
         .map(|s| parse_renamable_path(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()
 }
-

@@ -18,8 +18,12 @@ use crate::{
     Options,
 };
 use lazy_static::lazy_static;
-use std::sync::{Arc, Mutex};
-use std::{collections::HashMap, convert::TryFrom, vec::Vec};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    sync::{Arc, Mutex},
+    vec::Vec,
+};
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};
@@ -30,7 +34,7 @@ use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, V
 
 lazy_static! {
     // The initial value has NO use.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new(), &vec![]))), Principal::NoCap));
+    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(Arc::new(Mutex::new(FileSystem::new(HashMap::new(), &[], false))), Principal::NoCap));
 }
 
 /// A macro for lock the global VFS and store the result in the variable,
@@ -107,9 +111,9 @@ fn check_main(tau: &ExternType) -> EntrySignature {
         ExternType::Func(tau) => {
             let params = tau.params();
 
-            if params == &[ValType::I32, ValType::I32] {
+            if params == [ValType::I32, ValType::I32] {
                 EntrySignature::ArgvAndArgc
-            } else if params == &[] {
+            } else if params == [] {
                 EntrySignature::NoParameters
             } else {
                 EntrySignature::NoEntryFound

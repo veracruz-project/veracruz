@@ -706,7 +706,7 @@ impl WasiWrapper {
         for iovec in iovecs.iter() {
             let mut fs = self.lock_vfs()?;
             let to_write = fs.fd_pread(fd.into(), iovec.len as usize, offset)?;
-            offset = offset + (to_write.len() as u64);
+            offset += to_write.len() as u64;
             memory_ref.write_buffer(iovec.buf, &to_write)?;
             size_read += to_write.len() as u32;
         }
@@ -724,7 +724,7 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let fd = Fd(fd);
         let mut fs = self.lock_vfs()?;
-        let pre = fs.fd_prestat_get(fd.into())?;
+        let pre = fs.fd_prestat_get(fd)?;
         memory_ref.write_struct(address, &pre)
     }
 
@@ -1108,7 +1108,7 @@ impl WasiWrapper {
         let events = memory_ref.unpack_array::<Event>(events, size)?;
         let mut fs = self.lock_vfs()?;
         let rst = fs.poll_oneoff(subscriptions, events)?;
-        memory_ref.write_u32(address, rst.into())
+        memory_ref.write_u32(address, rst)
     }
 
     /// The implementation of the WASI `proc_exit` function. It requires an extra `memory_ref` to
@@ -1174,7 +1174,7 @@ impl WasiWrapper {
                 fs.sock_recv(socket.into(), iovec.len as usize, ri_flag)?;
             memory_ref.write_buffer(iovec.buf, &to_write)?;
             size_read += to_write.len() as u32;
-            ro_rst = ro_rst | next_ro_rst;
+            ro_rst |= next_ro_rst;
         }
         memory_ref.write_u32(ro_data_len, size_read)?;
         memory_ref.write_buffer(ro_flag, &u16::to_le_bytes(ro_rst.bits()))

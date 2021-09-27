@@ -1,0 +1,16 @@
+# Clippy configuration file for the Veracruz project.
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT AND LICENSING
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz repository root
+# directory for copyright and licensing information.
+
+block_in_if_condition_stmt = false
+missing_safety_doc = false
+too_many_arguments = false
+type_complexity = false
+

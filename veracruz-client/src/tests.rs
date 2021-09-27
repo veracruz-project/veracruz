@@ -34,16 +34,14 @@ const MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME: &'static str =
     "../test-collateral/server_rsa_cert.pem";
 const MOCK_ATTESTATION_ENCLAVE_NAME: &'static str = "localhost";
 
-use crate::attestation::*;
-use crate::veracruz_client::*;
 use crate::error::*;
+use crate::veracruz_client::*;
 use std::{fs::File, io::prelude::*, io::Read, path::Path};
 
 use actix_session::Session;
 use actix_web::http::StatusCode;
 use actix_web::{post, App, HttpRequest, HttpResponse, HttpServer};
 use futures;
-use veracruz_utils::{platform::Platform, policy::policy::Policy};
 
 #[test]
 fn test_internal_read_all_bytes_in_file_succ() {
@@ -101,16 +99,9 @@ fn test_internal_init_self_signed_cert_client_config_succ() {
         ))
     });
 
-    
     let policy_str = std::fs::read_to_string(POLICY_FILENAME).unwrap();
-    assert!(VeracruzClient::new(
-        CLIENT_CERT_FILENAME,
-        CLIENT_KEY_FILENAME,
-        &policy_str,
-    )
-    .is_ok());
+    assert!(VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_str,).is_ok());
 }
-
 
 #[test]
 fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
@@ -126,12 +117,14 @@ fn test_internal_init_self_signed_cert_client_config_invalid_ciphersuite() {
     });
 
     let policy_str = std::fs::read_to_string(POLICY_FILENAME).unwrap();
-    let mod_policy_str = str::replace(&policy_str, "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", "WRONG CIPHERSUITE");
-    assert!(VeracruzClient::new(
-        CLIENT_CERT_FILENAME,
-        CLIENT_KEY_FILENAME,
-        &mod_policy_str,
-    ).is_err());
+    let mod_policy_str = str::replace(
+        &policy_str,
+        "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+        "WRONG CIPHERSUITE",
+    );
+    assert!(
+        VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &mod_policy_str,).is_err()
+    );
 }
 
 /// Auxiliary function: read policy file
@@ -180,7 +173,6 @@ fn test_veracruz_client_new_succ() {
     });
 
     iterate_over_policy("../test-collateral/", |policy| {
-
         assert!(policy.is_ok());
         let policy = policy.unwrap();
         assert!(VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy).is_ok());
@@ -275,9 +267,11 @@ async fn veracruz_client_policy_violations() {
     let server_key_filename = "../test-collateral/server_rsa_key.pem";
     let mut server_config = {
         let mut server_root_cert_store = rustls::RootCertStore::empty();
-        let program_client_cert = VeracruzClient::pub_read_cert(PROGRAM_CLIENT_CERT_FILENAME).unwrap();
+        let program_client_cert =
+            VeracruzClient::pub_read_cert(PROGRAM_CLIENT_CERT_FILENAME).unwrap();
         let data_client_cert = VeracruzClient::pub_read_cert(DATA_CLIENT_CERT_FILENAME).unwrap();
-        let result_client_cert = VeracruzClient::pub_read_cert(RESULT_CLIENT_CERT_FILENAME).unwrap();
+        let result_client_cert =
+            VeracruzClient::pub_read_cert(RESULT_CLIENT_CERT_FILENAME).unwrap();
         server_root_cert_store.add(&program_client_cert).unwrap();
         server_root_cert_store.add(&data_client_cert).unwrap();
         server_root_cert_store.add(&result_client_cert).unwrap();
@@ -321,7 +315,7 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
     )?;
 
     let fake_data = vec![0xde, 0xad, 0xbe, 0xef];
-    let sp_ret = data_client.send_program("fake_program",&fake_data.to_vec());
+    let sp_ret = data_client.send_program("fake_program", &fake_data.to_vec());
     match sp_ret {
         Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
         _otherwise => panic!(),
@@ -333,7 +327,7 @@ async fn policy_client_loop() -> Result<(), VeracruzClientError> {
         &policy_json,
     )?;
 
-    let sd_ret = program_client.send_data("fake_data",&fake_data.to_vec());
+    let sd_ret = program_client.send_data("fake_data", &fake_data.to_vec());
     match sd_ret {
         Err(VeracruzClientError::InvalidClientCertificateError(_)) => (),
         _otherwise => panic!(),
@@ -380,9 +374,12 @@ fn veracruz_client_session() {
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
 
-    let mut _veracruz_client =
-        crate::veracruz_client::VeracruzClient::new(CLIENT_CERT_FILENAME, CLIENT_KEY_FILENAME, &policy_json)
-            .unwrap();
+    let mut _veracruz_client = crate::veracruz_client::VeracruzClient::new(
+        CLIENT_CERT_FILENAME,
+        CLIENT_KEY_FILENAME,
+        &policy_json,
+    )
+    .unwrap();
 
     let client_cert = {
         let mut cert_file =
@@ -410,7 +407,10 @@ fn veracruz_client_session() {
 
 /// simple index handler
 #[post("/runtime_manager")]
-async fn runtime_manager(session: Session, req: HttpRequest) -> Result<HttpResponse, actix_web::Error> {
+async fn runtime_manager(
+    session: Session,
+    req: HttpRequest,
+) -> Result<HttpResponse, actix_web::Error> {
     println!("runtime_manager:{:?}", req);
     // session
     let mut counter = 1;

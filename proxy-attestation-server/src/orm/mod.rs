@@ -13,12 +13,10 @@ pub mod models;
 pub mod schema;
 
 use crate::error::ProxyAttestationServerError;
-use diesel::{
-    prelude::SqliteConnection, Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
-};
+use diesel::{prelude::SqliteConnection, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use dotenv::dotenv;
-use hex;
 use schema::devices;
+#[cfg(not(feature = "nitro"))]
 use schema::firmware_versions;
 use std::env;
 
@@ -29,7 +27,10 @@ pub fn establish_connection() -> Result<SqliteConnection, ProxyAttestationServer
     Ok(SqliteConnection::establish(&database_url)?)
 }
 
-pub fn query_device<'a>(conn: &SqliteConnection, device_id: i32) -> Result<Vec<u8>, ProxyAttestationServerError> {
+pub fn query_device(
+    conn: &SqliteConnection,
+    device_id: i32,
+) -> Result<Vec<u8>, ProxyAttestationServerError> {
     let hashes: Vec<String> = devices::table
         .filter(devices::device_id.eq(device_id))
         .select(devices::pubkey_hash)
@@ -38,10 +39,11 @@ pub fn query_device<'a>(conn: &SqliteConnection, device_id: i32) -> Result<Vec<u
     Ok(pubkey_hash_vec)
 }
 
-pub fn get_firmware_version_hash<'a>(
+#[cfg(not(feature = "nitro"))]
+pub fn get_firmware_version_hash(
     conn: &SqliteConnection,
-    protocol: &String,
-    version: &String,
+    protocol: &str,
+    version: &str,
 ) -> Result<Option<Vec<u8>>, ProxyAttestationServerError> {
     let hashes: Vec<String> = firmware_versions::table
         .filter(firmware_versions::protocol.eq(protocol))

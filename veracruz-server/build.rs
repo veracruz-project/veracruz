@@ -38,7 +38,7 @@ fn main() {
         let out_dir_arg = format!("OUT_DIR={:}", out_dir);
 
         let final_dir_arg = {
-            let out_dir_fields: Vec<&str> = out_dir.split("/").collect();
+            let out_dir_fields: Vec<&str> = out_dir.split('/').collect();
             let final_dir_fields: Vec<&str> = out_dir_fields[0..out_dir_fields.len() - 3].to_vec();
             let final_dir = final_dir_fields.join("/");
             format!("FINAL_DIR={:}", final_dir)

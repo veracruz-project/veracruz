@@ -27,8 +27,8 @@ fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir_arg = format!("OUT_DIR={:}", out_dir);
 
-    let out_dir_fields: Vec<&str> = out_dir.split("/").collect();
-    let final_dir_fields: Vec<&str> = out_dir_fields[0..out_dir_fields.len()-3].to_vec();
+    let out_dir_fields: Vec<&str> = out_dir.split('/').collect();
+    let final_dir_fields: Vec<&str> = out_dir_fields[0..out_dir_fields.len() - 3].to_vec();
     let final_dir = final_dir_fields.join("/");
     let final_dir_arg = format!("FINAL_DIR={:}", final_dir);
 
@@ -63,6 +63,7 @@ fn main() {
         .expect("Unable to generate bindings");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings.write_to_file(out_path.join("bindings.rs"))
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings.rs file")
 }

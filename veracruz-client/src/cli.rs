@@ -9,25 +9,13 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use std::{fs, io, io::Read, io::Write, path, process};
 use structopt::StructOpt;
-use std::{
-    fs,
-    io,
-    io::Read,
-    io::Write,
-    path,
-    process,
-};
 use veracruz_client::VeracruzClient;
-use veracruz_utils::policy::{
-    error::PolicyError,
-    parsers,
-    policy::Policy,
-};
-
+use veracruz_utils::policy::{error::PolicyError, parsers, policy::Policy};
 
 #[derive(Debug, StructOpt)]
-#[structopt(rename_all="kebab")]
+#[structopt(rename_all = "kebab")]
 struct Opt {
     /// Path to policy file
     #[structopt(parse(from_os_str))]
@@ -130,7 +118,6 @@ macro_rules! qprintln {
     ($opt:expr, $($arg:tt)*) => (if !$opt.quiet { eprintln!($($arg)*); });
 }
 
-
 /// Entry point
 fn main() {
     // parse args
@@ -150,7 +137,9 @@ fn main() {
             process::exit(1);
         }
     };
-    qprintln!(opt, "Loaded policy {} {}",
+    qprintln!(
+        opt,
+        "Loaded policy {} {}",
         opt.policy_path.to_string_lossy(),
         policy.policy_hash().unwrap_or("???")
     );
@@ -174,12 +163,15 @@ fn main() {
 
     // send program(s)?
     for (program_name, program_path) in opt.program.iter().flatten() {
-        qprintln!(opt, "Submitting <enclave>/{} from {}",
+        qprintln!(
+            opt,
+            "Submitting <enclave>/{} from {}",
             program_name,
             match program_path.to_string_lossy().as_ref() {
                 "-" => "<stdout>",
                 path => path,
-            });
+            }
+        );
         did_something = true;
 
         let program_data = if program_path == &path::PathBuf::from("-") {
@@ -212,12 +204,15 @@ fn main() {
 
     // send data(s)?
     for (data_name, data_path) in opt.data.iter().flatten() {
-        qprintln!(opt, "Submitting <enclave>/{} from {}",
+        qprintln!(
+            opt,
+            "Submitting <enclave>/{} from {}",
             data_name,
             match data_path.to_string_lossy().as_ref() {
                 "-" => "<stdout>",
                 path => path,
-            });
+            }
+        );
         did_something = true;
 
         let data_data = if data_path == &path::PathBuf::from("-") {
@@ -252,12 +247,15 @@ fn main() {
     // TODO why does results take the path to the _binary_? can this
     // API be better?
     for (output_name, output_path) in opt.output.iter().flatten() {
-        qprintln!(opt, "Reading <enclave>/{} into {}",
+        qprintln!(
+            opt,
+            "Reading <enclave>/{} into {}",
             output_name,
             match output_path.to_string_lossy().as_ref() {
                 "-" => "<stdout>",
                 path => path,
-            });
+            }
+        );
         did_something = true;
 
         let results = match veracruz_client.get_results(output_name) {
@@ -270,7 +268,7 @@ fn main() {
 
         if output_path == &path::PathBuf::from("-") {
             match io::stdout().write_all(&results) {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(err) => {
                     eprintln!("{}", err);
                     process::exit(1);
@@ -278,7 +276,7 @@ fn main() {
             }
         } else {
             match fs::write(output_path, results) {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(err) => {
                     eprintln!("{}", err);
                     process::exit(1);

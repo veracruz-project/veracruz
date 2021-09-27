@@ -35,7 +35,7 @@ fn main() {
     let qcbor_dir = format!("{:}/lib/QCBOR", project_dir);
     let make_status = Command::new("make")
         .env("CC", cc)
-        .current_dir(qcbor_dir.clone())
+        .current_dir(qcbor_dir)
         .args(&["all", outdir_arg.as_str()])
         .status()
         .unwrap();
@@ -47,7 +47,7 @@ fn main() {
     let mbed_crypto_dir = format!("{:}/lib/mbed-crypto", project_dir);
     let make_status = Command::new("make")
         .env("CC", cc)
-        .current_dir(mbed_crypto_dir.clone())
+        .current_dir(mbed_crypto_dir)
         .args(&["-j8", "all", outdir_arg.as_str()])
         .status()
         .unwrap();
@@ -61,12 +61,18 @@ fn main() {
     // The following renames the colliding symbols, sorta just brushing the
     // problem under the rug (until it comes back to bite me later, which it
     // it will)
-    #[cfg(feature="tz")]
-    let rename_status = Command::new("/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy")
-        .current_dir(target_dir.clone())
-        .args(&["--redefine-syms", &format!("{}/redefined_symbols",project_dir), "./libmbedcrypto.a"])
-        .status()
-        .unwrap();
+    #[cfg(feature = "tz")]
+    let rename_status = Command::new(
+        "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy",
+    )
+    .current_dir(target_dir.clone())
+    .args(&[
+        "--redefine-syms",
+        &format!("{}/redefined_symbols", project_dir),
+        "./libmbedcrypto.a",
+    ])
+    .status()
+    .unwrap();
     #[cfg(feature = "tz")]
     if !rename_status.success() {
         panic!("rename of mbed-crypto symbols failed");
@@ -76,7 +82,7 @@ fn main() {
     let make_status = Command::new("make")
         .env("CC", cc)
         .args(&["-f", "Makefile.psa", "all", outdir_arg.as_str()])
-        .current_dir(t_cose_dir.clone())
+        .current_dir(t_cose_dir)
         .status()
         .unwrap();
     if !make_status.success() {
@@ -87,7 +93,7 @@ fn main() {
     let c_src_dir = format!("{:}/c_src/", project_dir);
     let make_status = Command::new("make")
         .env("CC", cc)
-        .current_dir(c_src_dir.clone())
+        .current_dir(c_src_dir)
         .args(&["all", outdir_arg.as_str()])
         .status()
         .unwrap();

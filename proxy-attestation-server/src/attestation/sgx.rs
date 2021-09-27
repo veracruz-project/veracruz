@@ -10,14 +10,9 @@
 //! information on licensing and copyright.
 
 use crate::error::*;
-use base64;
-use transport_protocol;
 use curl::easy::{Easy, List};
 use lazy_static::lazy_static;
-use openssl;
-use percent_encoding;
 use rand::Rng;
-use serde_json;
 use sgx_types::{
     marker::ContiguousMemory, sgx_cmac_128bit_tag_t, sgx_ec256_dh_shared_t, sgx_ec256_private_t,
     sgx_ec256_public_t, sgx_quote_t, sgx_ra_msg1_t, sgx_ra_msg2_t, sgx_ra_msg3_t, sgx_spid_t,
@@ -25,7 +20,6 @@ use sgx_types::{
 };
 use sgx_ucrypto::{SgxEccHandle, SgxShaHandle};
 use std::{collections::HashMap, env, io::Read, sync::Mutex};
-use stringreader;
 
 #[derive(Clone)]
 pub(crate) struct SgxAttestationContext {
@@ -42,10 +36,8 @@ pub(crate) struct SgxAttestationContext {
 lazy_static! {
     static ref ATTESTATION_CONTEXT: Mutex<HashMap<i32, SgxAttestationContext>> =
         Mutex::new(HashMap::new());
-    static ref TOKEN: String = {
-        let value = env::var("IAS_TOKEN").expect("Failed to read IAS_TOKEN environment variable.");
-        value
-    };
+    static ref TOKEN: String =
+        env::var("IAS_TOKEN").expect("Failed to read IAS_TOKEN environment variable.");
 }
 
 static QUOTE_TYPE: u16 = 1; //SAMPLE_QUOTE_LINKABLE_SIGNATURE
@@ -53,21 +45,27 @@ static QUOTE_TYPE: u16 = 1; //SAMPLE_QUOTE_LINKABLE_SIGNATURE
 
 pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerResponder {
     let sgx_ecc_handle = SgxEccHandle::new();
-    sgx_ecc_handle.open()
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::start failed to open sgx_ecc_handle:{:?}", err);
+    sgx_ecc_handle.open().map_err(|err| {
+        println!(
+            "proxy-attestation-server::attestation::sgx::start failed to open sgx_ecc_handle:{:?}",
             err
-        })?;
-    let (private_key, public_key) = sgx_ecc_handle.create_key_pair()
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::start failed to create key pair:{:?}", err);
+        );
+        err
+    })?;
+    let (private_key, public_key) = sgx_ecc_handle.create_key_pair().map_err(|err| {
+        println!(
+            "proxy-attestation-server::attestation::sgx::start failed to create key pair:{:?}",
             err
-        })?;
-    sgx_ecc_handle.close()
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::sgx::start failed to close sgx_ecc_Handle:{:?}", err);
+        );
+        err
+    })?;
+    sgx_ecc_handle.close().map_err(|err| {
+        println!(
+            "proxy-attestation-server::attestation::sgx::start failed to close sgx_ecc_Handle:{:?}",
             err
-        })?;
+        );
+        err
+    })?;
 
     let mut serialized_pubkey = Vec::new();
 
@@ -76,8 +74,8 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
     {
         let attestation_context = SgxAttestationContext {
             firmware_version: firmware_version.to_string(),
-            private_key: private_key,
-            public_key: public_key,
+            private_key,
+            public_key,
             smk: None,
             vk: None,
             msg1: None,
@@ -136,14 +134,17 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
 
             let attestation_context = ac_hash
                 .get_mut(&device_id)
-                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id)) 
+                .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg1 NoDeviceError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg1 NoDeviceError:{:?}",
+                        err
+                    );
                     err
                 })?;
             (
-                attestation_context.private_key.clone(),
-                attestation_context.public_key.clone(),
+                attestation_context.private_key,
+                attestation_context.public_key,
             )
         };
         let dh_key = sgx_ecc_handle.compute_shared_dhkey(&private_key, &msg1.g_a)?;
@@ -157,11 +158,13 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
                 println!("proxy-attestation-server::attestation::sgx::msg1 generate_sgx_symmetric_keys failed:{:?}", err);
                 err
             })?;
-        let msg2 = proc_msg1(&msg1, &smk, &private_key, &public_key)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::sgx::msg1 proc_msg1 failed:{:?}", err);
+        let msg2 = proc_msg1(&msg1, &smk, &private_key, &public_key).map_err(|err| {
+            println!(
+                "proxy-attestation-server::attestation::sgx::msg1 proc_msg1 failed:{:?}",
                 err
-            })?;
+            );
+            err
+        })?;
         {
             let mut ac_hash = ATTESTATION_CONTEXT.lock()
                 .map_err(|err| {
@@ -172,7 +175,10 @@ pub fn msg1(body_string: String) -> ProxyAttestationServerResponder {
                 .get_mut(&device_id)
                 .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg1 NoDeviceError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg1 NoDeviceError:{:?}",
+                        err
+                    );
                     err
                 })?;
 
@@ -226,14 +232,16 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
                 })?;
             // we are calling remove because after this, the context will no
             // longer be needed
-            let context = ac_hash
+            ac_hash
                 .remove(&device_id)
                 .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg3 NoDeviceError:{:?}",
+                        err
+                    );
                     err
-                })?;
-            context.clone()
+                })?
         };
 
         let expected_enclave_hash = {
@@ -262,16 +270,26 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         let msg3_epid_pseudonym = authenticate_msg3(
             &attestation_context
                 .msg1
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg1"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError(
+                    "attestation_context.msg1",
+                ))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}",
+                        err
+                    );
                     err
                 })?,
             &attestation_context
                 .msg2
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.msg2"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError(
+                    "attestation_context.msg2",
+                ))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}",
+                        err
+                    );
                     err
                 })?,
             &msg3,
@@ -279,16 +297,26 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
             &msg3_sig,
             &attestation_context
                 .smk
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.smk"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError(
+                    "attestation_context.smk",
+                ))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}",
+                        err
+                    );
                     err
                 })?,
             &attestation_context
                 .vk
-                .ok_or(ProxyAttestationServerError::MissingFieldError("attestation_context.vk"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError(
+                    "attestation_context.vk",
+                ))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}",
+                        err
+                    );
                     err
                 })?,
             &expected_enclave_hash,
@@ -297,9 +325,14 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         let (pubkey_epid_pseudonym, collateral_hash) = authenticate_pubkey_quote(
             &attestation_context
                 .pubkey_challenge
-                .ok_or(ProxyAttestationServerError::MissingFieldError("pubkey_challenge"))
+                .ok_or(ProxyAttestationServerError::MissingFieldError(
+                    "pubkey_challenge",
+                ))
                 .map_err(|err| {
-                    println!("proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}", err);
+                    println!(
+                        "proxy-attestation-server::attestation::sgx::msg3 MissingFieldError:{:?}",
+                        err
+                    );
                     err
                 })?,
             &collateral_quote,
@@ -315,7 +348,6 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
                 received: calculated_collateral_hash.as_ref().to_vec(),
             });
         }
-
 
         if pubkey_epid_pseudonym != msg3_epid_pseudonym {
             // We cannot verify that msg3 and pubkey_quote came from the same SGX system
@@ -341,15 +373,20 @@ pub fn msg3(body_string: String) -> ProxyAttestationServerResponder {
         }
 
         // All's good. Generate a Certificate from the CSR...
-        let cert = crate::attestation::convert_csr_to_certificate(&csr, true, &msg3_quote.report_body.mr_enclave.m)?;
+        let cert = crate::attestation::convert_csr_to_certificate(
+            &csr,
+            true,
+            &msg3_quote.report_body.mr_enclave.m,
+        )?;
 
         let root_cert_der = crate::attestation::get_ca_certificate()?;
 
-        let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
-        
+        let response_bytes =
+            transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
+
         let response_b64 = base64::encode(&response_bytes);
 
-        return Ok(response_b64);
+        Ok(response_b64)
     }
 }
 
@@ -358,10 +395,10 @@ fn generate_sgx_symmetric_keys(
 ) -> Result<(sgx_cmac_128bit_tag_t, sgx_cmac_128bit_tag_t), ProxyAttestationServerError> {
     let zero_key = [0; 16];
     let kdk = sgx_ucrypto::rsgx_rijndael128_cmac_msg(&zero_key, &ecdh.s)?;
-    let smk_input: [u8; 7] = [0x01, 'S' as u8, 'M' as u8, 'K' as u8, 0x00, 0x80, 0x00];
+    let smk_input: [u8; 7] = [0x01, b'S', b'M', b'K', 0x00, 0x80, 0x00];
     let smk = sgx_ucrypto::rsgx_rijndael128_cmac_msg(&kdk, &smk_input)?;
 
-    let vk_input: [u8; 6] = [0x01, 'V' as u8, 'K' as u8, 0x00, 0x80, 0x00];
+    let vk_input: [u8; 6] = [0x01, b'V', b'K', 0x00, 0x80, 0x00];
     let vk = sgx_ucrypto::rsgx_rijndael128_cmac_msg(&kdk, &vk_input)?;
 
     Ok((smk, vk))
@@ -374,7 +411,7 @@ fn proc_msg1(
     public_key: &sgx_ec256_public_t,
 ) -> Result<sgx_ra_msg2_t, ProxyAttestationServerError> {
     let gid_little_endian = &msg1.gid;
-    let gid = reverse(&gid_little_endian.to_vec());
+    let gid = gid_little_endian.iter().rev().copied().collect::<Vec<_>>();
 
     let sig_rl = get_sigrl(&gid)?;
     if sig_rl != "" {
@@ -415,7 +452,7 @@ fn proc_msg1(
         quote_type: QUOTE_TYPE,
         kdf_id: 0x0001,      // AES_CMAC_KDF_ID
         sign_gb_ga: sgx_sig, // sgx_ec256_signature_t
-        mac: mac,
+        mac,
         sig_rl_size: 0,
         sig_rl: [0; 0],
     };
@@ -460,19 +497,12 @@ fn proc_msg1(
     Ok(msg2)
 }
 
-fn reverse(input: &Vec<u8>) -> Vec<u8> {
-    let mut output = Vec::new();
-    for i in (0..input.len()).rev() {
-        output.push(input[i]);
-    }
-    output
-}
-
-fn get_sigrl(gid: &Vec<u8>) -> Result<String, ProxyAttestationServerError> {
+fn get_sigrl(gid: &[u8]) -> Result<String, ProxyAttestationServerError> {
     let mut gid_string = String::new();
-    for i in 0..gid.len() {
-        gid_string = format!("{:}{:02x}", gid_string, gid[i]);
+    for g in gid.iter() {
+        gid_string = format!("{:}{:02x}", gid_string, g);
     }
+
     let url = "https://api.trustedservices.intel.com:443/sgx/dev/attestation/v3/sigrl/";
     let url = url.to_string() + &gid_string;
 
@@ -514,16 +544,16 @@ fn authenticate_msg3(
     msg2: &sgx_ra_msg2_t,
     msg3: &sgx_ra_msg3_t,
     msg3_quote: &sgx_quote_t,
-    sig: &Vec<u8>,
+    sig: &[u8],
     smk: &sgx_cmac_128bit_tag_t,
     vk: &sgx_cmac_128bit_tag_t,
-    expected_enclave_hash: &Vec<u8>,
+    expected_enclave_hash: &[u8],
 ) -> Result<String, ProxyAttestationServerError> {
     // now we've got the msg3 and pubkey quote, verify msg3
     // compare g_a in msg3 with local g_a
     if msg3.g_a.gx != msg1.g_a.gx || (msg3.g_a.gy != msg1.g_a.gy) {
         //TODO
-        assert!(false);
+        unimplemented!();
     }
     // verify the message MAC using SMK
     let mac = {
@@ -565,7 +595,7 @@ fn authenticate_msg3(
 
     if mac != msg3.mac {
         //TODO
-        assert!(false);
+        unimplemented!();
     }
 
     // verify the hash value that is internal to the quote
@@ -602,12 +632,12 @@ fn authenticate_msg3(
 
 fn ias_verify_attestation_evidence(
     quote: &sgx_types::sgx_quote_t,
-    sig: &Vec<u8>,
+    sig: &[u8],
 ) -> Result<String, ProxyAttestationServerError> {
     let mut json_string = "{\"isvEnclaveQuote\":\"".to_string();
 
     let mut quote_slice = unsafe { any_as_u8_slice(quote) }.to_vec();
-    quote_slice.append(&mut sig.clone());
+    quote_slice.append(&mut sig.to_vec());
 
     json_string = json_string + &base64::encode(&quote_slice);
     json_string = json_string + &"\"}".to_string();
@@ -648,12 +678,12 @@ fn ias_verify_attestation_evidence(
     }
 
     let header_lines: Vec<&str> = {
-        let lines = received_header.split("\n");
+        let lines = received_header.split('\n');
         lines.collect()
     };
     let mut header_fields = std::collections::HashMap::new();
     for this_line in header_lines.iter() {
-        let fields: Vec<&str> = this_line.split(":").collect();
+        let fields: Vec<&str> = this_line.split(':').collect();
         if fields.len() == 2 {
             header_fields.insert(fields[0], fields[1]);
         }
@@ -668,12 +698,9 @@ fn ias_verify_attestation_evidence(
         let certs = header_fields["X-IASReport-Signing-Certificate"];
         let certs = percent_encoding::percent_decode(certs.as_bytes()).decode_utf8()?;
 
-        let cert1_index =
-            certs
-                .rfind("-----BEGIN CERTIFICATE-----")
-                .ok_or(ProxyAttestationServerError::MissingFieldError(
-                    "-----BEGIN CERTIFICATE-----",
-                ))?;
+        let cert1_index = certs.rfind("-----BEGIN CERTIFICATE-----").ok_or(
+            ProxyAttestationServerError::MissingFieldError("-----BEGIN CERTIFICATE-----"),
+        )?;
         let cert1 = certs[1..cert1_index].to_string();
         //let cert2 = certs[cert1_index..].to_string();
         let x509 = openssl::x509::X509::from_pem(cert1.as_bytes())?;
@@ -684,7 +711,9 @@ fn ias_verify_attestation_evidence(
         verifier.update(received_body.as_bytes())?;
         let result = verifier.verify(&decoded_signature)?;
         if !result {
-            return Err(ProxyAttestationServerError::FailedToVerifyError("decoded_signature"));
+            return Err(ProxyAttestationServerError::FailedToVerifyError(
+                "decoded_signature",
+            ));
         }
         // TODO: Authenticate the certificate chain. Right now, all we are doing is authenticating
         // the received signature with a key provided in a certificate. We are not authenticating that
@@ -697,18 +726,21 @@ fn ias_verify_attestation_evidence(
     Ok(v["epidPseudonym"]
         .as_str()
         //TODO
-        .ok_or(ProxyAttestationServerError::MissingFieldError("epidPseudonym"))?
+        .ok_or(ProxyAttestationServerError::MissingFieldError(
+            "epidPseudonym",
+        ))?
         .to_string())
 }
 
+#[inline]
 unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::std::slice::from_raw_parts((p as *const T) as *const u8, ::std::mem::size_of::<T>())
+    std::slice::from_raw_parts((p as *const T) as *const u8, std::mem::size_of::<T>())
 }
 
 fn authenticate_pubkey_quote(
     pubkey_challenge: &[u8; 16],
     pubkey_quote: &sgx_quote_t,
-    pubkey_sig: &Vec<u8>,
+    pubkey_sig: &[u8],
 ) -> Result<(String, Vec<u8>), ProxyAttestationServerError> {
     // verify the challge value value that is internal to the pubkey quote
     if *pubkey_challenge != pubkey_quote.report_body.report_data.d[0..16] {
@@ -723,8 +755,5 @@ fn authenticate_pubkey_quote(
 
     // verify the pubkey quote with the attestation server
     let pubkey_epid_pseudonym = ias_verify_attestation_evidence(&pubkey_quote, &pubkey_sig)?;
-    Ok((
-        pubkey_epid_pseudonym,
-        pubkey_hash.to_vec(),
-    ))
+    Ok((pubkey_epid_pseudonym, pubkey_hash.to_vec()))
 }

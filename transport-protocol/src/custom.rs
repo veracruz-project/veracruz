@@ -14,8 +14,6 @@ use crate::transport_protocol;
 use core::convert::TryInto;
 use err_derive::Error;
 use protobuf::{error::ProtobufError, Message, ProtobufEnum};
-#[cfg(feature = "sgx_attestation")]
-use sgx_types;
 use std::{result::Result, string::ToString};
 
 #[derive(Debug, Error)]
@@ -31,31 +29,41 @@ pub enum TransportProtocolError {
 type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
 /// Parse a request to the Runtime Manager.
-pub fn parse_runtime_manager_request(buffer: &[u8]) -> Result<transport_protocol::RuntimeManagerRequest, TransportProtocolError> {
-    Ok(protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(
-        buffer,
-    )?)
+#[inline]
+pub fn parse_runtime_manager_request(
+    buffer: &[u8],
+) -> Result<transport_protocol::RuntimeManagerRequest, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<
+        transport_protocol::RuntimeManagerRequest,
+    >(buffer)?)
 }
 
 /// Parse a response from the Runtime Manager.
+#[inline]
 pub fn parse_runtime_manager_response(
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerResponse, TransportProtocolError> {
-    Ok(protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerResponse>(
-        buffer,
-    )?)
+    Ok(protobuf::parse_from_bytes::<
+        transport_protocol::RuntimeManagerResponse,
+    >(buffer)?)
 }
 
-pub fn parse_proxy_attestation_server_request(buffer: &[u8]) -> Result<transport_protocol::ProxyAttestationServerRequest, TransportProtocolError> {
-    Ok(protobuf::parse_from_bytes::<transport_protocol::ProxyAttestationServerRequest>(
-        buffer,
-    )?)
+#[inline]
+pub fn parse_proxy_attestation_server_request(
+    buffer: &[u8],
+) -> Result<transport_protocol::ProxyAttestationServerRequest, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<
+        transport_protocol::ProxyAttestationServerRequest,
+    >(buffer)?)
 }
 
-pub fn parse_proxy_attestation_server_response(buffer: &[u8]) -> Result<transport_protocol::ProxyAttestationServerResponse, TransportProtocolError> {
-    Ok(protobuf::parse_from_bytes::<transport_protocol::ProxyAttestationServerResponse>(
-        buffer,
-    )?)
+#[inline]
+pub fn parse_proxy_attestation_server_response(
+    buffer: &[u8],
+) -> Result<transport_protocol::ProxyAttestationServerResponse, TransportProtocolError> {
+    Ok(protobuf::parse_from_bytes::<
+        transport_protocol::ProxyAttestationServerResponse,
+    >(buffer)?)
 }
 
 #[cfg(feature = "sgx_attestation")]
@@ -96,7 +104,9 @@ fn parse_report_body(
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn parse_quote(proto: &transport_protocol::SgxQuote) -> Result<sgx_types::sgx_quote_t, TransportProtocolError> {
+fn parse_quote(
+    proto: &transport_protocol::SgxQuote,
+) -> Result<sgx_types::sgx_quote_t, TransportProtocolError> {
     let mut quote = sgx_types::sgx_quote_t::default();
     quote.version = proto.get_version().try_into()?;
     quote.sign_type = proto.get_sign_type().try_into()?;
@@ -212,7 +222,7 @@ pub fn serialize_stream(data_buffer: &[u8], file_name: &str) -> TransportProtoco
 }
 
 /// Serialize the request for querying the result.
-pub fn serialize_request_result(file_name : &str) -> TransportProtocolResult {
+pub fn serialize_request_result(file_name: &str) -> TransportProtocolResult {
     let mut command = transport_protocol::RequestResult::new();
     command.set_file_name(file_name.to_string());
     let mut request = transport_protocol::RuntimeManagerRequest::new();
@@ -248,18 +258,28 @@ pub fn serialize_request_next_round() -> TransportProtocolResult {
     Ok(request.write_to_bytes()?)
 }
 
+#[inline]
 pub fn parse_request_proxy_psa_attestation_token(
     proto: &transport_protocol::RequestProxyPsaAttestationToken,
 ) -> std::vec::Vec<u8> {
     proto.get_challenge().to_vec()
 }
 
-pub fn serialize_sgx_collateral(collateral: &transport_protocol::SgxCollateral) -> TransportProtocolResult {
-    return Ok(collateral.write_to_bytes()?);
+#[inline]
+pub fn serialize_sgx_collateral(
+    collateral: &transport_protocol::SgxCollateral,
+) -> TransportProtocolResult {
+    Ok(collateral.write_to_bytes()?)
 }
 
-pub fn parse_cert_chain(chain: &transport_protocol::CertChain) -> (std::vec::Vec<u8>, std::vec::Vec<u8>) {
-    return (chain.get_root_cert().to_vec(), chain.get_enclave_cert().to_vec())
+#[inline]
+pub fn parse_cert_chain(
+    chain: &transport_protocol::CertChain,
+) -> (std::vec::Vec<u8>, std::vec::Vec<u8>) {
+    (
+        chain.get_root_cert().to_vec(),
+        chain.get_enclave_cert().to_vec(),
+    )
 }
 
 pub fn serialize_proxy_psa_attestation_token(
@@ -271,7 +291,8 @@ pub fn serialize_proxy_psa_attestation_token(
     pat_proto.set_token(token.to_vec());
     pat_proto.set_pubkey(pubkey.to_vec());
     pat_proto.set_device_id(device_id);
-    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
+    let mut proxy_attestation_server_request =
+        transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_proxy_psa_attestation_token(pat_proto);
 
     Ok(proxy_attestation_server_request.write_to_bytes()?)
@@ -281,7 +302,8 @@ pub fn serialize_nitro_attestation_doc(doc: &[u8], device_id: i32) -> TransportP
     let mut nad_proto = transport_protocol::NitroAttestationDoc::new();
     nad_proto.set_doc(doc.to_vec());
     nad_proto.set_device_id(device_id);
-    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
+    let mut proxy_attestation_server_request =
+        transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_nitro_attestation_doc(nad_proto);
 
     Ok(proxy_attestation_server_request.write_to_bytes()?)
@@ -292,9 +314,10 @@ pub fn serialize_certificate(cert: &[u8]) -> TransportProtocolResult {
     proto_cert.set_data(cert.to_vec());
     let mut rmr = transport_protocol::RuntimeManagerResponse::new();
     rmr.set_cert(proto_cert);
-    return Ok(rmr.write_to_bytes()?);
+    Ok(rmr.write_to_bytes()?)
 }
 
+#[inline]
 pub fn parse_proxy_psa_attestation_token(
     proto: &transport_protocol::ProxyPsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
@@ -305,30 +328,44 @@ pub fn parse_proxy_psa_attestation_token(
     )
 }
 
-pub fn serialize_native_psa_attestation_token(token: &[u8], csr: &[u8], device_id: i32) -> TransportProtocolResult {
+pub fn serialize_native_psa_attestation_token(
+    token: &[u8],
+    csr: &[u8],
+    device_id: i32,
+) -> TransportProtocolResult {
     let mut pat_proto = transport_protocol::NativePsaAttestationToken::new();
     pat_proto.set_token(token.to_vec());
     pat_proto.set_csr(csr.to_vec());
     pat_proto.set_device_id(device_id);
-    let mut proxy_attestation_server_request = transport_protocol::ProxyAttestationServerRequest::new();
+    let mut proxy_attestation_server_request =
+        transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_native_psa_attestation_token(pat_proto);
 
     Ok(proxy_attestation_server_request.write_to_bytes()?)
 }
 
+#[inline]
 pub fn parse_native_psa_attestation_token(
     proto: &transport_protocol::NativePsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
-    (proto.get_token().to_vec(), proto.get_csr().to_vec(), proto.get_device_id())
+    (
+        proto.get_token().to_vec(),
+        proto.get_csr().to_vec(),
+        proto.get_device_id(),
+    )
 }
 
+#[inline]
 pub fn parse_nitro_attestation_doc(
     proto: &transport_protocol::NitroAttestationDoc,
 ) -> (std::vec::Vec<u8>, i32) {
     (proto.get_doc().to_vec(), proto.get_device_id())
 }
 
-pub fn parse_sgx_attestation_init(proto: &transport_protocol::SgxAttestationInit) -> (std::vec::Vec<u8>, i32) {
+#[inline]
+pub fn parse_sgx_attestation_init(
+    proto: &transport_protocol::SgxAttestationInit,
+) -> (std::vec::Vec<u8>, i32) {
     (proto.get_public_key().to_vec(), proto.get_device_id())
 }
 
@@ -348,7 +385,7 @@ pub fn serialize_cert_chain(enclave_cert: &[u8], root_cert: &[u8]) -> TransportP
     cert_chain.set_enclave_cert(enclave_cert.to_vec());
     let mut response = transport_protocol::ProxyAttestationServerResponse::new();
     response.set_cert_chain(cert_chain);
-    return Ok(response.write_to_bytes()?);
+    Ok(response.write_to_bytes()?)
 }
 
 #[cfg(feature = "sgx_attestation")]
@@ -421,16 +458,6 @@ pub fn parse_psa_attestation_init(
     Ok((pai.get_challenge().to_vec(), pai.get_device_id()))
 }
 
-/// Serialize the request for querying the hash of the provisioned program.
-#[deprecated]
-pub fn serialize_request_pi_hash(file_name : &str) -> TransportProtocolResult {
-    let mut request = transport_protocol::RuntimeManagerRequest::new();
-    let mut rph = transport_protocol::RequestPiHash::new();
-    rph.set_file_name(file_name.to_string());
-    request.set_request_pi_hash(rph);
-    Ok(request.write_to_bytes()?)
-}
-
 /// Serialize the request for querying the enclave policy.
 pub fn serialize_request_policy_hash() -> TransportProtocolResult {
     let mut request = transport_protocol::RuntimeManagerRequest::new();
@@ -480,19 +507,22 @@ pub fn serialize_policy_hash(hash: &[u8]) -> TransportProtocolResult {
 /// Serialize an empty response.
 pub fn serialize_empty_response(status: i32) -> TransportProtocolResult {
     let mut response = transport_protocol::RuntimeManagerResponse::new();
-    let encoded_status =
-        transport_protocol::ResponseStatus::from_i32(status).ok_or(TransportProtocolError::ResponseStatusError(status))?;
+    let encoded_status = transport_protocol::ResponseStatus::from_i32(status)
+        .ok_or(TransportProtocolError::ResponseStatusError(status))?;
     response.set_status(encoded_status);
 
     Ok(response.write_to_bytes()?)
 }
 
 /// Serialize a response containing the computation result.
-pub fn serialize_result(status: i32, data_opt: Option<std::vec::Vec<u8>>) -> TransportProtocolResult {
+pub fn serialize_result(
+    status: i32,
+    data_opt: Option<std::vec::Vec<u8>>,
+) -> TransportProtocolResult {
     let mut response = transport_protocol::RuntimeManagerResponse::new();
 
-    let encoded_status =
-        transport_protocol::ResponseStatus::from_i32(status).ok_or(TransportProtocolError::ResponseStatusError(status))?;
+    let encoded_status = transport_protocol::ResponseStatus::from_i32(status)
+        .ok_or(TransportProtocolError::ResponseStatusError(status))?;
 
     response.set_status(encoded_status);
 
@@ -553,21 +583,22 @@ fn parse_msg3(proto: &transport_protocol::SgxMsg3) -> (sgx_types::sgx_ra_msg3_t,
     (msg3, device_id)
 }
 
+/// The content of a parsed SGX EPID attestation token.
+#[cfg(feature = "sgx_attestation")]
+pub type ParsedAttestationToken = (
+    sgx_types::sgx_ra_msg3_t, // msg3
+    sgx_types::sgx_quote_t,   // msg3_quote
+    std::vec::Vec<u8>,        // msg3_sig
+    sgx_types::sgx_quote_t,   // collateral_quote
+    std::vec::Vec<u8>,        // collateral_sig
+    std::vec::Vec<u8>,        // csr
+    i32,                      // device_id
+);
+
 #[cfg(feature = "sgx_attestation")]
 pub fn parse_attestation_tokens(
     parsed: &transport_protocol::ProxyAttestationServerRequest,
-) -> Result<
-    (
-        sgx_types::sgx_ra_msg3_t, // msg3
-        sgx_types::sgx_quote_t,   // msg3_quote
-        std::vec::Vec<u8>,        // msg3_sig
-        sgx_types::sgx_quote_t,   // collateral_quote
-        std::vec::Vec<u8>,        // collateral_sig
-        std::vec::Vec<u8>,        // csr
-        i32,                      // device_id
-    ),
-    TransportProtocolError,
-> {
+) -> Result<ParsedAttestationToken, TransportProtocolError> {
     let attest_tokens = parsed.get_sgx_attestation_tokens();
     let (msg3, device_id) = parse_msg3(attest_tokens.get_msg3());
     let msg3_quote = parse_quote(&attest_tokens.get_msg3_quote())?;
@@ -600,10 +631,10 @@ pub fn serialize_sgx_attestation_tokens(
     context: sgx_types::sgx_ra_context_t,
     msg3: &sgx_types::sgx_ra_msg3_t,
     msg3_quote: &sgx_types::sgx_quote_t,
-    msg3_sig: &std::vec::Vec<u8>,
+    msg3_sig: &[u8],
     collateral_quote: &sgx_types::sgx_quote_t,
-    collateral_sig: &std::vec::Vec<u8>,
-    csr: &std::vec::Vec<u8>,
+    collateral_sig: &[u8],
+    csr: &[u8],
     device_id: i32,
 ) -> TransportProtocolResult {
     let msg3_proto = {
@@ -654,6 +685,7 @@ pub fn serialize_sgx_attestation_tokens(
     Ok(transport_protocol.write_to_bytes()?)
 }
 
+#[inline]
 pub fn parse_start_msg(
     parsed: &transport_protocol::ProxyAttestationServerRequest,
 ) -> (std::string::String, std::string::String) {
@@ -710,7 +742,9 @@ pub fn serialize_msg1(
 }
 
 #[cfg(feature = "sgx_attestation")]
-fn parse_msg2(proto: &transport_protocol::SgxMsg2) -> Result<sgx_types::sgx_ra_msg2_t, TransportProtocolError> {
+fn parse_msg2(
+    proto: &transport_protocol::SgxMsg2,
+) -> Result<sgx_types::sgx_ra_msg2_t, TransportProtocolError> {
     let mut msg2 = sgx_types::sgx_ra_msg2_t::default();
     msg2.g_b.gx.copy_from_slice(proto.get_g_b().get_gx());
     msg2.g_b.gy.copy_from_slice(proto.get_g_b().get_gy());

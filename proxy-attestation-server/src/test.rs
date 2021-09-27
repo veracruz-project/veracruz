@@ -37,11 +37,13 @@ extern crate sgx_root_enclave_bind;
 use sgx_root_enclave_bind::{
     _quote_nonce, _ra_msg2_t, _ra_msg3_t, _report_t, _sgx_ec256_public_t, _target_info_t,
     sgx_root_enclave_get_firmware_version, sgx_root_enclave_get_firmware_version_len,
-    sgx_root_enclave_init_remote_attestation_enc, sgx_root_enclave_sgx_get_pubkey_report, sgx_root_enclave_sgx_ra_get_ga,
-    sgx_root_enclave_sgx_ra_get_msg3_trusted, sgx_root_enclave_sgx_ra_proc_msg2_trusted,
+    sgx_root_enclave_init_remote_attestation_enc, sgx_root_enclave_sgx_get_pubkey_report,
+    sgx_root_enclave_sgx_ra_get_ga, sgx_root_enclave_sgx_ra_get_msg3_trusted,
+    sgx_root_enclave_sgx_ra_proc_msg2_trusted,
 };
 
-static ENCLAVE_FILE: &'static str = "/work/veracruz/trustzone-root-enclave/bin/sgx_root_enclave.signed.so";
+static ENCLAVE_FILE: &'static str =
+    "/work/veracruz/trustzone-root-enclave/bin/sgx_root_enclave.signed.so";
 
 #[test]
 fn test_sgx_attestation() {
@@ -71,7 +73,11 @@ fn test_sgx_attestation() {
         let mut gfvl_ret: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_result = unsafe {
-            sgx_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_ret, &mut fv_length)
+            sgx_root_enclave_get_firmware_version_len(
+                enclave.geteid(),
+                &mut gfvl_ret,
+                &mut fv_length,
+            )
         };
         assert!(gfvl_result == 0);
         assert!(gfvl_ret == 0);
@@ -81,7 +87,12 @@ fn test_sgx_attestation() {
 
         let mut gfv_ret = sgx_status_t::SGX_SUCCESS as u32;
         let gfv_result = unsafe {
-            sgx_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_ret, p_output, fv_length)
+            sgx_root_enclave_get_firmware_version(
+                enclave.geteid(),
+                &mut gfv_ret,
+                p_output,
+                fv_length,
+            )
         };
         assert!(gfv_result == sgx_status_t::SGX_SUCCESS as u32);
         assert!(gfv_ret == sgx_status_t::SGX_SUCCESS as u32);
@@ -224,13 +235,16 @@ fn test_psa_attestation() {
     assert!(status == 0);
     unsafe { token.set_len(token_size.try_into().unwrap()) }
 
-    let serialized_pat =
-        transport_protocol::serialize_psa_attestation_token(&token, public_key.as_ref(), fake_device_id);
+    let serialized_pat = transport_protocol::serialize_psa_attestation_token(
+        &token,
+        public_key.as_ref(),
+        fake_device_id,
+    );
     let encoded_token = base64::encode(&serialized_pat);
 
     let url = "127.0.0.1:3016/VerifyPAT";
-    let received_buffer =
-        post_buffer(&url, &encoded_token).expect("Failed to send buffer to proxy attestation server");
+    let received_buffer = post_buffer(&url, &encoded_token)
+        .expect("Failed to send buffer to proxy attestation server");
 }
 
 static SETUP: Once = Once::new();

@@ -9,12 +9,12 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#[cfg(feature = "nitro")]
+pub mod nitro;
 #[cfg(feature = "psa")]
 pub mod psa;
 #[cfg(feature = "sgx")]
 pub mod sgx;
-#[cfg(feature = "nitro")]
-pub mod nitro;
 
 use crate::error::*;
 use lazy_static::lazy_static;
@@ -25,26 +25,20 @@ use std::{
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
-use openssl;
-
 lazy_static! {
     static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
-    static ref CA_CERT_DER: std::sync::Mutex<Option<
-            Vec<u8>
-        >> = std::sync::Mutex::new(None);
-    static ref CA_KEY_PKEY: std::sync::Mutex<Option<
-            openssl::pkey::PKey<openssl::pkey::Private>
-        >> = std::sync::Mutex::new(None);
+    static ref CA_CERT_DER: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
+    static ref CA_KEY_PKEY: std::sync::Mutex<Option<openssl::pkey::PKey<openssl::pkey::Private>>> =
+        std::sync::Mutex::new(None);
 }
 
 /// Reads a PEM certificate from `pem_cert_path`, converts it to DER format,
 /// and stores it in CA_CERT_DER for use by the service
 pub fn load_ca_certificate<P>(pem_cert_path: P) -> Result<(), ProxyAttestationServerError>
 where
-    P: AsRef<path::Path>
+    P: AsRef<path::Path>,
 {
-    let mut f = std::fs::File::open(pem_cert_path)
-        .map_err(|err| ProxyAttestationServerError::IOError(err))?;
+    let mut f = std::fs::File::open(pem_cert_path).map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;
     let cert = openssl::x509::X509::from_pem(&buffer)?;
@@ -56,14 +50,14 @@ where
             *ccd_guard = Some(der);
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
     let ccd_guard = CA_CERT_DER.lock()?;
     match &*ccd_guard {
-        None => return Err(ProxyAttestationServerError::BadStateError),
-        Some(der) => return Ok(der.clone()),
+        None => Err(ProxyAttestationServerError::BadStateError),
+        Some(der) => Ok(der.clone()),
     }
 }
 
@@ -71,10 +65,9 @@ fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
 /// and stores it in CA_KEY_PKEY for use by the service
 pub fn load_ca_key<P>(pem_key_path: P) -> Result<(), ProxyAttestationServerError>
 where
-    P: AsRef<path::Path>
+    P: AsRef<path::Path>,
 {
-    let mut f = std::fs::File::open(pem_key_path)
-        .map_err(|err| ProxyAttestationServerError::IOError(err))?;
+    let mut f = std::fs::File::open(pem_key_path).map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;
     let key = openssl::pkey::PKey::private_key_from_pem(&buffer)?;
@@ -85,14 +78,15 @@ where
             *guard = Some(key);
         }
     }
-    return Ok(());
+    Ok(())
 }
 
-fn get_ca_key() -> Result<openssl::pkey::PKey<openssl::pkey::Private>, ProxyAttestationServerError> {
+fn get_ca_key() -> Result<openssl::pkey::PKey<openssl::pkey::Private>, ProxyAttestationServerError>
+{
     let guard = CA_KEY_PKEY.lock()?;
     match &*guard {
-        None => return Err(ProxyAttestationServerError::BadStateError),
-        Some(key) => return Ok(key.clone()),
+        None => Err(ProxyAttestationServerError::BadStateError),
+        Some(key) => Ok(key.clone()),
     }
 }
 
@@ -115,7 +109,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
     }
     let (protocol, firmware_version) = transport_protocol::parse_start_msg(&parsed);
 
-    let device_id = DEVICE_ID.fetch_add(1, Ordering::SeqCst); 
+    let device_id = DEVICE_ID.fetch_add(1, Ordering::SeqCst);
 
     match protocol.as_str() {
         #[cfg(feature = "sgx")]
@@ -130,7 +124,11 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
 
 /// Convert a Certificate Signing Request (CSR) to an X.509 Certificate and
 /// sign it
-fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
+fn convert_csr_to_certificate(
+    csr_der: &[u8],
+    is_ca: bool,
+    enclave_hash: &[u8],
+) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
     let csr = openssl::x509::X509Req::from_der(csr_der)
         .map_err(|err| {
             print!("proxy-attestation-server::attestation::convert_csr_to_certificate failed to get csr from der:{:?}", err);
@@ -214,10 +212,8 @@ fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) 
 
         let mut issuer_name_builder = openssl::x509::X509NameBuilder::new()?;
         for entry in ca_cert.subject_name().entries() {
-            issuer_name_builder.append_entry_by_nid(
-                entry.object().nid(),
-                &entry.data().as_utf8()?
-            )?;
+            issuer_name_builder
+                .append_entry_by_nid(entry.object().nid(), &entry.data().as_utf8()?)?;
         }
         issuer_name_builder.build()
     };
@@ -275,10 +271,13 @@ fn convert_csr_to_certificate(csr_der: &[u8], is_ca: bool, enclave_hash: &[u8]) 
         })?;
 
     // Add our custom extension to the certificate that contains the hash of the enclave
-    let extension_name = format!("{}.{}.{}.{}", VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0], 
-                                                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                                                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                                                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]);
+    let extension_name = format!(
+        "{}.{}.{}.{}",
+        VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0],
+        VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+        VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+        VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]
+    );
     let extension_value = format!("DER:{}", hex::encode(enclave_hash));
     let custom_extension = openssl::x509::X509Extension::new(None, None, &extension_name, &extension_value)
         .map_err(|err| {

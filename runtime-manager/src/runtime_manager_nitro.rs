@@ -9,18 +9,19 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use nix::sys::socket::listen as listen_vsock;
-use nix::sys::socket::{accept, bind, SockAddr};
-use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
+use nix::sys::socket::{
+    accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
+};
 use nsm_io;
 use nsm_lib;
 use std::os::unix::io::AsRawFd;
 use veracruz_utils::{
-    io::raw_fd::{receive_buffer, send_buffer}, io::vsocket, platform::nitro::nitro::{NitroRootEnclaveMessage, NitroStatus, RuntimeManagerMessage},
+    io::raw_fd::{receive_buffer, send_buffer},
+    io::vsocket,
+    platform::nitro::{NitroRootEnclaveMessage, NitroStatus, RuntimeManagerMessage},
 };
 
-use crate::managers;
-use crate::managers::RuntimeManagerError;
+use crate::{managers, managers::RuntimeManagerError};
 
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
@@ -69,8 +70,12 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
         let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)
             .map_err(|err| RuntimeManagerError::BincodeError(err))?;
         let return_message = match received_message {
-            RuntimeManagerMessage::Attestation(challenge, challenge_id) => attestation(&challenge, challenge_id)?,
-            RuntimeManagerMessage::Initialize(policy_json, certificate_chain) => initialize(&policy_json, &certificate_chain)?,
+            RuntimeManagerMessage::Attestation(challenge, challenge_id) => {
+                attestation(&challenge, challenge_id)?
+            }
+            RuntimeManagerMessage::Initialize(policy_json, certificate_chain) => {
+                initialize(&policy_json, &certificate_chain)?
+            }
             RuntimeManagerMessage::NewTLSSession => {
                 println!("runtime_manager_nitro::main NewTLSSession");
                 let ns_result = managers::session_manager::new_session();
@@ -137,7 +142,10 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
     }
 }
 
-fn attestation(challenge: &[u8], challenge_id: i32) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+fn attestation(
+    challenge: &[u8],
+    challenge_id: i32,
+) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
     println!("runtime_manager_nitro::attestation started");
     managers::session_manager::init_session_manager()?;
     // generate the csr
@@ -152,15 +160,15 @@ fn attestation(challenge: &[u8], challenge_id: i32) -> Result<RuntimeManagerMess
         }
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
-                nsm_fd,                             //fd
-                csr.as_ptr() as *const u8,          // user_data
-                csr.len() as u32,                   // user_data_len
-                challenge.as_ptr(),                 // nonce_data
-                challenge.len() as u32,             // nonce_len
-                std::ptr::null() as *const u8,      // pub_key_data
-                0 as u32,                           // pub_key_len
-                buffer.as_mut_ptr(),                // att_doc_data
-                &mut buffer_len,                    // att_doc_len
+                nsm_fd,                        //fd
+                csr.as_ptr() as *const u8,     // user_data
+                csr.len() as u32,              // user_data_len
+                challenge.as_ptr(),            // nonce_data
+                challenge.len() as u32,        // nonce_len
+                std::ptr::null() as *const u8, // pub_key_data
+                0 as u32,                      // pub_key_len
+                buffer.as_mut_ptr(),           // att_doc_data
+                &mut buffer_len,               // att_doc_len
             )
         };
         match status {
@@ -177,7 +185,10 @@ fn attestation(challenge: &[u8], challenge_id: i32) -> Result<RuntimeManagerMess
 }
 
 /// Handler for the RuntimeManagerMessage::Initialize message
-fn initialize(policy_json: &str, cert_chain: &Vec<Vec<u8>>) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+fn initialize(
+    policy_json: &str,
+    cert_chain: &Vec<Vec<u8>>,
+) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
     managers::session_manager::load_policy(policy_json)?;
     println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;

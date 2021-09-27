@@ -20,7 +20,7 @@ use std::sync::PoisonError;
 use veracruz_utils::csr::CertError;
 
 #[cfg(feature = "nitro")]
-use veracruz_utils::{platform::nitro::nitro::NitroRootEnclaveMessage, io::error::SocketError};
+use veracruz_utils::{io::error::SocketError, platform::nitro::NitroRootEnclaveMessage};
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {
@@ -75,7 +75,12 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: wrong message type received:{:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
-    #[error(display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}", _0, _1, _2)]
+    #[error(
+        display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}",
+        _0,
+        _1,
+        _2
+    )]
     DataWrongSizeForField(std::string::String, usize, usize),
     #[error(display = "RuntimeManager: RingKeyRejected error:{:?}", _0)]
     RingKeyRejected(ring::error::KeyRejected),

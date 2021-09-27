@@ -17,8 +17,6 @@ use log::debug;
 use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
-#[cfg(feature = "nitro")]
-use base64;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -80,19 +78,22 @@ pub enum VeracruzServerError {
     BincodeError(bincode::ErrorKind),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
-    RuntimeManagerMessageStatus(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
+    RuntimeManagerMessageStatus(veracruz_utils::platform::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
-    NitroStatus(veracruz_utils::platform::nitro::nitro::NitroStatus),
+    NitroStatus(veracruz_utils::platform::nitro::NitroStatus),
     #[cfg(feature = "nitro")]
-    #[error(display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}", _0)]
-    InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
+    #[error(
+        display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}",
+        _0
+    )]
+    InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
         display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
         _0
     )]
-    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
+    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
@@ -206,7 +207,7 @@ impl error::ResponseError for VeracruzServerError {
     }
     fn status_code(&self) -> StatusCode {
         match self {
-            VeracruzServerError::DirectMessageError(_, e) => e.clone(),
+            VeracruzServerError::DirectMessageError(_, e) => *e,
             VeracruzServerError::UnimplementedRequestError
             | VeracruzServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
             VeracruzServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
@@ -256,10 +257,10 @@ pub fn send_proxy_attestation_server_start(
 
     let body_vec = base64::decode(&received_body)?;
     let response = transport_protocol::parse_proxy_attestation_server_response(&body_vec)?;
-    return Ok(response);
+    Ok(response)
 }
 
-pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerError> {
+pub fn post_buffer(url: &str, buffer: &str) -> Result<String, VeracruzServerError> {
     let mut buffer_reader = stringreader::StringReader::new(buffer);
 
     let mut curl_request = Easy::new();
@@ -277,37 +278,43 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerE
 
         transfer.read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))?;
         transfer.write_function(|buf| {
-            received_body.push_str(
-                std::str::from_utf8(buf)
-                    .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-            );
+            received_body.push_str(std::str::from_utf8(buf).unwrap_or_else(|e| {
+                panic!(
+                    "Error converting data {:?} from UTF-8.  Error produced: {}.",
+                    buf, e
+                )
+            }));
             Ok(buf.len())
         })?;
 
         transfer.header_function(|buf| {
-            received_header.push_str(
-                std::str::from_utf8(buf)
-                    .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-            );
+            received_header.push_str(std::str::from_utf8(buf).unwrap_or_else(|e| {
+                panic!(
+                    "Error converting data {:?} from UTF-8.  Error produced: {}.",
+                    buf, e
+                )
+            }));
             true
         })?;
 
         transfer.perform()?;
     }
     let header_lines: Vec<&str> = {
-        let lines = received_header.split("\n");
+        let lines = received_header.split('\n');
         lines.collect()
     };
     println!(
         "veracruz_server::post_buffer received header (from url:{:?}):{:?}",
-        url,
-        received_header
+        url, received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
         return Err(VeracruzServerError::ReceivedNonSuccessPostStatusError);
     }
 
-    debug!("veracruz_server::post_buffer header_lines:{:?}", header_lines);
+    debug!(
+        "veracruz_server::post_buffer header_lines:{:?}",
+        header_lines
+    );
 
-    return Ok(received_body);
+    Ok(received_body)
 }

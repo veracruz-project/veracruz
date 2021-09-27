@@ -14,6 +14,7 @@
 extern crate sgx_tstd as std;
 
 use lazy_static::lazy_static;
+use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use sgx_tdh::{SgxDhInitiator, SgxDhMsg3};
 use sgx_types;
 use sgx_types::{
@@ -21,8 +22,11 @@ use sgx_types::{
     sgx_dh_session_enclave_identity_t, sgx_ec256_public_t, sgx_key_128bit_t, sgx_ra_context_t,
     sgx_ra_init, sgx_status_t, sgx_target_info_t,
 };
-use std::{collections::HashMap, mem, sync::atomic::{AtomicU64, Ordering}};
-use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
+use std::{
+    collections::HashMap,
+    mem,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use veracruz_utils::csr;
 
@@ -30,8 +34,10 @@ lazy_static! {
     static ref SESSION_ID: AtomicU64 = AtomicU64::new(1);
     static ref INITIATOR_HASH: std::sync::SgxMutex<HashMap<u64, SgxDhInitiator>> =
         std::sync::SgxMutex::new(HashMap::new());
-    static ref PRIVATE_KEY: std::sync::SgxMutex<Option<std::vec::Vec<u8>>> = std::sync::SgxMutex::new(None);
-    static ref CERT_CHAIN: std::sync::SgxMutex<Option<(std::vec::Vec<u8>, std::vec::Vec<u8>)>> = std::sync::SgxMutex::new(None);
+    static ref PRIVATE_KEY: std::sync::SgxMutex<Option<std::vec::Vec<u8>>> =
+        std::sync::SgxMutex::new(None);
+    static ref CERT_CHAIN: std::sync::SgxMutex<Option<(std::vec::Vec<u8>, std::vec::Vec<u8>)>> =
+        std::sync::SgxMutex::new(None);
 }
 
 pub enum SgxRootEnclave {
@@ -40,10 +46,10 @@ pub enum SgxRootEnclave {
     ProcMsg3Error = 0x02,
     CsrVerifyFail = 0x03,
     CsrToCertFail = 0x04,
-    LockFail      = 0x05,
-    HashError     = 0x06,
-    PKCS8Error    = 0x07,
-    StateError    = 0x08,
+    LockFail = 0x05,
+    HashError = 0x06,
+    PKCS8Error = 0x07,
+    StateError = 0x08,
     PrivateKeyNotPopulated = 0x09,
 }
 
@@ -109,15 +115,14 @@ fn get_private_key() -> Result<std::vec::Vec<u8>, SgxRootEnclave> {
         Ok(guard) => guard,
     };
     let pkcs8_bytes = match &*private_key_guard {
-        Some(bytes) => {
-            bytes.clone()
-        }
+        Some(bytes) => bytes.clone(),
         None => {
             // ECDSA prime256r1 generation.
             let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
                 &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-                &SystemRandom::new(),)
-                    .map_err(|_| SgxRootEnclave::PKCS8Error)?;
+                &SystemRandom::new(),
+            )
+            .map_err(|_| SgxRootEnclave::PKCS8Error)?;
             *private_key_guard = Some(pkcs8_bytes.as_ref().to_vec());
             pkcs8_bytes.as_ref().to_vec()
         }
@@ -147,7 +152,10 @@ pub extern "C" fn sgx_get_collateral_report(
             Ok(vec) => vec,
             Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
         };
-        match EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec) {
+        match EcdsaKeyPair::from_pkcs8(
+            &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            &private_key_vec,
+        ) {
             Ok(pkr) => pkr,
             Err(_) => return sgx_status_t::SGX_ERROR_UNEXPECTED,
         }
@@ -232,7 +240,10 @@ const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
 
 fn verify_csr(csr: &[u8]) -> Result<bool, std::string::String> {
     let pubkey_bytes = &csr[CSR_PUBKEY_LOCATION.0..CSR_PUBKEY_LOCATION.1];
-    let public_key = ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_ASN1, pubkey_bytes);
+    let public_key = ring::signature::UnparsedPublicKey::new(
+        &ring::signature::ECDSA_P256_SHA256_ASN1,
+        pubkey_bytes,
+    );
     let csr_body = &csr[CSR_BODY_LOCATION.0..CSR_BODY_LOCATION.1];
     let csr_signature = &csr[237..];
     let verify_result = public_key.verify(&csr_body, &csr_signature);
@@ -292,31 +303,39 @@ pub extern "C" fn finish_local_attest_enc(
             false => {
                 println!("CSR Did not verify successfully");
                 return SgxRootEnclave::CsrVerifyFail;
-            },
+            }
         },
         Err(err) => {
             println!("CSR did not verify:{:?}. Returning error", err);
             return SgxRootEnclave::CsrVerifyFail;
-        },
+        }
     }
 
     //generate cert from csr, signed by PRIVATE_KEY
     let private_key = {
         let private_key_vec = match get_private_key() {
             Ok(key) => key,
-            Err(_)  => return SgxRootEnclave::PrivateKeyNotPopulated,
+            Err(_) => return SgxRootEnclave::PrivateKeyNotPopulated,
         };
-        match EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec) {
+        match EcdsaKeyPair::from_pkcs8(
+            &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            &private_key_vec,
+        ) {
             Ok(key) => key,
-            Err(_)  => return SgxRootEnclave::PKCS8Error,
+            Err(_) => return SgxRootEnclave::PKCS8Error,
         }
     };
-    let mut compute_enclave_cert = match csr::convert_csr_to_cert(&csr_slice, &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE, &responder_identity.mr_enclave.m, &private_key) {
+    let mut compute_enclave_cert = match csr::convert_csr_to_cert(
+        &csr_slice,
+        &csr::COMPUTE_ENCLAVE_CERT_TEMPLATE,
+        &responder_identity.mr_enclave.m,
+        &private_key,
+    ) {
         Ok(bytes) => bytes,
         Err(err) => {
             println!("Failed to convert csr to cert:{:?}", err);
             return SgxRootEnclave::CsrToCertFail;
-        },
+        }
     };
     let (mut root_enclave_cert, mut root_cert) = {
         let cert_chain_guard = match CERT_CHAIN.lock() {
@@ -324,21 +343,28 @@ pub extern "C" fn finish_local_attest_enc(
             Ok(guard) => guard,
         };
         match &*cert_chain_guard {
-            Some((re_cert, r_cert)) => {
-                (re_cert.clone(), r_cert.clone())
-            }
+            Some((re_cert, r_cert)) => (re_cert.clone(), r_cert.clone()),
             None => {
                 panic!("CERT_CHAIN is not populated");
-            },
+            }
         }
     };
 
     if cert_buf_size < (compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) {
         assert!(false);
     }
-    let cert_buf_slice = unsafe { std::slice::from_raw_parts_mut(p_cert_buf, compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()) };
-    unsafe { *p_cert_size = compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len() };
-    let cert_lengths_slice = unsafe { std::slice::from_raw_parts_mut(cert_lengths, cert_lengths_size/std::mem::size_of::<u32>()) };
+    let cert_buf_slice = unsafe {
+        std::slice::from_raw_parts_mut(
+            p_cert_buf,
+            compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len(),
+        )
+    };
+    unsafe {
+        *p_cert_size = compute_enclave_cert.len() + root_enclave_cert.len() + root_cert.len()
+    };
+    let cert_lengths_slice = unsafe {
+        std::slice::from_raw_parts_mut(cert_lengths, cert_lengths_size / std::mem::size_of::<u32>())
+    };
 
     // create a buffer to aggregate the certificates
     let mut temp_cert_buf: std::vec::Vec<u8> = std::vec::Vec::new();

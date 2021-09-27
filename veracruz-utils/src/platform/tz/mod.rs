@@ -27,7 +27,7 @@ pub fn transmute_to_u32(src: &[u8]) -> Vec<u32> {
     let mut index = 0;
     let mut dest: Vec<u32> = Vec::new();
     while index < src.len() {
-        let mut value:u32 = 0;
+        let mut value: u32 = 0;
         value += (src[index] as u32) << 24;
         value += (src[index + 1] as u32) << 16;
         value += (src[index + 2] as u32) << 8;

@@ -19,13 +19,15 @@ use std::{
 };
 
 use crate::{
-    session::{Session, Principal},
     error::SessionManagerError,
+    session::{Principal, Session},
 };
-use veracruz_utils::policy::policy::Policy;
+use veracruz_utils::policy::Policy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
-use rustls::{AllowAnyAuthenticatedClient, Certificate, CipherSuite, PrivateKey, RootCertStore, ServerConfig};
+use rustls::{
+    AllowAnyAuthenticatedClient, Certificate, CipherSuite, PrivateKey, RootCertStore, ServerConfig,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -93,8 +95,8 @@ impl SessionContext {
             server_config: None,
             principals: None,
             policy: None,
-            server_public_key: server_public_key,
-            server_private_key: server_private_key,
+            server_public_key,
+            server_private_key,
         })
     }
 
@@ -107,23 +109,28 @@ impl SessionContext {
 
         for identity in policy.identities().iter() {
             let cert = convert_cert_buffer(identity.certificate())?;
-            let principal = Principal::new(cert.clone(), *identity.id(), identity.file_rights().to_vec());
+            let principal = Principal::new(
+                cert.clone(),
+                *identity.id(),
+                identity.file_rights().to_vec(),
+            );
 
             root_cert_store.add(&cert)?;
 
             principals.push(principal);
         }
-         // create the configuration
-         let mut server_config =
-         ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
+        // create the configuration
+        let mut server_config =
+            ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
 
         // Set the supported ciphersuites in the server to the one specified in
         // the policy.  This is a dumb way to do this, but I leave it up to the
         // student to find a better way (the ALL_CIPHERSUITES array is not very
         // long, anyway).
 
-        let policy_ciphersuite = CipherSuite::lookup_value(policy.ciphersuite())
-            .map_err(|_| SessionManagerError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string()))?;
+        let policy_ciphersuite = CipherSuite::lookup_value(policy.ciphersuite()).map_err(|_| {
+            SessionManagerError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string())
+        })?;
         let mut supported_ciphersuite = None;
 
         for this_supported_cs in rustls::ALL_CIPHERSUITES.iter() {
@@ -143,10 +150,10 @@ impl SessionContext {
         self.principals = Some(principals);
         self.policy = Some(policy);
 
-        return Ok(());
+        Ok(())
     }
 
-    pub fn set_cert_chain(&mut self, chain_data: &Vec<Vec<u8>>) -> Result<(), SessionManagerError> {
+    pub fn set_cert_chain(&mut self, chain_data: &[Vec<u8>]) -> Result<(), SessionManagerError> {
         let mut cert_chain: Vec<rustls::Certificate> = Vec::new();
         for this_chain_data in chain_data {
             let cert: rustls::Certificate = rustls::Certificate(this_chain_data.clone());
@@ -156,15 +163,15 @@ impl SessionContext {
             Some(config) => config.set_single_cert(cert_chain, self.server_private_key.clone())?,
             None => return Err(SessionManagerError::InvalidStateError),
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Returns the configuration associated with the server.
     #[inline]
-    pub fn server_config(&self) -> Result<ServerConfig, SessionManagerError> {
+    pub fn server_config(&self) -> Result<&ServerConfig, SessionManagerError> {
         match &self.server_config {
-            Some(config) => return Ok(config.clone()),
-            None => return Err(SessionManagerError::InvalidStateError), 
+            Some(config) => Ok(config),
+            None => Err(SessionManagerError::InvalidStateError),
         }
     }
 
@@ -172,15 +179,15 @@ impl SessionContext {
     #[inline]
     pub fn principals(&self) -> Result<&Vec<Principal>, SessionManagerError> {
         match &self.principals {
-            Some(principals) => return Ok(&principals),
-            None => return Err(SessionManagerError::InvalidStateError),
+            Some(principals) => Ok(&principals),
+            None => Err(SessionManagerError::InvalidStateError),
         }
     }
 
     /// Returns the public key (as a Vec<u8>) of the server
     #[inline]
-    pub fn public_key(&self) -> Vec<u8> {
-        return self.server_public_key.clone();
+    pub fn public_key(&self) -> &Vec<u8> {
+        &self.server_public_key
     }
 
     /// Returns the private key of the server
@@ -188,8 +195,8 @@ impl SessionContext {
     /// Returning the private key seems a little irresponsible (not that the
     /// software requesting it couldn't just inspect the memory, but still...)
     #[inline]
-    pub fn private_key(&self) -> PrivateKey {
-        return self.server_private_key.clone();
+    pub fn private_key(&self) -> &PrivateKey {
+        &self.server_private_key
     }
 
     /// Creates a new session, using server configuration and information about
@@ -197,6 +204,9 @@ impl SessionContext {
     /// of the new session fails.
     #[inline]
     pub fn create_session(&self) -> Result<Session, SessionManagerError> {
-        Ok(Session::new(self.server_config()?, self.principals()?))
+        Ok(Session::new(
+            self.server_config()?.clone(),
+            self.principals()?.clone(),
+        ))
     }
 }
