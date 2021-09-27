@@ -25,6 +25,7 @@ use data_encoding::HEXLOWER;
 use log::{info, warn};
 use policy_utils::{
     expiry::Timepoint,
+    parsers::enforce_leading_backslash,
     parsers::parse_renamable_paths,
     policy::Policy,
     principal::{ExecutionStrategy, FileRights, Identity, Program, StandardStream},
@@ -755,9 +756,10 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
     {
         let pi_hash = compute_program_hash(program_file_path);
         let file_permissions = serialize_capability(capability);
+        let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
 
         values.push(Program::new(
-            program_file_name.clone(),
+            program_file_name,
             id as u32,
             pi_hash,
             file_permissions,
@@ -808,11 +810,13 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         | Rights::PATH_CREATE_DIRECTORY;
 
     let mut split = cap_string.split(':');
-    let file_name = split
-        .next()
-        .expect(&format!("Failed to parse {}, empty string", cap_string))
-        .trim()
-        .to_string();
+    let file_name = enforce_leading_backslash(
+        split
+            .next()
+            .expect(&format!("Failed to parse {}, empty string", cap_string))
+            .trim()
+    )
+        .into_owned();
     let string_number = split
         .next()
         .expect(&format!(

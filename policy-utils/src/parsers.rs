@@ -14,7 +14,11 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "std")]
-use std::{ffi, path};
+use std::{
+    borrow::Cow,
+    ffi,
+    path,
+};
 
 /// parser for a single file path either in the form of
 /// --program a.wasm or --program b=a.wasm if a file should
@@ -59,3 +63,18 @@ pub fn parse_renamable_paths(
         .map(|s| parse_renamable_path(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()
 }
+
+/// Insert a backslash (/) if the path does not already have one
+///
+/// Veracruz currently doesn't have a concept of "current directory", so
+/// the "current directory" is always the root. This avoid easy typing
+/// mistakes.
+#[cfg(feature = "std")]
+pub fn enforce_leading_backslash<'a>(path: &'a str) -> Cow<'a, str> {
+    if !path.starts_with('/') {
+        Cow::Owned(format!("/{}", path))
+    } else {
+        Cow::Borrowed(path)
+    }
+}
+

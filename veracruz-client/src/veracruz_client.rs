@@ -20,7 +20,7 @@ use std::{
     path,
     str::from_utf8,
 };
-use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
+use veracruz_utils::{platform::Platform, VERACRUZ_RUNTIME_HASH_EXTENSION_ID};
 use webpki;
 
 // Use Mockall for testing
@@ -245,30 +245,12 @@ impl VeracruzClient {
         })
     }
 
-    pub fn send_program(
-        &mut self,
-        file_name: &str,
-        program: &Vec<u8>,
-    ) -> Result<(), VeracruzClientError> {
-        self.check_policy_hash().map_err(|e| {
-            error!(
-                "Policy hash incorrect when sending program.  Error produced: {}.",
-                e
-            );
+    pub fn send_program(&mut self, path: &str, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
+        self.check_policy_hash()?;
+        self.check_runtime_hash()?;
 
-            e
-        })?;
-
-        self.check_runtime_hash().map_err(|e| {
-            error!(
-                "Runtime hash incorrect when sending program.  Error produced: {}.",
-                e
-            );
-
-            e
-        })?;
-
-        let serialized_program = transport_protocol::serialize_program(&program, file_name)?;
+        let path = enforce_leading_backslash(path);
+        let serialized_program = transport_protocol::serialize_program(&program, &path)?;
         let response = self.send(&serialized_program)?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
@@ -280,14 +262,12 @@ impl VeracruzClient {
         }
     }
 
-    pub fn send_data(
-        &mut self,
-        file_name: &str,
-        data: &Vec<u8>,
-    ) -> Result<(), VeracruzClientError> {
+    pub fn send_data(&mut self, path: &str, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
-        let serialized_data = transport_protocol::serialize_program_data(&data, file_name)?;
+
+        let path = enforce_leading_backslash(path);
+        let serialized_data = transport_protocol::serialize_program_data(&data, &path)?;
         let response = self.send(&serialized_data)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
@@ -300,11 +280,12 @@ impl VeracruzClient {
         }
     }
 
-    pub fn request_compute(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn request_compute(&mut self, path: &str) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
-        let serialized_read_result = transport_protocol::serialize_request_result(file_name)?;
+        let path = enforce_leading_backslash(path);
+        let serialized_read_result = transport_protocol::serialize_request_result(&path)?;
         let response = self.send(&serialized_read_result)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
@@ -320,11 +301,12 @@ impl VeracruzClient {
     }
 
 
-    pub fn get_results(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn get_results(&mut self, path: &str) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
-        let serialized_read_result = transport_protocol::serialize_read_file(file_name)?;
+        let path = enforce_leading_backslash(path);
+        let serialized_read_result = transport_protocol::serialize_read_file(&path)?;
         let response = self.send(&serialized_read_result)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
