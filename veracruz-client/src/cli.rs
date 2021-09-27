@@ -75,6 +75,26 @@ struct Opt {
     )]
     data: Vec<Vec<(String, path::PathBuf)>>,
 
+    /// Request a computation
+    ///
+    /// This requires the path of a WebAssembly binary to execute, which
+    /// must have been previously uploaded by a client with "PiProvider"
+    /// permissions.
+    ///
+    /// The WebAssembly binary will be executed with the uploaded data files
+    /// available in the enclave's filesystem, and files written to can be
+    /// retrieved by clients with the "ResultReader" permission.
+    ///
+    ///
+    /// Note: This requires "ResultReader" permissions in the
+    /// policy file.
+    ///
+    #[structopt(
+        short, long, multiple=true, number_of_values=1,
+        visible_alias="computes"
+    )]
+    compute: Vec<String>,
+
     /// Specify optional output files to store results. If not provided
     /// the results will not be fetched.
     ///
@@ -85,7 +105,7 @@ struct Opt {
     /// accepts "-" to write to stdout.
     ///
     /// If --no-shutdown is not provided, Veracruz Client will request a shutdown
-    /// from the Sinaloa server after recieving the results.
+    /// from the Veracruz server after recieving the results.
     ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
@@ -99,7 +119,7 @@ struct Opt {
     )]
     output: Vec<Vec<(String, path::PathBuf)>>,
 
-    /// Do not request a shutdown of the Sinaloa server after recieving the
+    /// Do not request a shutdown of the Veracruz server after recieving the
     /// results. This can be useful if you have multiple result readers.
     #[structopt(short, long)]
     no_shutdown: bool,
@@ -243,9 +263,22 @@ fn main() {
         }
     }
 
+    // request compute(s)?
+    for compute_name in opt.compute {
+        qprintln!(opt, "Requesting compute of <enclave>/{}",
+            compute_name);
+        did_something = true;
+
+        match veracruz_client.request_compute(&compute_name) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("{}", err);
+                process::exit(1);
+            }
+        }
+    }
+
     // fetch result(s)?
-    // TODO why does results take the path to the _binary_? can this
-    // API be better?
     for (output_name, output_path) in opt.output.iter().flatten() {
         qprintln!(
             opt,

@@ -159,17 +159,17 @@ $ vc-pgen \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
     --css-file runtime-manager/css-sgx.bin \
     --certificate example/example-program-cert.pem \
-    --capability "example-binary.wasm:w" \
+    --capability "/example-binary.wasm:w" \
     --certificate example/example-data0-cert.pem \
-    --capability "input-0:w" \
+    --capability "/input-0:w" \
     --certificate example/example-data1-cert.pem \
-    --capability "input-1:w" \
+    --capability "/input-1:w" \
     --certificate example/example-data2-cert.pem \
-    --capability "input-2:w" \
+    --capability "/input-2:w" \
     --certificate example/example-result-cert.pem \
-    --capability "output:r" \
-    --binary example-binary.wasm=example/example-binary.wasm \
-    --capability "input-0:r,input-1:r,input-2:r,output:w" \
+    --capability "/output:r" \
+    --binary /example-binary.wasm=example/example-binary.wasm \
+    --capability "/input-0:r,/input-1:r,/input-2:r,/output:w" \
     --output-policy-file example/example-policy.json
 ```
 
@@ -243,7 +243,7 @@ identity with the "ProgramProvider" role:
 $ vc-client example/example-policy.json \
     --identity example/example-program-cert.pem \
     --key example/example-program-key.pem \
-    --program example-binary.wasm=example/example-binary.wasm
+    --program /example-binary.wasm=example/example-binary.wasm
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/example-binary.wasm from example/example-binary.wasm
@@ -258,7 +258,7 @@ different devices:
 $ vc-client example/example-policy.json \
     --identity example/example-data0-cert.pem \
     --key example/example-data0-key.pem \
-    --data input-0=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
+    --data /input-0=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-0 from /dev/fd/63
@@ -266,7 +266,7 @@ Submitting <enclave>/input-0 from /dev/fd/63
 $ vc-client example/example-policy.json \
     --identity example/example-data1-cert.pem \
     --key example/example-data1-key.pem \
-    --data input-1=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
+    --data /input-1=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-1 from /dev/fd/63
@@ -274,23 +274,25 @@ Submitting <enclave>/input-1 from /dev/fd/63
 $ vc-client example/example-policy.json \
     --identity example/example-data2-cert.pem \
     --key example/example-data2-key.pem \
-    --data input-2=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
+    --data /input-2=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-2 from /dev/fd/63
 ```
 
-And finally, we can request the result using an identity with the
-"RequestResult" role:
+And finally, we can request a computation and read the result using an identity
+with the "RequestResult" role:
 
 ``` bash
 $ vc-client example/example-policy.json \
     --identity example/example-result-cert.pem \
     --key example/example-result-key.pem \
-    --result example-binary.wasm=-
+    --compute /example-binary.wasm \
+    --result /output=-
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
-Reading <enclave>/example-binary.wasm into <stdout>
+Requestion compute of <enclave>/example-binary.wasm
+Reading <enclave>/output into <stdout>
 Hello World!
 Shutting down enclave
 ```
