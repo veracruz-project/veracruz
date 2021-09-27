@@ -20,7 +20,7 @@ HAS_ISSUES=0
 echo "Checking code formatting of files staged for commit."
 
 for file in $(git diff --name-only --staged \*.rs); do
-    RUSTFMT="$(rustfmt --check --skip-children --unstable-features $file)"
+    RUSTFMT="$(rustfmt --edition=2018 --check --skip-children --unstable-features $file)"
     if [ "$RUSTFMT" != "" ]; then
         printf "[ERROR]: $file\n"
         HAS_ISSUES=1
