@@ -12,3 +12,4 @@ description = "Automatically-generated C bindings for the SGX root enclave image
 [build-dependencies]
 bindgen = "0.53.1"
 bitflags = "=1.2.1"
+glob = "0.3.0"
