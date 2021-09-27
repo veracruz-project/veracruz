@@ -180,6 +180,8 @@ pub enum VeracruzServerError {
     #[cfg(feature = "nitro")]
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
     NonSuccessHttp,
+    #[error(display = "VeracruzServer: No enclave matches id {}.", _0)]
+    InvalidEnclaveIdError(u32),
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
@@ -209,7 +211,8 @@ impl error::ResponseError for VeracruzServerError {
             VeracruzServerError::DirectMessageError(_, e) => e.clone(),
             VeracruzServerError::UnimplementedRequestError
             | VeracruzServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
-            VeracruzServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
+            VeracruzServerError::UnsupportedRequestError
+            | VeracruzServerError::InvalidEnclaveIdError(_) => StatusCode::NOT_FOUND,
             _otherwise => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
