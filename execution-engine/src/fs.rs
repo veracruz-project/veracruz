@@ -122,7 +122,7 @@ impl FileSystem {
     #[inline]
     pub fn new(
         rights_table: RightsTable,
-        std_streams_table: &Vec<StandardStream>,
+        std_streams_table: &[StandardStream],
         enable_clock: bool,
     ) -> Self {
         let mut rst = Self {
@@ -133,7 +133,7 @@ impl FileSystem {
             prestat_table: HashMap::new(),
             enable_clock,
         };
-        rst.install_prestat::<&Path>(&Vec::new(), std_streams_table);
+        rst.install_prestat::<&Path>(&[], std_streams_table);
         rst
     }
 
@@ -142,7 +142,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////
 
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
-    fn install_standard_streams(&mut self, std_streams_table: &Vec<StandardStream>) {
+    fn install_standard_streams(&mut self, std_streams_table: &[StandardStream]) {
         for std_stream in std_streams_table {
             // Map each standard stream to an fd and inode.
             // Rights are assumed to be already configured by the execution engine in the rights table
@@ -168,7 +168,7 @@ impl FileSystem {
     fn install_prestat<T: AsRef<Path> + Sized>(
         &mut self,
         dir_paths: &[T],
-        std_streams_table: &Vec<StandardStream>,
+        std_streams_table: &[StandardStream],
     ) {
         // Pre open the standard streams.
         self.install_standard_streams(std_streams_table);
@@ -480,6 +480,7 @@ impl FileSystem {
         atime: Timestamp,
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
+        current_time: Timestamp,
     ) -> FileSystemResult<()> {
         self.check_right(&fd, Rights::FD_FILESTAT_SET_TIMES)?;
         let inode = self
@@ -487,7 +488,6 @@ impl FileSystem {
             .get(&fd)
             .map(|FileTableEntry { inode, .. }| inode.clone())
             .ok_or(ErrNo::BadF)?;
-        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
 
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
         if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
@@ -752,6 +752,7 @@ impl FileSystem {
         atime: Timestamp,
         mtime: Timestamp,
         fst_flags: SetTimeFlags,
+        current_time: Timestamp,
     ) -> FileSystemResult<()> {
         let path = path.as_ref();
         self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
@@ -759,7 +760,6 @@ impl FileSystem {
         if fd != Self::ROOT_DIRECTORY_FD {
             return Err(ErrNo::NotDir);
         }
-        let current_time = self.clock_time_get(ClockId::RealTime, Timestamp::from_nanos(0))?;
 
         let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?;
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::BadF)?;
