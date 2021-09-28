@@ -18,6 +18,7 @@ use crate::attestation::sgx;
 use crate::attestation::nitro;
 
 use lazy_static::lazy_static;
+use std::net::ToSocketAddrs;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 lazy_static! {
@@ -195,8 +196,9 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> P
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
-pub fn server<P1, P2>(url: String, ca_cert_path: P1, ca_key_path: P2, debug: bool) -> Result<Server, String>
+pub fn server<U, P1, P2>(url: U, ca_cert_path: P1, ca_key_path: P2, debug: bool) -> Result<Server, String>
 where
+    U: ToSocketAddrs,
     P1: AsRef<path::Path>,
     P2: AsRef<path::Path>
 {
@@ -220,7 +222,7 @@ where
             .route("/PSA/{psa_request}", web::post().to(psa_router))
             .route("/Nitro/{nitro_request}", web::post().to(nitro_router))
     })
-    .bind(&url)
+    .bind(url)
     .map_err(|err| format!("binding error: {:?}", err))?
     .run();
     Ok(server)

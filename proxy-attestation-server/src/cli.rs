@@ -13,20 +13,29 @@ use actix_rt;
 use env_logger;
 use log::info;
 use proxy_attestation_server;
-use std::{env, fs, path, process};
+use std::{env, path, process};
 use structopt::StructOpt;
-use veracruz_utils::policy::{
-    error::PolicyError,
-    policy::Policy,
-};
 
+
+/// A bit of extra parsing to allow omitting addr/port
+fn parse_bind_addr(s: &str) -> String {
+    // Rust's SocketAddr parser requires an explicit address/port, add 0.0.0.0
+    // if omitted, this lets ':3010' be used to specify only the port
+    if s.starts_with(':') {
+        format!("0.0.0.0{}", s)
+    } else if s.ends_with(':') {
+        format!("{}0", s)
+    } else {
+        s.to_string()
+    }
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all="kebab")]
 struct Opt {
-    /// Path to policy file
-    #[structopt(parse(from_os_str))]
-    policy_path: path::PathBuf,
+    /// URL to serve on
+    #[structopt(parse(from_str=parse_bind_addr))]
+    url: String,
 
     /// Path to CA certificate
     #[structopt(long, parse(from_os_str))]
@@ -55,23 +64,6 @@ fn main() {
     // setup logger
     env_logger::init();
 
-    // load policy
-    info!("Loading policy {:?}", opt.policy_path);
-    let policy = fs::read_to_string(&opt.policy_path)
-        .map_err(|err| PolicyError::from(err))
-        .and_then(|policy_json| Policy::from_json(&policy_json));
-    let policy = match policy {
-        Ok(policy) => policy,
-        Err(err) => {
-            eprintln!("{}", err);
-            process::exit(1);
-        }
-    };
-    info!("Loaded policy {}", policy.policy_hash().unwrap_or("???"));
-
-    // log the CA cert
-    info!("Using CA certificate {:?}", opt.ca_cert);
-
     // needs a database URL
     if let Some(url) = opt.database_url {
         env::set_var("DATABASE_URL", url);
@@ -86,12 +78,15 @@ fn main() {
         }
     }
 
+    // log the CA cert
+    info!("Using CA certificate {:?}", opt.ca_cert);
+
     // create Actix runtime
     let mut sys = actix_rt::System::new("Proxy Attestation Server");
 
     // create Proxy Attestation Server instance
     let proxy_attestation_server = match proxy_attestation_server::server::server(
-        policy.proxy_attestation_server_url().clone(),
+        &opt.url,
         &opt.ca_cert,
         &opt.ca_key,
         opt.debug
@@ -103,7 +98,7 @@ fn main() {
         }
     };
 
-    println!("Proxy Attestation Server running on {}", policy.proxy_attestation_server_url());
+    println!("Proxy Attestation Server running on {}", opt.url);
     match sys.block_on(proxy_attestation_server) {
         Ok(()) => {}
         Err(err) => {

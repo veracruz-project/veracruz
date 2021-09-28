@@ -27,7 +27,8 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   string-edit-distance \
  		   number-stream-accumulation \
 		   read-file \
- 		   image-processing
+ 		   image-processing \
+		   shamir-secret-sharing
 RUST_EXAMPLE_DIR = rust-examples/
 # Navigate to the actual wasm programs.
 RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-wasi/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))

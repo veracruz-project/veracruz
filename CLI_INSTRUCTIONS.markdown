@@ -1,6 +1,7 @@
-# Getting started with Veracruz
+# Getting started with the Veracruz command-line interface
 
-This document walks through running an example Veracruz program.
+This document walks through running an example Veracruz program using
+the Veracruz command-line interface.
 
 It assumes you have walked through the steps in [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown).
 
@@ -204,7 +205,7 @@ Now we can launch the Proxy Attestation Server with the
 character `&` to launch the Proxy Attestation Server in the background:
 
 ``` bash
-$ vc-pas example/example-policy.json \
+$ vc-pas :3010 \
     --database-url=example/example-pas.db \
     --ca-cert=example/example-ca-cert.pem \
     --ca-key=example/example-ca-key.pem &
