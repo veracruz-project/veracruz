@@ -62,13 +62,13 @@ const OUTPUT_FILE: &str = "output";
 
 /// The default dump status of `stdout`, if no alternative is provided on the
 /// command line.
-const DEFAULT_DUMP_STDOUT: &'static str = "false";
+const DEFAULT_DUMP_STDOUT: &str = "false";
 /// The default dump status of `stderr`, if no alternative is provided on the
 /// command line.
-const DEFAULT_DUMP_STDERR: &'static str = "false";
+const DEFAULT_DUMP_STDERR: &str = "false";
 /// The default value of the clock flag, if no alternative is provided on the
 /// command line.
-const DEFAULT_ENABLE_CLOCK: &'static str = "false";
+const DEFAULT_ENABLE_CLOCK: &str = "false";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -365,7 +365,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let main_time = Instant::now();
     let options = Options {
         enable_clock: cmdline.enable_clock,
-        ..Default::default()
     };
     let return_code = execute(
         &cmdline.execution_strategy,

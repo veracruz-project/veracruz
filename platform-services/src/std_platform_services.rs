@@ -15,7 +15,6 @@
 //! information on licensing and copyright.
 
 use super::result;
-use getrandom;
 use nix::{errno::Errno, sys::time::TimeValLike, time, Error};
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the random number

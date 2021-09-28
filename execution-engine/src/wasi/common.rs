@@ -16,6 +16,7 @@
 //! information on licensing and copyright.
 
 #![allow(non_camel_case_types)]
+#![allow(clippy::too_many_arguments)]
 
 use crate::fs::{FileSystem, FileSystemResult};
 use crate::Options;

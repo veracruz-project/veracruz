@@ -14,6 +14,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::too_many_arguments)]
+
 use platform_services::getrandom;
 use std::{
     collections::HashMap,
@@ -146,7 +148,7 @@ impl FileSystem {
                 StandardStream::Stdout(file_rights) => (file_rights.file_name(), 1, 1),
                 StandardStream::Stderr(file_rights) => (file_rights.file_name(), 2, 2),
             };
-            self.install_file(&path, Inode(inode_number), "".as_bytes());
+            self.install_file(&path, Inode(inode_number), b"");
             self.install_fd(
                 Fd(fd_number),
                 Inode(inode_number),
@@ -200,7 +202,7 @@ impl FileSystem {
     fn install_dir<T: AsRef<Path>>(&mut self, path: T, inode: Inode) {
         let file_stat = FileStat {
             device: (0u64).into(),
-            inode: inode.clone(),
+            inode,
             file_type: FileType::Directory,
             num_links: 0,
             file_size: 0u64,
@@ -212,9 +214,8 @@ impl FileSystem {
             file_stat,
             raw_file_data: Vec::new(),
         };
-        self.inode_table.insert(inode.clone(), node);
-        self.path_table
-            .insert(path.as_ref().to_path_buf(), inode.clone());
+        self.inode_table.insert(inode, node);
+        self.path_table.insert(path.as_ref().to_path_buf(), inode);
     }
 
     /// Install a file with content `raw_file_data` and attatch it to `inode`.
@@ -222,7 +223,7 @@ impl FileSystem {
         let file_size = raw_file_data.len();
         let file_stat = FileStat {
             device: 0u64.into(),
-            inode: inode.clone(),
+            inode,
             file_type: FileType::RegularFile,
             num_links: 0,
             file_size: file_size as u64,
@@ -234,9 +235,8 @@ impl FileSystem {
             file_stat,
             raw_file_data: raw_file_data.to_vec(),
         };
-        self.inode_table.insert(inode.clone(), node);
-        self.path_table
-            .insert(path.as_ref().to_path_buf(), inode.clone());
+        self.inode_table.insert(inode, node);
+        self.path_table.insert(path.as_ref().to_path_buf(), inode);
     }
 
     /// Install a `fd` to the file system. The fd will be of type RegularFile.
@@ -250,18 +250,18 @@ impl FileSystem {
         let fd_stat = FdStat {
             file_type: FileType::RegularFile,
             flags: FdFlags::empty(),
-            rights_base: rights_base.clone(),
-            rights_inheriting: rights_inheriting.clone(),
+            rights_base: *rights_base,
+            rights_inheriting: *rights_inheriting,
         };
 
         let fd_entry = FileTableEntry {
-            inode: inode.clone(),
+            inode,
             fd_stat,
             offset: 0,
             /// Advice on how regions of the file are to be used.
             advice: Vec::new(),
         };
-        self.fd_table.insert(fd.clone(), fd_entry);
+        self.fd_table.insert(fd, fd_entry);
     }
 
     /// Return a random u32
@@ -375,7 +375,7 @@ impl FileSystem {
     /// Return a copy of the status of the file descriptor, `fd`.
     #[inline]
     pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemResult<FdStat> {
-        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat.clone())
+        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat)
     }
 
     /// Change the flag associated with the file descriptor, `fd`.
@@ -408,12 +408,7 @@ impl FileSystem {
             .map(|fte| fte.inode)
             .ok_or(ErrNo::BadF)?;
 
-        Ok(self
-            .inode_table
-            .get(&inode)
-            .ok_or(ErrNo::NoEnt)?
-            .file_stat
-            .clone())
+        Ok(self.inode_table.get(&inode).ok_or(ErrNo::NoEnt)?.file_stat)
     }
 
     /// Change the size of the open file pointed by the file descriptor, `fd`. The extra bytes are
@@ -423,7 +418,7 @@ impl FileSystem {
         let inode = self
             .fd_table
             .get(&fd)
-            .map(|FileTableEntry { inode, .. }| inode.clone())
+            .map(|FileTableEntry { inode, .. }| *inode)
             .ok_or(ErrNo::BadF)?;
 
         let inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
@@ -447,7 +442,7 @@ impl FileSystem {
         let inode = self
             .fd_table
             .get(&fd)
-            .map(|FileTableEntry { inode, .. }| inode.clone())
+            .map(|FileTableEntry { inode, .. }| *inode)
             .ok_or(ErrNo::BadF)?;
 
         let mut inode_impl = self.inode_table.get_mut(&inode).ok_or(ErrNo::NoEnt)?;
@@ -624,7 +619,7 @@ impl FileSystem {
             let t_offset = new_base_offset + (delta.abs() as u64);
             // If offset is greater the file size, then expand the file.
             if t_offset > file_size {
-                self.fd_filestat_set_size(fd.clone(), t_offset)?;
+                self.fd_filestat_set_size(fd, t_offset)?;
             }
             t_offset
         } else {
@@ -651,7 +646,7 @@ impl FileSystem {
     #[inline]
     pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemResult<FileSize> {
         self.check_right(&fd, Rights::FD_TELL)?;
-        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset.clone())
+        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset)
     }
 
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
@@ -694,12 +689,7 @@ impl FileSystem {
             return Err(ErrNo::NotDir);
         }
         let inode = self.path_table.get(path).ok_or(ErrNo::NoEnt)?;
-        Ok(self
-            .inode_table
-            .get(&inode)
-            .ok_or(ErrNo::BadF)?
-            .file_stat
-            .clone())
+        Ok(self.inode_table.get(&inode).ok_or(ErrNo::BadF)?.file_stat)
     }
 
     /// Change the time of the open file at `path` If `fst_flags`
@@ -792,7 +782,7 @@ impl FileSystem {
                 if oflags.contains(OpenFlags::EXCL) {
                     return Err(ErrNo::Exist);
                 }
-                i.clone()
+                *i
             }
             None => {
                 // If file does NOT exists and `create` is NOT set, return `NoEnt` error.
@@ -804,7 +794,7 @@ impl FileSystem {
                     return Err(ErrNo::Access);
                 }
                 let new_inode = self.new_inode()?;
-                self.install_file(path, new_inode, &vec![]);
+                self.install_file(path, new_inode, &[]);
                 new_inode
             }
         };
@@ -1063,7 +1053,7 @@ impl FileSystem {
             .get(principal)
             .ok_or(ErrNo::Access)?
             .get(file_name)
-            .map(|r| r.clone())
+            .copied()
             .ok_or(ErrNo::Access)
     }
 }

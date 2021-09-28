@@ -9,6 +9,8 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+#![allow(clippy::too_many_arguments)]
+
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
