@@ -701,7 +701,7 @@ mod tests {
     /// data sources: private-set-inter-sum/*.dat
     fn test_performance_set_intersection_sum_with_attestation() {
         iterate_over_data(data_dir("private-set-inter-sum").as_path(), |data_path| {
-            info!("Data path: {}", data_path);
+            info!("Data path: {}", data_path.display());
             // call the test_template with info flag on,
             // which prints out the time
             let result = test_template::<(usize, u64)>(
