@@ -11,9 +11,17 @@
 
 extern crate bindgen;
 
+use glob;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
+
+/// Mapping to cargo:rerun-if-changed with glob support
+fn rerun_if_changed(path: &str) {
+    for path in glob::glob(path).unwrap() {
+        println!("cargo:rerun-if-changed={}", path.unwrap().to_string_lossy());
+    }
+}
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -29,9 +37,11 @@ fn main() {
     println!("cargo:rustc-link-search=../runtime-manager/bin");
     println!("{:}", out_dir_link_search);
     println!("cargo:rustc-link-lib=static=runtime_manager_u");
-    println!("cargo:rerun-if-changed=.");
-    println!("cargo:rerun-if-changed=../runtime-manager/");
-    println!("cargo:rerun-if-changed=../runtime-manager/Makefile");
+
+    rerun_if_changed("src");
+    rerun_if_changed("src/*.rs");
+    rerun_if_changed("../runtime-manager/Makefile");
+    rerun_if_changed("../runtime-manager/src/*.rs");
 
     let make_result = Command::new("make")
         .arg("sgx")

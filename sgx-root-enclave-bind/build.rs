@@ -11,9 +11,17 @@
 
 extern crate bindgen;
 
+use glob;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
+
+/// Mapping to cargo:rerun-if-changed with glob support
+fn rerun_if_changed(path: &str) {
+    for path in glob::glob(path).unwrap() {
+        println!("cargo:rerun-if-changed={}", path.unwrap().to_string_lossy());
+    }
+}
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -34,9 +42,10 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=sgx_urts");
     println!("cargo:rustc-link-lib=dylib=sgx_uae_service");
     println!("cargo:rustc-link-lib=dylib=sgx_ukey_exchange");
-    println!("cargo:rerun-if-changed=../sgx-root-enclave/sgx_root_enclave.edl");
-    println!("cargo:rerun-if-changed=../sgx-root-enclave/src/lib.rs");
-    println!("cargo:rerun-if-changed=../veracruz-utils/src/*.rs");
+    rerun_if_changed("../sgx-root-enclave/sgx_root_enclave.edl");
+    rerun_if_changed("../sgx-root-enclave/src/lib.rs");
+    rerun_if_changed("../veracruz-utils/src");
+    rerun_if_changed("../veracruz-utils/src/*.rs");
 
     let make_result = Command::new("make")
         .current_dir("../sgx-root-enclave")
