@@ -263,7 +263,13 @@ buf --> |  dirent[0] path[0] dirent[1] path[1] ... ... ... ...|
         ^  ... ... ...       size         ... ... ...  ^
 ```
 
-**NOT SUPPORTED**
+Each `dirent[i]` contains:
+- `next` the offset of the next dir entry
+- `inode` 
+- `name_len` the length of the `path[i]`
+- `file_type`
+Given the wasm program compiled from Rust, it is required to fill the buf as much as possible. Particularly, if `dirent[i]` is able to fit in while `path[i]` is not, then it should fill `dirent[i]`.
+**QUESTION:** the semantic of `next` in the `dirent`. It looks like to be implementation-dependent, hence in our implementation, it is simply a counter.
 
 #### `fd_renumber`
 ```
@@ -374,8 +380,6 @@ fn path_create_directory(fd: Fd, path_addr: u32, path_len: u32) -> u16;
 ```
 Read the new directory path at address `path_addr` of length `path_len`.
 Then create a new directory starting from the directory opened by the file descriptor `fd`.
-
-**NOT SUPPORTED**
 
 #### `path_remove_directory`
 ```rust

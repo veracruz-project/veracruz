@@ -356,8 +356,8 @@ shamir-secret-sharing-policy.json: pgen css-$(TEE).bin program_client_cert.pem d
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 server_test.json: pgen css-$(TEE).bin client_rsa_cert.pem $(WASM_PROG_FILES)
-	./pgen --certificate client_rsa_cert.pem --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_RIGHT)" \
-	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(WRITE_RIGHT)") \
+	./pgen --certificate client_rsa_cert.pem --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
         --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \

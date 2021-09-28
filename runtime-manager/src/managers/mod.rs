@@ -21,10 +21,7 @@ use std::sync::Mutex;
 use std::{
     collections::HashMap,
     string::{String, ToString},
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
     vec::Vec,
 };
 use lazy_static::lazy_static;
@@ -207,9 +204,13 @@ impl ProtocolState {
     /// The client must have the right to read the program.
     pub(crate) fn execute(&mut self, client_id: &Principal, file_name: &str) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
+        let options = execution_engine::Options {
+            enable_clock: *self.global_policy.enable_clock(),
+            ..Default::default()
+        };
         println!("file_name: {}", file_name);
         let program = self.read_file(client_id, file_name)?.ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
-        let return_code = execute(&execution_strategy, &self.vfs.spawn(&Principal::Program(file_name.to_string()))?, file_name, program)?;
+        let return_code = execute(&execution_strategy, self.vfs.spawn(&Principal::Program(file_name.to_string()))?, program, options)?;
 
         let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))

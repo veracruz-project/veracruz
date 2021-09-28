@@ -30,7 +30,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{fs, path::{PathBuf, Path}};
+use std::{fs, path::{PathBuf, Path}, io::Write};
 use anyhow::anyhow;
 ////////////////////////////////////////////////////////////////////////////////
 // Reading input
@@ -47,7 +47,7 @@ type Dataset = Vec<Vec<f64>>;
 ///   - [`return_code::ErrorCode::DataSourceCount`] if the number of inputs provided to the
 ///     program is not exactly 1.
 ///
-fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Dataset, Dataset, u32, u32, i32, i32)> {
+fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Dataset, Dataset, u64, u64, i64, i64)> {
     let input = fs::read(path.as_ref())?;
     Ok(pinecone::from_bytes(&input)?)
 }
@@ -60,10 +60,10 @@ fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Dataset, Dataset, u32
 fn nlgd(
     train_set: &mut Dataset,
     test_set: &mut Dataset,
-    num_of_iter: u32,
-    degree_of_sigmoid: u32,
-    gamma_up: i32,
-    gamma_down: i32,
+    num_of_iter: u64,
+    degree_of_sigmoid: u64,
+    gamma_up: i64,
+    gamma_down: i64,
 ) -> anyhow::Result<(Vec<f64>, f64, f64)> {
     let training_sample = train_set.len();
 
@@ -136,7 +136,7 @@ fn plain_nlgd_iteration(
     dataset: &Dataset,
     w_data: Vec<f64>,
     v_data: Vec<f64>,
-    approximate_degree: u32,
+    approximate_degree: u64,
     gamma: f64,
     eta: f64,
 ) -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
@@ -172,7 +172,7 @@ static DEGREE_7: &'static [f64] = &[-0.5, 0.216884, -0.00819276, 0.000165861, -0
 fn plain_sigmoid(
     dataset: &Dataset,
     ip_vec: &[f64],
-    approximate_degree: u32,
+    approximate_degree: u64,
     gamma: f64,
 ) -> anyhow::Result<Vec<f64>> {
     if dataset.len() != ip_vec.len() {
@@ -280,8 +280,11 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> anyhow::Result<f64> {
 /// them together into a single compound dataset, then trains a logistic regressor on this new
 /// dataset.  Input and output are assumed to be encoded in Pinecone.
 fn main() -> anyhow::Result<()> {
-    for path in fs::read_dir("/input/idash2017/")? {
+    for path in fs::read_dir("/input/idash2017")? {
         let path = path?.path();
+        println!("path in: {:?}",path);
+        let file_name = path.file_name().ok_or(anyhow!("cannot get file name"))?;
+        println!("file name {:?}", file_name);
         let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
             read_inputs(&path)?;
         let (w_data, correct, auc) = nlgd(
@@ -292,10 +295,12 @@ fn main() -> anyhow::Result<()> {
             gamma_up,
             gamma_down,
         )?;
+        println!("result: {:?}, {:?}, {:?}",w_data, correct, auc);
         let result_encode = pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
         let mut output = PathBuf::from("/output/idash2017/");
-        output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
-        fs::write(output, result_encode)?;
+        output.push(file_name);
+        println!("output {:?}", output);
+        std::fs::OpenOptions::new().write(true).create(true).open(output)?.write(&result_encode)?;
     }
     Ok(())
 }

@@ -448,7 +448,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Err(_) =>
                     match std::str::from_utf8(buf) {
                         Ok(oo) => oo.to_string(),
-                        Err(_) => "(Cannot Parse)".to_string(),
+                        Err(_) => "(Cannot Parse as a utf8 string)".to_string(),
                     },
             };
             info!("{:?}: {:?}", output_path, decode);
