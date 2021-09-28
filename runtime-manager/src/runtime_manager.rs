@@ -29,5 +29,6 @@ pub fn break_up_cert_array(
         certs.push(this_cert);
         aggregate_length += *this_length as usize;
     }
-    return Ok(certs);
+
+    Ok(certs)
 }

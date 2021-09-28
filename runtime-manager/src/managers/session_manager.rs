@@ -51,7 +51,7 @@ pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
             }
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 pub fn load_cert_chain(chain: &[Vec<u8>]) -> Result<(), RuntimeManagerError> {
@@ -66,7 +66,7 @@ pub fn load_cert_chain(chain: &[Vec<u8>]) -> Result<(), RuntimeManagerError> {
             ))
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 pub fn new_session() -> Result<u32, RuntimeManagerError> {
@@ -155,14 +155,10 @@ pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
 
 fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(session_manager) => {
-            return Ok(session_manager.private_key().clone());
-        }
-        None => {
-            return Err(RuntimeManagerError::UninitializedSessionError(
-                "get_enclave_private_key",
-            ));
-        }
+        Some(session_manager) => Ok(session_manager.private_key().clone()),
+        None => Err(RuntimeManagerError::UninitializedSessionError(
+            "get_enclave_private_key",
+        )),
     }
 }
 
@@ -175,5 +171,5 @@ pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
     .map_err(RuntimeManagerError::RingKeyRejected)?;
     let csr = csr::generate_csr(&csr::COMPUTE_ENCLAVE_CSR_TEMPLATE, &private_key)
         .map_err(RuntimeManagerError::CertError)?;
-    return Ok(csr);
+    Ok(csr)
 }

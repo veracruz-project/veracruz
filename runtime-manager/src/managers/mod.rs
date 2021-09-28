@@ -49,7 +49,7 @@ lazy_static! {
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
-const OUTPUT_FILE: &'static str = "output";
+const OUTPUT_FILE: &str = "output";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.
@@ -217,7 +217,6 @@ impl ProtocolState {
         let execution_strategy = self.global_policy.execution_strategy();
         let options = Options {
             enable_clock: *self.global_policy.enable_clock(),
-            ..Default::default()
         };
         let return_code = execute(&execution_strategy, self.vfs.clone(), file_name, options)?;
 

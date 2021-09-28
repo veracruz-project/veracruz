@@ -32,7 +32,7 @@ fn main() -> std::io::Result<()> {
         let tee_uuid = tee_uuid_result.unwrap();
         let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) = tee_uuid.as_fields();
 
-        write!(buffer, "\n")?;
+        writeln!(buffer)?;
         write!(
             buffer,
             "const TA_UUID: optee_utee_sys::TEE_UUID = optee_utee_sys::TEE_UUID {{

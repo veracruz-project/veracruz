@@ -9,6 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 pub use crate::managers;
 pub use crate::managers::RuntimeManagerError;
 
@@ -18,7 +20,7 @@ use sgx_types::{
     c_char, sgx_dh_msg1_t, sgx_dh_msg2_t, sgx_dh_msg3_t, sgx_dh_session_enclave_identity_t,
     sgx_key_128bit_t, sgx_status_t,
 };
-use std::mem;
+use std::{mem, string::String};
 
 extern "C" {
     pub fn start_local_attest_ocall(
@@ -82,7 +84,7 @@ pub extern "C" fn init_session_manager_enc(
         return sgx_status_t::SGX_ERROR_UNEXPECTED;
     }
 
-    debug_message(format!("init_session_manager_enc getting csr"));
+    debug_message(String::from("init_session_manager_enc getting csr"));
     // TODO: Make this conditional on a field in the policy
     let csr_result = managers::session_manager::generate_csr();
     let csr = match csr_result {
@@ -141,7 +143,7 @@ pub extern "C" fn close_session_enc(session_id: u32) -> sgx_status_t {
 
 #[cfg(feature = "sgx")]
 fn local_attestation_get_cert_enc(
-    csr: &std::vec::Vec<u8>,
+    csr: &[u8],
 ) -> Result<std::vec::Vec<std::vec::Vec<u8>>, RuntimeManagerError> {
     let mut dh_msg1: SgxDhMsg1 = SgxDhMsg1::default();
 
@@ -221,7 +223,7 @@ fn local_attestation_get_cert_enc(
     let certs: std::vec::Vec<std::vec::Vec<u8>> =
         crate::runtime_manager::break_up_cert_array(&cert_array, &certificate_lengths)?;
 
-    return Ok(certs);
+    Ok(certs)
 }
 
 #[no_mangle]

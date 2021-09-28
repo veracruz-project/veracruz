@@ -14,13 +14,10 @@ use crate::managers::debug_message;
 use libc;
 #[cfg(feature = "tz")]
 use optee_utee::{
-    ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session,
-    ErrorKind, Parameters, Result, 
+    ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, ErrorKind,
+    Parameters, Result,
 };
-use std::{
-    convert::TryFrom,
-    io::Write,
-};
+use std::{convert::TryFrom, io::Write};
 use veracruz_utils::platform::tz::runtime_manager_opcode::RuntimeManagerOpcode;
 
 fn print_error_and_return(message: String) -> ErrorKind {
@@ -242,9 +239,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
         RuntimeManagerOpcode::GetCSR => {
             // p0 - challenge input
             // p1 - buffer for the CSR
-            debug_message(
-                "runtime_manager_trustzone::invoke_command GetCSR".to_string(),
-            );
+            debug_message("runtime_manager_trustzone::invoke_command GetCSR".to_string());
 
             // We don't currently have anything to do with the challenge value
             // (since we are faking attestation on TrustZone platforms for now)
@@ -282,7 +277,10 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
         RuntimeManagerOpcode::PopulateCertificates => {
             // p0 - cert_chain_buffer - input
             // p1 - cert_lengths as [u8]
-            debug_message("runtime_manager_trustzone::invoke_command::PopulateCertificates started".to_string());
+            debug_message(
+                "runtime_manager_trustzone::invoke_command::PopulateCertificates started"
+                    .to_string(),
+            );
             let cert_chain_buffer = unsafe {
                 let mut memref = params.0.as_memref().map_err(|err|
                     print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed to get memref from params.0:{:?}", err))
@@ -305,7 +303,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
 
             managers::session_manager::load_cert_chain(&certs)
                 .map_err(|err| print_error_and_return(format!("runtime_manager_trustzone::invoke_command::PopulateCertificates failed on call to break_up_cert_array:{:?}", err)))?;
-        },
+        }
         RuntimeManagerOpcode::ResetEnclave => {
             debug_message("runtime_manager_trustzone::invoke_command::ResetEnclave".to_string());
         }

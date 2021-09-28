@@ -29,3 +29,8 @@ fn main() -> Result<(), String> {
     runtime_manager_nitro::nitro_main()
         .map_err(|err| format!("Runtime Manager::main nitro_main returned error:{:?}", err))
 }
+
+#[cfg(not(feature = "nitro"))]
+fn main() -> Result<(), String> {
+    Ok(())
+}
