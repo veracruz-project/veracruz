@@ -11,7 +11,6 @@
 
 extern crate bindgen;
 
-use glob;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;

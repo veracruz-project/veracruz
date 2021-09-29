@@ -9,6 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![no_std]
 #[macro_use]
 extern crate sgx_tstd as std;
@@ -16,7 +17,6 @@ extern crate sgx_tstd as std;
 use lazy_static::lazy_static;
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use sgx_tdh::{SgxDhInitiator, SgxDhMsg3};
-use sgx_types;
 use sgx_types::{
     sgx_create_report, sgx_dh_msg1_t, sgx_dh_msg2_t, sgx_dh_msg3_t,
     sgx_dh_session_enclave_identity_t, sgx_ec256_public_t, sgx_key_128bit_t, sgx_ra_context_t,
@@ -105,7 +105,7 @@ pub extern "C" fn init_remote_attestation_enc(
         *p_context = context;
     }
 
-    return ret;
+    ret
 }
 
 /// Retrieve or generate the private key as a Vec<u8>
@@ -127,7 +127,7 @@ fn get_private_key() -> Result<std::vec::Vec<u8>, SgxRootEnclave> {
             pkcs8_bytes.as_ref().to_vec()
         }
     };
-    return Ok(pkcs8_bytes);
+    Ok(pkcs8_bytes)
 }
 
 #[no_mangle]
@@ -208,7 +208,7 @@ pub extern "C" fn sgx_send_cert_chain(
             *cert_chain_guard = Some((enclave_cert_slice.to_vec(), root_cert_slice.to_vec()));
         }
     }
-    return sgx_status_t::SGX_SUCCESS;
+    sgx_status_t::SGX_SUCCESS
 }
 
 #[no_mangle]
@@ -248,9 +248,9 @@ fn verify_csr(csr: &[u8]) -> Result<bool, std::string::String> {
     let csr_signature = &csr[237..];
     let verify_result = public_key.verify(&csr_body, &csr_signature);
     if verify_result.is_err() {
-        return Err(format!("verify_csr failed:{:?}", verify_result));
+        Err(format!("verify_csr failed:{:?}", verify_result))
     } else {
-        return Ok(true);
+        Ok(true)
     }
 }
 
@@ -385,7 +385,7 @@ pub extern "C" fn finish_local_attest_enc(
     cert_buf_slice.clone_from_slice(&temp_cert_buf);
     cert_lengths_slice.clone_from_slice(&temp_cert_lengths);
 
-    return SgxRootEnclave::Success;
+    SgxRootEnclave::Success
 }
 
 fn from_slice(bytes: &[u8]) -> [u8; 32] {

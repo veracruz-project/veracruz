@@ -9,6 +9,10 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use crate::veracruz_server::*;
 use lazy_static::lazy_static;
 use log::{debug, error};

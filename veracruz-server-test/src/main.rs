@@ -12,20 +12,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub fn main() -> Result<(), String> {
-    Ok(())
-}
+#![allow(clippy::type_complexity)]
 
 mod tests {
     use actix_rt::System;
-    use env_logger;
     use lazy_static::lazy_static;
-    use log::{debug, error, info, Level};
-    use rand;
-    use rand::Rng;
-    use ring;
+    use log::{info, Level};
 
-    use proxy_attestation_server;
     use serde::Deserialize;
     use std::{
         collections::{HashMap, HashSet},
@@ -40,7 +33,6 @@ mod tests {
         time::Instant,
         vec::Vec,
     };
-    use transport_protocol;
     use veracruz_server::veracruz_server::*;
     #[cfg(feature = "nitro")]
     use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;

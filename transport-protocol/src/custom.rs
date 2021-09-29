@@ -9,6 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::too_many_arguments)]
+
 use crate::transport_protocol;
 #[cfg(feature = "sgx_attestation")]
 use core::convert::TryInto;

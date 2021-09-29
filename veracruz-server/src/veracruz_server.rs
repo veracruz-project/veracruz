@@ -9,6 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::type_complexity)]
+
 use actix_http::ResponseBuilder;
 use actix_web::{error, http::StatusCode, HttpResponse};
 use curl::easy::{Easy, List};

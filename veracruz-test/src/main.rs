@@ -15,10 +15,6 @@
 // NB: added to avoid a compile failure in Rust's futures library.
 #![feature(proc_macro_hygiene)]
 
-pub fn main() -> Result<(), String> {
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     // Policies
