@@ -17,7 +17,7 @@
 mod tests {
     use actix_rt::System;
     use lazy_static::lazy_static;
-    use log::{info, Level};
+    use log::{debug, info, Level};
 
     use serde::Deserialize;
     use std::{
