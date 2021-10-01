@@ -148,6 +148,8 @@ pub enum VeracruzServerError {
     InvalidLengthError(&'static str, usize),
     #[error(display = "VeracruzServer: Uninitialized enclave.")]
     UninitializedEnclaveError,
+    #[error(display = "VeracruzServer: Exceeded number of supported enclave ({} > {})", _0, _1)]
+    TooManyEnclavesError(usize, usize),
     #[error(display = "VeracruzServer: Unknown attestation protocol.")]
     UnknownAttestationTokenError,
     #[error(display = "VeracruzServer: Unsupported request (not implemented in this platform).")]
@@ -180,8 +182,6 @@ pub enum VeracruzServerError {
     #[cfg(feature = "nitro")]
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
     NonSuccessHttp,
-    #[error(display = "VeracruzServer: No enclave matches id {}.", _0)]
-    InvalidEnclaveIdError(u32),
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
@@ -211,8 +211,8 @@ impl error::ResponseError for VeracruzServerError {
             VeracruzServerError::DirectMessageError(_, e) => e.clone(),
             VeracruzServerError::UnimplementedRequestError
             | VeracruzServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
-            VeracruzServerError::UnsupportedRequestError
-            | VeracruzServerError::InvalidEnclaveIdError(_) => StatusCode::NOT_FOUND,
+            VeracruzServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
+            VeracruzServerError::TooManyEnclavesError(_, _) => StatusCode::TOO_MANY_REQUESTS,
             _otherwise => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -225,7 +225,7 @@ impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError {
     }
 }
 
-pub trait VeracruzServer {
+pub trait VeracruzServer: Send {
     fn new(policy: &str) -> Result<Self, VeracruzServerError>
     where
         Self: Sized;

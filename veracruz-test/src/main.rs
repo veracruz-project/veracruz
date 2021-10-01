@@ -454,7 +454,11 @@ mod tests {
 
     async fn server_tls_loop(policy_filename: &Path) -> Result<(), VeracruzTestError> {
         let policy_text = read_policy(policy_filename)?;
-        veracruz_server::server::server(&policy_text)?.await?;
+        let policy = Policy::from_json(&policy_text)?;
+        veracruz_server::server::server_with_policy(
+            policy.veracruz_server_url(),
+            &policy_text
+        )?.await?;
         Ok(())
     }
 

@@ -379,7 +379,7 @@ impl VeracruzClient {
         }
     }
 
-    /// send the data to the runtime_manager path on the Veracruz server.
+    /// send the data to the enclave_tls path on the Veracruz server.
     // TODO: This function has return points scattered all over, making it very hard to follow
     fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
@@ -403,7 +403,7 @@ impl VeracruzClient {
         loop {
             for outgoing_data in &outgoing_data_vec {
                 let incoming_data_option =
-                    self.post_runtime_manager(enclave_session_id, &outgoing_data)?;
+                    self.post_enclave_tls(enclave_session_id, &outgoing_data)?;
                 match incoming_data_option {
                     Some((received_session_id, received_data_vec)) => {
                         enclave_session_id = received_session_id;
@@ -476,7 +476,7 @@ impl VeracruzClient {
         Ok(ret_val)
     }
 
-    fn post_runtime_manager(
+    fn post_enclave_tls(
         &self,
         enclave_session_id: u32,
         data: &Vec<u8>,
@@ -484,7 +484,7 @@ impl VeracruzClient {
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
-        let dest_url = format!("http://{:}/runtime_manager", self.policy.veracruz_server_url());
+        let dest_url = format!("http://{:}/enclave_tls", self.policy.veracruz_server_url());
         let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
         let mut ret = client_build
             .post(dest_url.as_str())
