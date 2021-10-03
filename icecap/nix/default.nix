@@ -13,10 +13,12 @@ let
 
   icecap = import icecapSource;
 
-  instances = with icecap; lib.flip lib.mapAttrs pkgs.none.icecap.configured (_: configured:
+  veracruz = with icecap; lib.flip lib.mapAttrs pkgs.none.icecap.configured (_: configured:
     import ./instance.nix {
       inherit lib pkgs configured;
     }
   );
 
-in icecap // instances
+in icecap // {
+  inherit veracruz;
+}
