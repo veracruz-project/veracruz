@@ -36,6 +36,9 @@ cfg_if! {
     } else if #[cfg(feature = "nitro")] {
         #[path="nitro_platform_services.rs"]
         mod imp;
+    } else if #[cfg(feature = "icecap")] {
+        #[path="icecap_platform_services.rs"]
+        mod imp;
     } else if #[cfg(feature = "std")] {
         #[path="std_platform_services.rs"]
         mod imp;

@@ -649,6 +649,11 @@ fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
     }
 }
 
+// HACK attestation not yet implemented for IceCap
+fn compute_icecap_enclave_hash(_arguments: &Arguments) -> Option<String> {
+    Some("deadbeefdeadbeefdeadbeefdeadbeeff00dcafef00dcafef00dcafef00dcafe".to_string())
+}
+
 /// Serializes the identities of all principals in the Veracruz computation into
 /// a vec of VeracruzIdentity<String>.
 fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
@@ -860,6 +865,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         // TODO should be tz_hash
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
+        compute_icecap_enclave_hash(arguments),
         format!(
             "{}",
             &arguments

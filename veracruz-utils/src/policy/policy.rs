@@ -81,6 +81,8 @@ pub struct Policy {
     runtime_manager_hash_tz: Option<String>,
     /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
     runtime_manager_hash_nitro: Option<String>,
+    /// The hash of the Veracruz trusted runtime for IceCap.
+    runtime_manager_hash_icecap: Option<String>,
     /// The URL of the proxy attestation service.
     proxy_attestation_server_url: String,
     /// The PEM encoded certificate for the proxy service that matches the chosen
@@ -116,6 +118,7 @@ impl Policy {
         runtime_manager_hash_sgx: Option<String>,
         runtime_manager_hash_tz: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
+        runtime_manager_hash_icecap: Option<String>,
         proxy_attestation_server_url: String,
         proxy_service_cert: String,
         debug: bool,
@@ -133,6 +136,7 @@ impl Policy {
             runtime_manager_hash_sgx,
             runtime_manager_hash_tz,
             runtime_manager_hash_nitro,
+            runtime_manager_hash_icecap,
             proxy_attestation_server_url,
             debug,
             execution_strategy,
@@ -218,6 +222,14 @@ impl Policy {
                 None => {
                     return Err(PolicyError::MissingPolicyFieldError(
                         "runtime_manager_hash_nitro".to_string(),
+                    ))
+                }
+            },
+            Platform::IceCap => match &self.runtime_manager_hash_icecap {
+                Some(hash) => hash,
+                None => {
+                    return Err(PolicyError::MissingPolicyFieldError(
+                        "runtime_manager_hash_icecap".to_string(),
                     ))
                 }
             },

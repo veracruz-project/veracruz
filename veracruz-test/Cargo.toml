@@ -10,6 +10,7 @@ description = "Veracruz integration test.  This is a full system test that shoul
 sgx = ["veracruz-client/sgx","veracruz-server/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation"]
 tz = ["veracruz-client/tz","veracruz-server/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz"]
 nitro = ["veracruz-client/nitro", "veracruz-server/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
+icecap = ["veracruz-client/icecap", "veracruz-server/icecap", "veracruz-utils/icecap", "proxy-attestation-server/psa", "transport-protocol/icecap"]
 
 [dependencies]
 veracruz-client = {path = "../veracruz-client"}

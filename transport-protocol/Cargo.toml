@@ -10,6 +10,7 @@ build = "build.rs"
 sgx = ["protobuf/mesalock_sgx", "sgx_types", "sgx_tstd"]
 sgx_attestation = ["sgx_types"]
 tz = []
+icecap = []
 
 [dependencies]
 protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }

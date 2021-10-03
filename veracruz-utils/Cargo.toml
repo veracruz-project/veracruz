@@ -11,6 +11,7 @@ sgx = ["sgx_tstd", "serde/mesalock_sgx", "serde_json/mesalock_sgx", "serde_json/
 tz = ["serde_json/std", "ring", "wasi-types/std"]
 std = ["x509-parser", "serde/std", "rustls","serde_json/std", "actix-web", "futures", "actix-http", "failure", "ring", "wasi-types/std"]
 nitro = ["serde_json/std", "nix", "byteorder", "ring/non_sgx", "wasi-types/std"]
+icecap = ["ring"]
 
 [dependencies]
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }

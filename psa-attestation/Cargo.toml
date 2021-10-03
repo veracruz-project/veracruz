@@ -15,11 +15,14 @@ crate-type = ["rlib"]
 tz = []
 sgx = []
 nitro = []
+icecap = []
 
 [dependencies]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+# TODO_BEFORE_MERGE
+libc = { git = "https://gitlab.com/arm-research/security/icecap/minor-patches/rust/libc.git", branch = "icecap" }
 
 [build-dependencies]
 bindgen = "0.53.1"
 cmake = "0.1"
 target_build_utils = "0.1"
+cfg-if = "1.0"

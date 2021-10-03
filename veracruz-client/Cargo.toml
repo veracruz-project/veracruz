@@ -14,6 +14,7 @@ required-features = ["cli"]
 sgx = ["sgx_types", "sgx_ucrypto", "transport-protocol/sgx_attestation"]
 tz = []
 nitro = []
+icecap = []
 mock = ["mockall", "mockito"]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies

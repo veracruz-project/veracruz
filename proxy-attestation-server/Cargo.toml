@@ -27,7 +27,7 @@ cli = ["structopt"]
 # a feature to enable PSA native attestation.
 # Note: Final attestation is always PSA. This is just to enable platforms
 # that use PSA for their native attestation.
-psa = ["psa-attestation/tz"]
+psa = []
 nitro = [ "serde_cbor", "nitro-enclave-attestation-document" ]
 
 [dependencies]

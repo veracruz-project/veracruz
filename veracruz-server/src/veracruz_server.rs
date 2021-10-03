@@ -19,6 +19,8 @@ use std::io::Read;
 use veracruz_utils::nitro_enclave::NitroError;
 #[cfg(feature = "nitro")]
 use base64;
+#[cfg(feature = "icecap")]
+use crate::veracruz_server_icecap::IceCapError;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -114,6 +116,9 @@ pub enum VeracruzServerError {
     #[cfg(feature = "tz")]
     #[error(display = "VeracruzServer: OpteeError: {:?}.", _0)]
     OpteeError(#[error(source)] optee_teec::Error),
+    #[cfg(feature = "icecap")]
+    #[error(display = "VeracruzServer: IceCap error: {:?}", _0)]
+    IceCapError(IceCapError),
     #[error(display = "VeracruzServer: Enclave function {} failed.", _0)]
     EnclaveCallError(&'static str),
     #[error(

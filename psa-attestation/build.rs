@@ -17,14 +17,19 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    #[cfg(feature = "tz")]
-    let cc = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc";
-    #[cfg(feature = "sgx")]
-    let cc = "gcc";
-    #[cfg(feature = "nitro")]
-    let cc = "musl-gcc";
-    #[cfg(not(any(feature = "tz", feature = "sgx", feature = "nitro")))]
-    let cc = "gcc";
+    let cc = {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "tz")] {
+                "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc".to_string()
+            } else if #[cfg(feature = "sgx")] {
+                "gcc".to_string()
+            } else if #[cfg(feature = "nitro")] {
+                "musl-gcc".to_string()
+            } else {
+                env::var("CC").unwrap()
+            }
+        }
+    };
 
     let project_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let target_dir = env::var("OUT_DIR").unwrap();
@@ -34,7 +39,7 @@ fn main() {
     // make the qcbor library
     let qcbor_dir = format!("{:}/lib/QCBOR", project_dir);
     let make_status = Command::new("make")
-        .env("CC", cc)
+        .env("CC", &cc)
         .current_dir(qcbor_dir.clone())
         .args(&["all", outdir_arg.as_str()])
         .status()
@@ -46,7 +51,7 @@ fn main() {
     // make the mbed crypto library
     let mbed_crypto_dir = format!("{:}/lib/mbed-crypto", project_dir);
     let make_status = Command::new("make")
-        .env("CC", cc)
+        .env("CC", &cc)
         .current_dir(mbed_crypto_dir.clone())
         .args(&["-j8", "all", outdir_arg.as_str()])
         .status()
@@ -74,7 +79,7 @@ fn main() {
 
     let t_cose_dir = format!("{:}/lib/t_cose", project_dir);
     let make_status = Command::new("make")
-        .env("CC", cc)
+        .env("CC", &cc)
         .args(&["-f", "Makefile.psa", "all", outdir_arg.as_str()])
         .current_dir(t_cose_dir.clone())
         .status()
@@ -86,7 +91,7 @@ fn main() {
     // Build the psa_attestation library
     let c_src_dir = format!("{:}/c_src/", project_dir);
     let make_status = Command::new("make")
-        .env("CC", cc)
+        .env("CC", &cc)
         .current_dir(c_src_dir.clone())
         .args(&["all", outdir_arg.as_str()])
         .status()

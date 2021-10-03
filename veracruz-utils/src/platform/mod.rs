@@ -17,6 +17,8 @@ pub mod error;
 pub mod nitro;
 #[cfg(feature = "tz")]
 pub mod tz;
+#[cfg(feature = "icecap")]
+pub mod icecap;
 
 #[cfg(feature = "std")]
 use error::PlatformError;
@@ -35,6 +37,8 @@ pub enum Platform {
     TrustZone,
     /// The enclave is running under AWS Nitro enclaves.
     Nitro,
+    /// The enclave is running under IceCap.
+    IceCap,
     /// The mock platform for unit testing (client unit tests, at the moment).
     Mock,
 }
@@ -47,6 +51,7 @@ impl FromStr for Platform {
             "sgx"       => Ok(Platform::SGX),
             "trustzone" => Ok(Platform::TrustZone),
             "nitro"     => Ok(Platform::Nitro),
+            "icecap"    => Ok(Platform::IceCap),
             _           => Err(PlatformError::InvalidPlatform(format!("{}", s))),
         }
     }
@@ -59,6 +64,7 @@ impl fmt::Display for Platform {
             Platform::SGX        => write!(f, "sgx"),
             Platform::TrustZone  => write!(f, "trustzone"),
             Platform::Nitro      => write!(f, "nitro"),
+            Platform::IceCap     => write!(f, "icecap"),
             Platform::Mock       => write!(f, "mock"),
         }
     }

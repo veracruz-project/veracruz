@@ -10,6 +10,7 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-server/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx"]
 tz = ["veracruz-server/tz", "veracruz-utils/tz", "proxy-attestation-server/psa", "transport-protocol/tz", "psa-attestation/tz"]
 nitro = ["veracruz-server/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
+icecap = ["veracruz-server/icecap", "veracruz-utils/icecap", "proxy-attestation-server/psa"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
