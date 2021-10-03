@@ -86,13 +86,13 @@ in lib.fix (self: with self; {
   icecapCratesEnv = crateUtils.collectEnv icecapCrates;
 
   env = {
-    runtime-manager = configured.callPackage ./binaries/runtime-manager.nix {
+    runtime-manager = configured.callPackage ./realm/runtime-manager.nix {
       inherit icecapCrates fakeLibc;
     };
-    veracruz-server-test = pkgs.linux.icecap.callPackage ./binaries/test.nix {} {
+    veracruz-server-test = pkgs.linux.icecap.callPackage ./host/test.nix {} {
       name = "veracruz-server-test";
     };
-    veracruz-test = pkgs.linux.icecap.callPackage ./binaries/test.nix {} {
+    veracruz-test = pkgs.linux.icecap.callPackage ./host/test.nix {} {
       name = "veracruz-test";
     };
   };
