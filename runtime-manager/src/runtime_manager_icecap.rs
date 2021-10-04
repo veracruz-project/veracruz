@@ -280,7 +280,8 @@ mod c_hack {
     #[no_mangle]
     extern "C" fn calloc(nelem: usize, elsize: usize) -> *mut core::ffi::c_void {
         let bytes = nelem * elsize;
-        let ret: *mut [MaybeUninit<u8>] = Box::into_raw(Box::<[u8]>::new_uninit_slice(bytes));
+        // TODO use Box::<[u8]>::new_zeroed_slice(bytes) instead after bumping rustc
+        let ret: *mut [u8] = Box::into_raw(vec![0; bytes].into_boxed_slice());
         ret as *mut core::ffi::c_void
     }
 
