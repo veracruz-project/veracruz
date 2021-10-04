@@ -15,7 +15,6 @@ crate-type = ["rlib"]
 tz = []
 sgx = []
 nitro = []
-icecap = []
 
 [dependencies]
 # TODO_BEFORE_MERGE

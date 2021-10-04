@@ -19,7 +19,7 @@ path = "src/main.rs"
 sgx = ["transport-protocol/sgx", "session-manager/sgx", "veracruz-utils/sgx", "wasmi/mesalock_sgx", "execution-engine/sgx", "rustls/mesalock_sgx", "protobuf/mesalock_sgx", "ring/mesalock_sgx", "sgx_types" , "sgx_tstd", "sgx_tcrypto", "sgx_tdh", "wasi-types/sgx"]
 tz = ["wasmi/std", "session-manager/tz", "execution-engine/tz", "veracruz-utils/tz", "libc", "optee-utee-sys", "optee-utee", "serde_json/alloc", "wasi-types/std"]
 nitro = [ "execution-engine/std", "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "veracruz-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode", "wasi-types/std"]
-icecap = ["veracruz-utils/icecap", "transport-protocol/icecap", "execution-engine/icecap", "session-manager/icecap", "psa-attestation/icecap", "wasmi/non_sgx", "serde", "bincode", "log", "libm", "icecap-core", "icecap-start-generic", "icecap-std-external", "icecap-event-server-types", "biterate"]
+icecap = ["veracruz-utils/icecap", "transport-protocol/icecap", "execution-engine/icecap", "session-manager/icecap", "psa-attestation", "wasmi/non_sgx", "serde", "bincode", "log", "libm", "icecap-core", "icecap-start-generic", "icecap-std-external", "icecap-event-server-types", "biterate"]
 
 [dependencies]
 session-manager = { path = "../session-manager"}

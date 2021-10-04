@@ -14,7 +14,7 @@ required-features = ["cli"]
 sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "sgx-root-enclave-bind", "tempfile"]
 tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid"]
 nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2" ]
-icecap = ["veracruz-utils/icecap", "psa-attestation", "psa-attestation/icecap", "bincode", "serde/derive", "once_cell" ]
+icecap = ["veracruz-utils/icecap", "psa-attestation", "bincode", "serde/derive", "once_cell" ]
 debug = []
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
