@@ -146,7 +146,7 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             &vec![(trust_path(CLIENT_CERT).as_path(), trust_path(CLIENT_KEY).as_path())],
             0, 
-            &Path::new(&"random-source.wasm".to_string()), // FIXME: should this be program_path(RANDOM_SOURCE_WASM).as_path()?
+            program_path(RANDOM_SOURCE_WASM).as_path(),
             &vec![],
             &vec![0],
         )
