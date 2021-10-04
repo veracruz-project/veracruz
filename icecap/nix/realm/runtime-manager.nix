@@ -3,7 +3,7 @@
 , crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
 , liboutline, sysroot-rs
-, icecapCrates, fakeLibc
+, icecapCrates, libc-supplement
 }:
 
 let
@@ -45,11 +45,11 @@ mkShell (crateUtils.baseEnv // {
 
   buildInputs = [
     liboutline
-    fakeLibc
+    libc-supplement
   ];
 
   NIX_LDFLAGS = [
-    "-lfake_libc"
+    "-lc_supplement"
     "-licecap_pure"
     "-licecap_utils"
   ];

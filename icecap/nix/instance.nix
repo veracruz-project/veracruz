@@ -87,7 +87,7 @@ in lib.fix (self: with self; {
 
   env = {
     runtime-manager = configured.callPackage ./realm/runtime-manager.nix {
-      inherit icecapCrates fakeLibc;
+      inherit icecapCrates libc-supplement;
     };
     veracruz-server-test = pkgs.linux.icecap.callPackage ./host/test.nix {} {
       name = "veracruz-server-test";
@@ -97,9 +97,9 @@ in lib.fix (self: with self; {
     };
   };
 
-  fakeLibc = configured.libs.mk {
-    name = "fake-libc";
-    root = icecapSrc.absoluteSplit ./realm/fake-libc;
+  libc-supplement = configured.libs.mk {
+    name = "c-supplement";
+    root = icecapSrc.absoluteSplit ./realm/libc-supplement;
     propagatedBuildInputs = [
       configured.libs.icecap-pure
       configured.libs.icecap-utils
