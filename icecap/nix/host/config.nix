@@ -86,6 +86,10 @@ in {
           VERACRUZ_ICECAP_REALM_ID=0 \
           VERACRUZ_ICECAP_REALM_SPEC=/spec.bin \
           VERACRUZ_ICECAP_REALM_ENDPOINT=/dev/icecap_channel_realm_$VERACRUZ_ICECAP_REALM_ID \
+          VERACRUZ_POLICY_DIR=/test-collateral \
+          VERACRUZ_TRUST_DIR=/test-collateral \
+          VERACRUZ_PROGRAM_DIR=/test-collateral \
+          VERACRUZ_DATA_DIR=/test-collateral \
             $test_cmd --test-threads=1 --nocapture --show-output "$@"
         }
 
