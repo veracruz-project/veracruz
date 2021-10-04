@@ -12,14 +12,14 @@
 use std::{
     env,
     fs::{OpenOptions, File},
-    io::{Read, Write},
+    io::{self, Read, Write},
     mem::size_of,
     net::{SocketAddr, TcpStream},
     path::PathBuf,
     result,
     sync::Mutex,
     string::ToString,
-    process::{Command, Child},
+    process::{Command, Child, ExitStatus},
 };
 use err_derive::Error;
 use bincode::{serialize, deserialize};
@@ -47,6 +47,12 @@ type Result<T> = result::Result<T, VeracruzServerError>;
 pub enum IceCapError {
     #[error(display = "IceCap: Realm channel error")]
     RealmChannelError,
+    #[error(display = "IceCap: Shadow VMM spawn error: {}", error)]
+    ShadowVmmSpawnError { error: io::Error },
+    #[error(display = "IceCap: Shadow VMM exit status error: {}", exit_status)]
+    ShadowVMMExitStatusError { exit_status: ExitStatus },
+    #[error(display = "IceCap: Shadow VMM stop error: {}", error)]
+    ShadowVMMStopError { error: io::Error },
     #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
     UnexpectedRuntimeManagerResponse(Response),
     #[error(display = "IceCap: Missing environment variable: {}", variable)]
@@ -79,49 +85,72 @@ impl Configuration {
         })
     }
 
-    fn hack_command() -> Command {
+    fn icecap_host_command(&self) -> Command {
+        // HACK
         let mut command = Command::new("taskset");
         command.arg("0x2");
+        command.arg(&self.icecap_host_command);
         command
     }
 
+    // HACK clean up in case of previous failure
     fn hack_ensure_not_realm_running() {
         Command::new("pkill").arg("icecap-host").status().unwrap();
     }
 
+    fn ensure_successful(exit_status: ExitStatus) -> Result<()> {
+        if exit_status.success() {
+            Ok(())
+        } else {
+            Err(VeracruzServerError::IceCapError(
+                IceCapError::ShadowVMMExitStatusError { exit_status }
+            ))
+        }
+    }
+
     fn create_realm(&self) -> Result<()> {
-        let status = Self::hack_command()
-            .arg(&self.icecap_host_command)
-            .arg("create")
-            .arg(format!("{}", self.realm_id))
-            .arg(&self.realm_spec)
-            .status().unwrap();
-        assert!(status.success());
-        Ok(())
+        Self::ensure_successful(
+            self.icecap_host_command()
+                .arg("create")
+                .arg(format!("{}", self.realm_id))
+                .arg(&self.realm_spec)
+                .status()
+                .map_err(|error|
+                    VeracruzServerError::IceCapError(
+                        IceCapError::ShadowVmmSpawnError { error }
+                    )
+                )?
+        )
     }
 
     fn run_realm(&self) -> Result<Child> {
         let virtual_node_id: usize = 0;
-        let child = Self::hack_command()
-            .arg(&self.icecap_host_command)
+        let child = self.icecap_host_command()
             .arg("run")
             .arg(format!("{}", self.realm_id))
             .arg(format!("{}", virtual_node_id))
-            .spawn().unwrap();
+            .spawn()
+            .map_err(|error|
+                VeracruzServerError::IceCapError(
+                    IceCapError::ShadowVmmSpawnError { error }
+                )
+            )?;
         Ok(child)
     }
 
     fn destroy_realm(&self) -> Result<()> {
-        // HACK clean up in case of previous failure
         Self::hack_ensure_not_realm_running();
-
-        let status = Self::hack_command()
-            .arg(&self.icecap_host_command)
-            .arg("destroy")
-            .arg(format!("{}", self.realm_id))
-            .status().unwrap();
-        assert!(status.success());
-        Ok(())
+        Self::ensure_successful(
+            self.icecap_host_command()
+                .arg("destroy")
+                .arg(format!("{}", self.realm_id))
+                .status()
+                .map_err(|error|
+                    VeracruzServerError::IceCapError(
+                        IceCapError::ShadowVmmSpawnError { error }
+                    )
+                )?
+        )
     }
 
 }
@@ -240,7 +269,11 @@ impl VeracruzServer for VeracruzServerIceCap {
     }
 
     fn close(&mut self) -> Result<bool> {
-        self.realm_process.kill().unwrap();
+        self.realm_process.kill().map_err(|error|
+            VeracruzServerError::IceCapError(
+                IceCapError::ShadowVMMStopError { error }
+            )
+        )?;
         self.configuration.destroy_realm()?;
         Ok(true)
     }
