@@ -117,12 +117,22 @@ in lib.fix (self: with self; {
 
   testCollateralRaw = lib.cleanSourceWith {
     src = lib.cleanSource ../../test-collateral;
-    filter = name: type: type == "directory" || lib.any (pattern: builtins.match pattern name != null) [
-      ".*\\.json"
-      ".*\\.pem"
-      ".*\\.wasm"
-      ".*\\.dat"
-    ];
+    filter = name: type:
+      type == "directory" || (
+        lib.any (pattern: builtins.match pattern name != null) [
+          ".*\\.json"
+          ".*\\.pem"
+          ".*\\.wasm"
+          ".*\\.dat"
+        ] &&
+        lib.all (pattern: builtins.match pattern name == null) ([
+          "^\\..*"
+          ".*/\\..*"
+        ] ++ lib.optionals (icecapPlat == "rpi4") [
+          # HACK ':' not allowed in FAT file name
+          ".*:.*"
+        ])
+      );
   };
 
 })
