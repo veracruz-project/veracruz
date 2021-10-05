@@ -17,7 +17,6 @@ use std::{
     net::{SocketAddr, TcpStream},
     path::PathBuf,
     result,
-    sync::Mutex,
     string::ToString,
     process::{Command, Child, ExitStatus},
 };
@@ -162,7 +161,7 @@ impl Configuration {
 /// IceCap implementation of 'VeracruzServer'
 pub struct VeracruzServerIceCap {
     configuration: Configuration,
-    realm_channel: Mutex<File>,
+    realm_channel: File,
     realm_process: Child,
 }
 
@@ -175,10 +174,9 @@ impl VeracruzServer for VeracruzServerIceCap {
         configuration.destroy_realm()?; // HACK clean up in case of previous failure
         configuration.create_realm()?;
         let realm_process = configuration.run_realm()?;
-        let realm_channel = Mutex::new(
-            OpenOptions::new().read(true).write(true).open(&configuration.realm_endpoint)
-                .map_err(|error| VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error }))?
-        );
+        let realm_channel = OpenOptions::new().read(true).write(true).open(&configuration.realm_endpoint).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
+        )?;
         let server = Self {
             configuration,
             realm_channel,
@@ -301,11 +299,14 @@ impl Drop for VeracruzServerIceCap {
 impl VeracruzServerIceCap {
 
     fn send(&self, request: &Request) -> Result<Response> {
+        // We have '&self' rather than '&mut self', so we must use 'impl Write for &File'
+        // rather than 'impl Write for File'.
+        let mut realm_channel = &self.realm_channel;
+
         let msg = serialize(request).map_err(|error|
             VeracruzServerError::IceCapError(IceCapError::SerializationError { error })
         )?;
         let header = (msg.len() as Header).to_le_bytes();
-        let mut realm_channel = self.realm_channel.lock()?;
         realm_channel.write(&header).map_err(|error|
             VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
         )?;
