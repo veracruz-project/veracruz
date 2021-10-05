@@ -40,16 +40,20 @@ use crate::{
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
 use std::sync::Mutex;
-use std::{boxed::Box, string::ToString, sync::Arc};
+use std::{boxed::Box, string::String, string::ToString, sync::Arc, vec::Vec};
 use veracruz_utils::policy::principal::ExecutionStrategy;
 
 pub struct Options {
+    pub environment_variables: Vec<(String, String)>,
+    pub program_arguments: Vec<String>,
     pub enable_clock: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
         Options {
+            environment_variables: Vec::new(),
+            program_arguments: Vec::new(),
             enable_clock: false,
         }
     }
