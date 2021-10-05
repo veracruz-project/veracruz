@@ -31,6 +31,8 @@ use crate::{
     send_proxy_attestation_server_start,
 };
 
+// For now, certain IceCap host configuration parameters must be passed as environment variables.
+// See veracruz/icecap/nix/host/config.nix for an illustration of their usage.
 const VERACRUZ_ICECAP_HOST_COMMAND_ENV: &str = "VERACRUZ_ICECAP_HOST_COMMAND";
 const VERACRUZ_ICECAP_REALM_ID_ENV: &str = "VERACRUZ_ICECAP_REALM_ID";
 const VERACRUZ_ICECAP_REALM_SPEC_ENV: &str = "VERACRUZ_ICECAP_REALM_SPEC";
