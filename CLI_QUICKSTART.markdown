@@ -53,10 +53,12 @@ Proxy Attestation Server running on 127.0.0.1:3010
 $ sleep 10
 ```
 
-Now we can launch the Veracruz Server using the `vc-server` program:
+Now we can launch the Veracruz Server using the `vc-server` program. We don't
+necessarily need to provide the policy when we launch the server, but we do here
+since this is a quickstart guide.
 
 ``` bash
-$ vc-server test-collateral/shamir-secret-sharing-policy.json &
+$ vc-server :3017 test-collateral/shamir-secret-sharing-policy.json &
 Veracruz Server running on 127.0.0.1:3017
 $ sleep 10
 ```

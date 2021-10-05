@@ -223,8 +223,10 @@ There is a lot of complexity underneath the hood, but launching the Veracruz
 Server requires only one command. Note again we are launching the Veracruz
 Server in the background:
 
+<!-- TODO upload policy as separate command -->
+
 ``` bash
-$ vc-server example/example-policy.json &
+$ vc-server :3017 example/example-policy.json &
 Veracruz Server running on 127.0.0.1:3017
 $ sleep 10
 ```

@@ -295,13 +295,11 @@ async fn enclave_tls(
 
 /// Return an actix server. The caller should call .await for starting the service.
 ///
-/// This is common for both `server` and `server_with_policy`
-///
 /// If a policy is provided the server will be started with an enclave setup with
 /// the given policy, otherwise the policy can be sent over an `enclave_setup`
 /// request.
 ///
-fn server_internal<U>(url: U, policy_json: Option<&str>) -> Result<Server, VeracruzServerError>
+pub fn server<U>(url: U, policy_json: Option<&str>) -> Result<Server, VeracruzServerError>
 where
     U: ToSocketAddrs
 {
@@ -373,28 +371,3 @@ where
     Ok(server)
 }
 
-/// Return an actix server. The caller should call .await for starting the service.
-///
-/// If a policy is provided the server will be started with an enclave setup with
-/// the given policy, otherwise the policy can be sent over an `enclave_setup`
-/// request.
-///
-pub fn server_with_policy<U>(url: U, policy_json: &str) -> Result<Server, VeracruzServerError>
-where
-    U: ToSocketAddrs
-{
-    server_internal(url, Some(policy_json))
-}
-
-// /// Return an actix server. The caller should call .await for starting the service.
-// ///
-// /// If a policy is provided the server will be started with an enclave setup with
-// /// the given policy, otherwise the policy can be sent over an `enclave_setup`
-// /// request.
-// ///
-// pub fn server<U>(url: U) -> Result<Server, VeracruzServerError>
-// where
-//     U: ToSocketAddrs
-// {
-//     server_internal(url, None)
-// }
