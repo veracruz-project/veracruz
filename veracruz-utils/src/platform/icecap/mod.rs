@@ -1,4 +1,7 @@
-//! IceCap-specific material.
+//! Platform-specific material.
+//!
+//! Material specific to a particular platform that Veracruz supports, and which
+//! does not fit elsewhere.
 //!
 //! ## Authors
 //!
