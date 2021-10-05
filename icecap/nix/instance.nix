@@ -129,7 +129,7 @@ in lib.fix (self: with self; {
           "^\\..*"
           ".*/\\..*"
         ] ++ lib.optionals (icecapPlat == "rpi4") [
-          # HACK ':' not allowed in FAT file name
+          # HACK ':' not allowed in FAT file names
           ".*:.*"
         ])
       );
