@@ -344,7 +344,6 @@ mod attestation_hack {
 // Dependencies depend on these C symbols. We define them here in Rust.
 mod c_hack {
 
-    use core::mem::MaybeUninit;
     use super::alloc::boxed::Box;
 
     #[no_mangle]
