@@ -63,7 +63,7 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Veracruz Socket error:{:?}", _0)]
     VeracruzSocketError(SocketError),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "nitro", feature = "icecap"))]
     #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
     BincodeError(bincode::Error),
     #[cfg(feature = "nitro")]
@@ -75,9 +75,6 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: wrong message type received:{:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
-    #[cfg(feature = "icecap")]
-    #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
-    SerializationError(bincode::Error),
     #[error(display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}", _0, _1, _2)]
     DataWrongSizeForField(std::string::String, usize, usize),
     #[error(display = "RuntimeManager: RingKeyRejected error:{:?}", _0)]

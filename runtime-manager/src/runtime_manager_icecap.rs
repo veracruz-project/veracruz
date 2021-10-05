@@ -214,7 +214,7 @@ impl RuntimeManager {
     fn send(&mut self, resp: &Response) -> Result<(), RuntimeManagerError> {
         log::trace!("write: {:x?}", resp);
         let mut block = false;
-        let resp_bytes = serialize(resp).map_err(RuntimeManagerError::SerializationError)?;
+        let resp_bytes = serialize(resp).map_err(RuntimeManagerError::BincodeError)?;
         while !self.channel.write(&resp_bytes) {
             log::warn!("host ring buffer full, waiting on notification");
             if block {
@@ -235,7 +235,7 @@ impl RuntimeManager {
         loop {
             if let Some(msg) = self.channel.read() {
                 self.channel.notify_read();
-                let req = deserialize(&msg).map_err(RuntimeManagerError::SerializationError)?;
+                let req = deserialize(&msg).map_err(RuntimeManagerError::BincodeError)?;
                 log::trace!("read: {:x?}", req);
                 return Ok(req);
             } else if block {
@@ -250,7 +250,7 @@ impl RuntimeManager {
 
 }
 
-const LOG_LEVEL: Level = Level::Debug
+const LOG_LEVEL: Level = Level::Debug;
 
 // HACK
 // System time is provided at build time. The same time is provided to the test Linux userland.
@@ -293,6 +293,7 @@ mod attestation_hack {
     const RUNTIME_MANAGER_HASH: &[u8] = &EXAMPLE_HASH;
 
 
+    /// Stub attestation handler
     pub(super) fn native_attestation(challenge: &[u8], csr: &[u8]) -> Result<Vec<u8>, RuntimeManagerError> {
 
         let root_private_key = &ROOT_PRIVATE_KEY;

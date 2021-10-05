@@ -14,6 +14,7 @@ use serde::{Serialize, Deserialize};
 pub type Header = u32;
 pub type SessionId = u32;
 
+/// Type of requests from the host to the realm
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Request {
     Initialize { policy_json: String },
@@ -26,6 +27,7 @@ pub enum Request {
     GetTlsData(SessionId),
 }
 
+/// Type of responses from the realm to the host
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Response {
     Initialize,
@@ -39,6 +41,7 @@ pub enum Response {
     Error(Error),
 }
 
+/// Type of error responses from the realm to the host
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Error {
     Unspecified,

@@ -43,6 +43,7 @@ const FIRMWARE_VERSION: &str = "0.3.0";
 
 type Result<T> = result::Result<T, VeracruzServerError>;
 
+/// Class of IceCap-specific errors.
 #[derive(Debug, Error)]
 pub enum IceCapError {
     #[error(display = "IceCap: Realm channel error: {}", error)]
@@ -158,6 +159,7 @@ impl Configuration {
 
 }
 
+/// IceCap implementation of 'VeracruzServer'
 pub struct VeracruzServerIceCap {
     configuration: Configuration,
     realm_channel: Mutex<File>,
