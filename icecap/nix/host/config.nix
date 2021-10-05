@@ -37,9 +37,6 @@ in {
         mount -t debugfs none /sys/kernel/debug/
 
         date -s '@${now}' # HACK
-
-        mkdir /x
-        cp ${instance.proxyAttestationServerTestDatabase} /x/proxy-attestation-server.db
       '';
     }
 
@@ -49,7 +46,8 @@ in {
       initramfs.extraInitCommands = ''
         mkdir -p /mnt/nix/store/
         mount -t 9p -o trans=virtio,version=9p2000.L,ro store /mnt/nix/store/
-        spec=/mnt/$spec
+        spec_src=/mnt/$spec
+        test_collateral_src=/mnt/$test_collateral
       '';
     })
 
@@ -61,15 +59,19 @@ in {
 
         mkdir /mnt/
         mount -o ro /dev/mmcblk0p1 /mnt/
-        spec=/mnt/spec.bin
+        spec_src=/mnt/spec.bin
+        test_collateral_src=/mnt/test-collateral
       '';
     })
 
     {
       initramfs.extraInitCommands = ''
+        d=/x
+        mkdir $d
         set -x
-        cp -L $spec /spec.bin
-        ln -s /mnt/$test_collateral /test-collateral
+        cp -L $spec_src $d/spec.bin
+        ln -s $test_collateral_src $d/test-collateral
+        cp ${instance.proxyAttestationServerTestDatabase} $d/proxy-attestation-server.db
         set +x
       '';
 
@@ -84,12 +86,12 @@ in {
           RUST_LOG=info \
           DATABASE_URL=proxy-attestation-server.db \
           VERACRUZ_ICECAP_REALM_ID=0 \
-          VERACRUZ_ICECAP_REALM_SPEC=/spec.bin \
+          VERACRUZ_ICECAP_REALM_SPEC=spec.bin \
           VERACRUZ_ICECAP_REALM_ENDPOINT=/dev/icecap_channel_realm_$VERACRUZ_ICECAP_REALM_ID \
-          VERACRUZ_POLICY_DIR=/test-collateral \
-          VERACRUZ_TRUST_DIR=/test-collateral \
-          VERACRUZ_PROGRAM_DIR=/test-collateral \
-          VERACRUZ_DATA_DIR=/test-collateral \
+          VERACRUZ_POLICY_DIR=test-collateral \
+          VERACRUZ_TRUST_DIR=test-collateral \
+          VERACRUZ_PROGRAM_DIR=test-collateral \
+          VERACRUZ_DATA_DIR=test-collateral \
             $test_cmd --test-threads=1 --nocapture --show-output "$@"
         }
 
