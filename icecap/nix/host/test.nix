@@ -33,7 +33,9 @@ mkShell (crateUtils.baseEnv // rec {
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
   PKG_CONFIG_ALLOW_CROSS = 1;
 
-  hardeningDisable = [ "all" ]; # HACK
+  # By default, Nix injects hardening options into C compilation.
+  # For now, to reduce build complexity, disable that.
+  hardeningDisable = [ "all" ];
 
   depsBuildBuild = [
     buildPackages.stdenv.cc
