@@ -2,7 +2,7 @@ let
   icecapRemote = builtins.fetchGit rec {
     url = "https://gitlab.com/arm-research/security/icecap/icecap.git";
     ref = "veracruz";
-    rev = "2fdddf0f082f7cd8e132455ae9277ff836ea14cf";
+    rev = "285304c96c7da80ba3926b22d1cfae880b3843c3";
     submodules = true;
   };
 
