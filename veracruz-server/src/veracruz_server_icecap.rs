@@ -45,8 +45,10 @@ type Result<T> = result::Result<T, VeracruzServerError>;
 
 #[derive(Debug, Error)]
 pub enum IceCapError {
-    #[error(display = "IceCap: Realm channel error")]
-    RealmChannelError,
+    #[error(display = "IceCap: Realm channel error: {}", error)]
+    RealmChannelError { error: io::Error },
+    #[error(display = "IceCap: Serialization error: {}", error)]
+    SerializationError { error: bincode::Error },
     #[error(display = "IceCap: Shadow VMM spawn error: {}", error)]
     ShadowVmmSpawnError { error: io::Error },
     #[error(display = "IceCap: Shadow VMM exit status error: {}", exit_status)]
@@ -87,6 +89,7 @@ impl Configuration {
 
     fn icecap_host_command(&self) -> Command {
         // HACK
+        // For now, at the pinned version of IceCap, realms must run on core 1.
         let mut command = Command::new("taskset");
         command.arg("0x2");
         command.arg(&self.icecap_host_command);
@@ -167,12 +170,12 @@ impl VeracruzServer for VeracruzServerIceCap {
         let policy: Policy = Policy::from_json(policy_json)?;
 
         let configuration = Configuration::from_env()?;
-        configuration.destroy_realm()?; // HACK
+        configuration.destroy_realm()?; // HACK clean up in case of previous failure
         configuration.create_realm()?;
         let realm_process = configuration.run_realm()?;
         let realm_channel = Mutex::new(
             OpenOptions::new().read(true).write(true).open(&configuration.realm_endpoint)
-                .map_err(|_| VeracruzServerError::IceCapError(IceCapError::RealmChannelError))?
+                .map_err(|error| VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error }))?
         );
         let server = Self {
             configuration,
@@ -188,11 +191,13 @@ impl VeracruzServer for VeracruzServerIceCap {
         let (challenge, device_id) = {
             let resp = send_proxy_attestation_server_start(
                 policy.proxy_attestation_server_url(), "psa", FIRMWARE_VERSION,
-            ).unwrap();
-            assert!(resp.has_psa_attestation_init());
+            )?;
+            if !resp.has_psa_attestation_init() {
+                return Err(VeracruzServerError::MissingFieldError("psa_attestation_init"));
+            }
             transport_protocol::parse_psa_attestation_init(
                 resp.get_psa_attestation_init(),
-            ).unwrap()
+            )?
         };
 
         let (token, csr) = match server.send(&Request::Attestation { challenge, device_id })? {
@@ -201,12 +206,16 @@ impl VeracruzServer for VeracruzServerIceCap {
         };
 
         let (root_cert, compute_cert) = {
-            let req = transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id).unwrap();
+            let req = transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id).map_err(
+                VeracruzServerError::TransportProtocolError
+            )?;
             let req = base64::encode(&req);
             let url = format!("{:}/PSA/AttestationToken", policy.proxy_attestation_server_url());
             let resp = crate::post_buffer(&url, &req)?;
             let resp = base64::decode(&resp)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(&resp).unwrap();
+            let pasr = transport_protocol::parse_proxy_attestation_server_response(&resp).map_err(
+                VeracruzServerError::TransportProtocolError
+            )?;
             let cert_chain = pasr.get_cert_chain();
             let root_cert = cert_chain.get_root_cert();
             let compute_cert = cert_chain.get_enclave_cert();
@@ -290,17 +299,29 @@ impl Drop for VeracruzServerIceCap {
 impl VeracruzServerIceCap {
 
     fn send(&self, request: &Request) -> Result<Response> {
-        let msg = serialize(request).unwrap();
+        let msg = serialize(request).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::SerializationError { error })
+        )?;
         let header = (msg.len() as Header).to_le_bytes();
-        let mut realm_channel = self.realm_channel.lock().unwrap();
-        realm_channel.write(&header).unwrap();
-        realm_channel.write(&msg).unwrap();
+        let mut realm_channel = self.realm_channel.lock()?;
+        realm_channel.write(&header).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
+        )?;
+        realm_channel.write(&msg).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
+        )?;
         let mut header_bytes = [0; size_of::<Header>()];
-        realm_channel.read_exact(&mut header_bytes).unwrap();
+        realm_channel.read_exact(&mut header_bytes).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
+        )?;
         let header = u32::from_le_bytes(header_bytes);
         let mut resp_bytes = vec![0; header as usize];
-        realm_channel.read_exact(&mut resp_bytes).unwrap();
-        let resp = deserialize(&resp_bytes).unwrap();
+        realm_channel.read_exact(&mut resp_bytes).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
+        )?;
+        let resp = deserialize(&resp_bytes).map_err(|error|
+            VeracruzServerError::IceCapError(IceCapError::SerializationError { error })
+        )?;
         Ok(resp)
     }
 

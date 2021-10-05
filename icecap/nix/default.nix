@@ -18,6 +18,8 @@ let
   icecapLocal = ../../../icecap;
 
   icecapSource = icecapRemote;
+
+  # NOTE to develop using a local checkout of IceCap, replace the above with:
   # icecapSource = icecapLocal;
 
   icecap = import icecapSource;

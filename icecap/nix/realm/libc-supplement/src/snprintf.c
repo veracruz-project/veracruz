@@ -13,7 +13,9 @@
 #include <stdio.h>
 
 int snprintf(char *str, size_t size, const char *format, ...) {
-    // HACK
+    // HACK instead of implementing sprintf, just:
+    //  - log when it's used (so far it isn't), and
+    //  - copy the format string directly
     printf("snprintf(_, _, \"%s\")\n", format);
     strcpy(str, format);
     return 0;

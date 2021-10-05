@@ -15,6 +15,7 @@ use serde::{Serialize, Deserialize};
 use bincode::{serialize, deserialize};
 
 use icecap_core::{
+    runtime as icecap_runtime,
     prelude::*,
     config::RingBufferConfig,
     logger::{Logger, Level, DisplayMode},
@@ -98,7 +99,7 @@ impl RuntimeManager {
             let resp = self.handle(req)?;
             self.send(&resp).map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
             if !self.active {
-                std::icecap_impl::external::runtime::exit(); // HACK
+                icecap_runtime::exit();
             }
         }
     }
@@ -249,52 +250,25 @@ impl RuntimeManager {
 
 }
 
+const LOG_LEVEL: Level = Level::Debug
+
+// HACK
+// System time is provided at build time. The same time is provided to the test Linux userland.
+// These must align with eachother and with the time the test policies were generated.
 const NOW: u64 = include!("../../icecap/build/NOW");
 
 fn icecap_runtime_init() {
     icecap_std_external::set_panic();
-    std::icecap_impl::set_now(std::time::Duration::from_secs(NOW)); // HACK
+    std::icecap_impl::set_now(std::time::Duration::from_secs(NOW));
     let mut logger = Logger::default();
-    logger.level = Level::Debug;
+    logger.level = LOG_LEVEL;
     logger.display_mode = DisplayMode::Line;
     logger.write = |s| debug_println!("{}", s);
     logger.init().unwrap();
 }
 
 // HACK
-mod c_hack {
-
-    use core::mem::MaybeUninit;
-    use super::alloc::boxed::Box;
-
-    #[no_mangle]
-    extern "C" fn fmod(x: f64, y: f64) -> f64 {
-        libm::fmod(x, y)
-    }
-
-    #[no_mangle]
-    extern "C" fn fmodf(x: f32, y: f32) -> f32 {
-        libm::fmodf(x, y)
-    }
-
-    #[no_mangle]
-    extern "C" fn calloc(nelem: usize, elsize: usize) -> *mut core::ffi::c_void {
-        let bytes = nelem * elsize;
-        // TODO use Box::<[u8]>::new_zeroed_slice(bytes) instead after bumping rustc
-        let ret: *mut [u8] = Box::into_raw(vec![0; bytes].into_boxed_slice());
-        ret as *mut core::ffi::c_void
-    }
-
-    #[no_mangle]
-    extern "C" fn free(ptr: *mut core::ffi::c_void) {
-        unsafe {
-            // TODO is this sound?
-            Box::<u8>::from_raw(ptr as *mut u8);
-        }
-    }
-}
-
-// HACK
+// Attestation not yet implemented in IceCap itself.
 mod attestation_hack {
 
     use super::RuntimeManagerError;
@@ -364,4 +338,37 @@ mod attestation_hack {
         Ok(token)
     }
 
+}
+
+// Dependencies depend on these C symbols. We define them here in Rust.
+mod c_hack {
+
+    use core::mem::MaybeUninit;
+    use super::alloc::boxed::Box;
+
+    #[no_mangle]
+    extern "C" fn fmod(x: f64, y: f64) -> f64 {
+        libm::fmod(x, y)
+    }
+
+    #[no_mangle]
+    extern "C" fn fmodf(x: f32, y: f32) -> f32 {
+        libm::fmodf(x, y)
+    }
+
+    #[no_mangle]
+    extern "C" fn calloc(nelem: usize, elsize: usize) -> *mut core::ffi::c_void {
+        let bytes = nelem * elsize;
+        // TODO use Box::<[u8]>::new_zeroed_slice(bytes) instead after bumping rustc
+        let ret: *mut [u8] = Box::into_raw(vec![0; bytes].into_boxed_slice());
+        ret as *mut core::ffi::c_void
+    }
+
+    #[no_mangle]
+    extern "C" fn free(ptr: *mut core::ffi::c_void) {
+        unsafe {
+            // TODO is this sound?
+            Box::<u8>::from_raw(ptr as *mut u8);
+        }
+    }
 }

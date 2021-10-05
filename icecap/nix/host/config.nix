@@ -26,10 +26,12 @@ in {
           copy_bin_and_libs ${executableInContext k v}/bin/${k}
         '') instance.testElf)}
 
-        cp -pdv ${pkgs.sqlite.out}/lib/libsqlite3.so* $out/lib # HACK
+        # dependency of veracruz-{server-,}test that isn't picked up by copy_bin_and_libs
+        cp -pdv ${pkgs.sqlite.out}/lib/libsqlite3.so* $out/lib
 
         copy_bin_and_libs ${pkgs.muslPkgs.icecap.icecap-host}/bin/icecap-host
 
+        # utilities for setup and debugging
         copy_bin_and_libs ${pkgs.strace}/bin/strace
         copy_bin_and_libs ${pkgs.iproute}/bin/ip
         copy_bin_and_libs ${pkgs.curl.bin}/bin/curl
@@ -44,7 +46,7 @@ in {
       initramfs.extraInitCommands = ''
         mount -t debugfs none /sys/kernel/debug/
 
-        date -s '@${now}' # HACK
+        date -s '@${now}'
       '';
     }
 
@@ -65,7 +67,7 @@ in {
           echo performance > $f
         done
 
-        sleep 2 # HACK
+        sleep 2 # HACK wait for sd card
         mkdir /mnt/
         mount -o ro /dev/mmcblk0p1 /mnt/
         spec_src=/mnt/spec.bin
