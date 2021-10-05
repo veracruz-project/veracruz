@@ -63,26 +63,17 @@ ifeq ($(PLATFORM), Linux)
 	CERTIFICATE_EXPIRY := "$(shell date --rfc-2822 -d 'now + 100 days')"
 endif
 
-POLICY_FILES ?= get_random_policy.json \
- 				one_data_source_policy.json \
-				two_data_source_string_edit_distance_policy.json \
-				two_data_source_intersection_set_policy.json \
-				two_data_source_private_set_intersection_policy.json \
+# the equivalent policy of one program provider and two data providers, however, deploy to different ports.
+TRIPLE_POLICY_FILE := triple_policy_1.json \
+					  triple_policy_2.json \
+					  triple_policy_3.json \
+					  triple_policy_4.json 
+
+POLICY_FILES ?= single_client.json \
 				dual_policy.json \
-				triple_policy.json \
- 				triple_parties_two_data_sources_sum_policy.json \
-				permuted_triple_parties_two_data_sources_sum_policy.json \
-				triple_parties_two_data_sources_string_edit_distance_policy.json \
 				dual_parallel_policy.json \
+				$(TRIPLE_POLICY_FILE) \
 				quadruple_policy.json \
-				test_multiple_key_policy.json \
- 				idash2017_logistic_regression_policy.json \
-				moving_average_convergence_divergence.json \
- 				private_set_intersection_sum.json \
- 				number-stream-accumulation.json \
- 				basic_file_read_write.json \
-				shamir-secret-sharing-policy.json \
-				server_test.json
 
 WASM_PROG_FILES = random-source.wasm \
 				  linear-regression.wasm \
@@ -135,80 +126,20 @@ css-$(TEE).bin: $(RUNTIME_MANAGER_CSS_BIN)
 	$(MAKE) css-$(TEE).bin -C ../runtime-manager
 	cp $< $@
 
-
-get_random_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem random-source.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/output : $(READ_RIGHT), /random-source.wasm : $(WRITE_RIGHT)" \
-		--binary random-source.wasm --capability "/output : $(WRITE_RIGHT)" \
-       --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--enclave-debug-mode true --execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) --proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-get_random_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem random-source.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/output : $(READ_RIGHT), /random-source.wasm : $(WRITE_RIGHT)" \
-		--binary random-source.wasm --capability "/output : $(WRITE_RIGHT)" \
+single_client.json: pgen css-$(TEE).bin client_rsa_cert.pem $(WASM_PROG_FILES)
+	./pgen --certificate client_rsa_cert.pem --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
         --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-	    --proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-one_data_source_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem linear-regression.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /linear-regression.wasm : $(WRITE_RIGHT)" \
- 		--binary linear-regression.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-test_multiple_key_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem moving-average-convergence-divergence.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /moving-average-convergence-divergence.wasm : $(WRITE_RIGHT)" \
- 		--binary moving-average-convergence-divergence.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-two_data_source_string_edit_distance_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem string-edit-distance.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /input-1 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /string-edit-distance.wasm : $(WRITE_RIGHT)" \
- 		--binary string-edit-distance.wasm --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3013 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-two_data_source_intersection_set_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem intersection-set-sum.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /input-1 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /intersection-set-sum.wasm : $(WRITE_RIGHT)" \
- 		--binary intersection-set-sum.wasm --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3022 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-two_data_source_private_set_intersection_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem private-set-intersection.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /input-1 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /private-set-intersection.wasm : $(WRITE_RIGHT)" \
- 		--binary private-set-intersection.wasm --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 dual_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem linear-regression.wasm
-	./pgen --certificate program_client_cert.pem --capability "/linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT)" \
-		--binary linear-regression.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3014 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
+	./pgen --certificate program_client_cert.pem --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+		--certificate data_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--enable-clock true \
@@ -216,151 +147,27 @@ dual_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.p
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 dual_parallel_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem linear-regression.wasm
-	./pgen --certificate program_client_cert.pem --capability "/linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /linear-regression.wasm : $(WRITE_RIGHT)" \
- 		--binary linear-regression.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3015 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-triple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem linear-regression.wasm
-	./pgen --certificate program_client_cert.pem --capability "/linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate result_client_cert.pem --capability "/output : $(READ_RIGHT), /linear-regression.wasm : $(WRITE_RIGHT)" \
- 		--binary linear-regression.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3016 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-triple_parties_two_data_sources_sum_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm
-	./pgen --certificate program_client_cert.pem --capability "/intersection-set-sum.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT)" \
-		--certificate result_client_cert.pem --capability "/input-1 : $(WRITE_RIGHT), /output : $(READ_RIGHT)" \
- 		--binary intersection-set-sum.wasm --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3017 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-permuted_triple_parties_two_data_sources_sum_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem intersection-set-sum.wasm
-	./pgen --certificate program_client_cert.pem --capability "/intersection-set-sum.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT)" \
-		--certificate result_client_cert.pem --capability "/input-1 : $(WRITE_RIGHT), /output : $(READ_RIGHT)" \
- 		--binary intersection-set-sum.wasm --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3018 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-triple_parties_two_data_sources_string_edit_distance_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm
-	./pgen --certificate program_client_cert.pem --capability "/string-edit-distance.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT)" \
-		--certificate result_client_cert.pem --capability "/input-1 : $(WRITE_RIGHT), /output : $(READ_RIGHT)" \
- 		--binary string-edit-distance.wasm  --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3019 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-quadruple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem string-edit-distance.wasm
-	./pgen --certificate program_client_cert.pem --capability "/string-edit-distance.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "/input-0 : $(WRITE_RIGHT)" \
-		--certificate never_used_cert.pem --capability "/input-1 : $(WRITE_RIGHT)" \
-		--certificate result_client_cert.pem --capability "/output : $(READ_RIGHT)" \
- 		--binary string-edit-distance.wasm --capability "/input-0 : $(READ_RIGHT), /input-1 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3020 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-invalid_policy/one_expired_data_source_policy.json: pgen css-$(TEE).bin expired_cert.pem linear-regression.wasm
-	./pgen --certificate expired_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /linear-regression.wasm : $(WRITE_RIGHT)" \
- 		--binary linear-regression.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3021 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-idash2017_logistic_regression_policy.json: pgen css-$(TEE).bin client_rsa_cert.pem idash2017-logistic-regression.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /idash2017-logistic-regression.wasm : $(WRITE_RIGHT)" \
- 		--binary idash2017-logistic-regression.wasm  --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3023 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-moving_average_convergence_divergence.json: pgen css-$(TEE).bin client_rsa_cert.pem moving-average-convergence-divergence.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /moving-average-convergence-divergence.wasm : $(WRITE_RIGHT)" \
- 		--binary moving-average-convergence-divergence.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3024 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-private_set_intersection_sum.json: pgen css-$(TEE).bin client_rsa_cert.pem private-set-intersection-sum.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input-0 : $(WRITE_RIGHT), /output : $(READ_RIGHT), /private-set-intersection-sum.wasm : $(WRITE_RIGHT)" \
-		--binary private-set-intersection-sum.wasm --capability "/input-0 : $(READ_RIGHT), /output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3025 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-number-stream-accumulation.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem number-stream-accumulation.wasm
-	./pgen --certificate client_rsa_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), /program/ : $(WRITE_RIGHT)" \
- 		--binary $(PROGRAM_DIR)number-stream-accumulation.wasm=number-stream-accumulation.wasm --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), /program/ : $(READ_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--enclave-debug-mode true --execution-strategy Interpretation \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-basic_file_read_write.json: pgen css-$(TEE).bin client_rsa_cert.pem read-file.wasm 
-	./pgen --certificate client_rsa_cert.pem --capability "/input.txt: $(WRITE_RIGHT), /output : $(READ_RIGHT), /read-file.wasm : $(WRITE_RIGHT), /a : $(READ_RIGHT)" \
-		--binary read-file.wasm --capability "/ : $(READ_RIGHT) , /output : $(WRITE_RIGHT), /a : $(READ_WRITE_RIGHT)" \
-        --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--enclave-debug-mode true --execution-strategy Interpretation \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		--enable-clock true \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-shamir-secret-sharing-policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem shamir-secret-sharing.wasm
-	./pgen --certificate program_client_cert.pem --capability "shamir-secret-sharing.wasm : $(WRITE_RIGHT)" \
-		--certificate data_client_cert.pem --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), input-2 : $(WRITE_RIGHT)" \
-		--certificate result_client_cert.pem --capability "output : $(READ_RIGHT)" \
-		--binary shamir-secret-sharing.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), input-2 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3017 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
-		--proxy-attestation-server-cert ../test-collateral/CACert.pem
-
-server_test.json: pgen css-$(TEE).bin client_rsa_cert.pem $(WASM_PROG_FILES)
-	./pgen --certificate client_rsa_cert.pem --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	./pgen --certificate program_client_cert.pem --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+		--certificate data_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
-        --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--enclave-debug-mode true --execution-strategy Interpretation \
+		--veracruz-server-ip 127.0.0.1:3013 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
+		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
+		--enable-clock true \
+		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
+		--proxy-attestation-server-cert ../test-collateral/CACert.pem
+
+# Generate all the triple policy but on different port.
+$(TRIPLE_POLICY_FILE) : triple_policy_%.json : pgen css-$(TEE).bin program_client_cert.pem data_client_cert.pem result_client_cert.pem linear-regression.wasm
+	./pgen --certificate program_client_cert.pem --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+		--certificate data_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+		--certificate result_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+		--veracruz-server-ip 127.0.0.1:$(shell echo "3020 + $(patsubst triple_policy_%.json,%,$@)" | bc) \
+	    --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
+		--execution-strategy Interpretation \
+		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
+		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 

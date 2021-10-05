@@ -55,27 +55,7 @@ mod tests {
     use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
     // Policy files
-    const TEST_POLICY: &'static str = "server_test.json";
-    //const ONE_DATA_SOURCE_POLICY: &'static str = "one_data_source_policy.json";
-    //const GET_RANDOM_POLICY: &'static str = "get_random_policy.json";
-    //const LINEAR_REGRESSION_POLICY: &'static str = "one_data_source_policy.json";
-    //const TWO_DATA_SOURCE_STRING_EDIT_DISTANCE_POLICY: &'static str =
-        //"two_data_source_string_edit_distance_policy.json";
-    //const TWO_DATA_SOURCE_INTERSECTION_SET_POLICY: &'static str =
-        //"two_data_source_intersection_set_policy.json";
-    //const TWO_DATA_SOURCE_PRIVATE_SET_INTERSECTION_POLICY: &'static str =
-        //"two_data_source_private_set_intersection_policy.json";
-    //const MULTIPLE_KEY_POLICY: &'static str = "test_multiple_key_policy.json";
-    //const IDASH2017_POLICY: &'static str =
-        //"idash2017_logistic_regression_policy.json";
-    //const MACD_POLICY: &'static str =
-        //"moving_average_convergence_divergence.json";
-    //const PRIVATE_SET_INTER_SUM_POLICY: &'static str =
-        //"private_set_intersection_sum.json";
-    //const NUMBER_STREAM_ACCUMULATION_POLICY: &'static str =
-        //"number-stream-accumulation.json";
-    //const BASIC_FILE_READ_WRITE_POLICY: &'static str =
-        //"basic_file_read_write.json";
+    const POLICY: &'static str = "server_test.json";
     const CA_CERT: &'static str = "CACert.pem";
     const CA_KEY: &'static str = "CAKey.pem";
     const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
@@ -107,6 +87,7 @@ mod tests {
     const VEC_F64_2_DATA: &'static str = "number-stream-2.dat";
     const LOGISTICS_REGRESSION_DATA_PATH: &'static str = "idash2017/";
     const MACD_DATA_PATH: &'static str = "macd/";
+    const PRIVATE_SET_INTER_SUM_DATA_PATH: &'static str = "private-set-inter-sum/";
 
     static SETUP: Once = Once::new();
     static DEBUG_SETUP: Once = Once::new();
@@ -263,7 +244,7 @@ mod tests {
     #[test]
     /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
-        let (policy, policy_json, _) = read_policy(policy_path(TEST_POLICY).as_path()).unwrap();
+        let (policy, policy_json, _) = read_policy(policy_path(POLICY).as_path()).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
 
         let ret = VeracruzServerEnclave::new(&policy_json);
@@ -294,7 +275,7 @@ mod tests {
     #[test]
     /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
-        let (policy, policy_json, _) = read_policy(policy_path(TEST_POLICY).as_path()).unwrap();
+        let (policy, policy_json, _) = read_policy(policy_path(POLICY).as_path()).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
         init_veracruz_server_and_tls_session(&policy_json).unwrap();
@@ -314,7 +295,7 @@ mod tests {
     /// data sources: a single input under filename `input.txt`.
     fn test_phase2_basic_file_read_write_no_attestation() {
         test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/read-file.wasm",program_path(READ_FILE_WASM).to_string_lossy().into_owned().as_str())],
@@ -332,7 +313,7 @@ mod tests {
     /// data sources: none
     fn test_phase2_random_source_no_data_no_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
@@ -347,7 +328,7 @@ mod tests {
     /// Attempt to fetch the result without program nor data
     fn test_phase2_random_source_no_program_no_data() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[],
@@ -363,7 +344,7 @@ mod tests {
     /// Attempt to provision a wrong program
     fn test_phase2_incorrect_program_no_attestation() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str())],
@@ -379,7 +360,7 @@ mod tests {
     /// Attempt to use an unauthorized key
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(UNAUTHORIZED_KEY).as_path(),
             &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
@@ -395,7 +376,7 @@ mod tests {
     /// Attempt to use an unauthorized certificate
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(UNAUTHORIZED_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
@@ -411,7 +392,7 @@ mod tests {
     /// A unauthorized client attempted to connect the service
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(UNAUTHORIZED_CERT).as_path(),
             trust_path(UNAUTHORIZED_KEY).as_path(),
             &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
@@ -432,7 +413,7 @@ mod tests {
     /// in two-dimensional space, represented by Vec<(f64, f64)>.
     fn test_phase2_linear_regression_single_data_no_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
@@ -447,7 +428,7 @@ mod tests {
     /// Attempt to fetch result without data
     fn test_phase2_linear_regression_no_data_no_attestation() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
@@ -474,7 +455,7 @@ mod tests {
     /// reversed order (data 1, then data 0)
     fn test_phase2_intersection_sum_reversed_data_provisioning_two_data_no_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str())],
@@ -496,7 +477,7 @@ mod tests {
     /// data sources: two strings
     fn test_phase2_string_edit_distance_two_data_no_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str())],
@@ -518,7 +499,7 @@ mod tests {
     /// A standard one data source scenario with attestation.
     fn test_phase3_linear_regression_one_data_with_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
@@ -537,7 +518,7 @@ mod tests {
     /// A standard two data sources scenario with attestation.
     fn test_phase3_private_set_intersection_two_data_with_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/private-set-intersection.wasm",program_path(PERSON_SET_INTERSECTION_WASM).to_string_lossy().into_owned().as_str())],
@@ -559,7 +540,7 @@ mod tests {
     /// A standard one data source and two stream sources scenario with attestation.
     fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
         let _result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
@@ -575,7 +556,7 @@ mod tests {
     /// Attempt to fetch result without enough stream data.
     fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
@@ -590,7 +571,7 @@ mod tests {
     /// Attempt to provision stream data in the state of loading static data.
     fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
         let result = test_template(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
@@ -609,14 +590,11 @@ mod tests {
     /// data sources: idash2017/*.dat
     /// TODO REWORK!!
     fn test_performance_idash2017_with_attestation() {
-        let input_vec = input_list(LOGISTICS_REGRESSION_DATA_PATH, "/input/idash2017/").expect("Failed to parse input");
+        let input_vec = input_list(data_dir(LOGISTICS_REGRESSION_DATA_PATH).to_string_lossy().into_owned().as_str(), "/input/idash2017/").expect("Failed to parse input");
         let input_vec: Vec<(&str, &str)> = input_vec.iter().map(|(s,k)| (&s[..],&k[..])).collect();
 
-        println!("vec: {:?}",input_vec);
-        //iterate_over_data(LOGISTICS_REGRESSION_DATA_PATH, |data_path| {
-        //info!("Data path: {:?}", data_path);
         let result = test_template::<(Vec<f64>, f64, f64)>(
-            policy_path(TEST_POLICY).as_path(),
+            policy_path(POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
             &[("/program/idash2017-logistic-regression.wasm",LOGISTICS_REGRESSION_WASM)],
@@ -625,8 +603,7 @@ mod tests {
             // only read two outputs
             &["/output/idash2017/generate-data-0.dat", "/output/idash2017/generate-data-1.dat"],
         );
-            assert!(result.is_ok(), "error:{:?}", result);
-        //});
+        assert!(result.is_ok(), "error:{:?}", result);
     }
 
     #[test]
@@ -636,51 +613,19 @@ mod tests {
     /// data sources: macd/*.dat
     /// TODO REWORK!!
     fn test_performance_macd_with_attestation() {
-        iterate_over_data(data_dir(MACD_DATA_PATH).as_path(), |data_path| {
-            info!("Data path: {}", data_path.to_string_lossy());
-            // call the test_template with info flag on,
-            // which prints out the time
-            let result = test_template(
-                policy_path(TEST_POLICY).as_path(),
-                trust_path(CLIENT_CERT).as_path(),
-                trust_path(CLIENT_KEY).as_path(),
-                &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM).to_string_lossy().into_owned().as_str())],
-                &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
-                &[],
-                &["/output"],
-            );
-            assert!(result.is_ok(), "error:{:?}", result);
-        });
-    }
+        let input_vec = input_list(data_dir(MACD_DATA_PATH).to_string_lossy().into_owned().as_str(), "/input/macd/").expect("Failed to parse input");
+        let input_vec: Vec<(&str, &str)> = input_vec.iter().map(|(s,k)| (&s[..],&k[..])).collect();
 
-    /// This test was written to test an issue.
-    /// The issue was that the key storage in Mbed Crypto was being exhausted
-    /// in the proxy attestation server.
-    /// The fix was to delete keys after they are used.
-    /// This test creates 32 enclaves, each of which attests against the proxy
-    /// attestation server.
-    /// To generate the dataset for this test:
-    /// - Go to directory: sdk/utility/macd2bincode
-    /// - execute run.sh . It generates more than 32 datasets of the form *.dat .
-    /// - Manually copy all *.dat to sdk/datasets/macd
-    #[test]
-    #[ignore]
-    /// TODO REWORK!!
-    fn test_multiple_keys() {
-        iterate_over_data(data_dir(MACD_DATA_PATH).as_path(), |data_path| {
-            // call the test_template with info flag on,
-            // which prints out the time
-            let result = test_template(
-                policy_path(TEST_POLICY).as_path(),
-                trust_path(CLIENT_CERT).as_path(),
-                trust_path(CLIENT_KEY).as_path(),
-                &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM).to_string_lossy().into_owned().as_str())],
-                &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
-                &[],
-                &["/output"],
-            );
-            assert!(result.is_ok(), "error:{:?}", result);
-        });
+        let result = test_template::<Vec<f64>>(
+            policy_path(POLICY).as_path(),
+            trust_path(CLIENT_CERT).as_path(),
+            trust_path(CLIENT_KEY).as_path(),
+            &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM))],
+            &input_vec,
+            &[],
+            &["/output/macd/generate-1000.dat"],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -690,22 +635,19 @@ mod tests {
     /// data sources: private-set-inter-sum/*.dat
     /// TODO REWORK!!!
     fn test_performance_set_intersection_sum_with_attestation() {
-        iterate_over_data(data_dir("private-set-inter-sum").as_path(), |data_path| {
-            info!("Data path: {}", data_path.display());
-            // call the test_template with info flag on,
-            // which prints out the time
-            let result = test_template(
-                policy_path(TEST_POLICY).as_path(),
-                trust_path(CLIENT_CERT).as_path(),
-                trust_path(CLIENT_KEY).as_path(),
-                &[("/progra/private-set-intersection-sum.wasm",program_path(INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str())],
-                &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
-                &[],
-                &["/output"],
-            );
+        let input_vec = input_list(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH).to_string_lossy().into_owned().as_str(), "/input/private-set-inter-sum/").expect("Failed to parse input");
+        let input_vec: Vec<(&str, &str)> = input_vec.iter().map(|(s,k)| (&s[..],&k[..])).collect();
 
-            assert!(result.is_ok(), "error:{:?}", result);
-        });
+        let result = test_template::<(usize, u64)>(
+            policy_path(POLICY).as_path(),
+            trust_path(CLIENT_CERT).as_path(),
+            trust_path(CLIENT_KEY).as_path(),
+            &[("/program/private-set-intersection-sum.wasm",program_path(INTERSECTION_SET_SUM_WASM))],
+            &input_vec,
+            &[],
+            &["/output/private-set-inter-sum/data-2000-0"],
+        )
+        .unwrap();
     }
 
     /// This is the template of test cases for veracruz-server,

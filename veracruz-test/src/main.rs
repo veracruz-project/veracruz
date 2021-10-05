@@ -22,16 +22,13 @@ pub fn main() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     // Policies
-    const GET_RANDOM_POLICY: &'static str = "get_random_policy.json";
+    const SINGLE_CLIENT_POLICY: &'static str = "single_client.json";
     const LINEAR_REGRESSION_DUAL_POLICY: &'static str = "dual_policy.json";
-    const LINEAR_REGRESSION_TRIPLE_POLICY: &'static str = "triple_policy.json";
+    const LINEAR_REGRESSION_TRIPLE_POLICY: &'static str = "triple_policy_1.json";
     const LINEAR_REGRESSION_PARALLEL_POLICY: &'static str = "dual_parallel_policy.json";
-    const INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str =
-        "triple_parties_two_data_sources_sum_policy.json";
-    const PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str =
-        "permuted_triple_parties_two_data_sources_sum_policy.json";
-    const STRING_EDIT_DISTANCE_TRIPLE_POLICY: &'static str =
-        "triple_parties_two_data_sources_string_edit_distance_policy.json";
+    const INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_2.json";
+    const PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_3.json";
+    const STRING_EDIT_DISTANCE_TRIPLE_POLICY: &'static str = "triple_policy_4.json";
     const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str = "quadruple_policy.json";
 
     // Identities
@@ -148,15 +145,11 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
         let result = test_template(
-            policy_path(GET_RANDOM_POLICY).as_path(),
-            &vec![(
-                trust_path(CLIENT_CERT).as_path(),
-                trust_path(CLIENT_KEY).as_path(),
-            )],
-            0,
-            program_path(RANDOM_SOURCE_WASM).as_path(),
+            policy_path(SINGLE_CLIENT_POLICY).as_path(),
+            &vec![(trust_path(CLIENT_CERT).as_path(), trust_path(CLIENT_KEY).as_path())],
+            &[(0, "/program/random-source.wasm", program_path(RANDOM_SOURCE_WASM).as_path())],
             &vec![],
-            &vec![0],
+            &vec![(0, "/output/random.dat")],
         )
         .await;
         assert!(
@@ -181,10 +174,9 @@ mod tests {
                     trust_path(DATA_CLIENT_KEY).as_path(),
                 ),
             ],
-            0,
-            program_path(LINEAR_REGRESSION_WASM).as_path(),
-            &vec![(1, "input-0", data_path(LINEAR_REGRESSION_DATA).as_path())],
-            &vec![1],
+            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).as_path())],
+            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA).as_path())],
+            &vec![(1, "/output/linear-regression.dat")],
         )
         .await;
         assert!(
@@ -213,10 +205,9 @@ mod tests {
                     trust_path(RESULT_CLIENT_KEY).as_path(),
                 ),
             ],
-            0,
-            program_path(LINEAR_REGRESSION_WASM).as_path(),
-            &vec![(1, "input-0", data_path(LINEAR_REGRESSION_DATA).as_path())],
-            &vec![1, 2],
+            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).as_path())],
+            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA).as_path())],
+            &vec![(1, "/output/linear-regression.dat"), (2, "/output/linear-regression.dat")],
         )
         .await;
         assert!(
@@ -246,21 +237,12 @@ mod tests {
                     trust_path(RESULT_CLIENT_KEY).as_path(),
                 ),
             ],
-            0,
-            program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path(),
+            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path())],
             &vec![
-                (
-                    1,
-                    "input-0",
-                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path(),
-                ),
-                (
-                    2,
-                    "input-1",
-                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path(),
-                ),
+                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path()),
+                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path()),
             ],
-            &vec![2],
+            &vec![(2, "/output/intersection-set-sum.dat")],
         )
         .await;
         assert!(
@@ -290,21 +272,12 @@ mod tests {
                     trust_path(RESULT_CLIENT_KEY).as_path(),
                 ),
             ],
-            0,
-            program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path(),
+            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path())],
             &vec![
-                (
-                    2,
-                    "input-1",
-                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path(),
-                ),
-                (
-                    1,
-                    "input-0",
-                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path(),
-                ),
+                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path()),
+                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path()),
             ],
-            &vec![2],
+            &vec![(2, "/output/intersection-set-sum.dat")],
         )
         .await;
         assert!(result.is_ok(), "veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision failed with error: {:?}",result);
@@ -330,13 +303,12 @@ mod tests {
                     trust_path(RESULT_CLIENT_KEY).as_path(),
                 ),
             ],
-            0,
-            program_path(STRING_EDIT_DISTANCE_WASM).as_path(),
+            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM).as_path())],
             &vec![
-                (1, "input-0", data_path(STRING_1_DATA).as_path()),
-                (2, "input-1", data_path(STRING_2_DATA).as_path()),
+                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA).as_path()),
+                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA).as_path()),
             ],
-            &vec![2],
+            &vec![(2, "/output/string-edit-distance.dat")],
         )
         .await;
         assert!(
@@ -376,7 +348,12 @@ mod tests {
                 (1, "input-0", data_path(STRING_1_DATA).as_path()),
                 (2, "input-1", data_path(STRING_2_DATA).as_path()),
             ],
-            &vec![3],
+            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM).as_path())],
+            &vec![
+                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA).as_path()),
+                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA).as_path()),
+            ],
+            &vec![(3, "/output/string-edit-distance.dat")],
         )
         .await;
         assert!(
@@ -409,11 +386,10 @@ mod tests {
                 &policy_json,
             )?;
             let prog_path = program_path(LINEAR_REGRESSION_WASM);
-            let program_filename = prog_path.as_path().file_name().unwrap().to_str().unwrap();
             info!("### program provider read binary.");
             let program_data = read_binary_file(prog_path.as_path())?;
             info!("### program provider send binary.");
-            client.send_program(program_filename, &program_data)?;
+            client.send_program("/program/linear-regression.wasm",&program_data)?;
             info!("### program provider request shutdown.");
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
@@ -431,12 +407,10 @@ mod tests {
             info!("### data provider read input.");
             let data = read_binary_file(&data_filename.as_path())?;
             info!("### data provider send input.");
-            client.send_data("input-0", &data)?;
-            let prog_path = program_path(LINEAR_REGRESSION_WASM);
-            let program_filename = prog_path.as_path().file_name().unwrap().to_str().unwrap();
+            client.send_data("/input/linear-regression.dat",&data)?;
             info!("### data provider read result.");
-            client.request_compute(&program_filename)?;
-            client.get_results("/output")?;
+            client.request_compute("/program/linear-regression.wasm")?;
+            client.get_results("/output/linear-regression.dat")?;
             info!("### data provider request shutdown.");
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
@@ -457,15 +431,14 @@ mod tests {
         // List of client's certificates and private keys
         client_configs: &[(&Path, &Path)],
         // Program provider, index refering to the `client_configs` parameter, and program path
-        program_provider_index: usize,
-        program_path: &Path,
+        program_providers: &[(usize, &str, &Path)],
         // Data providers, a list of indices refering to the `client_configs` parameter,
         // remote file name and data pathes.
         // The list determines the order of which data is sent out, from head to tail.
         // Note that a client might provision more than one packages
         data_providers: &[(usize, &str, &Path)],
         // Result retriever, a list of indices refering to the `client_configs` parameter.
-        result_retrievers: &[usize],
+        result_retrievers: &[(usize, &str)],
     ) -> Result<(), VeracruzTestError> {
         let policy_json = read_policy(policy_path)?;
         let policy = Policy::from_json(&policy_json)?;
@@ -493,29 +466,24 @@ mod tests {
                     &policy_json,
                 )?);
             }
-
-            info!(
-                "### Step 3. Client #{} provisions program {}.",
-                program_provider_index,
-                program_path.to_string_lossy()
-            );
-            // provision program
-            let program_provider_veracruz_client = clients
-                .get_mut(program_provider_index)
-                .ok_or(VeracruzTestError::ClientIndexError(program_provider_index))?;
-            let program_data = read_binary_file(program_path)?;
-            let mut program_name = Path::new(program_path).file_name().unwrap().to_str().unwrap().to_string();
-            // inject the absolute path
-            program_name.insert(0, '/');
-            info!("send {}", program_name);
-            program_provider_veracruz_client.send_program(&program_name,&program_data)?;
+            info!("### Step 3. Provisions programs.");
+            for (program_provider_index, remote_filename, data_filename) in program_providers.iter() {
+                info!(
+                    "            Client #{} provisions program {}.",
+                    program_provider_index, remote_filename
+                );
+                let program_provider_veracruz_client = clients
+                    .get_mut(*program_provider_index)
+                    .ok_or(VeracruzTestError::ClientIndexError(*program_provider_index))?;
+                let data = read_binary_file(data_filename)?;
+                program_provider_veracruz_client.send_data(remote_filename, &data)?;
+            }
             info!("### Step 4. Provision data.");
             // provosion data
             for (data_provider_index, remote_filename, data_filename) in data_providers.iter() {
                 info!(
-                    "            Client #{} provisions program {}.",
-                    data_provider_index,
-                    data_filename.to_string_lossy()
+                    "            Client #{} provisions data {}.",
+                    data_provider_index, remote_filename
                 );
                 let data_provider_veracruz_client = clients
                     .get_mut(*data_provider_index)
@@ -525,16 +493,25 @@ mod tests {
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
-            // fetch result
-            // remove the absolute path
-            program_name.remove(0);
-            for result_retriever_index in result_retrievers {
+            for (program_provider_index, remote_filename, _) in program_providers.iter() {
+                info!(
+                    "            Client #{} request computation {}.",
+                    program_provider_index, remote_filename
+                );
+                let program_provider_veracruz_client = clients
+                    .get_mut(*program_provider_index)
+                    .ok_or(VeracruzTestError::ClientIndexError(*program_provider_index))?;
+                program_provider_veracruz_client.request_compute(remote_filename)?;
+            }
+            for (result_retriever_index, remote_filename) in result_retrievers.iter() {
+                info!(
+                    "            Client #{} request result {}.",
+                    result_retriever_index, remote_filename
+                );
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
-                info!("send {}", program_name);
-                let compute = result_retriever_veracruz_client.request_compute(&program_name)?;
-                let result = result_retriever_veracruz_client.get_results("/output")?;
+                let result = result_retriever_veracruz_client.get_results(remote_filename)?;
                 let result: T = pinecone::from_bytes(&result)?;
                 info!("            Result: {:?}", result);
             }
