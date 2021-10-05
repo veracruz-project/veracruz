@@ -21,7 +21,6 @@ in {
 
         copy_bin_and_libs ${pkgs.muslPkgs.icecap.icecap-host}/bin/icecap-host
 
-        # debugging tools
         copy_bin_and_libs ${pkgs.strace}/bin/strace
         copy_bin_and_libs ${pkgs.iproute}/bin/ip
         copy_bin_and_libs ${pkgs.curl.bin}/bin/curl
@@ -57,6 +56,7 @@ in {
           echo performance > $f
         done
 
+        sleep 2 # HACK
         mkdir /mnt/
         mount -o ro /dev/mmcblk0p1 /mnt/
         spec_src=/mnt/spec.bin
