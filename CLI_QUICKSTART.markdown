@@ -24,7 +24,7 @@ These can be combined into one command to maximize the time you have to
 make coffee while the code is compiling:
 
 ``` bash
-$ make sgx-cli-install sgx-test-collateral sdk
+$ make sdk sgx-cli-install sgx-test-collateral
 ...
 ```
 
