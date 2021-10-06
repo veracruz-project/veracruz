@@ -101,6 +101,7 @@ impl InodeEntry {
     /// Resize a file to `size`, fill with `fill_byte` if it grows,
     /// and update the file status.
     /// Return ErrNo::IsDir, if it is not a file
+    #[inline]
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemResult<()> {
         self.data.resize_file(size, fill_byte)?;
         self.file_stat.file_size = size;
@@ -109,6 +110,7 @@ impl InodeEntry {
 
     /// Read maximum `max` bytes from the offset `offset`.
     /// Return ErrNo::IsDir if it is not a file.
+    #[inline]
     pub(self) fn read_file(&self, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
         self.data.read_file(max, offset)
     }
@@ -116,6 +118,7 @@ impl InodeEntry {
     /// Write `buf` to the file from the offset `offset`,
     /// update the file status and return the number of written bytes.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
+    #[inline]
     pub(self) fn write_file(&mut self, buf: Vec<u8>, offset: FileSize) -> FileSystemResult<Size> {
         let rst = self.data.write_file(buf, offset)?;
         self.file_stat.file_size = self.data.len()?;
@@ -124,6 +127,7 @@ impl InodeEntry {
 
     /// Truncate the file.
     /// Return ErrNo::IsDir if it is not a file.
+    #[inline]
     pub(self) fn truncate_file(&mut self) -> FileSystemResult<()> {
         self.data.truncate_file()?;
         self.file_stat.file_size = 0u64;
@@ -132,12 +136,14 @@ impl InodeEntry {
 
     /// Insert a file to the directory at `self`.
     /// Return ErrNo:: NotDir if `self` is not a directory.
+    #[inline]
     pub(self) fn insert<T: AsRef<Path>>(&mut self, path: T, inode: Inode) -> FileSystemResult<()> {
         self.data.insert(path, inode)
     }
 
     /// Return the inode of `path`.
     /// Return ErrNo:: NotDir if `self` is not a directory.
+    #[inline]
     pub(self) fn get_inode_by_path<T: AsRef<Path>>(&self, path: T) -> FileSystemResult<Inode> {
         self.data.get_inode_by_path(path)
     }
@@ -154,18 +160,21 @@ impl InodeEntry {
     }
 
     /// Check if the inode is a directory
+    #[inline]
     pub(crate) fn is_dir(&self) -> bool {
         self.data.is_dir()
     }
 
     /// Read metadata of all files and sub-dirs in the dir and return a vec of DirEnt,
     /// or return NotDir if `self` is not a dir
+    #[inline]
     pub(self) fn read_dir(&self, inode_table: &InodeTable) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
         self.data.read_dir(inode_table)
     }
 
     /// Return the number of the bytes, if it is a file,
     /// or the number of inodes, if it it is a directory.
+    #[inline]
     pub(self) fn len(&self) -> FileSystemResult<FileSize> {
         self.data.len()
     }
@@ -307,6 +316,7 @@ impl InodeImpl {
     }
 
     /// Check if it is a directory
+    #[inline]
     pub(crate) fn is_dir(&self) -> bool {
         match self {
             Self::Directory(_) => true,
@@ -408,14 +418,20 @@ impl InodeTable {
         Ok(())
     }
 
+    /// Return the inode for stdin
+    #[inline]
     fn stdin(&self) -> Inode {
         self.stdin
     }
 
+    /// Return the inode for stdout
+    #[inline]
     fn stdout(&self) -> Inode {
         self.stdout
     }
 
+    /// Return the inode for stderr
+    #[inline]
     fn stderr(&self) -> Inode {
         self.stderr
     }
@@ -436,10 +452,14 @@ impl InodeTable {
         self.table.get_mut(&inode).ok_or(ErrNo::NoEnt)
     }
 
+    /// Return if the `inode` is a directory.
+    #[inline]
     fn is_dir(&self, inode: &Inode) -> bool {
         self.get(inode).map(|i| i.is_dir()).unwrap_or(false)
     }
 
+    /// Return the rights table of `principal`.
+    #[inline]
     fn get_rights(&self, principal: &Principal) -> FileSystemResult<&HashMap<PathBuf, Rights>> {
         self.rights_table.get(principal).ok_or(ErrNo::Access)
     }
@@ -704,22 +724,6 @@ impl FileSystem {
         all_rights.insert(PathBuf::from("stdout"), Rights::all());
         all_rights.insert(PathBuf::from("stderr"), Rights::all());
 
-        //// Set up standard streams table
-        //let std_streams_table = vec![
-            //StandardStream::Stdin(FileRights::new(
-                //String::from("stdin"),
-                //Rights::all(),
-            //)),
-            //StandardStream::Stdout(FileRights::new(
-                //String::from("stdout"),
-                //Rights::all(),
-            //)),
-            //StandardStream::Stderr(FileRights::new(
-                //String::from("stderr"),
-                //Rights::all(),
-            //)),
-        //];
-
         rst.install_prestat::<PathBuf>(&all_rights)?;
         rst.lock_inode_table()?.print();
         Ok(rst)
@@ -760,6 +764,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////
     
     /// Lock the inode table
+    #[inline]
     fn lock_inode_table(&self) -> FileSystemResult<MutexGuard<InodeTable>> {
         self.inode_table.lock().map_err(|_| ErrNo::Busy)
     }
@@ -937,6 +942,7 @@ impl FileSystem {
     }
 
     /// Return the inode and the associated inode entry, contained in file descriptor `fd`
+    #[inline]
     fn get_inode_by_fd(&self, fd: &Fd) -> FileSystemResult<Inode> {
         Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode)
     }
@@ -1761,18 +1767,25 @@ impl FileSystem {
         Ok(rst)
     }
 
+    /// A public API for writing to stdin. 
+    #[inline]
     pub fn write_stdin(&mut self, buf: &[u8])  -> FileSystemResult<Size> {
         self.fd_write(Fd(0), buf)
     }
 
+    /// A public API for reading from stdout. 
+    #[inline]
     pub fn read_stdout(&mut self) -> FileSystemResult<Vec<u8>>  {
         self.read_std_stream(Fd(1))
     }
 
+    /// A public API for reading from stderr. 
+    #[inline]
     pub fn read_stderr(&mut self) -> FileSystemResult<Vec<u8>>  {
         self.read_std_stream(Fd(2))
     }
 
+    /// Read from std streaming. 
     fn read_std_stream(&mut self, fd: Fd) -> FileSystemResult<Vec<u8>> {
         // read the length of a stream
         let inode = self.get_inode_by_fd(&fd)?;
