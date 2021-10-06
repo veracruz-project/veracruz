@@ -20,10 +20,8 @@ mod tests {
     use actix_rt::System;
     use env_logger;
     use lazy_static::lazy_static;
-    use log::{debug, error, info, Level};
-    use rand;
+    use log::{debug, info, Level};
     use ring;
-
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
     use serde::Deserialize;
@@ -55,7 +53,7 @@ mod tests {
     use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
     // Policy files
-    const POLICY: &'static str = "server_test.json";
+    const POLICY: &'static str = "single_client.json";
     const CA_CERT: &'static str = "CACert.pem";
     const CA_KEY: &'static str = "CAKey.pem";
     const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
@@ -83,8 +81,7 @@ mod tests {
     const PERSON_SET_1_DATA: &'static str = "private-set-1.dat";
     const PERSON_SET_2_DATA: &'static str = "private-set-2.dat";
     const SINGLE_F64_DATA: &'static str = "number-stream-init.dat";
-    const VEC_F64_1_DATA: &'static str = "number-stream-1.dat";
-    const VEC_F64_2_DATA: &'static str = "number-stream-2.dat";
+    const F64_STREAM_PATH: &'static str = "number-stream/";
     const LOGISTICS_REGRESSION_DATA_PATH: &'static str = "idash2017/";
     const MACD_DATA_PATH: &'static str = "macd/";
     const PRIVATE_SET_INTER_SUM_DATA_PATH: &'static str = "private-set-inter-sum/";
@@ -244,7 +241,7 @@ mod tests {
     #[test]
     /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
-        let (policy, policy_json, _) = read_policy(policy_path(POLICY).as_path()).unwrap();
+        let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
 
         let ret = VeracruzServerEnclave::new(&policy_json);
@@ -275,7 +272,7 @@ mod tests {
     #[test]
     /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
-        let (policy, policy_json, _) = read_policy(policy_path(POLICY).as_path()).unwrap();
+        let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
         init_veracruz_server_and_tls_session(&policy_json).unwrap();
@@ -295,11 +292,11 @@ mod tests {
     /// data sources: a single input under filename `input.txt`.
     fn test_phase2_basic_file_read_write_no_attestation() {
         test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/read-file.wasm",program_path(READ_FILE_WASM).to_string_lossy().into_owned().as_str())],
-            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA).to_string_lossy().into_owned().as_str())],
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/read-file.wasm", program_path(READ_FILE_WASM))],
+            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA))],
             &[],
             &["/output/test/test.txt", "/output/hello-world-1.dat"],
         )
@@ -312,11 +309,11 @@ mod tests {
     /// computation: random-source, returning a vec of random u8
     /// data sources: none
     fn test_phase2_random_source_no_data_no_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/random-source.wasm", program_path(RANDOM_SOURCE_WASM))],
             &[],
             &[],
             &["/output/random.dat"],
@@ -327,10 +324,10 @@ mod tests {
     #[test]
     /// Attempt to fetch the result without program nor data
     fn test_phase2_random_source_no_program_no_data() {
-        let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
             &[],
             &[],
             &[],
@@ -343,11 +340,11 @@ mod tests {
     #[test]
     /// Attempt to provision a wrong program
     fn test_phase2_incorrect_program_no_attestation() {
-        let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM))],
             &[],
             &[],
             &["/output/random.dat"],
@@ -359,11 +356,11 @@ mod tests {
     #[test]
     /// Attempt to use an unauthorized key
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
-        let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(UNAUTHORIZED_KEY).as_path(),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(UNAUTHORIZED_KEY),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM))],
             &[],
             &[],
             &["/output/random.dat"],
@@ -375,11 +372,11 @@ mod tests {
     #[test]
     /// Attempt to use an unauthorized certificate
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
-        let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(UNAUTHORIZED_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(UNAUTHORIZED_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM))],
             &[],
             &[],
             &["/output/random.dat"],
@@ -391,11 +388,11 @@ mod tests {
     #[test]
     /// A unauthorized client attempted to connect the service
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
-        let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(UNAUTHORIZED_CERT).as_path(),
-            trust_path(UNAUTHORIZED_KEY).as_path(),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(UNAUTHORIZED_CERT),
+            trust_path(UNAUTHORIZED_KEY),
+            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM))],
             &[],
             &[],
             &["/output/random.dat"],
@@ -412,12 +409,12 @@ mod tests {
     /// two-dimensional space.  Data sources: linear-regression, a vec of points
     /// in two-dimensional space, represented by Vec<(f64, f64)>.
     fn test_phase2_linear_regression_single_data_no_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
-            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
+            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
             &[],
             &["/output/linear-regression.dat"],
         )
@@ -428,10 +425,10 @@ mod tests {
     /// Attempt to fetch result without data
     fn test_phase2_linear_regression_no_data_no_attestation() {
         let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
             &[],
             &[],
             &["/output/linear-regression.dat"],
@@ -454,15 +451,15 @@ mod tests {
     /// A standard two data source scenario, where the data provisioned in the
     /// reversed order (data 1, then data 0)
     fn test_phase2_intersection_sum_reversed_data_provisioning_two_data_no_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM))],
             &[
                 // message sends out in the reversed order
-                ("/input/intersection-customer.dat", data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA).to_string_lossy().into_owned().as_str()),
-                ("/input/intersection-advertisement-viewer.dat", data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).to_string_lossy().into_owned().as_str()),
+                ("/input/intersection-customer.dat", data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
+                ("/input/intersection-advertisement-viewer.dat", data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)),
             ],
             &[],
             &["/output/intersection-set-sum.dat"],
@@ -476,13 +473,13 @@ mod tests {
     /// computation: string-edit-distance, computing the string edit distance.
     /// data sources: two strings
     fn test_phase2_string_edit_distance_two_data_no_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str())],
-            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA).to_string_lossy().into_owned().as_str()),
-              ("/input/hello-world-2.dat", data_dir(STRING_2_DATA).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM))],
+            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA)),
+              ("/input/hello-world-2.dat", data_dir(STRING_2_DATA))],
             &[],
             &["/output/string-edit-distance.dat"],
         )
@@ -498,12 +495,12 @@ mod tests {
     /// in two-dimensional space, represented by Vec<(f64, f64)>
     /// A standard one data source scenario with attestation.
     fn test_phase3_linear_regression_one_data_with_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str())],
-            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
+            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
             &[],
             &["/output/linear-regression.dat"],
         )
@@ -517,14 +514,14 @@ mod tests {
     /// data sources: two vecs of persons, representing by Vec<Person>
     /// A standard two data sources scenario with attestation.
     fn test_phase3_private_set_intersection_two_data_with_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/private-set-intersection.wasm",program_path(PERSON_SET_INTERSECTION_WASM).to_string_lossy().into_owned().as_str())],
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/private-set-intersection.wasm",program_path(PERSON_SET_INTERSECTION_WASM))],
             &[
-                ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA).to_string_lossy().into_owned().as_str()),
-                ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA).to_string_lossy().into_owned().as_str()),
+                ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA)),
+                ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA)),
             ],
             &[],
             &["/output/private-set.dat"],
@@ -539,14 +536,14 @@ mod tests {
     /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
     /// A standard one data source and two stream sources scenario with attestation.
     fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
-        let _result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
-            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
-            &[("/input/number-stream-1.dat", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-              ("/input/number-stream-2.dat", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+        let stream_list = stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM))],
+            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
+            &stream_list,
             &["/output/accumulation.dat"],
         )
         .unwrap();
@@ -556,12 +553,12 @@ mod tests {
     /// Attempt to fetch result without enough stream data.
     fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
         let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
-            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
-            &[("/input/number-stream-1.dat", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str())],
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM))],
+            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
+            &[],
             &["/output/accumulation.dat"],
         );
         assert!(result.is_err(), "An error should occur");
@@ -570,14 +567,14 @@ mod tests {
     #[test]
     /// Attempt to provision stream data in the state of loading static data.
     fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
+        let stream_list = stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
         let result = test_template(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str())],
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM))],
             &[],
-            &[("/input/number-stream-1.dat", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-              ("/input/number-stream-2.dat", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            &stream_list,
             &["/output/accumulation.dat"],
         );
         assert!(result.is_err(), "An error should occur");
@@ -590,14 +587,14 @@ mod tests {
     /// data sources: idash2017/*.dat
     /// TODO REWORK!!
     fn test_performance_idash2017_with_attestation() {
-        let input_vec = input_list(data_dir(LOGISTICS_REGRESSION_DATA_PATH).to_string_lossy().into_owned().as_str(), "/input/idash2017/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, &str)> = input_vec.iter().map(|(s,k)| (&s[..],&k[..])).collect();
+        let input_vec = input_list(data_dir(LOGISTICS_REGRESSION_DATA_PATH), "/input/idash2017/").expect("Failed to parse input");
+        let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
 
-        let result = test_template::<(Vec<f64>, f64, f64)>(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
-            &[("/program/idash2017-logistic-regression.wasm",LOGISTICS_REGRESSION_WASM)],
+        let result = test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/idash2017-logistic-regression.wasm", program_path(LOGISTICS_REGRESSION_WASM))],
             &input_vec,
             &[],
             // only read two outputs
@@ -613,13 +610,13 @@ mod tests {
     /// data sources: macd/*.dat
     /// TODO REWORK!!
     fn test_performance_macd_with_attestation() {
-        let input_vec = input_list(data_dir(MACD_DATA_PATH).to_string_lossy().into_owned().as_str(), "/input/macd/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, &str)> = input_vec.iter().map(|(s,k)| (&s[..],&k[..])).collect();
+        let input_vec = input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
+        let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
 
-        let result = test_template::<Vec<f64>>(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
+        let result = test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
             &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM))],
             &input_vec,
             &[],
@@ -635,13 +632,13 @@ mod tests {
     /// data sources: private-set-inter-sum/*.dat
     /// TODO REWORK!!!
     fn test_performance_set_intersection_sum_with_attestation() {
-        let input_vec = input_list(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH).to_string_lossy().into_owned().as_str(), "/input/private-set-inter-sum/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, &str)> = input_vec.iter().map(|(s,k)| (&s[..],&k[..])).collect();
+        let input_vec = input_list(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH), "/input/private-set-inter-sum/").expect("Failed to parse input");
+        let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
 
-        let result = test_template::<(usize, u64)>(
-            policy_path(POLICY).as_path(),
-            trust_path(CLIENT_CERT).as_path(),
-            trust_path(CLIENT_KEY).as_path(),
+        let result = test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
             &[("/program/private-set-intersection-sum.wasm",program_path(INTERSECTION_SET_SUM_WASM))],
             &input_vec,
             &[],
@@ -654,19 +651,22 @@ mod tests {
     /// ensuring it is a single client policy,
     /// and the client_cert and client_key match the policy
     /// The type T is the return type of the computation
-    fn test_template(
-        policy_path: &Path,
-        client_cert_path: &Path,
-        client_key_path: &Path,
-        program_path: &[(&str, &str)],
+    fn test_template<P: AsRef<Path>>(
+        policy_path: P,
+        client_cert_path: P,
+        client_key_path: P,
+        program_path: &[(&str, P)],
         // Assuming there is a single data provider,
         // yet the client can provision several packages.
         // The list determines the order of which data is sent out, from head to tail.
         // Each element contains the package id (u64) and the path to the data
-        data_id_paths: &[(&str, &str)],
-        stream_id_paths: &[(&str, &str)],
+        data_id_paths: &[(&str, P)],
+        stream_id_paths: &[Vec<(String, P)>],
         output_files: &[&str],
     ) -> Result<(), VeracruzServerError> {
+        let policy_path = policy_path.as_ref();
+        let client_cert_path = client_cert_path.as_ref();
+        let client_key_path = client_key_path.as_ref();
         info!("### Step 0.  Initialise test configuration.");
         // initialise the pipe
         let (server_tls_tx, client_tls_rx): (
@@ -738,7 +738,7 @@ mod tests {
         // so the ownership can be transferred into a client thread.
         let program_path: Vec<_> = program_path
             .iter()
-            .map(|(remote_path, path)| (remote_path.to_string(), path.to_string()))
+            .map(|(remote_path, path)| (remote_path.to_string(), path.as_ref().to_path_buf()))
             .collect();
         // Assuming we are using single data provider,
         // yet the client can provision several packages.
@@ -746,11 +746,11 @@ mod tests {
         // Each element contains the package id (u64) and the path to the data
         let data_id_paths: Vec<_> = data_id_paths
             .iter()
-            .map(|(remote_path, path)| (remote_path.to_string(), path.to_string()))
+            .map(|(remote_path, path)| (remote_path.to_string(), path.as_ref().to_path_buf()))
             .collect();
-        let stream_id_paths: Vec<_> = stream_id_paths
+        let mut stream_id_paths: Vec<_> = stream_id_paths
             .iter()
-            .map(|(remote_path, path)| (remote_path.to_string(), path.to_string()))
+            .map(|v| v.iter().map(|(remote_path, path)| (remote_path.to_string(), path.as_ref().to_path_buf())).collect::<Vec<_>>())
             .collect();
         let output_files: Vec<_> = output_files
             .iter()
@@ -767,12 +767,6 @@ mod tests {
                 program_path
             );
 
-            //TODO: change to the actually remote filename
-            //let program_file_name = if let Some(path) = program_path.as_ref() {
-                //Path::new(path).file_name().unwrap().to_str().unwrap()
-            //} else {
-                //"no_program"
-            //};
             for (remote_file_name, data_path) in program_path.iter() {
                 let time_provosion_data = Instant::now();
 
@@ -788,7 +782,7 @@ mod tests {
                 )?;
 
                 let response = provision_data(
-                    Path::new(path),
+                    Path::new(data_path),
                     client_session_id,
                     &mut client_session,
                     ticket,
@@ -809,7 +803,7 @@ mod tests {
             info!("### Step 6.  Data providers provision secret data.");
             for (remote_file_name, data_path) in data_id_paths.iter() {
                 info!(
-                    "             Data providers provision secret data #{}.",
+                    "             Data providers provision secret data {}.",
                     remote_file_name
                 );
                 let time_data_hash = Instant::now();
@@ -846,159 +840,53 @@ mod tests {
                     time_data.elapsed().as_micros()
                 );
             }
-            // If stream_id_paths is NOT empty, we are in streaming mode
-            if !stream_id_paths.is_empty() {
-                info!("### Step 7.  Stream providers request the program hash.");
+            // If stream_id_paths is empty, we inject an round of stream with empty data
+            if stream_id_paths.is_empty() {
+                stream_id_paths.push(Vec::new());
+            }
 
-                let mut id_vec = Vec::new();
-                let mut stream_data_vec = Vec::new();
-
-                for (remote_file_name, data_path) in stream_id_paths.iter() {
-                    id_vec.push(remote_file_name);
-                    let data = {
-                        let mut data_file = std::fs::File::open(data_path)?;
-                        let mut data_buffer = std::vec::Vec::new();
-                        data_file.read_to_end(&mut data_buffer)?;
-                        data_buffer
-                    };
-                    let decoded_data: Vec<Vec<u8>> = pinecone::from_bytes(&data.as_slice())?;
-                    // convert vec of raw stream packages to queue of them
-                    stream_data_vec.push(decoded_data);
+            info!("### Step 7.  Stream providers request the program hash.");
+            for (round, paths) in stream_id_paths.iter().enumerate() {
+                info!("             ------------ Streaming Round # {} ------------", round);
+                for (remote_file_name, data_path) in paths.iter() {
+                    info!(
+                        "             Stream providers provision secret data {}.",
+                        remote_file_name
+                    );
+                    let time_data_hash = Instant::now();
+                    check_hash(
+                        &policy,
+                        &policy_hash,
+                        &test_target_platform,
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                    )?;
+                    info!(
+                        "             Stream provider hash response time (μs): {}.",
+                        time_data_hash.elapsed().as_micros()
+                    );
+                    let time_data = Instant::now();
+                    let response = provision_stream(
+                        Path::new(data_path),
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        remote_file_name,
+                    )?;
+                    info!(
+                        "             Client received acknowledgement after sending data: {:?},",
+                        transport_protocol::parse_runtime_manager_response(&response)
+                    );
+                    info!(
+                        "             Provisioning data time (μs): {}.",
+                        time_data.elapsed().as_micros()
+                    );
                 }
-
-                check_hash(
-                    &policy,
-                    &policy_hash,
-                    &test_target_platform,
-                    client_session_id,
-                    &mut client_session,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
-
-                // Reverse the vec so we can use `pop` for the `first` element of the list.
-                // In each round of stream, the loop pops an element from the `stream_data_vec`
-                // in the order specified in the package id vec `id_vec`.
-                // e.g. if id_vec is [2,1,0], the loop pops stream_data_vec[2] then
-                // stream_data_vec[1] and then stream_data_vec[0].
-                stream_data_vec.iter_mut().for_each(|e| e.reverse());
-                let mut count = 0;
-                loop {
-                    let next_round_data: Vec<_> = {
-                        let next: Vec<_> = stream_data_vec.iter_mut().map(|d| d.pop()).collect();
-                        if next.iter().any(|e| e.is_none()) {
-                            break;
-                        }
-                        id_vec
-                            .clone()
-                            .into_iter()
-                            .zip(next.into_iter().flatten())
-                            .collect()
-                    };
-                    info!("------------ Streaming Round # {} ------------", count);
-                    count += 1;
-                    for (remote_file_name, data) in next_round_data.iter() {
-                        let time_stream_hash = Instant::now();
-                        check_hash(
-                            &policy,
-                            &policy_hash,
-                            &test_target_platform,
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &client_tls_tx,
-                            &client_tls_rx,
-                        )?;
-                        info!(
-                            "             Stream provider hash response time (μs): {}.",
-                            time_stream_hash.elapsed().as_micros()
-                        );
-                        info!(
-                            "             Stream provider provision secret data #{}.",
-                            remote_file_name
-                        );
-                        let time_stream = Instant::now();
-                        let response = provision_stream(
-                            data.as_slice(),
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &client_tls_tx,
-                            &client_tls_rx,
-                            remote_file_name,
-                        )?;
-                        info!(
-                            "             Stream provider received acknowledgement after sending stream data: {:?},",
-                            transport_protocol::parse_runtime_manager_response(&response)
-                        );
-                        info!(
-                            "             Provisioning stream time (μs): {}.",
-                            time_stream.elapsed().as_micros()
-                        );
-                    }
-                    for (remote_file_name, _) in program_path.iter() {
-                        info!(
-                            "### Step 8.  Result retrievers request program {}.",
-                            remote_file_name
-                        );
-                        let time_result_hash = Instant::now();
-                        check_hash(
-                            &policy,
-                            &policy_hash,
-                            &test_target_platform,
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &client_tls_tx,
-                            &client_tls_rx,
-                        )?;
-                        info!(
-                            "             Result retriever hash response time (μs): {}.",
-                            time_result_hash.elapsed().as_micros()
-                        );
-                        let time_result = Instant::now();
-                        info!("             Result retrievers request result.");
-                        let response = client_tls_send(
-                            &client_tls_tx,
-                            &client_tls_rx,
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &transport_protocol::serialize_request_result(remote_file_name)?
-                                .as_slice(),
-                        )?;
-                        info!(
-                            "             Computation result time (μs): {} with return code (undecoded) {:?}.",
-                            time_result.elapsed().as_micros(), response
-                        );
-                    }
-
-                    info!("### Step 9.  Client read and decodes the result.");
-                    for remote_file_name in &output_files {
-                        info!("             Read {}.", remote_file_name);
-                        let response = read_file(
-                                client_session_id,
-                                &mut client_session,
-                                ticket,
-                                &client_tls_tx,
-                                &client_tls_rx,
-                                &remote_file_name,
-                            )?;
-                        let response =
-                            transport_protocol::parse_runtime_manager_response(&response)?;
-                        let response = transport_protocol::parse_result(&response)?;
-                        let response = response.ok_or(VeracruzServerError::MissingFieldError(
-                            "Result retrievers response",
-                        ))?;
-                        let result: T = pinecone::from_bytes(&response.as_slice())?;
-                        info!("             Client received result: {:?},", result);
-                    }
-
-                }
-                info!("------------ Stream-Result-Next End  ------------");
-            } else {
-                info!("### Step 7.  NOT in streaming mode.");
                 for (remote_file_name, _) in program_path.iter() {
                     info!(
                         "### Step 8.  Result retrievers request program {}.",
@@ -1030,22 +918,12 @@ mod tests {
                         &transport_protocol::serialize_request_result(remote_file_name)?
                             .as_slice(),
                     )?;
-                    let response =
-                        transport_protocol::parse_runtime_manager_response(&response)?;
-                    let response = transport_protocol::parse_result(&response)?;
-                    let response = response.ok_or(VeracruzServerError::MissingFieldError(
-                        "Computation response",
-                    ))?;
-                    if response.len() != 4 {
-                        return Err(VeracruzServerError::DirectStrError("cannot parse computation response"));
-                    }
-                    let response: [u8; 4] = [*response.get(0).unwrap(), *response.get(1).unwrap(), *response.get(2).unwrap(), *response.get(3).unwrap()];
-                    let response = u32::from_le_bytes(response);
                     info!(
                         "             Computation result time (μs): {} with return code (undecoded) {:?}.",
                         time_result.elapsed().as_micros(), response
                     );
                 }
+
                 info!("### Step 9.  Client read and decodes the result.");
                 for remote_file_name in &output_files {
                     info!("             Read {}.", remote_file_name);
@@ -1139,32 +1017,12 @@ mod tests {
         }
     }
 
-    fn iterate_over_data(dir_path: &Path, f: fn(&Path) -> ()) {
-        for entry in dir_path
-            .read_dir()
-            .expect(&format!("invalid path:{}", dir_path.to_string_lossy()))
-        {
-            if let Ok(entry) = entry {
-                if let Some(extension_str) = entry
-                    .path()
-                    .extension()
-                    .and_then(|extension_name| extension_name.to_str())
-                {
-                    // iterate over all the json file
-                    if extension_str.eq_ignore_ascii_case("dat") {
-                        let data_path = entry.path();
-                        f(data_path.as_path());
-                    }
-                }
-                match entry.expect(&format!("invalid path:{}", dir_path)).path().to_str() {
-                    Some(data_path) => f(data_path),
-                    None => panic!("Failed to parse the path"),
-                }
-            }
-        }
-    }
-
-    fn input_list<T: AsRef<Path>, K: AsRef<Path>>(dir_path: T, remote_dir_path: K) -> Result<Vec<(String, String)>, VeracruzServerError> {
+    /// Function produces a vec of pairs of remote (des) file and local (src) file path,
+    /// which corresponds to provisioning/overwriting the content of the local file to the remote file.
+    /// Read all files and diretory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
+    /// E.g. if call the function with '/local/path/' and '/remote/path/', 
+    /// the result could be [(/remote/path/a.txt, /local/path/a.txt), (/remote/path/b/c.txt, /local/path/b/c.txt), ... ].
+    fn input_list<T: AsRef<Path>, K: AsRef<Path>>(dir_path: T, remote_dir_path: K) -> Result<Vec<(String, PathBuf)>, VeracruzServerError> {
         let mut rst = Vec::new();
         let dir_path = dir_path.as_ref();
         for entry in dir_path
@@ -1177,16 +1035,37 @@ mod tests {
                 rst.append(&mut input_list(entry, remote_entry_path)?)
             } else if entry.is_file() {
                 let entry_path = entry.to_str().expect("Failed to parse the entry path");
-                rst.push((remote_entry_path.to_str().expect("Failed to parse remote entry path").to_string(), entry_path.to_string()))
+                rst.push((remote_entry_path.to_str().expect("Failed to parse remote entry path").to_string(), PathBuf::from(entry_path)))
             }
         }
         Ok(rst)
     }
 
+    /// Function produces a vec of input lists. Each list corresponds to a round 
+    /// and is a vec of pairs of remote (des) file and local (src) file path,
+    /// which corresponds to provisioning/appending the content of the local file to the remote file.
+    fn stream_list<T: AsRef<Path>, K: AsRef<Path>>(dir_path: T, remote_dir_path: K) -> Result<Vec<Vec<(String, PathBuf)>>, VeracruzServerError> {
+        let remote_dir_path = remote_dir_path.as_ref();
+        let mut rst = Vec::new();
+        let dir_path = dir_path.as_ref();
+        let mut dir_entries = dir_path
+            .read_dir()
+            .expect(&format!("invalid path: {:?}", dir_path))
+            .filter_map(|e| e.map(|x| x.path()).ok())
+            .collect::<Vec<_>>();
+        dir_entries.sort();
+        for entry in dir_entries.iter() {
+            rst.push(input_list(entry, remote_dir_path)?);
+        }
+        Ok(rst)
+    }
+
     /// Auxiliary function: read policy file
-    fn read_policy(fname: &Path) -> Result<(Policy, String, String), VeracruzServerError> {
-        let policy_json = std::fs::read_to_string(fname)
-            .expect(&format!("Cannot open file {}", fname.to_string_lossy()));
+    fn read_policy<T: AsRef<Path>>(fname: T) -> Result<(Policy, String, String), VeracruzServerError> {
+        let fname = fname.as_ref();
+        let policy_json =
+            std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname.to_string_lossy()));
+
 
         let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
         let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
@@ -1419,7 +1298,7 @@ mod tests {
     }
 
     fn provision_stream(
-        data: &[u8],
+        filename: &Path,
         client_session_id: u32,
         client_session: &mut rustls::ClientSession,
         ticket: u32,
@@ -1428,7 +1307,13 @@ mod tests {
         remote_file_name: &str,
     ) -> Result<Vec<u8>, VeracruzServerError> {
         // The client also sends the associated data
-        let serialized_stream = transport_protocol::serialize_stream(data, remote_file_name)?;
+        let data = {
+            let mut data_file = std::fs::File::open(filename)?;
+            let mut data_buffer = std::vec::Vec::new();
+            data_file.read_to_end(&mut data_buffer)?;
+            data_buffer
+        };
+        let serialized_stream = transport_protocol::serialize_stream(&data, remote_file_name)?;
 
         client_tls_send(
             client_tls_tx,
@@ -1622,7 +1507,7 @@ mod tests {
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
-            let data = std::fs::read(trust_path(CA_CERT).as_path()).unwrap();
+            let data = std::fs::read(trust_path(CA_CERT)).unwrap();
             let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
             certs[0].clone()
         };

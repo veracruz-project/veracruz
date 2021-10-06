@@ -84,30 +84,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = File::create(format!("{}-init.dat", file_prefix))?;
     file.write_all(&encode)?;
 
-    let dataset1_txt: Vec<f64> = (0..dataset_size).map(|_| normal.sample(&mut rng)).collect();
-    let dataset1: Vec<Vec<u8>> = dataset1_txt
-        .iter()
-        .map(|n| pinecone::to_vec(&n).unwrap())
-        .collect();
-    let encode = pinecone::to_vec(&dataset1)?;
+    for round in 0..dataset_size {
+        std::fs::create_dir_all(format!("{}/{}/", file_prefix, round))?;
+        let number_1 = normal.sample(&mut rng);
+        let number_1 = pinecone::to_vec(&number_1)?;
+        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(format!("{0}/{1}/{0}-1.dat", file_prefix, round))?.write(&number_1)?;
 
-    let mut file = File::create(format!("{}-1.txt", file_prefix))?;
-    file.write_all(format!("{:?}\n{:?}", dataset1_txt, dataset1).as_bytes())?;
-    let mut file = File::create(format!("{}-1.dat", file_prefix))?;
-    file.write_all(&encode)?;
-
-    let dataset2_txt: Vec<f64> = (0..dataset_size).map(|_| normal.sample(&mut rng)).collect();
-    let dataset2: Vec<Vec<u8>> = dataset2_txt
-        .iter()
-        .map(|n| pinecone::to_vec(&n).unwrap())
-        .collect();
-    let encode = pinecone::to_vec(&dataset2)?;
-
-    let mut file = File::create(format!("{}-2.txt", file_prefix))?;
-    file.write_all(format!("{:?}\n{:?}", dataset2_txt, dataset2).as_bytes())?;
-    let mut file = File::create(format!("{}-2.dat", file_prefix))?;
-    file.write_all(&encode)?;
-
+        let number_2 = normal.sample(&mut rng);
+        let number_2 = pinecone::to_vec(&number_2)?;
+        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(format!("{0}/{1}/{0}-2.dat", file_prefix, round))?.write(&number_2)?;
+    }
     Ok(())
 }
 

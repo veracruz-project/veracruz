@@ -12,7 +12,7 @@
 
 STREAM_ROUND = 10
 TARGET_PREFIX = number-stream
-TARGET_DAT = $(addprefix $(TARGET_PREFIX), -init.dat -1.dat -2.dat)
+TARGET_DAT = $(TARGET_PREFIX)-init.dat $(TARGET_PREFIX)
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
 SEED = 0
@@ -22,8 +22,8 @@ SEED = 0
 all: $(TARGET_DIR_DAT)
 
 .SECONDEXPANSION:
-$(TARGET_DIR_DAT): %.dat : $$(notdir $$@) $(TARGET_DIR)
-	cp $< $@ 
+$(TARGET_DIR_DAT): % : $$(notdir $$@) $(TARGET_DIR)
+	cp -r $< $@ 
 
 $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)

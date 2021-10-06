@@ -123,8 +123,8 @@ mod tests {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 let server = proxy_attestation_server::server::server(
                     proxy_attestation_server_url,
-                    trust_path(CA_CERT).as_path(),
-                    trust_path(CA_KEY).as_path(),
+                    trust_path(CA_CERT),
+                    trust_path(CA_KEY),
                     false).unwrap();
                 sys.block_on(server).unwrap();
             });
@@ -145,9 +145,9 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
         let result = test_template(
-            policy_path(SINGLE_CLIENT_POLICY).as_path(),
-            &vec![(trust_path(CLIENT_CERT).as_path(), trust_path(CLIENT_KEY).as_path())],
-            &[(0, "/program/random-source.wasm", program_path(RANDOM_SOURCE_WASM).as_path())],
+            policy_path(SINGLE_CLIENT_POLICY),
+            &vec![(trust_path(CLIENT_CERT), trust_path(CLIENT_KEY))],
+            &[(0, "/program/random-source.wasm", program_path(RANDOM_SOURCE_WASM))],
             &vec![],
             &vec![(0, "/output/random.dat")],
         )
@@ -163,19 +163,13 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase1_linear_regression_two_clients() {
         let result = test_template(
-            policy_path(LINEAR_REGRESSION_DUAL_POLICY).as_path(),
+            policy_path(LINEAR_REGRESSION_DUAL_POLICY),
             &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_CERT).as_path(),
-                    trust_path(DATA_CLIENT_KEY).as_path(),
-                ),
+                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
             ],
-            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).as_path())],
-            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA).as_path())],
+            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
+            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA))],
             &vec![(1, "/output/linear-regression.dat")],
         )
         .await;
@@ -190,23 +184,14 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase2_linear_regression_three_clients() {
         let result = test_template(
-            policy_path(LINEAR_REGRESSION_TRIPLE_POLICY).as_path(),
+            policy_path(LINEAR_REGRESSION_TRIPLE_POLICY),
             &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_CERT).as_path(),
-                    trust_path(DATA_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(RESULT_CLIENT_CERT).as_path(),
-                    trust_path(RESULT_CLIENT_KEY).as_path(),
-                ),
+                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
             ],
-            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM).as_path())],
-            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA).as_path())],
+            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
+            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA))],
             &vec![(1, "/output/linear-regression.dat"), (2, "/output/linear-regression.dat")],
         )
         .await;
@@ -222,25 +207,16 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase2_intersection_set_sum_three_clients() {
         let result = test_template(
-            policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY).as_path(),
+            policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_CERT).as_path(),
-                    trust_path(DATA_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(RESULT_CLIENT_CERT).as_path(),
-                    trust_path(RESULT_CLIENT_KEY).as_path(),
-                ),
+                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
             ],
-            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path())],
+            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM))],
             &vec![
-                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path()),
-                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path()),
+                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)),
+                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
             ],
             &vec![(2, "/output/intersection-set-sum.dat")],
         )
@@ -257,25 +233,16 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision() {
         let result = test_template(
-            policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY).as_path(),
+            policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_CERT).as_path(),
-                    trust_path(DATA_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(RESULT_CLIENT_CERT).as_path(),
-                    trust_path(RESULT_CLIENT_KEY).as_path(),
-                ),
+                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
             ],
-            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).as_path())],
+            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM))],
             &vec![
-                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA).as_path()),
-                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).as_path()),
+                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
+                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)),
             ],
             &vec![(2, "/output/intersection-set-sum.dat")],
         )
@@ -288,25 +255,16 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase2_string_edit_distance_three_clients() {
         let result = test_template(
-            policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY).as_path(),
+            policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY),
             &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_CERT).as_path(),
-                    trust_path(DATA_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(RESULT_CLIENT_CERT).as_path(),
-                    trust_path(RESULT_CLIENT_KEY).as_path(),
-                ),
+                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
             ],
-            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM).as_path())],
+            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM))],
             &vec![
-                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA).as_path()),
-                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA).as_path()),
+                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
+                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
             ],
             &vec![(2, "/output/string-edit-distance.dat")],
         )
@@ -323,35 +281,17 @@ mod tests {
     #[actix_rt::test]
     async fn veracruz_phase3_string_edit_distance_four_clients() {
         let result = test_template(
-            policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY).as_path(),
+            policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY),
             &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_CERT).as_path(),
-                    trust_path(DATA_CLIENT_KEY).as_path(),
-                ),
-                (
-                    trust_path(DATA_CLIENT_SECOND_CERT).as_path(),
-                    trust_path(DATA_CLIENT_SECOND_KEY).as_path(),
-                ),
-                (
-                    trust_path(RESULT_CLIENT_CERT).as_path(),
-                    trust_path(RESULT_CLIENT_KEY).as_path(),
-                ),
+                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                (trust_path(DATA_CLIENT_SECOND_CERT), trust_path(DATA_CLIENT_SECOND_KEY)),
+                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
             ],
-            0,
-            program_path(STRING_EDIT_DISTANCE_WASM).as_path(),
+            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM))],
             &vec![
-                (1, "input-0", data_path(STRING_1_DATA).as_path()),
-                (2, "input-1", data_path(STRING_2_DATA).as_path()),
-            ],
-            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM).as_path())],
-            &vec![
-                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA).as_path()),
-                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA).as_path()),
+                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
+                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
             ],
             &vec![(3, "/output/string-edit-distance.dat")],
         )
@@ -425,21 +365,22 @@ mod tests {
         assert!(result.is_ok(), "error: {:?}", result);
     }
 
-    async fn test_template(
+    async fn test_template<P: AsRef<Path>>(
         // Policy files
-        policy_path: &Path,
+        policy_path: P,
         // List of client's certificates and private keys
-        client_configs: &[(&Path, &Path)],
+        client_configs: &[(P, P)],
         // Program provider, index refering to the `client_configs` parameter, and program path
-        program_providers: &[(usize, &str, &Path)],
+        program_providers: &[(usize, &str, P)],
         // Data providers, a list of indices refering to the `client_configs` parameter,
         // remote file name and data pathes.
         // The list determines the order of which data is sent out, from head to tail.
         // Note that a client might provision more than one packages
-        data_providers: &[(usize, &str, &Path)],
+        data_providers: &[(usize, &str, P)],
         // Result retriever, a list of indices refering to the `client_configs` parameter.
         result_retrievers: &[(usize, &str)],
     ) -> Result<(), VeracruzTestError> {
+        let policy_path = policy_path.as_ref();
         let policy_json = read_policy(policy_path)?;
         let policy = Policy::from_json(&policy_json)?;
         setup(policy.proxy_attestation_server_url().clone());
@@ -460,14 +401,11 @@ mod tests {
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
-                clients.push(veracruz_client::VeracruzClient::new(
-                    cert,
-                    key,
-                    &policy_json,
-                )?);
+                clients.push(veracruz_client::VeracruzClient::new(cert.as_ref(), key.as_ref(), &policy_json)?);
             }
             info!("### Step 3. Provisions programs.");
             for (program_provider_index, remote_filename, data_filename) in program_providers.iter() {
+                let data_filename = data_filename.as_ref();
                 info!(
                     "            Client #{} provisions program {}.",
                     program_provider_index, remote_filename
@@ -481,6 +419,7 @@ mod tests {
             info!("### Step 4. Provision data.");
             // provosion data
             for (data_provider_index, remote_filename, data_filename) in data_providers.iter() {
+                let data_filename = data_filename.as_ref();
                 info!(
                     "            Client #{} provisions data {}.",
                     data_provider_index, remote_filename
