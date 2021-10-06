@@ -111,8 +111,8 @@ async fn enclave_list(
             // note we can't return a web::Json object here because Actix and Veracruz
             // are actually using two incompatible versions of serde at the moment
             enclave_list.push(serde_json::json!({
-                "id": 0,
                 "policy_hash": enclave.policy_hash,
+                "id": 0,
                 "uptime": uptime,
             }));
         }
@@ -127,7 +127,7 @@ async fn enclave_list(
     Ok(serde_json::to_string(&enclave_list)?)
 }
 
-/// Get the policy governing a policy's computation
+/// Get the policy governing an enclave's computation
 #[get("/enclave_policy")]
 async fn enclave_policy(
     enclave_handler: web::Data<EnclaveHandler>,

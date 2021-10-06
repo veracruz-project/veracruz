@@ -29,6 +29,7 @@ use crate::attestation::MockAttestation as AttestationHandler;
 pub struct VeracruzClient {
     tls_session: rustls::ClientSession,
     remote_session_id: Option<u32>,
+    url: String,
     policy: Policy,
     policy_hash: String,
     package_id: u32,
@@ -190,6 +191,30 @@ impl VeracruzClient {
         P1: AsRef<path::Path>,
         P2: AsRef<path::Path>
     {
+        Self::with_url_policy_and_hash(
+            &policy.veracruz_server_url().to_owned(),
+            client_cert_filename,
+            client_key_filename,
+            policy,
+            policy_hash,
+        )
+    }
+
+    /// Load the client certificate and key, and the global policy, which contains information
+    /// about the enclave. This takes both an explicit URL and the global policy as a
+    /// VeracruzPolicy struct and related hash. The URL in the policy is ignored.
+    /// Attest the enclave.
+    pub fn with_url_policy_and_hash<P1, P2>(
+        url: &str,
+        client_cert_filename: P1,
+        client_key_filename: P2,
+        policy: Policy,
+        policy_hash: String,
+    ) -> Result<VeracruzClient, VeracruzClientError>
+    where
+        P1: AsRef<path::Path>,
+        P2: AsRef<path::Path>
+    {
         let client_cert = Self::read_cert(&client_cert_filename)?;
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
@@ -233,6 +258,7 @@ impl VeracruzClient {
         Ok(VeracruzClient {
             tls_session: session,
             remote_session_id: None,
+            url: url.to_owned(),
             policy: policy,
             policy_hash: policy_hash,
             package_id: 0,
@@ -484,7 +510,7 @@ impl VeracruzClient {
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
-        let dest_url = format!("http://{:}/enclave_tls", self.policy.veracruz_server_url());
+        let dest_url = format!("http://{:}/enclave_tls", self.url);
         let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
         let mut ret = client_build
             .post(dest_url.as_str())

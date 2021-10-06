@@ -17,7 +17,7 @@ nitro = []
 mock = ["mockall", "mockito"]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "env_logger", "log"]
+cli = ["structopt", "env_logger", "log", "either"]
 
 [dependencies]
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
@@ -35,6 +35,7 @@ veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 hex = "=0.4.2"
 http = "=0.2.4"
 percent-encoding = "2.1.0"
+serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 stringreader = "0.1.1"
 err-derive = "0.2"
@@ -47,6 +48,7 @@ structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 env_logger = { version = "0.7", optional = true }
 log = { version = "0.4", optional = true }
 bitflags = "=1.2.1"
+either = { version = "1.6.1", optional = true }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
 sgx_ucrypto = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
