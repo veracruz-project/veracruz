@@ -30,7 +30,6 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
-use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -190,11 +189,13 @@ enum InodeImpl {
 }
 
 impl InodeImpl {
+    const CURRENT_PATH_STR: &'static str = ".";
+    const PARRENT_PATH_STR: &'static str = "..";
     /// Return a new Directory InodeImpl containing only current and parent paths
     pub(crate) fn new_directory(current: Inode, parent: Inode) -> Self {
         let mut dir = HashMap::new();
-        dir.insert(PathBuf::from("."), current);
-        dir.insert(PathBuf::from(".."), parent);
+        dir.insert(PathBuf::from(Self::CURRENT_PATH_STR), current);
+        dir.insert(PathBuf::from(Self::PARRENT_PATH_STR), parent);
         Self::Directory(dir)
     }
 
@@ -332,7 +333,7 @@ impl InodeImpl {
             _otherwise => return Err(ErrNo::NotDir),
         };
         let mut rst = Vec::new();
-        for (index, (path, inode)) in dir.iter().filter(|(p,_)| **p != PathBuf::from(".") && **p != PathBuf::from("..")).enumerate() {
+        for (index, (path, inode)) in dir.iter().filter(|(p,_)| **p != PathBuf::from(Self::CURRENT_PATH_STR) && **p != PathBuf::from(Self::PARRENT_PATH_STR)).enumerate() {
             let path_byte = path.as_os_str().as_bytes().to_vec();
             let dir_ent = DirEnt {
                 next: (index as u64 + 1u64).into(),
