@@ -17,16 +17,11 @@ use crate::veracruz_server_sgx::veracruz_server_sgx::VeracruzServerSGX as Veracr
 #[cfg(feature = "tz")]
 use crate::veracruz_server_tz::veracruz_server_tz::VeracruzServerTZ as VeracruzServerEnclave;
 
-use actix_web::{dev::Server, get, middleware, post, web, App, HttpRequest, HttpServer, Responder};
+use actix_web::{dev::Server, get, middleware, post, web, App, HttpServer};
 use base64;
 use futures::executor;
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
-    convert::TryFrom,
     net::ToSocketAddrs,
-    num::ParseIntError,
     sync::mpsc,
     sync::{Arc, Mutex},
     thread,
@@ -34,11 +29,9 @@ use std::{
 };
 use veracruz_utils::policy::policy::Policy;
 
-//type EnclaveHandlerServer = Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>;
 
-
-//type EnclaveList = Arc<Mutex<Vec<Option<EnclaveState>>>>;
-
+/// State of a running enclave, this is a bit of additional state the server
+/// can keep track of to simplify the VeracruzServer trait
 struct EnclaveState {
     enclave: Box<dyn VeracruzServer>,
     start_time: SystemTime,
@@ -46,42 +39,11 @@ struct EnclaveState {
     policy_hash: String,
 }
 
+/// Type alias of a thread-safe, optional EnclaveState
 type EnclaveHandler = Arc<Mutex<Option<EnclaveState>>>;
 
 
-//lazy_static! {
-//    /// A list of active enclaves, mapping id -> enclaves, policy, and starttime
-//    ///
-//    static ref ACTIVE_ENCLAVES: Mutex<Vec<Option<EnclaveState>>> = {
-//        Mutex::new(Vec::new())
-//    };
-//}
-//
-///// Parse optional id
-/////
-///// Since we always use the first available slot, we can default to
-///// the id 0 for systems where only a single enclave is supported
-/////
-///// To do this with actix, we need to use a "tail match" and parse
-///// out the optional id ourselves
-/////
-//fn parse_optional_id(id_path: &str) -> Result<u32, ParseIntError> {
-//    if id_path.len() == 0 {
-//        Ok(0)
-//    } else if id_path.starts_with('/') {
-//        // expect leading slash
-//        id_path[1..].parse::<u32>()
-//    } else {
-//        // force ParseIntError
-//        "".parse::<u32>()
-//    }
-//}
-
-//#[post("/enclave_setup")]
-//async fn enclave_setup(
-//    
-//) -> VeracruzServerResponder
-
+/// Setup an enclave with a provided policy file
 #[post("/enclave_setup")]
 async fn enclave_setup(
     policy_json: String,
@@ -105,137 +67,84 @@ async fn enclave_setup(
         policy: policy_json,
         policy_hash: policy_hash.to_owned(),
     });
-    
-
-//
-//    if 
-//            let mut enclave_handler_locked = enclave_handler.lock()?;
-//
-//            let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-//
-//    // find next enclave slot
-//    let mut active_enclaves = ACTIVE_ENCLAVES.lock()?;
-//    let id = match active_enclaves.iter().position(|e| e.is_none()) {
-//        Some(id) => id,
-//        None => {
-//            // allocate new slot
-//            active_enclaves.push(None);
-//            active_enclaves.len()-1
-//        }
-//    };
-//
-//    // setup enclave instance
-//    // TODO prevent multiple enclaves when not possible
-//    let enclave = VeracruzServerEnclave::new(&policy_json)?;
-//
-//    // store enclave in list
-//    active_enclaves[id] = Some(EnclaveState {
-//        enclave: Box::new(enclave),
-//        start_time: SystemTime::now(),
-//        policy: policy_json,
-//        policy_hash: policy_hash.to_owned(),
-//    });
 
     // return 0, this may be the current id in the future
     Ok(serde_json::to_string(&0)?)
 }
 
-#[post("/enclave_teardown{id:.*}")]
+/// Teardown an enclave
+#[post("/enclave_teardown")]
 async fn enclave_teardown(
-    web::Path((id)): web::Path<String>,
+    enclave_handler: web::Data<EnclaveHandler>,
 ) -> Result<String, VeracruzServerError> {
-    todo!()
-//    let id = parse_optional_id(&id)?;
-//    let mut active_enclaves = ACTIVE_ENCLAVES.lock()?;
-//
-//    // does enclave exist?
-//    match active_enclaves.get_mut(usize::try_from(id).unwrap()) {
-//        Some(state) if state.is_some() => {
-//            // remove instance, let drop take care of the rest
-//            *state = None;
-//            Ok("".to_owned())
-//        }
-//        _ => Err(VeracruzServerError::InvalidEnclaveIdError(id)),
-//    }
+    // does enclave exist?
+    let mut enclave_handler = enclave_handler.lock()?;
+    match enclave_handler.take() {
+        Some(_enclave) => {
+            // well it doesn't anymore, let drop take care of the rest
+            Ok("".to_owned())
+        }
+        None => {
+            Err(VeracruzServerError::UninitializedEnclaveError)?
+        }
+    }
 }
 
-/// Representation of an enclave in enclave_list
-#[derive(Debug, Deserialize, Serialize)]
-struct EnclaveListEntry {
-    id: u32,
-    policy_hash: String,
-    uptime: Duration,
-}
-
+/// Query a list of running enclaves
+///
+/// Currently this can only be one or zero enclaves
+///
 #[get("/enclave_list")]
-async fn enclave_list() -> Result<String, VeracruzServerError> {
-    todo!()
-//    let active_enclaves = ACTIVE_ENCLAVES.lock()?;
-//
-//    let mut list = Vec::with_capacity(active_enclaves.len());
-//    for (id, state) in active_enclaves.iter().enumerate() {
-//        if let Some(state) = state {
-//            // SystemTime can error if time has moved backwards,
-//            // if this happens (clock change?) we just show an uptime of zero
-//            let uptime = state.start_time.elapsed()
-//                .unwrap_or_else(|_| Duration::from_secs(0));
-//
-//            list.push(EnclaveListEntry {
-//                id: u32::try_from(id).unwrap(),
-//                policy_hash: state.policy_hash.clone(),
-//                uptime: uptime,
-//            });
-//        }
-//    }
-//
-//    // note we can't return a web::Json object here because Actix and Veracruz
-//    // are actually using two incompatible versions of serde at the moment
-//    Ok(serde_json::to_string(&list)?)
-}
-
-#[get("/enclave_policy{id:.*}")]
-async fn enclave_policy(
-    web::Path((id)): web::Path<String>,
+async fn enclave_list(
+    enclave_handler: web::Data<EnclaveHandler>,
 ) -> Result<String, VeracruzServerError> {
-    todo!()
-//    let id = parse_optional_id(&id)?;
-//    let active_enclaves = ACTIVE_ENCLAVES.lock()?;
-//
-//    // does enclave exist?
-//    let state = active_enclaves.get(usize::try_from(id).unwrap())
-//        .map(|o| o.as_ref())
-//        .flatten()
-//        .ok_or_else(|| VeracruzServerError::InvalidEnclaveIdError(id))?;
-//
-//    Ok(state.policy.clone())
+    let mut enclave_list = Vec::<serde_json::Value>::new();
+    
+    let enclave_handler = enclave_handler.lock()?;
+    match enclave_handler.as_ref() {
+        Some(enclave) => {
+            // Apparently SystemTime can error if time has moved backwards,
+            // if this happens (clock change?) we just show an uptime of zero
+            let uptime = enclave.start_time.elapsed()
+                .unwrap_or_else(|_| Duration::from_secs(0));
+
+            // note we can't return a web::Json object here because Actix and Veracruz
+            // are actually using two incompatible versions of serde at the moment
+            enclave_list.push(serde_json::json!({
+                "id": 0,
+                "policy_hash": enclave.policy_hash,
+                "uptime": uptime,
+            }));
+        }
+        None => {
+            // Note! This is not an error! The client may just want to be
+            // querying what enclaves exist
+        }
+    };
+
+    // note we can't return a web::Json object here because Actix and Veracruz
+    // are actually using two incompatible versions of serde at the moment
+    Ok(serde_json::to_string(&enclave_list)?)
 }
 
+/// Get the policy governing a policy's computation
+#[get("/enclave_policy")]
+async fn enclave_policy(
+    enclave_handler: web::Data<EnclaveHandler>,
+) -> Result<String, VeracruzServerError> {
+    // does enclave exist?
+    let enclave_handler = enclave_handler.lock()?;
+    let enclave = match enclave_handler.as_ref() {
+        Some(enclave) => enclave,
+        None => {
+            Err(VeracruzServerError::UninitializedEnclaveError)?
+        }
+    };
 
-//#[post("/veracruz_server")]
-//#[deprecated]
-//async fn veracruz_server_request(
-//    enclave_handler: web::Data<EnclaveHandler>,
-//    _request: HttpRequest,
-//    input_data: String,
-//) -> VeracruzServerResponder {
-//    let input_data_decoded = base64::decode(&input_data)?;
-//
-//    panic!("this should be currently unused");
-//    
-//    let mut enclave_handler_locked = enclave_handler.lock()?;
-//
-//    let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-//
-//    let result = enclave.plaintext_data(input_data_decoded)?;
-//
-//    let result_string = match result {
-//        Some(return_data) => base64::encode(&return_data),
-//        None => String::new(),
-//    };
-//    
-//    Ok(result_string)
-//}
+    Ok(enclave.policy.clone())
+}
 
+/// Send TLS data to a currently running enclave
 #[post("/enclave_tls")]
 async fn enclave_tls(
     enclave_handler: web::Data<EnclaveHandler>,
@@ -347,7 +256,6 @@ where
             .service(enclave_tls)
     })
     .bind(url)?
-//policy.veracruz_server_url())?
     .run();
 
     // clone the Server handle and launch a thread for shuting down the server
