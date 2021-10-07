@@ -25,13 +25,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing and copyright
 //! information.
 
+use anyhow::anyhow;
 use rusty_machine::{
     learning::{logistic_reg::LogisticRegressor, SupModel},
     linalg::{Matrix, Vector},
 };
 use serde::Deserialize;
 use std::fs;
-use anyhow::anyhow;
 
 /// This is a row of the input that each contributor to the computation
 /// provides: it consists of a vector, representing an N-dimension
@@ -198,10 +198,20 @@ fn read_all_datasets(input: &[Vec<u8>]) -> anyhow::Result<Vec<Dataset>> {
         }
 
         match dimension {
-            None => dimension = Some(dataset.dimension().ok_or_else(|| anyhow!("empty dimensions"))?),
+            None => {
+                dimension = Some(
+                    dataset
+                        .dimension()
+                        .ok_or_else(|| anyhow!("empty dimensions"))?,
+                )
+            }
             Some(dim) => {
                 // Unwrap is safe as we have checked that the dataset is not empty.
-                if dataset.dimension().ok_or_else(|| anyhow!("empty dataset"))? != dim {
+                if dataset
+                    .dimension()
+                    .ok_or_else(|| anyhow!("empty dataset"))?
+                    != dim
+                {
                     return Err(anyhow!("bad dimensions"));
                 } else {
                     result.push(dataset);
@@ -241,7 +251,9 @@ fn train(dataset: &Dataset) -> anyhow::Result<Vec<f64>> {
 
     regressor.train(&inputs, &targets)?;
 
-    let parameters = regressor.parameters().ok_or_else(|| anyhow!("empty parameters"))?;
+    let parameters = regressor
+        .parameters()
+        .ok_or_else(|| anyhow!("empty parameters"))?;
 
     Ok(parameters.to_owned().into_vec())
 }

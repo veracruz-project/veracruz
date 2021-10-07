@@ -88,11 +88,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::fs::create_dir_all(format!("{}/{}/", file_prefix, round))?;
         let number_1 = normal.sample(&mut rng);
         let number_1 = pinecone::to_vec(&number_1)?;
-        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(format!("{0}/{1}/{0}-1.dat", file_prefix, round))?.write(&number_1)?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(format!("{0}/{1}/{0}-1.dat", file_prefix, round))?
+            .write(&number_1)?;
 
         let number_2 = normal.sample(&mut rng);
         let number_2 = pinecone::to_vec(&number_2)?;
-        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(format!("{0}/{1}/{0}-2.dat", file_prefix, round))?.write(&number_2)?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(format!("{0}/{1}/{0}-2.dat", file_prefix, round))?
+            .write(&number_2)?;
     }
     Ok(())
 }

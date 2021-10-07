@@ -130,10 +130,7 @@ pub struct WasmtimeRuntimeState {}
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(
-        filesystem: FileSystem,
-        enable_clock: bool,
-    ) -> Result<Self, FatalEngineError> {
+    pub fn new(filesystem: FileSystem, enable_clock: bool) -> Result<Self, FatalEngineError> {
         // Load the VFS ref to the global environment. This is required by Wasmtime.
         *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, enable_clock)?;
         Ok(Self {})

@@ -13,7 +13,7 @@ use clap::{App, Arg};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::{error::Error, fs, path::Path, vec::Vec, io::Write};
+use std::{error::Error, fs, io::Write, path::Path, vec::Vec};
 
 // pinecone does not support u128, so we use two u64 representing the id
 
@@ -105,8 +105,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         let sample = pinecone::to_vec(&sample).unwrap();
         let path = dir.join(format!("data-{}-{}", size, i));
         fs::create_dir_all(&path)?;
-        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(path.join("data.dat"))?.write(data.as_slice())?;
-        std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(path.join("sample.dat"))?.write(sample.as_slice())?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path.join("data.dat"))?
+            .write(data.as_slice())?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path.join("sample.dat"))?
+            .write(sample.as_slice())?;
     }
     Ok(())
 }

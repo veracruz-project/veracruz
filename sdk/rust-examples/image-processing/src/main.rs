@@ -21,7 +21,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use image::{GenericImageView, imageops, ImageFormat};
+use image::{imageops, GenericImageView, ImageFormat};
 
 /// Read image from the virtual filesystem, crop the image, display the new dimensions and write
 /// the new image to /output in PNG format.
@@ -37,7 +37,9 @@ fn main() -> anyhow::Result<()> {
     println!("new dimensions: {:?}", subimg.dimensions());
 
     // Write the contents of this image to the Writer in PNG format.
-    subimg.to_image().save_with_format("/output/image-processing.png", ImageFormat::Png)?;
+    subimg
+        .to_image()
+        .save_with_format("/output/image-processing.png", ImageFormat::Png)?;
 
     Ok(())
 }

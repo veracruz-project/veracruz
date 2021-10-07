@@ -15,9 +15,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
+use anyhow;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs};
-use anyhow;
 
 /// The format of the contents of the input sets, encoding meta-data about an employee.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]

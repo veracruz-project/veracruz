@@ -15,8 +15,12 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{collections::HashSet, fs, path::{PathBuf, Path}};
 use anyhow::anyhow;
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// The identifier of each customer, a pair of `u64` values.
 type Id = (u64, u64);

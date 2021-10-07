@@ -39,7 +39,7 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-use std::{boxed::Box, vec::Vec};
+use std::{boxed::Box, vec::Vec, string::String};
 use policy_utils::policy::principal::ExecutionStrategy;
 
 pub struct Options {
@@ -58,7 +58,7 @@ impl Default for Options {
     }
 }
 
-/// The top-level function executes program `program_name` on
+/// The top-level function executes program `program` on
 /// the `filesystem` handler, in which inputs, outputs and programs are stored.
 /// The function requires execution `strategy`.
 /// It currently supports `interp` or `JIT`, backed by `WASI` and `wasmtime`, respectively.
@@ -68,7 +68,6 @@ impl Default for Options {
 pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: FileSystem,
-    //TODO change to principal
     program: Vec<u8>,
     options: Options,
 ) -> Result<u32, FatalEngineError> {

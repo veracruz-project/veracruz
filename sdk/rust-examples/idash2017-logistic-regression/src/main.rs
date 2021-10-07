@@ -30,8 +30,12 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{fs, path::{PathBuf, Path}, io::Write};
 use anyhow::anyhow;
+use std::{
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 ////////////////////////////////////////////////////////////////////////////////
 // Reading input
 ////////////////////////////////////////////////////////////////////////////////
@@ -282,7 +286,7 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> anyhow::Result<f64> {
 fn main() -> anyhow::Result<()> {
     for path in fs::read_dir("/input/idash2017")? {
         let path = path?.path();
-        println!("path in: {:?}",path);
+        println!("path in: {:?}", path);
         let file_name = path.file_name().ok_or(anyhow!("cannot get file name"))?;
         println!("file name {:?}", file_name);
         let (mut train_set, mut test_set, num_of_iter, degree_of_sigmoid, gamma_up, gamma_down) =
@@ -295,12 +299,16 @@ fn main() -> anyhow::Result<()> {
             gamma_up,
             gamma_down,
         )?;
-        println!("result: {:?}, {:?}, {:?}",w_data, correct, auc);
+        println!("result: {:?}, {:?}, {:?}", w_data, correct, auc);
         let result_encode = pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
         let mut output = PathBuf::from("/output/idash2017/");
         output.push(file_name);
         println!("output {:?}", output);
-        std::fs::OpenOptions::new().write(true).create(true).open(output)?.write(&result_encode)?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(output)?
+            .write(&result_encode)?;
     }
     Ok(())
 }

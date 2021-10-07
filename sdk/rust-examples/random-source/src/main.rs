@@ -19,9 +19,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use anyhow;
 use rand::Rng;
 use std::fs;
-use anyhow;
 
 /// Write 32 random bytes to 'output'. The result is a Pinecone-encoded vector of u8.
 fn main() -> anyhow::Result<()> {

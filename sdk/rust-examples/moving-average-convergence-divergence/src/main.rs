@@ -24,8 +24,11 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::{fs, path::{PathBuf, Path}};
 use anyhow::anyhow;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reading inputs.

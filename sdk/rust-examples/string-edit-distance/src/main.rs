@@ -17,9 +17,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use anyhow;
 use std::fs;
 use strsim::jaro_winkler;
-use anyhow;
 
 /// Reads two input strings via the H-call mechanism.  Fails
 ///

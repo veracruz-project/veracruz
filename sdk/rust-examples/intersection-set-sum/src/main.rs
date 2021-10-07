@@ -27,9 +27,9 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow;
 use serde::Deserialize;
 use std::fs;
-use anyhow;
 
 /// The advertising platform provides a Rust vec filled with `AdvertisementViewer` structs.  These
 /// contain the unique identifiers of every web-surfer who viewed the company's advertisements on

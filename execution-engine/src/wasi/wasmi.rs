@@ -1216,9 +1216,11 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32, FatalEngineError> {
-        self.vfs.environment_variables = options.environment_variables;
-        self.vfs.program_arguments = options.program_arguments;
+    fn invoke_entry_point(
+        &mut self,
+        program: Vec<u8>,
+        options: Options,
+    ) -> Result<u32, FatalEngineError> {
         self.load_program(&program)?;
         self.vfs.enable_clock = options.enable_clock;
 

@@ -108,7 +108,9 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .long("input-source")
                 .value_name("DIRECTORIES")
                 .help(
-                    "Space-separated paths to the input directories on disk. The directories are copied into the root directory in Veracruz space. The program is granted with read capabilities.",
+                    "Space-separated paths to the input directories on disk. The directories are \
+                     copied into the root directory in Veracruz space. The program is granted \
+                     with read capabilities.",
                 )
                 .multiple(true),
         )
@@ -117,7 +119,10 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("o")
                 .long("output-source")
                 .value_name("DIRECTORIES")
-                .help("Space-separated paths to the output directories. The directories are copied into disk on the host. The program is granted with write capabilities.")
+                .help(
+                    "Space-separated paths to the output directories. The directories are copied \
+                     into disk on the host. The program is granted with write capabilities.",
+                )
                 .multiple(true),
         )
         .arg(
@@ -295,11 +300,7 @@ fn load_input_source<T: AsRef<Path>>(
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        vfs.write_file_by_absolute_path(
-                &Path::new("/").join(file_path),
-                &buffer,
-                false,
-            )?;
+        vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), &buffer, false)?;
     } else if file_path.is_dir() {
         for dir in file_path.read_dir()? {
             load_input_source(&dir?.path(), vfs)?;
@@ -366,20 +367,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         file_table.insert(Path::new("/").join(file_path), write_right);
     }
     let program_id = Principal::Program(
-            prog_file_abs_path
-                .to_str()
-                .ok_or("Failed to convert program path to a string.")?
-                .to_string(),
-        );
-    right_table.insert(
-        program_id.clone(),
-        file_table,
+        prog_file_abs_path
+            .to_str()
+            .ok_or("Failed to convert program path to a string.")?
+            .to_string(),
     );
+    right_table.insert(program_id.clone(), file_table);
     info!("The final right tables: {:?}", right_table);
 
-    let mut vfs = FileSystem::new(
-        right_table,
-    )?;
+    let mut vfs = FileSystem::new(right_table)?;
 
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
     info!("Data sources loaded.");
@@ -404,8 +400,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dump contents of stdout
     if cmdline.dump_stdout {
-        let buf = vfs
-            .read_stdout()?;
+        let buf = vfs.read_stdout()?;
         let stdout_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
         print!(
@@ -416,8 +411,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dump contents of stderr
     if cmdline.dump_stderr {
-        let buf = vfs
-            .read_stderr()?;
+        let buf = vfs.read_stderr()?;
         let stderr_dump = std::str::from_utf8(&buf)
             .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
         eprint!(
@@ -428,9 +422,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for file_path in cmdline.output_sources.iter() {
         for (output_path, buf) in vfs
-            .read_all_files_by_absolute_path(
-                Path::new("/").join(file_path),
-            )?
+            .read_all_files_by_absolute_path(Path::new("/").join(file_path))?
             .iter()
         {
             let output_path = output_path.strip_prefix("/").unwrap_or(output_path);

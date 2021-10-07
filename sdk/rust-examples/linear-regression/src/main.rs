@@ -25,9 +25,9 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow;
 use serde::Serialize;
 use std::fs;
-use anyhow;
 
 /// Reads the single input dataset, which is assumed to be a Bincode-encoded
 /// vector of 64-bit float pairs.  Fails with

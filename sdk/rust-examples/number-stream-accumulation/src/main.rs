@@ -3,7 +3,7 @@
 //!
 //! ## Context
 //!
-//! Add an initial float-64 number and two stream of float-64 numbers. 
+//! Add an initial float-64 number and two stream of float-64 numbers.
 //! The result is a pair of the number of (function) calls and the final accumulation result.
 //!
 //! Inputs:                  One.
@@ -21,19 +21,19 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
+use anyhow::anyhow;
 use std::{
     fs,
     fs::File,
     io::{ErrorKind, Read, Seek, SeekFrom},
 };
-use anyhow::anyhow;
 
-/// Read the initial value, if there is no previous result at 'output' file. 
+/// Read the initial value, if there is no previous result at 'output' file.
 /// Otherwise, read the previous result.
 /// Read two new numbers from 'stream-0' and 'stream-1'.
-/// Add the two new numbers, and either the initial value or the previous result 
+/// Add the two new numbers, and either the initial value or the previous result
 /// as the new result and write it to 'output'.
-/// The result also contains the number of function calls, which 
+/// The result also contains the number of function calls, which
 /// track the starting point of the next nunbers in 'stream-0' and 'stream-1'.
 fn main() -> anyhow::Result<()> {
     let (count, last_result_or_init) = read_last_result_or_init()?;
