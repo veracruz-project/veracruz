@@ -269,7 +269,7 @@ Each `dirent[i]` contains:
 - `name_len` the length of the `path[i]`
 - `file_type`
 Given the wasm program compiled from Rust, it is required to fill the buf as much as possible. Particularly, if `dirent[i]` is able to fit in while `path[i]` is not, then it should fill `dirent[i]`.
-**QUESTION:** the semantic of `next` in the `dirent`. It looks like to be implementation-dependent, hence in our implementation, it is simply a counter.
+**QUESTION:** the semantic of `next` in the `dirent`. It seems to be implementation-dependent, hence in our implementation, it is simply a counter.
 
 #### `fd_renumber`
 ```

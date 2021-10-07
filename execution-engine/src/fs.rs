@@ -171,8 +171,8 @@ impl InodeEntry {
         self.data.read_dir(inode_table)
     }
 
-    /// Return the number of the bytes, if it is a file,
-    /// or the number of inodes, if it it is a directory.
+    /// Return the number of bytes, if it is a file,
+    /// or the number of inodes, if it is a directory.
     #[inline]
     pub(self) fn len(&self) -> FileSystemResult<FileSize> {
         self.data.len()
@@ -184,7 +184,7 @@ impl InodeEntry {
 enum InodeImpl {
     /// A file
     File(Vec<u8>),
-    /// A directory. The `PathBuf` key is the relative path and must match to the name inside the `Inode`.
+    /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
     Directory(HashMap<PathBuf, Inode>),
 }
 
@@ -1416,8 +1416,8 @@ impl FileSystem {
             inode_table.get(&parent_inode)?.absolute_path(&inode_table)?
         };
         absolute_path.push(path.clone());
-        // Manually convert to the canonicalize form.
-        // NOTE that the canonicalize function call in pathbuf seems require some sys info.
+        // Manually convert to the canonical form.
+        // NOTE that the canonicalize function call in pathbuf seems to require some sys info.
         let absolute_path: PathBuf = absolute_path.iter().map(|c| c.clone()).collect();
         println!(
             "call path_open on abs path {:?}",
@@ -1466,7 +1466,7 @@ impl FileSystem {
         };
         // Truncate the file if `trunc` flag is set.
         if oflags.contains(OpenFlags::TRUNC) {
-            // Check the right of the program on truacate
+            // Check the right of the program on truncate
             self.check_right(&fd, Rights::PATH_FILESTAT_SET_SIZE)?;
             self.lock_inode_table()?
                 .get_mut(&inode)?
@@ -1643,7 +1643,7 @@ impl FileSystem {
         Ok((fd,path.to_path_buf()))
     }
 
-    /// Write to a file on path `file_name`. If `is_append` is set, `data` will be append to `file_name`.
+    /// Write to a file on path `file_name`. If `is_append` is set, `data` will be appended to `file_name`.
     /// Otherwise this file will be truncated. The `principal` must have the right on `path_open`,
     /// `fd_write` and `fd_seek`.
     pub fn write_file_by_absolute_path<T: AsRef<Path>>(
