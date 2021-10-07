@@ -1226,6 +1226,8 @@ impl ExecutionEngine for WASMIRuntimeState {
         file_name: &str,
         options: Options,
     ) -> Result<u32, FatalEngineError> {
+        self.vfs.environment_variables = options.environment_variables;
+        self.vfs.program_arguments = options.program_arguments;
         self.vfs.enable_clock = options.enable_clock;
         let program = self.vfs.read_file_by_filename(file_name)?;
         self.load_program(program.as_slice())?;

@@ -90,6 +90,10 @@ struct CommandLineOptions {
     /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
     /// enabled.
     enable_clock: bool,
+    /// Environment variables for the program.
+    environment_variables: Vec<(String, String)>,
+    /// Command-line arguments for the program, including argv[0].
+    program_arguments: Vec<String>,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
@@ -150,6 +154,20 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                      enabled.",
                 )
                 .value_name("BOOLEAN"),
+        )
+        .arg(
+            Arg::with_name("arg")
+                .long("arg")
+                .help("Specify a command-line argument.")
+                .value_name("ARG")
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("env")
+                .long("env")
+                .help("Specify an environment variable and value (VAR=VAL).")
+                .value_name("VAR=VAL")
+                .multiple(true),
         )
         .get_matches();
 
@@ -235,6 +253,20 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         }
     };
 
+    let environment_variables = match matches.values_of("env") {
+        None => Vec::new(),
+        Some(x) =>
+            x.map(|e| {
+                let n = e.find("=").unwrap();
+                (e[0..n].to_string(), e[n + 1..].to_string())
+            })
+            .collect(),
+    };
+    let program_arguments = match matches.values_of("arg") {
+        None => Vec::new(),
+        Some(x) => x.map(|e| e.to_string()).collect(),
+    };
+
     Ok(CommandLineOptions {
         data_sources,
         binary,
@@ -242,6 +274,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         dump_stdout,
         dump_stderr,
         enable_clock,
+        environment_variables,
+        program_arguments,
     })
 }
 
@@ -365,6 +399,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("Invoking main.");
     let main_time = Instant::now();
     let options = Options {
+        environment_variables: cmdline.environment_variables,
+        program_arguments: cmdline.program_arguments,
         enable_clock: cmdline.enable_clock,
         ..Default::default()
     };

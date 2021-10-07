@@ -361,10 +361,10 @@ pub struct WasiWrapper {
     /// The environment variables that have been passed to this program from the
     /// global policy file.  These are stored as a key-value mapping from
     /// variable name to value.
-    environment_variables: Vec<(String, String)>,
+    pub environment_variables: Vec<(String, String)>,
     /// The array of program arguments that have been passed to this program,
     /// again from the global policy file.
-    program_arguments: Vec<String>,
+    pub program_arguments: Vec<String>,
     /// The principal that accesses the filesystem. This information is used in path_open.
     principal: Principal,
     /// The exit code, if program calls proc_exit.

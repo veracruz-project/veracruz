@@ -773,6 +773,8 @@ impl ExecutionEngine for WasmtimeRuntimeState {
         file_name: &str,
         options: Options,
     ) -> Result<u32, FatalEngineError> {
+        VFS_INSTANCE.lock()?.environment_variables = options.environment_variables;
+        VFS_INSTANCE.lock()?.program_arguments = options.program_arguments;
         VFS_INSTANCE.lock()?.enable_clock = options.enable_clock;
         let program = VFS_INSTANCE.lock()?.read_file_by_filename(file_name)?;
         Self::invoke_entry_point(program.to_vec())
