@@ -21,7 +21,7 @@ ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracru
 serde = { git = "https://github.com/veracruz-project/serde.git", features=["derive"], branch = "veracruz" }
 typetag = { git = "https://github.com/veracruz-project/typetag.git", branch="veracruz" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch="veracruz" }
-wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", rev = "cd67c9783600bc5437afaac088acde46ca48b650", optional = true }
+wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch="veracruz", optional = true }
 veracruz-utils = { path = "../veracruz-utils" }
 err-derive = "0.2"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
