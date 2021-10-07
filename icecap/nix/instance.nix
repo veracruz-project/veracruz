@@ -85,13 +85,9 @@ in lib.fix (self: with self; {
     };
   };
 
-  icecapCrates = lib.attrValues (crateUtils.closure' (with globalCrates; [
-    icecap-core
-    icecap-start-generic
-    icecap-std-external
-    icecap-event-server-types
-    biterate
-  ]));
+  icecapWrapperCrate = configured.callPackage ./realm/icecap-wrapper/cargo.nix {};
+
+  icecapCrates = lib.attrValues (crateUtils.closure icecapWrapperCrate);
 
   icecapCratesEnv = crateUtils.collectEnv icecapCrates;
 

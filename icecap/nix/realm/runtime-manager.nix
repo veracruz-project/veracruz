@@ -26,7 +26,11 @@ let
   cargoConfig = nixToToml (crateUtils.clobber [
     crateUtils.baseCargoConfig
     {
-      target.${rustTargetName}.rustflags = [ "--sysroot=${sysroot-rs}" ];
+      target.${rustTargetName}.rustflags = [
+        "--sysroot=${sysroot-rs}"
+        "-l" "static=c_supplement"
+        "-L" "${libc-supplement}/lib"
+      ];
     }
     {
       target.${rustTargetName} = crateUtils.clobber (lib.forEach icecapCrates (crate:
@@ -54,13 +58,6 @@ mkShell (crateUtils.baseEnv // {
 
   buildInputs = [
     liboutline
-    libc-supplement
-  ];
-
-  NIX_LDFLAGS = [
-    "-lc_supplement"
-    "-licecap_pure"
-    "-licecap_utils"
   ];
 
   shellHook = ''

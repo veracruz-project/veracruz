@@ -9,8 +9,9 @@
 
 ICECAP_PLAT ?= virt
 
-crates_dir := crates
 build_dir := build
+crates_dir := crates
+dummy_crates_dir := dummy-crates
 
 now := $(build_dir)/NOW
 
@@ -23,12 +24,19 @@ nix_attribute_path := $(ICECAP_PLAT)
 all:
 
 .PHONY: clean
-clean:
-	rm -rf $(crates_dir) $(build_dir)
+clean: unlink-crates
+	rm -rf $(build_dir)
+
+.PHONY: link-crates
+link-crates:
+	ln -sfT $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).crates) $(crates_dir)
+
+.PHONY: unlink-crates
+unlink-crates:
+	ln -sfT $(dummy_crates_dir) $(crates_dir)
 
 .PHONY: setup
-setup:
-	$(nix_build) $(nix_expression) -A $(nix_attribute_path).crates -o $(crates_dir)
+setup: link-crates
 
 .PHONY: runtime-manager
 runtime-manager: $(now) setup
