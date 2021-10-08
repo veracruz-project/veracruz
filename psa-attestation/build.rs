@@ -26,7 +26,7 @@ fn main() {
             } else if #[cfg(feature = "nitro")] {
                 "musl-gcc".to_string()
             } else {
-                env::var("CC").unwrap()
+                env::var(format!("CC_{}", env::var("TARGET").unwrap())).unwrap()
             }
         }
     };
