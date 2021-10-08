@@ -29,6 +29,8 @@ cli = ["structopt"]
 # that use PSA for their native attestation.
 psa = []
 nitro = [ "serde_cbor", "nitro-enclave-attestation-document" ]
+tz = ["psa"]
+icecap = ["psa"]
 
 [dependencies]
 rouille = "=3.2.1"

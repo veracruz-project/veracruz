@@ -183,7 +183,8 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             received: received_enclave_hash.to_vec(),
         });
     }
-    let cert = crate::attestation::convert_csr_to_certificate(&csr, false, &received_enclave_hash)
+    let is_ca = cfg!(feature = "tz");
+    let cert = crate::attestation::convert_csr_to_certificate(&csr, is_ca, &received_enclave_hash)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);
             err
