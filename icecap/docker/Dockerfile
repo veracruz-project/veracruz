@@ -67,10 +67,17 @@ USER root
 RUN mkdir $RUSTUP_HOME $CARGO_HOME && chown x $RUSTUP_HOME $CARGO_HOME
 USER x
 
-ARG rustup_tmp=/tmp/rustup-init
 ARG rust_version=1.48.0
-RUN curl -L -o ${rustup_tmp} "https://static.rust-lang.org/rustup/archive/1.22.1/x86_64-unknown-linux-gnu/rustup-init" && \
-    echo "49c96f3f74be82f4752b8bffcf81961dea5e6e94ce1ccba94435f12e871c3bdb ${rustup_tmp}" | sha256sum -c - && \
+ARG rustup_tmp=/tmp/rustup-init
+RUN arch="$(uname -m)" && \
+    case "$arch" in \
+        x86_64) rust_arch='x86_64-unknown-linux-gnu' && rustup_sha256='49c96f3f74be82f4752b8bffcf81961dea5e6e94ce1ccba94435f12e871c3bdb' ;; \
+        aarch64) rust_arch='aarch64-unknown-linux-gnu' && rustup_sha256='d93ef6f91dab8299f46eef26a56c2d97c66271cea60bf004f2f088a86a697078' ;; \
+        *) echo >&2 "unsupported architecture: $arch" && exit 1 ;; \
+    esac && \
+    url="https://static.rust-lang.org/rustup/archive/1.22.1/${rust_arch}/rustup-init" && \
+    curl -L -o ${rustup_tmp} ${url} && \
+    echo "${rustup_sha256} ${rustup_tmp}" | sha256sum -c - && \
     chmod +x ${rustup_tmp} && \
     ${rustup_tmp} -y --no-modify-path --profile minimal --default-toolchain ${rust_version} --default-host x86_64-unknown-linux-gnu && \
     rm ${rustup_tmp}
@@ -90,6 +97,7 @@ ENV XDG_CACHE_HOME=/nix/cache
 ENV NIX_BUILD_SHELL bash
 
 COPY nix.conf /etc/nix/
+COPY install-nix.sh /
 COPY setup.sh /
 
 WORKDIR /work
