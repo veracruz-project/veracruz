@@ -18,7 +18,7 @@ nitro = []
 
 [dependencies]
 # TODO_BEFORE_MERGE
-libc = { git = "https://gitlab.com/arm-research/security/icecap/minor-patches/rust/libc.git", branch = "icecap" }
+libc = { git = "https://github.com/nspin/libc.git", branch = "veracruz-icecap" }
 
 [build-dependencies]
 bindgen = "0.53.1"
