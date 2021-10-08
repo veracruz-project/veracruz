@@ -58,6 +58,7 @@ mkShell (crateUtils.baseEnv // {
 
   buildInputs = [
     liboutline
+    libc-supplement
   ];
 
   shellHook = ''
