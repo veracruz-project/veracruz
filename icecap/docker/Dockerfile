@@ -79,7 +79,7 @@ RUN arch="$(uname -m)" && \
     curl -L -o ${rustup_tmp} ${url} && \
     echo "${rustup_sha256} ${rustup_tmp}" | sha256sum -c - && \
     chmod +x ${rustup_tmp} && \
-    ${rustup_tmp} -y --no-modify-path --profile minimal --default-toolchain ${rust_version} --default-host x86_64-unknown-linux-gnu && \
+    ${rustup_tmp} -y --no-modify-path --profile minimal --default-toolchain ${rust_version} --default-host ${rust_arch} && \
     rm ${rustup_tmp}
 
 RUN cargo install diesel_cli --no-default-features --features sqlite
