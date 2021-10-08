@@ -27,6 +27,10 @@ all:
 clean: unlink-crates
 	rm -rf $(build_dir)
 
+.PHONY: deep-clean
+deep-clean: clean unlink-crates
+	cd .. && git clean -fxd --exclude=icecap/docker/nix-root
+
 .PHONY: link-crates
 link-crates:
 	ln -sfT $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).crates) $(crates_dir)
