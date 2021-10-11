@@ -114,16 +114,12 @@ fn clock_res_get(id: u32, resolution: u32) -> u16;
 ```
 Write the time resolution as `u64` to the memory at `resolution`. 
 
-**NOT SUPPORTED**
-
-#### `clock_res_get`
+#### `clock_time_get`
 ```rust
 fn clock_time_get(id: ClockId, precision: Timestamp) -> Result<Timestamp, ErrNo>;
 fn clock_time_get(id: u32, precision: u64, time: u32) -> u16;
 ```
 Write the time of `precision` to the memory at `time`. 
-
-**NOT SUPPORTED**
 
 ### Files
 
@@ -399,7 +395,6 @@ fn path_filestat_get(fd: u32, flags: u32, path_addr: u32, path_len: u32, file_st
 Read the path at address `path_addr` of length `path_len`.
 Then write the status of the file at the path starting from the directory opened by the file descriptor `fd`. 
 
-**NOT SUPPORTED**
 #### `path_filestat_set_times`
 ```
 fn path_filestat_set_times(fd: Fd, lookup_flags: LookupFlags, path: String, atime: Timestamp, mtime: Timestamp, fst_flags: SetTimeFlags) -> Result<(), ErrNo>;
@@ -557,11 +552,6 @@ WASM passes a `u32` as the `flags` parameter.
 ## Some Possible Future Directions
 
  * Test suite for WASI ABI.
- * More WASI functionality: 
-    - Add the support for directories. 
-    - Separate file descriptor spaces for different principals, 
-      e.g. participants and programs. Pre-opened file descriptors in each 
-      space have the rights match the policy file.
  * Event-oriented models: WASI poll could be implemented to allow Veracruz
    programs to wait for events.
  * Streaming, producer/consumer and multi-program graphs: file-like objects
