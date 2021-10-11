@@ -17,8 +17,7 @@ sgx = []
 nitro = []
 
 [dependencies]
-# TODO_BEFORE_MERGE
-libc = { git = "https://github.com/nspin/libc.git", branch = "veracruz-icecap" }
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
 
 [build-dependencies]
 bindgen = "0.53.1"
