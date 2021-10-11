@@ -22,8 +22,7 @@ use base64;
 use futures::executor;
 use std::{
     net::ToSocketAddrs,
-    sync::mpsc,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     thread,
     time::{Duration, SystemTime},
 };
@@ -39,15 +38,20 @@ struct EnclaveState {
     policy_hash: String,
 }
 
-/// Type alias of a thread-safe, optional EnclaveState
-type EnclaveHandler = Arc<Mutex<Option<EnclaveState>>>;
+/// State of enclaves
+struct EnclaveHandler {
+    enclave: Option<EnclaveState>,
+    auto_shutdown_tx: Option<mpsc::Sender<()>>,
+}
+
+// TODO rm type EnclaveHandler = Arc<Mutex<Option<EnclaveState>>>;
 
 
 /// Setup an enclave with a provided policy file
 #[post("/enclave_setup")]
 async fn enclave_setup(
     policy_json: String,
-    enclave_handler: web::Data<EnclaveHandler>,
+    enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     // parse policy
     let policy = Policy::from_json(&policy_json)?;
@@ -55,13 +59,13 @@ async fn enclave_setup(
 
     // check that we don't already have an enclave running
     let mut enclave_handler = enclave_handler.lock()?;
-    if !enclave_handler.is_none() {
+    if !enclave_handler.enclave.is_none() {
         Err(VeracruzServerError::TooManyEnclavesError(2, 1))?
     }
 
     // create new enclave, with policy
     let enclave = VeracruzServerEnclave::new(&policy_json)?;
-    *enclave_handler = Some(EnclaveState {
+    enclave_handler.enclave = Some(EnclaveState {
         enclave: Box::new(enclave),
         start_time: SystemTime::now(),
         policy: policy_json,
@@ -75,13 +79,14 @@ async fn enclave_setup(
 /// Teardown an enclave
 #[post("/enclave_teardown")]
 async fn enclave_teardown(
-    enclave_handler: web::Data<EnclaveHandler>,
+    enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     // does enclave exist?
     let mut enclave_handler = enclave_handler.lock()?;
-    match enclave_handler.take() {
+    match enclave_handler.enclave.take() {
         Some(_enclave) => {
             // well it doesn't anymore, let drop take care of the rest
+            // TODO close? 
             Ok("".to_owned())
         }
         None => {
@@ -96,12 +101,12 @@ async fn enclave_teardown(
 ///
 #[get("/enclave_list")]
 async fn enclave_list(
-    enclave_handler: web::Data<EnclaveHandler>,
+    enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     let mut enclave_list = Vec::<serde_json::Value>::new();
     
     let enclave_handler = enclave_handler.lock()?;
-    match enclave_handler.as_ref() {
+    match enclave_handler.enclave.as_ref() {
         Some(enclave) => {
             // Apparently SystemTime can error if time has moved backwards,
             // if this happens (clock change?) we just show an uptime of zero
@@ -130,11 +135,11 @@ async fn enclave_list(
 /// Get the policy governing an enclave's computation
 #[get("/enclave_policy")]
 async fn enclave_policy(
-    enclave_handler: web::Data<EnclaveHandler>,
+    enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     // does enclave exist?
     let enclave_handler = enclave_handler.lock()?;
-    let enclave = match enclave_handler.as_ref() {
+    let enclave = match enclave_handler.enclave.as_ref() {
         Some(enclave) => enclave,
         None => {
             Err(VeracruzServerError::UninitializedEnclaveError)?
@@ -147,9 +152,7 @@ async fn enclave_policy(
 /// Send TLS data to a currently running enclave
 #[post("/enclave_tls")]
 async fn enclave_tls(
-    enclave_handler: web::Data<EnclaveHandler>,
-    stopper: web::Data<mpsc::Sender<()>>,
-    //_request: HttpRequest,
+    enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
     input_data: String,
 ) -> VeracruzServerResponder {
     let fields = input_data.split_whitespace().collect::<Vec<&str>>();
@@ -160,7 +163,7 @@ async fn enclave_tls(
         0 => {
             let mut enclave_handler_locked = enclave_handler.lock()?;
 
-            let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            let enclave = enclave_handler_locked.enclave.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
             enclave.enclave.new_tls_session()?
         }    
@@ -173,18 +176,27 @@ async fn enclave_tls(
     let (active_flag, output_data_option) = {
         let mut enclave_handler_locked = enclave_handler.lock()?;
 
-        let enclave = enclave_handler_locked.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+        let enclave = enclave_handler_locked.enclave.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
         enclave.enclave.tls_data(session_id, received_data_decoded)?
     };
 
-    // Shutdown the enclave
-    // TODO this?
+    // Shutdown the enclave if we're done with it
     if !active_flag {
-        let mut enclave_handler_locked = enclave_handler.lock()?;
-        enclave_handler_locked.as_mut().map(|e| e.enclave.close());
-        *enclave_handler_locked = None;
-        stopper.send(())?;
+        let mut enclave_handler = enclave_handler.lock()?;
+        match enclave_handler.enclave.take() {
+            Some(_enclave) => {
+                // The enclave has been removed now, let drop take care of the rest
+
+                // Auto-shutdown the server?
+                if let Some(auto_shutdown_tx) = &enclave_handler.auto_shutdown_tx {
+                    auto_shutdown_tx.send(())?;
+                }
+            }
+            None => {
+                Err(VeracruzServerError::UninitializedEnclaveError)?
+            }
+        }
     }
 
     // Response this request
@@ -208,33 +220,44 @@ async fn enclave_tls(
 /// the given policy, otherwise the policy can be sent over an `enclave_setup`
 /// request.
 ///
-pub fn server<U>(url: U, policy_json: Option<&str>) -> Result<Server, VeracruzServerError>
+pub fn server<U>(
+    url: U,
+    policy_json: Option<&str>,
+    auto_shutdown: bool,
+) -> Result<Server, VeracruzServerError>
 where
     U: ToSocketAddrs
 {
     // create an enclave if policy was provided, otherwise leave this up to enclave_setup
-    let enclave_handler: EnclaveHandler = Arc::new(Mutex::new(
-        match policy_json {
-            Some(policy_json) => {
-                // parse policy
-                let policy = Policy::from_json(&policy_json)?;
-                let policy_hash = policy.policy_hash().unwrap();
+    let enclave_state = match policy_json {
+        Some(policy_json) => {
+            // parse policy
+            let policy = Policy::from_json(&policy_json)?;
+            let policy_hash = policy.policy_hash().unwrap();
 
-                // create enclave
-                let enclave = VeracruzServerEnclave::new(&policy_json)?;
-                Some(EnclaveState {
-                    enclave: Box::new(enclave),
-                    start_time: SystemTime::now(),
-                    policy: policy_json.to_owned(),
-                    policy_hash: policy_hash.to_owned(),
-                })
-            }
-            None => None,
+            // create enclave
+            let enclave = VeracruzServerEnclave::new(&policy_json)?;
+            Some(EnclaveState {
+                enclave: Box::new(enclave),
+                start_time: SystemTime::now(),
+                policy: policy_json.to_owned(),
+                policy_hash: policy_hash.to_owned(),
+            })
         }
-    ));
+        None => None,
+    };
 
-    // create a channel for stop server
-    let (shutdown_channel_tx, shutdown_channel_rx) = mpsc::channel::<()>();
+    let (auto_shutdown_tx, auto_shutdown_rx) = if auto_shutdown {
+        let (auto_shutdown_tx, auto_shutdown_rx) = mpsc::channel::<()>();
+        (Some(auto_shutdown_tx), Some(auto_shutdown_rx))
+    } else {
+        (None, None)
+    };
+
+    let enclave_handler = Arc::new(Mutex::new(EnclaveHandler {
+        enclave: enclave_state,
+        auto_shutdown_tx: auto_shutdown_tx,
+    }));
 
     let server = HttpServer::new(move || {
         // create an enclave if policy was provided, otherwise leave
@@ -243,11 +266,10 @@ where
         App::new()
             // enable logging
             .wrap(middleware::Logger::default())
+
             // provide enclave handler, an Option<EnclaveHandler> which may change
             // between None or Some through the server's lifetime
             .data(enclave_handler.clone())
-            // also the shutdown channel
-            .data(shutdown_channel_tx.clone())
 
             .service(enclave_setup)
             .service(enclave_teardown)
@@ -258,23 +280,25 @@ where
     .bind(url)?
     .run();
 
-    // clone the Server handle and launch a thread for shuting down the server
-    let server_clone = server.clone();
-    thread::spawn(move || {
-        // wait for shutdown signal
-        match shutdown_channel_rx.recv() {
-            // stop server gracefully
-            Ok(_) => {
-                executor::block_on(server_clone.stop(true));
+    // launch a thread for shutting down the server?
+    if let Some(auto_shutdown_rx) = auto_shutdown_rx {
+        let server_clone = server.clone();
+        thread::spawn(move || {
+            // wait for shutdown signal
+            match auto_shutdown_rx.recv() {
+                // stop server gracefully
+                Ok(_) => {
+                    executor::block_on(server_clone.stop(true));
+                }
+                // this CAN fail, in the case that the main thread has died,
+                // most likely from a user's ctrl-C, in either case we want to
+                // shutdown the server
+                Err(_) => {
+                    return;
+                }
             }
-            // this CAN fail, in the case that the main thread has died,
-            // most likely from a user's ctrl-C, in either case we want to
-            // shutdown the server
-            Err(_) => {
-                return;
-            }
-        }
-    });
+        });
+    }
 
     Ok(server)
 }

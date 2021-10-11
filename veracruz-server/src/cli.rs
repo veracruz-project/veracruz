@@ -47,6 +47,17 @@ struct Opt {
     ///
     #[structopt(parse(from_os_str))]
     policy_path: Option<path::PathBuf>,
+
+    /// Automatically shutdown the server
+    ///
+    /// This causes server to automatically terminate with a successful exit
+    /// code when there is no enclave running.
+    ///
+    /// Note, you probably want to provide --policy-path, otherwise the server
+    /// will terminate immediately.
+    /// 
+    #[structopt(short="s", long)]
+    auto_shutdown: bool,
 }
 
 
@@ -85,6 +96,7 @@ fn main() {
     let veracruz_server = match veracruz_server::server::server(
         &opt.url,
         opt_policy_json.as_deref(),
+        opt.auto_shutdown,
     ) {
         Ok(veracruz_server) => veracruz_server,
         Err(err) => {

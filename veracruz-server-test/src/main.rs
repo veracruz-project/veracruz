@@ -1111,7 +1111,7 @@ mod tests {
                 client_session_id,
                 &mut client_session,
                 ticket,
-                &transport_protocol::serialize_request_shutdown()?.as_slice(),
+                &transport_protocol::serialize_signal_done()?.as_slice(),
             )?;
             info!(
                 "             Client received acknowledgment after shutdown request: {:?}",

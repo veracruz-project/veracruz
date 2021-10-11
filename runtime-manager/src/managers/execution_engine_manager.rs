@@ -180,8 +180,8 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         MESSAGE::request_state(_) => {
             Ok(Some(transport_protocol::serialize_machine_state(u8::from(0))?))
         },
-        MESSAGE::request_shutdown(_) => {
-            let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
+        MESSAGE::signal_done(_) => {
+            let is_dead = protocol_state.signal_done_and_check_shutdown(client_id)?;
             if is_dead {
                 *protocol_state_guard = None;
             }

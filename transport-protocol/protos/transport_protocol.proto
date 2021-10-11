@@ -180,7 +180,8 @@ message ProxyPsaAttestationToken {
   bytes pubkey = 2;
   int32 device_id = 3;
 }
-message RequestShutdown {
+
+message SignalDone {
 }
 
 message RequestNextRound {
@@ -236,7 +237,7 @@ message RuntimeManagerRequest {
     RequestResult request_result = 5;
     RequestProxyPsaAttestationToken request_proxy_psa_attestation_token = 6;
     RequestState request_state = 7;
-    RequestShutdown request_shutdown = 8;
+    SignalDone signal_done = 8;
     PsaAttestationInit psa_attestation_init = 9;
     RequestPolicyHash request_policy_hash = 10;
     Data stream = 11;

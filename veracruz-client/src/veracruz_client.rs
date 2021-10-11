@@ -317,8 +317,8 @@ impl VeracruzClient {
         return Ok(response_data.clone());
     }
 
-    pub fn request_shutdown(&mut self) -> Result<(), VeracruzClientError> {
-        let serialized_request = transport_protocol::serialize_request_shutdown()?;
+    pub fn signal_done(&mut self) -> Result<(), VeracruzClientError> {
+        let serialized_request = transport_protocol::serialize_signal_done()?;
         let _response = self.send(&serialized_request)?;
         Ok(())
     }

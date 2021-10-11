@@ -77,9 +77,9 @@ pub(crate) struct ProtocolState {
     global_policy: Policy,
     /// A hex-encoding of the raw JSON global policy.
     global_policy_hash: String,
-    /// The list of clients (their IDs) that can request shutdown of the
+    /// The list of clients (their IDs) that can signal they are done with the
     /// Veracruz platform.
-    expected_shutdown_sources: Vec<u64>,
+    expected_done_sources: Vec<u64>,
     /// The ref to the VFS.
     vfs: Arc<Mutex<FileSystem>>,
     /// Digest table. Certain files must match the digest before writting to the filesystem.
@@ -94,7 +94,7 @@ impl ProtocolState {
         global_policy: Policy,
         global_policy_hash: String,
     ) -> Result<Self, RuntimeManagerError> {
-        let expected_shutdown_sources = global_policy.expected_shutdown_list();
+        let expected_done_sources = global_policy.expected_done_list();
 
         let rights_table = global_policy.get_rights_table();
         let std_streams_table = global_policy.std_streams_table();
@@ -104,7 +104,7 @@ impl ProtocolState {
         Ok(ProtocolState {
             global_policy,
             global_policy_hash,
-            expected_shutdown_sources,
+            expected_done_sources,
             vfs,
             digest_table,
             is_modified: true,
@@ -205,15 +205,15 @@ impl ProtocolState {
         Ok(Some(rst))
     }
 
-    /// Requests shutdown on behalf of a client, as identified by their client
-    /// ID, and then checks if this request was sufficient to reach a threshold
-    /// of requests wherein the platform can finally shutdown.
-    pub(crate) fn request_and_check_shutdown(
+    /// Signals computation is done on behalf of a client, as identified by
+    /// their client ID, and then checks if this request was sufficient to
+    /// reach a threshold of signals wherein the platform can finally shutdown.
+    pub(crate) fn signal_done_and_check_shutdown(
         &mut self,
         client_id: u64,
     ) -> Result<bool, RuntimeManagerError> {
-        self.expected_shutdown_sources.retain(|v| v != &client_id);
-        Ok(self.expected_shutdown_sources.is_empty())
+        self.expected_done_sources.retain(|v| v != &client_id);
+        Ok(self.expected_done_sources.is_empty())
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.

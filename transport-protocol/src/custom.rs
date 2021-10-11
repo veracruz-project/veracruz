@@ -222,10 +222,10 @@ pub fn serialize_request_result(file_name : &str) -> TransportProtocolResult {
 }
 
 /// Serialize the request for shutting down the enclave.
-pub fn serialize_request_shutdown() -> TransportProtocolResult {
-    let command = transport_protocol::RequestShutdown::new();
+pub fn serialize_signal_done() -> TransportProtocolResult {
+    let command = transport_protocol::SignalDone::new();
     let mut request = transport_protocol::RuntimeManagerRequest::new();
-    request.set_request_shutdown(command);
+    request.set_signal_done(command);
 
     Ok(request.write_to_bytes()?)
 }

@@ -310,11 +310,18 @@ impl Policy {
     }
 
     /// Returns the identity of any principal in the computation who is capable
-    /// of requesting a shutdown of the computation.  At the moment, only the
-    /// principals who can request the result can also request shutdown.
-    pub fn expected_shutdown_list(&self) -> Vec<u64> {
+    /// of signalling a computation is done.  At the moment, only the
+    /// principals who can request the result can also signal they are done.
+    pub fn expected_done_list(&self) -> Vec<u64> {
         self.identities()
             .iter()
+            .filter(|identity| {
+                identity.file_rights().iter()
+                    .any(|file_rights| {
+                        Rights::from_bits(*file_rights.rights() as u64).unwrap()
+                            .contains(Rights::FD_READ)
+                    })
+            })
             .fold(Vec::new(), |mut acc, identity| {
                 acc.push(*identity.id() as u64);
                 acc

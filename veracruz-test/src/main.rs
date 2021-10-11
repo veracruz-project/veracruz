@@ -332,8 +332,8 @@ mod tests {
             let program_data = read_binary_file(prog_path.as_path())?;
             info!("### program provider send binary.");
             client.send_program(program_filename, &program_data)?;
-            info!("### program provider request shutdown.");
-            client.request_shutdown()?;
+            info!("### data provider signal completion.");
+            client.signal_done()?;
             Ok::<(), VeracruzTestError>(())
         };
         let data_provider_handle = async {
@@ -351,8 +351,8 @@ mod tests {
             let program_filename = prog_path.as_path().file_name().unwrap().to_str().unwrap();
             info!("### data provider read result.");
             client.get_results(program_filename)?;
-            info!("### data provider request shutdown.");
-            client.request_shutdown()?;
+            info!("### data provider signal completion.");
+            client.signal_done()?;
             Ok::<(), VeracruzTestError>(())
         };
 
@@ -427,8 +427,8 @@ mod tests {
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
-            // fetch result
             for result_retriever_index in result_retrievers {
+                // fetch result
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
@@ -441,9 +441,10 @@ mod tests {
                 clients
                     .get_mut(client_index)
                     .ok_or(VeracruzTestError::ClientIndexError(client_index))?
-                    .request_shutdown()?;
+                    .signal_done()?;
                 info!("            Client {} disconnects", client_index);
             }
+
             Ok::<(), VeracruzTestError>(())
         };
         info!("            Server and clients threads execute.");
@@ -457,7 +458,8 @@ mod tests {
         let policy = Policy::from_json(&policy_text)?;
         veracruz_server::server::server(
             policy.veracruz_server_url(),
-            Some(&policy_text)
+            Some(&policy_text),
+            true,
         )?.await?;
         Ok(())
     }

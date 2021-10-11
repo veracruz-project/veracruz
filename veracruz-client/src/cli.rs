@@ -189,17 +189,22 @@ struct Opt {
     )]
     output: Vec<Vec<(String, path::PathBuf)>>,
 
-    /// Do not request a shutdown of the Sinaloa server after recieving the
-    /// results. This can be useful if you have multiple result readers.
+    /// Signal that we aren't done with the computation even if we request
+    /// data.
+    ///
+    /// By default this client signals that we are done with the computation
+    /// if we read the result, since this is the most common case. This flag
+    /// overrides that, allowing multiple reads by the same identity.
+    ///
     #[structopt(short, long)]
-    no_shutdown: bool,
+    not_done: bool,
 
-    /// Request shutdown without requesting data.
+    /// Signal that we are done without requesting data.
     ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
-    #[structopt(short, long)]
-    shutdown: bool,
+    #[structopt(long)]
+    done: bool,
 }
 
 /// A macro to make printing a bit easier with support for --quiet
@@ -557,14 +562,17 @@ fn main() {
         }
     }
 
-    // shutdown?
-    if (!opt.output.is_empty() && !opt.no_shutdown) || opt.shutdown {
+    // done?
+    if (!opt.output.is_empty() && !opt.not_done) || opt.done {
         let mut veracruz_client = veracruz_client();
 
-        qprintln!(opt, "Shutting down enclave");
+        // don't bother to print this unless explicitly requested
+        if opt.done {
+            qprintln!(opt, "Signalling done-ness");
+        }
         did_something = true;
 
-        match veracruz_client.request_shutdown() {
+        match veracruz_client.signal_done() {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -587,7 +595,7 @@ fn main() {
         match admin_client.enclave_teardown() {
             Ok(()) => {},
             Err(err) => {
-                eprintln!("{}", err);
+                println!("{}", err);
                 process::exit(1);
             }
         }
