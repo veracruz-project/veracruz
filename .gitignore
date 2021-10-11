@@ -30,6 +30,7 @@ test-collateral/idash2017/
 test-collateral/macd/
 test-collateral/private-set-inter-sum/
 test-collateral/pgen
+test-collateral/proxy-attestation-server.db
 *.vscode/
 *.orig
 veracruz-server/fuzz/*
