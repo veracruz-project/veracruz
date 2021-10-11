@@ -9,8 +9,8 @@
 
 let
   icecapRemote = builtins.fetchGit rec {
-    url = "https://gitlab.com/arm-research/security/icecap/icecap.git";
-    ref = "veracruz";
+    url = "https://gitlab.com/arm-research/security/icecap/icecap-refs.git";
+    ref = "refs/tags/icecap/keep/${builtins.substring 0 32 rev}";
     rev = "e3c8980f6d301b9f340ad859caef511696c18ba3";
     submodules = true;
   };
