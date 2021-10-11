@@ -34,7 +34,7 @@ $ vc-client --help
 veracruz-client 0.3.0
 
 USAGE:
-    vc-client [FLAGS] [OPTIONS] <policy-path> --identity <identity> --key <key> --target <target>
+    vc-client [FLAGS] [OPTIONS] [--] [url]
 
 ...
 ```
@@ -242,7 +242,8 @@ First lets send over the program to our Veracruz server, this requires an
 identity with the "ProgramProvider" role:
 
 ``` bash
-$ vc-client example/example-policy.json \
+$ vc-client \
+    --policy example/example-policy.json \
     --identity example/example-program-cert.pem \
     --key example/example-program-key.pem \
     --program example-binary.wasm=example/example-binary.wasm
@@ -257,7 +258,8 @@ secret message. Keep in mind most likely this data will be coming from
 different devices:
 
 ``` bash
-$ vc-client example/example-policy.json \
+$ vc-client \
+    --policy example/example-policy.json \
     --identity example/example-data0-cert.pem \
     --key example/example-data0-key.pem \
     --data input-0=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
@@ -265,7 +267,8 @@ Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-0 from /dev/fd/63
 
-$ vc-client example/example-policy.json \
+$ vc-client \
+    --policy example/example-policy.json \
     --identity example/example-data1-cert.pem \
     --key example/example-data1-key.pem \
     --data input-1=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
@@ -273,7 +276,8 @@ Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-1 from /dev/fd/63
 
-$ vc-client example/example-policy.json \
+$ vc-client \
+    --policy example/example-policy.json \
     --identity example/example-data2-cert.pem \
     --key example/example-data2-key.pem \
     --data input-2=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
@@ -286,7 +290,8 @@ And finally, we can request the result using an identity with the
 "RequestResult" role:
 
 ``` bash
-$ vc-client example/example-policy.json \
+$ vc-client \
+    --policy example/example-policy.json \
     --identity example/example-result-cert.pem \
     --key example/example-result-key.pem \
     --result example-binary.wasm=-

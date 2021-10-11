@@ -11,7 +11,7 @@
 
 use actix_rt;
 use log::info;
-use std::{fs, path, process};
+use std::{fs, path, ops::Deref, process};
 use structopt::StructOpt;
 use veracruz_server;
 use veracruz_utils::policy::{
@@ -37,8 +37,11 @@ fn parse_bind_addr(s: &str) -> String {
 #[structopt(rename_all="kebab")]
 struct Opt {
     /// URL to serve on
-    #[structopt(parse(from_str=parse_bind_addr))]
-    url: String,
+    #[structopt(
+        parse(from_str=parse_bind_addr),
+        required_unless="policy-path"
+    )]
+    url: Option<String>,
 
     /// Optional path to policy file
     ///
@@ -70,23 +73,33 @@ fn main() {
     env_logger::init();
 
     // load policy
-    let opt_policy_json = match opt.policy_path {
+    let opt_policy = match opt.policy_path {
         Some(policy_path) => {
             info!("Loading policy {:?}", policy_path);
             let policy_result = fs::read_to_string(&policy_path)
                 .map_err(|err| PolicyError::from(err))
-                .and_then(|policy_json| Ok((Policy::from_json(&policy_json)?, policy_json)));
-            let (policy, policy_json) = match policy_result {
-                Ok((policy, policy_json)) => (policy, policy_json),
+                .and_then(|policy_json| {
+                    let policy = Policy::from_json(&policy_json)?;
+                    Ok((policy_json, policy))
+                });
+            let (policy_json, policy) = match policy_result {
+                Ok((policy_json, policy)) => (policy_json, policy),
                 Err(err) => {
                     eprintln!("{}", err);
                     process::exit(1);
                 }
             };
             info!("Loaded policy {}", policy.policy_hash().unwrap_or("???"));
-            Some(policy_json)
+            Some((policy_json, policy))
         }
         None => None
+    };
+
+    // figure out the URL server on
+    let url = match (opt.url.as_ref(), opt_policy.as_ref()) {
+        (Some(url), _) => url,
+        (None, Some((_, policy))) => policy.veracruz_server_url(),
+        _ => unreachable!(),
     };
 
     // create Actix runtime
@@ -94,8 +107,9 @@ fn main() {
 
     // create Veracruz Server instance
     let veracruz_server = match veracruz_server::server::server(
-        &opt.url,
-        opt_policy_json.as_deref(),
+        url,
+        opt_policy.as_ref()
+            .map(|(policy_json, _)| policy_json.deref()),
         opt.auto_shutdown,
     ) {
         Ok(veracruz_server) => veracruz_server,
@@ -105,7 +119,7 @@ fn main() {
         }
     };
 
-    println!("Veracruz Server running on {}", opt.url);
+    println!("Veracruz Server running on {}", url);
     match sys.block_on(veracruz_server) {
         Ok(_) => {},
         Err(err) => {

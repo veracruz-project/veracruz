@@ -35,7 +35,7 @@ $ vc-client --help
 veracruz-client 0.3.0
 
 USAGE:
-    vc-client [FLAGS] [OPTIONS] <policy-path> --identity <identity> --key <key> --target <target>
+    vc-client [FLAGS] [OPTIONS] [--] [url]
 
 ...
 ```
@@ -74,7 +74,8 @@ The identity of each client is determined by a signed certificate, and the
 permissions each client has is stored in the policy file.
 
 ``` bash
-$ vc-client test-collateral/shamir-secret-sharing-policy.json \
+$ vc-client \
+    --policy test-collateral/shamir-secret-sharing-policy.json \
     --identity test-collateral/program_client_cert.pem \
     --key test-collateral/program_client_key.pem \
     --program shamir-secret-sharing.wasm=test-collateral/shamir-secret-sharing.wasm
@@ -84,7 +85,8 @@ Submitting <enclave>/shamir-secret-sharing.wasm from test-collateral/shamir-secr
 ```
 
 ``` bash
-$ vc-client test-collateral/shamir-secret-sharing-policy.json \
+$ vc-client \
+    --policy test-collateral/shamir-secret-sharing-policy.json \
     --identity test-collateral/data_client_cert.pem \
     --key test-collateral/data_client_key.pem \
     --data input-0=<(cat test-collateral/share-1.dat | xxd -r -p)
@@ -94,7 +96,8 @@ Submitting <enclave>/input-0 from /dev/fd/63
 ```
 
 ``` bash
-$ vc-client test-collateral/shamir-secret-sharing-policy.json \
+$ vc-client \
+    --policy test-collateral/shamir-secret-sharing-policy.json \
     --identity test-collateral/data_client_cert.pem \
     --key test-collateral/data_client_key.pem \
     --data input-1=<(cat test-collateral/share-2.dat | xxd -r -p)
@@ -104,7 +107,8 @@ Submitting <enclave>/input-1 from /dev/fd/63
 ```
 
 ``` bash
-$ vc-client test-collateral/shamir-secret-sharing-policy.json \
+$ vc-client \
+    --policy test-collateral/shamir-secret-sharing-policy.json \
     --identity test-collateral/data_client_cert.pem \
     --key test-collateral/data_client_key.pem \
     --data input-2=<(cat test-collateral/share-3.dat | xxd -r -p)
@@ -117,7 +121,8 @@ And finally, we can get request the result, as long as our client certificate
 has the permission to do so:
 
 ``` bash
-$ vc-client test-collateral/shamir-secret-sharing-policy.json \
+$ vc-client \
+    --policy test-collateral/shamir-secret-sharing-policy.json \
     --identity test-collateral/result_client_cert.pem \
     --key test-collateral/result_client_key.pem \
     --result shamir-secret-sharing.wasm=-

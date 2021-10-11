@@ -9,7 +9,6 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use either::Either;
 use structopt::StructOpt;
 use std::{
     cell::RefCell,
@@ -46,41 +45,17 @@ fn parse_bind_addr(s: &str) -> String {
     }
 }
 
-/// Parse either path or a url
-///
-/// This attempts to open the file, falling back to url parsing if this
-/// doesn't work
-fn parse_policy_path_or_bind_addr(s: &std::ffi::OsStr) -> Either<path::PathBuf, String> {
-    if fs::metadata(s).ok().map(|m| m.is_file()).unwrap_or(false) {
-        Either::Left(path::PathBuf::from(s))
-    } else {
-        Either::Right(parse_bind_addr(&s.to_string_lossy()))
-    }
-}
-
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all="kebab")]
 struct Opt {
-    /// Optional path to the policy file
-    ///
-    /// Or a URL, this can actually take both a policy file or a URL to the
-    /// server since you usually only need to provide one of those.
-    ///
-    /// This tries to open the policy file, and if that fails, falls back to
-    /// treating this as a URL. If this isn't desired, you can specify either
-    /// the policy file or the URL with the explicit --policy and --url flags.
-    ///
-    #[structopt(
-        name="policy_path",
-        parse(from_os_str=parse_policy_path_or_bind_addr)
-    )]
-    policy_path_or_url: Option<Either<path::PathBuf, String>>,
-
     /// Optional URL of server to connect to
     ///
     /// If not provided, the URL in the policy file will be used
     ///
-    #[structopt(long, parse(from_str=parse_bind_addr))]
+    #[structopt(
+        parse(from_str=parse_bind_addr),
+        required_unless="policy-path"
+    )]
     url: Option<String>,
 
     /// Optional path to policy file
@@ -88,7 +63,7 @@ struct Opt {
     /// If not provided, the client will be limited to administrative commands
     /// such as querying what enclaves are running
     ///
-    #[structopt(long="policy", parse(from_os_str))]
+    #[structopt(short="p", long="policy", parse(from_os_str))]
     policy_path: Option<path::PathBuf>,
 
     /// Request quiet operation
@@ -141,7 +116,7 @@ struct Opt {
     /// policy file.
     ///
     #[structopt(
-        short, long, multiple=true, number_of_values=1,
+        short="x", long, multiple=true, number_of_values=1,
         visible_alias="programs",
         parse(try_from_os_str=parsers::parse_renamable_paths)
     )]
@@ -233,21 +208,8 @@ fn main() {
     // setup logger
     env_logger::init();
 
-    // is policy_path provided? is url?
-    let policy_path = match (opt.policy_path_or_url.as_ref(), opt.policy_path.as_ref()) {
-        (Some(Either::Left(policy_path)), None) => Some(policy_path),
-        (_, Some(policy_path))                  => Some(policy_path),
-        _                                       => None,
-    };
-
-    let url = match (&opt.policy_path_or_url, &opt.url) {
-        (Some(Either::Right(url)), None) => Some(url),
-        (_, Some(url))                   => Some(url),
-        _                                => None,
-    };
-
     // load policy
-    let policy = match policy_path {
+    let policy = match opt.policy_path.as_ref() {
         Some(policy_path) => {
             let (policy_json, policy) = match
                 fs::read_to_string(&policy_path)
@@ -271,13 +233,10 @@ fn main() {
     };
 
     // figure out the URL to connect to
-    let url = match (url.as_ref(), policy.as_ref()) {
+    let url = match (opt.url.as_ref(), policy.as_ref()) {
         (Some(url), _) => url,
         (None, Some((_, policy))) => policy.veracruz_server_url(),
-        (None, None) => {
-            eprintln!("Requires either a policy_path or url (see --help?)");
-            process::exit(2);
-        }
+        _ => unreachable!(),
     };
     qprintln!(opt, "Connecting to {}", url);
 
