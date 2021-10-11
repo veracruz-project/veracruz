@@ -15,7 +15,8 @@ env_logger = "0.8.2"
 http = "=0.2.4"
 log = "=0.4.13"
 policy-utils = { path = "../../policy-utils", features = ["std"] }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
+ring = "0.16.11"
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", features = ["std"] }
 veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }

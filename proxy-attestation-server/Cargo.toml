@@ -58,8 +58,10 @@ openssl-sys = "=0.9.70"
 percent-encoding = "2.1"
 psa-attestation = { path = "../psa-attestation" }
 rand = "0.7"
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+ring = "0.16.11"
 rouille = "=3.2.1"
+rustls = "0.16"
+serde_cbor = { version = "0.11", optional = true }
 serde_json = "1.0"
 serde_with = "=1.6.4"
 stringreader = "0.1"

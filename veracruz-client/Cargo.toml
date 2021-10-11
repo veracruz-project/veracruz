@@ -36,14 +36,15 @@ openssl-sys = "=0.9.70"
 policy-utils = { path = "../policy-utils", features = ["std"] }
 rand = "0.7.0"
 reqwest = { version = "0.9", default-features = false }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+ring = "0.16.11"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+rustls = "0.16"
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+webpki = "0.21.2"
+webpki-roots = "0.19.0"
 x509-parser = "0.12.0"
 
 [dev-dependencies]

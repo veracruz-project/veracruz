@@ -29,11 +29,12 @@ std = [
 
 [dependencies]
 err-derive = "0.2"
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", default-features = false }
+ring = "0.16.11"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz", optional = true }
+rustls = "0.16"
 serde = { git = "https://github.com/veracruz-project/serde.git", default-features = false, branch = "veracruz", optional = true }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", default-features = false }
+webpki = "=0.21.2"
 
 [patch.crates-io]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed", optional = true }

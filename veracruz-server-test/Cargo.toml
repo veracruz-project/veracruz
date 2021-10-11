@@ -41,12 +41,13 @@ lazy_static = "1.4"
 log = "=0.4.13"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+ring = "0.16.11"
+rustls = "0.16"
 transport-protocol = { path = "../transport-protocol" }
 veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+webpki = "=0.21.2"
+webpki-roots = "0.19.0"
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }

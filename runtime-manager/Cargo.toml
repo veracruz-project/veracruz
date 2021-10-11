@@ -85,8 +85,8 @@ nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", bran
 policy-utils = { path = "../policy-utils" }
 protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
 psa-attestation = { path = "../psa-attestation", optional = true }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+ring = "0.16.11"
+rustls = "0.16"
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 session-manager = { path = "../session-manager" }
