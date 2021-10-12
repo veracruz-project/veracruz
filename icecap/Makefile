@@ -54,11 +54,9 @@ veracruz-server-test: setup
 veracruz-test: setup
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
 
-# must be run inside of container
 .PHONY: test-resources
 test-resources:
-	$(MAKE) -C ../sdk
-	TEE=icecap $(MAKE) -C ../test-collateral
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
 
 .PHONY: test-system
 test-system: $(now) runtime-manager veracruz-server-test veracruz-test test-resources

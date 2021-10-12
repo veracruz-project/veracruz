@@ -98,8 +98,11 @@ $(RELATIVE_DATA):
 	$(MAKE) -C $(dir $<)
 
 env:
+# TODO_BEFORE_MERGE
+ifeq ($(IN_NIX_SHELL),"")
 	rustup target add wasm32-wasi
 	rustup component add rust-src rust-std
+endif
 
 fmt:
 	for data in $(RELATIVE_DATA_GEN); do \

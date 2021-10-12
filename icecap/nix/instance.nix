@@ -101,6 +101,7 @@ in lib.fix (self: with self; {
     veracruz-test = pkgs.linux.icecap.callPackage ./host/test.nix {} {
       name = "veracruz-test";
     };
+    test-resources = pkgs.dev.icecap.callPackage ./host/test-resources.nix {};
   };
 
   libc-supplement = configured.libs.mk {
