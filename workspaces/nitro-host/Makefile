@@ -17,6 +17,8 @@ all:
 		--features proxy-attestation-server/nitro \
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \
+		--features veracruz-server-test/nitro \
+		--features veracruz-test/nitro \
 		--features cli
 
 doc:
