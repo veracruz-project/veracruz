@@ -347,7 +347,7 @@ fn main() {
 
         match admin_client.enclave_list() {
             Ok(list) => {
-                println!("{:>5} {:<64}  {:<7}", "id", "policy hash", "uptime");
+                println!("{:>5} {:<64}  {:<7}", "id", "policy_hash", "uptime");
                 for enclave in list {
                     println!("{:>5} {:<64}  {}",
                         enclave.id,

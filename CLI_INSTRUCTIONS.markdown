@@ -219,16 +219,53 @@ The Veracruz Server is the main frontend for the compute side of Veracruz. It
 launches the Root Enclave (the trusted core of Veracruz) inside the enclave and
 provides a Rest API for communicating into the enclave.
 
-There is a lot of complexity underneath the hood, but launching the Veracruz
-Server requires only one command. Note again we are launching the Veracruz
-Server in the background:
-
-<!-- TODO upload policy as separate command -->
+There is a lot of complexity underneath the hood, but this is hidden behind the
+`vc-server` command. Note again we are launching the Veracruz Server in the
+background:
 
 ``` bash
-$ vc-server :3017 example/example-policy.json &
-Veracruz Server running on 127.0.0.1:3017
+$ vc-server :3017 &
+Veracruz Server running on 0.0.0.0:3017
+```
+
+By default, the Veracruz Server launches without a policy, so we need to provide
+a policy to Veracruz for it to know what computation to perform. This can be
+done with the `vc-client` command:
+
+``` bash
+$ vc-client :3017 --policy example/example-policy.json --setup
+Loaded policy example/example-policy.json
+  (with hash) 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01
+Connecting to 0.0.0.0:3017
+Setting up enclave
 $ sleep 10
+```
+
+At this point, the Veracruz Server will setup an enclave for the computation,
+communicating with the Proxy Attestation Server to attest the enclave and get a
+properly signed certificate.
+
+We can use `vc-client` to query what computations are up and running:
+
+``` bash
+$ vc-client :3017 --query-list
+Connecting to 0.0.0.0:3017
+Querying list of enclaves
+   id policy_hash                                                       uptime
+    0 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01  0d 0h 4m 12s
+```
+
+And we can use `vc-client` to query the computation's policy:
+
+``` bash
+$ vc-client :3017 --query-policy=-
+Connecting to 0.0.0.0:3017
+Querying policy into <stdout>
+{
+    "ciphersuite": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+    "debug": false,
+    "enable_clock": false,
+...
 ```
 
 ## Running the Veracruz Client 
@@ -239,7 +276,7 @@ example we'll use the Veracruz Client CLI interface. This provides the same
 functionality, but in a CLI form.
 
 First lets send over the program to our Veracruz server, this requires an
-identity with the "ProgramProvider" role:
+identity with write-access to the file:
 
 ``` bash
 $ vc-client \
@@ -252,9 +289,9 @@ Connecting to 127.0.0.1:3017
 Submitting <enclave>/example-binary.wasm from example/example-binary.wasm
 ```
 
-Then lets send over our data with identities with the "DataProvider" role.
-These are shares I've created that the example will use to reconstruct a
-secret message. Keep in mind most likely this data will be coming from
+Now lets send over our data with identities with write-access to the data
+files.  These are shares I've created that the example will use to reconstruct
+a secret message. Keep in mind most likely this data will be coming from
 different devices:
 
 ``` bash
@@ -286,8 +323,8 @@ Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-2 from /dev/fd/63
 ```
 
-And finally, we can request the result using an identity with the
-"RequestResult" role:
+And finally, we can request the result using an identity with read-access
+to the output files:
 
 ``` bash
 $ vc-client \
@@ -299,7 +336,6 @@ Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6
 Connecting to 127.0.0.1:3017
 Reading <enclave>/example-binary.wasm into <stdout>
 Hello World!
-Shutting down enclave
 ```
 
 Note that `--result example-binary.wasm=-` indicates that the output
@@ -308,6 +344,56 @@ of the `example-binary.wasm` binary should be written to stdout.
 And that's it! You've now completed a confidential computation. Only the
 original creator of the shares and the result reader had the permission and
 ability to observe this secret message.
+
+## Server lifetime
+
+At this point we can see that there is no computation running on the Veracruz
+Server. This is because our computation has completed:
+
+``` bash
+$ vc-client :3017 --query-list
+Connecting to 0.0.0.0:3017
+Querying list of enclaves
+   id policy_hash                                                       uptime
+```
+
+But what does it mean for a computation to "complete"? In Veracruz's case, a
+computation is complete when all clients with read permissions have signalled
+to Veracruz that they are done with the computation.
+
+The `vc-client` command does this automatically when the `--result` flag is
+provided, however this can be disabled by also providing the `--not-done`
+flag. It's also possible to signal that a client is done without reading the
+result by instead providing the `--done` flag.
+
+Now that our computation is complete, we can setup another policy file to
+continue performing more computations:
+
+``` bash
+$ vc-client :3017 --policy example/example-policy.json --setup
+Loaded policy example/example-policy.json
+  (with hash) 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01
+Connecting to 0.0.0.0:3017
+Setting up enclave
+$ sleep 10
+```
+
+``` bash
+$ vc-client :3017 --query-list
+Connecting to 0.0.0.0:3017
+Querying list of enclaves
+   id policy_hash                                                       uptime
+    0 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01  0d 0h 4m 12s
+```
+
+We can also teardown an enclave without waiting for it to complete by specifying
+the `--teardown` flag:
+
+``` bash
+$ vc-client :3017 --teardown
+Connecting to 0.0.0.0:3017
+Tearing down enclave
+```
 
 ## Cleanup
 
