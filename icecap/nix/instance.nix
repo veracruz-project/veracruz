@@ -37,29 +37,33 @@ in lib.fix (self: with self; {
 
   inherit proxyAttestationServerTestDatabase testElf;
 
-  run = platUtils.${icecapPlat}.bundle {
-    firmware = icecapFirmware.image;
-    payload = icecapFirmware.mkDefaultPayload {
-      linuxImage = pkgs.linux.icecap.linuxKernel.host.${icecapPlat}.kernel;
-      initramfs = hostUser.config.build.initramfs;
-      bootargs = [
-        "earlycon=icecap_vmm"
-        "console=hvc0"
-        "loglevel=7"
-      ] ++ lib.optionals (icecapPlat == "virt") [
-        "spec=${spec}"
-        "test_collateral=${testCollateral}"
-      ];
-    };
-    platArgs = selectIceCapPlatOr {} {
-      rpi4 = {
-        extraBootPartitionCommands = ''
-          ln -s ${spec} $out/spec.bin
-          ln -s ${testCollateral} $out/test-collateral
-        '';
+  run = { automate ? false }:
+    platUtils.${icecapPlat}.bundle {
+      firmware = icecapFirmware.image;
+      payload = icecapFirmware.mkDefaultPayload {
+        linuxImage = pkgs.linux.icecap.linuxKernel.host.${icecapPlat}.kernel;
+        initramfs = hostUser.config.build.initramfs;
+        bootargs = [
+          "earlycon=icecap_vmm"
+          "console=hvc0"
+          "loglevel=7"
+        ] ++ lib.optionals (icecapPlat == "virt") [
+          "spec=${spec}"
+          "test_collateral=${testCollateral}"
+        ];
+      };
+      platArgs = selectIceCapPlatOr {} {
+        rpi4 = {
+          extraBootPartitionCommands = ''
+            ln -s ${spec} $out/spec.bin
+            ln -s ${testCollateral} $out/test-collateral
+          '';
+        };
       };
     };
-  };
+
+  runAuto = run { automate = true; };
+  runManual = run { automate = false; };
 
   hostUser = nixosLite.eval {
     modules = [

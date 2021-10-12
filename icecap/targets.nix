@@ -17,5 +17,5 @@ in lib.flip lib.mapAttrs veracruz (_plat: attrs: {
   veracruz-server-test = attrs.env.veracruz-server-test;
   veracruz-test = attrs.env.veracruz-test;
   test-resources = attrs.env.test-resources;
-  test-system = attrs.run;
+  test-system = attrs.runManual;
 })

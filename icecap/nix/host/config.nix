@@ -17,6 +17,24 @@ let
     cp ${file} $out/bin/${name}
   '';
 
+  run-test = pkgs.writeScript "run-test" ''
+    set -eu
+
+    test_cmd=$1
+    shift
+
+    RUST_LOG=info \
+    DATABASE_URL=$VERACRUZ_DATABASE_URL \
+    VERACRUZ_ICECAP_REALM_ID=0 \
+    VERACRUZ_ICECAP_REALM_SPEC=$VERACRUZ_REALM_SPEC \
+    VERACRUZ_ICECAP_REALM_ENDPOINT=/dev/icecap_channel_realm_$VERACRUZ_ICECAP_REALM_ID \
+    VERACRUZ_POLICY_DIR=$VERACRUZ_TEST_COLLATERAL \
+    VERACRUZ_TRUST_DIR=$VERACRUZ_TEST_COLLATERAL \
+    VERACRUZ_PROGRAM_DIR=$VERACRUZ_TEST_COLLATERAL \
+    VERACRUZ_DATA_DIR=$VERACRUZ_TEST_COLLATERAL \
+      $test_cmd --test-threads=1 --nocapture --show-output "$@"
+  '';
+
 in {
   config = lib.mkMerge [
 
@@ -79,41 +97,27 @@ in {
       initramfs.extraInitCommands = ''
         d=/x
         mkdir $d
+
+        export VERACRUZ_REALM_SPEC=$d/spec.bin
+        export VERACRUZ_TEST_COLLATERAL=$d/test-collateral
+        export VERACRUZ_DATABASE_URL=$d/proxy-attestation-server.db
+
         set -x
-        cp -L $spec_src $d/spec.bin
-        ln -s $test_collateral_src $d/test-collateral
-        cp ${instance.proxyAttestationServerTestDatabase} $d/proxy-attestation-server.db
+        cp -L $spec_src $VERACRUZ_REALM_SPEC
+        ln -s $test_collateral_src $VERACRUZ_TEST_COLLATERAL
+        cp ${instance.proxyAttestationServerTestDatabase} $VERACRUZ_DATABASE_URL
         set +x
+
+        ln -s ${run-test} /run-test
       '';
 
       initramfs.profile = ''
-        run_test() {
-
-          test_cmd=$1
-          shift
-
-          cd /x
-
-          RUST_LOG=info \
-          DATABASE_URL=proxy-attestation-server.db \
-          VERACRUZ_ICECAP_REALM_ID=0 \
-          VERACRUZ_ICECAP_REALM_SPEC=spec.bin \
-          VERACRUZ_ICECAP_REALM_ENDPOINT=/dev/icecap_channel_realm_$VERACRUZ_ICECAP_REALM_ID \
-          VERACRUZ_POLICY_DIR=test-collateral \
-          VERACRUZ_TRUST_DIR=test-collateral \
-          VERACRUZ_PROGRAM_DIR=test-collateral \
-          VERACRUZ_DATA_DIR=test-collateral \
-            $test_cmd --test-threads=1 --nocapture --show-output "$@"
-        }
-
-        # convenience
-
         vst() {
-          run_test veracruz-server-test
+          sh /run-test veracruz-server-test
         }
 
         vt() {
-          run_test veracruz-test
+          sh /run-test veracruz-test
         }
       '';
     }
