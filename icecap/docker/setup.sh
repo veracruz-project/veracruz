@@ -7,7 +7,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-set -eu
+set -e
 
 if [ ! -f /nix/.installed ]; then
     echo "Installing Nix..."

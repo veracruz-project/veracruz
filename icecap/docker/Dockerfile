@@ -7,7 +7,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-FROM ubuntu:18.04
+FROM debian:bullseye-slim
 
 ARG UID
 ARG GID

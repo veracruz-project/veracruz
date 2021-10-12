@@ -15,8 +15,8 @@ dummy_crates_dir := dummy-crates
 
 now := $(build_dir)/NOW
 
-nix_build := nix-build -j$(shell nproc)
-nix_shell := nix-shell -j$(shell nproc) --pure
+nix_build := nix-build
+nix_shell := nix-shell --pure
 nix_expression := targets.nix
 nix_attribute_path := $(ICECAP_PLAT)
 

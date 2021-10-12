@@ -7,7 +7,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-# from https://github.com/nspin/minimally-invasive-nix-installer/blob/master/dist/install-min-nix.fragment.sh
+# update by copying from https://github.com/nspin/minimally-invasive-nix-installer/blob/master/dist/install-min-nix.fragment.sh
 
 set -e
 
