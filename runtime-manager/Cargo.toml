@@ -76,7 +76,7 @@ io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }
 libm = { version = "0.2", optional = true }
-log = { version = "=0.4.13", optional = true }
+log = { version = "0.4.13", optional = true }
 nix = { version = "0.15", optional = true }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "aws-nitro-enclaves-nsm-api", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }

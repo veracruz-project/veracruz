@@ -32,7 +32,7 @@ env_logger = "0.7"
 err-derive = "0.2"
 futures = "0.3"
 lazy_static = "1.4"
-log = "=0.4.13"
+log = "0.4.13"
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", features = ["std"] }
 proxy-attestation-server = { path = "../proxy-attestation-server" }

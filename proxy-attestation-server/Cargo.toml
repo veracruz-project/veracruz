@@ -50,7 +50,7 @@ half = "=1.7.1"
 hex = "0.4.2"
 http = "=0.2.4"
 lazy_static = "1.3"
-log = "=0.4.13"
+log = "0.4.13"
 nb-connect = "=1.0.3"
 nitro-enclave-attestation-document = { git = "https://github.com/veracruz-project/nitro-enclave-attestation-document.git", rev = "4d703bcde209a8d625776f6c346c36a9ad084511", optional = true }
 openssl = "0.10.24"

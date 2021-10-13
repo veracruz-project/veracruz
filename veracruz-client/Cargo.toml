@@ -22,12 +22,11 @@ nitro = []
 [dependencies]
 backtrace = "=0.3.61"
 base64 = "0.10.1"
-bitflags = "=1.2.1"
 curl = "=0.4.35"
 env_logger = { version = "0.7", optional = true }
 err-derive = "0.2"
 hex = "0.4.2"
-log = "=0.4.13"
+log = "0.4.13"
 # Used in unit tests. Mock all the network traffic
 mockall = { version = "0.5.0", optional = true }
 mockito = { version = "0.23.1", optional = true }
