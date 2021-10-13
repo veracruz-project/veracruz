@@ -11,7 +11,7 @@ icecap = []
 
 [dependencies]
 err-derive = "0.2"
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
+protobuf = "=2.8.1"
 
 [build-dependencies]
-protoc-rust = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
+protoc-rust = "=2.8.1"
