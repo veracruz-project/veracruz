@@ -75,13 +75,17 @@ deep-clean: clean
 
 ### CI ###
 
-ci_image_tag := $(image_tag)-ci
+icecap_rev := d581f77edf4ff87e07b42eec8ecd7463a2727e6f
+
+icecap_rev_short := $(shell echo $(icecap_rev) | head -c 10)
+
+ci_image_tag := $(image_tag)-ci-$(icecap_rev_short)
 ci_container_name := $(container_name)-ci
 
 .PHONY: build-ci
 build-ci:
 	docker build -f Dockerfile.ci \
-		--build-arg UID=$(uid) --build-arg GID=$(gid) \
+		--build-arg UID=$(uid) --build-arg GID=$(gid) --build-arg ICECAP_REV=$(icecap_rev) \
 		--squash \
 		--label $(label) -t $(ci_image_tag)  .
 
@@ -112,7 +116,7 @@ test-ci: build-ci
 
 ### CI + remote registry ###
 
-remote_ci_image_tag := ghcr.io/veracruz-project/veracruz/veracruz:ci-icecap
+remote_ci_image_tag := ghcr.io/veracruz-project/veracruz/veracruz:ci-icecap-$(icecap_rev_short)
 
 .PHONY: test-ci-remote
 test-ci-remote:

@@ -11,6 +11,7 @@ FROM debian:bullseye-slim
 
 ARG UID
 ARG GID
+ARG ICECAP_REV
 
 RUN apt-get update && apt-get install -y \
     curl git man make rsync \
@@ -33,6 +34,10 @@ ENV MANPATH="/nix/env/share/man:${MANPATH}"
 ENV NIX_SSL_CERT_FILE=/nix/env/etc/ssl/certs/ca-bundle.crt
 
 COPY nix.ci.conf /etc/nix/
+
+COPY populate.sh .
+COPY populate.nix .
+RUN ICECAP_REV=${ICECAP_REV} bash populate.sh && rm populate.sh populate.nix
 
 ENV NIX_BUILD_SHELL bash
 

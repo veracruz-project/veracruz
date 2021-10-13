@@ -9,7 +9,7 @@ nix_binary_cache_options=" \
 
 drv=$(nix-instantiate populate.nix $nix_binary_cache_options --add-root cache-roots)
 
-nix-store --realise $nix_binary_cache_options $(nix-store -qR $drv)
+nix-store --realise $nix_binary_cache_options $drv
 
 # NOTE
 # Counterintuitively counterproductive. We don't benefit from hard-links.
