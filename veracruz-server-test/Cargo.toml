@@ -33,7 +33,7 @@ nitro = [
 
 [dependencies]
 actix-rt = "1.1.1"
-curl = "=0.4.35"
+curl = "0.4.35"
 env_logger = "0.7"
 hex = "0.4.2"
 lazy_static = "1.4"
