@@ -87,7 +87,7 @@ ci_container_name := $(container_name_base)-ci
 .PHONY: build-ci
 build-ci:
 	docker build -f Dockerfile.ci \
-		--build-arg UID=$(uid) --build-arg GID=$(gid) --build-arg ICECAP_REV=$(icecap_rev) \
+		--build-arg ICECAP_REV=$(icecap_rev) \
 		--squash \
 		--label $(label) -t $(ci_image_tag)  .
 

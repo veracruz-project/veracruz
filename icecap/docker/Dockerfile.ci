@@ -9,8 +9,6 @@
 
 FROM debian:bullseye-slim
 
-ARG UID
-ARG GID
 ARG ICECAP_REV
 
 RUN apt-get update && apt-get install -y \
@@ -18,13 +16,7 @@ RUN apt-get update && apt-get install -y \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m -p x x
-
-RUN mkdir -m 0755 /nix && chown x /nix
-
-USER x
-
-WORKDIR /home/x
+RUN mkdir -m 0755 /nix
 
 COPY install-nix.sh .
 RUN bash install-nix.sh && rm install-nix.sh
