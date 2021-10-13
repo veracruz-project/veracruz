@@ -18,8 +18,10 @@ ifeq ($(ICECAP_LOCAL), 1)
 endif
 
 label := veracruz-icecap
-image_tag := veracruz-icecap
-container_name := veracruz-icecap
+local_repository := veracruz-icecap
+image_tag := $(local_repository):dev
+container_name_base := veracruz-icecap
+container_name := $(container_name_base)-dev
 
 uid := $(shell id -u)
 gid := $(shell id -g)
@@ -78,9 +80,9 @@ deep-clean: clean
 icecap_rev := d581f77edf4ff87e07b42eec8ecd7463a2727e6f
 
 icecap_rev_short := $(shell echo $(icecap_rev) | head -c 10)
-
-ci_image_tag := $(image_tag)-ci-$(icecap_rev_short)
-ci_container_name := $(container_name)-ci
+ci_image_tag_name := ci-$(icecap_rev_short)
+ci_image_tag := $(local_repository):$(ci_image_tag_name)
+ci_container_name := $(container_name_base)-ci
 
 .PHONY: build-ci
 build-ci:
@@ -108,7 +110,7 @@ clean-ci:
 
 .PHONY: test-ci
 test-ci: build-ci
-	docker run -i --rm --label $(label) \
+	docker run -it --rm --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
 		$(icecap_mount) \
 		$(ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
@@ -116,7 +118,8 @@ test-ci: build-ci
 
 ### CI + remote registry ###
 
-remote_ci_image_tag := ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-$(icecap_rev_short)
+remote_repository := ghcr.io/veracruz-project/veracruz/veracruz-icecap
+remote_ci_image_tag := $(remote_repository):$(ci_image_tag_name)
 
 .PHONY: test-ci-remote
 test-ci-remote:

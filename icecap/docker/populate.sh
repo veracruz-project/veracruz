@@ -7,10 +7,4 @@ nix_binary_cache_options=" \
     --option extra-trusted-public-keys $nix_binary_cache_public_key \
 "
 
-drv=$(nix-instantiate populate.nix $nix_binary_cache_options --add-root cache-roots)
-
-nix-store --realise $nix_binary_cache_options $drv
-
-# NOTE
-# Counterintuitively counterproductive. We don't benefit from hard-links.
-# nix-store --optimise
+nix-build $nix_binary_cache_options populate.nix --no-out-link
