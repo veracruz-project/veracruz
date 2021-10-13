@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -m 0755 /nix
 
+RUN groupadd -r nixbld && useradd -rMN -g nixbld -G nixbld -d /var/empty -s /bin/false nixbld
+
 COPY install-nix.sh .
 RUN bash install-nix.sh && rm install-nix.sh
 
