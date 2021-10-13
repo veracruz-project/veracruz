@@ -40,7 +40,7 @@ serde = { version = "1.0.115", features = ["derive"] }
 typetag = "=0.1.6"
 wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace" }
-wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
+wasmtime = { version = "0.27", optional = true }
 wast = "=35.0.0"
 
 [lib]
