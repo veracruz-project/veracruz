@@ -126,5 +126,9 @@ jobs:
       volumes: 
         - ${{ github.workspace }}:/work/veracruz 
     steps:
+      - name: Check out the Veracruz repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Build and test Veracruz on IceCap
         run: bash /work/veracruz/icecap/ci/run.sh
