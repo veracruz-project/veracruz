@@ -78,7 +78,16 @@ $(now):
 	date +%s | tr -d '\n' > $@
 
 
+# TODO integrate
+
+.PHONY: set-key-permissions
+set-key-permissions:
+	chmod 0400 nix/keys/client.priv
+
 .PHONY: run-tests
-run-tests:
-	@chmod 0400 nix/keys/dev.priv
+run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-resources
 	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).$@ --no-out-link) && $$script
+
+.PHONY: run-tests-stale
+run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-resources
+	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && $$script

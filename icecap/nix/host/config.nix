@@ -12,14 +12,15 @@
 { config, pkgs, lib, ... }:
 
 let
+  devAddr = "10.0.2.2";
+
   executableInContext = name: file: pkgs.runCommand name {} ''
     mkdir -p $out/bin
     cp ${file} $out/bin/${name}
   '';
 
   run-test = pkgs.writeScript "run-test.sh" ''
-    #!/bin/sh
-
+    #!${config.build.extraUtils}/bin/sh
     set -eu
 
     test_cmd=$1
@@ -38,9 +39,8 @@ let
   '';
 
   run-tests = pkgs.writeScript "run-tests.sh" ''
-    #!/bin/sh
-
-    set -e
+    #!${config.build.extraUtils}/bin/sh
+    set -eu
 
     # HACK
     d=/x
@@ -51,10 +51,6 @@ let
     /run-test veracruz-test
     /run-test veracruz-server-test
   '';
-
-  dropbearCmd = "dropbear -Es -r /keys/dropbear_ecdsa_host_key -p 0.0.0.0:22";
-
-  devAddr = "10.0.2.2";
 
 in {
   config = lib.mkMerge [
@@ -143,11 +139,11 @@ in {
         chmod -R 0500 /keys
         mkdir -p /root/.ssh
         export HOME=/root
-        cp /keys/dev.pub /root/.ssh/authorized_keys
+        cp /keys/client.pub /root/.ssh/authorized_keys
         echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
 
         if [ "$automate" = "1" ]; then
-          ${dropbearCmd}
+          dropbear -Es -r /keys/dropbear_ecdsa_server_key -p 0.0.0.0:22
           echo "host: ready"
           nc ${devAddr} ${readyPort} < /dev/null
           echo "host: ready ack ack"
@@ -161,10 +157,6 @@ in {
 
         vt() {
           /run-test veracruz-test
-        }
-
-        s() {
-          ${dropbearCmd}
         }
       '';
     }

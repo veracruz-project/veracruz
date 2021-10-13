@@ -50,13 +50,13 @@ in lib.fix (self: with self; {
     ${runAuto}/run < /dev/null &
 
     ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
-    echo "dev: ready"
+    echo "dev: ready ack"
 
     ${pkgs.dev.openssh}/bin/ssh \
       -o UserKnownHostsFile=/dev/null \
       -o StrictHostKeyChecking=no \
       -o Preferredauthentications=publickey \
-      -i ${toString ./keys/dev.priv} root@localhost -p ${sshPort} \
+      -i ${toString ./keys/client.priv} root@localhost -p ${sshPort} \
       /run-tests
   '';
 

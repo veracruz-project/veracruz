@@ -13,7 +13,8 @@ ARG UID
 ARG GID
 
 RUN apt-get update && apt-get install -y \
-    curl git man make rsync procps \
+    curl git man make rsync \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m -p x x
