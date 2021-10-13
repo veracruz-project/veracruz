@@ -29,7 +29,9 @@ all: run
 
 .PHONY: build
 build:
-	docker build --build-arg UID=$(uid) --build-arg GID=$(gid) --label $(label) -t $(image_tag) .
+	docker build \
+		--build-arg UID=$(uid) --build-arg GID=$(gid) \
+		--label $(label) -t $(image_tag) .
 
 $(nix_root):
 	mkdir -p -m 0755 $@
@@ -69,3 +71,22 @@ deep-clean: clean
 		chmod -R u+w $(nix_root); \
 		rm -rf $(nix_root); \
 	fi
+
+ci_image_tag := $(image_tag)-ci
+ci_container_name := $(container_name)-ci
+
+.PHONY: build-ci
+build-ci:
+	docker build -f Dockerfile.ci \
+		--build-arg UID=$(uid) --build-arg GID=$(gid) \
+		--label $(label) -t $(ci_image_tag)  .
+
+.PHONY: run-ci
+run-ci: build-ci
+	docker run --privileged -d --name $(ci_container_name) --label $(label) \
+		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
+		$(ci_image_tag) sleep inf
+
+.PHONY: exec-ci
+exec:-ci
+	docker exec -it $(ci_container_name) bash
