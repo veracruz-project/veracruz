@@ -17,7 +17,7 @@ linux = []
 nitro = []
 
 [dependencies]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+libc = "0.2.69"
 
 [build-dependencies]
 bindgen = "0.53.1"
