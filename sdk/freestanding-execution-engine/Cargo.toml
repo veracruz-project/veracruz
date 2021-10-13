@@ -14,6 +14,8 @@ log = "0.4.13"
 postcard = "0.7.2"
 policy-utils = { path = "../../policy-utils", features = ["std"] }
 wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
+wast = "35.0.0"
+wat = "1.0.38"
 
 [patch.crates-io]
 serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }

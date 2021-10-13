@@ -41,7 +41,7 @@ typetag = "=0.1.6"
 wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace" }
 wasmtime = { version = "0.27", optional = true }
-wast = "=35.0.0"
+wast = "35.0.0"
 
 [lib]
 name = "execution_engine"
