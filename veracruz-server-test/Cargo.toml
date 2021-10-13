@@ -36,7 +36,6 @@ actix-rt = "1.1.1"
 curl = "=0.4.35"
 env_logger = "0.7"
 hex = "0.4.2"
-http = "=0.2.4"
 lazy_static = "1.4"
 log = "=0.4.13"
 policy-utils = { path = "../policy-utils", optional = true }

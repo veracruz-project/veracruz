@@ -62,14 +62,12 @@ nitro = [
 
 [dependencies]
 bincode = { version = "1.2.1", default-features = false, optional = true }
-bitflags = "=1.2.1"
 clap = { version = "2.33", optional = true }
 env_logger = { version = "0.8.3", optional = true }
 err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
 half = "=1.7.1"
 hex = { version = "0.4.2" }
-http = "=0.2.4"
 icecap-core = { path = "../icecap/crates/icecap/icecap-core", optional = true }
 icecap-event-server-types = { path = "../icecap/crates/components/event-server/types", optional = true }
 icecap-start-generic = { path = "../icecap/crates/icecap/icecap-start/generic", optional = true }
