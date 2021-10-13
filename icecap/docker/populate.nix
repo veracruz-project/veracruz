@@ -20,15 +20,9 @@ let
 
   configured = pkgs.none.icecap.configured.virt;
 
-  inherit (pkgs.dev) runCommand nukeReferences;
+  inherit (configured) icecapFirmware icecapPlat;
   inherit (pkgs.none.icecap) platUtils;
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
-  inherit (pkgs.musl.icecap) icecap-host;
-  inherit (configured) icecapFirmware icecapPlat;
-
-  hostUser = nixosLite.eval {
-    modules = [];
-  };
 
   run = platUtils.${icecapPlat}.bundle {
     firmware = icecapFirmware.image;
@@ -39,14 +33,18 @@ let
     };
   };
 
+  hostUser = nixosLite.eval {
+    modules = [];
+  };
+
   roots = [
     run
-    icecap-host
     pkgs.dev.icecap.rustc
     pkgs.dev.icecap.cargo
-
-    # extra
+    pkgs.musl.icecap.icecap-host
     pkgs.linux.dropbear
+    configured.sysroot-rs
+    configured.icecap-sel4-sys-gen
   ];
 
 in

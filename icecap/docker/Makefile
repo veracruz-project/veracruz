@@ -115,6 +115,10 @@ test-ci: build-ci
 		$(icecap_mount) \
 		$(ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
 
+.PHONY: test-ci-populate
+test-ci-populate:
+	ICECAP_REV=$(icecap_rev) bash populate.sh
+
 
 ### CI + remote registry ###
 
