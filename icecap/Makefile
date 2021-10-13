@@ -72,17 +72,9 @@ test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-ser
 test-system-stale-test-resources: $(now) runtime-manager veracruz-server-test veracruz-test # implicit prerequisite: test-resources
 	$(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system
 
-# HACK for setting time in host and realm
-$(now):
-	mkdir -p $(dir $@)
-	date +%s | tr -d '\n' > $@
-
-
-# TODO integrate
-
 .PHONY: set-key-permissions
 set-key-permissions:
-	chmod 0400 nix/keys/client.priv
+	chmod 0400 nix/host/keys/client.priv
 
 .PHONY: run-tests
 run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-resources
@@ -91,3 +83,8 @@ run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test verac
 .PHONY: run-tests-stale
 run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-resources
 	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && $$script
+
+# HACK for setting time in host and realm
+$(now):
+	mkdir -p $(dir $@)
+	date +%s | tr -d '\n' > $@

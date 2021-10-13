@@ -84,10 +84,10 @@ in {
       initramfs.extraInitCommands = ''
         mount -t debugfs none /sys/kernel/debug/
 
-        date -s '@${now}'
-
         mkdir -p /bin
         ln -s $(which sh) /bin/sh
+
+        date -s '@${now}'
       '';
     }
 
@@ -135,7 +135,7 @@ in {
         ln -s ${run-tests} /run-tests
 
         mkdir -p /keys
-        cp -rp ${../keys}/* /keys
+        cp -rp ${./keys}/* /keys
         chmod -R 0500 /keys
         mkdir -p /root/.ssh
         export HOME=/root

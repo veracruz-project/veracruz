@@ -44,8 +44,12 @@ in lib.fix (self: with self; {
     #!${pkgs.dev.runtimeShell}
     set -e
 
+    cleanup() {
+      kill $(jobs -p)
+    }
+
     trap "exit" INT TERM
-    trap "kill 0" EXIT
+    trap "cleanup" EXIT
 
     ${runAuto}/run < /dev/null &
 
@@ -56,7 +60,7 @@ in lib.fix (self: with self; {
       -o UserKnownHostsFile=/dev/null \
       -o StrictHostKeyChecking=no \
       -o Preferredauthentications=publickey \
-      -i ${toString ./keys/client.priv} root@localhost -p ${sshPort} \
+      -i ${toString ./host/keys/client.priv} root@localhost -p ${sshPort} \
       /run-tests
   '';
 
