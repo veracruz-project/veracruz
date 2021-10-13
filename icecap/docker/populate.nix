@@ -42,6 +42,8 @@ let
   roots = [
     run
     icecap-host
+    pkgs.dev.icecap.rustc
+    pkgs.dev.icecap.cargo
 
     # extra
     pkgs.linux.dropbear

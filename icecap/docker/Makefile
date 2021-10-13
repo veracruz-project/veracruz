@@ -108,7 +108,7 @@ clean-ci:
 
 .PHONY: test-ci
 test-ci: build-ci
-	docker run --rm --label $(label) \
+	docker run -i --rm --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
 		$(icecap_mount) \
 		$(ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
