@@ -19,6 +19,7 @@ nitro = [
 std = [
   "platform-services/std",
   "policy-utils/std",
+  "ring",
   "wasmtime",
 ]
 
@@ -34,16 +35,14 @@ num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
+ring = { version = "0.16.11", optional = true }
+serde = { version = "1.0.115", features = ["derive"] }
 typetag = "=0.1.6"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
-wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
+wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace" }
 wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
 wast = "=35.0.0"
 
 [lib]
 name = "execution_engine"
 path = "./src/lib.rs"
-
-[patch.crates-io]
-serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }

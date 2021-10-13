@@ -61,7 +61,7 @@ nitro = [
 ]
 
 [dependencies]
-bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
+bincode = { version = "1.2.1", default-features = false, optional = true }
 bitflags = "=1.2.1"
 clap = { version = "2.33", optional = true }
 env_logger = { version = "0.8.3", optional = true }
@@ -88,11 +88,12 @@ psa-attestation = { path = "../psa-attestation", optional = true }
 ring = "0.16.11"
 rustls = "0.16"
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
+serde_json = "1.0"
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
+wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace", optional = true }
 
 [profile.release]
 lto = true

@@ -29,6 +29,4 @@ opt-level = 3
 
 [patch.crates-io]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
-serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
-serde_derive = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
 webpki = { git = "https://github.com/mathias-arm/webpki.git", branch = "unrecognized_extensions" }

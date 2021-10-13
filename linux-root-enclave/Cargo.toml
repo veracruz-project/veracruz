@@ -8,7 +8,7 @@ version = "0.3.0"
 
 [dependencies]
 base64 = "0.13.0"
-bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false }
+bincode = { version = "1.2.1", default-features = false }
 clap = "2.33"
 env_logger = "0.8.3"
 err-derive = "0.3.0"
@@ -21,7 +21,7 @@ nix = "0.20.0"
 openssl-sys = "=0.9.70"
 psa-attestation = { path = "../psa-attestation", features = ["linux"] }
 ring = "0.16.11"
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
+serde = { version = "1.0.115", features = ["derive"] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils/", features = ["linux"] }
 
