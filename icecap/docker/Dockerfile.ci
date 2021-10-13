@@ -11,12 +11,12 @@ FROM debian:bullseye-slim
 
 ARG UID
 ARG GID
+ARG ICECAP_REV
 
 RUN apt-get update && apt-get install -y \
     curl git man make rsync \
     procps \
     && rm -rf /var/lib/apt/lists/*
-
 
 RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m -p x x
 
@@ -37,7 +37,7 @@ COPY nix.ci.conf /etc/nix/
 
 COPY populate.sh .
 COPY populate.nix .
-RUN bash populate.sh && rm populate.sh populate.nix
+RUN ICECAP_REV=${ICECAP_REV} bash populate.sh && rm populate.sh populate.nix
 
 ENV NIX_BUILD_SHELL bash
 

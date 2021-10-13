@@ -72,21 +72,33 @@ deep-clean: clean
 		rm -rf $(nix_root); \
 	fi
 
-ci_image_tag := $(image_tag)-ci
+icecap_rev := d581f77edf4ff87e07b42eec8ecd7463a2727e6f
+
+icecap_rev_short := $(shell echo $(icecap_rev) | head -c 10)
+
+ci_image_tag := $(image_tag)-ci-$(icecap_rev_short)
 ci_container_name := $(container_name)-ci
 
 .PHONY: build-ci
 build-ci:
 	docker build -f Dockerfile.ci \
-		--build-arg UID=$(uid) --build-arg GID=$(gid) \
+		--build-arg UID=$(uid) --build-arg GID=$(gid) --build-arg ICECAP_REV=$(icecap_rev) \
+		--squash \
 		--label $(label) -t $(ci_image_tag)  .
 
 .PHONY: run-ci
 run-ci: build-ci
-	docker run --privileged -d --name $(ci_container_name) --label $(label) \
+	docker run -d --name $(ci_container_name) --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
+		$(icecap_mount) \
 		$(ci_image_tag) sleep inf
 
 .PHONY: exec-ci
-exec:-ci
+exec-ci:
 	docker exec -it $(ci_container_name) bash
+
+.PHONY: clean-ci
+clean-ci:
+	for id in $$(docker ps -aq -f "name=$(ci_container_name)"); do \
+		docker rm -f $$id; \
+	done
