@@ -72,6 +72,9 @@ deep-clean: clean
 		rm -rf $(nix_root); \
 	fi
 
+
+### CI ###
+
 icecap_rev := d581f77edf4ff87e07b42eec8ecd7463a2727e6f
 
 icecap_rev_short := $(shell echo $(icecap_rev) | head -c 10)
@@ -102,3 +105,33 @@ clean-ci:
 	for id in $$(docker ps -aq -f "name=$(ci_container_name)"); do \
 		docker rm -f $$id; \
 	done
+
+.PHONY: test-ci
+test-ci: build-ci
+	docker run --rm --label $(label) \
+		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
+		$(icecap_mount) \
+		$(ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
+
+
+### CI + remote registry ###
+
+remote_ci_image_tag := ghcr.io/veracruz-project/veracruz/veracruz:ci-icecap-$(icecap_rev_short)
+
+.PHONY: test-ci-remote
+test-ci-remote:
+	docker run --rm --label $(label) \
+		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
+		$(icecap_mount) \
+		$(remote_ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
+
+.PHONY: pull-ci
+pull-ci:
+	docker rmi $(remote_ci_image_tag)
+	docker pull $(remote_ci_image_tag)
+
+# NOTE use caution
+.PHONY: push-ci
+push-ci:
+	docker tag $(ci_image_tag) $(remote_ci_image_tag)
+	docker push $(remote_ci_image_tag)
