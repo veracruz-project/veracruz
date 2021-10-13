@@ -99,7 +99,7 @@ $(RELATIVE_DATA):
 
 env:
 # TODO_BEFORE_MERGE
-ifeq ($(IN_NIX_SHELL),"")
+ifeq ($(IN_NIX_SHELL),)
 	rustup target add wasm32-wasi
 	rustup component add rust-src rust-std
 endif
