@@ -25,7 +25,7 @@ ENV PATH="/nix/env/bin:${PATH}"
 ENV MANPATH="/nix/env/share/man:${MANPATH}"
 ENV NIX_SSL_CERT_FILE=/nix/env/etc/ssl/certs/ca-bundle.crt
 
-COPY nix.ci.conf /etc/nix/
+COPY nix.ci.conf /etc/nix/nix.conf
 
 COPY populate.sh .
 COPY populate.nix .
