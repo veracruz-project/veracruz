@@ -42,11 +42,7 @@ let
     #!${config.build.extraUtils}/bin/sh
     set -eu
 
-    # HACK
-    d=/x
-    export VERACRUZ_REALM_SPEC=$d/spec.bin
-    export VERACRUZ_TEST_COLLATERAL=$d/test-collateral
-    export VERACRUZ_DATABASE_URL=$d/proxy-attestation-server.db
+    . /env.sh
 
     /run-test veracruz-test
     /run-test veracruz-server-test
@@ -65,12 +61,11 @@ in {
         cp -pdv ${pkgs.sqlite.out}/lib/libsqlite3.so* $out/lib
 
         copy_bin_and_libs ${pkgs.muslPkgs.icecap.icecap-host}/bin/icecap-host
-        copy_bin_and_libs ${pkgs.dropbear}/bin/dropbear
 
-        # utilities for setup and debugging
         copy_bin_and_libs ${pkgs.strace}/bin/strace
         copy_bin_and_libs ${pkgs.iproute}/bin/ip
         copy_bin_and_libs ${pkgs.curl.bin}/bin/curl
+        copy_bin_and_libs ${pkgs.dropbear}/bin/dropbear
         copy_bin_and_libs ${pkgs.glibc.bin}/bin/locale
         copy_bin_and_libs ${pkgs.glibc.bin}/bin/localedef
         cp -pdv ${pkgs.libunwind}/lib/libunwind-aarch64*.so* $out/lib
@@ -87,7 +82,29 @@ in {
         mkdir -p /bin
         ln -s $(which sh) /bin/sh
 
+        echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
+        mkdir -p /root/.ssh
+        ln -s ${./keys}/client.pub /root/.ssh/authorized_keys
+        export HOME=/root
+
         date -s '@${now}'
+
+        ln -s ${run-test} /run-test
+        ln -s ${run-tests} /run-tests
+
+        (
+          d=/x
+          mkdir $d
+
+          cat <<EOF > /env.sh
+          export VERACRUZ_REALM_SPEC=$d/spec.bin
+          export VERACRUZ_TEST_COLLATERAL=$d/test-collateral
+          export VERACRUZ_DATABASE_URL=$d/proxy-attestation-server.db
+        # de-dent for heredoc:
+        EOF
+        )
+
+        . /env.sh
       '';
     }
 
@@ -118,45 +135,23 @@ in {
 
     {
       initramfs.extraInitCommands = ''
-        d=/x
-        mkdir $d
-
-        export VERACRUZ_REALM_SPEC=$d/spec.bin
-        export VERACRUZ_TEST_COLLATERAL=$d/test-collateral
-        export VERACRUZ_DATABASE_URL=$d/proxy-attestation-server.db
-
-        set -x
         cp -L $spec_src $VERACRUZ_REALM_SPEC
         ln -s $test_collateral_src $VERACRUZ_TEST_COLLATERAL
         cp ${instance.proxyAttestationServerTestDatabase} $VERACRUZ_DATABASE_URL
-        set +x
-
-        ln -s ${run-test} /run-test
-        ln -s ${run-tests} /run-tests
-
-        mkdir -p /keys
-        cp -rp ${./keys}/* /keys
-        chmod -R 0500 /keys
-        mkdir -p /root/.ssh
-        export HOME=/root
-        cp /keys/client.pub /root/.ssh/authorized_keys
-        echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
 
         if [ "$automate" = "1" ]; then
-          dropbear -Es -r /keys/dropbear_ecdsa_server_key -p 0.0.0.0:22
-          echo "host: ready"
+          dropbear -Es -r ${./keys}/dropbear_ecdsa_server_key -p 0.0.0.0:22
           nc ${devAddr} ${readyPort} < /dev/null
-          echo "host: ready ack ack"
         fi
       '';
 
       initramfs.profile = ''
-        vst() {
-          /run-test veracruz-server-test
-        }
-
         vt() {
           /run-test veracruz-test
+        }
+
+        vst() {
+          /run-test veracruz-server-test
         }
       '';
     }

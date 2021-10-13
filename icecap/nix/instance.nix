@@ -54,7 +54,6 @@ in lib.fix (self: with self; {
     ${runAuto}/run < /dev/null &
 
     ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
-    echo "dev: ready ack"
 
     ${pkgs.dev.openssh}/bin/ssh \
       -o UserKnownHostsFile=/dev/null \
@@ -65,6 +64,7 @@ in lib.fix (self: with self; {
   '';
 
   run = { automate ? false }:
+    assert automate -> icecapPlat == "virt";
     platUtils.${icecapPlat}.bundle {
       firmware = icecapFirmware.image;
       payload = icecapFirmware.mkDefaultPayload {
