@@ -7,7 +7,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-{ icecapPlat, now, instance }:
+{ icecapPlat, now, readyPort, instance }:
 
 { config, pkgs, lib, ... }:
 
@@ -17,7 +17,9 @@ let
     cp ${file} $out/bin/${name}
   '';
 
-  run-test = pkgs.writeScript "run-test" ''
+  run-test = pkgs.writeScript "run-test.sh" ''
+    #!/bin/sh
+
     set -eu
 
     test_cmd=$1
@@ -35,6 +37,25 @@ let
       $test_cmd --test-threads=1 --nocapture --show-output "$@"
   '';
 
+  run-tests = pkgs.writeScript "run-tests.sh" ''
+    #!/bin/sh
+
+    set -e
+
+    # HACK
+    d=/x
+    export VERACRUZ_REALM_SPEC=$d/spec.bin
+    export VERACRUZ_TEST_COLLATERAL=$d/test-collateral
+    export VERACRUZ_DATABASE_URL=$d/proxy-attestation-server.db
+
+    /run-test veracruz-test
+    /run-test veracruz-server-test
+  '';
+
+  dropbearCmd = "dropbear -Es -r /keys/dropbear_ecdsa_host_key -p 0.0.0.0:22";
+
+  devAddr = "10.0.2.2";
+
 in {
   config = lib.mkMerge [
 
@@ -48,13 +69,16 @@ in {
         cp -pdv ${pkgs.sqlite.out}/lib/libsqlite3.so* $out/lib
 
         copy_bin_and_libs ${pkgs.muslPkgs.icecap.icecap-host}/bin/icecap-host
+        copy_bin_and_libs ${pkgs.dropbear}/bin/dropbear
 
         # utilities for setup and debugging
         copy_bin_and_libs ${pkgs.strace}/bin/strace
         copy_bin_and_libs ${pkgs.iproute}/bin/ip
         copy_bin_and_libs ${pkgs.curl.bin}/bin/curl
+        copy_bin_and_libs ${pkgs.glibc.bin}/bin/locale
+        copy_bin_and_libs ${pkgs.glibc.bin}/bin/localedef
         cp -pdv ${pkgs.libunwind}/lib/libunwind-aarch64*.so* $out/lib
-        cp -pdv ${pkgs.glibc}/lib/libnss_dns*.so* $out/lib
+        cp -pdv ${pkgs.glibc}/lib/libnss_*.so* $out/lib
       '';
 
       net.interfaces = {
@@ -65,6 +89,9 @@ in {
         mount -t debugfs none /sys/kernel/debug/
 
         date -s '@${now}'
+
+        mkdir -p /bin
+        ln -s $(which sh) /bin/sh
       '';
     }
 
@@ -109,15 +136,35 @@ in {
         set +x
 
         ln -s ${run-test} /run-test
+        ln -s ${run-tests} /run-tests
+
+        mkdir -p /keys
+        cp -rp ${../keys}/* /keys
+        chmod -R 0500 /keys
+        mkdir -p /root/.ssh
+        export HOME=/root
+        cp /keys/dev.pub /root/.ssh/authorized_keys
+        echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
+
+        if [ "$automate" = "1" ]; then
+          ${dropbearCmd}
+          echo "host: ready"
+          nc ${devAddr} ${readyPort} < /dev/null
+          echo "host: ready ack ack"
+        fi
       '';
 
       initramfs.profile = ''
         vst() {
-          sh /run-test veracruz-server-test
+          /run-test veracruz-server-test
         }
 
         vt() {
-          sh /run-test veracruz-test
+          /run-test veracruz-test
+        }
+
+        s() {
+          ${dropbearCmd}
         }
       '';
     }

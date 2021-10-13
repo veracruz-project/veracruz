@@ -76,3 +76,9 @@ test-system-stale-test-resources: $(now) runtime-manager veracruz-server-test ve
 $(now):
 	mkdir -p $(dir $@)
 	date +%s | tr -d '\n' > $@
+
+
+.PHONY: run-tests
+run-tests:
+	@chmod 0400 nix/keys/dev.priv
+	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).$@ --no-out-link) && $$script

@@ -31,11 +31,34 @@ let
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
 
+  sshPort = "6666";
+  readyPort = "6667";
+
 in lib.fix (self: with self; {
 
   inherit configured;
 
   inherit proxyAttestationServerTestDatabase testElf;
+
+  runTests = pkgs.dev.writeScript "run-test.sh" ''
+    #!${pkgs.dev.runtimeShell}
+    set -e
+
+    trap "exit" INT TERM
+    trap "kill 0" EXIT
+
+    ${runAuto}/run < /dev/null &
+
+    ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
+    echo "dev: ready"
+
+    ${pkgs.dev.openssh}/bin/ssh \
+      -o UserKnownHostsFile=/dev/null \
+      -o StrictHostKeyChecking=no \
+      -o Preferredauthentications=publickey \
+      -i ${toString ./keys/dev.priv} root@localhost -p ${sshPort} \
+      /run-tests
+  '';
 
   run = { automate ? false }:
     platUtils.${icecapPlat}.bundle {
@@ -50,9 +73,14 @@ in lib.fix (self: with self; {
         ] ++ lib.optionals (icecapPlat == "virt") [
           "spec=${spec}"
           "test_collateral=${testCollateral}"
+        ] ++ lib.optionals automate [
+          "automate=1"
         ];
       };
       platArgs = selectIceCapPlatOr {} {
+        virt = {
+          extraNetDevArgs = "hostfwd=tcp::${sshPort}-:22";
+        };
         rpi4 = {
           extraBootPartitionCommands = ''
             ln -s ${spec} $out/spec.bin
@@ -68,7 +96,7 @@ in lib.fix (self: with self; {
   hostUser = nixosLite.eval {
     modules = [
       (import ./host/config.nix {
-        inherit icecapPlat now;
+        inherit icecapPlat now readyPort;
         instance = self;
       })
     ];
