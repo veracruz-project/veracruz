@@ -116,7 +116,7 @@ test-ci: build-ci
 
 ### CI + remote registry ###
 
-remote_ci_image_tag := ghcr.io/veracruz-project/veracruz/veracruz:ci-icecap-$(icecap_rev_short)
+remote_ci_image_tag := ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-$(icecap_rev_short)
 
 .PHONY: test-ci-remote
 test-ci-remote:
