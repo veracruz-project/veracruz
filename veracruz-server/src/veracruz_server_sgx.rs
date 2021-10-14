@@ -32,8 +32,14 @@ pub mod veracruz_server_sgx {
     };
     use std::{ffi::CStr, mem};
     use std::io::Write;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering;
     use tempfile;
     use veracruz_utils::policy::policy::Policy;
+
+    lazy_static! {
+        static ref ENCLAVE_IN_USE: AtomicBool = AtomicBool::new(false);
+    }
 
     lazy_static! {
         static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
@@ -500,6 +506,10 @@ pub mod veracruz_server_sgx {
 
     impl VeracruzServer for VeracruzServerSGX {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
+            if ENCLAVE_IN_USE.load(Ordering::SeqCst) {
+                Err(VeracruzServerError::UninitializedEnclaveError)?
+            }
+
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_BINARY)?;
 
             let mut new_veracruz_server = VeracruzServerSGX {
@@ -533,6 +543,7 @@ pub mod veracruz_server_sgx {
             };
 
             if (result == 0) && (ret == 0) {
+                ENCLAVE_IN_USE.store(true, Ordering::SeqCst);
                 Ok(new_veracruz_server)
             } else {
                 debug!(
@@ -638,6 +649,12 @@ pub mod veracruz_server_sgx {
         fn close(&mut self) -> Result<bool, VeracruzServerError> {
             //self.runtime_manager_enclave.destroy();
             Ok(true)
+        }
+    }
+
+    impl Drop for VeracruzServerSGX {
+        fn drop(&mut self) {
+            ENCLAVE_IN_USE.store(false, Ordering::SeqCst);
         }
     }
 

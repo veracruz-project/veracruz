@@ -32,6 +32,10 @@ pub mod veracruz_server_tz {
     };
 
     lazy_static! {
+        static ref ENCLAVE_IN_USE: AtomicBool = AtomicBool::new(false);
+    }
+
+    lazy_static! {
         static ref CONTEXT: Mutex<Option<Context>> = Mutex::new(Some(Context::new().unwrap()));
         static ref TRUSTZONE_ROOT_ENCLAVE_INITIALIZED: AtomicBool = AtomicBool::new(false);
     }
@@ -42,6 +46,10 @@ pub mod veracruz_server_tz {
 
     impl VeracruzServer for VeracruzServerTZ {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
+            if ENCLAVE_IN_USE.load(Ordering::SeqCst) {
+                Err(VeracruzServerError::UninitializedEnclaveError)?
+            }
+
             let policy: Policy =
                 Policy::from_json(policy_json)?;
 
@@ -150,6 +158,7 @@ pub mod veracruz_server_tz {
                 session.invoke_command(RuntimeManagerOpcode::PopulateCertificates as u32, &mut operation)?;
             }
 
+            ENCLAVE_IN_USE.store(true, Ordering::SeqCst);
             Ok(Self {
                 runtime_manager_uuid: RUNTIME_MANAGER_UUID.to_string(),
             })
@@ -266,6 +275,8 @@ pub mod veracruz_server_tz {
                 Err(err) => panic!("VeracruzServerTZ::drop failed in call to self.close:{:?}", err),
                 _ => (),
             }
+
+            ENCLAVE_IN_USE.store(false, Ordering::SeqCst);
         }
     }
 

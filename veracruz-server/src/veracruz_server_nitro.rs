@@ -13,6 +13,8 @@
 pub mod veracruz_server_nitro {
     use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
     use std::io::Read;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering;
     use veracruz_utils::platform::nitro::nitro::{RuntimeManagerMessage, NitroStatus};
     use veracruz_utils::platform::nitro::nitro_enclave::NitroEnclave;
     use veracruz_utils::policy::policy::Policy;
@@ -20,12 +22,20 @@ pub mod veracruz_server_nitro {
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
 
+    lazy_static! {
+        static ref ENCLAVE_IN_USE: AtomicBool = AtomicBool::new(false);
+    }
+
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
     }
 
     impl VeracruzServer for VeracruzServerNitro {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
+            if ENCLAVE_IN_USE.load(Ordering::SeqCst) {
+                Err(VeracruzServerError::UninitializedEnclaveError)?
+            }
+
             // Set up, initialize Nitro Root Enclave
             let policy: Policy =
                 Policy::from_json(policy_json)?;
@@ -91,6 +101,7 @@ pub mod veracruz_server_nitro {
                 _ => return Err(VeracruzServerError::NitroStatus(status)),
             }
             println!("VeracruzServerNitro::new complete. Returning");
+            ENCLAVE_IN_USE.store(true, Ordering::SeqCst);
             return Ok(meta);
         }
 
@@ -195,6 +206,8 @@ pub mod veracruz_server_nitro {
                 Err(err) => println!("VeracruzServerNitro::drop failed in call to self.close:{:?}, we will persevere, though.", err),
                 _ => (),
             }
+
+            ENCLAVE_IN_USE.store(false, Ordering::SeqCst);
         }
     }
 

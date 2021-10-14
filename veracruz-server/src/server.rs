@@ -21,7 +21,9 @@ use actix_web::{dev::Server, get, middleware, post, web, App, HttpServer};
 use base64;
 use futures::executor;
 use std::{
+    collections::HashMap,
     net::ToSocketAddrs,
+    num::ParseIntError,
     sync::{Arc, Mutex, mpsc},
     thread,
     time::{Duration, SystemTime},
@@ -40,11 +42,35 @@ struct EnclaveState {
 
 /// State of enclaves
 struct EnclaveHandler {
-    enclave: Option<EnclaveState>,
+    enclaves: HashMap<u32, EnclaveState>,
+    id_gen: Box<dyn Iterator<Item=u32> + Send>,
     auto_shutdown_tx: Option<mpsc::Sender<()>>,
 }
 
-// TODO rm type EnclaveHandler = Arc<Mutex<Option<EnclaveState>>>;
+impl EnclaveHandler {
+    /// Parse optional id
+    ///
+    /// To do this with actix, we need to use a "tail match" and parse
+    /// out the optional id ourselves
+    ///
+    fn parse_optional_id(
+        &self,
+        id_path: &str
+    ) -> Result<u32, ParseIntError> {
+        if id_path.len() == 0 {
+            // If we don't have an id, lookup what the id should
+            // be. If there are no enclaves at all, return 0 (an invalid id)
+            // and let the handler error when they look it up.
+            Ok(self.enclaves.iter().next().map(|(id, _)| *id).unwrap_or(0))
+        } else if id_path.starts_with('/') {
+            // expect leading slash
+            id_path[1..].parse::<u32>()
+        } else {
+            // force ParseIntError
+            "".parse::<u32>()
+        }
+    }
+}
 
 
 /// Setup an enclave with a provided policy file
@@ -57,36 +83,37 @@ async fn enclave_setup(
     let policy = Policy::from_json(&policy_json)?;
     let policy_hash = policy.policy_hash().unwrap();
 
-    // check that we don't already have an enclave running
-    let mut enclave_handler = enclave_handler.lock()?;
-    if !enclave_handler.enclave.is_none() {
-        Err(VeracruzServerError::TooManyEnclavesError(2, 1))?
-    }
-
     // create new enclave, with policy
     let enclave = VeracruzServerEnclave::new(&policy_json)?;
-    enclave_handler.enclave = Some(EnclaveState {
+
+    // find next id
+    let mut enclave_handler = enclave_handler.lock()?;
+    let id = enclave_handler.id_gen.next().unwrap();
+
+    // store id in list
+    enclave_handler.enclaves.insert(id, EnclaveState {
         enclave: Box::new(enclave),
         start_time: SystemTime::now(),
         policy: policy_json,
         policy_hash: policy_hash.to_owned(),
     });
 
-    // return 0, this may be the current id in the future
-    Ok(serde_json::to_string(&0)?)
+    Ok(serde_json::to_string(&id)?)
 }
 
 /// Teardown an enclave
-#[post("/enclave_teardown")]
+#[post("/enclave_teardown{id:.*}")]
 async fn enclave_teardown(
+    web::Path(id): web::Path<String>,
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     // does enclave exist?
     let mut enclave_handler = enclave_handler.lock()?;
-    match enclave_handler.enclave.take() {
-        Some(_enclave) => {
-            // well it doesn't anymore, let drop take care of the rest
-            // TODO close? 
+    let id = enclave_handler.parse_optional_id(&id)?;
+    match enclave_handler.enclaves.remove(&id) {
+        Some(mut enclave) => {
+            // well it doesn't anymore, let close take care of the rest
+            enclave.enclave.close()?;
             Ok("".to_owned())
         }
         None => {
@@ -106,25 +133,19 @@ async fn enclave_list(
     let mut enclave_list = Vec::<serde_json::Value>::new();
     
     let enclave_handler = enclave_handler.lock()?;
-    match enclave_handler.enclave.as_ref() {
-        Some(enclave) => {
-            // Apparently SystemTime can error if time has moved backwards,
-            // if this happens (clock change?) we just show an uptime of zero
-            let uptime = enclave.start_time.elapsed()
-                .unwrap_or_else(|_| Duration::from_secs(0));
+    for (id, enclave) in enclave_handler.enclaves.iter() {
+        // Apparently SystemTime can error if time has moved backwards,
+        // if this happens (clock change?) we just show an uptime of zero
+        let uptime = enclave.start_time.elapsed()
+            .unwrap_or_else(|_| Duration::from_secs(0));
 
-            // note we can't return a web::Json object here because Actix and Veracruz
-            // are actually using two incompatible versions of serde at the moment
-            enclave_list.push(serde_json::json!({
-                "policy_hash": enclave.policy_hash,
-                "id": 0,
-                "uptime": uptime,
-            }));
-        }
-        None => {
-            // Note! This is not an error! The client may just want to be
-            // querying what enclaves exist
-        }
+        // note we can't return a web::Json object here because Actix and Veracruz
+        // are actually using two incompatible versions of serde at the moment
+        enclave_list.push(serde_json::json!({
+            "policy_hash": enclave.policy_hash,
+            "id": id,
+            "uptime": uptime,
+        }));
     };
 
     // note we can't return a web::Json object here because Actix and Veracruz
@@ -133,13 +154,15 @@ async fn enclave_list(
 }
 
 /// Get the policy governing an enclave's computation
-#[get("/enclave_policy")]
+#[get("/enclave_policy{id:.*}")]
 async fn enclave_policy(
+    web::Path(id): web::Path<String>,
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     // does enclave exist?
     let enclave_handler = enclave_handler.lock()?;
-    let enclave = match enclave_handler.enclave.as_ref() {
+    let id = enclave_handler.parse_optional_id(&id)?;
+    let enclave = match enclave_handler.enclaves.get(&id) {
         Some(enclave) => enclave,
         None => {
             Err(VeracruzServerError::UninitializedEnclaveError)?
@@ -150,8 +173,9 @@ async fn enclave_policy(
 }
 
 /// Send TLS data to a currently running enclave
-#[post("/enclave_tls")]
+#[post("/enclave_tls{id:.*}")]
 async fn enclave_tls(
+    web::Path(id): web::Path<String>,
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
     input_data: String,
 ) -> VeracruzServerResponder {
@@ -162,8 +186,9 @@ async fn enclave_tls(
     let session_id = match fields[0].parse::<u32>()? {
         0 => {
             let mut enclave_handler_locked = enclave_handler.lock()?;
+            let id = enclave_handler_locked.parse_optional_id(&id)?;
 
-            let enclave = enclave_handler_locked.enclave.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
             enclave.enclave.new_tls_session()?
         }    
@@ -175,8 +200,9 @@ async fn enclave_tls(
 
     let (active_flag, output_data_option) = {
         let mut enclave_handler_locked = enclave_handler.lock()?;
+        let id = enclave_handler_locked.parse_optional_id(&id)?;
 
-        let enclave = enclave_handler_locked.enclave.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+        let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
         enclave.enclave.tls_data(session_id, received_data_decoded)?
     };
@@ -184,9 +210,11 @@ async fn enclave_tls(
     // Shutdown the enclave if we're done with it
     if !active_flag {
         let mut enclave_handler = enclave_handler.lock()?;
-        match enclave_handler.enclave.take() {
-            Some(_enclave) => {
+        let id = enclave_handler.parse_optional_id(&id)?;
+        match enclave_handler.enclaves.remove(&id) {
+            Some(mut enclave) => {
                 // The enclave has been removed now, let drop take care of the rest
+                enclave.enclave.close()?;
 
                 // Auto-shutdown the server?
                 if let Some(auto_shutdown_tx) = &enclave_handler.auto_shutdown_tx {
@@ -247,6 +275,8 @@ where
         None => None,
     };
 
+    let mut id_gen = 1..;
+
     let (auto_shutdown_tx, auto_shutdown_rx) = if auto_shutdown {
         let (auto_shutdown_tx, auto_shutdown_rx) = mpsc::channel::<()>();
         (Some(auto_shutdown_tx), Some(auto_shutdown_rx))
@@ -255,7 +285,10 @@ where
     };
 
     let enclave_handler = Arc::new(Mutex::new(EnclaveHandler {
-        enclave: enclave_state,
+        enclaves: enclave_state.into_iter()
+            .map(|enclave_state| (id_gen.next().unwrap(), enclave_state))
+            .collect(),
+        id_gen: Box::new(id_gen),
         auto_shutdown_tx: auto_shutdown_tx,
     }));
 

@@ -17,6 +17,7 @@ use std::{
     io,
     io::Read,
     io::Write,
+    num::NonZeroU32,
     path,
     process,
     time::Duration,
@@ -65,6 +66,16 @@ struct Opt {
     ///
     #[structopt(short="p", long="policy", parse(from_os_str))]
     policy_path: Option<path::PathBuf>,
+
+    /// Optional id of the enclave to use
+    ///
+    /// This allows a client to choose which computation they are contributing
+    /// to if there are multiple enclaves running on the server.
+    ///
+    /// By default, Veracruz chooses an abritrary computation to connect to.
+    ///
+    #[structopt(long)]
+    id: Option<NonZeroU32>,
 
     /// Request quiet operation
     ///
@@ -276,8 +287,9 @@ fn main() {
                         }
                     };
 
-                    match VeracruzClient::with_url_policy_and_hash(
+                    match VeracruzClient::with_url_id_policy_and_hash(
                         &url,
+                        opt.id,
                         identity,
                         key,
                         policy.clone(),
@@ -374,7 +386,7 @@ fn main() {
             });
         did_something = true;
 
-        match admin_client.enclave_policy() {
+        match admin_client.enclave_policy(opt.id) {
             Ok(policy) if policy_path.to_string_lossy() == "-" => {
                 match io::stdout().write_all(policy.as_bytes()) {
                     Ok(()) => {},
@@ -551,7 +563,7 @@ fn main() {
         qprintln!(opt, "Tearing down enclave");
         did_something = true;
 
-        match admin_client.enclave_teardown() {
+        match admin_client.enclave_teardown(opt.id) {
             Ok(()) => {},
             Err(err) => {
                 println!("{}", err);

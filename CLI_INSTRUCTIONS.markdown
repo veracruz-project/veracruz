@@ -210,7 +210,7 @@ $ vc-pas :3010 \
     --ca-cert=example/example-ca-cert.pem \
     --ca-key=example/example-ca-key.pem &
 Proxy Attestation Server running on 127.0.0.1:3010
-$ sleep 10
+$ sleep 5
 ```
 
 ## Running the Veracruz Server
@@ -226,6 +226,7 @@ background:
 ``` bash
 $ vc-server :3017 &
 Veracruz Server running on 0.0.0.0:3017
+$ sleep 5
 ```
 
 By default, the Veracruz Server launches without a policy, so we need to provide
@@ -238,7 +239,7 @@ Loaded policy example/example-policy.json
   (with hash) 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01
 Connecting to 0.0.0.0:3017
 Setting up enclave
-$ sleep 10
+$ sleep 5
 ```
 
 At this point, the Veracruz Server will setup an enclave for the computation,
@@ -252,13 +253,13 @@ $ vc-client :3017 --query-list
 Connecting to 0.0.0.0:3017
 Querying list of enclaves
    id policy_hash                                                       uptime
-    0 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01  0d 0h 4m 12s
+    1 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01  0d 0h 4m 12s
 ```
 
 And we can use `vc-client` to query the computation's policy:
 
 ``` bash
-$ vc-client :3017 --query-policy=-
+$ vc-client :3017 --id=1 --query-policy=-
 Connecting to 0.0.0.0:3017
 Querying policy into <stdout>
 {
@@ -375,7 +376,7 @@ Loaded policy example/example-policy.json
   (with hash) 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01
 Connecting to 0.0.0.0:3017
 Setting up enclave
-$ sleep 10
+$ sleep 5
 ```
 
 ``` bash
@@ -383,14 +384,14 @@ $ vc-client :3017 --query-list
 Connecting to 0.0.0.0:3017
 Querying list of enclaves
    id policy_hash                                                       uptime
-    0 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01  0d 0h 4m 12s
+    2 17115447cda3d9e8d70d7c78abf0b34f1446cc1acc00b9308f44e60085f52c01  0d 0h 4m 12s
 ```
 
 We can also teardown an enclave without waiting for it to complete by specifying
 the `--teardown` flag:
 
 ``` bash
-$ vc-client :3017 --teardown
+$ vc-client :3017 --id=2 --teardown
 Connecting to 0.0.0.0:3017
 Tearing down enclave
 ```

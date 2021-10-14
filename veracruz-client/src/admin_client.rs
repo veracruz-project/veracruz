@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
+use std::num::NonZeroU32;
 use std::time::Duration;
 use veracruz_utils::policy::policy::Policy;
 use serde::{Serialize, Deserialize};
@@ -61,9 +62,15 @@ impl VeracruzAdminClient {
     }
 
     /// Teardown an enclave
-    pub fn enclave_teardown(&mut self) -> Result<(), VeracruzClientError> {
+    pub fn enclave_teardown(
+        &mut self,
+        id: Option<NonZeroU32>
+    ) -> Result<(), VeracruzClientError> {
         // send request
-        let path = format!("http://{}/enclave_teardown", self.url);
+        let path = format!("http://{}/enclave_teardown{}",
+            self.url,
+            id.map(|id| format!("/{}", id)).unwrap_or("".to_owned())
+        );
         let ret = reqwest::Client::new()
             .post(&path)
             .send()?;
@@ -96,9 +103,15 @@ impl VeracruzAdminClient {
     /// is returned. This is because the policy's textual representation matters
     /// as this determines the hash of its value. 
     ///
-    pub fn enclave_policy(&self) -> Result<String, VeracruzClientError> {
+    pub fn enclave_policy(
+        &self,
+        id: Option<NonZeroU32>
+    ) -> Result<String, VeracruzClientError> {
         // send request
-        let path = format!("http://{}/enclave_policy", self.url);
+        let path = format!("http://{}/enclave_policy{}",
+            self.url,
+            id.map(|id| format!("/{}", id)).unwrap_or("".to_owned())
+        );
         let mut ret = reqwest::Client::new()
             .get(&path)
             .send()?;
