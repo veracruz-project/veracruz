@@ -11,29 +11,27 @@
 
 extern crate alloc;
 
-use serde::{Serialize, Deserialize};
-use bincode::{serialize, deserialize};
+use bincode::{deserialize, serialize};
+use serde::{Deserialize, Serialize};
 
 use icecap_wrapper::{
     icecap_core::{
-        runtime as icecap_runtime,
-        prelude::*,
         config::RingBufferConfig,
-        logger::{Logger, Level, DisplayMode},
-        finite_set::Finite,
-        rpc_sel4::RPCClient,
         config::RingBufferKicksConfig,
+        finite_set::Finite,
+        logger::{DisplayMode, Level, Logger},
+        prelude::*,
+        rpc_sel4::RPCClient,
+        runtime as icecap_runtime,
     },
     icecap_event_server_types::{
-        events,
-        calls::Client as EventServerRequest,
-        Bitfield as EventServerBitfield,
+        calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
     },
     icecap_start_generic::declare_generic_main,
     icecap_std_external,
 };
 
-use veracruz_utils::platform::icecap::message::{Request, Response, Error};
+use veracruz_utils::platform::icecap::message::{Error, Request, Response};
 
 use crate::managers::{session_manager, RuntimeManagerError};
 
@@ -57,9 +55,11 @@ fn main(config: Config) -> Fallible<()> {
             use events::*;
             RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
         };
-        let kick = Box::new(move || event_server.call::<()>(&EventServerRequest::Signal {
-            index: index.to_nat(),
-        }));
+        let kick = Box::new(move || {
+            event_server.call::<()>(&EventServerRequest::Signal {
+                index: index.to_nat(),
+            })
+        });
         RingBuffer::realize_resume(
             &config.channel,
             RingBufferKicksConfig {
@@ -69,9 +69,7 @@ fn main(config: Config) -> Fallible<()> {
         )
     };
 
-    let event_server_bitfield = unsafe {
-        EventServerBitfield::new(config.event_server_bitfield)
-    };
+    let event_server_bitfield = unsafe { EventServerBitfield::new(config.event_server_bitfield) };
 
     event_server_bitfield.clear_ignore_all();
 
@@ -86,8 +84,11 @@ struct RuntimeManager {
 }
 
 impl RuntimeManager {
-
-    fn new(channel: RingBuffer, event: Notification, event_server_bitfield: EventServerBitfield) -> Self {
+    fn new(
+        channel: RingBuffer,
+        event: Notification,
+        event_server_bitfield: EventServerBitfield,
+    ) -> Self {
         Self {
             channel: PacketRingBuffer::new(channel),
             event,
@@ -98,9 +99,12 @@ impl RuntimeManager {
 
     fn run(&mut self) -> Fallible<()> {
         loop {
-            let req = self.recv().map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
+            let req = self
+                .recv()
+                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
             let resp = self.handle(req)?;
-            self.send(&resp).map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
+            self.send(&resp)
+                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
             if !self.active {
                 icecap_runtime::exit();
             }
@@ -110,98 +114,82 @@ impl RuntimeManager {
     fn handle(&mut self, req: Request) -> Fallible<Response> {
         Ok(match req {
             Request::Initialize { policy_json } => {
-                match session_manager::init_session_manager().and(session_manager::load_policy(&policy_json)) {
+                match session_manager::init_session_manager()
+                    .and(session_manager::load_policy(&policy_json))
+                {
                     Err(e) => {
                         log::warn!("{:?}", e);
                         Response::Error(Error::Unspecified)
                     }
-                    Ok(()) => {
-                        Response::Initialize
-                    }
+                    Ok(()) => Response::Initialize,
                 }
             }
-            Request::Attestation { device_id, challenge } => {
-                match self.handle_attestation(device_id, &challenge) {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok((token, csr)) => {
-                        Response::Attestation { token, csr }
-                    }
+            Request::Attestation {
+                device_id,
+                challenge,
+            } => match self.handle_attestation(device_id, &challenge) {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
-            Request::CertificateChain { root_cert, compute_cert } => {
-                match session_manager::load_cert_chain(&vec![compute_cert, root_cert]) {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok(()) => {
-                        Response::CertificateChain
-                    }
+                Ok((token, csr)) => Response::Attestation { token, csr },
+            },
+            Request::CertificateChain {
+                root_cert,
+                compute_cert,
+            } => match session_manager::load_cert_chain(&vec![compute_cert, root_cert]) {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
-            Request::NewTlsSession => {
-                match session_manager::new_session() {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok(sess) => {
-                        Response::NewTlsSession(sess)
-                    }
+                Ok(()) => Response::CertificateChain,
+            },
+            Request::NewTlsSession => match session_manager::new_session() {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
-            Request::CloseTlsSession(sess) => {
-                match session_manager::close_session(sess) {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok(()) => {
-                        Response::CloseTlsSession
-                    }
+                Ok(sess) => Response::NewTlsSession(sess),
+            },
+            Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
-            Request::SendTlsData(sess, data) => {
-                match session_manager::send_data(sess, &data) {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok(()) => {
-                        Response::SendTlsData
-                    }
+                Ok(()) => Response::CloseTlsSession,
+            },
+            Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
-            Request::GetTlsDataNeeded(sess) => {
-                match session_manager::get_data_needed(sess) {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok(needed) => {
-                        Response::GetTlsDataNeeded(needed)
-                    }
+                Ok(()) => Response::SendTlsData,
+            },
+            Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
-            Request::GetTlsData(sess) => {
-                match session_manager::get_data(sess) {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
-                    Ok((active, data)) => {
-                        self.active = active;
-                        Response::GetTlsData(active, data)
-                    }
+                Ok(needed) => Response::GetTlsDataNeeded(needed),
+            },
+            Request::GetTlsData(sess) => match session_manager::get_data(sess) {
+                Err(e) => {
+                    log::warn!("{:?}", e);
+                    Response::Error(Error::Unspecified)
                 }
-            }
+                Ok((active, data)) => {
+                    self.active = active;
+                    Response::GetTlsData(active, data)
+                }
+            },
         })
     }
 
-    fn handle_attestation(&self, device_id: i32, challenge: &[u8]) -> Result<(Vec<u8>, Vec<u8>), RuntimeManagerError> {
+    fn handle_attestation(
+        &self,
+        device_id: i32,
+        challenge: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>), RuntimeManagerError> {
         let csr = session_manager::generate_csr()?;
         let token = attestation_hack::native_attestation(&challenge, &csr)?;
         Ok((token, csr))
@@ -250,7 +238,6 @@ impl RuntimeManager {
             }
         }
     }
-
 }
 
 const LOG_LEVEL: Level = Level::Debug;
@@ -278,27 +265,26 @@ mod attestation_hack {
     use ring::digest;
 
     const EXAMPLE_PRIVATE_KEY: [u8; 32] = [
-        0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe,
-        0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54, 0xd0,
-        0xba, 0x94, 0xbf, 0xb5, 0x47, 0x67, 0x2c, 0x31,
-        0xc1, 0xd4, 0xee, 0x1c, 0x05, 0x76, 0xa1, 0x44,
+        0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe, 0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54,
+        0xd0, 0xba, 0x94, 0xbf, 0xb5, 0x47, 0x67, 0x2c, 0x31, 0xc1, 0xd4, 0xee, 0x1c, 0x05, 0x76,
+        0xa1, 0x44,
     ];
 
     const EXAMPLE_HASH: [u8; 32] = [
-        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
-        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
-        0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
-        0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
+        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe,
+        0xef, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d,
+        0xca, 0xfe,
     ];
 
     const ROOT_PRIVATE_KEY: &[u8] = &EXAMPLE_PRIVATE_KEY;
 
     const RUNTIME_MANAGER_HASH: &[u8] = &EXAMPLE_HASH;
 
-
     /// Stub attestation handler
-    pub(super) fn native_attestation(challenge: &[u8], csr: &[u8]) -> Result<Vec<u8>, RuntimeManagerError> {
-
+    pub(super) fn native_attestation(
+        challenge: &[u8],
+        csr: &[u8],
+    ) -> Result<Vec<u8>, RuntimeManagerError> {
         let root_private_key = &ROOT_PRIVATE_KEY;
         let enclave_hash = &RUNTIME_MANAGER_HASH;
         let csr_hash = digest::digest(&digest::SHA256, csr);
@@ -329,19 +315,14 @@ mod attestation_hack {
                 &mut token_len as *mut u64,
             )
         });
-        unsafe {
-            token.set_len(token_len as usize)
-        };
+        unsafe { token.set_len(token_len as usize) };
 
         assert_eq!(0, unsafe {
-            psa_attestation::psa_initial_attest_remove_key(
-                root_key_handle,
-            )
+            psa_attestation::psa_initial_attest_remove_key(root_key_handle)
         });
 
         Ok(token)
     }
-
 }
 
 // Dependencies depend on these C symbols. We define them here in Rust.

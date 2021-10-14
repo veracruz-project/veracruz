@@ -9,7 +9,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub type Header = u32;
 pub type SessionId = u32;
@@ -17,9 +17,17 @@ pub type SessionId = u32;
 /// Type of requests from the host to the realm
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Request {
-    Initialize { policy_json: String },
-    Attestation { device_id: i32, challenge: Vec<u8> },
-    CertificateChain { root_cert: Vec<u8>, compute_cert: Vec<u8> },
+    Initialize {
+        policy_json: String,
+    },
+    Attestation {
+        device_id: i32,
+        challenge: Vec<u8>,
+    },
+    CertificateChain {
+        root_cert: Vec<u8>,
+        compute_cert: Vec<u8>,
+    },
     NewTlsSession,
     CloseTlsSession(SessionId),
     SendTlsData(SessionId, Vec<u8>),

@@ -9,8 +9,8 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use core::sync::atomic::{AtomicU64, Ordering};
 use crate::Result;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 static RNG_STATE: AtomicU64 = AtomicU64::new(0);
 
