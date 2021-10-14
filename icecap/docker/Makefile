@@ -92,7 +92,7 @@ build-ci:
 		--label $(label) -t $(ci_image_tag)  .
 
 .PHONY: run-ci
-run-ci: build-ci
+run-ci:
 	docker run -d --name $(ci_container_name) --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
 		$(icecap_mount) \
@@ -109,7 +109,7 @@ clean-ci:
 	done
 
 .PHONY: test-ci
-test-ci: build-ci
+test-ci:
 	docker run -it --name $(ci_container_name) --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
 		$(icecap_mount) \
