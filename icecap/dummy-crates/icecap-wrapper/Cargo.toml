@@ -3,4 +3,4 @@ name = "icecap-wrapper"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
-description = "Dummy version of icecap-wrapper for non-IceCap builds."
+description = "Dummy version of the icecap-wrapper crate for non-IceCap builds."

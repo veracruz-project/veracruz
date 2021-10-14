@@ -1,3 +1,5 @@
+# CapDL specification creation script for the Veracruz IceCap realm.
+#
 # AUTHORS
 #
 # The Veracruz Development Team.

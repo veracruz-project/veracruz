@@ -98,7 +98,7 @@ $(RELATIVE_DATA):
 	$(MAKE) -C $(dir $<)
 
 env:
-# TODO_BEFORE_MERGE
+# Don't use rustup if we are building in a Nix shell
 ifeq ($(IN_NIX_SHELL),)
 	rustup target add wasm32-wasi
 	rustup component add rust-src rust-std

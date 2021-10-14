@@ -15,7 +15,9 @@ use crate::Result;
 static RNG_STATE: AtomicU64 = AtomicU64::new(0);
 
 /// Fill `buffer` with random bytes.
-/// Uses a placeholder generator with a fixed seed and a period of 2**61.
+///
+/// Until IceCap provides randomness for realms, this is just a placeholder
+// generator with a fixed seed and a period of 2**61.
 pub fn platform_getrandom(buffer: &mut [u8]) -> Result<()> {
     for b in buffer {
         let state = RNG_STATE.fetch_add(1, Ordering::SeqCst);
