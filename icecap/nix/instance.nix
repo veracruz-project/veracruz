@@ -79,6 +79,7 @@ in lib.fix (self: with self; {
           "test_collateral=${testCollateral}"
         ] ++ lib.optionals automate [
           "automate=1"
+          "rcupdate.rcu_cpu_stall_suppress=1" # HACK to avoid noisy warnings due to poor perf in CI environment
         ];
       };
       platArgs = selectIceCapPlatOr {} {
