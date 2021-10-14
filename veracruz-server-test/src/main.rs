@@ -20,9 +20,7 @@ mod tests {
     use actix_rt::System;
     use env_logger;
     use lazy_static::lazy_static;
-    use log::{debug, error, info, Level};
-    use rand;
-    use rand::Rng;
+    use log::{debug, info, Level};
     use ring;
 
     use serde::Deserialize;
@@ -289,7 +287,7 @@ mod tests {
         let (policy, policy_json, _) = read_policy(policy_path(ONE_DATA_SOURCE_POLICY).as_path()).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
-        let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
+        init_veracruz_server_and_tls_session(&policy_json).unwrap();
 
         let client_cert_filename = trust_path("never_used_cert.pem");
         let client_key_filename = trust_path("client_rsa_key.pem");
