@@ -1,4 +1,6 @@
 [package]
 name = "icecap-wrapper"
-version = "0.1.0"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
 edition = "2018"
+description = "Dummy version of icecap-wrapper for non-IceCap builds."

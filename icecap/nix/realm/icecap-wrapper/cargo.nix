@@ -18,4 +18,8 @@ crateUtils.mkCrate {
     icecap-std-external
     icecap-event-server-types
   ];
+
+  # match the rest of Veracruz crates
+  package.version = "0.3.0";
+  package.authors = [ "The Veracruz Development Team" ];
 }
