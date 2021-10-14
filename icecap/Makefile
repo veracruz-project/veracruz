@@ -78,11 +78,12 @@ set-key-permissions:
 
 .PHONY: run-tests
 run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-resources
-	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).$@ --no-out-link) && $$script
+	eval $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).$@ --no-out-link)
 
+# convenient shortcut
 .PHONY: run-tests-stale
 run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-resources
-	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && $$script
+	eval $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link)
 
 # HACK for setting time in host and realm
 $(now):
