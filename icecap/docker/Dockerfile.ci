@@ -30,7 +30,7 @@ ENV NIX_SSL_CERT_FILE=/nix/env/etc/ssl/certs/ca-bundle.crt
 COPY nix.ci.conf /etc/nix/nix.conf
 
 COPY populate populate/
-RUN ICECAP_REV=${ICECAP_REV} bash populate/run.sh && rm -r populate && rm -r /root/.cache/nix
+RUN ICECAP_REV=${ICECAP_REV} bash populate/run.sh && rm -r populate && rm -rf /root/.cache/nix
 
 ENV NIX_BUILD_SHELL bash
 
