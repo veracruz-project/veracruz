@@ -84,7 +84,7 @@ in {
 
         echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
         mkdir -p /root/.ssh
-        ln -s ${./keys}/client.pub /root/.ssh/authorized_keys
+        ln -s ${./token-ssh-keys}/client.pub /root/.ssh/authorized_keys
         export HOME=/root
 
         date -s '@${now}'
@@ -140,7 +140,7 @@ in {
         cp ${instance.proxyAttestationServerTestDatabase} $VERACRUZ_DATABASE_URL
 
         if [ "$automate" = "1" ]; then
-          dropbear -Es -r ${./keys}/dropbear_ecdsa_server_key -p 0.0.0.0:22
+          dropbear -Es -r ${./token-ssh-keys}/dropbear_ecdsa_server_key -p 0.0.0.0:22
           nc ${devAddr} ${readyPort} < /dev/null
         fi
       '';

@@ -31,8 +31,8 @@ let
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
 
-  sshPort = "6666";
-  readyPort = "6667";
+  sshPort = "6666"; # on emulated machine
+  readyPort = "6667"; # on development machine
 
 in lib.fix (self: with self; {
 
@@ -59,7 +59,7 @@ in lib.fix (self: with self; {
       -o UserKnownHostsFile=/dev/null \
       -o StrictHostKeyChecking=no \
       -o Preferredauthentications=publickey \
-      -i ${toString ./host/keys/client.priv} root@localhost -p ${sshPort} \
+      -i ${toString ./host/token-ssh-keys/client.priv} root@localhost -p ${sshPort} \
       /run-tests
   '';
 
@@ -80,7 +80,7 @@ in lib.fix (self: with self; {
         ] ++ lib.optionals automate [
           "automate=1"
 
-          # HACK to avoid noisy warnings due to poor perf in CI environment
+          # NOTE use this to avoid noisy warnings due to poor perf in CI environment
           # "rcupdate.rcu_cpu_stall_suppress=1"
         ];
       };

@@ -74,7 +74,7 @@ test-system-stale-test-resources: $(now) runtime-manager veracruz-server-test ve
 
 .PHONY: set-key-permissions
 set-key-permissions:
-	chmod 0400 nix/host/keys/client.priv
+	chmod 0400 nix/host/token-ssh-keys/client.priv
 
 .PHONY: run-tests
 run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-resources
