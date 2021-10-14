@@ -57,7 +57,6 @@ let
     pkgs.dev.icecap.rustc
     pkgs.dev.icecap.cargo
     pkgs.musl.icecap.icecap-host
-    pkgs.linux.dropbear
     configured.sysroot-rs
     configured.icecap-sel4-sys-gen
     configured.liboutline
