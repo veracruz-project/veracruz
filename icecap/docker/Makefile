@@ -117,7 +117,7 @@ test-ci: build-ci
 
 .PHONY: test-ci-populate
 test-ci-populate:
-	ICECAP_REV=$(icecap_rev) bash populate.sh
+	ICECAP_REV=$(icecap_rev) bash populate/run.sh
 
 
 ### CI + remote registry ###

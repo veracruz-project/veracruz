@@ -20,7 +20,8 @@ let
 
   configured = pkgs.none.icecap.configured.virt;
 
-  inherit (configured) icecapFirmware icecapPlat;
+  inherit (configured) icecapFirmware icecapPlat mkDynDLSpec mkIceDL;
+  inherit (pkgs.dev) writeText linkFarm;
   inherit (pkgs.none.icecap) platUtils;
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
 
@@ -37,8 +38,22 @@ let
     modules = [];
   };
 
+  spec = mkDynDLSpec {
+    cdl = "${ddl}/icecap.cdl";
+    root = "${ddl}/links";
+  };
+
+  ddl = mkIceDL {
+    src = ./cdl;
+    config = {
+      components = {
+      };
+    };
+  };
+
   roots = [
     run
+    spec
     pkgs.dev.icecap.rustc
     pkgs.dev.icecap.cargo
     pkgs.musl.icecap.icecap-host
@@ -49,4 +64,4 @@ let
   ];
 
 in
-pkgs.dev.writeText "cache-roots" (toString roots)
+writeText "cache-roots" (toString roots)
