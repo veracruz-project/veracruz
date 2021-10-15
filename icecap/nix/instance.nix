@@ -94,6 +94,8 @@ in lib.fix (self: with self; {
   ddl = mkIceDL {
     src = ./realm/ddl;
     config = {
+      realm_id = 0;
+      num_cores = 1;
       components = {
         runtime_manager.image = elfUtils.split runtimeManagerElf;
         runtime_manager.heap_size = 64 * 1048576; # 64M (HACK overstimate)
