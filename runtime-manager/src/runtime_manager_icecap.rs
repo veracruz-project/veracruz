@@ -47,7 +47,6 @@ struct Config {
 
 fn main(config: Config) -> Fallible<()> {
     icecap_runtime_init();
-    log::debug!("runtime manager enter");
 
     let channel = {
         let event_server = RPCClient::<EventServerRequest>::new(config.event_server_endpoint);
@@ -117,10 +116,7 @@ impl RuntimeManager {
                 match session_manager::init_session_manager()
                     .and(session_manager::load_policy(&policy_json))
                 {
-                    Err(e) => {
-                        log::warn!("{:?}", e);
-                        Response::Error(Error::Unspecified)
-                    }
+                    Err(_) => Response::Error(Error::Unspecified),
                     Ok(()) => Response::Initialize,
                 }
             }
@@ -128,55 +124,34 @@ impl RuntimeManager {
                 device_id,
                 challenge,
             } => match self.handle_attestation(device_id, &challenge) {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok((token, csr)) => Response::Attestation { token, csr },
             },
             Request::CertificateChain {
                 root_cert,
                 compute_cert,
             } => match session_manager::load_cert_chain(&vec![compute_cert, root_cert]) {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok(()) => Response::CertificateChain,
             },
             Request::NewTlsSession => match session_manager::new_session() {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok(sess) => Response::NewTlsSession(sess),
             },
             Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok(()) => Response::CloseTlsSession,
             },
             Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok(()) => Response::SendTlsData,
             },
             Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok(needed) => Response::GetTlsDataNeeded(needed),
             },
             Request::GetTlsData(sess) => match session_manager::get_data(sess) {
-                Err(e) => {
-                    log::warn!("{:?}", e);
-                    Response::Error(Error::Unspecified)
-                }
+                Err(_) => Response::Error(Error::Unspecified),
                 Ok((active, data)) => {
                     self.active = active;
                     Response::GetTlsData(active, data)
@@ -196,18 +171,14 @@ impl RuntimeManager {
     }
 
     fn wait(&self) {
-        log::trace!("waiting");
         let badge = self.event.wait();
-        log::trace!("done waiting");
         self.event_server_bitfield.clear_ignore(badge);
     }
 
     fn send(&mut self, resp: &Response) -> Result<(), RuntimeManagerError> {
-        log::trace!("write: {:x?}", resp);
         let mut block = false;
         let resp_bytes = serialize(resp).map_err(RuntimeManagerError::BincodeError)?;
         while !self.channel.write(&resp_bytes) {
-            log::warn!("host ring buffer full, waiting on notification");
             if block {
                 self.wait();
                 block = false;
@@ -221,13 +192,11 @@ impl RuntimeManager {
     }
 
     fn recv(&mut self) -> Result<Request, RuntimeManagerError> {
-        log::trace!("read enter");
         let mut block = false;
         loop {
             if let Some(msg) = self.channel.read() {
                 self.channel.notify_read();
                 let req = deserialize(&msg).map_err(RuntimeManagerError::BincodeError)?;
-                log::trace!("read: {:x?}", req);
                 return Ok(req);
             } else if block {
                 self.wait();
@@ -240,7 +209,7 @@ impl RuntimeManager {
     }
 }
 
-const LOG_LEVEL: Level = Level::Debug;
+const LOG_LEVEL: Level = Level::Error;
 
 // HACK
 // System time is provided at build time. The same time is provided to the test Linux userland.
