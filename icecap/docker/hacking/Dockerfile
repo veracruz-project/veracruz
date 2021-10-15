@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 ARG UID
 ARG GID
 
-RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m -p x x
+RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m x
 USER x
 
 ENV PATH="/nix/env/bin:${PATH}"
@@ -32,4 +32,4 @@ COPY install-nix.sh /
 COPY hacking/setup.sh /
 COPY hacking/nix.conf /etc/nix/
 
-WORKDIR /work
+WORKDIR /work/veracruz

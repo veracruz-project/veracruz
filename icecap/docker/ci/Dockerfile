@@ -32,4 +32,4 @@ COPY ci/populate populate/
 ARG ICECAP_REV
 RUN ICECAP_REV=${ICECAP_REV} bash populate/run.sh && rm -r populate && rm -rf /root/.cache/nix
 
-WORKDIR /work
+WORKDIR /work/veracruz
