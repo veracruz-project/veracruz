@@ -507,7 +507,7 @@ pub mod veracruz_server_sgx {
     impl VeracruzServer for VeracruzServerSGX {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             if ENCLAVE_IN_USE.load(Ordering::SeqCst) {
-                Err(VeracruzServerError::UninitializedEnclaveError)?
+                Err(VeracruzServerError::TooManyEnclavesError(2, 1))?
             }
 
             let runtime_manager_enclave = start_enclave(RUNTIME_MANAGER_BINARY)?;

@@ -117,7 +117,7 @@ async fn enclave_teardown(
             Ok("".to_owned())
         }
         None => {
-            Err(VeracruzServerError::UninitializedEnclaveError)?
+            Err(VeracruzServerError::InvalidEnclaveError(id))?
         }
     }
 }
@@ -165,7 +165,7 @@ async fn enclave_policy(
     let enclave = match enclave_handler.enclaves.get(&id) {
         Some(enclave) => enclave,
         None => {
-            Err(VeracruzServerError::UninitializedEnclaveError)?
+            Err(VeracruzServerError::InvalidEnclaveError(id))?
         }
     };
 
@@ -188,7 +188,7 @@ async fn enclave_tls(
             let mut enclave_handler_locked = enclave_handler.lock()?;
             let id = enclave_handler_locked.parse_optional_id(&id)?;
 
-            let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::InvalidEnclaveError(id))?;
 
             enclave.enclave.new_tls_session()?
         }    
@@ -202,7 +202,7 @@ async fn enclave_tls(
         let mut enclave_handler_locked = enclave_handler.lock()?;
         let id = enclave_handler_locked.parse_optional_id(&id)?;
 
-        let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+        let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::InvalidEnclaveError(id))?;
 
         enclave.enclave.tls_data(session_id, received_data_decoded)?
     };
@@ -222,7 +222,7 @@ async fn enclave_tls(
                 }
             }
             None => {
-                Err(VeracruzServerError::UninitializedEnclaveError)?
+                Err(VeracruzServerError::InvalidEnclaveError(id))?
             }
         }
     }

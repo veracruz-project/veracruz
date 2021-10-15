@@ -146,8 +146,8 @@ pub enum VeracruzServerError {
         _1
     )]
     InvalidLengthError(&'static str, usize),
-    #[error(display = "VeracruzServer: Uninitialized enclave.")]
-    UninitializedEnclaveError,
+    #[error(display = "VeracruzServer: Invalid or uninitialized enclave (id={}).", _0)]
+    InvalidEnclaveError(u32),
     #[error(display = "VeracruzServer: Exceeded number of supported enclave ({} > {})", _0, _1)]
     TooManyEnclavesError(usize, usize),
     #[error(display = "VeracruzServer: Unknown attestation protocol.")]
@@ -211,7 +211,8 @@ impl error::ResponseError for VeracruzServerError {
             VeracruzServerError::DirectMessageError(_, e) => e.clone(),
             VeracruzServerError::UnimplementedRequestError
             | VeracruzServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
-            VeracruzServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
+            VeracruzServerError::UnsupportedRequestError
+            | VeracruzServerError::InvalidEnclaveError(_) => StatusCode::NOT_FOUND,
             VeracruzServerError::TooManyEnclavesError(_, _) => StatusCode::TOO_MANY_REQUESTS,
             _otherwise => StatusCode::INTERNAL_SERVER_ERROR,
         }

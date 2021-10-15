@@ -47,7 +47,7 @@ pub mod veracruz_server_tz {
     impl VeracruzServer for VeracruzServerTZ {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             if ENCLAVE_IN_USE.load(Ordering::SeqCst) {
-                Err(VeracruzServerError::UninitializedEnclaveError)?
+                Err(VeracruzServerError::TooManyEnclavesError(2, 1))?
             }
 
             let policy: Policy =
@@ -80,7 +80,7 @@ pub mod veracruz_server_tz {
                 let mut context_opt = CONTEXT.lock()?;
                 let context = context_opt
                     .as_mut()
-                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                    .unwrap();
                 let mut session = context.open_session(runtime_manager_uuid)?;
                 session.invoke_command(RuntimeManagerOpcode::Initialize as u32, &mut operation)?;
             }
@@ -99,7 +99,7 @@ pub mod veracruz_server_tz {
                 let mut context_opt = CONTEXT.lock()?;
                 let context = context_opt
                     .as_mut()
-                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                    .unwrap();
                 let mut session = context.open_session(runtime_manager_uuid)?;
                 session.invoke_command(RuntimeManagerOpcode::GetCSR as u32, &mut operation)?;
 
@@ -128,7 +128,7 @@ pub mod veracruz_server_tz {
                 let mut context_opt = CONTEXT.lock()?;
                 let context = context_opt
                     .as_mut()
-                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                    .unwrap();
                 let mut session = context.open_session(root_enclave_uuid)?;
                 session.invoke_command(TrustZoneRootEnclaveOpcode::ProxyAttestation as u32, &mut operation)
                     .map_err(|err| {
@@ -153,7 +153,7 @@ pub mod veracruz_server_tz {
                 let mut context_opt = CONTEXT.lock()?;
                 let context = context_opt
                     .as_mut()
-                    .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                    .unwrap();
                 let mut session = context.open_session(runtime_manager_uuid)?;
                 session.invoke_command(RuntimeManagerOpcode::PopulateCertificates as u32, &mut operation)?;
             }
@@ -174,7 +174,7 @@ pub mod veracruz_server_tz {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                .unwrap();
 
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
@@ -193,7 +193,7 @@ pub mod veracruz_server_tz {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                .unwrap();
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
@@ -210,7 +210,7 @@ pub mod veracruz_server_tz {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                .unwrap();
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             let mut session = context.open_session(runtime_manager_uuid)?;
 
@@ -254,7 +254,7 @@ pub mod veracruz_server_tz {
             let runtime_manager_uuid = Uuid::parse_str(&self.runtime_manager_uuid)?;
             match &mut *context_guard {
                 None => {
-                    return Err(VeracruzServerError::UninitializedEnclaveError);
+                    return panic!("Uninitialized enclave?");
                 }
                 Some(context) => {
                     let mut session = context.open_session(runtime_manager_uuid)?;
@@ -300,7 +300,7 @@ pub mod veracruz_server_tz {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                .unwrap();
             let mut trustzone_root_enclave_session = context.open_session(trustzone_root_enclave_uuid)?;
 
             let firmware_version = VeracruzServerTZ::fetch_firmware_version(&mut trustzone_root_enclave_session)?;
@@ -349,7 +349,7 @@ pub mod veracruz_server_tz {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+                .unwrap();
             let mut trustzone_root_enclave_session = context.open_session(trustzone_root_enclave_uuid)?;
 
             let mut challenge = vec![0; 16];

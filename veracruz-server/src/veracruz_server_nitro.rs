@@ -33,7 +33,7 @@ pub mod veracruz_server_nitro {
     impl VeracruzServer for VeracruzServerNitro {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             if ENCLAVE_IN_USE.load(Ordering::SeqCst) {
-                Err(VeracruzServerError::UninitializedEnclaveError)?
+                Err(VeracruzServerError::TooManyEnclavesError(2, 1))?
             }
 
             // Set up, initialize Nitro Root Enclave
