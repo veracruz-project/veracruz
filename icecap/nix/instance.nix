@@ -131,16 +131,16 @@ in lib.fix (self: with self; {
   icecapCratesEnv = crateUtils.collectEnv icecapCrates;
 
   env = {
-    runtime-manager = configured.callPackage ./realm/runtime-manager.nix {
+    runtime-manager = configured.callPackage ./env/runtime-manager.nix {
       inherit icecapCrates libc-supplement;
     };
-    veracruz-server-test = pkgs.linux.icecap.callPackage ./host/test.nix {} {
+    veracruz-server-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
       name = "veracruz-server-test";
     };
-    veracruz-test = pkgs.linux.icecap.callPackage ./host/test.nix {} {
+    veracruz-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
       name = "veracruz-test";
     };
-    sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./host/sdk-and-test-collateral.nix {};
+    sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
   };
 
   libc-supplement = configured.libs.mk {
