@@ -78,7 +78,7 @@ deep-clean: clean
 
 ### CI ###
 
-icecap_rev := 720872483ddb7270c58fffd517437f1e4e00c027
+icecap_rev := e27e7bf9b4160a718cf59d5e2a97674a8456bdc1
 
 icecap_rev_short := $(shell echo $(icecap_rev) | head -c 10)
 ci_image_tag_name := ci-$(icecap_rev_short)
