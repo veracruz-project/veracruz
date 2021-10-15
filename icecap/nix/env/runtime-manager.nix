@@ -19,7 +19,7 @@ let
 
   name = "runtime-manager";
 
-  manifestPath = toString ../../.. + "/${name}/Cargo.toml";
+  manifestPath = toString (../../.. + "/${name}/Cargo.toml");
 
   debug = false;
 
