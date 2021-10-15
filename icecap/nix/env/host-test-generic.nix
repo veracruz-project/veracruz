@@ -104,7 +104,7 @@ mkShell (crateUtils.baseEnv // rec {
         | cut -d ' ' -f 2 \
       )"
       mkdir -p $build_dir/out
-      ln -sf "$f" $build_dir/out/${name}
+      ln -sf ../"$f" $build_dir/out/${name}
     }
   '';
 
