@@ -83,8 +83,6 @@ nitro-cli:
 	# enclave binaries needed for veracruz-server
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave
-	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C nitro-root-enclave-server
 	# build CLIs in top-level crates
 	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
 	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
@@ -273,7 +271,7 @@ clean:
 clean-cargo-lock:
 	$(MAKE) -C sdk clean
 	$(MAKE) -C test-collateral clean
-	rm -f $(addsuffix /Cargo.lock,execution-engine nitro-root-enclave nitro-root-enclave-server platform-services proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager sgx-root-enclave sgx-root-enclave-bind transport-protocol trustzone-root-enclave veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
+	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager sgx-root-enclave sgx-root-enclave-bind transport-protocol trustzone-root-enclave veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
