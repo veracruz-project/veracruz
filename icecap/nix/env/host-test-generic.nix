@@ -30,9 +30,6 @@ in
 
 mkShell (crateUtils.baseEnv // rec {
 
-  LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
-  PKG_CONFIG_ALLOW_CROSS = 1;
-
   # By default, Nix injects hardening options into C compilation.
   # For now, to reduce build complexity, disable that.
   hardeningDisable = [ "all" ];
@@ -51,6 +48,11 @@ mkShell (crateUtils.baseEnv // rec {
     openssl sqlite
   ];
 
+  PKG_CONFIG_ALLOW_CROSS = 1;
+
+  # For bindgen
+  LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
+
   shellHook = ''
     # NOTE
     #
@@ -59,16 +61,15 @@ mkShell (crateUtils.baseEnv // rec {
     #
     # Copied from: https://github.com/NixOS/nixpkgs/blob/1fab95f5190d087e66a3502481e34e15d62090aa/pkgs/applications/networking/browsers/firefox/common.nix#L247-L253
     # Set C flags for bindgen. Bindgen does not invoke $CC directly. Instead it
-    # uses LLVM's libclang. To make sure all necessary flags are included we
+    # uses LLVM's libclang. To make sure all necessary flags are included, we
     # need to look in a few places.
     export BINDGEN_EXTRA_CLANG_ARGS=" \
       $(< ${stdenv.cc}/nix-support/libc-crt1-cflags) \
       $(< ${stdenv.cc}/nix-support/libc-cflags) \
       $(< ${stdenv.cc}/nix-support/cc-cflags) \
       $(< ${stdenv.cc}/nix-support/libcxx-cxxflags) \
-      ${lib.optionalString stdenv.cc.isClang "-idirafter ${stdenv.cc.cc}/lib/clang/${lib.getVersion stdenv.cc.cc}/include"} \
-      ${lib.optionalString stdenv.cc.isGNU "-isystem ${stdenv.cc.cc}/include/c++/${lib.getVersion stdenv.cc.cc} -isystem ${stdenv.cc.cc}/include/c++/${lib.getVersion stdenv.cc.cc}/${stdenv.hostPlatform.config}"} \
-      ${lib.optionalString stdenv.cc.isGNU "-isystem ${stdenv.cc.cc}/lib/gcc/${stdenv.hostPlatform.config}/${lib.getVersion stdenv.cc.cc}/include"} \
+      -isystem ${stdenv.cc.cc}/include/c++/${lib.getVersion stdenv.cc.cc} -isystem ${stdenv.cc.cc}/include/c++/${lib.getVersion stdenv.cc.cc}/${stdenv.hostPlatform.config} \
+      -isystem ${stdenv.cc.cc}/lib/gcc/${stdenv.hostPlatform.config}/${lib.getVersion stdenv.cc.cc}/include \
       $NIX_CFLAGS_COMPILE \
     "
 

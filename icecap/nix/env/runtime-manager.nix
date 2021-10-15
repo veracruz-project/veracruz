@@ -45,8 +45,6 @@ in
 
 mkShell (crateUtils.baseEnv // {
 
-  LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
-
   depsBuildBuild = [
     buildPackages.stdenv.cc
   ];
@@ -60,6 +58,9 @@ mkShell (crateUtils.baseEnv // {
     liboutline
     libc-supplement
   ];
+
+  # For bindgen
+  LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
 
   shellHook = ''
     # NOTE
