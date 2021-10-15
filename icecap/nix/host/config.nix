@@ -7,7 +7,10 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-{ icecapPlat, now, readyPort, instance }:
+{ icecapPlat, now, readyPort
+, tokenSshKeyPub, tokenSshKeyPrivDropbear
+, instance
+}:
 
 { config, pkgs, lib, ... }:
 
@@ -84,7 +87,7 @@ in {
 
         echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
         mkdir -p /root/.ssh
-        ln -s ${./token-ssh-keys}/client.pub /root/.ssh/authorized_keys
+        ln -s ${tokenSshKeyPub} /root/.ssh/authorized_keys
         export HOME=/root
 
         date -s '@${now}'
@@ -140,7 +143,7 @@ in {
         cp ${instance.proxyAttestationServerTestDatabase} $VERACRUZ_DATABASE_URL
 
         if [ "$automate" = "1" ]; then
-          dropbear -Es -r ${./token-ssh-keys}/dropbear_ecdsa_server_key -p 0.0.0.0:22
+          dropbear -Es -r ${tokenSshKeyPrivDropbear} -p 0.0.0.0:22
           nc ${qemuHostAddr} ${readyPort} < /dev/null
         fi
       '';

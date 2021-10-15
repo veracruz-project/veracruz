@@ -11,7 +11,7 @@
 
 let
 
-  inherit (pkgs.dev) runCommand nukeReferences;
+  inherit (pkgs.dev) runCommand writeScript nukeReferences;
   inherit (pkgs.none.icecap) icecapSrc crateUtils elfUtils platUtils;
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
 
@@ -31,6 +31,8 @@ let
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
 
+  tokenSshKeyPriv = ./host/token-ssh-key.priv;
+
   sshPort = "6666"; # on emulated machine
   readyPort = "6667"; # on development machine
 
@@ -39,6 +41,24 @@ in lib.fix (self: with self; {
   inherit configured;
 
   inherit proxyAttestationServerTestDatabase testElf;
+
+  tokenSshKeyPub = runCommand "token-ssh-key.pub" {
+    nativeBuildInputs = with pkgs.dev; [
+      openssh
+    ];
+  } ''
+    cp ${tokenSshKeyPriv} priv
+    chmod 0400 priv
+    ssh-keygen -y -f priv > $out
+  '';
+
+  tokenSshKeyPrivDropbear = runCommand "token-ssh-key.dropbear.priv" {
+    nativeBuildInputs = with pkgs.dev; [
+      dropbear
+    ];
+  } ''
+    dropbearconvert openssh dropbear ${tokenSshKeyPriv} $out
+  '';
 
   runTests = pkgs.dev.writeScript "run-test.sh" ''
     #!${pkgs.dev.runtimeShell}
@@ -59,7 +79,7 @@ in lib.fix (self: with self; {
       -o UserKnownHostsFile=/dev/null \
       -o StrictHostKeyChecking=no \
       -o Preferredauthentications=publickey \
-      -i ${toString ./host/token-ssh-keys/client.priv} root@localhost -p ${sshPort} \
+      -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
       /run-tests
   '';
 
@@ -104,6 +124,7 @@ in lib.fix (self: with self; {
     modules = [
       (import ./host/config.nix {
         inherit icecapPlat now readyPort;
+        inherit tokenSshKeyPub tokenSshKeyPrivDropbear;
         instance = self;
       })
     ];

@@ -94,10 +94,10 @@ test-system-stale-test-collateral: $(now) runtime-manager veracruz-server-test v
 test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-collateral
 	$(test_system_body)
 
-# Permission constraints required by the OpenSSH client cannot be expressed in Git
+# Permission constraints required by the OpenSSH client cannot be expressed in Git or Nix
 .PHONY: set-key-permissions
 set-key-permissions:
-	chmod 0400 nix/host/token-ssh-keys/client.priv
+	chmod 0400 nix/host/token-ssh-key.priv
 
 run_tests_body = eval $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link)
 
