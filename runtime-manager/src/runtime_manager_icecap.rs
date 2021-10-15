@@ -162,7 +162,7 @@ impl RuntimeManager {
 
     fn handle_attestation(
         &self,
-        device_id: i32,
+        _device_id: i32,
         challenge: &[u8],
     ) -> Result<(Vec<u8>, Vec<u8>), RuntimeManagerError> {
         let csr = session_manager::generate_csr()?;
@@ -218,7 +218,7 @@ const NOW: u64 = include!("../../icecap/build/NOW");
 
 fn icecap_runtime_init() {
     icecap_std_external::set_panic();
-    std::icecap_impl::set_now(std::time::Duration::from_secs(NOW));
+    icecap_std_external::set_now(std::time::Duration::from_secs(NOW));
     let mut logger = Logger::default();
     logger.level = LOG_LEVEL;
     logger.display_mode = DisplayMode::Line;
