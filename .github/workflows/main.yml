@@ -121,10 +121,10 @@ jobs:
 
   icecap:
     runs-on: ubuntu-latest
-    container: 
+    container:
       image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-720872483d
-      volumes: 
-        - ${{ github.workspace }}:/work/veracruz 
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
         uses: actions/checkout@v2
