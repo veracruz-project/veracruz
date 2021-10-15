@@ -103,22 +103,19 @@ run-ci:
 exec-ci:
 	docker exec -it $(ci_container_name) bash
 
+.PHONY: test-ci
+test-ci:
+	docker exec -it $(ci_container_name) bash /work/veracruz/icecap/ci/run.sh
+
+.PHONY: test-ci-populate
+test-ci-populate:
+	ICECAP_REV=$(icecap_rev) bash ci/populate/run.sh
+
 .PHONY: clean-ci
 clean-ci:
 	for id in $$(docker ps -aq -f "name=$(ci_container_name)"); do \
 		docker rm -f $$id; \
 	done
-
-.PHONY: test-ci
-test-ci:
-	docker run -it --name $(ci_container_name) --label $(label) \
-		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
-		$(icecap_mount) \
-		$(ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
-
-.PHONY: test-ci-populate
-test-ci-populate:
-	ICECAP_REV=$(icecap_rev) bash populate/run.sh
 
 
 ### CI + remote registry ###
