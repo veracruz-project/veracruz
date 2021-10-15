@@ -63,11 +63,3 @@ sgx_tstd = { branch="veracruz", git = 'https://github.com/veracruz-project/incub
 
 [profile.release]
 lto = true
-
-# TODO_BEFORE_MERGE
-[patch."https://github.com/veracruz-project/ring.git"]
-ring = { git = "https://github.com/nspin/veracruz-project-ring.git", branch = "pr/initial-icecap-stubs", optional = true }
-
-# TODO_BEFORE_MERGE
-[patch."https://github.com/veracruz-project/libc.git"]
-libc = { git = "https://github.com/nspin/libc.git", branch = "pr/initial-icecap-support" }
