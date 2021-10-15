@@ -36,8 +36,8 @@ let
 
     . ${testEnv}
 
-    /run-test veracruz-test
     /run-test veracruz-server-test
+    /run-test veracruz-test
   '';
 
   runTest = pkgs.writeScript "run-test.sh" ''
@@ -145,12 +145,12 @@ in {
       '';
 
       initramfs.profile = ''
-        vt() {
-          /run-test veracruz-test
-        }
-
         vst() {
           /run-test veracruz-server-test
+        }
+
+        vt() {
+          /run-test veracruz-test
         }
       '';
     }
