@@ -9,8 +9,6 @@
 
 FROM debian:bullseye-slim
 
-ARG ICECAP_REV
-
 RUN apt-get update && apt-get install -y \
     curl git man make rsync \
     procps \
@@ -26,12 +24,12 @@ RUN bash install-nix.sh && rm install-nix.sh
 ENV PATH="/nix/env/bin:${PATH}"
 ENV MANPATH="/nix/env/share/man:${MANPATH}"
 ENV NIX_SSL_CERT_FILE=/nix/env/etc/ssl/certs/ca-bundle.crt
-
-COPY nix.ci.conf /etc/nix/nix.conf
-
-COPY populate populate/
-RUN ICECAP_REV=${ICECAP_REV} bash populate/run.sh && rm -r populate && rm -rf /root/.cache/nix
-
 ENV NIX_BUILD_SHELL bash
+
+COPY ci/nix.conf /etc/nix/
+COPY ci/populate populate/
+
+ARG ICECAP_REV
+RUN ICECAP_REV=${ICECAP_REV} bash populate/run.sh && rm -r populate && rm -rf /root/.cache/nix
 
 WORKDIR /work

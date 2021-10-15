@@ -29,7 +29,7 @@ clean: unlink-crates
 
 .PHONY: deep-clean
 deep-clean: clean unlink-crates
-	cd .. && git clean -xdff --exclude=icecap/docker/nix-root
+	cd .. && git clean -xdff --exclude=icecap/docker
 
 .PHONY: link-crates
 link-crates:
