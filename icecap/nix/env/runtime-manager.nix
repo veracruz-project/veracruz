@@ -68,6 +68,8 @@ mkShell (crateUtils.baseEnv // {
     export BINDGEN_EXTRA_CLANG_ARGS="$NIX_CFLAGS_COMPILE"
 
     build_dir=build/${name}
+    build_dir_inverse=../..
+    target_dir=build/target
 
     build() {
       setup && \
@@ -76,7 +78,7 @@ mkShell (crateUtils.baseEnv // {
         --manifest-path ${manifestPath} \
         --target ${rustTargetName} --features icecap \
         ${lib.optionalString (!debug) "--release"} \
-        --target-dir ./target \
+        --target-dir $build_dir_inverse/$target_dir \
         --out-dir ./out \
         -j$NIX_BUILD_CORES \
         "$@"

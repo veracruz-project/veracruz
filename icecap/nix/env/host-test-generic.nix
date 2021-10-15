@@ -74,6 +74,8 @@ mkShell (crateUtils.baseEnv // rec {
     "
 
     build_dir=build/${name}
+    build_dir_inverse=../..
+    target_dir=build/target
 
     build() {
       setup && \
@@ -82,7 +84,7 @@ mkShell (crateUtils.baseEnv // rec {
         --target ${rustTargetName} --features icecap \
         ${lib.optionalString (!debug) "--release"} \
         -j$NIX_BUILD_CORES \
-        --target-dir ./target \
+        --target-dir $build_dir_inverse/$target_dir \
         "$@"
       ) && \
       distinguish
@@ -95,7 +97,7 @@ mkShell (crateUtils.baseEnv // rec {
 
     # cargo test --no-run doesn't give the test binary a predictable filename, so we have to find it ourselves
     distinguish() {
-      d=$build_dir/target/${rustTargetName}/${if debug then "debug" else "release"}/deps
+      d=$target_dir/${rustTargetName}/${if debug then "debug" else "release"}/deps
       f="$(find $d -executable -type f -name "${crateUtils.kebabToSnake name}-*" -printf "%T@ %p\n" \
         | sort -n \
         | tail -n 1 \
