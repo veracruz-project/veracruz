@@ -20,7 +20,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, Read, Write},
     mem::size_of,
-    net::{SocketAddr, TcpStream},
     path::PathBuf,
     process::{Child, Command, ExitStatus},
     result,
@@ -263,7 +262,6 @@ impl VeracruzServer for VeracruzServerIceCap {
     }
 
     fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
         unimplemented!()
     }
 
