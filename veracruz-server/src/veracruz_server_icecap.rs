@@ -261,7 +261,7 @@ impl VeracruzServer for VeracruzServerIceCap {
         Ok(server)
     }
 
-    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>> {
+    fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>> {
         unimplemented!()
     }
 
