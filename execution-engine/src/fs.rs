@@ -276,26 +276,6 @@ impl FileSystem {
         self.fd_table.insert(fd.clone(), fd_entry);
     }
 
-    /// Return a random u32
-    fn random_u32(&self) -> FileSystemResult<u32> {
-        let mut buf: [u8; 4] = [0; 4];
-        if getrandom(&mut buf).is_success() {
-            Ok(u32::from_le_bytes(buf))
-        } else {
-            Err(ErrNo::Inval)
-        }
-    }
-
-    /// Return a random u64
-    fn random_u64(&self) -> FileSystemResult<u64> {
-        let mut buf: [u8; 8] = [0; 8];
-        if getrandom(&mut buf).is_success() {
-            Ok(u64::from_le_bytes(buf))
-        } else {
-            Err(ErrNo::Inval)
-        }
-    }
-
     /// Pick a new fd randomly.
     fn new_fd(&mut self) -> FileSystemResult<Fd> {
         let mut cur = self.next_fd_candidate;
