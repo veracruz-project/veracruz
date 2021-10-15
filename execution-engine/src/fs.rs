@@ -82,6 +82,11 @@ pub struct FileSystem {
     /// A table of file descriptor table entries.  This is indexed by file
     /// descriptors.  
     fd_table: HashMap<Fd, FileTableEntry>,
+    /// In order to quickly allocate file descriptors, we keep track of a monotonically increasing
+    /// candidate, starting just above the reserved values. With this approach, file descriptors
+    /// can not be re-allocated after being freed, imposing an artificial limit of 2^31 file
+    /// descriptor allocations over the course of a program's execution.
+    next_fd_candidate: Fd,
     /// The structure of the file system.
     ///
     /// NOTE: This is a flat map from files to inodes for now, assuming everything is in $ROOT.
@@ -90,6 +95,9 @@ pub struct FileSystem {
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
     inode_table: HashMap<Inode, InodeEntry>,
+    /// We allocate inodes in the same way as we allocate file descriptors. Inode's are 64 bits
+    /// rather than 31 bits, so the artificial limit on inode allocations is 2^64.
+    next_inode_candidate: Inode,
     /// The Right table for Principal, including participants and programs.
     /// It will be used in, e.g.  `path_open` function,
     /// to constrain the `Right` of file descriptors.
@@ -121,11 +129,15 @@ impl FileSystem {
     pub fn new(rights_table: RightsTable, std_streams_table: &Vec<StandardStream>) -> Self {
         let mut rst = Self {
             fd_table: HashMap::new(),
+            next_fd_candidate: Fd(u32::from(Self::ROOT_DIRECTORY_FD) + 1),
             path_table: HashMap::new(),
             inode_table: HashMap::new(),
+            next_inode_candidate: Inode(u64::from(Self::ROOT_DIRECTORY_INODE) + 1),
             rights_table,
             prestat_table: HashMap::new(),
         };
+        // If 'dir_paths' passed to 'install_prestat' changes to be non-empty,
+        // 'next_fd_candidate' and 'next_inode_candidate' will need to be increased accordingly.
         rst.install_prestat::<&Path>(&Vec::new(), std_streams_table);
         rst
     }
@@ -285,26 +297,34 @@ impl FileSystem {
     }
 
     /// Pick a new fd randomly.
-    fn new_fd(&self) -> FileSystemResult<Fd> {
+    fn new_fd(&mut self) -> FileSystemResult<Fd> {
+        let mut cur = self.next_fd_candidate;
         loop {
-            let new_fd = self.random_u32()?;
-
-            // Set upper limit to 2**31 - 1 (WASI requirement)
-            let new_fd = (new_fd >> 1).into();
-
-            if !self.fd_table.contains_key(&new_fd) {
-                return Ok(new_fd);
+            if u32::from(cur) & 1 << 31 != 0 {
+                return Err(ErrNo::NFile); // Not quite accurate, but this may be the best fit
             }
+            let next = Fd(u32::from(cur) + 1);
+            if !self.fd_table.contains_key(&cur) {
+                self.next_fd_candidate = next;
+                return Ok(cur);
+            }
+            cur = next;
         }
     }
 
     /// Pick a new inode randomly.
-    fn new_inode(&self) -> FileSystemResult<Inode> {
+    fn new_inode(&mut self) -> FileSystemResult<Inode> {
+        let mut cur = self.next_inode_candidate;
         loop {
-            let new_inode = Inode(self.random_u64()?);
-            if !self.inode_table.contains_key(&new_inode) {
-                return Ok(new_inode);
+            let next = match u64::from(cur).checked_add(1) {
+                Some(next) => Inode(next),
+                None => return Err(ErrNo::NFile), // Not quite accurate, but this may be the best fit
+            };
+            if !self.inode_table.contains_key(&cur) {
+                self.next_inode_candidate = next;
+                return Ok(cur);
             }
+            cur = next;
         }
     }
 
