@@ -318,6 +318,7 @@ mod tests {
         assert!(result.is_ok(), "error:{:?}", result);
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
@@ -363,6 +364,7 @@ mod tests {
         assert!(result.is_err(), "An error should occur");
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// Attempt to use an unauthorized key
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
@@ -377,6 +379,7 @@ mod tests {
         assert!(result.is_err(), "An error should occur");
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// Attempt to use an unauthorized certificate
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
@@ -391,6 +394,7 @@ mod tests {
         assert!(result.is_err(), "An error should occur");
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// A unauthorized client attempt to connect the service
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
@@ -405,6 +409,7 @@ mod tests {
         assert!(result.is_err(), "An error should occur");
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// Attempt to provision more data than expected
     fn test_phase2_random_source_one_data_no_attestation() {
@@ -539,6 +544,7 @@ mod tests {
         grade: u8,
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
@@ -696,6 +702,7 @@ mod tests {
         });
     }
 
+    #[cfg(not(feature = "icecap"))]
     #[test]
     /// Performance test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
