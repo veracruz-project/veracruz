@@ -14,7 +14,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use platform_services::getrandom;
 use std::{
     collections::HashMap,
     convert::AsRef,
