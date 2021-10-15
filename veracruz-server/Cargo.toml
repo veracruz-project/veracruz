@@ -24,7 +24,6 @@ dirs = "1.0.2"
 veracruz-utils = { path = "../veracruz-utils" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 serde_json = { package = "serde_json", git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
-http = "=0.2.4"
 transport-protocol = { path = "../transport-protocol"}
 rouille = "=3.2.1"
 base64 = "0.10.1"
