@@ -103,8 +103,7 @@ mkShell (crateUtils.baseEnv // rec {
         | tail -n 1 \
         | cut -d ' ' -f 2 \
       )"
-      mkdir -p $build_dir/out
-      ln -sf ../"$f" $build_dir/out/${name}
+      install -D -T "$f" $build_dir/out/${name}
     }
   '';
 

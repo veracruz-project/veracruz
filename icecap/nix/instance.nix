@@ -20,8 +20,6 @@ let
     mkIceDL mkDynDLSpec
     globalCrates;
 
-  now = builtins.readFile ../build/NOW;
-
   runtimeManagerElf = ../build/runtime-manager/out/runtime_manager_enclave.elf;
 
   testElf = {
@@ -33,6 +31,8 @@ let
 
   tokenSshKeyPriv = ./host/token-ssh-key.priv;
 
+  now = builtins.readFile ../build/NOW;
+
   sshPort = "6666"; # on emulated machine
   readyPort = "6667"; # on development machine
 
@@ -42,48 +42,10 @@ in lib.fix (self: with self; {
 
   inherit proxyAttestationServerTestDatabase testElf;
 
-  tokenSshKeyPub = runCommand "token-ssh-key.pub" {
-    nativeBuildInputs = with pkgs.dev; [
-      openssh
-    ];
-  } ''
-    cp ${tokenSshKeyPriv} priv
-    chmod 0400 priv
-    ssh-keygen -y -f priv > $out
-  '';
+  runAuto = run { automate = true; };
+  runManual = run { automate = false; };
 
-  tokenSshKeyPrivDropbear = runCommand "token-ssh-key.dropbear.priv" {
-    nativeBuildInputs = with pkgs.dev; [
-      dropbear
-    ];
-  } ''
-    dropbearconvert openssh dropbear ${tokenSshKeyPriv} $out
-  '';
-
-  runTests = pkgs.dev.writeScript "run-test.sh" ''
-    #!${pkgs.dev.runtimeShell}
-    set -e
-
-    cleanup() {
-      kill $(jobs -p)
-    }
-
-    trap "exit" INT TERM
-    trap "cleanup" EXIT
-
-    ${runAuto}/run < /dev/null &
-
-    ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
-
-    ${pkgs.dev.openssh}/bin/ssh \
-      -o UserKnownHostsFile=/dev/null \
-      -o StrictHostKeyChecking=no \
-      -o Preferredauthentications=publickey \
-      -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
-      /run-tests
-  '';
-
-  run = { automate ? false }:
+  run = { automate }:
     assert automate -> icecapPlat == "virt";
     platUtils.${icecapPlat}.bundle {
       firmware = icecapFirmware.image;
@@ -95,13 +57,10 @@ in lib.fix (self: with self; {
           "console=hvc0"
           "loglevel=7"
         ] ++ lib.optionals (icecapPlat == "virt") [
-          "spec=${spec}"
-          "test_collateral=${testCollateral}"
+          "vearcruz_spec_store_path=${spec}"
+          "vearcruz_test_collateral_store_path=${testCollateral}"
         ] ++ lib.optionals automate [
-          "automate=1"
-
-          # NOTE use this to avoid noisy warnings due to poor perf in CI environment
-          # "rcupdate.rcu_cpu_stall_suppress=1"
+          "vearcruz_automate=1"
         ];
       };
       platArgs = selectIceCapPlatOr {} {
@@ -116,9 +75,6 @@ in lib.fix (self: with self; {
         };
       };
     };
-
-  runAuto = run { automate = true; };
-  runManual = run { automate = false; };
 
   hostUser = nixosLite.eval {
     modules = [
@@ -198,5 +154,46 @@ in lib.fix (self: with self; {
         ])
       );
   };
+
+  tokenSshKeyPub = runCommand "token-ssh-key.pub" {
+    nativeBuildInputs = with pkgs.dev; [
+      openssh
+    ];
+  } ''
+    cp ${tokenSshKeyPriv} priv
+    chmod 0400 priv
+    ssh-keygen -y -f priv > $out
+  '';
+
+  tokenSshKeyPrivDropbear = runCommand "token-ssh-key.dropbear.priv" {
+    nativeBuildInputs = with pkgs.dev; [
+      dropbear
+    ];
+  } ''
+    dropbearconvert openssh dropbear ${tokenSshKeyPriv} $out
+  '';
+
+  runTests = pkgs.dev.writeScript "run-test.sh" ''
+    #!${pkgs.dev.runtimeShell}
+    set -e
+
+    cleanup() {
+      kill $(jobs -p)
+    }
+
+    trap "exit" INT TERM
+    trap "cleanup" EXIT
+
+    ${runAuto}/run < /dev/null &
+
+    ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
+
+    ${pkgs.dev.openssh}/bin/ssh \
+      -o UserKnownHostsFile=/dev/null \
+      -o StrictHostKeyChecking=no \
+      -o Preferredauthentications=publickey \
+      -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
+      /run-tests
+  '';
 
 })

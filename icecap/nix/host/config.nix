@@ -22,14 +22,31 @@ let
     cp ${file} $out/bin/${name}
   '';
 
-  run-test = pkgs.writeScript "run-test.sh" ''
+  testDir = "/x";
+
+  testEnv = pkgs.writeText "test-env.sh" ''
+    export VERACRUZ_REALM_SPEC=${testDir}/spec.bin
+    export VERACRUZ_TEST_COLLATERAL=${testDir}/test-collateral
+    export VERACRUZ_DATABASE_URL=${testDir}/proxy-attestation-server.db
+  '';
+
+  runTests = pkgs.writeScript "run-tests.sh" ''
+    #!${config.build.extraUtils}/bin/sh
+    set -eu
+
+    . ${testEnv}
+
+    /run-test veracruz-test
+    /run-test veracruz-server-test
+  '';
+
+  runTest = pkgs.writeScript "run-test.sh" ''
     #!${config.build.extraUtils}/bin/sh
     set -eu
 
     test_cmd=$1
     shift
 
-    RUST_LOG=info \
     DATABASE_URL=$VERACRUZ_DATABASE_URL \
     VERACRUZ_ICECAP_REALM_ID=0 \
     VERACRUZ_ICECAP_REALM_SPEC=$VERACRUZ_REALM_SPEC \
@@ -39,16 +56,6 @@ let
     VERACRUZ_PROGRAM_DIR=$VERACRUZ_TEST_COLLATERAL \
     VERACRUZ_DATA_DIR=$VERACRUZ_TEST_COLLATERAL \
       $test_cmd --test-threads=1 --nocapture --show-output "$@"
-  '';
-
-  run-tests = pkgs.writeScript "run-tests.sh" ''
-    #!${config.build.extraUtils}/bin/sh
-    set -eu
-
-    . /env.sh
-
-    /run-test veracruz-test
-    /run-test veracruz-server-test
   '';
 
 in {
@@ -86,28 +93,17 @@ in {
         ln -s $(which sh) /bin/sh
 
         echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
-        mkdir -p /root/.ssh
-        ln -s ${tokenSshKeyPub} /root/.ssh/authorized_keys
         export HOME=/root
+        mkdir -p $HOME/.ssh
+        ln -s ${tokenSshKeyPub} $HOME/.ssh/authorized_keys
 
         date -s '@${now}'
 
-        ln -s ${run-test} /run-test
-        ln -s ${run-tests} /run-tests
+        ln -s ${runTest} /run-test
+        ln -s ${runTests} /run-tests
 
-        (
-          d=/x
-          mkdir $d
-
-          cat <<EOF > /env.sh
-          export VERACRUZ_REALM_SPEC=$d/spec.bin
-          export VERACRUZ_TEST_COLLATERAL=$d/test-collateral
-          export VERACRUZ_DATABASE_URL=$d/proxy-attestation-server.db
-        # de-dent for heredoc:
-        EOF
-        )
-
-        . /env.sh
+        . ${testEnv}
+        mkdir ${testDir}
       '';
     }
 
@@ -117,8 +113,8 @@ in {
       initramfs.extraInitCommands = ''
         mkdir -p /mnt/nix/store/
         mount -t 9p -o trans=virtio,version=9p2000.L,ro store /mnt/nix/store/
-        spec_src=/mnt/$spec
-        test_collateral_src=/mnt/$test_collateral
+        spec_src=/mnt/$vearcruz_spec_store_path
+        test_collateral_src=/mnt/$vearcruz_test_collateral_store_path
       '';
     })
 
@@ -142,7 +138,7 @@ in {
         ln -s $test_collateral_src $VERACRUZ_TEST_COLLATERAL
         cp ${instance.proxyAttestationServerTestDatabase} $VERACRUZ_DATABASE_URL
 
-        if [ "$automate" = "1" ]; then
+        if [ "$vearcruz_automate" = "1" ]; then
           dropbear -Es -r ${tokenSshKeyPrivDropbear} -p 0.0.0.0:22
           nc ${qemuHostAddr} ${readyPort} < /dev/null
         fi
