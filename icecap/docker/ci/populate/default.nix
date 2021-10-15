@@ -1,8 +1,11 @@
 let
+  icecapRev = builtins.getEnv "ICECAP_REV";
+  salt = builtins.getEnv "SALT";
+
   icecapRemote = builtins.fetchGit rec {
     url = "https://gitlab.com/arm-research/security/icecap/icecap-refs.git";
     ref = "refs/tags/icecap/keep/${builtins.substring 0 32 rev}";
-    rev = builtins.getEnv "ICECAP_REV";
+    rev = icecapRev;
     submodules = true;
   };
 
@@ -35,7 +38,13 @@ let
   };
 
   hostUser = nixosLite.eval {
-    modules = [];
+    modules = [
+      {
+        initramfs.extraContentCommands = ''
+          # ${salt}
+        '';
+      }
+    ];
   };
 
   spec = mkDynDLSpec {
@@ -46,8 +55,7 @@ let
   ddl = mkIceDL {
     src = ./cdl;
     config = {
-      components = {
-      };
+      inherit salt;
     };
   };
 

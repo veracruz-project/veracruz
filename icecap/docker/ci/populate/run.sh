@@ -9,4 +9,4 @@ nix_binary_cache_options=" \
     --option extra-trusted-public-keys $nix_binary_cache_public_key \
 "
 
-nix-build $nix_binary_cache_options $here --no-out-link
+SALT=$RANDOM nix-build $nix_binary_cache_options $here --no-out-link
