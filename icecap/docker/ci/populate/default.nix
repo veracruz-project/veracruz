@@ -56,6 +56,8 @@ let
     src = ./cdl;
     config = {
       inherit salt;
+      realm_id = 0;
+      num_cores = 1;
     };
   };
 
