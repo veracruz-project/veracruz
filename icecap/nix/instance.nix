@@ -124,11 +124,9 @@ in lib.fix (self: with self; {
     };
   };
 
-  icecapWrapperCrate = configured.callPackage ../src/rust/icecap-wrapper/cargo.nix {};
-
-  icecapCrates = lib.attrValues (crateUtils.closure icecapWrapperCrate);
-
   icecapCratesEnv = crateUtils.collectEnv icecapCrates;
+  icecapCrates = lib.attrValues (crateUtils.closure icecapWrapperCrate);
+  icecapWrapperCrate = configured.callPackage ../src/rust/icecap-wrapper/cargo.nix {};
 
   env = {
     runtime-manager = configured.callPackage ./env/runtime-manager.nix {
@@ -146,9 +144,9 @@ in lib.fix (self: with self; {
   libc-supplement = configured.libs.mk {
     name = "c-supplement";
     root = icecapSrc.absoluteSplit ../src/c/libc-supplement;
-    propagatedBuildInputs = [
-      configured.libs.icecap-pure
-      configured.libs.icecap-utils
+    propagatedBuildInputs = with configured.libs; [
+      icecap-pure
+      icecap-utils
     ];
   };
 

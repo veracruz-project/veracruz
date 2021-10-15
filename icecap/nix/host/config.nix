@@ -12,7 +12,7 @@
 { config, pkgs, lib, ... }:
 
 let
-  devAddr = "10.0.2.2";
+  qemuHostAddr = "10.0.2.2";
 
   executableInContext = name: file: pkgs.runCommand name {} ''
     mkdir -p $out/bin
@@ -141,7 +141,7 @@ in {
 
         if [ "$automate" = "1" ]; then
           dropbear -Es -r ${./token-ssh-keys}/dropbear_ecdsa_server_key -p 0.0.0.0:22
-          nc ${devAddr} ${readyPort} < /dev/null
+          nc ${qemuHostAddr} ${readyPort} < /dev/null
         fi
       '';
 
