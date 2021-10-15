@@ -194,6 +194,8 @@ in lib.fix (self: with self; {
       -o Preferredauthentications=publickey \
       -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
       /run-tests
+
+      echo PASS
   '';
 
 })
