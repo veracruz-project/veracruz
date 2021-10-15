@@ -140,7 +140,6 @@ mod tests {
     }
 
     /// A test of veracruz using network communication using a single session
-    #[cfg(not(feature = "icecap"))]
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
         let result = test_template::<Vec<u8>>(
