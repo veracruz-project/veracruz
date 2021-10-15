@@ -72,11 +72,11 @@ veracruz-test:
 
 .PHONY: sdk
 sdk:
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run make -C ../sdk
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run "make -C ../sdk"
 
 .PHONY: test-collateral
 test-collateral: sdk
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run make -C ../test-collateral TEE=icecap
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run "make -C ../test-collateral TEE=icecap"
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 
