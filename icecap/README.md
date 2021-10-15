@@ -16,8 +16,9 @@ loaded with `veracruz-test` and `veracruz-server-test`:
 
 ```
 cd /work/veracruz/icecap
-make run-tests # this will take a while
+make run-tests
 ```
+
 To instead build a test system for the Raspberry Pi 4, do:
 
 ```
