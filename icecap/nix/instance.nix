@@ -124,7 +124,7 @@ in lib.fix (self: with self; {
     };
   };
 
-  icecapWrapperCrate = configured.callPackage ./realm/icecap-wrapper/cargo.nix {};
+  icecapWrapperCrate = configured.callPackage ../src/rust/icecap-wrapper/cargo.nix {};
 
   icecapCrates = lib.attrValues (crateUtils.closure icecapWrapperCrate);
 
@@ -145,7 +145,7 @@ in lib.fix (self: with self; {
 
   libc-supplement = configured.libs.mk {
     name = "c-supplement";
-    root = icecapSrc.absoluteSplit ./realm/libc-supplement;
+    root = icecapSrc.absoluteSplit ../src/c/libc-supplement;
     propagatedBuildInputs = [
       configured.libs.icecap-pure
       configured.libs.icecap-utils

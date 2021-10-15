@@ -16,26 +16,15 @@ loaded with `veracruz-test` and `veracruz-server-test`:
 
 ```
 cd /work/veracruz/icecap
-make test-system # this will take a while
-./result/run
+make run-tests # this will take a while
 ```
-
-From inside of the test system, run `veracruz-test` and `veracruz-server-test`:
-
-```
-run_test veracruz-test
-run_test veracruz-server-test
-```
-
-Use `'<ctrl>-a x'` to quit QEMU and exit the emulation.
-
 To instead build a test system for the Raspberry Pi 4, do:
 
 ```
-cd /work/veracruz/icecap # back inside the container
+cd /work/veracruz/icecap
 make clean
 make test-system ICECAP_PLAT=rpi4
-ls -L ./result/boot/
+ls -L ./build/test-system/boot/
 ```
 
-For more detailed information about supported Raspberry Pi 4 variants and about running the test system contained in `./result/boot/`, see https://gitlab.com/arm-research/security/icecap/icecap.
+For more detailed information about supported Raspberry Pi 4 variants and about running the test system contained in `./build/test-system/boot/`, see https://gitlab.com/arm-research/security/icecap/icecap.

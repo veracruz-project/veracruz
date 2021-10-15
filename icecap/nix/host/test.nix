@@ -52,7 +52,12 @@ mkShell (crateUtils.baseEnv // rec {
   ];
 
   shellHook = ''
-    # From: https://github.com/NixOS/nixpkgs/blob/1fab95f5190d087e66a3502481e34e15d62090aa/pkgs/applications/networking/browsers/firefox/common.nix#L247-L253
+    # NOTE
+    #
+    # This is one spot where we have to do a bit of Nix gymnastics.
+    # Having to do this kind of thing isn't ideal, but it's the price we pay.
+    #
+    # Copied from: https://github.com/NixOS/nixpkgs/blob/1fab95f5190d087e66a3502481e34e15d62090aa/pkgs/applications/networking/browsers/firefox/common.nix#L247-L253
     # Set C flags for bindgen. Bindgen does not invoke $CC directly. Instead it
     # uses LLVM's libclang. To make sure all necessary flags are included we
     # need to look in a few places.
@@ -75,7 +80,7 @@ mkShell (crateUtils.baseEnv // rec {
         --manifest-path ${manifestPath} \
         --target ${rustTargetName} --features icecap \
         ${lib.optionalString (!debug) "--release"} \
-        -j $NIX_BUILD_CORES \
+        -j$NIX_BUILD_CORES \
         --target-dir ./target \
         "$@"
       ) && \
@@ -87,6 +92,7 @@ mkShell (crateUtils.baseEnv // rec {
       ln -sf ${cargoConfig} $build_dir/.cargo/config
     }
 
+    # cargo test --no-run doesn't give the test binary a predictable filename, so we have to find it ourselves
     distinguish() {
       d=$build_dir/target/${rustTargetName}/${if debug then "debug" else "release"}/deps
       f="$(find $d -executable -type f -printf "%T@ %p\n" \

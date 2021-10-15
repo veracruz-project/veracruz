@@ -62,6 +62,8 @@ mkShell (crateUtils.baseEnv // {
   ];
 
   shellHook = ''
+    # NOTE
+    # If this ever ceases to suffice, see $BINDGEN_EXTRA_CLANG_ARGS for the host binaries. 
     export BINDGEN_EXTRA_CLANG_ARGS="$NIX_CFLAGS_COMPILE"
 
     build_dir=build/${name}
@@ -75,7 +77,7 @@ mkShell (crateUtils.baseEnv // {
         ${lib.optionalString (!debug) "--release"} \
         --target-dir ./target \
         --out-dir ./out \
-        -j $NIX_BUILD_CORES \
+        -j$NIX_BUILD_CORES \
         "$@"
       )
     }

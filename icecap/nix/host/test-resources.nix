@@ -11,7 +11,7 @@
 , crateUtils
 , rustc, cargo, git, cacert
 , cmake, python3, perl
-, bc, xxd, file
+, file, bc, xxd
 , sqlite, diesel-cli
 }:
 
@@ -23,20 +23,9 @@ mkShell (crateUtils.baseEnv // rec {
 
   nativeBuildInputs = [
     rustc cargo git cacert
-    cmake
-    perl
-    python3
-    file
-    diesel-cli
-    bc xxd
-    sqlite
+    cmake python3 perl
+    file bc xxd
+    sqlite diesel-cli
   ];
-
-  shellHook = ''
-    build() {
-      make -C ../sdk
-      TEE=icecap make -C ../test-collateral
-    }
-  '';
 
 })
