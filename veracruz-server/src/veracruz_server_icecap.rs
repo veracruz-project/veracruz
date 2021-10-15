@@ -100,9 +100,9 @@ impl Configuration {
 
     fn icecap_host_command(&self) -> Command {
         // HACK
-        // For now, at the pinned version of IceCap, realms must run on core 1.
+        // For now, at the pinned version of IceCap, realms must run on core 0.
         let mut command = Command::new("taskset");
-        command.arg("0x2");
+        command.arg("0x1");
         command.arg(&self.icecap_host_command);
         command
     }

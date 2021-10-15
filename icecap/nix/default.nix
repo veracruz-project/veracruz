@@ -11,7 +11,7 @@ let
   icecapRemote = builtins.fetchGit rec {
     url = "https://gitlab.com/arm-research/security/icecap/icecap-refs.git";
     ref = "refs/tags/icecap/keep/${builtins.substring 0 32 rev}";
-    rev = "d581f77edf4ff87e07b42eec8ecd7463a2727e6f";
+    rev = "5cf2552e7ec63d5b5700f3bed8f3ead6bf3517cc";
     submodules = true;
   };
 
