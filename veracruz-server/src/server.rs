@@ -17,13 +17,13 @@ use crate::veracruz_server_sgx::veracruz_server_sgx::VeracruzServerSGX as Veracr
 #[cfg(feature = "tz")]
 use crate::veracruz_server_tz::veracruz_server_tz::VeracruzServerTZ as VeracruzServerEnclave;
 
-use actix_web::{dev::Server, get, middleware, post, web, App, HttpServer};
+use actix_web::{dev::Server, get, middleware, post, web, App, HttpServer, HttpRequest};
 use base64;
 use futures::executor;
+use qstring::QString;
 use std::{
     collections::HashMap,
     net::ToSocketAddrs,
-    num::ParseIntError,
     sync::{Arc, Mutex, mpsc},
     thread,
     time::{Duration, SystemTime},
@@ -48,26 +48,28 @@ struct EnclaveHandler {
 }
 
 impl EnclaveHandler {
-    /// Parse optional id
-    ///
-    /// To do this with actix, we need to use a "tail match" and parse
-    /// out the optional id ourselves
-    ///
-    fn parse_optional_id(
-        &self,
-        id_path: &str
-    ) -> Result<u32, ParseIntError> {
-        if id_path.len() == 0 {
-            // If we don't have an id, lookup what the id should
-            // be. If there are no enclaves at all, return 0 (an invalid id)
-            // and let the handler error when they look it up.
-            Ok(self.enclaves.iter().next().map(|(id, _)| *id).unwrap_or(0))
-        } else if id_path.starts_with('/') {
-            // expect leading slash
-            id_path[1..].parse::<u32>()
+    /// Find the best enclave handler id from the given query string, or zero
+    /// if no matching enclaves are found
+    fn best_id(&self, query: &str) -> Result<u32, VeracruzServerError> {
+        let q = QString::from(query);
+
+        if let Some(id) = q.get("id") {
+            Ok(id.parse::<u32>()?)
+        } else if let Some(hash) = q.get("hash") {
+            Ok(
+                self.enclaves.iter()
+                    .filter(|(_, enclave)| enclave.policy_hash == hash)
+                    .next()
+                    .map(|(id, _)| *id)
+                    .unwrap_or(0)
+            )
         } else {
-            // force ParseIntError
-            "".parse::<u32>()
+            Ok(
+                self.enclaves.iter()
+                    .next()
+                    .map(|(id, _)| *id)
+                    .unwrap_or(0)
+            )
         }
     }
 }
@@ -104,12 +106,12 @@ async fn enclave_setup(
 /// Teardown an enclave
 #[post("/enclave_teardown{id:.*}")]
 async fn enclave_teardown(
-    web::Path(id): web::Path<String>,
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
+    req: HttpRequest,
 ) -> Result<String, VeracruzServerError> {
     // does enclave exist?
     let mut enclave_handler = enclave_handler.lock()?;
-    let id = enclave_handler.parse_optional_id(&id)?;
+    let id = enclave_handler.best_id(req.query_string())?;
     match enclave_handler.enclaves.remove(&id) {
         Some(mut enclave) => {
             // well it doesn't anymore, let close take care of the rest
@@ -154,14 +156,14 @@ async fn enclave_list(
 }
 
 /// Get the policy governing an enclave's computation
-#[get("/enclave_policy{id:.*}")]
+#[get("/enclave_policy")]
 async fn enclave_policy(
-    web::Path(id): web::Path<String>,
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
+    req: HttpRequest,
 ) -> Result<String, VeracruzServerError> {
     // does enclave exist?
     let enclave_handler = enclave_handler.lock()?;
-    let id = enclave_handler.parse_optional_id(&id)?;
+    let id = enclave_handler.best_id(req.query_string())?;
     let enclave = match enclave_handler.enclaves.get(&id) {
         Some(enclave) => enclave,
         None => {
@@ -175,8 +177,8 @@ async fn enclave_policy(
 /// Send TLS data to a currently running enclave
 #[post("/enclave_tls{id:.*}")]
 async fn enclave_tls(
-    web::Path(id): web::Path<String>,
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
+    req: HttpRequest,
     input_data: String,
 ) -> VeracruzServerResponder {
     let fields = input_data.split_whitespace().collect::<Vec<&str>>();
@@ -186,7 +188,7 @@ async fn enclave_tls(
     let session_id = match fields[0].parse::<u32>()? {
         0 => {
             let mut enclave_handler_locked = enclave_handler.lock()?;
-            let id = enclave_handler_locked.parse_optional_id(&id)?;
+            let id = enclave_handler_locked.best_id(req.query_string())?;
 
             let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::InvalidEnclaveError(id))?;
 
@@ -200,7 +202,7 @@ async fn enclave_tls(
 
     let (active_flag, output_data_option) = {
         let mut enclave_handler_locked = enclave_handler.lock()?;
-        let id = enclave_handler_locked.parse_optional_id(&id)?;
+        let id = enclave_handler_locked.best_id(req.query_string())?;
 
         let enclave = enclave_handler_locked.enclaves.get_mut(&id).ok_or(VeracruzServerError::InvalidEnclaveError(id))?;
 
@@ -210,7 +212,7 @@ async fn enclave_tls(
     // Shutdown the enclave if we're done with it
     if !active_flag {
         let mut enclave_handler = enclave_handler.lock()?;
-        let id = enclave_handler.parse_optional_id(&id)?;
+        let id = enclave_handler.best_id(req.query_string())?;
         match enclave_handler.enclaves.remove(&id) {
             Some(mut enclave) => {
                 // The enclave has been removed now, let drop take care of the rest

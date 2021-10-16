@@ -69,7 +69,7 @@ impl VeracruzAdminClient {
         // send request
         let path = format!("http://{}/enclave_teardown{}",
             self.url,
-            id.map(|id| format!("/{}", id)).unwrap_or("".to_owned())
+            id.map(|id| format!("?id={}", id)).unwrap_or("".to_owned())
         );
         let ret = reqwest::Client::new()
             .post(&path)
@@ -110,7 +110,7 @@ impl VeracruzAdminClient {
         // send request
         let path = format!("http://{}/enclave_policy{}",
             self.url,
-            id.map(|id| format!("/{}", id)).unwrap_or("".to_owned())
+            id.map(|id| format!("?id={}", id)).unwrap_or("".to_owned())
         );
         let mut ret = reqwest::Client::new()
             .get(&path)

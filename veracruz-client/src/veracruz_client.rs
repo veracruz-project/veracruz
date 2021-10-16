@@ -261,10 +261,11 @@ impl VeracruzClient {
         Ok(VeracruzClient {
             tls_session: session,
             remote_session_id: None,
-            url_path: format!("http://{}/enclave_tls{}",
+            url_path: format!("http://{}/enclave_tls?hash={}{}",
                 url,
+                policy_hash,
                 id
-                    .map(|id| format!("/{}", id))
+                    .map(|id| format!("?id={}", id))
                     .unwrap_or("".to_owned())
             ),
             policy: policy,
