@@ -113,9 +113,11 @@ impl Configuration {
         command
     }
 
-    // HACK clean up in case of previous failure
+    // HACK
+    // Clean up in case of previous failure.
+    // As the IceCap shadow VMM matures, this will become unnecessary.
     fn hack_ensure_not_realm_running() {
-        Command::new("pkill").arg("icecap-host").status().unwrap();
+        Command::new("pkill").arg("-f").arg("icecap-host run").status().unwrap();
     }
 
     fn ensure_successful(exit_status: ExitStatus) -> Result<()> {
