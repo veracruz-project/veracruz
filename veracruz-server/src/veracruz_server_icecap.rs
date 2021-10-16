@@ -46,22 +46,29 @@ type Result<T> = result::Result<T, VeracruzServerError>;
 /// Class of IceCap-specific errors.
 #[derive(Debug, Error)]
 pub enum IceCapError {
-    #[error(display = "IceCap: Realm channel error: {}", error)]
-    RealmChannelError { error: io::Error },
-    #[error(display = "IceCap: Serialization error: {}", error)]
-    SerializationError { error: bincode::Error },
-    #[error(display = "IceCap: Shadow VMM spawn error: {}", error)]
-    ShadowVmmSpawnError { error: io::Error },
+    #[error(display = "IceCap: Realm channel error: {}", _0)]
+    RealmChannelError(io::Error),
+    #[error(display = "IceCap: Serialization error: {}", _0)]
+    SerializationError(bincode::Error),
+    #[error(display = "IceCap: Shadow VMM spawn error: {}", _0)]
+    ShadowVmmSpawnError(io::Error),
     #[error(display = "IceCap: Shadow VMM exit status error: {}", exit_status)]
     ShadowVMMExitStatusError { exit_status: ExitStatus },
-    #[error(display = "IceCap: Shadow VMM stop error: {}", error)]
-    ShadowVMMStopError { error: io::Error },
+    #[error(display = "IceCap: Shadow VMM stop error: {}", _0)]
+    ShadowVMMStopError(io::Error),
     #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
     UnexpectedRuntimeManagerResponse(Response),
     #[error(display = "IceCap: Missing environment variable: {}", variable)]
     MissingEnvironmentVariable { variable: String },
     #[error(display = "IceCap: Invalid environment variable value: {}", variable)]
     InvalidEnvironemntVariableValue { variable: String },
+}
+
+impl IceCapError {
+    // For point-free error handling
+    fn hoist<T>(f: impl Fn(T) -> IceCapError) -> impl Fn(T) -> VeracruzServerError {
+        move |inner| VeracruzServerError::IceCapError(f(inner))
+    }
 }
 
 struct Configuration {
@@ -128,9 +135,7 @@ impl Configuration {
                 .arg(format!("{}", self.realm_id))
                 .arg(&self.realm_spec)
                 .status()
-                .map_err(|error| {
-                    VeracruzServerError::IceCapError(IceCapError::ShadowVmmSpawnError { error })
-                })?,
+                .map_err(IceCapError::hoist(IceCapError::ShadowVmmSpawnError))?,
         )
     }
 
@@ -142,9 +147,7 @@ impl Configuration {
             .arg(format!("{}", self.realm_id))
             .arg(format!("{}", virtual_node_id))
             .spawn()
-            .map_err(|error| {
-                VeracruzServerError::IceCapError(IceCapError::ShadowVmmSpawnError { error })
-            })?;
+            .map_err(IceCapError::hoist(IceCapError::ShadowVmmSpawnError))?;
         Ok(child)
     }
 
@@ -155,9 +158,7 @@ impl Configuration {
                 .arg("destroy")
                 .arg(format!("{}", self.realm_id))
                 .status()
-                .map_err(|error| {
-                    VeracruzServerError::IceCapError(IceCapError::ShadowVmmSpawnError { error })
-                })?,
+                .map_err(IceCapError::hoist(IceCapError::ShadowVmmSpawnError))?,
         )
     }
 }
@@ -181,9 +182,7 @@ impl VeracruzServer for VeracruzServerIceCap {
             .read(true)
             .write(true)
             .open(&configuration.realm_endpoint)
-            .map_err(|error| {
-                VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
-            })?;
+            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
         let server = Self {
             configuration,
             realm_channel,
@@ -327,9 +326,9 @@ impl VeracruzServer for VeracruzServerIceCap {
     }
 
     fn close(&mut self) -> Result<bool> {
-        self.realm_process.kill().map_err(|error| {
-            VeracruzServerError::IceCapError(IceCapError::ShadowVMMStopError { error })
-        })?;
+        self.realm_process
+            .kill()
+            .map_err(IceCapError::hoist(IceCapError::ShadowVMMStopError))?;
         self.configuration.destroy_realm()?;
         Ok(true)
     }
@@ -349,30 +348,26 @@ impl VeracruzServerIceCap {
         // rather than 'impl Write for File'.
         let mut realm_channel = &self.realm_channel;
 
-        let msg = serialize(request).map_err(|error| {
-            VeracruzServerError::IceCapError(IceCapError::SerializationError { error })
-        })?;
+        let msg =
+            serialize(request).map_err(IceCapError::hoist(IceCapError::SerializationError))?;
         let header = (msg.len() as Header).to_le_bytes();
-        realm_channel.write(&header).map_err(|error| {
-            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
-        })?;
-        realm_channel.write(&msg).map_err(|error| {
-            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
-        })?;
+        realm_channel
+            .write(&header)
+            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
+        realm_channel
+            .write(&msg)
+            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
         let mut header_bytes = [0; size_of::<Header>()];
         realm_channel
             .read_exact(&mut header_bytes)
-            .map_err(|error| {
-                VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
-            })?;
+            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
         let header = u32::from_le_bytes(header_bytes);
         let mut resp_bytes = vec![0; header as usize];
-        realm_channel.read_exact(&mut resp_bytes).map_err(|error| {
-            VeracruzServerError::IceCapError(IceCapError::RealmChannelError { error })
-        })?;
-        let resp = deserialize(&resp_bytes).map_err(|error| {
-            VeracruzServerError::IceCapError(IceCapError::SerializationError { error })
-        })?;
+        realm_channel
+            .read_exact(&mut resp_bytes)
+            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
+        let resp = deserialize(&resp_bytes)
+            .map_err(IceCapError::hoist(IceCapError::SerializationError))?;
         Ok(resp)
     }
 
