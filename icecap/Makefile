@@ -120,7 +120,9 @@ run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-ma
 clean: unlink-crates
 	rm -rf $(build_dir)
 
-# This is a bit heavy-handed, but useful for achieving a clean slate for the test resources too
+# This is a bit heavy-handed, but useful for achieving a clean slate for 'sdk' and 'test-collateral'
 .PHONY: deep-clean
 deep-clean: clean
-	cd .. && git clean -Xdff --exclude='!icecap/docker/hacking/nix-root'
+	cd .. && git clean -Xdffn \
+		--exclude='!icecap/docker/hacking/nix-root/' \
+		--exclude='!icecap/docker/hacking/nix-root/**'
