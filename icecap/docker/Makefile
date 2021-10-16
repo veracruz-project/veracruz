@@ -56,20 +56,14 @@ run: build $(nix_root)/.installed
 exec:
 	docker exec -it $(hacking_container_name) bash
 
-.PHONY: logs
-logs:
-	for id in $$(docker ps -aq -f "label=$(label)"); do \
-		docker logs $$id; \
-	done
-
-.PHONY: clean
-clean:
-	for id in $$(docker ps -aq -f "label=$(label)"); do \
+.PHONY: rm-container
+rm-container:
+	for id in $$(docker ps -aq -f "name=$(hacking_container_name)"); do \
 		docker rm -f $$id; \
 	done
 
-.PHONY: deep-clean
-deep-clean: clean
+.PHONY: rm-nix-state
+rm-nix-state:
 	if [ -d $(nix_root) ]; then \
 		chmod -R u+w $(nix_root); \
 		rm -rf $(nix_root); \
@@ -86,33 +80,29 @@ ci_image_tag := $(local_repository):$(ci_image_tag_name)
 ci_container_name := $(container_name_base)-ci
 
 # TODO investigate the benefits of the use of --squash
-.PHONY: build-ci
-build-ci:
+.PHONY: ci-build
+ci-build:
 	docker build -f ci/Dockerfile \
 		--build-arg ICECAP_REV=$(icecap_rev) \
 		--label $(label) -t $(ci_image_tag)  .
 
-.PHONY: run-ci
-run-ci:
+.PHONY: ci-run
+ci-run:
 	docker run -d --name $(ci_container_name) --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
 		$(icecap_mount) \
 		$(ci_image_tag) sleep inf
 
-.PHONY: exec-ci
-exec-ci:
+.PHONY: ci-exec
+ci-exec:
 	docker exec -it $(ci_container_name) bash
 
-.PHONY: test-ci
-test-ci:
-	docker exec -it $(ci_container_name) bash /work/veracruz/icecap/ci/run.sh
-
-.PHONY: test-ci-populate
-test-ci-populate:
+.PHONY: ci-test-populate
+ci-test-populate:
 	ICECAP_REV=$(icecap_rev) bash ci/populate/run.sh
 
-.PHONY: clean-ci
-clean-ci:
+.PHONY: ci-rm-container
+ci-rm-container:
 	for id in $$(docker ps -aq -f "name=$(ci_container_name)"); do \
 		docker rm -f $$id; \
 	done
@@ -123,20 +113,8 @@ clean-ci:
 remote_repository := ghcr.io/veracruz-project/veracruz/veracruz-icecap
 remote_ci_image_tag := $(remote_repository):$(ci_image_tag_name)
 
-.PHONY: test-ci-remote
-test-ci-remote:
-	docker run --rm --label $(label) \
-		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
-		$(icecap_mount) \
-		$(remote_ci_image_tag) bash /work/veracruz/icecap/ci/run.sh
-
-.PHONY: pull-ci
-pull-ci:
-	docker rmi $(remote_ci_image_tag)
-	docker pull $(remote_ci_image_tag)
-
 # NOTE use caution
-.PHONY: push-ci
-push-ci:
+.PHONY: ci-push
+ci-push:
 	docker tag $(ci_image_tag) $(remote_ci_image_tag)
 	docker push $(remote_ci_image_tag)
