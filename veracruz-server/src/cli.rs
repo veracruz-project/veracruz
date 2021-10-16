@@ -37,11 +37,31 @@ fn parse_bind_addr(s: &str) -> String {
 #[structopt(rename_all="kebab")]
 struct Opt {
     /// URL to serve on
+    ///
+    /// By default this provides both enclave and administrative access to this
+    /// port. To override, specify either --admin-url or --no-admin.
+    ///
     #[structopt(
         parse(from_str=parse_bind_addr),
         required_unless="policy-path"
     )]
     url: Option<String>,
+
+    /// Optional URL for administrative access
+    ///
+    /// This overrides the URL for administrative access, limiting
+    /// administrative to the provided URL.
+    ///
+    #[structopt(short="A", long, parse(from_str=parse_bind_addr))]
+    admin_url: Option<String>,
+
+    /// Disables administrative access
+    ///
+    /// This limits interactions with the server to only interact with
+    /// running enclaves.
+    ///
+    #[structopt(short="N", long)]
+    no_admin: bool,
 
     /// Optional path to policy file
     ///
@@ -95,11 +115,18 @@ fn main() {
         None => None
     };
 
-    // figure out the URL server on
+    // figure out the URL to serve on
     let url = match (opt.url.as_ref(), opt_policy.as_ref()) {
         (Some(url), _) => url,
         (None, Some((_, policy))) => policy.veracruz_server_url(),
         _ => unreachable!(),
+    };
+
+    // figure out the URL to serve administrative requests on
+    let admin_url = match (opt.admin_url, opt.no_admin) {
+        (Some(admin_url), _) => Some(admin_url),
+        (None, true)         => None,
+        (None, false)        => Some(url.clone()),
     };
 
     // create Actix runtime
@@ -108,6 +135,7 @@ fn main() {
     // create Veracruz Server instance
     let veracruz_server = match veracruz_server::server::server(
         url,
+        admin_url,
         opt_policy.as_ref()
             .map(|(policy_json, _)| policy_json.deref()),
         opt.auto_shutdown,
@@ -120,7 +148,7 @@ fn main() {
     };
 
     println!("Veracruz Server running on {}", url);
-    match sys.block_on(veracruz_server) {
+    match sys.block_on(futures::future::try_join_all(veracruz_server)) {
         Ok(_) => {},
         Err(err) => {
             eprintln!("{}", err);

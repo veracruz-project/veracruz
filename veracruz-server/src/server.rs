@@ -248,14 +248,25 @@ async fn enclave_tls(
 /// the given policy, otherwise the policy can be sent over an `enclave_setup`
 /// request.
 ///
-pub fn server<U>(
-    url: U,
+pub fn server<U1, U2>(
+    server_url: U1,
+    admin_url: Option<U2>,
     policy_json: Option<&str>,
     auto_shutdown: bool,
-) -> Result<Server, VeracruzServerError>
+) -> Result<Vec<Server>, VeracruzServerError>
 where
-    U: ToSocketAddrs
+    U1: ToSocketAddrs,
+    U2: ToSocketAddrs
 {
+    // same url for admin/server? we only run one server in that case
+    let same_url = if let Some(admin_url) = admin_url.as_ref() {
+        let server_addrs = server_url.to_socket_addrs()?;
+        let admin_addrs = admin_url.to_socket_addrs()?;
+        server_addrs.eq(admin_addrs)
+    } else {
+        false
+    };
+
     // create an enclave if policy was provided, otherwise leave this up to enclave_setup
     let enclave_state = match policy_json {
         Some(policy_json) => {
@@ -275,8 +286,10 @@ where
         None => None,
     };
 
+    // incrementing ids
     let mut id_gen = 1..;
 
+    // auto_shutdown channel, if requested
     let (auto_shutdown_tx, auto_shutdown_rx) = if auto_shutdown {
         let (auto_shutdown_tx, auto_shutdown_rx) = mpsc::channel::<()>();
         (Some(auto_shutdown_tx), Some(auto_shutdown_rx))
@@ -292,36 +305,93 @@ where
         auto_shutdown_tx: auto_shutdown_tx,
     }));
 
-    let server = HttpServer::new(move || {
-        // create an enclave if policy was provided, otherwise leave
+    let mut servers = vec![];
+    if same_url {
+        servers.push(
+            HttpServer::new(move || {
+                // create an enclave if policy was provided, otherwise leave
 
-        // give the server a Sender in .data
-        App::new()
-            // enable logging
-            .wrap(middleware::Logger::default())
+                // give the server a Sender in .data
+                App::new()
+                    // enable logging
+                    .wrap(middleware::Logger::default())
 
-            // provide enclave handler, an Option<EnclaveHandler> which may change
-            // between None or Some through the server's lifetime
-            .data(enclave_handler.clone())
+                    // provide enclave handler, an Option<EnclaveHandler> which may change
+                    // between None or Some through the server's lifetime
+                    .data(enclave_handler.clone())
 
-            .service(enclave_setup)
-            .service(enclave_teardown)
-            .service(enclave_list)
-            .service(enclave_policy)
-            .service(enclave_tls)
-    })
-    .bind(url)?
-    .run();
+                    .service(enclave_setup)
+                    .service(enclave_teardown)
+                    .service(enclave_list)
+                    .service(enclave_policy)
+                    .service(enclave_tls)
+            })
+                .bind(server_url)?
+                .run()
+        );
+    } else {
+        let enclave_handler2 = enclave_handler.clone();
+
+        servers.push(
+            HttpServer::new(move || {
+                // create an enclave if policy was provided, otherwise leave
+
+                // give the server a Sender in .data
+                App::new()
+                    // enable logging
+                    .wrap(middleware::Logger::default())
+
+                    // provide enclave handler, an Option<EnclaveHandler> which may change
+                    // between None or Some through the server's lifetime
+                    .data(enclave_handler2.clone())
+
+                    // no enclave_setup!
+                    // no enclave_teardown!
+                    // no enclave_list!
+                    // no enclave_policy!
+                    .service(enclave_tls)
+            })
+                .bind(server_url)?
+                .run()
+        );
+
+        if let Some(admin_url) = admin_url {
+            servers.push(
+                HttpServer::new(move || {
+                    // create an enclave if policy was provided, otherwise leave
+
+                    // give the server a Sender in .data
+                    App::new()
+                        // enable logging
+                        .wrap(middleware::Logger::default())
+
+                        // provide enclave handler, an Option<EnclaveHandler> which may change
+                        // between None or Some through the server's lifetime
+                        .data(enclave_handler.clone())
+
+                        .service(enclave_setup)
+                        .service(enclave_teardown)
+                        .service(enclave_list)
+                        .service(enclave_policy)
+                        // no enclave_tls!
+                })
+                    .bind(admin_url)?
+                    .run()
+            );
+        }
+    }
 
     // launch a thread for shutting down the server?
     if let Some(auto_shutdown_rx) = auto_shutdown_rx {
-        let server_clone = server.clone();
+        let servers_clone = servers.clone();
         thread::spawn(move || {
             // wait for shutdown signal
             match auto_shutdown_rx.recv() {
                 // stop server gracefully
                 Ok(_) => {
-                    executor::block_on(server_clone.stop(true));
+                    executor::block_on(futures::future::join_all(
+                        servers_clone.into_iter().map(|server| server.stop(true))
+                    ));
                 }
                 // this CAN fail, in the case that the main thread has died,
                 // most likely from a user's ctrl-C, in either case we want to
@@ -333,6 +403,6 @@ where
         });
     }
 
-    Ok(server)
+    Ok(servers)
 }
 

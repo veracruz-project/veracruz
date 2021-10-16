@@ -456,11 +456,14 @@ mod tests {
     async fn server_tls_loop(policy_filename: &Path) -> Result<(), VeracruzTestError> {
         let policy_text = read_policy(policy_filename)?;
         let policy = Policy::from_json(&policy_text)?;
-        veracruz_server::server::server(
-            policy.veracruz_server_url(),
-            Some(&policy_text),
-            true,
-        )?.await?;
+        futures::future::try_join_all(
+            veracruz_server::server::server(
+                policy.veracruz_server_url(),
+                None::<&str>,
+                Some(&policy_text),
+                true,
+            )?
+        ).await?;
         Ok(())
     }
 
