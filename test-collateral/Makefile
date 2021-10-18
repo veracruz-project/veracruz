@@ -343,7 +343,7 @@ shamir-secret-sharing-policy.json: pgen css-$(TEE).bin program_client_cert.pem d
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
 .SECONDEXPANSION:
-$(WASM_PROG_FILES) : %.wasm: ../sdk/rust-examples/%/target/wasm32-wasi/release/$$@
+$(WASM_PROG_FILES) : %.wasm: ../sdk/target/wasm32-wasi/release/$$@
 	cp $< $@
 
 $(DATA_FILES) : %.dat: ../sdk/datasets/%.dat 
