@@ -330,7 +330,7 @@ impl TypeCheck {
                 Self::POINTER,
             ],
             WasiAPIName::SOCK_SHUTDOWN => vec![Self::FD, Self::SDFLAGS],
-            WasiAPIName::MAGIC_NEW_FUNCTION => vec![Self::POINTER],
+            WasiAPIName::FD_CREATE => vec![Self::POINTER],
         }
     }
 
@@ -489,7 +489,7 @@ impl Externals for WASMIRuntimeState {
             WasiAPIName::SOCK_RECV => self.wasi_sock_recv(args),
             WasiAPIName::SOCK_SEND => self.wasi_sock_send(args),
             WasiAPIName::SOCK_SHUTDOWN => self.wasi_sock_shutdown(args),
-            WasiAPIName::MAGIC_NEW_FUNCTION => self.wasi_magic_new_function(args),
+            WasiAPIName::FD_CREATE => self.wasi_fd_create(args),
         }?;
         Ok(Some(RuntimeValue::I32((return_code as i16).into())))
     }
@@ -1200,9 +1200,8 @@ impl WASMIRuntimeState {
         Self::convert_to_errno(self.vfs.sock_shutdown(&mut self.memory()?, socket, sd_flag))
     }
 
-    fn wasi_magic_new_function(&mut self, args: RuntimeArgs) -> WasiResult {
+    fn wasi_fd_create(&mut self, args: RuntimeArgs) -> WasiResult {
         let address = args.nth_checked::<u32>(0)?;
-        println!("running magic (interp)");
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
 }

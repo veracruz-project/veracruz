@@ -6,21 +6,21 @@
 #include <unistd.h>
 #include <wasi/api.h>
 
-int32_t imported_wasi_snapshot_preview1_magic_new_function(int32_t) __attribute__((
+int32_t imported_wasi_snapshot_preview1_fd_create(int32_t) __attribute__((
     __import_module__("wasi_snapshot_preview1"),
-    __import_name__("magic_new_function")
+    __import_name__("fd_create")
 ));
 
-__wasi_errno_t wasi_magic_new_function(__wasi_fd_t *retptr0)
+__wasi_errno_t wasi_fd_create(__wasi_fd_t *retptr0)
 {
-    int32_t ret = imported_wasi_snapshot_preview1_magic_new_function((int32_t)retptr0);
+    int32_t ret = imported_wasi_snapshot_preview1_fd_create((int32_t)retptr0);
     return (uint16_t) ret;
 }
 
-int magic_new_function(void)
+int fd_create(void)
 {
     __wasi_fd_t newfd;
-    __wasi_errno_t error = wasi_magic_new_function(&newfd);
+    __wasi_errno_t error = wasi_fd_create(&newfd);
     if (error) {
         errno = error;
         return -1;
@@ -45,7 +45,7 @@ void assert_fail(const char *file, unsigned long long line,
 
 int main()
 {
-    int fd = magic_new_function();
+    int fd = fd_create();
     assert(fd >= 0);
 
     uint8_t data[10000];
