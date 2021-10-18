@@ -1201,6 +1201,7 @@ impl WASMIRuntimeState {
     }
 
     fn wasi_magic_new_function(&self, _args: RuntimeArgs) -> WasiResult {
+        println!("running magic (interp)");
         Ok(ErrNo::Success)
     }
 }

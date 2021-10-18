@@ -19,4 +19,4 @@ RUN=../freestanding-execution-engine/target/debug/freestanding-execution-engine
 
 "$RUN" --program prog.wasm -o true -x jit
 #xx Does not work because magic function has unexpected return type:
-#"$RUN" --program prog.wasm -o true -x interp
+"$RUN" --program prog.wasm -o true -x interp
