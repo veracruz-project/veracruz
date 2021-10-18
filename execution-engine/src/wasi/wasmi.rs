@@ -330,7 +330,7 @@ impl TypeCheck {
                 Self::POINTER,
             ],
             WasiAPIName::SOCK_SHUTDOWN => vec![Self::FD, Self::SDFLAGS],
-            WasiAPIName::MAGIC_NEW_FUNCTION => vec![],
+            WasiAPIName::MAGIC_NEW_FUNCTION => vec![Self::POINTER],
         }
     }
 
@@ -1200,9 +1200,10 @@ impl WASMIRuntimeState {
         Self::convert_to_errno(self.vfs.sock_shutdown(&mut self.memory()?, socket, sd_flag))
     }
 
-    fn wasi_magic_new_function(&self, _args: RuntimeArgs) -> WasiResult {
+    fn wasi_magic_new_function(&mut self, args: RuntimeArgs) -> WasiResult {
+        let address = args.nth_checked::<u32>(0)?;
         println!("running magic (interp)");
-        Ok(ErrNo::Success)
+        Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
 }
 

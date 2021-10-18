@@ -1218,6 +1218,17 @@ impl WasiWrapper {
         fs.sock_shutdown(socket.into(), sd_flag)
     }
 
+    /// xx
+    pub(crate) fn fd_create<T: MemoryHandler>(
+        &mut self,
+        memory_ref: &mut T,
+        address: u32,
+    ) -> FileSystemResult<()> {
+        let mut fs = self.lock_vfs()?;
+        let new_fd = fs.fd_create()?;
+        memory_ref.write_u32(address, new_fd.into())
+    }
+
     ///////////////////////////////////////
     // Internal methods
     ///////////////////////////////////////

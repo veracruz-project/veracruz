@@ -964,6 +964,52 @@ impl FileSystem {
         Err(ErrNo::NoSys)
     }
 
+    /// xx
+    pub(crate) fn fd_create(&mut self) -> FileSystemResult<Fd> {
+        let inode = self.new_inode()?;
+        let file_stat = FileStat {
+            device: 0u64.into(),
+            inode: inode.clone(),
+            file_type: FileType::RegularFile,
+            num_links: 0,
+            file_size: 0,
+            atime: Timestamp::from_nanos(0),
+            mtime: Timestamp::from_nanos(0),
+            ctime: Timestamp::from_nanos(0),
+        };
+        let node = InodeEntry {
+            file_stat,
+            raw_file_data: Vec::new(),
+        };
+        self.inode_table.insert(inode.clone(), node);
+
+        let new_fd = self.new_fd()?;
+        let FileStat {
+            file_type,
+            file_size,
+            ..
+        } = self.inode_table.get(&inode).ok_or(ErrNo::BadF)?.file_stat;
+        let flags = FdFlags::empty();
+        let rights_base = Rights::all();
+        let rights_inheriting = Rights::all();
+        let fd_stat = FdStat {
+            file_type,
+            flags,
+            rights_base,
+            rights_inheriting,
+        };
+        self.fd_table.insert(
+            new_fd,
+            FileTableEntry {
+                inode,
+                fd_stat,
+                offset: 0,
+                advice: vec![(0, file_size, Advice::Normal)],
+            },
+        );
+        Ok(new_fd)
+    }
+
     ////////////////////////////////////////////////////////////////////////
     // Public interface for the filesystem.
     // It will be used by the veracruz runtime.

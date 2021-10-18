@@ -764,9 +764,10 @@ impl WasmtimeRuntimeState {
         Self::convert_to_errno(vfs.sock_shutdown(&mut caller, socket, sd_flag))
     }
 
-    fn wasi_magic_new_function(mut _caller: Caller) -> u32 {
+    fn wasi_magic_new_function(mut caller: Caller, address: u32) -> u32 {
         println!("running magic (jit)");
-        ErrNo::Success as u32
+        let mut vfs = lock_vfs!();
+        Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
 }
 
