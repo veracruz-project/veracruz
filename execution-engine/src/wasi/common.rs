@@ -88,6 +88,7 @@ pub enum WasiAPIName {
     SOCK_RECV,
     SOCK_SEND,
     SOCK_SHUTDOWN,
+    MAGIC_NEW_FUNCTION,
 }
 
 impl TryFrom<&str> for WasiAPIName {
@@ -139,6 +140,7 @@ impl TryFrom<&str> for WasiAPIName {
             "sock_recv" => WasiAPIName::SOCK_RECV,
             "sock_send" => WasiAPIName::SOCK_SEND,
             "sock_shutdown" => WasiAPIName::SOCK_SHUTDOWN,
+            "magic_new_function" => WasiAPIName::MAGIC_NEW_FUNCTION,
             _otherwise => return Err(()),
         };
         Ok(rst)

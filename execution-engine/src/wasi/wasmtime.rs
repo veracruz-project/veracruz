@@ -232,6 +232,9 @@ impl WasmtimeRuntimeState {
                 WasiAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
                 WasiAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
                 WasiAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
+                WasiAPIName::MAGIC_NEW_FUNCTION => {
+                    Func::wrap(&store, Self::wasi_magic_new_function)
+                }
             };
             exports.push(Extern::Func(host_call_body))
         }
@@ -759,6 +762,10 @@ impl WasmtimeRuntimeState {
         let sd_flag = convert_wasi_arg!(sd_flag, u8);
         let mut vfs = lock_vfs!();
         Self::convert_to_errno(vfs.sock_shutdown(&mut caller, socket, sd_flag))
+    }
+
+    fn wasi_magic_new_function(mut _caller: Caller) {
+        println!("running magic");
     }
 }
 
