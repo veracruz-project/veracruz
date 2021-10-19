@@ -7,7 +7,7 @@
 #include <wasi/api.h>
 
 int32_t imported_wasi_snapshot_preview1_fd_create(int32_t) __attribute__((
-    __import_module__("wasi_snapshot_preview1"),
+    __import_module__("veracruz_si"),
     __import_name__("fd_create")
 ));
 

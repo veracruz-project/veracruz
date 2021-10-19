@@ -28,6 +28,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
     convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
 };
+use strum_macros::EnumCount;
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
@@ -41,7 +42,9 @@ use wasi_types::{
 ////////////////////////////////////////////////////////////////////////////////
 
 /// List of WASI API.
-#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
+#[derive(
+    Debug, EnumCount, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy,
+)]
 pub enum WasiAPIName {
     ARGS_GET = 1,
     ARGS_SIZES_GET,
@@ -88,7 +91,6 @@ pub enum WasiAPIName {
     SOCK_RECV,
     SOCK_SEND,
     SOCK_SHUTDOWN,
-    FD_CREATE,
 }
 
 impl TryFrom<&str> for WasiAPIName {
@@ -140,7 +142,23 @@ impl TryFrom<&str> for WasiAPIName {
             "sock_recv" => WasiAPIName::SOCK_RECV,
             "sock_send" => WasiAPIName::SOCK_SEND,
             "sock_shutdown" => WasiAPIName::SOCK_SHUTDOWN,
-            "fd_create" => WasiAPIName::FD_CREATE,
+            _otherwise => return Err(()),
+        };
+        Ok(rst)
+    }
+}
+
+/// List of Veracruz API.
+#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
+pub enum VeracruzAPIName {
+    FD_CREATE,
+}
+
+impl TryFrom<&str> for VeracruzAPIName {
+    type Error = ();
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let rst = match s {
+            "fd_create" => VeracruzAPIName::FD_CREATE,
             _otherwise => return Err(()),
         };
         Ok(rst)
@@ -382,6 +400,8 @@ impl WasiWrapper {
     pub(crate) const LINEAR_MEMORY_NAME: &'static str = "memory";
     /// The name of the containing module for all WASI imports.
     pub(crate) const WASI_SNAPSHOT_MODULE_NAME: &'static str = "wasi_snapshot_preview1";
+    /// The name of the containing module for Veracruz imports.
+    pub(crate) const VERACRUZ_SI_MODULE_NAME: &'static str = "veracruz_si";
 
     ////////////////////////////////////////////////////////////////////////////
     // Creating and modifying runtime states.
