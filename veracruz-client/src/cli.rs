@@ -18,6 +18,7 @@ use std::{
     io::Read,
     io::Write,
     num::NonZeroU32,
+    ops::Deref,
     path,
     process,
     time::Duration,
@@ -72,13 +73,26 @@ struct Opt {
 
     /// Optional id of the enclave to use
     ///
-    /// This allows a client to choose which computation they are contributing
-    /// to if there are multiple enclaves running on the server.
+    /// This allows a client to specify a specific enclave instance by id, 
+    /// if there are multiple enclaves running on the server.
     ///
-    /// By default, Veracruz chooses an abritrary computation to connect to.
+    /// By default, Veracruz connects to any computation that matches the
+    /// provided policy's hash.
     ///
     #[structopt(long)]
     id: Option<NonZeroU32>,
+
+    /// Optional policy hash of the enclave to use
+    ///
+    /// This allows a client to specify a specific enclave instance by policy
+    /// hash, if there are multiple enclaves running on the server.
+    ///
+    /// By default the client hashes the provided policy, so this shouldn't
+    /// normally be necessary outside of administrative commands (and will
+    /// error if hashes mismatch).
+    ///
+    #[structopt(long)]
+    policy_hash: Option<String>,
 
     /// Request quiet operation
     ///
@@ -246,6 +260,28 @@ fn main() {
         None => None,
     };
 
+    // figure out which hash to use
+    //
+    // if policy is provided and hashes mismatch, error
+    //
+    let policy_hash = match (opt.policy_hash.as_ref(), policy.as_ref()) {
+        (Some(hash), policy) => {
+            if let Some(policy_hash) = policy.and_then(|(_, policy)| policy.policy_hash()) {
+                if hash != policy_hash {
+                    eprintln!("Explicit hash does not match policy's hash");
+                    process::exit(1);
+                }
+            }
+            Some(hash.deref())
+        }
+        (None, Some((_, policy))) => {
+            policy.policy_hash()
+        }
+        _ => {
+            None
+        }
+    };
+
     // figure out the URL to connect to
     let url = match (opt.url.as_ref(), policy.as_ref()) {
         (Some(url), _) => url,
@@ -389,7 +425,7 @@ fn main() {
             });
         did_something = true;
 
-        match admin_client.enclave_policy(opt.id) {
+        match admin_client.enclave_policy(policy_hash, opt.id) {
             Ok(policy) if policy_path.to_string_lossy() == "-" => {
                 match io::stdout().write_all(policy.as_bytes()) {
                     Ok(()) => {},
@@ -566,7 +602,7 @@ fn main() {
         qprintln!(opt, "Tearing down enclave");
         did_something = true;
 
-        match admin_client.enclave_teardown(opt.id) {
+        match admin_client.enclave_teardown(policy_hash, opt.id) {
             Ok(()) => {},
             Err(err) => {
                 println!("{}", err);

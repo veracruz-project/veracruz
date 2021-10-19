@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
+use std::convert::identity;
 use std::num::NonZeroU32;
 use std::time::Duration;
 use veracruz_utils::policy::policy::Policy;
@@ -64,13 +65,23 @@ impl VeracruzAdminClient {
     /// Teardown an enclave
     pub fn enclave_teardown(
         &mut self,
+        hash: Option<&str>,
         id: Option<NonZeroU32>
     ) -> Result<(), VeracruzClientError> {
         // send request
-        let path = format!("http://{}/enclave_teardown{}",
-            self.url,
-            id.map(|id| format!("?id={}", id)).unwrap_or("".to_owned())
-        );
+        let path = [
+            format!("http://{}/enclave_teardown", self.url),
+            [
+                hash.map(|hash| format!("hash={}", hash)),
+                id.map(|id| format!("id={}", id))
+            ]
+            .iter()
+            .cloned()
+            .filter_map(identity)
+            .collect::<Vec<_>>()
+            .join("&")
+        ]
+        .join("?");
         let ret = reqwest::Client::new()
             .post(&path)
             .send()?;
@@ -105,13 +116,23 @@ impl VeracruzAdminClient {
     ///
     pub fn enclave_policy(
         &self,
+        hash: Option<&str>,
         id: Option<NonZeroU32>
     ) -> Result<String, VeracruzClientError> {
         // send request
-        let path = format!("http://{}/enclave_policy{}",
-            self.url,
-            id.map(|id| format!("?id={}", id)).unwrap_or("".to_owned())
-        );
+        let path = [
+            format!("http://{}/enclave_policy", self.url),
+            [
+                hash.map(|hash| format!("hash={}", hash)),
+                id.map(|id| format!("id={}", id))
+            ]
+            .iter()
+            .cloned()
+            .filter_map(identity)
+            .collect::<Vec<_>>()
+            .join("&")
+        ]
+        .join("?");
         let mut ret = reqwest::Client::new()
             .get(&path)
             .send()?;
