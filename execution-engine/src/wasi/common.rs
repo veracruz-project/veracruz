@@ -28,7 +28,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
     convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
 };
-use strum_macros::EnumCount;
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
@@ -42,9 +41,7 @@ use wasi_types::{
 ////////////////////////////////////////////////////////////////////////////////
 
 /// List of WASI API.
-#[derive(
-    Debug, EnumCount, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy,
-)]
+#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
 pub enum WasiAPIName {
     ARGS_GET = 1,
     ARGS_SIZES_GET,
@@ -91,6 +88,7 @@ pub enum WasiAPIName {
     SOCK_RECV,
     SOCK_SEND,
     SOCK_SHUTDOWN,
+    _LAST,
 }
 
 impl TryFrom<&str> for WasiAPIName {

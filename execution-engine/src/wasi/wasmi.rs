@@ -20,7 +20,6 @@ use crate::{
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::sync::{Arc, Mutex};
 use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
-use strum::EnumCount;
 use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;
 use wasmi::{
@@ -44,12 +43,15 @@ impl FromPrimitive for APIName {
         }
     }
     fn from_u64(n: u64) -> Option<Self> {
-        match WasiAPIName::from_u64(n) {
-            Some(x) => Some(APIName::WasiAPIName(x)),
-            None => match VeracruzAPIName::from_u64(n - WasiAPIName::count() as u64 - 1) {
+        if n == 0 {
+            None
+        } else if n < WasiAPIName::_LAST as u64 {
+            Some(APIName::WasiAPIName(WasiAPIName::from_u64(n).unwrap()))
+        } else {
+            match VeracruzAPIName::from_u64(n - WasiAPIName::_LAST as u64) {
                 Some(x) => Some(APIName::VeracruzAPIName(x)),
                 None => None,
-            },
+            }
         }
     }
 }
@@ -60,10 +62,9 @@ impl ToPrimitive for APIName {
     }
     fn to_u64(&self) -> Option<u64> {
         match self {
+            APIName::WasiAPIName(WasiAPIName::_LAST) => unreachable!(),
             APIName::WasiAPIName(x) => x.to_u64(),
-            APIName::VeracruzAPIName(x) => {
-                Some(WasiAPIName::count() as u64 + 1 + x.to_u64().unwrap())
-            }
+            APIName::VeracruzAPIName(x) => Some(WasiAPIName::_LAST as u64 + x.to_u64().unwrap()),
         }
     }
 }
@@ -375,6 +376,7 @@ impl TypeCheck {
                     Self::POINTER,
                 ],
                 WasiAPIName::SOCK_SHUTDOWN => vec![Self::FD, Self::SDFLAGS],
+                WasiAPIName::_LAST => unreachable!(),
             },
             APIName::VeracruzAPIName(index) => match index {
                 VeracruzAPIName::FD_CREATE => vec![Self::POINTER],
@@ -544,6 +546,7 @@ impl Externals for WASMIRuntimeState {
                 WasiAPIName::SOCK_RECV => self.wasi_sock_recv(args),
                 WasiAPIName::SOCK_SEND => self.wasi_sock_send(args),
                 WasiAPIName::SOCK_SHUTDOWN => self.wasi_sock_shutdown(args),
+                WasiAPIName::_LAST => unreachable!(),
             },
             APIName::VeracruzAPIName(veracruz_call_index) => match veracruz_call_index {
                 VeracruzAPIName::FD_CREATE => self.veracruz_fd_create(args),

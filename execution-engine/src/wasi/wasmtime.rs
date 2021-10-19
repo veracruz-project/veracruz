@@ -245,6 +245,7 @@ impl WasmtimeRuntimeState {
                         WasiAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
                         WasiAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
                         WasiAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
+                        WasiAPIName::_LAST => unreachable!(),
                     };
                     exports.push(Extern::Func(host_call_body))
                 }
