@@ -19,6 +19,9 @@ use structopt::StructOpt;
 
 /// A bit of extra parsing to allow omitting addr/port
 fn parse_bind_addr(s: &str) -> String {
+    // Remove whitespace
+    let s = s.trim();
+
     // Rust's SocketAddr parser requires an explicit address/port, add 0.0.0.0
     // if omitted, this lets ':3010' be used to specify only the port
     if s.starts_with(':') {
