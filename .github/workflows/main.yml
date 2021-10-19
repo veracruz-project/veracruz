@@ -119,3 +119,16 @@ jobs:
             make trustzone-veracruz-test
             make trustzone-veracruz-client-test
 
+  icecap:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-e27e7bf9b4
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
+    steps:
+      - name: Check out the Veracruz repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Build and test Veracruz on IceCap
+        run: bash /work/veracruz/icecap/ci/run.sh

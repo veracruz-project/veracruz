@@ -139,6 +139,9 @@ css-tz.bin: $(FINAL_DIR)/$(TZ_UUID).ta
 css-nitro.bin: PCR0
 	cp $< $@
 
+css-icecap.bin:
+	touch $@
+
 $(FINAL_DIR)/$(TZ_UUID).ta: $(OUT_DIR)/$(TZ_UUID).ta
 	cp $< $@
 

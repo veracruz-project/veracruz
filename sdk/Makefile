@@ -14,6 +14,9 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
+# HACK temporary workaround for CI running out of disk space
+export CARGO_TARGET_DIR := $(abspath target)
+
 # All programs
 RUST_EXAMPLES = idash2017-logistic-regression \
 	   	   linear-regression \
@@ -31,7 +34,7 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   shamir-secret-sharing
 RUST_EXAMPLE_DIR = rust-examples/
 # Navigate to the actual wasm programs.
-RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(addsuffix /target/wasm32-wasi/release/$(EXAMPLE).wasm,$(addprefix $(RUST_EXAMPLE_DIR), $(EXAMPLE))))
+RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(CARGO_TARGET_DIR)/wasm32-wasi/release/$(EXAMPLE).wasm)
 # All dataset filenames
 DATA = hello-world-1.dat \
  	   hello-world-2.dat \
@@ -98,8 +101,11 @@ $(RELATIVE_DATA):
 	$(MAKE) -C $(dir $<)
 
 env:
+# Don't use rustup if we are building in a Nix shell
+ifeq ($(IN_NIX_SHELL),)
 	rustup target add wasm32-wasi
 	rustup component add rust-src rust-std
+endif
 
 fmt:
 	for data in $(RELATIVE_DATA_GEN); do \

@@ -12,6 +12,7 @@ std = ["wasmi/non_sgx", "platform-services/std", "wasmtime", "ring/non_sgx", "ve
 sgx = ["sgx_tstd", "wasmi/mesalock_sgx", "platform-services/sgx", "serde/mesalock_sgx", "typetag/mesalock_sgx", "ring/mesalock_sgx", "veracruz-utils/sgx", "wasi-types/sgx"]
 tz = ["platform-services/tz", "wasmi/non_sgx", "ring/non_sgx", "veracruz-utils/tz", "wasi-types/std"]
 nitro = ["platform-services/nitro", "veracruz-utils/std", "wasmtime", "wasi-types/std"]
+icecap = ["platform-services/icecap", "veracruz-utils/icecap", "wasmi/non_sgx"]
 
 [dependencies]
 byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch = "veracruz" }

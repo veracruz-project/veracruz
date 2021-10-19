@@ -30,3 +30,7 @@ pub mod veracruz_server_nitro;
 #[cfg(feature = "nitro")]
 pub use self::veracruz_server_nitro::veracruz_server_nitro::*;
 
+#[cfg(feature = "icecap")]
+mod veracruz_server_icecap;
+#[cfg(feature = "icecap")]
+pub use self::veracruz_server_icecap::*;

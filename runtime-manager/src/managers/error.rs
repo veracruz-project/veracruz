@@ -12,7 +12,7 @@
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use nix;
-#[cfg(any(feature = "tz", feature = "nitro"))]
+#[cfg(any(feature = "tz", feature = "nitro", feature = "icecap"))]
 use std::sync::PoisonError;
 #[cfg(feature = "sgx")]
 use std::sync::PoisonError;
@@ -63,7 +63,7 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: Veracruz Socket error:{:?}", _0)]
     VeracruzSocketError(SocketError),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "nitro", feature = "icecap"))]
     #[error(display = "RuntimeManager: Bincode error:{:?}", _0)]
     BincodeError(bincode::Error),
     #[cfg(feature = "nitro")]

@@ -324,7 +324,7 @@ impl VeracruzClient {
     }
 
     fn compare_runtime_hash(&self, received: &[u8]) -> Result<(), VeracruzClientError> {
-        let platforms = vec![Platform::SGX, Platform::TrustZone, Platform::Nitro];
+        let platforms = vec![Platform::SGX, Platform::TrustZone, Platform::Nitro, Platform::IceCap];
         for platform in platforms {
             let expected = match self.policy.runtime_manager_hash(&platform) {
                 Err(_) => continue, // no hash found for this platform

@@ -40,6 +40,18 @@ psa_initial_attest_load_key(uint8_t const *private_key,
 }
 
 psa_status_t
+psa_initial_attest_remove_key(uint16_t key_handle) {
+    psa_status_t status;
+    status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        return status;
+    }
+
+    status = psa_destroy_key(key_handle);
+    return status;
+}
+
+psa_status_t
 psa_initial_attest_get_token(const uint8_t *fw_hash,
                              size_t         fw_hash_size,
                              const uint8_t *cert_hash,
