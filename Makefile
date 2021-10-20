@@ -84,9 +84,9 @@ nitro-cli:
 	pwd
 	RUSTFLAGS=$(NITRO_RUST_FLAG) $(MAKE) -C runtime-manager nitro
 	# build CLIs in top-level crates
-	cd proxy-attestation-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
-	cd veracruz-server && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
-	cd veracruz-client && RUSTFLAGS=$(SGX_RUST_FLAG) cargo build --features nitro --features cli
+	cd proxy-attestation-server && RUSTFLAGS=$(NITRO_RUST_FLAG) cargo build --features nitro --features cli
+	cd veracruz-server && RUSTFLAGS=$(NITRO_RUST_FLAG) cargo build --features nitro --features cli
+	cd veracruz-client && RUSTFLAGS=$(NITRO_RUST_FLAG) cargo build --features nitro --features cli
 	# build CLIs in the SDK/test-collateral
 	$(MAKE) -C sdk/freestanding-execution-engine
 	$(MAKE) -C sdk/wasm-checker

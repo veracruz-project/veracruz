@@ -24,7 +24,7 @@ fn main() {
             } else if #[cfg(feature = "sgx")] {
                 "gcc".to_string()
             } else if #[cfg(feature = "nitro")] {
-                "musl-gcc".to_string()
+                "gcc".to_string()
             } else {
                 env::var(format!("CC_{}", env::var("TARGET").unwrap().replace("-", "_"))).unwrap()
             }
@@ -66,12 +66,18 @@ fn main() {
     // The following renames the colliding symbols, sorta just brushing the
     // problem under the rug (until it comes back to bite me later, which it
     // it will)
-    #[cfg(feature="tz")]
-    let rename_status = Command::new("/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy")
-        .current_dir(target_dir.clone())
-        .args(&["--redefine-syms", &format!("{}/redefined_symbols",project_dir), "./libmbedcrypto.a"])
-        .status()
-        .unwrap();
+    #[cfg(feature = "tz")]
+    let rename_status = Command::new(
+        "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy",
+    )
+    .current_dir(target_dir.clone())
+    .args(&[
+        "--redefine-syms",
+        &format!("{}/redefined_symbols", project_dir),
+        "./libmbedcrypto.a",
+    ])
+    .status()
+    .unwrap();
     #[cfg(feature = "tz")]
     if !rename_status.success() {
         panic!("rename of mbed-crypto symbols failed");

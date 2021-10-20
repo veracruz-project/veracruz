@@ -28,7 +28,7 @@ cli = ["structopt"]
 # Note: Final attestation is always PSA. This is just to enable platforms
 # that use PSA for their native attestation.
 psa = []
-nitro = [ "serde_cbor", "nitro-enclave-attestation-document" ]
+nitro = [ "serde_cbor", "nitro-enclave-attestation-document", "psa-attestation/nitro" ]
 tz = ["psa"]
 icecap = ["psa"]
 
@@ -66,6 +66,8 @@ sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
+half = "=1.7.1"
+http = "=0.2.4"
 
 [dev-dependencies]
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git" }

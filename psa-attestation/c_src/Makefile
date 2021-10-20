@@ -16,7 +16,7 @@ INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../lib/mbed-crypto/inclu
 
 all: $(OUT_DIR)/libpsa_attestation.a
 
-CFLAGS=-g
+CFLAGS=-g -fPIC
 $(OUT_DIR)/libpsa_attestation.a: $(OUT_DIR)/psa_attestation.o $(OUT_DIR)/attestation_core.o $(OUT_DIR)/attest_token.o
 	ar cr $@ $(OUT_DIR)/psa_attestation.o $(OUT_DIR)/attestation_core.o $(OUT_DIR)/attest_token.o
 
