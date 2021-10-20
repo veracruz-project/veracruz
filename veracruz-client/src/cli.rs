@@ -239,23 +239,23 @@ fn main() {
     // load policy
     let policy = match opt.policy_path.as_ref() {
         Some(policy_path) => {
-            let (policy_json, policy) = match
+            let (policy_json, policy, policy_hash) = match
                 fs::read_to_string(&policy_path)
                     .map_err(|err| PolicyError::from(err))
                     .and_then(|policy_json| {
-                        Policy::from_json(&policy_json)
-                            .map(|policy| (policy_json, policy))
+                        Policy::and_hash_from_json(&policy_json)
+                            .map(|(policy, policy_hash)| (policy_json, policy, policy_hash))
                     })
             {
-                Ok((policy_json, policy)) => (policy_json, policy),
+                Ok((policy_json, policy, policy_hash)) => (policy_json, policy, policy_hash),
                 Err(err) => {
                     eprintln!("{}", err);
                     process::exit(1);
                 }
             };
             qprintln!(opt, "Loaded policy {}", policy_path.to_string_lossy());
-            qprintln!(opt, "  (with hash) {}", policy.policy_hash().unwrap_or("???"));
-            Some((policy_json, policy))
+            qprintln!(opt, "  (with hash) {}", policy_hash);
+            Some((policy_json, policy, policy_hash))
         }
         None => None,
     };
@@ -265,17 +265,15 @@ fn main() {
     // if policy is provided and hashes mismatch, error
     //
     let policy_hash = match (opt.policy_hash.as_ref(), policy.as_ref()) {
-        (Some(hash), policy) => {
-            if let Some(policy_hash) = policy.and_then(|(_, policy)| policy.policy_hash()) {
-                if hash != policy_hash {
-                    eprintln!("Explicit hash does not match policy's hash");
-                    process::exit(1);
-                }
-            }
+        (Some(hash), Some((_, _, policy_hash))) if hash != policy_hash => {
+            eprintln!("Explicit hash does not match policy's hash");
+            process::exit(1);
+        }
+        (Some(hash), _) => {
             Some(hash.deref())
         }
-        (None, Some((_, policy))) => {
-            policy.policy_hash()
+        (None, Some((_, _, policy_hash))) => {
+            Some(policy_hash.deref())
         }
         _ => {
             None
@@ -285,7 +283,7 @@ fn main() {
     // figure out the URL to connect to
     let url = match (opt.url.as_ref(), policy.as_ref()) {
         (Some(url), _) => url,
-        (None, Some((_, policy))) => policy.veracruz_server_url(),
+        (None, Some((_, policy, _))) => policy.veracruz_server_url(),
         _ => unreachable!(),
     };
     qprintln!(opt, "Connecting to {}", url);
@@ -310,8 +308,8 @@ fn main() {
             lazy_veracruz_client.borrow_mut(),
             |ref_| {
                 ref_.get_or_insert_with(|| {
-                    let policy = match &policy {
-                        Some((_, policy)) => policy,
+                    let (policy, policy_hash) = match &policy {
+                        Some((_, policy, policy_hash)) => (policy, policy_hash),
                         None => {
                             eprintln!("Requires policy_path to interact with enclave");
                             process::exit(1);
@@ -332,7 +330,7 @@ fn main() {
                         identity,
                         key,
                         policy.clone(),
-                        policy.policy_hash().unwrap().to_string(),
+                        policy_hash.clone()
                     ) {
                         Ok(veracruz_client) => veracruz_client,
                         Err(err) => {
@@ -371,7 +369,7 @@ fn main() {
                     }
                 }
             }
-            (None, Some((policy_json, _))) => {
+            (None, Some((policy_json, _, _))) => {
                 policy_json.clone()
             }
             (None, None) => {

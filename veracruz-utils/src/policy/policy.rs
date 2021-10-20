@@ -162,6 +162,25 @@ impl Policy {
         Ok(policy)
     }
 
+    /// Parses a Veracruz policy type from a JSON-encoded string, `json`,
+    /// validating the well-formedness of the resulting policy in the process.
+    /// Returns `Ok(policy)` iff these well-formedness checks pass.
+    ///
+    /// This is the same as `from_json`, but provides a route to get the policy
+    /// hash without needing to go through Option::unwrap.
+    ///
+    pub fn and_hash_from_json(json: &str) -> Result<(Self, String), PolicyError> {
+        // parse json
+        let mut policy: Self = serde_json::from_str(json)?;
+        policy.assert_valid()?;
+
+        // include hash?
+        let hash = hex::encode(ring::digest::digest(&ring::digest::SHA256, json.as_bytes()));
+        policy.policy_hash = Some(hash.clone());
+
+        Ok((policy, hash))
+    }
+
     /// Returns the identities associated with this policy.
     #[inline]
     pub fn identities(&self) -> &Vec<Identity<String>> {

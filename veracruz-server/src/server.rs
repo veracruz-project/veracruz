@@ -82,8 +82,7 @@ async fn enclave_setup(
     enclave_handler: web::Data<Arc<Mutex<EnclaveHandler>>>,
 ) -> Result<String, VeracruzServerError> {
     // parse policy
-    let policy = Policy::from_json(&policy_json)?;
-    let policy_hash = policy.policy_hash().unwrap();
+    let (_, policy_hash) = Policy::and_hash_from_json(&policy_json)?;
 
     // create new enclave, with policy
     let enclave = VeracruzServerEnclave::new(&policy_json)?;
@@ -273,8 +272,7 @@ where
     let enclave_state = match policy_json {
         Some(policy_json) => {
             // parse policy
-            let policy = Policy::from_json(&policy_json)?;
-            let policy_hash = policy.policy_hash().unwrap();
+            let (_, policy_hash) = Policy::and_hash_from_json(&policy_json)?;
 
             // create enclave
             let enclave = VeracruzServerEnclave::new(&policy_json)?;
