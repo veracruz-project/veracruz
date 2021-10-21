@@ -48,6 +48,7 @@ structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 env_logger = { version = "0.7", optional = true }
 log = { version = "0.4", optional = true }
 bitflags = "=1.2.1"
+backtrace = "=0.3.61"
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
 sgx_ucrypto = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
