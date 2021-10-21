@@ -53,6 +53,8 @@ bitflags = "=1.2.1"
 psa-attestation = { path = "../psa-attestation", optional = true }
 icecap-wrapper = { path = "../icecap/crates-hack/crates/icecap-wrapper", optional = true }
 log = { version = "0.4", optional = true }
+half = "=1.7.1"
+http = "=0.2.4"
 
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }
