@@ -112,7 +112,7 @@ PGEN = $(WORKSPACE_DIR)/host/target/release/generate-policy
 $(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.rs $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
-policy-files: $(OUT_DIR) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))
+policy-files: $(OUT_DIR) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES)) $(OUT_DIR)/invalid_policy
 	@echo $(INFO_COLOR)"GEN   =>  $(POLICY_FILES)"$(RESET_COLOR)
 
 CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
@@ -127,6 +127,10 @@ CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $
 
 PGEN_COMMON_PARAMS = --proxy-attestation-server-cert $(CA_CRT) $(MEASUREMENT_PARAMETER) \
 	--certificate-expiry $(CERTIFICATE_EXPIRY) --execution-strategy Interpretation
+
+$(OUT_DIR)/invalid_policy: $(WORKSPACE_DIR)/../test-collateral/*.json
+	mkdir -p $@
+	cp $(WORKSPACE_DIR)/../test-collateral/*.json $@
 
 $(OUT_DIR)/get_random_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/random-source.wasm
 	cd $(OUT_DIR) ; $(PGEN) --enclave-debug-mode true \
