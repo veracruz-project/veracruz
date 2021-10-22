@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-OUT_DIR ?= $(abspath crates/test-collateral)
+OUT_DIR ?= $(abspath test-programs)
 FINAL_DIR ?= $(abspath .)
 WORKSPACE_DIR = $(abspath ..)
 
@@ -48,4 +48,5 @@ css-linux.bin: target/release/runtime_manager_enclave
 clean:
 	@cargo clean
 	@rm -rf target
+	@rm -rf test-programs
 	@rm -f css-linux.bin

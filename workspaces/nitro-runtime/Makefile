@@ -39,9 +39,13 @@ css-nitro.bin: PCR0
 	cp $< $@
 
 runtime_manager.eif: target/x86_64-unknown-linux-musl/release/runtime_manager_enclave crates/runtime-manager/Dockerfile
-	cp crates/runtime-manager/Dockerfile .
-	nitro-cli build-enclave --docker-dir . --docker-uri runtime_manager --output-file runtime_manager.eif > measurements.json
+	rm -rf docker
+	mkdir -p docker/target/x86_64-unknown-linux-musl/release
+	cp target/x86_64-unknown-linux-musl/release/runtime_manager_enclave docker/target/x86_64-unknown-linux-musl/release
+	cp crates/runtime-manager/Dockerfile docker
+	nitro-cli build-enclave --docker-dir docker --docker-uri runtime_manager --output-file runtime_manager.eif > measurements.json
 	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
+	rm -rf docker
 
 target/x86_64-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
 	rustup target add x86_64-unknown-linux-musl

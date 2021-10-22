@@ -30,7 +30,10 @@ WASM_PROG_LIST = random-source.wasm \
 
 WASM_PROG_FILES = $(patsubst %.wasm, $(OUT_DIR)/%.wasm, $(WASM_PROG_LIST))
 
-wasm-files: $(WASM_PROG_FILES)
+$(OUT_DIR):
+	@mkdir -p $@
+
+wasm-files: $(OUT_DIR) $(WASM_PROG_FILES)
 
 $(OUT_DIR)/%.wasm: $(WORKSPACE_DIR)/applications/target/wasm32-wasi/release/%.wasm
 	cp $< $@
@@ -109,7 +112,7 @@ PGEN = $(WORKSPACE_DIR)/host/target/release/generate-policy
 $(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.rs $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
-policy-files: $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))
+policy-files: $(OUT_DIR) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))
 	@echo $(INFO_COLOR)"GEN   =>  $(POLICY_FILES)"$(RESET_COLOR)
 
 CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
@@ -281,7 +284,7 @@ $(OUT_DIR)/number-stream-accumulation.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/nu
 		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 \
 		$(PGEN_COMMON_PARAMS) --output-policy-file $@
 
-$(OUT_DIR)/basic_file_read_write.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/read-file.wasm 
+$(OUT_DIR)/basic_file_read_write.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/read-file.wasm
 	cd $(OUT_DIR) ; $(PGEN) \
 		--certificate $(CLIENT_CRT) --capability "input.txt: $(WRITE_RIGHT), output : $(READ_RIGHT), read-file.wasm : $(WRITE_RIGHT)" \
 		--binary read-file.wasm --capability "input.txt: $(READ_RIGHT), output : $(WRITE_RIGHT)" \
