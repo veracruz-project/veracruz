@@ -18,7 +18,7 @@ use policy_utils::principal::{FileRights, Principal, RightsTable, StandardStream
 use platform_services::getrandom;
 use std::{
     collections::HashMap,
-    convert::{AsRef, TryInto},
+    convert::{AsRef, TryFrom},
     ffi::OsString,
     os::unix::ffi::{OsStrExt, OsStringExt},
     path::{Component, Path, PathBuf},
@@ -51,7 +51,7 @@ type SharedInodeTable = Arc<Mutex<InodeTable>>;
 
 /// Get random bytes
 fn getrandom_to_buffer(buf_len: Size) -> FileSystemResult<Vec<u8>> {
-    let mut buf = vec![0; buf_len as usize];
+    let mut buf = vec![0; try_from_or_errno(buf_len)?];
     if getrandom(&mut buf).is_success() {
         Ok(buf)
     } else {
@@ -180,7 +180,7 @@ impl InodeImpl {
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemResult<()> {
         match self {
             Self::File(file) => {
-                file.resize(size as usize, fill_byte);
+                file.resize(try_from_or_errno(size)?, fill_byte);
                 Ok(())
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
@@ -195,7 +195,7 @@ impl InodeImpl {
             Self::Directory(_) => return Err(ErrNo::IsDir),
         };
         // NOTE: It should be safe to convert a u64 to usize.
-        let offset = offset as usize;
+        let offset = try_from_or_errno(offset)?;
         //          offset
         //             v
         // ---------------------------------------------
@@ -223,7 +223,7 @@ impl InodeImpl {
             Self::Directory(_) => return Err(ErrNo::IsDir),
         };
         // NOTE: It should be safe to convert a u64 to usize.
-        let offset = offset as usize;
+        let offset = try_from_or_errno(offset)?;
         //          offset
         //             v  .. remain_length .. v
         // ----------------------------------------------
@@ -310,17 +310,13 @@ impl InodeImpl {
         let mut rst = Vec::new();
         for (index, (path, inode)) in dir
             .iter()
-            .filter(|(p, _)| {
-                **p != PathBuf::from(Self::CURRENT_PATH_STR)
-                    && **p != PathBuf::from(Self::PARRENT_PATH_STR)
-            })
             .enumerate()
         {
             let path_byte = path.as_os_str().as_bytes().to_vec();
             let dir_ent = DirEnt {
-                next: (index as u64 + 1u64).into(),
+                next: (try_from_or_errno::<usize, u64>(index)? + 1u64).into(),
                 inode: inode.clone(),
-                name_len: path_byte.len() as u32,
+                name_len: try_from_or_errno(path_byte.len())?,
                 file_type: inode_table.get(&inode)?.file_stat.file_type,
             };
             rst.push((dir_ent, path_byte))
@@ -339,6 +335,9 @@ struct InodeTable {
     stdin: Inode,
     stdout: Inode,
     stderr: Inode,
+    /// We allocate inodes in the same way as we allocate file descriptors. Inode's are 64 bits
+    /// rather than 31 bits, so the artificial limit on inode allocations is 2^64.
+    next_inode_candidate: Inode,
 }
 
 impl InodeTable {
@@ -346,17 +345,15 @@ impl InodeTable {
     pub(self) const ROOT_DIRECTORY: &'static str = "/";
     /// The root directory inode. It will be pre-opened for any wasm program.
     /// File descriptors 0 to 2 are reserved for the standard streams.
-    /// TODO change to 2
     pub(self) const ROOT_DIRECTORY_INODE: Inode = Inode(2);
     fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
         let mut rst = Self {
             table: HashMap::new(),
-            // Must update those fields with random number
-            // See below the function call install_standard_streams
             stdin: Inode(0),
             stdout: Inode(1),
             stderr: Inode(2),
             rights_table,
+            next_inode_candidate: Inode(Self::ROOT_DIRECTORY_INODE.0 + 1),
         };
         // Add the root directory
         rst.add_dir(
@@ -449,14 +446,19 @@ impl InodeTable {
         Ok((inode, self.get(&inode)?))
     }
 
-    /// Pick a fresh inode randomly.
-    fn new_inode(&self) -> FileSystemResult<Inode> {
-        loop {
-            let new_inode = Inode(random_u64()?);
-            if !self.table.contains_key(&new_inode) {
-                return Ok(new_inode);
-            }
+    /// Pick a fresh inode.
+    fn new_inode(&mut self) -> FileSystemResult<Inode> {
+        let cur = self.next_inode_candidate;
+        // Consume all possible Inodes, or the next inode is already used. 
+        if self.table.contains_key(&cur) {
+            return Err(ErrNo::NFile);
         }
+        // NOTE: we waste the max inode.
+        self.next_inode_candidate = match u64::from(cur).checked_add(1) {
+            Some(next) => Inode(next),
+            None => return Err(ErrNo::NFile), // Not quite accurate, but this may be the best fit
+        };
+        Ok(cur)
     }
 
     /// Install a directory with inode `new_inode` and attatch it under the parent inode `parent`.
@@ -562,7 +564,7 @@ impl InodeTable {
             inode: new_inode.clone(),
             file_type: FileType::RegularFile,
             num_links: 0,
-            file_size: file_size as u64,
+            file_size: try_from_or_errno(file_size)?,
             atime: Timestamp::from_nanos(0),
             mtime: Timestamp::from_nanos(0),
             ctime: Timestamp::from_nanos(0),
@@ -625,9 +627,6 @@ pub struct FileSystem {
     /// The inode table, which points to the actual data associated with a file
     /// and other metadata.  This table is indexed by the Inode.
     inode_table: SharedInodeTable,
-    /// We allocate inodes in the same way as we allocate file descriptors. Inode's are 64 bits
-    /// rather than 31 bits, so the artificial limit on inode allocations is 2^64.
-    next_inode_candidate: Inode,
     /// Preopen FD table. Mapping the FD to dir name.
     prestat_table: HashMap<Fd, PathBuf>,
 }
@@ -650,14 +649,12 @@ impl FileSystem {
     /// need to preallocate some files corresponding to those, here.
     #[inline]
     pub fn new(
-        //TODO REMOVE
         rights_table: RightsTable,
     ) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
-            next_fd_candidate: Fd(u32::from(Self::ROOT_DIRECTORY_FD) + 1),
+            next_fd_candidate: Self::FIRST_FD,
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table)?)),
-            next_inode_candidate: Inode(u64::from(Self::ROOT_DIRECTORY_INODE) + 1),
             prestat_table: HashMap::new(),
         };
         let mut all_rights = HashMap::new();
@@ -673,6 +670,7 @@ impl FileSystem {
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
+            next_fd_candidate: Self::FIRST_FD,
             inode_table: self.inode_table.clone(),
             prestat_table: HashMap::new(),
         };
@@ -688,6 +686,7 @@ impl FileSystem {
         rights_table.insert(Principal::NoCap, HashMap::new());
         Self {
             fd_table: HashMap::new(),
+            next_fd_candidate: Self::FIRST_FD,
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table).unwrap())),
             prestat_table: HashMap::new(),
         }
@@ -716,18 +715,18 @@ impl FileSystem {
 
             let (rights, fd_number, inode_number) = match std_stream {
                 StandardStream::Stdin(file_rights) => {
-                    (file_rights.rights(), 0, self.lock_inode_table()?.stdin())
+                    (file_rights.rights(), Fd(0), self.lock_inode_table()?.stdin())
                 }
                 StandardStream::Stdout(file_rights) => {
-                    (file_rights.rights(), 1, self.lock_inode_table()?.stdout())
+                    (file_rights.rights(), Fd(1), self.lock_inode_table()?.stdout())
                 }
                 StandardStream::Stderr(file_rights) => {
-                    (file_rights.rights(), 2, self.lock_inode_table()?.stderr())
+                    (file_rights.rights(), Fd(2), self.lock_inode_table()?.stderr())
                 }
             };
-            let rights = Rights::from_bits(*rights as u64).ok_or(ErrNo::Inval)?;
+            let rights = Rights::from_bits(try_from_or_errno(*rights)?).ok_or(ErrNo::Inval)?;
             self.install_fd(
-                Fd(fd_number),
+                fd_number,
                 FileType::RegularFile,
                 inode_number,
                 &rights,
@@ -747,45 +746,51 @@ impl FileSystem {
         let std_streams_table = rights_table
             .iter()
             .filter_map(|(k, v)| {
-                let file: &Path = k.as_ref();
+                let file = k.as_ref().to_str();
                 let rights = *v;
-                if file == Path::new("stdin") {
-                    Some(StandardStream::Stdin(FileRights::new(
-                        String::from("stdin"),
-                        u64::from(rights) as u32,
-                    )))
-                } else if file == Path::new("stdout") {
-                    Some(StandardStream::Stdout(FileRights::new(
-                        String::from("stdout"),
-                        u64::from(rights) as u32,
-                    )))
-                } else if file == Path::new("stderr") {
-                    Some(StandardStream::Stderr(FileRights::new(
-                        String::from("stderr"),
-                        u64::from(rights) as u32,
-                    )))
-                } else {
-                    None
+                match file {
+                    // Extract right associated to stdin stdout stderr
+                    Some(path) if path == "stdin" || path == "stdout" || path == "stderr" => {
+
+                        let rights_u32 = match try_from_or_errno::<u64, u32>(u64::from(rights)) {
+                            Ok(o) => o,
+                            Err(_) => return None,
+                        };
+                        let file_rights = FileRights::new(
+                            String::from(path),
+                            rights_u32,
+                        );
+
+                        let stream_rights = if path == "stdin" {
+                            StandardStream::Stdin(file_rights)
+                        } else if path == "stdout" {
+                            StandardStream::Stdout(file_rights)
+                        } else if path == "stderr" {
+                            StandardStream::Stderr(file_rights)
+                        } else {
+                            return None;
+                        };
+                        Some(stream_rights)
+                    },
+                    _other => None,
                 }
             })
             .collect::<Vec<_>>();
         // Pre open the standard streams.
         self.install_standard_streams_fd(&std_streams_table)?;
 
-        // TODO: REMOVE ??? Assume the FIRST_FD is the first FD prestat will open.
         let first_fd = Self::FIRST_FD.0;
-        //let root_inode_number = InodeTable::ROOT_DIRECTORY_INODE.0;
 
         // Load all pre-opened directories. Create directories if necessary.
-        for (index, (path, rights)) in rights_table
+        let rights_table_without_std = rights_table
             .iter()
             .filter(|(k, _)| {
                 let k = k.as_ref();
                 k != Path::new("stdin") && k != Path::new("stdout") && k != Path::new("stderr")
-            })
-            .enumerate()
+            });
+        for (index, (path, rights)) in rights_table_without_std.enumerate()
         {
-            let new_fd = Fd(index as u32 + first_fd);
+            let new_fd = Fd(try_from_or_errno::<usize, u32>(index)? + first_fd);
             let path = path.as_ref();
             // strip off the root
             let relative_path = path.strip_prefix("/").unwrap_or(path).clone();
@@ -807,6 +812,8 @@ impl FileSystem {
             );
             self.prestat_table.insert(new_fd, path.to_path_buf());
         }
+        // Set the next_fd_candidate, it might waste few FDs.
+        self.next_fd_candidate = Fd(Self::FIRST_FD.0 + try_from_or_errno::<usize, u32>(rights_table.len())?);
 
         Ok(())
     }
@@ -837,36 +844,15 @@ impl FileSystem {
         self.fd_table.insert(fd.clone(), fd_entry);
     }
 
-    /// Pick a new fd randomly.
+    /// Pick a fresh fd.
     fn new_fd(&mut self) -> FileSystemResult<Fd> {
-        let mut cur = self.next_fd_candidate;
-        loop {
-            if u32::from(cur) & 1 << 31 != 0 {
-                return Err(ErrNo::NFile); // Not quite accurate, but this may be the best fit
-            }
-            let next = Fd(u32::from(cur) + 1);
-            if !self.fd_table.contains_key(&cur) {
-                self.next_fd_candidate = next;
-                return Ok(cur);
-            }
-            cur = next;
+        let cur = self.next_fd_candidate;
+        // Consume all possible FDs, or the next FD is already used.
+        if u32::from(cur) & 1 << 31 != 0 || self.fd_table.contains_key(&cur) {
+            return Err(ErrNo::NFile); // Not quite accurate, but this may be the best fit
         }
-    }
-
-    /// Pick a new inode randomly.
-    fn new_inode(&mut self) -> FileSystemResult<Inode> {
-        let mut cur = self.next_inode_candidate;
-        loop {
-            let next = match u64::from(cur).checked_add(1) {
-                Some(next) => Inode(next),
-                None => return Err(ErrNo::NFile), // Not quite accurate, but this may be the best fit
-            };
-            if !self.inode_table.contains_key(&cur) {
-                self.next_inode_candidate = next;
-                return Ok(cur);
-            }
-            cur = next;
-        }
+        self.next_fd_candidate = Fd(u32::from(cur) + 1);
+        Ok(cur)
     }
 
     /// Check if `rights` is allowed in `fd`
@@ -1060,7 +1046,7 @@ impl FileSystem {
     pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemResult<Prestat> {
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         let resource_type = PreopenType::Dir {
-            name_len: path.as_os_str().len() as u32,
+            name_len: try_from_or_errno(path.as_os_str().len())?,
         };
         Ok(Prestat { resource_type })
     }
@@ -1117,7 +1103,7 @@ impl FileSystem {
             let inode_table = self.lock_inode_table()?;
             inode_table.get(&dir_inode)?.read_dir(&inode_table)?
         };
-        let cookie = cookie.0 as usize;
+        let cookie = try_from_or_errno(cookie.0)?;
         if dirs.len() < cookie {
             return Ok(Vec::new());
         }
@@ -1159,7 +1145,7 @@ impl FileSystem {
         // NOTE: Ensure the computation does not overflow.
         let new_offset: FileSize = if delta >= 0 {
             // It is safe to convert a positive i64 to u64.
-            let t_offset = new_base_offset + (delta.abs() as u64);
+            let t_offset = new_base_offset + try_from_or_errno::<i64, u64>(delta.abs())?;
             // If offset is greater the file size, then expand the file.
             if t_offset > file_size {
                 self.fd_filestat_set_size(fd.clone(), t_offset)?;
@@ -1167,10 +1153,10 @@ impl FileSystem {
             t_offset
         } else {
             // It is safe to convert a positive i64 to u64.
-            if (delta.abs() as u64) > new_base_offset {
+            if try_from_or_errno::<i64, u64>(delta.abs())? > new_base_offset {
                 return Err(ErrNo::SPipe);
             }
-            new_base_offset - (delta.abs() as u64)
+            new_base_offset - try_from_or_errno::<i64, u64>(delta.abs())?
         };
 
         // Update the offset
@@ -1602,7 +1588,7 @@ impl FileSystem {
             return Err(ErrNo::Access);
         }
         let file_stat = self.fd_filestat_get(fd)?;
-        let rst = self.fd_read(fd, file_stat.file_size as usize)?;
+        let rst = self.fd_read(fd, try_from_or_errno(file_stat.file_size)?)?;
         self.fd_close(fd)?;
         Ok(rst)
     }
@@ -1673,6 +1659,9 @@ impl FileSystem {
         // read the length of a stream
         let inode = self.get_inode_by_fd(&fd)?;
         let len = self.lock_inode_table()?.get(&inode)?.len()?;
-        self.fd_read(fd, len as usize)
+        self.fd_read(fd, try_from_or_errno(len)?)
     }
+}
+fn try_from_or_errno<T, K:TryFrom<T>>(i: T) -> FileSystemResult<K> {
+    K::try_from(i).map_err(|_| ErrNo::Inval)
 }

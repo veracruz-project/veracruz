@@ -239,7 +239,6 @@ message RuntimeManagerRequest {
     RequestPiHash request_pi_hash = 4;
     RequestResult request_result = 5;
     RequestProxyPsaAttestationToken request_proxy_psa_attestation_token = 6;
-    Data append = 7;
     RequestShutdown request_shutdown = 8;
     PsaAttestationInit psa_attestation_init = 9;
     RequestPolicyHash request_policy_hash = 10;

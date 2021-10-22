@@ -342,19 +342,17 @@ pub trait MemoryHandler {
 #[derive(Clone)]
 pub struct WasiWrapper {
     /// The synthetic filesystem associated with this machine.
-    /// Note: Veracruz runtime also need to hold a reference to the
-    ///       filesystem. Both the Veracruz runtime and this WasiWrapper
-    ///       need to have the ability to update, i.e. mutate, the file system,
-    ///       e.g.
+    /// Note: Veracruz runtime hold a the root FileSystem handler.
+    ///       Both the Veracruz runtime and this WasiWrapper can update, i.e. mutate, 
+    ///       the file system internal state, if passing capability check.
     ///       ---------------------------
     ///           Runtime  |  WasiWrapper
+    /// FileSystem(handler)| FileSystem(handler)   
     ///               v    |   v          
     ///       ---------------------------  
     ///            |  ^        ^  |
-    ///            |  FileSystem  |
+    ///            |  Internal    |
     ///            ----------------      
-    ///       As there is no 'sharable' and 'mutable' reference in Rust,
-    ///       we can either use `Arc` or use `unsafe`. Here we choose `Arc`.
     filesystem: FileSystem,
     /// The environment variables that have been passed to this program from the
     /// global policy file.  These are stored as a key-value mapping from
@@ -794,8 +792,8 @@ impl WasiWrapper {
         let mut written = 0;
         for (dir, path) in dir_entries {
             //NOTE: `buf_len` is the number of bytes dir entries can store.
-            //      If there is not enough space, stop writing and filling the last entry
-            //      with random bytes.
+            //      If there is not enough space, stop writing and leave the rest of the buffer
+            //      untouched.
             written += size_of::<DirEnt>() as u32;
             if written > buf_len {
                 written = buf_len;
