@@ -232,7 +232,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         Vec::new()
     };
 
-    let enable_clock = if matches.is_present("dump-stdout") {
+    let enable_clock = if matches.is_present("enable-clock") {
         true
     } else {
         DEFAULT_ENABLE_CLOCK

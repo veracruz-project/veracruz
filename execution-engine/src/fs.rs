@@ -27,7 +27,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
     vec::Vec,
 };
-#[cfg(not(features = "icecap"))]
+#[cfg(not(feature = "icecap"))]
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
@@ -317,9 +317,9 @@ impl InodeImpl {
         {
             // TODO: wait for icecap support direct conversion from os_str to bytes, bypassing
             // potential utf-8 encoding check when calling to_str
-            #[cfg(features = "icecap")]
+            #[cfg(feature = "icecap")]
             let path_byte = path.as_os_str().to_str().unwrap().as_bytes().to_vec();
-            #[cfg(not(features = "icecap"))]
+            #[cfg(not(feature = "icecap"))]
             let path_byte = path.as_os_str().as_bytes().to_vec();
             let dir_ent = DirEnt {
                 next: (try_from_or_errno::<usize, u64>(index)? + 1u64).into(),
@@ -1627,10 +1627,10 @@ impl FileSystem {
             for (_, sub_relative_path) in all_dir.iter() {
                 // TODO: wait for icecap support direct conversion from bytes to os_str, bypassing
                 // potential utf-8 encoding check
-                #[cfg(features = "icecap")]
+                #[cfg(feature = "icecap")]
                 let sub_relative_path =
                     PathBuf::from(String::from_utf8(sub_relative_path.to_vec()).unwrap());
-                #[cfg(not(features = "icecap"))]
+                #[cfg(not(feature = "icecap"))]
                 let sub_relative_path =
                     PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
                 // Ignore the path for current and parent directories.
