@@ -15,83 +15,55 @@ label := veracruz-icecap
 local_repository := veracruz-icecap
 container_name_base := veracruz-icecap
 
-stateful_hacking_dockerfile := hacking/Dockerfile.stateful
-stateful_hacking_image_tag := $(local_repository):hacking
-stateful_hacking_container_name := $(container_name_base)-hacking
-
-stateless_hacking_dockerfile := hacking/Dockerfile.stateless
-stateless_hacking_image_tag := $(local_repository):hacking-stateless
-stateless_hacking_container_name := $(container_name_base)-hacking-stateless
+hacking_image_tag := $(local_repository):hacking
+hacking_container_name := $(container_name_base)-hacking
+hacking_nix_root_volume_name := veracruz-icecap-nix-root
 
 uid := $(shell id -u)
 gid := $(shell id -g)
 
 .PHONY: all
-all:
-
-### stateful ###
+all: run
 
 .PHONY: build
 build:
-	docker build -f $(stateful_hacking_dockerfile) \
+	docker build -f hacking/Dockerfile \
 		--build-arg UID=$(uid) --build-arg GID=$(gid) \
-		--label $(label) -t $(stateful_hacking_image_tag) .
+		--label $(label) -t $(hacking_image_tag) .
+
+.PHONY: initialize-volume
+initialize-volume: build
+	if [ -z "$$(docker volume ls -q -f "name=$(hacking_nix_root_volume_name)")" ]; then \
+		docker volume create --label $(label) \
+			$(hacking_nix_root_volume_name) && \
+		docker run --privileged --rm --label $(label) -w /home/x \
+			--mount type=volume,src=$(hacking_nix_root_volume_name),dst=/nix \
+			$(hacking_image_tag) flock /nix/.installed.lock bash /setup.sh; \
+	fi
 
 .PHONY: run
-run: build
-	docker run --privileged -d --name $(stateful_hacking_container_name) --label $(label) \
+run: initialize-volume
+	docker run --privileged -d --name $(hacking_container_name) --label $(label) \
+		--mount type=volume,src=$(hacking_nix_root_volume_name),dst=/nix \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
-		$(stateful_hacking_image_tag) sleep inf
+		$(hacking_image_tag) sleep inf
 
 .PHONY: exec
 exec:
-	docker exec -it $(stateful_hacking_container_name) bash
+	docker exec -it $(hacking_container_name) bash
 
 .PHONY: rm-container
 rm-container:
-	for id in $$(docker ps -aq -f "name=$(stateful_hacking_container_name)"); do \
+	for id in $$(docker ps -aq -f "name=$(hacking_container_name)"); do \
 		docker rm -f $$id; \
 	done
 
-### stateless ###
-
-.PHONY: build-stateless
-build-stateless:
-	docker build -f $(stateless_hacking_dockerfile) \
-		--build-arg UID=$(uid) --build-arg GID=$(gid) \
-		--label $(label) -t $(stateless_hacking_image_tag) .
-
-$(nix_root):
-	mkdir -p -m 0755 $@
-
-$(nix_root)/.installed: build-stateless $(nix_root)
-	docker run --privileged --rm --label $(label) -w /home/x \
-		--mount type=bind,src=$(abspath $(nix_root)),dst=/nix \
-		$(stateless_hacking_image_tag) flock /nix/.installed.lock bash /setup.sh
-
-.PHONY: run-stateless
-run-stateless: build-stateless $(nix_root)/.installed
-	docker run --privileged -d --name $(stateless_hacking_container_name) --label $(label) \
-		--mount type=bind,src=$(abspath $(nix_root)),dst=/nix \
-		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
-		$(stateless_hacking_image_tag) sleep inf
-
-.PHONY: exec-stateless
-exec-stateless:
-	docker exec -it $(stateless_hacking_container_name) bash
-
-.PHONY: rm-stateless-container
-rm-stateless-container:
-	for id in $$(docker ps -aq -f "name=$(stateless_hacking_container_name)"); do \
-		docker rm -f $$id; \
+.PHONY: rm-volume
+rm-volume:
+	for volume in $$(docker volume ls -q -f "name=$(hacking_nix_root_volume_name)"); do \
+		docker volume rm $$volume; \
 	done
 
-.PHONY: rm-nix-root
-rm-nix-root:
-	if [ -d $(nix_root) ]; then \
-		chmod -R u+w $(nix_root); \
-		rm -rf $(nix_root); \
-	fi
 
 ### CI ###
 
@@ -128,6 +100,7 @@ ci-rm-container:
 	for id in $$(docker ps -aq -f "name=$(ci_container_name)"); do \
 		docker rm -f $$id; \
 	done
+
 
 ### CI + remote registry ###
 

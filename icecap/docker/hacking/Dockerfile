@@ -19,20 +19,21 @@ ARG GID
 
 RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m x
 
-RUN mkdir -m 0755 /nix && chown x /nix
+RUN mkdir -m 0755 /nix && chown x:x /nix
+VOLUME /nix
 
 USER x
-
-WORKDIR /home/x
-
-COPY install-nix.sh .
-RUN bash install-nix.sh && rm install-nix.sh
 
 ENV PATH="/nix/env/bin:${PATH}"
 ENV MANPATH="/nix/env/share/man:${MANPATH}"
 ENV NIX_SSL_CERT_FILE=/nix/env/etc/ssl/certs/ca-bundle.crt
 ENV NIX_BUILD_SHELL bash
 
+# HACK for persistent git cache.
+ENV XDG_CACHE_HOME=/nix/cache
+
+COPY install-nix.sh /
+COPY hacking/setup.sh /
 COPY hacking/nix.conf /etc/nix/
 
 WORKDIR /work/veracruz
