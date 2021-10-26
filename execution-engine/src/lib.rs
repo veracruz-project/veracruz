@@ -24,6 +24,7 @@ extern crate num_derive;
 
 pub mod fs;
 mod wasi;
+mod native_modules;
 // Expose the error to the external.
 pub use wasi::common::FatalEngineError;
 

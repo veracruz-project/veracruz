@@ -37,12 +37,14 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
     vec::Vec,
     fmt::Debug,
+    boxed::Box,
 };
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
+use crate::native_modules::pinecone::PineconeService;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -150,6 +152,21 @@ impl InodeEntry {
     pub(self) fn len(&self) -> FileSystemResult<FileSize> {
         self.data.len()
     }
+
+    #[inline]
+    /// Return the input of the service.
+    /// Otherwise return ErrNo::Inval if it is not a service
+    pub(self) fn get_service_input(&self) -> FileSystemResult<Vec<PathBuf>> {
+        self.data.get_service_input()
+    }
+
+    /// Run the service, and store the result, and return the read result.
+    /// Otherwise return ErrNo::Inval if it is not a service
+    pub(self) fn service(&mut self, input: &[Vec<u8>], max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
+        let result = self.data.service(input, max, offset)?;
+        self.file_stat.file_size = self.data.len()?;
+        Ok(result)
+    }
 }
 
 /// The actual data of an inode, either a file or a directory.
@@ -160,7 +177,7 @@ enum InodeImpl {
     /// It treat the `Inode` as the input parameter and the result will be stored in Vec.
     /// TODO We do not support reentry now, hence once the Vec exists,
     /// we will directly return the Vec.
-    NativeModule(FileSystem, Arc<Mutex<dyn Service>>, Vec<PathBuf>, Option<Vec<u8>>),
+    NativeModule(FileSystem, Arc<Mutex<Box<dyn Service>>>, Vec<PathBuf>, Option<Vec<u8>>),
     /// A file
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
@@ -192,31 +209,44 @@ impl InodeImpl {
     }
 
     /// Read maximum `max` bytes from the offset `offset`.
-    /// Otherwise, return ErrNo::IsDir if it is not a file.
+    /// Otherwise, return ErrNo::IsDir if it is a dir
+    /// or ErrNo::Again if it is a service and no output is available.
     pub(self) fn read_file(&self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
-        let bytes = match self {
-            Self::File(b) => b,
-            Self::NativeModule(fs, service, inode_vec, output) => {
-                match output {
-                    Some(b) => Self::read_bytes_from_offset(b, max, offset),
-                    None => {
-                        // Read the inputs
-                        let input = inode_vec.iter().try_fold(Vec::new(), |mut acc, next| {
-                            acc.push(fs.read_file_by_absolute_path(next)?);
-                            Ok::<Vec<Vec<u8>>, ErrNo>(acc)
-                        })?;
-                        // lock the service and execute 
-                        let service_return_bytes = service.lock().map_err(|_| ErrNo::Busy)?.serve(&input)?;
-                        // read the result and store the result.
-                        let rst = Self::read_bytes_from_offset(&service_return_bytes, max, offset);
-                        *output = Some(service_return_bytes);
-                        rst
-                    }
-                }
-            }
-            Self::Directory(_) => return Err(ErrNo::IsDir),
-        };
+        match self {
+            Self::File(b) => Self::read_bytes_from_offset(b, max, offset),
+            Self::NativeModule(.., Some(b)) => Self::read_bytes_from_offset(b, max, offset),
+            Self::NativeModule(.., None) => Err(ErrNo::Again),
+            Self::Directory(_) => Err(ErrNo::IsDir),
+        }
     }
+    
+    /// Return the input of the service.
+    /// Otherwise return ErrNo::Inval if it is not a service
+    pub(crate) fn get_service_input(&self) -> FileSystemResult<Vec<PathBuf>> {
+        match self {
+            Self::NativeModule(_, _, inode_vec, _) => Ok(inode_vec.to_vec()),
+            _otherwise => Err(ErrNo::Inval),
+        }
+    }
+
+    /// Run the service, and store the result, and return the read result.
+    /// Otherwise return ErrNo::Inval if it is not a service
+    pub(crate) fn service(&mut self, input: &[Vec<u8>], max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
+        match self {
+            Self::NativeModule(_, service, _, output) => {
+                println!("call {:?}", service);
+                let service_return_bytes = service.lock().map_err(|_| ErrNo::Busy)?.serve(input)?;
+                println!("call {:?} return {:?}", service, service_return_bytes.len());
+                // read the result and store the result.
+                let rst = Self::read_bytes_from_offset(&service_return_bytes, max, offset)?;
+                println!("call {:?} return rst {:?}", service, rst.len());
+                *output = Some(service_return_bytes);
+                Ok(rst)
+            }
+            _otherwise => Err(ErrNo::Inval)
+        }
+    }
+
     fn read_bytes_from_offset(bytes: &[u8], max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
         // NOTE: It should be safe to convert a u64 to usize.
         let offset = <_>::try_from_or_errno(offset)?;
@@ -303,7 +333,7 @@ impl InodeImpl {
     /// or the number of inodes, if it it is a directory.
     pub(self) fn len(&self) -> FileSystemResult<FileSize> {
         let rst = match self {
-            Self::NativeModule(..) => return Err(ErrNo::Perm),
+            Self::NativeModule(..,output) => output.as_ref().map_or(0usize, |v| v.len()),
             Self::File(f) => f.len(),
             Self::Directory(f) => f.len(),
         };
@@ -365,6 +395,17 @@ struct InodeTable {
 }
 
 impl InodeTable {
+    fn print(&self) {
+        println!("Inode Table");
+        for (k,v) in self.table.iter() {
+            match &v.data {
+                InodeImpl::File(_) => println!("\t{:?} -> {}", k, "file"),
+                InodeImpl::NativeModule(..) => println!("\t{:?} -> {}", k, "service"),
+                InodeImpl::Directory(d) => println!("\t{:?} -> {:?}", k, d),
+            }
+        }
+    }
+
     /// The root directory name. It will be pre-opened for any wasm program.
     pub(self) const ROOT_DIRECTORY: &'static str = "/";
     /// The root directory inode. It will be pre-opened for any wasm program.
@@ -393,10 +434,12 @@ impl InodeTable {
     /// Install all the (file_system_handler, input_paths, output_path, service_instance) tuples. Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created, since each service is assocaited a child filesystem (handler).
-    fn install_services<T: AsRef<Path>>(&mut self, services: Vec<(FileSystem, Vec<PathBuf>, T, Arc<Mutex<dyn Service>>)>) -> FileSystemResult<()> {
+    fn install_services<T: AsRef<Path>>(&mut self, services: Vec<(FileSystem, Vec<PathBuf>, T, Arc<Mutex<Box<dyn Service>>>)>) -> FileSystemResult<()> {
         for (service_fs, input_paths, output_path, service) in services {
             let output_path = output_path.as_ref();
             let new_inode = self.new_inode()?;
+
+            println!("input: {:?}, output: {:?}", input_paths, output_path);
 
             let relative_output_path = output_path.strip_prefix("/").unwrap_or(output_path).clone();
             // Call the existing function to create general files.
@@ -405,6 +448,7 @@ impl InodeTable {
             // TODO change the input inode.
             self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data = InodeImpl::NativeModule(service_fs, service.clone(), input_paths.to_vec(), None);
         }
+        println!("install services return");
         Ok(())
     }
 
@@ -644,6 +688,32 @@ impl InodeTable {
         }
         Ok(())
     }
+
+    fn read_file(&mut self, inode: Inode, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
+        let inode_impl = self.get_mut(&inode)?;
+        match inode_impl.read_file(max, offset) {
+            Ok(o) => Ok(o),
+            Err(ErrNo::Again) => {
+                // read the input
+                let input_paths = inode_impl.get_service_input()?;
+                let inputs = input_paths.iter().try_fold(Vec::new(), |mut acc, next| {
+                    println!("NativeModule: read input: {:?}", next);
+                    let (inode, inode_entry) = self.get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE,next.strip_prefix("/").unwrap_or(next))?;
+                    let size = inode_entry.file_stat.file_size;
+                    println!("NativeModule: read input inode: {:?} of size {:?}", inode, size);
+                    let input = self.read_file(inode, try_from_or_errno(size)?, 0)?;
+                    println!("NativeModule: input {:?}", input.len());
+                    acc.push(input);
+                    Ok::<Vec<Vec<u8>>, ErrNo>(acc)
+                })?;
+                println!("NativeModule: read input succ");
+
+                // call the service
+                self.get_mut(&inode)?.service(&inputs, max, offset)
+            },
+            Err(e) => Err(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -724,7 +794,10 @@ impl FileSystem {
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
         //TODO include the correct parameter
-        rst.install_services::<PathBuf>(Vec::new())?;
+        let service: Box<dyn Service> = Box::new(PineconeService::new());
+        let mut services = Vec::new();
+        services.push( (rst.clone(), vec![PathBuf::from("/services/pinecone_string.dat")], "/services/pinecone_result.dat", Arc::new(Mutex::new(service))) );
+        rst.install_services(services)?;
         Ok(rst)
     }
 
@@ -732,6 +805,7 @@ impl FileSystem {
     /// It return a FileSystem where directories are pre-opened with appropriate
     /// capabilities in related to `principal`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
+        println!("spawn on: {:?}", principal);
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
@@ -741,6 +815,7 @@ impl FileSystem {
         // Must clone as install_prestat need to lock the inode_table too
         let rights_table = self.lock_inode_table()?.get_rights(principal)?.clone();
         rst.install_prestat::<PathBuf>(&rights_table)?;
+        println!("spawn fd_table: {:?}", rst.fd_table);
         Ok(rst)
     }
 
@@ -867,7 +942,8 @@ impl FileSystem {
         Ok(())
     }
 
-    fn install_services<T: AsRef<Path>>(&mut self, services: Vec<(FileSystem, Vec<PathBuf>, T, Arc<Mutex<dyn Service>>)>) -> FileSystemResult<()> {
+    fn install_services<T: AsRef<Path>>(&mut self, services: Vec<(FileSystem, Vec<PathBuf>, T, Arc<Mutex<Box<dyn Service>>>)>) -> FileSystemResult<()> {
+
         self.lock_inode_table()?.install_services(services)
     }
 
@@ -920,6 +996,7 @@ impl FileSystem {
         {
             Ok(())
         } else {
+            println!("right check fail: {:?} {:?} {:?}", fd, rights, self.fd_table);
             Err(ErrNo::Access)
         }
     }
@@ -940,7 +1017,7 @@ impl FileSystem {
             .0)
     }
 
-    ////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////s/////////////
     // Operations on the filesystem. Rust style implementation of WASI API
     ////////////////////////////////////////////////////////////////////////////
 
@@ -1138,6 +1215,7 @@ impl FileSystem {
         bufs: &[B],
         offset: FileSize,
     ) -> FileSystemResult<usize> {
+        println!("fd_write on FD {:?} is call", fd);
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
@@ -1213,6 +1291,7 @@ impl FileSystem {
         delta: FileDelta,
         whence: Whence,
     ) -> FileSystemResult<FileSize> {
+        println!("call fd_seek {:?} with {:?} and {:?}", fd, whence, delta);
         self.check_right(&fd, Rights::FD_SEEK)?;
         let FdEntry { inode, offset, .. } = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?;
         let file_size = self.lock_inode_table()?.get(inode)?.file_stat.file_size;
@@ -1377,10 +1456,14 @@ impl FileSystem {
         flags: FdFlags,
     ) -> FileSystemResult<Fd> {
         let path = path.as_ref();
+        println!("path_open fd: {:?}, path: {:?}, oflags: {:?}", fd, path, oflags);
+        self.lock_inode_table()?.print();
         // Check the right of the program on path_open
         self.check_right(&fd, Rights::PATH_OPEN)?;
+        println!("path_open right check passes");
         // Read the parent inode.
         let parent_inode = self.get_inode_by_fd(&fd)?;
+        println!("path_open parent_inode: {:?}", parent_inode);
 
         if !self.lock_inode_table()?.is_dir(&parent_inode) {
             return Err(ErrNo::NotDir);
@@ -1427,6 +1510,7 @@ impl FileSystem {
             self.lock_inode_table()?.get_mut(&inode)?.truncate_file()?;
         }
         let new_fd = self.new_fd()?;
+        println!("path_open return new fd: {:?}", new_fd);
         let FileStat {
             file_type,
             file_size,
@@ -1691,6 +1775,7 @@ impl FileSystem {
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
         let file_name = file_name.as_ref();
+        println!("read_file_by_absolute_path file_name: {:?}", file_name);
         let (fd, file_name) = self.find_prestat(file_name)?;
         let fd = self.path_open(
             fd,
@@ -1811,7 +1896,7 @@ where
     }
 }
 
-trait Service: Send {
+pub trait Service: Send {
     fn name(&self) -> &str;
     //fn configure(&mut self, config: Self::Configuration) -> FileSystemResult<()>;
     // The FS will prepare the Input and call the serve function at an appropriate time.
