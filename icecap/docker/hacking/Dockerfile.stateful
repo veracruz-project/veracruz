@@ -1,0 +1,38 @@
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
+# and copyright information.
+
+FROM debian:bullseye-slim
+
+RUN apt-get update && apt-get install -y \
+    curl git man make rsync \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG UID
+ARG GID
+
+RUN groupadd -f -g $GID x && useradd -u $UID -g $GID -m x
+
+RUN mkdir -m 0755 /nix && chown x /nix
+
+USER x
+
+WORKDIR /home/x
+
+COPY install-nix.sh .
+RUN bash install-nix.sh && rm install-nix.sh
+
+ENV PATH="/nix/env/bin:${PATH}"
+ENV MANPATH="/nix/env/share/man:${MANPATH}"
+ENV NIX_SSL_CERT_FILE=/nix/env/etc/ssl/certs/ca-bundle.crt
+ENV NIX_BUILD_SHELL bash
+
+COPY hacking/nix.conf /etc/nix/
+
+WORKDIR /work/veracruz

@@ -35,3 +35,14 @@ For more detailed information about supported Raspberry Pi 4 variants and about 
 IceCap doesn't yet support attestation.
 
 IceCap doesn't yet provide a source of randomness to realms. Until that changes, WASM programs running under Veracruz on IceCap are provided with a trivial generator with a fixed seed and a large period, which is not suitable for use in cryptography.
+
+## Advanced
+
+For a Nix cache which persists outside of the Docker container, replace the Docker setup incantations above with:
+
+```
+cd veracruz/icecap/docker
+make run-stateless && make exec-stateless
+```
+
+Note that this alternative Docker configuration is not suitable for Docker on MacOS.
