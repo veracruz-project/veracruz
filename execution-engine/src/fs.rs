@@ -156,8 +156,8 @@ impl InodeEntry {
     #[inline]
     /// Return the input of the service.
     /// Otherwise return ErrNo::Inval if it is not a service
-    pub(self) fn get_service_input(&self) -> FileSystemResult<Vec<PathBuf>> {
-        self.data.get_service_input()
+    pub(self) fn get_service_input_paths(&self) -> FileSystemResult<Vec<PathBuf>> {
+        self.data.get_service_input_paths()
     }
 
     /// Run the service, and store the result, and return the read result.
@@ -220,11 +220,25 @@ impl InodeImpl {
         }
     }
     
-    /// Return the input of the service.
-    /// Otherwise return ErrNo::Inval if it is not a service
-    pub(crate) fn get_service_input(&self) -> FileSystemResult<Vec<PathBuf>> {
+    /// Return the input paths of the service, if they all pass the capabilities check.
+    /// Otherwise return appropriate ErrNo if the capabilities check fails, or ErrNo::Inval if it is not a service.
+    pub(crate) fn get_service_input_paths(&self) -> FileSystemResult<Vec<PathBuf>> {
         match self {
-            Self::NativeModule(_, _, inode_vec, _) => Ok(inode_vec.to_vec()),
+            Self::NativeModule(fs, _, input_paths, _) => {
+                for path in input_paths {
+                    // NOTE: Manually check the capabilities before return.
+                    //       A better way here is to use the wasi APIs via `fs`.
+                    //       However, most wasi API replies on lock on the 
+                    //       shared inode table. When the execution engine 
+                    //       reaches this point, the shared inode table is already locked. 
+                    //       Hence, we only use `fs` to do capabilities check, and then directly 
+                    //       operate on the inode table level. After this point, to some 
+                    //       level, the rest service-related operations bypass capabilities check.
+                    let (fd, _) = fs.find_prestat(path)?;
+                    fs.check_right(&fd, Rights::FD_READ)?;
+                }
+                Ok(input_paths.to_vec())
+            }
             _otherwise => Err(ErrNo::Inval),
         }
     }
@@ -294,14 +308,17 @@ impl InodeImpl {
     }
 
     /// Truncate the file.
-    /// Return ErrNo::IsDir if it is not a file.
+    /// Return ErrNo::IsDir if it is a dir.
     pub(self) fn truncate_file(&mut self) -> FileSystemResult<()> {
         match self {
             Self::File(b) => {
                 b.clear();
                 Ok(())
             }
-            Self::NativeModule(..) => Err(ErrNo::Perm),
+            Self::NativeModule(.., fs) => {
+                *fs = None;
+                Ok(())
+            }
             Self::Directory(_) => Err(ErrNo::IsDir),
         }
     }
@@ -394,18 +411,21 @@ struct InodeTable {
     next_inode_candidate: Inode,
 }
 
-impl InodeTable {
-    fn print(&self) {
-        println!("Inode Table");
+impl Debug for InodeTable {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Inode Table:\n")?;
         for (k,v) in self.table.iter() {
             match &v.data {
-                InodeImpl::File(_) => println!("\t{:?} -> {}", k, "file"),
-                InodeImpl::NativeModule(..) => println!("\t{:?} -> {}", k, "service"),
-                InodeImpl::Directory(d) => println!("\t{:?} -> {:?}", k, d),
+                InodeImpl::File(_) => write!(f,"\t{:?} -> {}", k, "file")?,
+                InodeImpl::NativeModule(..) => write!(f,"\t{:?} -> {}", k, "service")?,
+                InodeImpl::Directory(d) => write!(f,"\t{:?} -> {:?}", k, d)?,
             }
         }
+        Ok(())
     }
+}
 
+impl InodeTable {
     /// The root directory name. It will be pre-opened for any wasm program.
     pub(self) const ROOT_DIRECTORY: &'static str = "/";
     /// The root directory inode. It will be pre-opened for any wasm program.
@@ -441,9 +461,9 @@ impl InodeTable {
 
             println!("input: {:?}, output: {:?}", input_paths, output_path);
 
-            let relative_output_path = output_path.strip_prefix("/").unwrap_or(output_path).clone();
+            let relative_output_path = strip_root_slash(output_path);
             // Call the existing function to create general files.
-            self.add_file(Self::ROOT_DIRECTORY_INODE, relative_output_path, new_inode, b"")?;
+            self.add_file(Self::ROOT_DIRECTORY_INODE, relative_output_path, new_inode, Vec::new())?;
             // Manually uplift the general file to special file bound with the service.
             // TODO change the input inode.
             self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data = InodeImpl::NativeModule(service_fs, service.clone(), input_paths.to_vec(), None);
@@ -499,17 +519,20 @@ impl InodeTable {
     }
 
     /// Insert a new inode
+    #[inline]
     fn insert(&mut self, inode: Inode, entry: InodeEntry) -> FileSystemResult<()> {
         self.table.insert(inode, entry);
         Ok(())
     }
 
     /// Return the inode entry associated to `inode`
+    #[inline]
     fn get(&self, inode: &Inode) -> FileSystemResult<&InodeEntry> {
         self.table.get(&inode).ok_or(ErrNo::NoEnt)
     }
 
     /// Return the inode entry associated to `inode`
+    #[inline]
     fn get_mut(&mut self, inode: &Inode) -> FileSystemResult<&mut InodeEntry> {
         self.table.get_mut(&inode).ok_or(ErrNo::NoEnt)
     }
@@ -693,12 +716,14 @@ impl InodeTable {
         let inode_impl = self.get_mut(&inode)?;
         match inode_impl.read_file(max, offset) {
             Ok(o) => Ok(o),
+            // If `Again` is returned, it is a service.
             Err(ErrNo::Again) => {
-                // read the input
-                let input_paths = inode_impl.get_service_input()?;
+                // Read the input paths
+                let input_paths = inode_impl.get_service_input_paths()?;
+                // Read all the inputs. If any error occurs, return earlier.
                 let inputs = input_paths.iter().try_fold(Vec::new(), |mut acc, next| {
                     println!("NativeModule: read input: {:?}", next);
-                    let (inode, inode_entry) = self.get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE,next.strip_prefix("/").unwrap_or(next))?;
+                    let (inode, inode_entry) = self.get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE,strip_root_slash(next))?;
                     let size = inode_entry.file_stat.file_size;
                     println!("NativeModule: read input inode: {:?} of size {:?}", inode, size);
                     let input = self.read_file(inode, try_from_or_errno(size)?, 0)?;
@@ -759,7 +784,16 @@ pub struct FileSystem {
 
 impl Debug for FileSystem {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "FileSystem:\n pre-open FDs: {:?} \n FD table {:?}", self.prestat_table, self.fd_table)
+        write!(f, "FileSystem:\n")?;
+        write!(f, "\tFD table:\n")?;
+        for (fd, fd_entry) in self.fd_table.iter() {
+            write!(f, "\t\t{:?} -> {:?}\n", fd, fd_entry)?;
+        }
+        write!(f, "\tpre open fd paths:\n")?;
+        for (fd, path) in self.fd_table.iter() {
+            write!(f, "\t\t{:?} -> {:?}\n", fd, path)?;
+        }
+        Ok(())
     }
 }
 
@@ -917,7 +951,7 @@ impl FileSystem {
             let new_fd = Fd(u32::try_from_or_errno(index)? + first_fd);
             let path = path.as_ref();
             // strip off the root
-            let relative_path = path.strip_prefix("/").unwrap_or(path);
+            let relative_path = strip_root_slash(path);
             let new_inode = {
                 if relative_path == Path::new("") {
                     InodeTable::ROOT_DIRECTORY_INODE
@@ -1457,7 +1491,6 @@ impl FileSystem {
     ) -> FileSystemResult<Fd> {
         let path = path.as_ref();
         println!("path_open fd: {:?}, path: {:?}, oflags: {:?}", fd, path, oflags);
-        self.lock_inode_table()?.print();
         // Check the right of the program on path_open
         self.check_right(&fd, Rights::PATH_OPEN)?;
         println!("path_open right check passes");
@@ -1817,7 +1850,7 @@ impl FileSystem {
             .lock_inode_table()?
             .get_inode_by_inode_path(
                 &InodeTable::ROOT_DIRECTORY_INODE,
-                path.strip_prefix("/").unwrap_or(path),
+                strip_root_slash(path),
             )?
             .0;
         let mut rst = Vec::new();
@@ -1894,6 +1927,10 @@ where
     fn try_from_or_errno(t: T) -> FileSystemResult<Self> {
         Self::try_from(t).map_err(|_| ErrNo::Inval)
     }
+}
+
+fn strip_root_slash(path: &Path) -> &Path {
+    path.strip_prefix("/").unwrap_or(path)
 }
 
 pub trait Service: Send {
