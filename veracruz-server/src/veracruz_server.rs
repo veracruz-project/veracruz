@@ -17,10 +17,10 @@ use actix_web::{error, http::StatusCode, HttpResponse};
 use base64;
 use curl::easy::{Easy, List};
 use err_derive::Error;
+#[cfg(feature = "nitro")]
+use io_utils::nitro::NitroError;
 use log::debug;
 use std::io::Read;
-#[cfg(feature = "nitro")]
-use veracruz_utils::nitro_enclave::NitroError;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -109,7 +109,7 @@ pub enum VeracruzServerError {
     SerdeError,
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Veracruz Socket Error:{:?}", _0)]
-    VeracruzSocketError(#[error(source)] veracruz_utils::io::error::SocketError),
+    VeracruzSocketError(#[error(source)] io_utils::error::SocketError),
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),

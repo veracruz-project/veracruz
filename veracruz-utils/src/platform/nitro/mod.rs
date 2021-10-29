@@ -10,4 +10,3 @@
 //! information on licensing and copyright.
 
 pub mod nitro;
-pub mod nitro_enclave;

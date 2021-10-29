@@ -17,21 +17,12 @@
 #[macro_use]
 extern crate sgx_tstd as std;
 
-/// I/O related material, such as VSocket types and material relating to FDs,
-/// that is shared across the Veracruz codebase.
-pub mod io;
 /// Platform-specific material, or material that is common to all
 /// platforms/backends that Veracruz supports and does not fit elsewhere.
 pub mod platform;
 
 #[cfg(feature = "nitro")]
 pub use crate::platform::nitro::*;
-
-#[cfg(feature = "nitro")]
-pub use self::io::vsocket::*;
-
-#[cfg(feature = "nitro")]
-pub use self::platform::nitro::nitro_enclave::*;
 
 pub mod csr;
 

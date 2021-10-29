@@ -13,7 +13,7 @@ required-features = ["cli"]
 [features]
 sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "sgx-root-enclave-bind", "tempfile", "policy-utils/std"]
 tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid", "policy-utils/tz"]
-nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2", "policy-utils/std"]
+nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2", "policy-utils/std", "io-utils/nitro"]
 icecap = ["veracruz-utils/icecap", "psa-attestation", "bincode", "serde/derive", "once_cell", "policy-utils/icecap"]
 debug = []
 # a feature to enable CLI-only dependencies
@@ -24,6 +24,7 @@ cli = ["structopt", "actix-rt", "env_logger", "policy-utils/std"]
 dirs = "1.0.2"
 veracruz-utils = { path = "../veracruz-utils", optional = true }
 policy-utils = { path = "../policy-utils", optional = true  }
+io-utils = { path = "../io-utils", optional = true }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 transport-protocol = { path = "../transport-protocol"}
 rouille = "=3.2.1"

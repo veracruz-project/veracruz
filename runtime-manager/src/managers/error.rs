@@ -20,7 +20,9 @@ use std::sync::PoisonError;
 use veracruz_utils::csr::CertError;
 
 #[cfg(feature = "nitro")]
-use veracruz_utils::{io::error::SocketError, platform::nitro::nitro::NitroRootEnclaveMessage};
+use io_utils::error::SocketError;
+#[cfg(feature = "nitro")]
+use veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage;
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {

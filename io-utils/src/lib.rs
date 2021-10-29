@@ -16,6 +16,8 @@
 /// IO-related error type.
 #[cfg(feature = "nitro")]
 pub mod error;
+#[cfg(feature = "nitro")]
+pub mod nitro;
 /// Buffer send- and receive-related functionality for raw file descriptors.
 #[cfg(feature = "nitro")]
 pub mod raw_fd;

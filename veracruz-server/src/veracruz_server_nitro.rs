@@ -13,10 +13,10 @@
 pub mod veracruz_server_nitro {
     use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
     use curl::easy::{Easy, List};
+    use io_utils::nitro::NitroEnclave;
     use policy_utils::policy::Policy;
     use std::io::Read;
     use veracruz_utils::platform::nitro::nitro::{NitroStatus, RuntimeManagerMessage};
-    use veracruz_utils::platform::nitro::nitro_enclave::NitroEnclave;
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
 
