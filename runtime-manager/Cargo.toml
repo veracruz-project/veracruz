@@ -101,7 +101,7 @@ execution-engine = { path = "../execution-engine" }
 half = "=1.7.1"
 hex = { version = "=0.4.2", default-features = false }
 http = "=0.2.4"
-icecap-wrapper = { path = "../icecap/crates-hack/crates/icecap-wrapper", optional = true }
+icecap-wrapper = { path = "../icecap/src/rust/icecap-wrapper", optional = true }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }

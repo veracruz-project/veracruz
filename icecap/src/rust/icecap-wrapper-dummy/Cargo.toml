@@ -1,6 +1,0 @@
-[package]
-authors = ["The Veracruz Development Team"]
-description = "Dummy version of the icecap-wrapper crate for non-IceCap builds."
-edition = "2018"
-name = "icecap-wrapper"
-version = "0.3.0"

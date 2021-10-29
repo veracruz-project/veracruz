@@ -17,8 +17,7 @@ let
 
   inherit (configured)
     icecapFirmware icecapPlat selectIceCapPlatOr
-    mkIceDL mkDynDLSpec
-    globalCrates;
+    mkIceDL mkDynDLSpec;
 
   runtimeManagerElf = ../build/runtime-manager/out/runtime_manager_enclave.elf;
 
@@ -103,13 +102,9 @@ in lib.fix (self: with self; {
     };
   };
 
-  icecapCratesEnv = crateUtils.collectEnv icecapCrates;
-  icecapCrates = lib.attrValues (crateUtils.closure icecapWrapperCrate);
-  icecapWrapperCrate = configured.callPackage ../src/rust/icecap-wrapper/cargo.nix {};
-
   env = {
     runtime-manager = configured.callPackage ./env/runtime-manager.nix {
-      inherit icecapCrates libc-supplement;
+      inherit libc-supplement;
     };
     veracruz-server-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
       name = "veracruz-server-test";

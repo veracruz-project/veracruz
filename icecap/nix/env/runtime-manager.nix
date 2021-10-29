@@ -8,11 +8,11 @@
 # and copyright information.
 
 { lib, stdenv, buildPackages, mkShell
-, rustc, cargo, git, cacert
+, rustc, cargo, git, cacert, rustfmt
 , crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
-, liboutline, sysroot-rs
-, icecapCrates, libc-supplement
+, libsel4, libs, sysroot-rs
+, libc-supplement
 }:
 
 let
@@ -28,16 +28,11 @@ let
     {
       target.${rustTargetName}.rustflags = [
         "--sysroot=${sysroot-rs}"
+        "-l" "static=icecap_pure"
+        "-L" "${libs.icecap-pure}/lib"
         "-l" "static=c_supplement"
         "-L" "${libc-supplement}/lib"
       ];
-    }
-    {
-      target.${rustTargetName} = crateUtils.clobber (lib.forEach icecapCrates (crate:
-        lib.optionalAttrs (crate.buildScript != null) {
-          ${"dummy-link-${crate.name}"} = crate.buildScript;
-        }
-      ));
     }
   ]);
 
@@ -50,12 +45,16 @@ mkShell (crateUtils.baseEnv // {
   ];
 
   nativeBuildInputs = [
-    rustc cargo git cacert
+    rustc cargo git cacert rustfmt
     protobuf perl python3
   ];
 
   buildInputs = [
-    liboutline
+    libsel4
+    libs.icecap-autoconf
+    libs.icecap-runtime
+    libs.icecap-utils
+    libs.icecap-pure
     libc-supplement
   ];
 
