@@ -65,9 +65,9 @@ rm-nix-state:
 
 ### CI ###
 
-icecap_rev := e27e7bf9b4160a718cf59d5e2a97674a8456bdc1
+icecap_rev := $(shell GIT_DIR=../icecap/.git git rev-parse HEAD)
+icecap_rev_short := $(shell GIT_DIR=../icecap/.git git rev-parse --short=10 HEAD)
 
-icecap_rev_short := $(shell echo $(icecap_rev) | head -c 10)
 ci_image_tag_name := ci-$(icecap_rev_short)
 ci_image_tag := $(local_repository):$(ci_image_tag_name)
 ci_container_name := $(container_name_base)-ci
