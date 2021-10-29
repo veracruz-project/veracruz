@@ -7,10 +7,10 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-server/sgx","veracruz-utils/std", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx"]
-tz = ["veracruz-server/tz", "veracruz-utils/tz", "proxy-attestation-server/tz", "transport-protocol/tz", "psa-attestation/tz"]
-nitro = ["veracruz-server/nitro", "veracruz-utils/nitro", "proxy-attestation-server/nitro"]
-icecap = ["veracruz-server/icecap", "veracruz-utils/icecap", "proxy-attestation-server/icecap"]
+sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-server/sgx", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx", "policy-utils/std", "veracruz-utils/std"]
+tz = ["veracruz-server/tz", "proxy-attestation-server/tz", "transport-protocol/tz", "psa-attestation/tz", "policy-utils/std", "veracruz-utils/std"]
+nitro = ["veracruz-server/nitro", "proxy-attestation-server/nitro", "policy-utils/std", "veracruz-utils/nitro"]
+icecap = ["veracruz-server/icecap", "proxy-attestation-server/icecap", "policy-utils/icecap", "veracruz-utils/icecap"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
@@ -19,7 +19,8 @@ debug = ["veracruz-server/debug"]
 
 [dependencies]
 veracruz-server = { path = "../veracruz-server"}
-veracruz-utils = { path = "../veracruz-utils", features=["std"] }
+veracruz-utils = { path = "../veracruz-utils", optional = true }
+policy-utils = { path = "../policy-utils", optional = true }
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
 webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }

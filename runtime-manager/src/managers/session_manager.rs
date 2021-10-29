@@ -9,11 +9,11 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::managers::*;
-use ::session_manager::SessionContext;
-use std::{sync::atomic::Ordering, vec::Vec};
-use veracruz_utils::policy::policy::Policy;
+use crate::managers::{ProtocolState, RuntimeManagerError, MY_SESSION_MANAGER};
+use policy_utils::policy::Policy;
 use rustls::PrivateKey;
+use session_manager::SessionContext;
+use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::csr;
 
 pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
@@ -44,9 +44,11 @@ pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
         let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
         match &mut *session_manager_state {
             Some(state) => state.set_policy(policy)?,
-            None => return Err(RuntimeManagerError::UninitializedSessionError(
-                "session_manager_state",
-            )),
+            None => {
+                return Err(RuntimeManagerError::UninitializedSessionError(
+                    "session_manager_state",
+                ))
+            }
         }
     }
     return Ok(());
@@ -57,12 +59,12 @@ pub fn load_cert_chain(chain: &Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> 
     match &mut *sm_guard {
         Some(session_manager) => {
             session_manager.set_cert_chain(chain)?;
-        },
+        }
         None => {
             return Err(RuntimeManagerError::UninitializedSessionError(
                 "load_cert_chain",
             ))
-        },
+        }
     }
     return Ok(());
 }
@@ -155,17 +157,22 @@ fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
         Some(session_manager) => {
             return Ok(session_manager.private_key());
-        },
+        }
         None => {
-            return Err(RuntimeManagerError::UninitializedSessionError("get_enclave_private_key"));
-        },
+            return Err(RuntimeManagerError::UninitializedSessionError(
+                "get_enclave_private_key",
+            ));
+        }
     }
 }
 
 pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
     let private_key_vec = get_enclave_private_key()?.0;
-    let private_key = ring::signature::EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, &private_key_vec)
-        .map_err(|err| RuntimeManagerError::RingKeyRejected(err))?;
+    let private_key = ring::signature::EcdsaKeyPair::from_pkcs8(
+        &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+        &private_key_vec,
+    )
+    .map_err(|err| RuntimeManagerError::RingKeyRejected(err))?;
     let csr = csr::generate_csr(&csr::COMPUTE_ENCLAVE_CSR_TEMPLATE, &private_key)
         .map_err(|err| RuntimeManagerError::CertError(err))?;
     return Ok(csr);

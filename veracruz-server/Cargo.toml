@@ -11,18 +11,19 @@ path = "src/cli.rs"
 required-features = ["cli"]
 
 [features]
-sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "sgx-root-enclave-bind", "tempfile"]
-tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid"]
-nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2" ]
-icecap = ["veracruz-utils/icecap", "psa-attestation", "bincode", "serde/derive", "once_cell" ]
+sgx = ["veracruz-utils/std","sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "sgx-root-enclave-bind", "tempfile", "policy-utils/std"]
+tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid", "policy-utils/tz"]
+nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2", "policy-utils/std"]
+icecap = ["veracruz-utils/icecap", "psa-attestation", "bincode", "serde/derive", "once_cell", "policy-utils/icecap"]
 debug = []
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "actix-rt", "env_logger"]
+cli = ["structopt", "actix-rt", "env_logger", "policy-utils/std"]
 
 [dependencies]
 dirs = "1.0.2"
-veracruz-utils = { path = "../veracruz-utils" }
+veracruz-utils = { path = "../veracruz-utils", optional = true }
+policy-utils = { path = "../policy-utils", optional = true  }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 transport-protocol = { path = "../transport-protocol"}
 rouille = "=3.2.1"

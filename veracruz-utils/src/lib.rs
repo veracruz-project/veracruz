@@ -23,9 +23,6 @@ pub mod io;
 /// Platform-specific material, or material that is common to all
 /// platforms/backends that Veracruz supports and does not fit elsewhere.
 pub mod platform;
-/// Types and definitions relating to the Veracruz global policy file.
-pub mod policy;
-pub use crate::policy::*;
 
 #[cfg(feature = "nitro")]
 pub use crate::platform::nitro::*;

@@ -17,8 +17,16 @@ use std::{string::String, time::SystemTimeError};
 use x509_parser::error::PEMError;
 
 ////////////////////////////////////////////////////////////////////////////////
-// Error type.
+// Policy-related errors.
 ////////////////////////////////////////////////////////////////////////////////
+
+/// A generic catch-all error type for functionality related to platforms.
+#[derive(Debug, Error)]
+pub enum PlatformError {
+    #[cfg(feature = "std")]
+    #[error(display = "PlatformError: Enclave platform not supported: {:?}.", _0)]
+    InvalidPlatform(String),
+}
 
 /// A generic catch-all error type for functionality related to policies.  This
 /// error type contains more constructors when compiling for clients or hosts.

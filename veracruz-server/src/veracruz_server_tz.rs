@@ -19,16 +19,17 @@ pub mod veracruz_server_tz {
     use optee_teec::{
         Context, Operation, ParamNone, ParamTmpRef, ParamType, ParamValue, Session, Uuid,
     };
-    use std::{convert::TryInto, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
-    use veracruz_utils::{
-        platform::{
-            Platform,
-            tz::{
-                root_enclave_opcode::{TrustZoneRootEnclaveOpcode, TRUSTZONE_ROOT_ENCLAVE_UUID},
-                runtime_manager_opcode::{RuntimeManagerOpcode, RUNTIME_MANAGER_UUID}
-            },
+    use policy_utils::{policy::Policy, Platform};
+    use std::{
+        convert::TryInto,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Mutex,
         },
-        policy::policy::Policy
+    };
+    use veracruz_utils::platform::tz::{
+        root_enclave_opcode::{TrustZoneRootEnclaveOpcode, TRUSTZONE_ROOT_ENCLAVE_UUID},
+        runtime_manager_opcode::{RuntimeManagerOpcode, RUNTIME_MANAGER_UUID},
     };
 
     lazy_static! {
@@ -42,16 +43,20 @@ pub mod veracruz_server_tz {
 
     impl VeracruzServer for VeracruzServerTZ {
         fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
-            let policy: Policy =
-                Policy::from_json(policy_json)?;
+            let policy: Policy = Policy::from_json(policy_json)?;
 
             if !TRUSTZONE_ROOT_ENCLAVE_INITIALIZED.load(Ordering::SeqCst) {
-                let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
+                let trustzone_root_enclave_uuid =
+                    Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
 
                 let runtime_manager_hash = {
                     match policy.runtime_manager_hash(&Platform::TrustZone) {
                         Ok(hash) => hash,
-                        Err(_) => return Err(VeracruzServerError::MissingFieldError("runtime_manager_hash_tz")),
+                        Err(_) => {
+                            return Err(VeracruzServerError::MissingFieldError(
+                                "runtime_manager_hash_tz",
+                            ))
+                        }
                     }
                 };
 
@@ -78,8 +83,10 @@ pub mod veracruz_server_tz {
             }
 
             // Get a 'challenge' value from the root enclave for the compute enclave to use for attestation
-            let trustzone_root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
-            let (challenge, challenge_id) = VeracruzServerTZ::start_local_attestation(trustzone_root_enclave_uuid)?;
+            let trustzone_root_enclave_uuid =
+                Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
+            let (challenge, challenge_id) =
+                VeracruzServerTZ::start_local_attestation(trustzone_root_enclave_uuid)?;
 
             let mut csr: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
             {
@@ -102,11 +109,11 @@ pub mod veracruz_server_tz {
                 }
             }
             let mut cert_chain_buffer: Vec<u8> = Vec::with_capacity(3 * 2048); //TODO: Don't do this
-            // cert lengths should be [u32] with 3 elements. But optee-utee doesn't
-            // support a way to pass this in as a parameter. We aren't using these
-            // values here, only passing them between OPTEE enclaves. So we're
-            // going to leave it as [u8] and let the enclaves handle it
-            let mut cert_lengths: Vec<u8> = Vec::with_capacity(3 * 4);// TODO: Unmagic these numbers
+                                                                               // cert lengths should be [u32] with 3 elements. But optee-utee doesn't
+                                                                               // support a way to pass this in as a parameter. We aren't using these
+                                                                               // values here, only passing them between OPTEE enclaves. So we're
+                                                                               // going to leave it as [u8] and let the enclaves handle it
+            let mut cert_lengths: Vec<u8> = Vec::with_capacity(3 * 4); // TODO: Unmagic these numbers
             {
                 // call ProxyAttestation in the root enclave
                 let root_enclave_uuid = Uuid::parse_str(&TRUSTZONE_ROOT_ENCLAVE_UUID.to_string())?;
@@ -147,7 +154,10 @@ pub mod veracruz_server_tz {
                     .as_mut()
                     .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
                 let mut session = context.open_session(runtime_manager_uuid)?;
-                session.invoke_command(RuntimeManagerOpcode::PopulateCertificates as u32, &mut operation)?;
+                session.invoke_command(
+                    RuntimeManagerOpcode::PopulateCertificates as u32,
+                    &mut operation,
+                )?;
             }
 
             Ok(Self {
@@ -251,7 +261,10 @@ pub mod veracruz_server_tz {
                     let mut session = context.open_session(runtime_manager_uuid)?;
                     let mut null_operation =
                         Operation::new(0, ParamNone, ParamNone, ParamNone, ParamNone);
-                    session.invoke_command(RuntimeManagerOpcode::ResetEnclave as u32, &mut null_operation)?;
+                    session.invoke_command(
+                        RuntimeManagerOpcode::ResetEnclave as u32,
+                        &mut null_operation,
+                    )?;
                 }
             }
 
@@ -263,7 +276,10 @@ pub mod veracruz_server_tz {
         fn drop(&mut self) {
             match self.close() {
                 // We can only panic here since drop function cannot return.
-                Err(err) => panic!("VeracruzServerTZ::drop failed in call to self.close:{:?}", err),
+                Err(err) => panic!(
+                    "VeracruzServerTZ::drop failed in call to self.close:{:?}",
+                    err
+                ),
                 _ => (),
             }
         }
@@ -277,7 +293,10 @@ pub mod veracruz_server_tz {
         ) -> Result<bool, VeracruzServerError> {
             let p0 = ParamValue::new(session_id, 0, ParamType::ValueInout);
             let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-            session.invoke_command(RuntimeManagerOpcode::GetTLSDataNeeded as u32, &mut operation)?;
+            session.invoke_command(
+                RuntimeManagerOpcode::GetTLSDataNeeded as u32,
+                &mut operation,
+            )?;
             Ok(operation.parameters().0.b() == 1)
         }
 
@@ -290,19 +309,26 @@ pub mod veracruz_server_tz {
             let context = context_opt
                 .as_mut()
                 .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            let mut trustzone_root_enclave_session = context.open_session(trustzone_root_enclave_uuid)?;
+            let mut trustzone_root_enclave_session =
+                context.open_session(trustzone_root_enclave_uuid)?;
 
-            let firmware_version = VeracruzServerTZ::fetch_firmware_version(&mut trustzone_root_enclave_session)?;
+            let firmware_version =
+                VeracruzServerTZ::fetch_firmware_version(&mut trustzone_root_enclave_session)?;
 
             {
                 let runtime_manager_hash_vec = hex::decode(runtime_manager_hash.as_str())?;
                 let p0 = ParamTmpRef::new_input(&runtime_manager_hash_vec);
                 let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                trustzone_root_enclave_session
-                    .invoke_command(TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack as u32, &mut operation)?;
+                trustzone_root_enclave_session.invoke_command(
+                    TrustZoneRootEnclaveOpcode::SetRuntimeManagerHashHack as u32,
+                    &mut operation,
+                )?;
             }
-            let (challenge, device_id) =
-                VeracruzServerTZ::send_start(proxy_attestation_server_url, "psa", &firmware_version)?;
+            let (challenge, device_id) = VeracruzServerTZ::send_start(
+                proxy_attestation_server_url,
+                "psa",
+                &firmware_version,
+            )?;
 
             let p0 = ParamValue::new(device_id.try_into()?, 0, ParamType::ValueInout);
             let p1 = ParamTmpRef::new_input(&challenge);
@@ -311,14 +337,22 @@ pub mod veracruz_server_tz {
             let mut csr: Vec<u8> = Vec::with_capacity(2048); // TODO: Don't do this
             let p3 = ParamTmpRef::new_output(&mut csr);
             let mut na_operation = Operation::new(0, p0, p1, p2, p3);
-            trustzone_root_enclave_session
-                .invoke_command(TrustZoneRootEnclaveOpcode::NativeAttestation as u32, &mut na_operation)?;
+            trustzone_root_enclave_session.invoke_command(
+                TrustZoneRootEnclaveOpcode::NativeAttestation as u32,
+                &mut na_operation,
+            )?;
             let token_size = na_operation.parameters().0.a();
             let csr_size = na_operation.parameters().0.b();
             unsafe { token.set_len(token_size as usize) };
             unsafe { csr.set_len(csr_size as usize) };
 
-            let (root_enclave_certificate, root_certificate) = VeracruzServerTZ::post_native_psa_attestation_token(proxy_attestation_server_url, &token, &csr, device_id)?;
+            let (root_enclave_certificate, root_certificate) =
+                VeracruzServerTZ::post_native_psa_attestation_token(
+                    proxy_attestation_server_url,
+                    &token,
+                    &csr,
+                    device_id,
+                )?;
 
             let p0 = ParamTmpRef::new_input(&root_certificate);
             let p1 = ParamTmpRef::new_input(&root_enclave_certificate);
@@ -334,19 +368,24 @@ pub mod veracruz_server_tz {
             return Ok(());
         }
 
-        fn start_local_attestation(trustzone_root_enclave_uuid: Uuid) -> Result<(Vec<u8>, u32), VeracruzServerError> {
+        fn start_local_attestation(
+            trustzone_root_enclave_uuid: Uuid,
+        ) -> Result<(Vec<u8>, u32), VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
                 .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            let mut trustzone_root_enclave_session = context.open_session(trustzone_root_enclave_uuid)?;
+            let mut trustzone_root_enclave_session =
+                context.open_session(trustzone_root_enclave_uuid)?;
 
             let mut challenge = vec![0; 16];
             let p0 = ParamTmpRef::new_output(&mut challenge);
             let p1 = ParamValue::new(0, 0, ParamType::ValueOutput);
             let mut sla_operation = Operation::new(0, p0, p1, ParamNone, ParamNone);
-            trustzone_root_enclave_session
-                .invoke_command(TrustZoneRootEnclaveOpcode::StartLocalAttestation as u32, &mut sla_operation)?;
+            trustzone_root_enclave_session.invoke_command(
+                TrustZoneRootEnclaveOpcode::StartLocalAttestation as u32,
+                &mut sla_operation,
+            )?;
             let challenge_id: u32 = sla_operation.parameters().1.a();
             return Ok((challenge, challenge_id));
         }
@@ -368,9 +407,9 @@ pub mod veracruz_server_tz {
                 "veracruz_server_tz::post_psa_attestation_token received buffer:{:?}",
                 response
             );
-            let body_vec =
-                base64::decode(&response)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(&body_vec).map_err(|err| VeracruzServerError::TransportProtocolError(err))?;
+            let body_vec = base64::decode(&response)?;
+            let pasr = transport_protocol::parse_proxy_attestation_server_response(&body_vec)
+                .map_err(|err| VeracruzServerError::TransportProtocolError(err))?;
             let cert_chain = pasr.get_cert_chain();
             let root_certificate = cert_chain.get_root_cert();
             let root_enclave_certificate = cert_chain.get_enclave_cert();
@@ -383,16 +422,20 @@ pub mod veracruz_server_tz {
             let firmware_version_len = {
                 let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
                 let mut gfvl_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                session
-                    .invoke_command(TrustZoneRootEnclaveOpcode::GetFirmwareVersionLen as u32, &mut gfvl_op)?;
+                session.invoke_command(
+                    TrustZoneRootEnclaveOpcode::GetFirmwareVersionLen as u32,
+                    &mut gfvl_op,
+                )?;
                 gfvl_op.parameters().0.a()
             };
             let firmware_version: String = {
                 let mut fwv_vec = vec![0; firmware_version_len as usize];
                 let p0 = ParamTmpRef::new_output(&mut fwv_vec);
                 let mut gfv_op = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
-                session
-                    .invoke_command(TrustZoneRootEnclaveOpcode::GetFirmwareVersion as u32, &mut gfv_op)?;
+                session.invoke_command(
+                    TrustZoneRootEnclaveOpcode::GetFirmwareVersion as u32,
+                    &mut gfv_op,
+                )?;
                 String::from_utf8(fwv_vec)?
             };
             return Ok(firmware_version);
@@ -403,7 +446,8 @@ pub mod veracruz_server_tz {
             protocol: &str,
             firmware_version: &str,
         ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
-            let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
+            let proxy_attestation_server_response =
+                crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_psa_attestation_init() {
                 let (challenge, device_id) = transport_protocol::parse_psa_attestation_init(
                     proxy_attestation_server_response.get_psa_attestation_init(),

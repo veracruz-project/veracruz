@@ -32,13 +32,11 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::{
-    platform::Platform,
-    policy::{
-        error::PolicyError,
-        expiry::Timepoint,
-        principal::{ExecutionStrategy, Identity, Principal, Program, RightsTable, StandardStream},
-    },
+use super::Platform;
+use super::{
+    error::PolicyError,
+    expiry::Timepoint,
+    principal::{ExecutionStrategy, Identity, Principal, Program, RightsTable, StandardStream},
 };
 use ring;
 use serde::{Deserialize, Serialize};

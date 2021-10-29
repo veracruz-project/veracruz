@@ -18,9 +18,9 @@ use crate::{
     Options,
 };
 use num::FromPrimitive;
+use policy_utils::principal::Principal;
 use std::sync::{Arc, Mutex};
 use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
-use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef, HostError,

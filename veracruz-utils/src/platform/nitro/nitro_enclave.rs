@@ -63,11 +63,7 @@ const VERACRUZ_PORT: u32 = 5005;
 
 impl NitroEnclave {
     /// create a new Nitro enclave, started with the file in eif_path
-    pub fn new(
-        nitro_sbin: bool,
-        eif_path: &str,
-        debug: bool,
-    ) -> Result<Self, NitroError> {
+    pub fn new(nitro_sbin: bool, eif_path: &str, debug: bool) -> Result<Self, NitroError> {
         let mut args = vec![
             "run-enclave",
             "--eif-path",

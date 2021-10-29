@@ -9,18 +9,18 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#[cfg(feature = "icecap")]
+use crate::veracruz_server_icecap::IceCapError;
 use actix_http::ResponseBuilder;
 use actix_web::{error, http::StatusCode, HttpResponse};
+#[cfg(feature = "nitro")]
+use base64;
 use curl::easy::{Easy, List};
 use err_derive::Error;
 use log::debug;
 use std::io::Read;
 #[cfg(feature = "nitro")]
 use veracruz_utils::nitro_enclave::NitroError;
-#[cfg(feature = "nitro")]
-use base64;
-#[cfg(feature = "icecap")]
-use crate::veracruz_server_icecap::IceCapError;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -87,7 +87,10 @@ pub enum VeracruzServerError {
     #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
     NitroStatus(veracruz_utils::platform::nitro::nitro::NitroStatus),
     #[cfg(feature = "nitro")]
-    #[error(display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}", _0)]
+    #[error(
+        display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}",
+        _0
+    )]
     InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
@@ -140,7 +143,7 @@ pub enum VeracruzServerError {
     #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "VeracruzServer: PolicyError: {:?}.", _0)]
-    VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
+    VeracruzUtilError(#[error(source)] policy_utils::error::PolicyError),
     #[error(display = "VeracruzServer: Pinecone Error: {:?}.", _0)]
     PineconeError(#[error(source)] pinecone::Error),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]
@@ -305,14 +308,16 @@ pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerE
     };
     println!(
         "veracruz_server::post_buffer received header (from url:{:?}):{:?}",
-        url,
-        received_header
+        url, received_header
     );
     if !received_header.contains("HTTP/1.1 200 OK\r") {
         return Err(VeracruzServerError::ReceivedNonSuccessPostStatusError);
     }
 
-    debug!("veracruz_server::post_buffer header_lines:{:?}", header_lines);
+    debug!(
+        "veracruz_server::post_buffer header_lines:{:?}",
+        header_lines
+    );
 
     return Ok(received_body);
 }

@@ -18,9 +18,9 @@ use crate::{
     Options,
 };
 use lazy_static::lazy_static;
+use policy_utils::principal::Principal;
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, convert::TryFrom, vec::Vec};
-use veracruz_utils::policy::principal::Principal;
 use wasi_types::ErrNo;
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};
 

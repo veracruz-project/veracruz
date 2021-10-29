@@ -28,7 +28,10 @@ pub enum VeracruzClientError {
     IOError(#[error(source)] std::io::Error),
     #[error(display = "VeracruzClient: TLSError: {:?}.", _0)]
     TLSError(#[error(source)] rustls::TLSError),
-    #[error(display = "VeracruzClient: TLSError: unsupported cyphersuite {:?}.", _0)]
+    #[error(
+        display = "VeracruzClient: TLSError: unsupported cyphersuite {:?}.",
+        _0
+    )]
     TLSUnsupportedCyphersuiteError(rustls::CipherSuite),
     #[error(display = "VeracruzClient: TLSError: unspecified.")]
     TLSUnspecifiedError,
@@ -53,7 +56,7 @@ pub enum VeracruzClientError {
     #[error(display = "VeracruzClient: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "VeracruzClient: PolicyError: {:?}.", _0)]
-    VeracruzUtilError(#[error(source)] veracruz_utils::policy::error::PolicyError),
+    VeracruzUtilError(#[error(source)] policy_utils::error::PolicyError),
     #[error(display = "VeracruzClient: Certificate expired: {:?}.", _0)]
     CertificateExpireError(String),
     #[error(
@@ -87,7 +90,9 @@ pub enum VeracruzClientError {
     InvalidClientCertificateError(String),
     #[error(display = "VeracruzClient: No Peer certificates received")]
     NoPeerCertificatesError,
-    #[error(display = "VeracruzClient: Runtime enclave hash extension is not present in the peer certificate")]
+    #[error(
+        display = "VeracruzClient: Runtime enclave hash extension is not present in the peer certificate"
+    )]
     RuntimeHashExtensionMissingError,
     #[error(display = "VeracruzClient: Direct message: {}.", _0)]
     DirectMessage(String),

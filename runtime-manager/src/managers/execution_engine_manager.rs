@@ -12,12 +12,12 @@
 
 use super::{ProtocolState, ProvisioningResult, RuntimeManagerError, OUTPUT_FILE};
 use lazy_static::lazy_static;
+use policy_utils::principal::Principal;
 use std::sync::Mutex;
 use std::{collections::HashMap, result::Result, vec::Vec};
 use transport_protocol::transport_protocol::{
     RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
 };
-use veracruz_utils::policy::principal::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The buffer of incoming data.
@@ -177,9 +177,9 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         MESSAGE::request_result(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
         }
-        MESSAGE::request_state(_) => {
-            Ok(Some(transport_protocol::serialize_machine_state(u8::from(0))?))
-        },
+        MESSAGE::request_state(_) => Ok(Some(transport_protocol::serialize_machine_state(
+            u8::from(0),
+        )?)),
         MESSAGE::request_shutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
             if is_dead {

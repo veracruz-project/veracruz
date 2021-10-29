@@ -13,6 +13,7 @@ use execution_engine::{execute, fs::FileSystem, Options};
 use lazy_static::lazy_static;
 #[cfg(feature = "tz")]
 use optee_utee::trace_println;
+use policy_utils::{policy::Policy, principal::Principal};
 #[cfg(feature = "sgx")]
 use sgx_types::sgx_status_t;
 #[cfg(feature = "sgx")]
@@ -27,7 +28,6 @@ use std::{
     },
     vec::Vec,
 };
-use veracruz_utils::policy::{policy::Policy, principal::Principal};
 use wasi_types::ErrNo;
 
 pub mod error;

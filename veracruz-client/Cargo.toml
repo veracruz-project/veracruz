@@ -32,6 +32,7 @@ base64 = "0.10.1"
 rand = "0.7.0"
 x509-parser="0.6.0"
 curl = "=0.4.35"
+policy-utils = { path = "../policy-utils", features = ["std"] }
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 hex = "=0.4.2"
 http = "=0.2.4"
