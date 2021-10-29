@@ -7,15 +7,9 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-ICECAP_LOCAL ?= 0
-
 nix_root := hacking/nix-root
 veracruz_root := ../..
 icecap_root := ../../../icecap
-
-ifeq ($(ICECAP_LOCAL), 1)
-       icecap_mount := --mount type=bind,src=$(abspath $(icecap_root)),dst=/work/icecap
-endif
 
 label := veracruz-icecap
 local_repository := veracruz-icecap
@@ -49,7 +43,6 @@ run: build $(nix_root)/.installed
 	docker run --privileged -d --name $(hacking_container_name) --label $(label) \
 		--mount type=bind,src=$(abspath $(nix_root)),dst=/nix \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
-		$(icecap_mount) \
 		$(hacking_image_tag) sleep inf
 
 .PHONY: exec
@@ -90,7 +83,6 @@ ci-build:
 ci-run:
 	docker run -d --name $(ci_container_name) --label $(label) \
 		--mount type=bind,src=$(abspath $(veracruz_root)),dst=/work/veracruz \
-		$(icecap_mount) \
 		$(ci_image_tag) sleep inf
 
 .PHONY: ci-exec
