@@ -7,17 +7,17 @@ description = "Veracruz integration test.  This is a full system test that shoul
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-sgx = ["veracruz-client/sgx","veracruz-server/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "policy-utils/sgx"]
-tz = ["veracruz-client/tz","veracruz-server/tz", "proxy-attestation-server/tz", "transport-protocol/tz", "policy-utils/tz"]
-nitro = ["veracruz-client/nitro", "veracruz-server/nitro", "proxy-attestation-server/nitro", "policy-utils/std"]
-icecap = ["veracruz-client/icecap", "veracruz-server/icecap", "proxy-attestation-server/icecap", "transport-protocol/icecap", "policy-utils/icecap"]
+sgx = ["veracruz-client/sgx","veracruz-server/sgx", "sgx_types", "sgx_ucrypto", "sgx_alloc", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation"]
+tz = ["veracruz-client/tz","veracruz-server/tz", "proxy-attestation-server/tz", "transport-protocol/tz"]
+nitro = ["veracruz-client/nitro", "veracruz-server/nitro", "proxy-attestation-server/nitro"]
+icecap = ["veracruz-client/icecap", "veracruz-server/icecap", "proxy-attestation-server/icecap", "transport-protocol/icecap"]
 
 [dependencies]
 veracruz-client = {path = "../veracruz-client"}
 veracruz-server = { path = "../veracruz-server"}
-policy-utils = { path = "../policy-utils" }
-serde = { version = "1.0.97", features = ["derive"] }
-proxy-attestation-server = { path = "../proxy-attestation-server"}
+policy-utils = { path = "../policy-utils", features = ["std"]}
+serde = { version = "1.0.97", features = ["derive"], default-features = false }
+proxy-attestation-server = { path = "../proxy-attestation-server", optional = true}
 transport-protocol = { path = "../transport-protocol"}
 http = "=0.2.4"
 actix-rt = "1.1.1"
