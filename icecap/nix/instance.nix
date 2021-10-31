@@ -14,10 +14,7 @@ let
   inherit (pkgs.dev) runCommand writeScript nukeReferences;
   inherit (pkgs.none.icecap) icecapSrc crateUtils elfUtils platUtils;
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
-
-  inherit (configured)
-    icecapFirmware icecapPlat selectIceCapPlatOr
-    mkIceDL mkDynDLSpec;
+  inherit (configured) icecapFirmware icecapPlat selectIceCapPlatOr mkRealm;
 
   runtimeManagerElf = ../build/runtime-manager/out/runtime_manager_enclave.elf;
 
@@ -85,13 +82,8 @@ in lib.fix (self: with self; {
     ];
   };
 
-  spec = mkDynDLSpec {
-    cdl = "${ddl}/icecap.cdl";
-    root = "${ddl}/links";
-  };
-
-  ddl = mkIceDL {
-    src = ./realm/ddl;
+  spec = mkRealm {
+    script = ../src/python/realm.py;
     config = {
       realm_id = 0;
       num_cores = 1;

@@ -13,6 +13,7 @@
 , protobuf, perl, python3
 , libsel4, libs, sysroot-rs
 , libc-supplement
+, icecapPlat
 }:
 
 let
@@ -27,6 +28,7 @@ let
     crateUtils.baseCargoConfig
     {
       target.${rustTargetName}.rustflags = [
+        "--cfg=icecap_plat=\"${icecapPlat}\""
         "--sysroot=${sysroot-rs}"
         "-l" "static=icecap_pure"
         "-L" "${libs.icecap-pure}/lib"
@@ -61,9 +63,17 @@ mkShell (crateUtils.baseEnv // {
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
 
+  # BINDGEN_EXTRA_CLANG_ARGS = [
+  #   "-I${libsel4}/include"
+  #   "-I${libs.icecap-autoconf}/include"
+  # ];
+
+  # HACK
+  "CC_${lib.replaceStrings [ "-" ] [ "_" ] rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
+
   shellHook = ''
     # NOTE
-    # If this ever ceases to suffice, see $BINDGEN_EXTRA_CLANG_ARGS for the host binaries. 
+    # If this ever ceases to suffice, see $BINDGEN_EXTRA_CLANG_ARGS for the host binaries.
     export BINDGEN_EXTRA_CLANG_ARGS="$NIX_CFLAGS_COMPILE"
 
     build_dir=build/${name}

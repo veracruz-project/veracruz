@@ -14,7 +14,6 @@ from icedl.common import GenericElfComponent
 from icedl.realm import BaseRealmComposition
 from icedl.utils import PAGE_SIZE_BITS, BLOCK_SIZE
 
-
 class RuntimeManager(GenericElfComponent):
 
     def __init__(self, *args, **kwargs):
@@ -49,11 +48,9 @@ class RuntimeManager(GenericElfComponent):
     def arg_json(self):
         return self._arg
 
-
 class Composition(BaseRealmComposition):
 
     def compose(self):
         self.component(RuntimeManager, 'runtime_manager')
 
-
-Composition.run()
+Composition.from_env().run()

@@ -78,7 +78,7 @@ test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-ser
 set-key-permissions:
 	chmod 0400 nix/host/token-ssh-key.priv
 
-run_tests_body = script $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && eval $$script
+run_tests_body = script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && eval $$script
 
 .PHONY: run-tests
 run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-collateral

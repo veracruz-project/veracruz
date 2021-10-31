@@ -14,7 +14,7 @@ authors = ["The Veracruz Development Team"]
 edition = "2018"
 
 [dependencies]
-icecap-core = { path = "../../../icecap/src/rust/icecap/icecap-core" }
-icecap-start-generic = { path = "../../../icecap/src/rust/icecap/icecap-start/generic" }
-icecap-std-external = { path = "../../../icecap/src/rust/std-support/icecap-std-external" }
-icecap-event-server-types = { path = "../../../icecap/src/rust/components/event-server/types" }
+icecap-core = { path = "../../../icecap/src/rust/crates/icecap/icecap-core" }
+icecap-start-generic = { path = "../../../icecap/src/rust/crates/icecap/icecap-start/generic" }
+icecap-std-external = { path = "../../../icecap/src/rust/crates/std-support/icecap-std-external" }
+icecap-event-server-types = { path = "../../../icecap/src/rust/crates/components/event-server/types" }
