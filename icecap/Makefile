@@ -103,5 +103,7 @@ clean:
 .PHONY: deep-clean
 deep-clean: clean
 	cd .. && git clean -Xdff \
+		--exclude='!icecap/icecap/nixpkgs/' \
+		--exclude='!icecap/icecap/nixpkgs/**' \
 		--exclude='!icecap/docker/hacking/nix-root/' \
 		--exclude='!icecap/docker/hacking/nix-root/**'
