@@ -19,9 +19,9 @@ std = [
 err-derive = { version = "0.2", default-features = false }
 hex = { version = "0.4.2" }
 lexical-core = { version = "0.8.2", default-features = false }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", optional = true }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz", optional = true }
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", default-features = false }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+ring = "0.16.11"
+rustls = { version = "0.16", optional = true }
+serde = { version = "1.0.115", features=["derive"] }
+serde_json = { version = "1.0", default-features = false }
+wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
 x509-parser = { version = "0.12.0", optional = true }
