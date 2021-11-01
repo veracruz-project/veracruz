@@ -26,10 +26,9 @@
 use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
-use policy_utils::principal::{ExecutionStrategy, FileRights, Principal, StandardStream};
+use policy_utils::principal::{ExecutionStrategy, Principal};
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     error::Error,
     fs::{create_dir_all, File},
     io::{Read, Write},
@@ -242,7 +241,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     } else {
         DEFAULT_DUMP_STDOUT
     };
-
     let dump_stderr = if matches.is_present("dump-stderr") {
         true
     } else {
@@ -332,36 +330,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
-    let std_streams_table = vec![
-        StandardStream::Stdin(FileRights::new(
-            String::from("stdin"),
-            u64::from(read_right) as u32,
-        )),
-        StandardStream::Stdout(FileRights::new(
-            String::from("stdout"),
-            u64::from(write_right) as u32,
-        )),
-        StandardStream::Stderr(FileRights::new(
-            String::from("stderr"),
-            u64::from(write_right) as u32,
-        )),
-    ];
-
+    file_table.insert(PathBuf::from("stdin"), read_right);
+    file_table.insert(PathBuf::from("stdout"), write_right);
+    file_table.insert(PathBuf::from("stderr"), write_right);
+    // Add read permission to input path
     for file_path in cmdline.input_sources.iter() {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), read_right);
     }
-    for std_stream in &std_streams_table {
-        let (path, rights) = match std_stream {
-            StandardStream::Stdin(file_rights) => (file_rights.file_name(), file_rights.rights()),
-            StandardStream::Stdout(file_rights) => (file_rights.file_name(), file_rights.rights()),
-            StandardStream::Stderr(file_rights) => (file_rights.file_name(), file_rights.rights()),
-        };
-        let rights = Rights::try_from(*rights as u64)
-            .map_err(|e| format!("Failed to convert u64 to Rights: {:?}", e))?;
-        file_table.insert(PathBuf::from(path), rights);
-    }
-    // Add write permission to output file
+    // Add write permission to output path
     for file_path in cmdline.output_sources.iter() {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), write_right);
@@ -401,8 +378,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Dump contents of stdout
     if cmdline.dump_stdout {
         let buf = vfs.read_stdout()?;
-        let stdout_dump = std::str::from_utf8(&buf)
-            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        let stdout_dump = std::str::from_utf8(&buf)?;
         print!(
             "---- stdout dump ----\n{}---- stdout dump end ----\n",
             stdout_dump
@@ -412,8 +388,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Dump contents of stderr
     if cmdline.dump_stderr {
         let buf = vfs.read_stderr()?;
-        let stderr_dump = std::str::from_utf8(&buf)
-            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
+        let stderr_dump = std::str::from_utf8(&buf)?;
         eprint!(
             "---- stderr dump ----\n{}---- stderr dump end ----\n",
             stderr_dump

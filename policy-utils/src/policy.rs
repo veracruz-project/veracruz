@@ -36,7 +36,7 @@ use super::Platform;
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, Identity, Principal, Program, RightsTable, StandardStream},
+    principal::{ExecutionStrategy, Identity, Principal, Program, RightsTable, FileHash},
 };
 use ring;
 use serde::{Deserialize, Serialize};
@@ -64,6 +64,8 @@ pub struct Policy {
     identities: Vec<Identity<String>>,
     /// The candidate programs that can be loaded in the execution engine.
     programs: Vec<Program>,
+    /// The list of files, e.g. binaries and configurations, that must match given hashes. 
+    file_hashes: Vec<FileHash>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -94,8 +96,8 @@ pub struct Policy {
     debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
-    /// The rights table of the standard streams (`stdin`, `stdout`, `stderr`).
-    std_streams_table: Vec<StandardStream>,
+    ///// The rights table of the standard streams (`stdin`, `stdout`, `stderr`).
+    //std_streams_table: Vec<StandardStream>,
     /// The clock flag.  This dictates whether the WASM program will be able to
     /// call clock functions to e.g. get a clock's time or resolution.
     enable_clock: bool,
@@ -124,7 +126,7 @@ impl Policy {
         proxy_service_cert: String,
         debug: bool,
         execution_strategy: ExecutionStrategy,
-        std_streams_table: Vec<StandardStream>,
+        file_hashes: Vec<FileHash>,
         enable_clock: bool,
     ) -> Result<Self, PolicyError> {
         let policy = Self {
@@ -142,10 +144,10 @@ impl Policy {
             proxy_attestation_server_url,
             debug,
             execution_strategy,
-            std_streams_table,
+            //std_streams_table,
             enable_clock,
-
             policy_hash: None,
+            file_hashes,
         };
 
         policy.assert_valid()?;
@@ -274,11 +276,11 @@ impl Policy {
         &self.execution_strategy
     }
 
-    /// Return the rights of the standard streams, associated with this policy.
-    #[inline]
-    pub fn std_streams_table(&self) -> &Vec<StandardStream> {
-        &self.std_streams_table
-    }
+    ///// Return the rights of the standard streams, associated with this policy.
+    //#[inline]
+    //pub fn std_streams_table(&self) -> &Vec<StandardStream> {
+        //&self.std_streams_table
+    //}
 
     /// Returns the clock flag associated with this policy.
     #[inline]
@@ -374,18 +376,25 @@ impl Policy {
         table
     }
 
-    /// Return the program digest table, mapping program filenames to their expected digests.
-    pub fn get_digest_table(&self) -> Result<HashMap<String, Vec<u8>>, PolicyError> {
+    /// Return the file hash table, mapping filenames to their expected hashes.
+    pub fn get_file_hash_table(&self) -> Result<HashMap<PathBuf, Vec<u8>>, PolicyError> {
         let mut table = HashMap::new();
-        for program in &self.programs {
-            let program_file_name = program.program_file_name();
-            let pi_hash = program.pi_hash();
+
+        for file_hash in self.file_hashes.iter() {
             table.insert(
-                program_file_name.to_string(),
-                hex::decode(pi_hash)
-                    .map_err(|_e| PolicyError::HexDecodeError(program_file_name.to_string()))?,
+                PathBuf::from(file_hash.file_path()), 
+                hex::decode(file_hash.hash())?,
             );
         }
+        //for program in &self.programs {
+            //let program_file_name = program.program_file_name();
+            //let pi_hash = program.pi_hash();
+            //table.insert(
+                //program_file_name.to_string(),
+                //hex::decode(pi_hash)
+                    //.map_err(|_e| PolicyError::HexDecodeError(program_file_name.to_string()))?,
+            //);
+        //}
         Ok(table)
     }
 

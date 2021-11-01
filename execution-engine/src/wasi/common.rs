@@ -22,7 +22,7 @@ use crate::Options;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
-use platform_services::{getclockres, getclocktime, result};
+use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
@@ -1135,8 +1135,12 @@ impl WasiWrapper {
         buf_ptr: u32,
         length: u32,
     ) -> FileSystemResult<()> {
-        let bytes = self.filesystem.random_get(length)?;
-        memory_ref.write_buffer(buf_ptr, &bytes)
+        let mut bytes = vec![0; length as usize];
+        if getrandom(&mut bytes).is_success() {
+            memory_ref.write_buffer(buf_ptr, &bytes)
+        } else {
+            Err(ErrNo::NoSys)
+        }
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to

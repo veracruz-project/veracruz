@@ -51,7 +51,7 @@ pub enum PolicyError {
     #[error(display = "PolicyError: unauthorized client certificate: {}.", _0)]
     InvalidClientCertificateError(String),
     #[error(display = "PolicyError: HexDecodeError: {:?}.", _0)]
-    HexDecodeError(String),
+    HexDecodeError(hex::FromHexError),
     #[error(display = "PolicyError: Enclave expired.")]
     EnclaveExpireError,
     #[error(display = "PolicyError: Certificate expired: {:?}.", _0)]
@@ -82,5 +82,12 @@ impl From<x509_parser::error::PEMError> for PolicyError {
     #[inline]
     fn from(error: PEMError) -> Self {
         PolicyError::X509ParserPEMError(error)
+    }
+}
+
+impl From<hex::FromHexError> for PolicyError {
+    #[inline]
+    fn from(error: hex::FromHexError) -> Self {
+        PolicyError::HexDecodeError(error)
     }
 }

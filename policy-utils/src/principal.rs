@@ -89,9 +89,6 @@ pub struct Program {
     program_file_name: String,
     /// The program ID
     id: u32,
-    /// The hash of the program which will be provisioned into Veracruz by the
-    /// program provider.
-    pi_hash: String,
     /// The file permission that specifies the program's ability to read, write and execute files.
     file_rights: Vec<FileRights>,
 }
@@ -102,7 +99,6 @@ impl Program {
     pub fn new<T>(
         program_file_name: String,
         id: T,
-        pi_hash: String,
         file_rights: Vec<FileRights>,
     ) -> Self
     where
@@ -111,7 +107,6 @@ impl Program {
         Self {
             program_file_name,
             id: id.into(),
-            pi_hash,
             file_rights,
         }
     }
@@ -126,12 +121,6 @@ impl Program {
     #[inline]
     pub fn id(&self) -> u32 {
         self.id
-    }
-
-    /// Return the program hash.
-    #[inline]
-    pub fn pi_hash(&self) -> &str {
-        self.pi_hash.as_str()
     }
 
     /// Return file rights map associated to the program.
@@ -253,19 +242,28 @@ impl Identity<String> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Standard streams.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Standard streams (`stdin`, `stdout`, `stderr`) are mapped to the VFS just like any other file, though
-/// associated with specific file descriptors and inodes.
-/// Their path (filename) and access rights are configured in the JSON policy file.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum StandardStream {
-    /// Standard input stream with its rights
-    Stdin(FileRights),
-    /// Standard output stream with its rights
-    Stdout(FileRights),
-    /// Standard error stream with its rights
-    Stderr(FileRights),
+pub struct FileHash {
+    file_path: String,
+    hash: String,
+}
+
+impl FileHash {
+    /// Creates a new file permission.
+    #[inline]
+    pub fn new(file_path: String, hash: String) -> Self {
+        Self { file_path, hash }
+    }
+
+    /// Returns the file_name.
+    #[inline]
+    pub fn file_path(&self) -> &str {
+        self.file_path.as_str()
+    }
+
+    /// Returns the rights.
+    #[inline]
+    pub fn hash(&self) -> &str {
+        &self.hash.as_str()
+    }
 }

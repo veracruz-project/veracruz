@@ -14,8 +14,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use policy_utils::principal::{FileRights, Principal, RightsTable, StandardStream};
-use platform_services::getrandom;
+use policy_utils::principal::{Principal, RightsTable, FileRights};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryFrom},
@@ -47,21 +46,6 @@ pub type FileSystemResult<T> = Result<T, ErrNo>;
 
 /// Internal shared inode table.
 type SharedInodeTable = Arc<Mutex<InodeTable>>;
-
-////////////////////////////////////////////////////////////////////////////////
-// Global functions.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Get random bytes
-fn getrandom_to_buffer(buf_len: Size) -> FileSystemResult<Vec<u8>> {
-    let mut buf = vec![0; try_from_or_errno(buf_len)?];
-    if getrandom(&mut buf).is_success() {
-        Ok(buf)
-    } else {
-        Err(ErrNo::Inval)
-    }
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // INodes.
@@ -713,7 +697,7 @@ impl FileSystem {
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
     fn install_standard_streams_fd(
         &mut self,
-        std_streams_table: &Vec<StandardStream>,
+        std_streams_table: &Vec<FileRights>,
     ) -> FileSystemResult<()> {
         for std_stream in std_streams_table {
             // Map each standard stream to an fd and inode.
@@ -721,18 +705,13 @@ impl FileSystem {
             // at that point.
             // Base rights are ignored and replaced with the default rights
 
-            let (rights, fd_number, inode_number) = match std_stream {
-                StandardStream::Stdin(file_rights) => {
-                    (file_rights.rights(), Fd(0), self.lock_inode_table()?.stdin())
-                }
-                StandardStream::Stdout(file_rights) => {
-                    (file_rights.rights(), Fd(1), self.lock_inode_table()?.stdout())
-                }
-                StandardStream::Stderr(file_rights) => {
-                    (file_rights.rights(), Fd(2), self.lock_inode_table()?.stderr())
-                }
+            let (fd_number, inode_number) = match std_stream.file_name() {
+                "stdin" => (Fd(0), self.lock_inode_table()?.stdin()),
+                "stdout" => (Fd(1), self.lock_inode_table()?.stdout()),
+                "stderr" => (Fd(2), self.lock_inode_table()?.stderr()),
+                _otherwise => continue,
             };
-            let rights = Rights::from_bits(try_from_or_errno(*rights)?).ok_or(ErrNo::Inval)?;
+            let rights = Rights::from_bits(try_from_or_errno(*std_stream.rights())?).ok_or(ErrNo::Inval)?;
             self.install_fd(
                 fd_number,
                 FileType::RegularFile,
@@ -769,16 +748,16 @@ impl FileSystem {
                             rights_u32,
                         );
 
-                        let stream_rights = if path == "stdin" {
-                            StandardStream::Stdin(file_rights)
-                        } else if path == "stdout" {
-                            StandardStream::Stdout(file_rights)
-                        } else if path == "stderr" {
-                            StandardStream::Stderr(file_rights)
-                        } else {
-                            return None;
-                        };
-                        Some(stream_rights)
+                        //let stream_rights = if path == "stdin" {
+                            //StandardStream::Stdin(file_rights)
+                        //} else if path == "stdout" {
+                            //StandardStream::Stdout(file_rights)
+                        //} else if path == "stderr" {
+                            //StandardStream::Stderr(file_rights)
+                        //} else {
+                            //return None;
+                        //};
+                        Some(file_rights)
                     },
                     _other => None,
                 }
@@ -1408,12 +1387,6 @@ impl FileSystem {
         self.check_right(&old_fd, Rights::PATH_RENAME_SOURCE)?;
         self.check_right(&new_fd, Rights::PATH_RENAME_TARGET)?;
         Err(ErrNo::NoSys)
-    }
-
-    /// Get random bytes.
-    #[inline]
-    pub(crate) fn random_get(&self, buf_len: Size) -> FileSystemResult<Vec<u8>> {
-        getrandom_to_buffer(buf_len)
     }
 
     /// The stub implementation of `path_rename`. Return unsupported error `NoSys`.

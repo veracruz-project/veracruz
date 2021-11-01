@@ -28,7 +28,7 @@ use policy_utils::{
     parsers::enforce_leading_backslash,
     parsers::parse_renamable_paths,
     policy::Policy,
-    principal::{ExecutionStrategy, FileRights, Identity, Program, StandardStream},
+    principal::{ExecutionStrategy, FileRights, Identity, Program, FileHash},
 };
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
@@ -142,6 +142,11 @@ struct Arguments {
     /// Note this is an array of string+path pairs, since a string enclave path
     /// can be provided along with the local file path.
     program_binaries: Vec<(String, PathBuf)>,
+    /// The hash of files.
+    ///
+    /// Note this is an array of string+path pairs, since a string enclave path
+    /// can be provided along with the local file path.
+    hashes: Vec<(String, PathBuf)>,
     /// Whether the enclave will be started in debug mode, with reduced
     /// protections against snooping and interference, and with the ability to
     /// write to the host's `stdout`.
@@ -149,9 +154,6 @@ struct Arguments {
     /// Describes the execution strategy (interpretation or JIT) that will be
     /// used for the computation.
     execution_strategy: String,
-    stdin: Option<String>,
-    stdout: Option<String>,
-    stderr: Option<String>,
     /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
     /// enabled.
     enable_clock: bool,
@@ -175,11 +177,9 @@ impl Arguments {
             output_policy_file: PathBuf::new(),
             certificate_expiry: None,
             program_binaries: Vec::new(),
+            hashes: Vec::new(),
             enclave_debug_mode: false,
             execution_strategy: String::new(),
-            stdin: None,
-            stdout: None,
-            stderr: None,
             enable_clock: false,
         }
     }
@@ -331,30 +331,6 @@ binary.",
                 )
         )
         .arg(
-            Arg::with_name("stdin")
-                .short("I")
-                .long("stdin")
-                .value_name("STDIN")
-                .help("The configuration of the standard input in the form 'path:rights'")
-                .required(false),
-        )
-        .arg(
-            Arg::with_name("stdout")
-                .short("O")
-                .long("stdout")
-                .value_name("STDOUT")
-                .help("The configuration of the standard output in the form 'path:rights'")
-                .required(false),
-        )
-        .arg(
-            Arg::with_name("stderr")
-                .short("E")
-                .long("stderr")
-                .value_name("STDERR")
-                .help("The configuration of the standard error in the form 'path:rights'")
-                .required(false),
-        )
-        .arg(
             Arg::with_name("enable-clock")
                 .short("c")
                 .long("enable-clock")
@@ -363,6 +339,17 @@ binary.",
 binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                 )
                 .value_name("BOOLEAN")
+        )
+        .arg(
+            Arg::with_name("hash")
+                .short("h")
+                .long("hashes")
+                .value_name("FILE")
+                .help("Specifies the filename of any (local) file that must match a hash. \
+This can be of the form \"--hash name\" or \"--hash  enclave_name=path\" if you want to \
+supply the file as a different name in the enclave. Multiple --hash flags or a comma-separated \
+list of files may be provided.")
+                .multiple(true),
         )
         .get_matches();
 
@@ -377,7 +364,7 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
     }
 
     if let Some(binaries) = matches.values_of_os("binary") {
-        arguments.program_binaries = binaries
+        let mut binaries_list = binaries
             .map(|b| match parse_renamable_paths(b) {
                 Ok(paths) => paths,
                 Err(err) => {
@@ -385,9 +372,24 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                 }
             })
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();               
+        arguments.program_binaries = binaries_list.clone();
+        arguments.hashes.append(&mut binaries_list);
     } else {
         abort_with("No program binary filename passed as an argument.");
+    }
+
+    if let Some(hashes) = matches.values_of_os("hash") {
+        let mut hashes_list = hashes
+            .map(|b| match parse_renamable_paths(b) {
+                Ok(paths) => paths,
+                Err(err) => {
+                    abort_with(err.to_string_lossy());
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+        arguments.hashes.append(&mut hashes_list);
     }
 
     if let Some(capabilities) = matches.values_of("capability") {
@@ -491,32 +493,32 @@ command-line parameter.",
         );
     }
 
-    if let Some(stdin) = matches.value_of("stdin") {
-        let stdin = String::from(stdin);
-        let stdin2 = stdin.clone();
-        check_capability(&[vec![stdin]]);
-        arguments.stdin = Some(stdin2);
-    } else {
-        info!("No stdin configuration was passed as command line parameters.");
-    }
+    //if let Some(stdin) = matches.value_of("stdin") {
+        //let stdin = String::from(stdin);
+        //let stdin2 = stdin.clone();
+        //check_capability(&[vec![stdin]]);
+        //arguments.stdin = Some(stdin2);
+    //} else {
+        //info!("No stdin configuration was passed as command line parameters.");
+    //}
 
-    if let Some(stdout) = matches.value_of("stdout") {
-        let stdout = String::from(stdout);
-        let stdout2 = stdout.clone();
-        check_capability(&[vec![stdout]]);
-        arguments.stdout = Some(stdout2);
-    } else {
-        info!("No stdout configuration was passed as command line parameters.");
-    }
+    //if let Some(stdout) = matches.value_of("stdout") {
+        //let stdout = String::from(stdout);
+        //let stdout2 = stdout.clone();
+        //check_capability(&[vec![stdout]]);
+        //arguments.stdout = Some(stdout2);
+    //} else {
+        //info!("No stdout configuration was passed as command line parameters.");
+    //}
 
-    if let Some(stderr) = matches.value_of("stderr") {
-        let stderr = String::from(stderr);
-        let stderr2 = stderr.clone();
-        check_capability(&[vec![stderr]]);
-        arguments.stderr = Some(stderr2);
-    } else {
-        info!("No stderr configuration was passed as command line parameters.");
-    }
+    //if let Some(stderr) = matches.value_of("stderr") {
+        //let stderr = String::from(stderr);
+        //let stderr2 = stderr.clone();
+        //check_capability(&[vec![stderr]]);
+        //arguments.stderr = Some(stderr2);
+    //} else {
+        //info!("No stderr configuration was passed as command line parameters.");
+    //}
 
     if let Some(enable_clock) = matches.value_of("enable-clock") {
         if let Ok(enable_clock) = bool::from_str(enable_clock) {
@@ -540,7 +542,7 @@ command-line parameter.",
 
 /// Executes the hashing program on the WASM binary, returning the computed
 /// SHA256 hash as a string.
-fn compute_program_hash(argument: &PathBuf) -> String {
+fn compute_hash(argument: &PathBuf) -> String {
     if let Ok(mut file) = File::open(argument) {
         let mut buffer = vec![];
 
@@ -746,26 +748,22 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
         arguments.binary_capabilities.len()
     );
 
-    let mut values = Vec::new();
-
-    for (id, ((program_file_name, program_file_path), capability)) in arguments
+    arguments
         .program_binaries
         .iter()
         .zip(&arguments.binary_capabilities)
         .enumerate()
-    {
-        let pi_hash = compute_program_hash(program_file_path);
-        let file_permissions = serialize_capability(capability);
-        let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
+        .map(|(id, ((program_file_name, _), capability))| {
+            let file_permissions = serialize_capability(capability);
+            let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
 
-        values.push(Program::new(
-            program_file_name,
-            id as u32,
-            pi_hash,
-            file_permissions,
-        ));
-    }
-    values
+            Program::new(
+                program_file_name,
+                id as u32,
+                file_permissions,
+            )
+        })
+        .collect()
 }
 
 /// Serializes the enclave server certificate expiry timepoint to a JSON value,
@@ -851,32 +849,28 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
 }
 
 fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
-    if strategy == "Interpretation" {
-        return ExecutionStrategy::Interpretation;
-    } else if strategy == "JIT" {
-        return ExecutionStrategy::JIT;
-    } else {
-        abort_with("Could not parse execution strategy argument.");
+    match strategy {
+        "Interpretation" => ExecutionStrategy::Interpretation,
+        "JIT" => ExecutionStrategy::JIT,
+        _otherwise => abort_with("Could not parse execution strategy argument."),
     }
 }
 
-/// Serializes the standard streams of all principals in the Veracruz computation into
-/// a vec of StandardStream.
-fn serialize_std_streams(arguments: &Arguments) -> Vec<StandardStream> {
+fn serialize_file_hash(arguments: &Arguments) -> Vec<FileHash> {
     info!("Serializing standard streams.");
+    arguments
+        .hashes
+        .iter()
+        .map(|(file_name, file_path)| {
+            let hash = compute_hash(file_path);
+            let file_name = enforce_leading_backslash(file_name).into_owned();
 
-    let mut std_streams_table = Vec::new();
-    if let Some(stdin) = &arguments.stdin {
-        std_streams_table.push(StandardStream::Stdin(serialize_capability_entry(&stdin)));
-    }
-    if let Some(stdout) = &arguments.stdout {
-        std_streams_table.push(StandardStream::Stdout(serialize_capability_entry(&stdout)));
-    }
-    if let Some(stderr) = &arguments.stderr {
-        std_streams_table.push(StandardStream::Stderr(serialize_capability_entry(&stderr)));
-    }
-
-    std_streams_table
+            FileHash::new(
+                file_name,
+                hash,
+            )
+        })
+        .collect()
 }
 
 /// Serializes the Veracruz policy file as a JSON value.
@@ -918,7 +912,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         serialize_certificate(&arguments.proxy_service_cert),
         arguments.enclave_debug_mode,
         serialize_execution_strategy(&arguments.execution_strategy),
-        serialize_std_streams(arguments),
+        serialize_file_hash(arguments),
         arguments.enable_clock,
     )
     .expect("Failed to instantiate a (struct) policy");

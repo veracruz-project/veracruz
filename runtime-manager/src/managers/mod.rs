@@ -20,6 +20,7 @@ use std::sync::Mutex;
 
 use std::{
     collections::HashMap,
+    path::PathBuf,
     string::{String, ToString},
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
     vec::Vec,
@@ -74,7 +75,7 @@ pub(crate) struct ProtocolState {
     /// The ref to the VFS, this is a FS handler with super user capability.
     vfs: FileSystem,
     /// Digest table. Certain files must match the digest before writting to the filesystem.
-    digest_table: HashMap<String, Vec<u8>>,
+    digest_table: HashMap<PathBuf, Vec<u8>>,
 }
 
 impl ProtocolState {
@@ -89,8 +90,7 @@ impl ProtocolState {
 
         let rights_table = global_policy.get_rights_table();
         println!("right table: {:?}", rights_table);
-        let std_streams_table = global_policy.std_streams_table();
-        let digest_table = global_policy.get_digest_table()?;
+        let digest_table = global_policy.get_file_hash_table()?;
         let vfs = FileSystem::new(rights_table)?;
 
         Ok(ProtocolState {
@@ -126,7 +126,7 @@ impl ProtocolState {
         data: &[u8],
     ) -> Result<(), RuntimeManagerError> {
         // Check the digest, if necessary
-        if let Some(digest) = self.digest_table.get(file_name) {
+        if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
             let incoming_digest = Self::sha_256_digest(data);
             if incoming_digest.len() != digest.len() {
                 return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
@@ -162,7 +162,7 @@ impl ProtocolState {
     ) -> Result<(), RuntimeManagerError> {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
-        if self.digest_table.contains_key(file_name) {
+        if self.digest_table.contains_key(&PathBuf::from(file_name)) {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
         self.vfs.spawn(client_id)?.write_file_by_absolute_path(
