@@ -13,38 +13,40 @@
 pub mod veracruz_server_sgx {
 
     use crate::veracruz_server::*;
-    use transport_protocol;
     use lazy_static::lazy_static;
     use log::{debug, error};
+    use policy_utils::policy::Policy;
     use runtime_manager_bind::{
         runtime_manager_close_session_enc, runtime_manager_init_session_manager_enc,
         runtime_manager_new_session_enc, runtime_manager_tls_get_data_enc,
         runtime_manager_tls_get_data_needed_enc, runtime_manager_tls_send_data_enc,
     };
-    use sgx_types::*;
+    // NOTE: The `SgxEnclave` MUST appear before `sgx_root_enclave_bind` for stopping a linker error.
+    #[rustfmt::skip]
     use sgx_urts::SgxEnclave;
+    #[rustfmt::skip]
     use sgx_root_enclave_bind::{
-        sgx_root_enclave_get_firmware_version, sgx_root_enclave_get_firmware_version_len,
-        sgx_root_enclave_init_remote_attestation_enc, sgx_root_enclave_sgx_ra_get_ga,
+        sgx_root_enclave_finish_local_attest_enc, sgx_root_enclave_get_firmware_version,
+        sgx_root_enclave_get_firmware_version_len, sgx_root_enclave_init_remote_attestation_enc,
+        sgx_root_enclave_sgx_get_collateral_report, sgx_root_enclave_sgx_ra_get_ga,
         sgx_root_enclave_sgx_ra_get_msg3_trusted, sgx_root_enclave_sgx_ra_proc_msg2_trusted,
-        sgx_root_enclave_start_local_attest_enc, sgx_root_enclave_sgx_get_collateral_report,
-        sgx_root_enclave_sgx_send_cert_chain, sgx_root_enclave_finish_local_attest_enc,
+        sgx_root_enclave_sgx_send_cert_chain, sgx_root_enclave_start_local_attest_enc,
     };
-    use std::{ffi::CStr, mem};
+    use sgx_types::*;
     use std::io::Write;
+    use std::{ffi::CStr, mem};
     use tempfile;
-    use veracruz_utils::policy::policy::Policy;
+    use transport_protocol;
 
     lazy_static! {
-        static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> = std::sync::Mutex::new(None);
+        static ref SGX_ROOT_ENCLAVE: std::sync::Mutex<Option<SgxEnclave>> =
+            std::sync::Mutex::new(None);
     }
 
-    static RUNTIME_MANAGER_BINARY: &'static [u8] = include_bytes!(
-        "../../runtime-manager-bind/target/debug/runtime_manager.signed.so"
-    );
-    static SGX_ROOT_ENCLAVE_BINARY: &'static [u8] = include_bytes!(
-        "../../sgx-root-enclave-bind/target/debug/sgx_root_enclave.signed.so"
-    );
+    static RUNTIME_MANAGER_BINARY: &'static [u8] =
+        include_bytes!("../../runtime-manager-bind/target/debug/runtime_manager.signed.so");
+    static SGX_ROOT_ENCLAVE_BINARY: &'static [u8] =
+        include_bytes!("../../sgx-root-enclave-bind/target/debug/sgx_root_enclave.signed.so");
 
     pub struct VeracruzServerSGX {
         runtime_manager_enclave: SgxEnclave,
@@ -100,7 +102,11 @@ pub mod veracruz_server_sgx {
         let mut gfvl_result: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_ret = unsafe {
-            sgx_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_result, &mut fv_length)
+            sgx_root_enclave_get_firmware_version_len(
+                enclave.geteid(),
+                &mut gfvl_result,
+                &mut fv_length,
+            )
         };
         if gfvl_ret != 0 || gfvl_result != 0 {
             return Err(VeracruzServerError::EnclaveCallError(
@@ -113,7 +119,12 @@ pub mod veracruz_server_sgx {
 
         let mut gfv_result: u32 = 0;
         let gfv_ret = unsafe {
-            sgx_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_result, p_output, fv_length)
+            sgx_root_enclave_get_firmware_version(
+                enclave.geteid(),
+                &mut gfv_result,
+                p_output,
+                fv_length,
+            )
         };
         if gfv_ret != 0 || gfv_result != 0 {
             return Err(VeracruzServerError::EnclaveCallError(
@@ -132,13 +143,17 @@ pub mod veracruz_server_sgx {
             protocol: &str,
             firmware_version: &str,
         ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
-            let proxy_attestation_server_response = crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
+            let proxy_attestation_server_response =
+                crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
             if proxy_attestation_server_response.has_sgx_attestation_init() {
                 let attestation_init = proxy_attestation_server_response.get_sgx_attestation_init();
-                let (public_key, device_id) = transport_protocol::parse_sgx_attestation_init(attestation_init);
+                let (public_key, device_id) =
+                    transport_protocol::parse_sgx_attestation_init(attestation_init);
                 Ok((public_key, device_id))
             } else {
-                Err(VeracruzServerError::MissingFieldError("sgx_attestation_init"))
+                Err(VeracruzServerError::MissingFieldError(
+                    "sgx_attestation_init",
+                ))
             }
         }
     }
@@ -151,7 +166,8 @@ pub mod veracruz_server_sgx {
             msg1: &sgx_ra_msg1_t,
             device_id: i32,
         ) -> Result<(Vec<u8>, sgx_ra_msg2_t), VeracruzServerError> {
-            let serialized_msg1 = transport_protocol::serialize_msg1(*attestation_context, msg1, device_id)?;
+            let serialized_msg1 =
+                transport_protocol::serialize_msg1(*attestation_context, msg1, device_id)?;
             let encoded_msg1 = base64::encode(&serialized_msg1);
 
             let url = format!("{:}/SGX/Msg1", url_base);
@@ -161,10 +177,13 @@ pub mod veracruz_server_sgx {
             let body_vec = base64::decode(&received_body)?;
             let parsed = transport_protocol::parse_proxy_attestation_server_response(&body_vec)?;
             if parsed.has_sgx_attestation_challenge() {
-                let (_context, msg2, challenge) = transport_protocol::parse_sgx_attestation_challenge(&parsed)?;
+                let (_context, msg2, challenge) =
+                    transport_protocol::parse_sgx_attestation_challenge(&parsed)?;
                 Ok((challenge.to_vec(), msg2))
             } else {
-                Err(VeracruzServerError::MissingFieldError("sgx_attestation_challenge"))
+                Err(VeracruzServerError::MissingFieldError(
+                    "sgx_attestation_challenge",
+                ))
             }
         }
     }
@@ -174,7 +193,17 @@ pub mod veracruz_server_sgx {
         collateral_challenge: &Vec<u8>,
         context: &sgx_ra_context_t,
         msg2: &sgx_ra_msg2_t,
-    ) -> Result<(sgx_ra_msg3_t, sgx_quote_t, Vec<u8>, sgx_quote_t, Vec<u8>, Vec<u8>), VeracruzServerError> {
+    ) -> Result<
+        (
+            sgx_ra_msg3_t,
+            sgx_quote_t,
+            Vec<u8>,
+            sgx_quote_t,
+            Vec<u8>,
+            Vec<u8>,
+        ),
+        VeracruzServerError,
+    > {
         let mut p_msg3 = std::ptr::null_mut();
         let mut msg3_size = 0;
         let msg2_size: u32 = std::mem::size_of::<sgx_ra_msg2_t>() as u32;
@@ -342,7 +371,8 @@ pub mod veracruz_server_sgx {
         unsafe { collateral_quote_vec.set_len(collateral_quote_size as usize) }
         assert!(gpq_result == sgx_types::sgx_status_t::SGX_SUCCESS);
 
-        let collateral_quote = unsafe { *(collateral_quote_vec.as_ptr() as *const sgx_types::sgx_quote_t) };
+        let collateral_quote =
+            unsafe { *(collateral_quote_vec.as_ptr() as *const sgx_types::sgx_quote_t) };
 
         let collateral_quote_sig =
             collateral_quote_vec[std::mem::size_of::<sgx_types::sgx_quote_t>()..].to_vec();
@@ -355,7 +385,7 @@ pub mod veracruz_server_sgx {
             sig.to_vec(),
             collateral_quote,
             collateral_quote_sig.to_vec(),
-            csr
+            csr,
         ))
     }
 
@@ -370,7 +400,7 @@ pub mod veracruz_server_sgx {
             collateral_quote: &sgx_quote_t,
             collateral_quote_sig: &Vec<u8>,
             device_id: i32,
-            csr: &Vec<u8>
+            csr: &Vec<u8>,
         ) -> Result<(Vec<u8>, Vec<u8>), VeracruzServerError> {
             let serialized_tokens = transport_protocol::serialize_sgx_attestation_tokens(
                 *attestation_context,
@@ -387,9 +417,11 @@ pub mod veracruz_server_sgx {
 
             let received_body = crate::post_buffer(&url, &encoded_tokens)?;
             let received_bytes = base64::decode(&received_body).unwrap();
-            let parsed = transport_protocol::parse_proxy_attestation_server_response(&received_bytes)?;
+            let parsed =
+                transport_protocol::parse_proxy_attestation_server_response(&received_bytes)?;
             if parsed.has_cert_chain() {
-                let (root_cert, enclave_cert) = transport_protocol::parse_cert_chain(&parsed.get_cert_chain());
+                let (root_cert, enclave_cert) =
+                    transport_protocol::parse_cert_chain(&parsed.get_cert_chain());
                 return Ok((root_cert, enclave_cert));
             } else {
                 return Err(VeracruzServerError::MissingFieldError("cert_chain"));
@@ -404,7 +436,8 @@ pub mod veracruz_server_sgx {
             proxy_attestation_server_url: &String,
         ) -> Result<(), VeracruzServerError> {
             let firmware_version = fetch_firmware_version(sgx_root_enclave)?;
-            let (public_key, device_id) = self.send_start(proxy_attestation_server_url, "sgx", &firmware_version)?;
+            let (public_key, device_id) =
+                self.send_start(proxy_attestation_server_url, "sgx", &firmware_version)?;
 
             let mut ra_context = sgx_ra_context_t::default();
 
@@ -476,17 +509,19 @@ pub mod veracruz_server_sgx {
                 &collateral_quote,
                 &collateral_quote_sig,
                 device_id,
-                &csr
+                &csr,
             )?;
 
             let mut gcr_result: u32 = 0;
             let gcr_ret = unsafe {
-                sgx_root_enclave_sgx_send_cert_chain(sgx_root_enclave.geteid(),
-                                                 &mut gcr_result,
-                                                 root_cert.as_ptr(),
-                                                 root_cert.len() as u64,
-                                                 enclave_cert.as_ptr(),
-                                                 enclave_cert.len() as u64)
+                sgx_root_enclave_sgx_send_cert_chain(
+                    sgx_root_enclave.geteid(),
+                    &mut gcr_result,
+                    root_cert.as_ptr(),
+                    root_cert.len() as u64,
+                    enclave_cert.as_ptr(),
+                    enclave_cert.len() as u64,
+                )
             };
 
             if gcr_ret != 0 || gcr_result != 0 {
@@ -515,7 +550,8 @@ pub mod veracruz_server_sgx {
                     Some(_) => (), // do nothing, we're good
                     None => {
                         let enclave = start_enclave(SGX_ROOT_ENCLAVE_BINARY)?;
-                        new_veracruz_server.native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
+                        new_veracruz_server
+                            .native_attestation(&enclave, &policy.proxy_attestation_server_url())?;
                         *sgx_root_enclave = Some(enclave)
                     }
                 }
@@ -539,19 +575,25 @@ pub mod veracruz_server_sgx {
                     "runtime_manager_init_session_manager_enc result:{:?}, ret:{:?}",
                     result, ret
                 );
-                Err(VeracruzServerError::EnclaveCallError("runtime_manager_init_session_manager_enc"))
+                Err(VeracruzServerError::EnclaveCallError(
+                    "runtime_manager_init_session_manager_enc",
+                ))
             }
         }
 
         fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
-                unreachable!("Unimplemented");
+            unreachable!("Unimplemented");
         }
 
         fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {
-                runtime_manager_new_session_enc(self.runtime_manager_enclave.geteid(), &mut result, &mut session_id)
+                runtime_manager_new_session_enc(
+                    self.runtime_manager_enclave.geteid(),
+                    &mut result,
+                    &mut session_id,
+                )
             };
             if (ret == 0) && (result == 0) {
                 Ok(session_id)
@@ -565,7 +607,11 @@ pub mod veracruz_server_sgx {
         fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
             let mut result: u32 = 0;
             let ret = unsafe {
-                runtime_manager_close_session_enc(self.runtime_manager_enclave.geteid(), &mut result, session_id)
+                runtime_manager_close_session_enc(
+                    self.runtime_manager_enclave.geteid(),
+                    &mut result,
+                    session_id,
+                )
             };
             if (ret == 0) && (result == 0) {
                 Ok(())
@@ -649,10 +695,13 @@ pub mod veracruz_server_sgx {
     ) -> sgx_status_t {
         let mut result: u32 = 0;
         let sgx_root_enclave = SGX_ROOT_ENCLAVE.lock().unwrap();
-        let bindgen_msg1_ref =
-            unsafe { mem::transmute::<&sgx_dh_msg1_t, &sgx_root_enclave_bind::_sgx_dh_msg1_t>(dh_msg1) };
+        let bindgen_msg1_ref = unsafe {
+            mem::transmute::<&sgx_dh_msg1_t, &sgx_root_enclave_bind::_sgx_dh_msg1_t>(dh_msg1)
+        };
         let bindgen_msg2_ref = unsafe {
-            mem::transmute::<&mut sgx_dh_msg2_t, &mut sgx_root_enclave_bind::_sgx_dh_msg2_t>(dh_msg2)
+            mem::transmute::<&mut sgx_dh_msg2_t, &mut sgx_root_enclave_bind::_sgx_dh_msg2_t>(
+                dh_msg2,
+            )
         };
         match &*sgx_root_enclave {
             Some(sgx_root_enclave) => {
@@ -676,7 +725,6 @@ pub mod veracruz_server_sgx {
         sgx_status_t::SGX_SUCCESS
     }
 
-
     #[no_mangle]
     pub extern "C" fn finish_local_attest_ocall(
         dh_msg3: &sgx_dh_msg3_t,
@@ -694,7 +742,9 @@ pub mod veracruz_server_sgx {
             Some(sgx_root_enclave) => {
                 let mut result: u32 = 0;
                 let bindgen_msg3_ref = unsafe {
-                    mem::transmute::<&sgx_dh_msg3_t, &sgx_root_enclave_bind::_sgx_dh_msg3_t>(dh_msg3)
+                    mem::transmute::<&sgx_dh_msg3_t, &sgx_root_enclave_bind::_sgx_dh_msg3_t>(
+                        dh_msg3,
+                    )
                 };
                 let ret = unsafe {
                     sgx_root_enclave_finish_local_attest_enc(

@@ -1,4 +1,4 @@
-//! Nitro-Enclave-specific material for Veracruz
+//! IO-related material for Nitro enclaves.
 //!
 //! ## Authors
 //!
@@ -33,7 +33,7 @@ pub enum NitroError {
     CLIError,
     /// a Veracruz-specific socket error occurred
     #[error(display = "Nitro: Veracruz Socket Error:{:?}", _0)]
-    VeracruzSocketError(#[error(source)] crate::io::error::SocketError),
+    VeracruzSocketError(#[error(source)] crate::error::SocketError),
     /// An error occured while processing UTF8 string data
     #[error(display = "Nitro: Utf8Error:{:?}", _0)]
     Utf8Error(#[error(source)] std::str::Utf8Error),
@@ -52,7 +52,7 @@ pub struct NitroEnclave {
     /// value
     enclave_id: String,
     /// A convenience struct for handling VSOCK connections to the enclave
-    vsocksocket: crate::io::vsocket::VsockSocket,
+    vsocksocket: crate::vsocket::VsockSocket,
     /// the path to the Nictro CLI function. Not all AMI images have it in the
     /// same place in the file system, so we need to keep track of it
     nitro_cli_path: String,
@@ -63,11 +63,7 @@ const VERACRUZ_PORT: u32 = 5005;
 
 impl NitroEnclave {
     /// create a new Nitro enclave, started with the file in eif_path
-    pub fn new(
-        nitro_sbin: bool,
-        eif_path: &str,
-        debug: bool,
-    ) -> Result<Self, NitroError> {
+    pub fn new(nitro_sbin: bool, eif_path: &str, debug: bool) -> Result<Self, NitroError> {
         let mut args = vec![
             "run-enclave",
             "--eif-path",
@@ -127,7 +123,7 @@ impl NitroEnclave {
                 .to_string()
                 .trim_matches('"')
                 .to_string(),
-            vsocksocket: crate::io::vsocket::VsockSocket::connect(cid, VERACRUZ_PORT)?,
+            vsocksocket: crate::vsocket::VsockSocket::connect(cid, VERACRUZ_PORT)?,
             nitro_cli_path: nitro_cli_path.to_string(),
         };
         return Ok(enclave);
@@ -135,13 +131,13 @@ impl NitroEnclave {
 
     /// send a buffer of data to the enclave
     pub fn send_buffer(&self, buffer: &Vec<u8>) -> Result<(), NitroError> {
-        crate::io::raw_fd::send_buffer(self.vsocksocket.as_raw_fd(), buffer)
+        crate::raw_fd::send_buffer(self.vsocksocket.as_raw_fd(), buffer)
             .map_err(|err| NitroError::VeracruzSocketError(err))
     }
 
     /// receive a buffer of data from the enclave
     pub fn receive_buffer(&self) -> Result<Vec<u8>, NitroError> {
-        crate::io::raw_fd::receive_buffer(self.vsocksocket.as_raw_fd())
+        crate::raw_fd::receive_buffer(self.vsocksocket.as_raw_fd())
             .map_err(|err| NitroError::VeracruzSocketError(err))
     }
 }

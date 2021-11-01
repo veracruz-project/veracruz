@@ -10,23 +10,26 @@
 //! and copyright information.
 
 #![no_main]
-use transport_protocol;
 use libfuzzer_sys::fuzz_target;
-use std::io::prelude::*;
 use std::fs::File;
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+use std::io::prelude::*;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use transport_protocol;
 
-use veracruz_utils::policy::policy::Policy;
+use policy_utils::policy::Policy;
 
 const ENCLAVE_STATE_DATA_SOURCES_LOADING: u8 = 1;
 
 fuzz_target!(|buffer: &[u8]| {
     // Fuzz a  valid protocol
     if let Ok(request) = transport_protocol::serialize_program(buffer) {
-        println!("program: {:?}",request);
+        println!("program: {:?}", request);
 
-	let mut f = File::open("../test-collateral/one_data_source_policy.json").unwrap();
-    	let mut policy = String::new();
+        let mut f = File::open("../test-collateral/one_data_source_policy.json").unwrap();
+        let mut policy = String::new();
         f.read_to_string(&mut policy).unwrap();
 
         let policy = Policy::new(&policy).unwrap();
@@ -53,16 +56,27 @@ fuzz_target!(|buffer: &[u8]| {
             std::sync::mpsc::Sender<std::vec::Vec<u8>>,
             std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
         ) = std::sync::mpsc::channel();
-        
+
         let flag_main = Arc::new(AtomicBool::new(true));
         let flag_server = flag_main.clone();
 
         let server_loop_handle = std::thread::spawn(move || {
-            server_tls_loop(flag_server, &veracruz_server, session_id, server_tls_tx, server_tls_rx);
+            server_tls_loop(
+                flag_server,
+                &veracruz_server,
+                session_id,
+                server_tls_tx,
+                server_tls_rx,
+            );
         });
 
-
-        let rst = client_tls_send(&client_tls_tx, &client_tls_rx, &mut client_session, &request).unwrap();
+        let rst = client_tls_send(
+            &client_tls_tx,
+            &client_tls_rx,
+            &mut client_session,
+            &request,
+        )
+        .unwrap();
         let rst = protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerResponse>(&rst);
         assert!(rst.is_ok());
 
@@ -92,39 +106,41 @@ fn init_veracruz_server_and_tls_session(
     })
 }
 
-fn enclave_self_signed_cert(veracruz_server: &VeracruzServerEnclave) -> Result<rustls::Certificate, String> {
+fn enclave_self_signed_cert(
+    veracruz_server: &VeracruzServerEnclave,
+) -> Result<rustls::Certificate, String> {
     let enclave_cert_vec = veracruz_server.get_enclave_cert()?;
     Ok(rustls::Certificate(enclave_cert_vec))
 }
 
 fn read_cert_file(filename: &str) -> rustls::Certificate {
     let mut cert_file = std::fs::File::open(filename).expect(&format!(
-	"Error opening certificate file {} for reading",
-	filename
+        "Error opening certificate file {} for reading",
+        filename
     ));
     let mut cert_buffer = std::vec::Vec::new();
     cert_file.read_to_end(&mut cert_buffer).expect(&format!(
-	"Error reading certificate file {} to end",
-	filename
+        "Error reading certificate file {} to end",
+        filename
     ));
     let mut cursor = std::io::Cursor::new(cert_buffer);
     let certs = rustls::internal::pemfile::certs(&mut cursor)
-	.expect(&format!("Error reading certificates from {}", filename));
+        .expect(&format!("Error reading certificates from {}", filename));
     assert!(certs.len() > 0);
     certs[0].clone()
 }
 
 fn read_priv_key_file(filename: &str) -> rustls::PrivateKey {
     let mut key_file = std::fs::File::open(filename)
-	.expect(&format!("Error opening key file {} for reading", filename));
+        .expect(&format!("Error opening key file {} for reading", filename));
     let mut key_buffer = std::vec::Vec::new();
     key_file.read_to_end(&mut key_buffer).expect(&format!(
-	"Error reading private key file {} to end",
-	filename
+        "Error reading private key file {} to end",
+        filename
     ));
     let mut cursor = std::io::Cursor::new(key_buffer);
     let rsa_keys = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
-	.expect("file contains invalid rsa private key");
+        .expect("file contains invalid rsa private key");
     rsa_keys[0].clone()
 }
 
@@ -134,7 +150,6 @@ fn create_client_test_session(
     client_key_filename: &str,
     cert_hash: Vec<u8>,
 ) -> rustls::ClientSession {
-
     let client_cert = read_cert_file(client_cert_filename);
 
     let client_priv_key = read_priv_key_file(client_key_filename);
@@ -144,24 +159,22 @@ fn create_client_test_session(
     client_cert_vec.push(client_cert);
     client_config.set_single_client_cert(client_cert_vec, client_priv_key);
     client_config
-	.root_store
-	.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+        .root_store
+        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
     client_config.pinned_cert_hashes.push(cert_hash);
 
     let enclave_name = veracruz_server
-	.get_enclave_name()
-	.expect("Error obtaining Enclave name");
+        .get_enclave_name()
+        .expect("Error obtaining Enclave name");
     let dns_name_ret = webpki::DNSNameRef::try_from_ascii_str(enclave_name.as_str());
     assert!(dns_name_ret.is_ok());
     let dns_name = dns_name_ret.expect(&format!(
-	"Error obtaining DNS name reference from enclave {}",
-	enclave_name
+        "Error obtaining DNS name reference from enclave {}",
+        enclave_name
     ));
     rustls::ClientSession::new(&std::sync::Arc::new(client_config), dns_name)
 }
-
-
 
 fn client_tls_send(
     tx: &std::sync::mpsc::Sender<std::vec::Vec<u8>>,
@@ -232,13 +245,13 @@ fn client_tls_send(
 }
 
 fn server_tls_loop(
-    flag : Arc<AtomicBool>,
+    flag: Arc<AtomicBool>,
     veracruz_server: &dyn veracruz_server::VeracruzServer,
     session_id: u32,
     tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
     rx: std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
 ) {
-     while flag.load(Ordering::SeqCst) {
+    while flag.load(Ordering::SeqCst) {
         let received = rx.try_recv();
         let received_buffer = received.unwrap_or_else(|_| std::vec::Vec::new());
 
@@ -297,14 +310,14 @@ fn check_enclave_state(
 fn request_enclave_state(
     client_session: &mut dyn rustls::Session,
     client_tls_tx: &std::sync::mpsc::Sender<std::vec::Vec<u8>>,
-    client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>
+    client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
 ) -> Result<Vec<u8>, String> {
     let serialized_enclave_state_request = transport_protocol::serialize_request_enclave_state()?;
 
     client_tls_send(
-	client_tls_tx,
-	client_tls_rx,
-	client_session,
-	&serialized_enclave_state_request[..]
+        client_tls_tx,
+        client_tls_rx,
+        client_session,
+        &serialized_enclave_state_request[..],
     )
 }

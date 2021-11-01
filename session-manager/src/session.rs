@@ -12,7 +12,7 @@
 //! information on licensing and copyright.
 
 use crate::error::SessionManagerError;
-use veracruz_utils::policy::principal::Identity;
+use policy_utils::principal::Identity;
 
 use std::{
     io::{Read, Write},
@@ -84,9 +84,7 @@ impl Session {
     /// Reads data via the established TLS session, returning the unique client
     /// ID and the set of roles associated with the principal that sent the
     /// data.
-    pub fn read_plaintext_data(
-        &mut self,
-    ) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
+    pub fn read_plaintext_data(&mut self) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
         let num_bytes = self.tls_session.read_to_end(&mut received_buffer)?;
 

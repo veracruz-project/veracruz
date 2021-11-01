@@ -39,9 +39,9 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
+use policy_utils::principal::ExecutionStrategy;
 use std::sync::Mutex;
 use std::{boxed::Box, string::String, string::ToString, sync::Arc, vec::Vec};
-use veracruz_utils::policy::principal::ExecutionStrategy;
 
 pub struct Options {
     pub environment_variables: Vec<(String, String)>,

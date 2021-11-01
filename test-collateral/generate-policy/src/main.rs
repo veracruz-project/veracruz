@@ -23,14 +23,14 @@ use chrono::{DateTime, Datelike, FixedOffset, Timelike};
 use clap::{App, Arg};
 use data_encoding::HEXLOWER;
 use log::{info, warn};
-use ring::digest::{digest, SHA256};
-use serde_json::{json, to_string_pretty, Value};
-use veracruz_utils::policy::{
+use policy_utils::{
     expiry::Timepoint,
     parsers::parse_renamable_paths,
     policy::Policy,
     principal::{ExecutionStrategy, FileRights, Identity, Program, StandardStream},
 };
+use ring::digest::{digest, SHA256};
+use serde_json::{json, to_string_pretty, Value};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////

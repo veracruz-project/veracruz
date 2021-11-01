@@ -26,6 +26,7 @@
 use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
+use policy_utils::principal::{ExecutionStrategy, FileRights, Principal, StandardStream};
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -38,7 +39,6 @@ use std::{
     time::Instant,
     vec::Vec,
 };
-use veracruz_utils::policy::principal::{ExecutionStrategy, FileRights, Principal, StandardStream};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////

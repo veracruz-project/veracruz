@@ -11,23 +11,18 @@
 
 use actix_rt;
 use log::info;
+use policy_utils::{error::PolicyError, policy::Policy};
 use std::{fs, path, process};
 use structopt::StructOpt;
 use veracruz_server;
-use veracruz_utils::policy::{
-    error::PolicyError,
-    policy::Policy,
-};
-
 
 #[derive(Debug, StructOpt)]
-#[structopt(rename_all="kebab")]
+#[structopt(rename_all = "kebab")]
 struct Opt {
     /// Path to policy file
     #[structopt(parse(from_os_str))]
     policy_path: path::PathBuf,
 }
-
 
 /// Entry point
 fn main() {
@@ -63,9 +58,12 @@ fn main() {
         }
     };
 
-    println!("Veracruz Server running on {}", policy.veracruz_server_url());
+    println!(
+        "Veracruz Server running on {}",
+        policy.veracruz_server_url()
+    );
     match sys.block_on(veracruz_server) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(err) => {
             eprintln!("{}", err);
             process::exit(1);

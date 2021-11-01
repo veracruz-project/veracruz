@@ -25,19 +25,9 @@ mod tests {
     use rand::Rng;
     use ring;
 
-    use serde::Deserialize;
-    use transport_protocol;
-    use veracruz_server::veracruz_server::*;
-    #[cfg(feature = "nitro")]
-    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
-    #[cfg(feature = "sgx")]
-    use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
-    #[cfg(feature = "tz")]
-    use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
-    #[cfg(feature = "icecap")]
-    use veracruz_server::VeracruzServerIceCap as VeracruzServerEnclave;
-    use veracruz_utils::{platform::Platform, policy::policy::Policy, VERACRUZ_RUNTIME_HASH_EXTENSION_ID};
+    use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
+    use serde::Deserialize;
     use std::{
         collections::{HashMap, HashSet},
         env,
@@ -51,6 +41,17 @@ mod tests {
         time::Instant,
         vec::Vec,
     };
+    use transport_protocol;
+    use veracruz_server::veracruz_server::*;
+    #[cfg(feature = "icecap")]
+    use veracruz_server::VeracruzServerIceCap as VeracruzServerEnclave;
+    #[cfg(feature = "nitro")]
+    use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
+    #[cfg(feature = "sgx")]
+    use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
+    #[cfg(feature = "tz")]
+    use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
+    use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
     // Policy files
     const ONE_DATA_SOURCE_POLICY: &'static str = "one_data_source_policy.json";
@@ -63,16 +64,11 @@ mod tests {
     const TWO_DATA_SOURCE_PRIVATE_SET_INTERSECTION_POLICY: &'static str =
         "two_data_source_private_set_intersection_policy.json";
     const MULTIPLE_KEY_POLICY: &'static str = "test_multiple_key_policy.json";
-    const IDASH2017_POLICY: &'static str =
-        "idash2017_logistic_regression_policy.json";
-    const MACD_POLICY: &'static str =
-        "moving_average_convergence_divergence.json";
-    const PRIVATE_SET_INTER_SUM_POLICY: &'static str =
-        "private_set_intersection_sum.json";
-    const NUMBER_STREAM_ACCUMULATION_POLICY: &'static str =
-        "number-stream-accumulation.json";
-    const BASIC_FILE_READ_WRITE_POLICY: &'static str =
-        "basic_file_read_write.json";
+    const IDASH2017_POLICY: &'static str = "idash2017_logistic_regression_policy.json";
+    const MACD_POLICY: &'static str = "moving_average_convergence_divergence.json";
+    const PRIVATE_SET_INTER_SUM_POLICY: &'static str = "private_set_intersection_sum.json";
+    const NUMBER_STREAM_ACCUMULATION_POLICY: &'static str = "number-stream-accumulation.json";
+    const BASIC_FILE_READ_WRITE_POLICY: &'static str = "basic_file_read_write.json";
     const CA_CERT: &'static str = "CACert.pem";
     const CA_KEY: &'static str = "CAKey.pem";
     const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
@@ -84,20 +80,15 @@ mod tests {
     const READ_FILE_WASM: &'static str = "read-file.wasm";
     const LINEAR_REGRESSION_WASM: &'static str = "linear-regression.wasm";
     const STRING_EDIT_DISTANCE_WASM: &'static str = "string-edit-distance.wasm";
-    const CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM: &'static str =
-        "intersection-set-sum.wasm";
-    const PERSON_SET_INTERSECTION_WASM: &'static str =
-        "private-set-intersection.wasm";
-    const LOGISTICS_REGRESSION_WASM: &'static str =
-        "idash2017-logistic-regression.wasm";
+    const CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM: &'static str = "intersection-set-sum.wasm";
+    const PERSON_SET_INTERSECTION_WASM: &'static str = "private-set-intersection.wasm";
+    const LOGISTICS_REGRESSION_WASM: &'static str = "idash2017-logistic-regression.wasm";
     const MACD_WASM: &'static str = "moving-average-convergence-divergence.wasm";
-    const INTERSECTION_SET_SUM_WASM: &'static str =
-        "private-set-intersection-sum.wasm";
+    const INTERSECTION_SET_SUM_WASM: &'static str = "private-set-intersection-sum.wasm";
     const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "linear-regression.dat";
-    const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str =
-        "intersection-customer.dat";
+    const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str = "intersection-customer.dat";
     const INTERSECTION_SET_SUM_ADVERTISEMENT_DATA: &'static str =
         "intersection-advertisement-viewer.dat";
     const STRING_1_DATA: &'static str = "hello-world-1.dat";
@@ -148,23 +139,26 @@ mod tests {
             println!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                println!("spawned thread calling server with url:{:?}", proxy_attestation_server_url);
+                println!(
+                    "spawned thread calling server with url:{:?}",
+                    proxy_attestation_server_url
+                );
                 #[cfg(feature = "debug")]
-                let server =
-                    proxy_attestation_server::server::server(
-                        proxy_attestation_server_url,
-                        trust_path(CA_CERT).as_path(),
-                        trust_path(CA_KEY).as_path(),
-                        true)
-                        .unwrap();
+                let server = proxy_attestation_server::server::server(
+                    proxy_attestation_server_url,
+                    trust_path(CA_CERT).as_path(),
+                    trust_path(CA_KEY).as_path(),
+                    true,
+                )
+                .unwrap();
                 #[cfg(not(feature = "debug"))]
-                let server =
-                    proxy_attestation_server::server::server(
-                        proxy_attestation_server_url,
-                        trust_path(CA_CERT).as_path(),
-                        trust_path(CA_KEY).as_path(),
-                        false)
-                        .unwrap();
+                let server = proxy_attestation_server::server::server(
+                    proxy_attestation_server_url,
+                    trust_path(CA_CERT).as_path(),
+                    trust_path(CA_KEY).as_path(),
+                    false,
+                )
+                .unwrap();
                 sys.block_on(server).unwrap();
             });
         });
@@ -180,9 +174,7 @@ mod tests {
                 // Check if the debug is called.
                 .format(|buf, record| {
                     let message = format!("{}", record.args());
-                    if record.level() == Level::Debug
-                        && message.contains("Enclave debug message")
-                    {
+                    if record.level() == Level::Debug && message.contains("Enclave debug message") {
                         DEBUG_IS_CALLED.store(true, Ordering::SeqCst);
                     }
                     writeln!(buf, "[{} {}]: {}", record.target(), record.level(), message)
@@ -197,8 +189,11 @@ mod tests {
     /// initialise an enclave.
     fn test_phase1_init_destroy_enclave() {
         // all the json in test-collateral should be valid policy
-        let policy_dir = PathBuf::from(env::var("VERACRUZ_POLICY_DIR").
-            unwrap_or("../test-collateral".to_string()).clone());
+        let policy_dir = PathBuf::from(
+            env::var("VERACRUZ_POLICY_DIR")
+                .unwrap_or("../test-collateral".to_string())
+                .clone(),
+        );
         iterate_over_policy(policy_dir.as_path(), |policy_json| {
             let policy = Policy::from_json(&policy_json);
             assert!(policy.is_ok());
@@ -229,8 +224,11 @@ mod tests {
     #[test]
     /// Load policy file and check if a new session tls can be opened
     fn test_phase1_new_session() {
-        let policy_dir = PathBuf::from(env::var("VERACRUZ_POLICY_DIR").
-            unwrap_or("../test-collateral".to_string()).clone());
+        let policy_dir = PathBuf::from(
+            env::var("VERACRUZ_POLICY_DIR")
+                .unwrap_or("../test-collateral".to_string())
+                .clone(),
+        );
         iterate_over_policy(policy_dir.as_path(), |policy_json| {
             let policy = Policy::from_json(&policy_json).unwrap();
             // start the proxy attestation server
@@ -244,8 +242,11 @@ mod tests {
     /// Load the Veracruz server and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
         // start the proxy attestation server
-        let policy_dir = PathBuf::from(env::var("VERACRUZ_POLICY_DIR").
-            unwrap_or("../test-collateral".to_string()).clone());
+        let policy_dir = PathBuf::from(
+            env::var("VERACRUZ_POLICY_DIR")
+                .unwrap_or("../test-collateral".to_string())
+                .clone(),
+        );
         iterate_over_policy(policy_dir.as_path(), |policy_json| {
             let policy = Policy::from_json(&policy_json).unwrap();
             setup(policy.proxy_attestation_server_url().clone());
@@ -257,7 +258,8 @@ mod tests {
     #[test]
     /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
-        let (policy, policy_json, _) = read_policy(policy_path(ONE_DATA_SOURCE_POLICY).as_path()).unwrap();
+        let (policy, policy_json, _) =
+            read_policy(policy_path(ONE_DATA_SOURCE_POLICY).as_path()).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
 
         let ret = VeracruzServerEnclave::new(&policy_json);
@@ -288,7 +290,8 @@ mod tests {
     #[test]
     /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
-        let (policy, policy_json, _) = read_policy(policy_path(ONE_DATA_SOURCE_POLICY).as_path()).unwrap();
+        let (policy, policy_json, _) =
+            read_policy(policy_path(ONE_DATA_SOURCE_POLICY).as_path()).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
         let (veracruz_server, _) = init_veracruz_server_and_tls_session(&policy_json).unwrap();
@@ -311,8 +314,19 @@ mod tests {
             policy_path(BASIC_FILE_READ_WRITE_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(READ_FILE_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input.txt", data_dir(STRING_1_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(READ_FILE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[(
+                "input.txt",
+                data_dir(STRING_1_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
             &[],
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -328,7 +342,12 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(RANDOM_SOURCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[],
         );
@@ -356,7 +375,12 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(STRING_EDIT_DISTANCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[],
         );
@@ -370,7 +394,12 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(UNAUTHORIZED_KEY).as_path(),
-            Some(program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(RANDOM_SOURCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[],
         );
@@ -384,7 +413,12 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(UNAUTHORIZED_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(RANDOM_SOURCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[],
         );
@@ -398,7 +432,12 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(UNAUTHORIZED_CERT).as_path(),
             trust_path(UNAUTHORIZED_KEY).as_path(),
-            Some(program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(RANDOM_SOURCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[],
         );
@@ -412,8 +451,19 @@ mod tests {
             policy_path(GET_RANDOM_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(RANDOM_SOURCE_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(RANDOM_SOURCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[(
+                "input-0",
+                data_dir(LINEAR_REGRESSION_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
             &[],
         );
         assert!(result.is_err(), "An error should occur");
@@ -439,8 +489,19 @@ mod tests {
             policy_path(LINEAR_REGRESSION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(LINEAR_REGRESSION_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[(
+                "input-0",
+                data_dir(LINEAR_REGRESSION_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
             &[],
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -453,7 +514,12 @@ mod tests {
             policy_path(LINEAR_REGRESSION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(LINEAR_REGRESSION_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[],
         );
@@ -478,11 +544,28 @@ mod tests {
             policy_path(TWO_DATA_SOURCE_INTERSECTION_SET_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[
                 // message sends out in the reversed order
-                ("input-1", data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA).to_string_lossy().into_owned().as_str()),
-                ("input-0", data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA).to_string_lossy().into_owned().as_str()),
+                (
+                    "input-1",
+                    data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "input-0",
+                    data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
             ],
             &[],
         );
@@ -499,9 +582,28 @@ mod tests {
             policy_path(TWO_DATA_SOURCE_STRING_EDIT_DISTANCE_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(STRING_EDIT_DISTANCE_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(STRING_1_DATA).to_string_lossy().into_owned().as_str()),
-                          ("input-1", data_dir(STRING_2_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(STRING_EDIT_DISTANCE_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[
+                (
+                    "input-0",
+                    data_dir(STRING_1_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "input-1",
+                    data_dir(STRING_2_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+            ],
             &[],
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -520,8 +622,19 @@ mod tests {
             policy_path(ONE_DATA_SOURCE_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(LINEAR_REGRESSION_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(LINEAR_REGRESSION_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(LINEAR_REGRESSION_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[(
+                "input-0",
+                data_dir(LINEAR_REGRESSION_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
             &[],
         );
         assert!(result.is_ok(), "error:{:?}", result);
@@ -550,10 +663,27 @@ mod tests {
             policy_path(TWO_DATA_SOURCE_PRIVATE_SET_INTERSECTION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(PERSON_SET_INTERSECTION_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(PERSON_SET_INTERSECTION_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[
-                ("input-0", data_dir(PERSON_SET_1_DATA).to_string_lossy().into_owned().as_str()),
-                ("input-1", data_dir(PERSON_SET_2_DATA).to_string_lossy().into_owned().as_str()),
+                (
+                    "input-0",
+                    data_dir(PERSON_SET_1_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "input-1",
+                    data_dir(PERSON_SET_2_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
             ],
             &[],
         );
@@ -571,10 +701,35 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
-            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-                            ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(NUMBER_STREM_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[(
+                "input-0",
+                data_dir(SINGLE_F64_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
+            &[
+                (
+                    "stream-0",
+                    data_dir(VEC_F64_1_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "stream-1",
+                    data_dir(VEC_F64_2_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+            ],
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -586,9 +741,26 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
-            &[("input-0", data_dir(SINGLE_F64_DATA).to_string_lossy().into_owned().as_str())],
-            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str())],
+            Some(
+                program_path(NUMBER_STREM_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
+            &[(
+                "input-0",
+                data_dir(SINGLE_F64_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
+            &[(
+                "stream-0",
+                data_dir(VEC_F64_1_DATA)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            )],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -600,10 +772,29 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(NUMBER_STREM_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
-            &[("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-                            ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str())],
+            &[
+                (
+                    "stream-0",
+                    data_dir(VEC_F64_1_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "stream-1",
+                    data_dir(VEC_F64_2_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+            ],
         );
         assert!(result.is_err(), "An error should occur");
     }
@@ -615,12 +806,35 @@ mod tests {
             policy_path(NUMBER_STREAM_ACCUMULATION_POLICY).as_path(),
             trust_path(CLIENT_CERT).as_path(),
             trust_path(CLIENT_KEY).as_path(),
-            Some(program_path(NUMBER_STREM_WASM).to_string_lossy().into_owned().as_str()),
+            Some(
+                program_path(NUMBER_STREM_WASM)
+                    .to_string_lossy()
+                    .into_owned()
+                    .as_str(),
+            ),
             &[],
             &[
-                ("stream-0", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
-                ("stream-1", data_dir(VEC_F64_2_DATA).to_string_lossy().into_owned().as_str()),
-                ("stream-2", data_dir(VEC_F64_1_DATA).to_string_lossy().into_owned().as_str()),
+                (
+                    "stream-0",
+                    data_dir(VEC_F64_1_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "stream-1",
+                    data_dir(VEC_F64_2_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
+                (
+                    "stream-2",
+                    data_dir(VEC_F64_1_DATA)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
             ],
         );
         assert!(result.is_err(), "An error should occur");
@@ -632,18 +846,26 @@ mod tests {
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn test_performance_idash2017_with_attestation() {
-        iterate_over_data(data_dir(LOGISTICS_REGRESSION_DATA_PATH).as_path(), |data_path| {
-            info!("Data path: {}", data_path.to_string_lossy());
-            let result = test_template::<(Vec<f64>, f64, f64)>(
-                policy_path(IDASH2017_POLICY).as_path(),
-                trust_path(CLIENT_CERT).as_path(),
-                trust_path(CLIENT_KEY).as_path(),
-                Some(program_path(LOGISTICS_REGRESSION_WASM).to_string_lossy().into_owned().as_str()),
-                &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
-                &[],
-            );
-            assert!(result.is_ok(), "error:{:?}", result);
-        });
+        iterate_over_data(
+            data_dir(LOGISTICS_REGRESSION_DATA_PATH).as_path(),
+            |data_path| {
+                info!("Data path: {}", data_path.to_string_lossy());
+                let result = test_template::<(Vec<f64>, f64, f64)>(
+                    policy_path(IDASH2017_POLICY).as_path(),
+                    trust_path(CLIENT_CERT).as_path(),
+                    trust_path(CLIENT_KEY).as_path(),
+                    Some(
+                        program_path(LOGISTICS_REGRESSION_WASM)
+                            .to_string_lossy()
+                            .into_owned()
+                            .as_str(),
+                    ),
+                    &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
+                    &[],
+                );
+                assert!(result.is_ok(), "error:{:?}", result);
+            },
+        );
     }
 
     #[test]
@@ -660,7 +882,12 @@ mod tests {
                 policy_path(MACD_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(program_path(MACD_WASM).to_string_lossy().into_owned().as_str()),
+                Some(
+                    program_path(MACD_WASM)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
             );
@@ -688,7 +915,12 @@ mod tests {
                 policy_path(MULTIPLE_KEY_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(program_path(MACD_WASM).to_string_lossy().into_owned().as_str()),
+                Some(
+                    program_path(MACD_WASM)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
             );
@@ -710,7 +942,12 @@ mod tests {
                 policy_path(PRIVATE_SET_INTER_SUM_POLICY).as_path(),
                 trust_path(CLIENT_CERT).as_path(),
                 trust_path(CLIENT_KEY).as_path(),
-                Some(program_path(INTERSECTION_SET_SUM_WASM).to_string_lossy().into_owned().as_str()),
+                Some(
+                    program_path(INTERSECTION_SET_SUM_WASM)
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_str(),
+                ),
                 &[("input-0", data_path.to_string_lossy().into_owned().as_str())],
                 &[],
             );
@@ -776,10 +1013,7 @@ mod tests {
 
         info!("             Enclave generated a self-signed certificate:");
 
-        let mut client_session = create_client_test_session(
-            client_cert_path,
-            client_key_path,
-        )?;
+        let mut client_session = create_client_test_session(client_cert_path, client_key_path)?;
         info!(
             "             Initialasation time (μs): {}.",
             time_init.elapsed().as_micros()
@@ -844,9 +1078,7 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
-                check_runtime_manager_hash(&policy,
-                                           &client_session,
-                                           &test_target_platform)?;
+                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
 
                 let response = provision_program(
                     Path::new(path),
@@ -881,9 +1113,7 @@ mod tests {
                     &client_tls_tx,
                     &client_tls_rx,
                 )?;
-                check_runtime_manager_hash(&policy,
-                                           &client_session,
-                                           &test_target_platform)?;
+                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
                 info!(
                     "             Data provider hash response time (μs): {}.",
                     time_data_hash.elapsed().as_micros()
@@ -927,9 +1157,7 @@ mod tests {
                     stream_data_vec.push(decoded_data);
                 }
 
-                check_runtime_manager_hash(&policy,
-                                           &client_session,
-                                           &test_target_platform)?;
+                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
 
                 // Reverse the vec so we can use `pop` for the `first` element of the list.
                 // In each round of stream, the loop pops an element from the `stream_data_vec`
@@ -1002,9 +1230,7 @@ mod tests {
                         &client_tls_tx,
                         &client_tls_rx,
                     )?;
-                    check_runtime_manager_hash(&policy,
-                                               &client_session,
-                                               &test_target_platform)?;
+                    check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
                     info!(
                         "             Result retriever hash response time (μs): {}.",
                         time_result_hash.elapsed().as_micros()
@@ -1073,9 +1299,7 @@ mod tests {
                     &client_tls_rx,
                 )?;
 
-                check_runtime_manager_hash(&policy,
-                                           &client_session,
-                                           &test_target_platform)?;
+                check_runtime_manager_hash(&policy, &client_session, &test_target_platform)?;
                 info!(
                     "             Result retriever hash response time (μs): {}.",
                     time_result_hash.elapsed().as_micros()
@@ -1194,9 +1418,8 @@ mod tests {
 
     /// Auxiliary function: read policy file
     fn read_policy(fname: &Path) -> Result<(Policy, String, String), VeracruzServerError> {
-        let policy_json =
-            std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname.to_string_lossy()));
-
+        let policy_json = std::fs::read_to_string(fname)
+            .expect(&format!("Cannot open file {}", fname.to_string_lossy()));
 
         let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
         let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
@@ -1302,7 +1525,7 @@ mod tests {
                 Err(_) => return false,
                 Ok(bytes) => bytes,
             };
-    
+
             if &received[..] != expected_bytes.as_slice() {
                 return false;
             } else {
@@ -1311,34 +1534,49 @@ mod tests {
         }
     }
 
-    fn check_runtime_manager_hash(policy: &Policy,
-                                  client_session: &dyn rustls::Session,
-                                  test_target_platform: &Platform,
+    fn check_runtime_manager_hash(
+        policy: &Policy,
+        client_session: &dyn rustls::Session,
+        test_target_platform: &Platform,
     ) -> Result<(), VeracruzServerError> {
         match client_session.get_peer_certificates() {
             None => {
-                return Err(VeracruzServerError::MissingFieldError("NO PEER CERTIFICATES. WTF?"));
-            },
+                return Err(VeracruzServerError::MissingFieldError(
+                    "NO PEER CERTIFICATES. WTF?",
+                ));
+            }
             Some(certs) => {
                 let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref()).unwrap();
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
-                let encoded_extension_id: [u8; 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];
+                let encoded_extension_id: [u8; 3] = [
+                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40
+                        + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
+                ];
                 match ues.get(&encoded_extension_id[..]) {
                     None => {
                         println!("Our extension is not present. This should be fatal");
-                        return Err(VeracruzServerError::MissingFieldError("MY CRAZY CUSTOM EXTENSION AIN'T TERE"));
-                    },
+                        return Err(VeracruzServerError::MissingFieldError(
+                            "MY CRAZY CUSTOM EXTENSION AIN'T TERE",
+                        ));
+                    }
                     Some(data) => {
-                        let extension_data = data.read_all(VeracruzServerError::MissingFieldError("CAN'T READ MY CRAZY CUSTOM EXTENSION"), |input| {
-                            Ok(input.read_bytes_to_end())
-                        })?;
-                        if !compare_policy_hash(extension_data.as_slice_less_safe(), &policy, test_target_platform) {
-                               // The hashes didn't match
-                               println!("None of the hashes matched.");
-                               return Err(VeracruzServerError::InvalidRuntimeManagerHash);
+                        let extension_data = data.read_all(
+                            VeracruzServerError::MissingFieldError(
+                                "CAN'T READ MY CRAZY CUSTOM EXTENSION",
+                            ),
+                            |input| Ok(input.read_bytes_to_end()),
+                        )?;
+                        if !compare_policy_hash(
+                            extension_data.as_slice_less_safe(),
+                            &policy,
+                            test_target_platform,
+                        ) {
+                            // The hashes didn't match
+                            println!("None of the hashes matched.");
+                            return Err(VeracruzServerError::InvalidRuntimeManagerHash);
                         }
                         return Ok(());
                     }
@@ -1490,9 +1728,7 @@ mod tests {
         let mut client_cert_vec = std::vec::Vec::new();
         client_cert_vec.push(client_cert);
         client_config.set_single_client_cert(client_cert_vec, client_priv_key);
-        client_config
-            .root_store
-            .add(&proxy_service_cert).unwrap();
+        client_config.root_store.add(&proxy_service_cert).unwrap();
 
         let dns_name = webpki::DNSNameRef::try_from_ascii_str("ComputeEnclave.dev")?;
         Ok(rustls::ClientSession::new(

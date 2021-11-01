@@ -15,6 +15,7 @@ use crate::{
 };
 use bincode::{deserialize, serialize};
 use err_derive::Error;
+use policy_utils::policy::Policy;
 use std::{
     env,
     fs::{File, OpenOptions},
@@ -25,10 +26,7 @@ use std::{
     result,
     string::ToString,
 };
-use veracruz_utils::{
-    platform::icecap::message::{Header, Request, Response},
-    policy::policy::Policy,
-};
+use veracruz_utils::platform::icecap::message::{Header, Request, Response};
 
 // For now, certain IceCap host configuration parameters must be passed as environment variables.
 // See veracruz/icecap/nix/host/config.nix for an illustration of their usage.
@@ -117,7 +115,11 @@ impl Configuration {
     // Clean up in case of previous failure.
     // As the IceCap shadow VMM matures, this will become unnecessary.
     fn hack_ensure_not_realm_running() {
-        Command::new("pkill").arg("-f").arg("icecap-host run").status().unwrap();
+        Command::new("pkill")
+            .arg("-f")
+            .arg("icecap-host run")
+            .status()
+            .unwrap();
     }
 
     fn ensure_successful(exit_status: ExitStatus) -> Result<()> {

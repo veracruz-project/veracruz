@@ -10,15 +10,15 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
+use policy_utils::{policy::Policy, Platform};
 use ring::signature::KeyPair;
 use rustls::Session;
 use std::{
-    path,
     io::{Read, Write},
+    path,
     str::from_utf8,
 };
-use veracruz_utils::policy::policy::Policy;
-use veracruz_utils::{platform::Platform, VERACRUZ_RUNTIME_HASH_EXTENSION_ID};
+use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 use webpki;
 
 // Use Mockall for testing
@@ -42,7 +42,7 @@ impl VeracruzClient {
     /// Otherwise return Err(msg) with the error message as String
     fn read_all_bytes_in_file<P>(filename: P) -> Result<Vec<u8>, VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         let mut file = std::fs::File::open(filename)?;
         let mut buffer = std::vec::Vec::new();
@@ -57,7 +57,7 @@ impl VeracruzClient {
     // TODO: use generic functions to unify read_cert and read_private_key
     fn read_cert<P>(filename: P) -> Result<rustls::Certificate, VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
@@ -76,7 +76,7 @@ impl VeracruzClient {
     /// Otherwise return Err(msg) with the error message as String
     fn read_private_key<P>(filename: P) -> Result<rustls::PrivateKey, VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
@@ -126,7 +126,7 @@ impl VeracruzClient {
         public_key: &[u8],
     ) -> Result<(), VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         let cert_file = std::fs::File::open(&client_cert_filename)?;
         let parsed_cert = x509_parser::pem::Pem::read(std::io::BufReader::new(cert_file))?;
@@ -161,10 +161,11 @@ impl VeracruzClient {
     ) -> Result<VeracruzClient, VeracruzClientError>
     where
         P1: AsRef<path::Path>,
-        P2: AsRef<path::Path>
+        P2: AsRef<path::Path>,
     {
         let policy = Policy::from_json(&policy_json)?;
-        let policy_hash = policy.policy_hash()
+        let policy_hash = policy
+            .policy_hash()
             .expect("policy did not hash json?")
             .to_string();
 
@@ -188,16 +189,14 @@ impl VeracruzClient {
     ) -> Result<VeracruzClient, VeracruzClientError>
     where
         P1: AsRef<path::Path>,
-        P2: AsRef<path::Path>
+        P2: AsRef<path::Path>,
     {
         let client_cert = Self::read_cert(&client_cert_filename)?;
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
         // check if the certificate is valid
         let key_pair = ring::signature::RsaKeyPair::from_der(client_priv_key.0.as_slice())
-            .map_err(|err| {
-                VeracruzClientError::RingError(format!("from_der failed:{:?}", err))
-            })?;
+            .map_err(|err| VeracruzClientError::RingError(format!("from_der failed:{:?}", err)))?;
         Self::check_certificate_validity(&client_cert_filename, key_pair.public_key().as_ref())?;
 
         let enclave_name = "ComputeEnclave.dev";
@@ -210,8 +209,12 @@ impl VeracruzClient {
         client_config.set_single_client_cert(client_cert_vec, client_priv_key);
         let proxy_service_cert = {
             let certs_pem = policy.proxy_service_cert();
-            let certs = rustls::internal::pemfile::certs(&mut certs_pem.as_bytes())
-                .map_err(|_| VeracruzClientError::X509ParserError(format!("pemfile::certs found not certificates")))?;
+            let certs =
+                rustls::internal::pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
+                    VeracruzClientError::X509ParserError(format!(
+                        "pemfile::certs found not certificates"
+                    ))
+                })?;
             certs[0].clone()
         };
         client_config.root_store.add(&proxy_service_cert)?;
@@ -240,7 +243,11 @@ impl VeracruzClient {
         })
     }
 
-    pub fn send_program(&mut self, file_name:&str, program: &Vec<u8>) -> Result<(), VeracruzClientError> {
+    pub fn send_program(
+        &mut self,
+        file_name: &str,
+        program: &Vec<u8>,
+    ) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
@@ -256,7 +263,11 @@ impl VeracruzClient {
         }
     }
 
-    pub fn send_data(&mut self,file_name:&str, data: &Vec<u8>) -> Result<(), VeracruzClientError> {
+    pub fn send_data(
+        &mut self,
+        file_name: &str,
+        data: &Vec<u8>,
+    ) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
         let serialized_data = transport_protocol::serialize_program_data(&data, file_name)?;
@@ -272,7 +283,7 @@ impl VeracruzClient {
         }
     }
 
-    pub fn get_results(&mut self, file_name:&str) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn get_results(&mut self, file_name: &str) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
@@ -324,7 +335,12 @@ impl VeracruzClient {
     }
 
     fn compare_runtime_hash(&self, received: &[u8]) -> Result<(), VeracruzClientError> {
-        let platforms = vec![Platform::SGX, Platform::TrustZone, Platform::Nitro, Platform::IceCap];
+        let platforms = vec![
+            Platform::SGX,
+            Platform::TrustZone,
+            Platform::Nitro,
+            Platform::IceCap,
+        ];
         for platform in platforms {
             let expected = match self.policy.runtime_manager_hash(&platform) {
                 Err(_) => continue, // no hash found for this platform
@@ -343,28 +359,32 @@ impl VeracruzClient {
         match self.tls_session.get_peer_certificates() {
             None => {
                 return Err(VeracruzClientError::NoPeerCertificatesError);
-            },
+            }
             Some(certs) => {
                 let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
                 // The Extension is encoded using DER, which puts the first two
                 // elements in the ID in 1 byte, and the rest get their own bytes
-                // This encoding is specified in ITU Recommendation x.690, 
+                // This encoding is specified in ITU Recommendation x.690,
                 // which is available here: https://www.itu.int/rec/T-REC-X.690-202102-I/en
                 // but it's deep inside a PDF...
-                let encoded_extension_id: [u8; 3] = [VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                                                     VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3]];
+                let encoded_extension_id: [u8; 3] = [
+                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40
+                        + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
+                ];
                 match ues.get(&encoded_extension_id[..]) {
                     None => {
                         println!("Our extension is not present. This should be fatal");
                         return Err(VeracruzClientError::RuntimeHashExtensionMissingError);
-                    },
+                    }
                     Some(data) => {
-                        let extension_data = data.read_all(VeracruzClientError::UnableToReadError, |input| {
-                            Ok(input.read_bytes_to_end())
-                        })?;
+                        let extension_data = data
+                            .read_all(VeracruzClientError::UnableToReadError, |input| {
+                                Ok(input.read_bytes_to_end())
+                            })?;
                         match self.compare_runtime_hash(extension_data.as_slice_less_safe()) {
                             Ok(_) => return Ok(()),
                             Err(err) => {
@@ -484,7 +504,10 @@ impl VeracruzClient {
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
 
-        let dest_url = format!("http://{:}/runtime_manager", self.policy.veracruz_server_url());
+        let dest_url = format!(
+            "http://{:}/runtime_manager",
+            self.policy.veracruz_server_url()
+        );
         let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
         let mut ret = client_build
             .post(dest_url.as_str())
@@ -517,7 +540,7 @@ impl VeracruzClient {
     #[cfg(test)]
     pub fn pub_read_all_bytes_in_file<P>(filename: P) -> Result<Vec<u8>, VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         VeracruzClient::read_all_bytes_in_file(filename)
     }
@@ -525,7 +548,7 @@ impl VeracruzClient {
     #[cfg(test)]
     pub fn pub_read_cert<P>(filename: P) -> Result<rustls::Certificate, VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         VeracruzClient::read_cert(filename)
     }
@@ -533,7 +556,7 @@ impl VeracruzClient {
     #[cfg(test)]
     pub fn pub_read_private_key<P>(filename: P) -> Result<rustls::PrivateKey, VeracruzClientError>
     where
-        P: AsRef<path::Path>
+        P: AsRef<path::Path>,
     {
         VeracruzClient::read_private_key(filename)
     }

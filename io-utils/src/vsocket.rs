@@ -13,7 +13,9 @@
 
 use nix::{
     sys::socket::{
-        connect, setsockopt, shutdown, socket, AddressFamily, sockopt::{ReuseAddr, ReusePort}, Shutdown, SockAddr, SockFlag, SockType,
+        connect, setsockopt, shutdown, socket,
+        sockopt::{ReuseAddr, ReusePort},
+        AddressFamily, Shutdown, SockAddr, SockFlag, SockType,
     },
     unistd::close,
 };

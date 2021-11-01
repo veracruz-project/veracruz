@@ -19,13 +19,15 @@ use std::{
 };
 
 use crate::{
-    session::{Session, Principal},
     error::SessionManagerError,
+    session::{Principal, Session},
 };
-use veracruz_utils::policy::policy::Policy;
+use policy_utils::policy::Policy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
-use rustls::{AllowAnyAuthenticatedClient, Certificate, CipherSuite, PrivateKey, RootCertStore, ServerConfig};
+use rustls::{
+    AllowAnyAuthenticatedClient, Certificate, CipherSuite, PrivateKey, RootCertStore, ServerConfig,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -107,23 +109,28 @@ impl SessionContext {
 
         for identity in policy.identities().iter() {
             let cert = convert_cert_buffer(identity.certificate())?;
-            let principal = Principal::new(cert.clone(), *identity.id(), identity.file_rights().to_vec());
+            let principal = Principal::new(
+                cert.clone(),
+                *identity.id(),
+                identity.file_rights().to_vec(),
+            );
 
             root_cert_store.add(&cert)?;
 
             principals.push(principal);
         }
-         // create the configuration
-         let mut server_config =
-         ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
+        // create the configuration
+        let mut server_config =
+            ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
 
         // Set the supported ciphersuites in the server to the one specified in
         // the policy.  This is a dumb way to do this, but I leave it up to the
         // student to find a better way (the ALL_CIPHERSUITES array is not very
         // long, anyway).
 
-        let policy_ciphersuite = CipherSuite::lookup_value(policy.ciphersuite())
-            .map_err(|_| SessionManagerError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string()))?;
+        let policy_ciphersuite = CipherSuite::lookup_value(policy.ciphersuite()).map_err(|_| {
+            SessionManagerError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string())
+        })?;
         let mut supported_ciphersuite = None;
 
         for this_supported_cs in rustls::ALL_CIPHERSUITES.iter() {
@@ -164,7 +171,7 @@ impl SessionContext {
     pub fn server_config(&self) -> Result<ServerConfig, SessionManagerError> {
         match &self.server_config {
             Some(config) => return Ok(config.clone()),
-            None => return Err(SessionManagerError::InvalidStateError), 
+            None => return Err(SessionManagerError::InvalidStateError),
         }
     }
 

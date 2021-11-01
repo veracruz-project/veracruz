@@ -14,12 +14,7 @@
 
 use super::error::PolicyError;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    string::String,
-    vec::Vec,
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,17 +44,14 @@ pub struct FileRights {
     /// The file name
     file_name: String,
     /// The associated right, when someone open the file
-    rights : u32,
+    rights: u32,
 }
 
 impl FileRights {
     /// Creates a new file permission.
     #[inline]
     pub fn new(file_name: String, rights: u32) -> Self {
-        Self {
-            file_name,
-            rights,
-        }
+        Self { file_name, rights }
     }
 
     /// Returns the file_name.
@@ -77,15 +69,18 @@ impl FileRights {
     /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
     #[inline]
     pub fn to_right_map(file_right_vec: &[FileRights]) -> HashMap<PathBuf, Rights> {
-        file_right_vec.iter().fold(HashMap::new(), |mut acc, FileRights{file_name, rights}| {
-            acc.insert(file_name.into(), Rights::from_bits_truncate(*rights as u64));
-            acc
-        })
+        file_right_vec.iter().fold(
+            HashMap::new(),
+            |mut acc, FileRights { file_name, rights }| {
+                acc.insert(file_name.into(), Rights::from_bits_truncate(*rights as u64));
+                acc
+            },
+        )
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Program 
+// Program
 ////////////////////////////////////////////////////////////////////////////////
 /// Defines a program that can be loaded into execution engine.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

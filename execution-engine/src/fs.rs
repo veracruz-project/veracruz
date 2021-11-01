@@ -14,13 +14,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use policy_utils::principal::{Principal, RightsTable, StandardStream};
 use std::{
     collections::HashMap,
     convert::AsRef,
     path::{Path, PathBuf},
     vec::Vec,
 };
-use veracruz_utils::policy::principal::{Principal, RightsTable, StandardStream};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,

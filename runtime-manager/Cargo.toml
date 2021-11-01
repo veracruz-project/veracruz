@@ -16,10 +16,10 @@ name = "runtime_manager_enclave"
 path = "src/main.rs"
 
 [features]
-sgx = ["transport-protocol/sgx", "session-manager/sgx", "veracruz-utils/sgx", "wasmi/mesalock_sgx", "execution-engine/sgx", "rustls/mesalock_sgx", "protobuf/mesalock_sgx", "ring/mesalock_sgx", "sgx_types" , "sgx_tstd", "sgx_tcrypto", "sgx_tdh", "wasi-types/sgx"]
-tz = ["wasmi/std", "session-manager/tz", "execution-engine/tz", "veracruz-utils/tz", "libc", "optee-utee-sys", "optee-utee", "serde_json/alloc", "wasi-types/std"]
-nitro = [ "execution-engine/std", "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "veracruz-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode", "wasi-types/std"]
-icecap = ["veracruz-utils/icecap", "transport-protocol/icecap", "execution-engine/icecap", "session-manager/icecap", "psa-attestation", "wasmi/non_sgx", "serde", "bincode", "log", "libm", "icecap-wrapper"]
+sgx = ["transport-protocol/sgx", "session-manager/sgx", "veracruz-utils/sgx", "policy-utils/sgx", "wasmi/mesalock_sgx", "execution-engine/sgx", "rustls/mesalock_sgx", "protobuf/mesalock_sgx", "ring/mesalock_sgx", "sgx_types" , "sgx_tstd", "sgx_tcrypto", "sgx_tdh", "wasi-types/sgx"]
+tz = ["wasmi/std", "session-manager/tz", "execution-engine/tz", "veracruz-utils/tz", "policy-utils/tz", "libc", "optee-utee-sys", "optee-utee", "serde_json/alloc", "wasi-types/std"]
+nitro = [ "execution-engine/std", "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "veracruz-utils/nitro", "policy-utils/std", "io-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode", "wasi-types/std"]
+icecap = ["veracruz-utils/icecap", "policy-utils/icecap", "transport-protocol/icecap", "execution-engine/icecap", "session-manager/icecap", "psa-attestation", "wasmi/non_sgx", "serde", "bincode", "log", "libm", "icecap-wrapper"]
 
 [dependencies]
 session-manager = { path = "../session-manager"}
@@ -30,6 +30,8 @@ protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", bran
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 veracruz-utils = { path = "../veracruz-utils" }
+policy-utils = { path = "../policy-utils" }
+io-utils = { path = "../io-utils", optional = true }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 hex = { version = "=0.4.2", default-features = false }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }

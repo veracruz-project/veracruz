@@ -23,12 +23,12 @@ use crate::Options;
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
+use policy_utils::principal::Principal;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::{
     convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
 };
-use veracruz_utils::policy::principal::Principal;
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
     IoVec, LookupFlags, OpenFlags, RiFlags, Rights, RoFlags, SdFlags, SetTimeFlags, SiFlags,

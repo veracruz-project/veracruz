@@ -6,16 +6,17 @@ edition = "2018"
 description = "TLS endpoint and session management for the trusted Veracruz runtime"
 
 [features]
-sgx = ["veracruz-utils/sgx", "sgx_tstd", "sgx_types", "rustls/mesalock_sgx", "webpki/mesalock_sgx", "ring/mesalock_sgx", "webpki-roots/mesalock_sgx"] 
+sgx = ["veracruz-utils/sgx", "policy-utils/sgx", "sgx_tstd", "sgx_types", "rustls/mesalock_sgx", "webpki/mesalock_sgx", "ring/mesalock_sgx", "webpki-roots/mesalock_sgx"] 
 # NOTE: turn on the `std` on ring for Error trait
-tz = ["veracruz-utils/tz", "webpki/default", "webpki-roots/default", "ring/std", "ring/non_sgx", "optee-utee", "rustls/default"]
-nitro = ["ring/std", "ring/non_sgx"]
-icecap = ["veracruz-utils/icecap", "ring/std", "ring/non_sgx"]
-std = ["veracruz-utils/std", "ring/std"]
+tz = ["veracruz-utils/tz", "policy-utils/tz", "webpki/default", "webpki-roots/default", "ring/std", "ring/non_sgx", "optee-utee", "rustls/default"]
+nitro = ["ring/std", "ring/non_sgx", "policy-utils/std"]
+icecap = ["veracruz-utils/icecap", "ring/std", "ring/non_sgx", "policy-utils/icecap"]
+std = ["veracruz-utils/std", "ring/std", "policy-utils/std"]
 
 [dependencies]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+policy-utils = { path = "../policy-utils" }
 veracruz-utils = { path = "../veracruz-utils" }
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
 webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git" , branch = "veracruz"}
