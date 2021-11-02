@@ -9,13 +9,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use std::vec::Vec;
+
 use crate::managers::RuntimeManagerError;
 
 /// Break up a single array slice containing multiple certs, using the lengths in cert_lengths, into a 2D Vec
-pub fn break_up_cert_array(cert_array: &[u8], cert_lengths: &[u32]) -> Result<std::vec::Vec<std::vec::Vec<u8>>, RuntimeManagerError> {
-
-    let mut certs: std::vec::Vec<std::vec::Vec<u8> > = std::vec::Vec::new();
-
+pub fn break_up_cert_array(cert_array: &[u8], cert_lengths: &[u32]) -> Result<Vec<Vec<u8>>, RuntimeManagerError> {
+    let mut certs: Vec<Vec<u8>> = Vec::new();
     let mut aggregate_length: usize = 0;
     // break the `cert_array` up according to the values in `certificate_lengths`
     // and place them in `certs`

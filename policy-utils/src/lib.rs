@@ -58,6 +58,9 @@ pub mod principal;
 /// A type capturing the platform the enclave is running on.
 #[derive(Debug)]
 pub enum Platform {
+    /// The enclave is running as a Linux process, either unprotected or as part of a
+    /// protected Virtual Machine-like enclaving mechanism.
+    Linux,
     /// The enclave is running under Intel SGX.
     SGX,
     /// The enclave is running under Arm TrustZone.
@@ -79,6 +82,7 @@ impl FromStr for Platform {
             "trustzone" => Ok(Platform::TrustZone),
             "nitro" => Ok(Platform::Nitro),
             "icecap" => Ok(Platform::IceCap),
+            "linux" => Ok(Platform::Linux),
             _ => Err(PlatformError::InvalidPlatform(format!("{}", s))),
         }
     }
@@ -88,6 +92,7 @@ impl FromStr for Platform {
 impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Platform::Linux => write!(f, "linux"),
             Platform::SGX => write!(f, "sgx"),
             Platform::TrustZone => write!(f, "trustzone"),
             Platform::Nitro => write!(f, "nitro"),

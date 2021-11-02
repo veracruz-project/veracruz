@@ -1,6 +1,6 @@
 //! Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -15,12 +15,14 @@ use actix_http::ResponseBuilder;
 use actix_web::{error, http::StatusCode, HttpResponse};
 #[cfg(feature = "nitro")]
 use base64;
-use curl::easy::{Easy, List};
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
+use io_utils::{error::SocketError, http::HttpError};
 use log::debug;
 use std::io::Read;
+#[cfg(feature = "linux")]
+use veracruz_utils::platform::linux::LinuxRootEnclaveResponse;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -72,33 +74,35 @@ pub enum VeracruzServerError {
     MpscSendVecU8Error(#[error(source)] std::sync::mpsc::SendError<std::vec::Vec<u8>>),
     #[error(display = "VeracruzServer: Mpsc TryRecvError: {}.", _0)]
     MpscTryRecvError(#[error(source)] std::sync::mpsc::TryRecvError),
-    #[error(display = "VeracruzServer: CurlError: {:?}.", _0)]
-    CurlError(#[error(source)] curl::Error),
+    /// A HTTP error was produced.
+    #[error(display = "Http error: {}.", _0)]
+    HttpError(HttpError),
     #[cfg(feature = "sgx")]
     #[error(display = "VeracruzServer: SGXError: {:?}.", _0)]
     SGXError(sgx_types::sgx_status_t),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
-    RuntimeManagerMessageStatus(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
-    #[cfg(feature = "nitro")]
-    #[error(display = "VeracruzServer: NitroStatus: {:?}", _0)]
-    NitroStatus(veracruz_utils::platform::nitro::nitro::NitroStatus),
-    #[cfg(feature = "nitro")]
+    RuntimeManagerMessageStatus(veracruz_utils::platform::vm::RuntimeManagerMessage),
+    #[cfg(any(feature = "nitro", feature = "linux"))]
+    #[error(display = "VeracruzServer: VMStatus: {:?}", _0)]
+    VMStatus(veracruz_utils::platform::vm::VMStatus),
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(
         display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}",
         _0
     )]
-    InvalidRuntimeManagerMessage(veracruz_utils::platform::nitro::nitro::RuntimeManagerMessage),
+    InvalidRuntimeManagerMessage(veracruz_utils::platform::vm::RuntimeManagerMessage),
     #[cfg(feature = "nitro")]
     #[error(
         display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
         _0
     )]
-    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
     #[cfg(feature = "nitro")]
+    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
+    #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
     #[cfg(feature = "nitro")]
@@ -172,6 +176,12 @@ pub enum VeracruzServerError {
     DirectMessageError(String, StatusCode),
     #[error(display = "VeracruzServer: Error message {}.", _0)]
     DirectStrError(&'static str),
+    #[cfg(feature = "linux")]
+    #[error(
+        display = "VeracruzServer: Unexpected reply from Linux Root enclave {:?}.",
+        _0
+    )]
+    LinuxRootEnclaveUnexpectedResponse(LinuxRootEnclaveResponse),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
     #[error(display = "VeracruzServer: Invalid runtime manager hash")]
@@ -184,6 +194,9 @@ pub enum VeracruzServerError {
     // #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Base64 Decode error:{:?}", _0)]
     Base64Decode(base64::DecodeError),
+    /// Some socket-related functionality failed.
+    #[error(display = "VeracruzServer: socket error:{:?}", _0)]
+    SocketError(SocketError),
     /// A remote http server returned a non-success (200) status
     #[cfg(feature = "nitro")]
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
@@ -235,9 +248,9 @@ pub trait VeracruzServer {
     where
         Self: Sized;
 
-    fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
+    fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
 
-    fn new_tls_session(&self) -> Result<u32, VeracruzServerError>;
+    fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError>;
 
     fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError>;
 
@@ -249,75 +262,4 @@ pub trait VeracruzServer {
     ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError>;
 
     fn close(&mut self) -> Result<bool, VeracruzServerError>;
-}
-
-pub fn send_proxy_attestation_server_start(
-    url_base: &str,
-    protocol: &str,
-    firmware_version: &str,
-) -> Result<transport_protocol::ProxyAttestationServerResponse, VeracruzServerError> {
-    let serialized_start_msg = transport_protocol::serialize_start_msg(protocol, firmware_version)?;
-    let encoded_start_msg: String = base64::encode(&serialized_start_msg);
-    let url = format!("{:}/Start", url_base);
-
-    let received_body: String = post_buffer(&url, &encoded_start_msg)?;
-
-    let body_vec = base64::decode(&received_body)?;
-    let response = transport_protocol::parse_proxy_attestation_server_response(&body_vec)?;
-    return Ok(response);
-}
-
-pub fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerError> {
-    let mut buffer_reader = stringreader::StringReader::new(buffer);
-
-    let mut curl_request = Easy::new();
-    curl_request.url(&url)?;
-    let mut headers = List::new();
-    headers.append("Content-Type: application/octet-stream")?;
-    curl_request.http_headers(headers)?;
-    curl_request.post(true)?;
-    curl_request.post_field_size(buffer.len() as u64)?;
-
-    let mut received_body = std::string::String::new();
-    let mut received_header = std::string::String::new();
-    {
-        let mut transfer = curl_request.transfer();
-
-        transfer.read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))?;
-        transfer.write_function(|buf| {
-            received_body.push_str(
-                std::str::from_utf8(buf)
-                    .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-            );
-            Ok(buf.len())
-        })?;
-
-        transfer.header_function(|buf| {
-            received_header.push_str(
-                std::str::from_utf8(buf)
-                    .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-            );
-            true
-        })?;
-
-        transfer.perform()?;
-    }
-    let header_lines: Vec<&str> = {
-        let lines = received_header.split("\n");
-        lines.collect()
-    };
-    println!(
-        "veracruz_server::post_buffer received header (from url:{:?}):{:?}",
-        url, received_header
-    );
-    if !received_header.contains("HTTP/1.1 200 OK\r") {
-        return Err(VeracruzServerError::ReceivedNonSuccessPostStatusError);
-    }
-
-    debug!(
-        "veracruz_server::post_buffer header_lines:{:?}",
-        header_lines
-    );
-
-    return Ok(received_body);
 }

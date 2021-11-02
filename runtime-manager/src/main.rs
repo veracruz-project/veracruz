@@ -1,5 +1,7 @@
 //! The Runtime Manager enclave
 //!
+//! Includes the entry point for the Nitro and Linux backends.
+//!
 //! ## Authors
 //!
 //! The Veracruz Development Team.
@@ -16,6 +18,8 @@
 
 #[cfg(feature = "tz")]
 pub mod runtime_manager_trustzone;
+#[cfg(feature = "linux")]
+pub mod runtime_manager_linux;
 #[cfg(feature = "tz")]
 pub use crate::runtime_manager_trustzone::*;
 
@@ -24,15 +28,20 @@ pub mod runtime_manager_icecap;
 #[cfg(feature = "icecap")]
 pub use crate::runtime_manager_icecap::*;
 
-pub mod managers;
-
 #[cfg(feature = "nitro")]
 pub mod runtime_manager_nitro;
 
+pub mod managers;
 mod runtime_manager;
 
 #[cfg(feature = "nitro")]
 fn main() -> Result<(), String> {
     runtime_manager_nitro::nitro_main()
-        .map_err(|err| format!("Runtime Manager::main nitro_main returned error:{:?}", err))
+        .map_err(|err| format!("Runtime Manager::main nitro_main returned error: {:?}", err))
+}
+
+#[cfg(feature = "linux")]
+fn main() -> Result<(), String> {
+    runtime_manager_linux::linux_main()
+        .map_err(|err| format!("Runtime Manager::main linux_main returned error: {:?}", err))
 }

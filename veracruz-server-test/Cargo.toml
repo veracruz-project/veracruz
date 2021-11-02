@@ -10,7 +10,8 @@ description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime 
 sgx = ["sgx_ucrypto", "sgx_urts", "sgx_types", "veracruz-server/sgx", "proxy-attestation-server/sgx", "transport-protocol/sgx_attestation", "psa-attestation/sgx", "policy-utils/std", "veracruz-utils/std"]
 tz = ["veracruz-server/tz", "proxy-attestation-server/tz", "transport-protocol/tz", "psa-attestation/tz", "policy-utils/std", "veracruz-utils/std"]
 nitro = ["veracruz-server/nitro", "proxy-attestation-server/nitro", "policy-utils/std", "veracruz-utils/nitro"]
-icecap = ["veracruz-server/icecap", "proxy-attestation-server/icecap", "policy-utils/icecap", "veracruz-utils/icecap"]
+icecap = ["veracruz-server/icecap", "proxy-attestation-server/icecap", "policy-utils/icecap", "veracruz-utils/icecap", "psa-attestation/icecap"]
+linux = ["veracruz-server/linux", "policy-utils/std", "veracruz-utils/linux", "proxy-attestation-server/linux", "psa-attestation/linux"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
@@ -32,7 +33,7 @@ untrusted = "0.6.2"
 base64 = "0.10.1"
 stringreader = "0.1.1"
 serde_json = "1.0"
-serde = { version = "1.0.97", features = ["derive"] }
+serde = { git = "https://github.com/veracruz-project/serde.git", features=["derive"], branch = "veracruz" }
 percent-encoding = "2.1.0"
 openssl = "0.10.24"
 rand = "0.7.0"

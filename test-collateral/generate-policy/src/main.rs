@@ -543,12 +543,46 @@ fn compute_program_hash(argument: &PathBuf) -> String {
     if let Ok(mut file) = File::open(argument) {
         let mut buffer = vec![];
 
-        file.read_to_end(&mut buffer).expect("Failed to read file.");
+        file.read_to_end(&mut buffer).unwrap_or_else(|e| {
+            abort_with(format!(
+                "Failed to read file: {:?}.  Error produced: {}.",
+                argument, e
+            ));
+        });
 
         return pretty_digest(&mut buffer);
     } else {
-        abort_with("Failed to open WASM program binary.");
+        abort_with(format!(
+            "Failed to open WASM program binary: {:?}.",
+            argument
+        ));
     }
+}
+
+/// Computes the Linux hash of the Runtime Manager enclave using a SHA256
+/// digest of the runtime manager binary's content.
+fn compute_linux_enclave_hash(arguments: &Arguments) -> Option<String> {
+    info!("Computing Linux enclave hash.");
+
+    let css_file = match &arguments.css_file {
+        None => {
+            warn!("No Linux CSS file specified.");
+            warn!("Continuing without computing a Linux runtime manager hash.");
+
+            return None;
+        }
+        Some(css_file) => {
+            info!("Measuring content of: {:?}.", css_file);
+
+            css_file
+        }
+    };
+
+    let hash = compute_program_hash(css_file);
+
+    info!("Computed sha256sum of Linux CSS file: {:?}.", hash);
+
+    Some(hash)
 }
 
 /// Computes the SGX hash of the Runtime Manager enclave making use of the external
@@ -849,6 +883,8 @@ fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
     let sgx_hash = compute_sgx_enclave_hash(arguments);
+    let linux_hash = compute_linux_enclave_hash(arguments);
+
     let policy = Policy::new(
         serialize_identities(arguments),
         serialize_binaries(arguments),
@@ -861,8 +897,9 @@ fn serialize_json(arguments: &Arguments) -> Value {
         ),
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
+        linux_hash.clone(),
         sgx_hash.clone(),
-        // TODO should be tz_hash
+        // TODO: should be tz_hash
         sgx_hash.clone(),
         compute_nitro_enclave_hash(arguments),
         compute_icecap_enclave_hash(arguments),

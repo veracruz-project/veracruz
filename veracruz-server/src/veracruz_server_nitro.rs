@@ -1,6 +1,6 @@
 //! Nitro-Enclave-specific material for the Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -13,12 +13,19 @@
 pub mod veracruz_server_nitro {
     use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
     use curl::easy::{Easy, List};
-    use io_utils::nitro::NitroEnclave;
+    use io_utils::{
+        http::{post_buffer, send_proxy_attestation_server_start, HttpError},
+        nitro::NitroEnclave,
+    };
     use policy_utils::policy::Policy;
     use std::io::Read;
-    use veracruz_utils::platform::nitro::nitro::{NitroStatus, RuntimeManagerMessage};
+    use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
+    /// The protocol to use when interacting with the proxy attestation server.
+    const PROXY_ATTESTATION_PROTOCOL: &str = "nitro";
+    /// The protocol version we are using with the proxy attestation server.
+    const FIRMWARE_VERSION: &str = "0.0";
 
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
@@ -29,8 +36,19 @@ pub mod veracruz_server_nitro {
             // Set up, initialize Nitro Root Enclave
             let policy: Policy = Policy::from_json(policy_json)?;
 
-            let (challenge, challenge_id) =
-                send_attestation_start(policy.proxy_attestation_server_url())?;
+            let (challenge_id, challenge) = send_proxy_attestation_server_start(
+                policy.proxy_attestation_server_url(),
+                PROXY_ATTESTATION_PROTOCOL,
+                FIRMWARE_VERSION,
+            )
+            .map_err(|e| {
+                eprintln!(
+                    "Failed to start proxy attestation process.  Error produced: {}.",
+                    e
+                );
+
+                VeracruzServerError::HttpError(e)
+            })?;
 
             println!("VeracruzServerNitro::new instantiating Runtime Manager");
             #[cfg(feature = "debug")]
@@ -89,18 +107,21 @@ pub mod veracruz_server_nitro {
                 _ => return Err(VeracruzServerError::RuntimeManagerMessageStatus(message)),
             };
             match status {
-                NitroStatus::Success => (),
-                _ => return Err(VeracruzServerError::NitroStatus(status)),
+                VMStatus::Success => (),
+                _ => return Err(VeracruzServerError::VMStatus(status)),
             }
             println!("VeracruzServerNitro::new complete. Returning");
             return Ok(meta);
         }
 
-        fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(
+            &mut self,
+            _data: Vec<u8>,
+        ) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             return Err(VeracruzServerError::UnimplementedError);
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerMessage::NewTLSSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
@@ -130,7 +151,7 @@ pub mod veracruz_server_nitro {
             let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             return match received_message {
                 RuntimeManagerMessage::Status(_status) => Ok(()),
-                _ => Err(VeracruzServerError::NitroStatus(NitroStatus::Fail)),
+                _ => Err(VeracruzServerError::VMStatus(VMStatus::Fail)),
             };
         }
 
@@ -150,8 +171,8 @@ pub mod veracruz_server_nitro {
             let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             match received_message {
                 RuntimeManagerMessage::Status(status) => match status {
-                    NitroStatus::Success => (),
-                    _ => return Err(VeracruzServerError::NitroStatus(status)),
+                    VMStatus::Success => (),
+                    _ => return Err(VeracruzServerError::VMStatus(status)),
                 },
                 _ => {
                     return Err(VeracruzServerError::InvalidRuntimeManagerMessage(
@@ -177,7 +198,7 @@ pub mod veracruz_server_nitro {
                         active_flag = alive;
                         ret_array.push(data);
                     }
-                    _ => return Err(VeracruzServerError::NitroStatus(NitroStatus::Fail)),
+                    _ => return Err(VeracruzServerError::VMStatus(VMStatus::Fail)),
                 }
             }
 
@@ -222,7 +243,7 @@ pub mod veracruz_server_nitro {
             let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
             let tls_data_needed = match received_message {
                 RuntimeManagerMessage::TLSDataNeeded(needed) => needed,
-                _ => return Err(VeracruzServerError::NitroStatus(NitroStatus::Fail)),
+                _ => return Err(VeracruzServerError::VMStatus(VMStatus::Fail)),
             };
             return Ok(tls_data_needed);
         }
@@ -243,7 +264,14 @@ pub mod veracruz_server_nitro {
             "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
             url
         );
-        let received_body: String = post_buffer(&url, &encoded_str)?;
+        let received_body: String = post_buffer(&url, &encoded_str).map_err(|e| {
+            println!(
+                "Failed to post native attestation token.  Error produced: {}.",
+                e
+            );
+
+            VeracruzServerError::HttpError(e)
+        })?;
 
         println!(
             "veracruz-server-nitro::post_psa_attestation_token received buffer:{:?}",
@@ -265,120 +293,5 @@ pub mod veracruz_server_nitro {
         cert_chain.push(re_cert.to_vec());
         cert_chain.push(ca_cert.to_vec());
         return Ok(cert_chain);
-    }
-
-    /// Send the start message to the proxy attestation server (this triggers the server to
-    /// send the challenge) and then handle the response
-    fn send_attestation_start(url_base: &str) -> Result<(Vec<u8>, i32), VeracruzServerError> {
-        let proxy_attestation_server_response = send_proxy_attestation_server_start(url_base)?;
-        if proxy_attestation_server_response.has_psa_attestation_init() {
-            let (challenge, device_id) = transport_protocol::parse_psa_attestation_init(
-                proxy_attestation_server_response.get_psa_attestation_init(),
-            )
-            .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
-            return Ok((challenge, device_id));
-        } else {
-            return Err(VeracruzServerError::InvalidProtoBufMessage);
-        }
-    }
-
-    /// Send start to the proxy attestation server.
-    fn send_proxy_attestation_server_start(
-        url_base: &str,
-    ) -> Result<transport_protocol::ProxyAttestationServerResponse, VeracruzServerError> {
-        let serialized_start_msg = transport_protocol::serialize_start_msg("nitro", "0.0")
-            .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
-        let encoded_start_msg: String = base64::encode(&serialized_start_msg);
-        let url = format!("{:}/Start", url_base);
-
-        println!(
-            "veracruz-server-nitro::send_proxy_attestation_server_start sending to url:{:?}",
-            url
-        );
-        let received_body: String = post_buffer(&url, &encoded_start_msg)?;
-        println!(
-            "veracruz-server-nitro::send_proxy_attestation_server_start completed post command"
-        );
-
-        let body_vec =
-            base64::decode(&received_body).map_err(|err| VeracruzServerError::Base64Decode(err))?;
-        let response = transport_protocol::parse_proxy_attestation_server_response(&body_vec)
-            .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
-        println!(
-            "veracruz-server-nitro::send_proxy_attestation_server_start completed. Returning."
-        );
-        return Ok(response);
-    }
-
-    /// Post a buffer to a remote HTTP server
-    fn post_buffer(url: &str, buffer: &String) -> Result<String, VeracruzServerError> {
-        let mut buffer_reader = stringreader::StringReader::new(buffer);
-
-        let mut curl_request = Easy::new();
-        curl_request
-            .url(&url)
-            .map_err(|err| VeracruzServerError::CurlError(err))?;
-        let mut headers = List::new();
-        headers
-            .append("Content-Type: application/octet-stream")
-            .map_err(|err| VeracruzServerError::CurlError(err))?;
-        curl_request
-            .http_headers(headers)
-            .map_err(|err| VeracruzServerError::CurlError(err))?;
-        curl_request
-            .post(true)
-            .map_err(|err| VeracruzServerError::CurlError(err))?;
-        curl_request
-            .post_field_size(buffer.len() as u64)
-            .map_err(|err| VeracruzServerError::CurlError(err))?;
-
-        let mut received_body = String::new();
-        let mut received_header = String::new();
-        {
-            let mut transfer = curl_request.transfer();
-
-            transfer
-                .read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))
-                .map_err(|err| VeracruzServerError::CurlError(err))?;
-            transfer
-                .write_function(|buf| {
-                    received_body.push_str(
-                        std::str::from_utf8(buf)
-                            .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                    );
-                    Ok(buf.len())
-                })
-                .map_err(|err| VeracruzServerError::CurlError(err))?;
-
-            transfer
-                .header_function(|buf| {
-                    received_header.push_str(
-                        std::str::from_utf8(buf)
-                            .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                    );
-                    true
-                })
-                .map_err(|err| VeracruzServerError::CurlError(err))?;
-
-            transfer
-                .perform()
-                .map_err(|err| VeracruzServerError::CurlError(err))?;
-        }
-        let header_lines: Vec<&str> = received_header.split("\n").collect();
-
-        println!(
-            "veracruz-server-nitro::post_buffer received header:{:?}",
-            received_header
-        );
-        if !received_header.contains("HTTP/1.1 200 OK\r") {
-            return Err(VeracruzServerError::NonSuccessHttp);
-        }
-
-        println!(
-            "veracruz-server-nitro::post_buffer header_lines:{:?}",
-            header_lines
-        );
-
-        return Ok(received_body);
     }
 }

@@ -13,8 +13,10 @@ crate-type = ["rlib"]
 [features]
 # build.rs depends on features
 tz = []
+linux = []
 sgx = []
 nitro = []
+icecap = []
 
 [dependencies]
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }

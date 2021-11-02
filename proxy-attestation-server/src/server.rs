@@ -10,12 +10,12 @@
 //! information on licensing and copyright.
 
 use crate::attestation;
-#[cfg(feature = "psa")]
+#[cfg(feature = "nitro")]
+use crate::attestation::nitro;
+#[cfg(any(feature = "linux", feature = "tz", feature = "icecap"))]
 use crate::attestation::psa;
 #[cfg(feature = "sgx")]
 use crate::attestation::sgx;
-#[cfg(feature = "nitro")]
-use crate::attestation::nitro;
 
 use lazy_static::lazy_static;
 use std::net::ToSocketAddrs;
@@ -38,14 +38,18 @@ use std::{ffi::c_void, path, ptr::null};
 async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
     if input_data.is_empty() {
         println!("proxy-attestation-server::verify_iat input_data is empty");
-        return Err(ProxyAttestationServerError::MissingFieldError("proxy-attestation-server::verify_iat data"));
+        return Err(ProxyAttestationServerError::MissingFieldError(
+            "proxy-attestation-server::verify_iat data",
+        ));
     }
 
-    let proto_bytes = base64::decode(&input_data)
-        .map_err(|err| {
-            println!("proxy-attestation-server::verify_iat decode of input data failed:{:?}", err);
+    let proto_bytes = base64::decode(&input_data).map_err(|err| {
+        println!(
+            "proxy-attestation-server::verify_iat decode of input data failed:{:?}",
             err
-        })?;
+        );
+        err
+    })?;
 
     let proto = transport_protocol::parse_proxy_attestation_server_request(&proto_bytes)
         .map_err(|err| {
@@ -53,23 +57,30 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
             err
         })?;
     if !proto.has_proxy_psa_attestation_token() {
-        println!("proxy-attestation-server::verify_iat proto does not have proxy psa attestation token");
+        println!(
+            "proxy-attestation-server::verify_iat proto does not have proxy psa attestation token"
+        );
         return Err(ProxyAttestationServerError::NoProxyPSAAttestationTokenError);
     }
 
-    let (token, pubkey, device_id) =
-        transport_protocol::parse_proxy_psa_attestation_token(proto.get_proxy_psa_attestation_token());
+    let (token, pubkey, device_id) = transport_protocol::parse_proxy_psa_attestation_token(
+        proto.get_proxy_psa_attestation_token(),
+    );
     let pubkey_hash = {
-        let conn = crate::orm::establish_connection()
-            .map_err(|err| {
-                println!("proxy-attestation-server::verify_iat orm::establish_connection failed:{:?}", err);
+        let conn = crate::orm::establish_connection().map_err(|err| {
+            println!(
+                "proxy-attestation-server::verify_iat orm::establish_connection failed:{:?}",
                 err
-            })?;
-        crate::orm::query_device(&conn, device_id)
-            .map_err(|err| {
-                println!("proxy-attestation-server::verify_iat orm::query_device failed:{:?}", err);
+            );
+            err
+        })?;
+        crate::orm::query_device(&conn, device_id).map_err(|err| {
+            println!(
+                "proxy-attestation-server::verify_iat orm::query_device failed:{:?}",
                 err
-            })?
+            );
+            err
+        })?
     };
 
     // verify that the pubkey we received matches the hash we received
@@ -96,7 +107,10 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
         )
     };
     if lpk_ret != 0 {
-        println!("proxy-attestation-server::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}", lpk_ret);
+        println!(
+            "proxy-attestation-server::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}",
+            lpk_ret
+        );
         return Err(ProxyAttestationServerError::UnsafeCallError(
             "proxy-attestation-server::server::verify_iat t_cose_sign1_verify_load_public_key",
             lpk_ret,
@@ -147,7 +161,9 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
 
     if payload.ptr == null() {
         println!("proxy-attestation-server::verify_iat payload.ptr is null");
-        return Err(ProxyAttestationServerError::MissingFieldError("payload.ptr"));
+        return Err(ProxyAttestationServerError::MissingFieldError(
+            "payload.ptr",
+        ));
     }
 
     let payload_vec =
@@ -157,7 +173,10 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
 }
 
 #[allow(unused)]
-async fn sgx_router(psa_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
+async fn sgx_router(
+    psa_request: web::Path<String>,
+    input_data: String,
+) -> ProxyAttestationServerResponder {
     #[cfg(feature = "sgx")]
     match psa_request.into_inner().as_str() {
         "Msg1" => sgx::msg1(input_data),
@@ -169,26 +188,35 @@ async fn sgx_router(psa_request: web::Path<String>, input_data: String) -> Proxy
 }
 
 #[allow(unused)]
-async fn psa_router(psa_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
-    #[cfg(feature = "psa")]
+async fn psa_router(
+    psa_request: web::Path<String>,
+    input_data: String,
+) -> ProxyAttestationServerResponder {
+    #[cfg(any(feature = "linux", feature = "tz", feature = "icecap"))]
     if psa_request.into_inner().as_str() == "AttestationToken" {
         psa::attestation_token(input_data)
     } else {
         Err(ProxyAttestationServerError::UnsupportedRequestError)
     }
-    #[cfg(not(feature = "psa"))]
+    #[cfg(not(any(feature = "tz", feature = "linux", feature = "icecap")))]
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
 #[allow(unused)]
-async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> ProxyAttestationServerResponder {
+async fn nitro_router(
+    nitro_request: web::Path<String>,
+    input_data: String,
+) -> ProxyAttestationServerResponder {
     #[cfg(feature = "nitro")]
     {
         let inner = nitro_request.into_inner();
         if inner.as_str() == "AttestationToken" {
             nitro::attestation_token(input_data)
         } else {
-            println!("proxy-attestation-server::nitro_router returning unsupported with into_inner:{:?}", inner.as_str());
+            println!(
+                "proxy-attestation-server::nitro_router returning unsupported with into_inner:{:?}",
+                inner.as_str()
+            );
             Err(ProxyAttestationServerError::UnsupportedRequestError)
         }
     }
@@ -196,23 +224,32 @@ async fn nitro_router(nitro_request: web::Path<String>, input_data: String) -> P
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
-pub fn server<U, P1, P2>(url: U, ca_cert_path: P1, ca_key_path: P2, debug: bool) -> Result<Server, String>
+pub fn server<U, P1, P2>(
+    url: U,
+    ca_cert_path: P1,
+    ca_key_path: P2,
+    debug: bool,
+) -> Result<Server, String>
 where
     U: ToSocketAddrs,
     P1: AsRef<path::Path>,
-    P2: AsRef<path::Path>
+    P2: AsRef<path::Path>,
 {
     if debug {
         DEBUG_MODE.store(true, Ordering::SeqCst);
     }
-    crate::attestation::load_ca_certificate(ca_cert_path)
-        .map_err(|err| {
-            format!("proxy-attestation-server::server::server load_ca_certificate returned an error:{:?}", err)
-        })?;
-    crate::attestation::load_ca_key(ca_key_path)
-        .map_err(|err| {
-            format!("proxy-attestation-server::server::server load_ca_key returned an error:{:?}", err)
-        })?;
+    crate::attestation::load_ca_certificate(ca_cert_path).map_err(|err| {
+        format!(
+            "proxy-attestation-server::server::server load_ca_certificate returned an error:{:?}",
+            err
+        )
+    })?;
+    crate::attestation::load_ca_key(ca_key_path).map_err(|err| {
+        format!(
+            "proxy-attestation-server::server::server load_ca_key returned an error:{:?}",
+            err
+        )
+    })?;
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())

@@ -1,6 +1,6 @@
 //! The Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -12,6 +12,8 @@
 use crate::veracruz_server::*;
 #[cfg(feature = "icecap")]
 use crate::veracruz_server_icecap::VeracruzServerIceCap as VeracruzServerEnclave;
+#[cfg(feature = "linux")]
+use crate::veracruz_server_linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use crate::veracruz_server_nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 #[cfg(feature = "sgx")]

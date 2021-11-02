@@ -14,10 +14,10 @@ on:
 jobs:
   check-repo-and-compile-sdk:
     runs-on: ubuntu-latest
-    container: 
+    container:
       image: ghcr.io/veracruz-project/veracruz/veracruz:ci
-      volumes: 
-        - ${{ github.workspace }}:/work/veracruz 
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
 
     steps:
 
@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: recursive
-      
+
       # Compile all examples and data sources in the sdk
       - name: Compile SDK
         id: sdk
@@ -46,19 +46,19 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: veracruz.tar
-          path: /veracruz.tar 
+          path: /veracruz.tar
           if-no-files-found: error
 
   sgx:
     runs-on: ubuntu-latest
-    container: 
+    container:
       image: ghcr.io/veracruz-project/veracruz/veracruz:ci
-      volumes: 
-        - ${{ github.workspace }}:/work/veracruz 
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
     needs: [check-repo-and-compile-sdk]
 
     steps:
-        
+
       # Download the artifact containing repo and sdk artifact, using the action from github
       - name: Download veracruz cache artifact
         uses: actions/download-artifact@v2
@@ -73,7 +73,7 @@ jobs:
             mkdir -p /work/veracruz
             tar -C /work/veracruz -xvf veracruz.tar
             rm veracruz.tar
-      
+
       # Run the sgx test
       - name: Running sgx test script
         id: sgx-test
@@ -83,16 +83,17 @@ jobs:
             make sgx-veracruz-server-test-dry-run
             make sgx-veracruz-test-dry-run
             make sgx-veracruz-client-test
+
   tz:
     runs-on: ubuntu-latest
-    container: 
+    container:
       image: ghcr.io/veracruz-project/veracruz/veracruz:ci
-      volumes: 
-        - ${{ github.workspace }}:/work/veracruz 
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
     needs: [check-repo-and-compile-sdk]
 
     steps:
-        
+
       # Download the artifact containing repo and sdk artifact, using the action from github
       - name: Download veracruz cache artifact
         uses: actions/download-artifact@v2
@@ -107,7 +108,7 @@ jobs:
             mkdir -p /work/veracruz
             tar -C /work/veracruz -xvf veracruz.tar
             rm veracruz.tar
-      
+
       - name: Running trustzone test script
         id: tz-test
         run: |
@@ -118,6 +119,39 @@ jobs:
             make trustzone-veracruz-server-test
             make trustzone-veracruz-test
             make trustzone-veracruz-client-test
+
+  linux:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
+    needs: [check-repo-and-compile-sdk]
+    steps:
+      # Download the artifact containing repo and sdk artifact, using the action from github
+      - name: Download veracruz cache artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: veracruz.tar
+          path: /
+      # Unpack
+      - name: Unpack veracruz cache artifact
+        id: tz-unpack
+        run: |
+            cd /
+            mkdir -p /work/veracruz
+            mv veracruz.tar /work/veracruz
+            cd /work/veracruz
+            tar -xvf veracruz.tar
+            rm veracruz.tar
+      - name: Running linux test script
+        id: linux-test
+        run: |
+            cd /work/veracruz
+            make linux
+            make linux-veracruz-server-test
+            make linux-veracruz-test
+            make linux-veracruz-client-test
 
   icecap:
     runs-on: ubuntu-latest
@@ -132,3 +166,7 @@ jobs:
           submodules: recursive
       - name: Build and test Veracruz on IceCap
         run: bash /work/veracruz/icecap/ci/run.sh
+
+
+
+

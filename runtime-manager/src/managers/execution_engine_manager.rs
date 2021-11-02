@@ -24,7 +24,7 @@ use transport_protocol::transport_protocol::{
 ////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
-    //TODO, wrap into a chihuahua management object.
+    // TODO: wrap into a runtime manager management object.
     static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
 }
 

@@ -1,0 +1,31 @@
+[package]
+name = "linux-root-enclave"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+description = "The root enclave (read: application) for Veracruz when used as a Linux process."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.13.0"
+bincode = { git= "https://github.com/veracruz-project/bincode.git", branch= "veracruz", default-features = false }
+clap = "2.33"
+env_logger = "0.8.3"
+err-derive = "0.3.0"
+hex = "0.4.2"
+io-utils = {path = "../io-utils", features = ["linux"]}
+lazy_static = "1.4.0"
+log = "=0.4.13"
+nix = "0.20.0"
+net2 = "0.2.37"
+psa-attestation = {path = "../psa-attestation", features = ["linux"]}
+ring = {git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
+serde = { git = "https://github.com/veracruz-project/serde.git", features=["derive"], branch = "veracruz" }
+transport-protocol = { path = "../transport-protocol" }
+veracruz-utils = {path = "../veracruz-utils/", features = ["linux"]}
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true

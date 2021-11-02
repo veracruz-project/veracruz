@@ -37,11 +37,15 @@ extern crate sgx_root_enclave_bind;
 use sgx_root_enclave_bind::{
     _quote_nonce, _ra_msg2_t, _ra_msg3_t, _report_t, _sgx_ec256_public_t, _target_info_t,
     sgx_root_enclave_get_firmware_version, sgx_root_enclave_get_firmware_version_len,
-    sgx_root_enclave_init_remote_attestation_enc, sgx_root_enclave_sgx_get_pubkey_report, sgx_root_enclave_sgx_ra_get_ga,
-    sgx_root_enclave_sgx_ra_get_msg3_trusted, sgx_root_enclave_sgx_ra_proc_msg2_trusted,
+    sgx_root_enclave_init_remote_attestation_enc, sgx_root_enclave_sgx_get_pubkey_report,
+    sgx_root_enclave_sgx_ra_get_ga, sgx_root_enclave_sgx_ra_get_msg3_trusted,
+    sgx_root_enclave_sgx_ra_proc_msg2_trusted,
 };
 
-static ENCLAVE_FILE: &'static str = "/work/veracruz/trustzone-root-enclave/bin/sgx_root_enclave.signed.so";
+use veracruz_utils::http::post_buffer;
+
+static ENCLAVE_FILE: &'static str =
+    "/work/veracruz/trustzone-root-enclave/bin/sgx_root_enclave.signed.so";
 
 #[test]
 fn test_sgx_attestation() {
@@ -71,7 +75,11 @@ fn test_sgx_attestation() {
         let mut gfvl_ret: u32 = 0;
         let mut fv_length: u64 = 0;
         let gfvl_result = unsafe {
-            sgx_root_enclave_get_firmware_version_len(enclave.geteid(), &mut gfvl_ret, &mut fv_length)
+            sgx_root_enclave_get_firmware_version_len(
+                enclave.geteid(),
+                &mut gfvl_ret,
+                &mut fv_length,
+            )
         };
         assert!(gfvl_result == 0);
         assert!(gfvl_ret == 0);
@@ -81,7 +89,12 @@ fn test_sgx_attestation() {
 
         let mut gfv_ret = sgx_status_t::SGX_SUCCESS as u32;
         let gfv_result = unsafe {
-            sgx_root_enclave_get_firmware_version(enclave.geteid(), &mut gfv_ret, p_output, fv_length)
+            sgx_root_enclave_get_firmware_version(
+                enclave.geteid(),
+                &mut gfv_ret,
+                p_output,
+                fv_length,
+            )
         };
         assert!(gfv_result == sgx_status_t::SGX_SUCCESS as u32);
         assert!(gfv_ret == sgx_status_t::SGX_SUCCESS as u32);
@@ -224,13 +237,16 @@ fn test_psa_attestation() {
     assert!(status == 0);
     unsafe { token.set_len(token_size.try_into().unwrap()) }
 
-    let serialized_pat =
-        transport_protocol::serialize_psa_attestation_token(&token, public_key.as_ref(), fake_device_id);
+    let serialized_pat = transport_protocol::serialize_psa_attestation_token(
+        &token,
+        public_key.as_ref(),
+        fake_device_id,
+    );
     let encoded_token = base64::encode(&serialized_pat);
 
     let url = "127.0.0.1:3016/VerifyPAT";
-    let received_buffer =
-        post_buffer(&url, &encoded_token).expect("Failed to send buffer to proxy attestation server");
+    let received_buffer = post_buffer(&url, &encoded_token)
+        .expect("Failed to send buffer to proxy attestation server");
 }
 
 static SETUP: Once = Once::new();
@@ -475,76 +491,4 @@ fn attestation_challenge(
             pubkey_quote_sig.to_vec(),
         ))
     }
-}
-fn post_buffer(url: &str, data: &str) -> Result<String, String> {
-    let mut data_reader = stringreader::StringReader::new(&data);
-    let mut curl_request = Easy::new();
-    curl_request
-        .url(url)
-        .expect(&format!("Error completing CURL request to {}", url));
-
-    let mut headers = List::new();
-    headers
-        .append("Content-Type: application/octet-stream")
-        .expect("Cannot append into CURL header list");
-
-    curl_request
-        .http_headers(headers)
-        .expect("Cannot append into CURL header list");
-
-    curl_request
-        .post(true)
-        .expect("Error setting POST for a curl request");
-    curl_request
-        .post_field_size(data.len() as u64)
-        .expect(&format!("Error setting POST field size of {}", 0));
-    curl_request
-        .fail_on_error(true)
-        .expect(&format!("Failed to set 'fail_on_error'"));
-
-    let mut received_body = std::string::String::new();
-    let mut received_header = std::string::String::new();
-    {
-        let mut transfer = curl_request.transfer();
-
-        transfer
-            .read_function(|buf| Ok(data_reader.read(buf).unwrap_or(0)))
-            .expect("Error completing CURL transfer");
-
-        transfer
-            .write_function(|buf| {
-                received_body.push_str(
-                    std::str::from_utf8(buf)
-                        .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                );
-                Ok(buf.len())
-            })
-            .expect("Error completing CURL transfer");
-        transfer
-            .header_function(|buf| {
-                received_header.push_str(
-                    std::str::from_utf8(buf)
-                        .expect(&format!("Error converting data {:?} from UTF-8", buf)),
-                );
-                true
-            })
-            .expect("Error completing CURL transfer");
-
-        transfer
-            .perform()
-            .expect(format!("Error performing CURL transfer to url:{:}", url).as_str());
-    }
-
-    let header_lines: Vec<&str> = {
-        let lines = received_header.split("\n");
-        lines.collect()
-    };
-    let mut header_fields = std::collections::HashMap::new();
-    for this_line in header_lines.iter() {
-        let fields: Vec<&str> = this_line.split(":").collect();
-        if fields.len() == 2 {
-            header_fields.insert(fields[0], fields[1]);
-        }
-    }
-    Ok(received_body)
 }
