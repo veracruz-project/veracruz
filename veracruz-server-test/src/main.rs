@@ -54,6 +54,7 @@ mod tests {
 
     // Policy files
     const POLICY: &'static str = "single_client.json";
+    const NO_DEBUG_POLICY: &'static str = "single_client_no_debug.json";
     const CA_CERT: &'static str = "CACert.pem";
     const CA_KEY: &'static str = "CAKey.pem";
     const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
@@ -124,7 +125,6 @@ mod tests {
             info!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                env_logger::init();
                 println!("spawned thread calling server with url:{:?}", proxy_attestation_server_url);
                 #[cfg(feature = "debug")]
                 let server = proxy_attestation_server::server::server(
@@ -265,7 +265,16 @@ mod tests {
     fn test_debug2_linear_regression_without_debug() {
         debug_setup();
         DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
-        test_phase2_linear_regression_single_data_no_attestation();
+        let result = test_template::<LinearRegression,_>(
+            policy_path(NO_DEBUG_POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
+            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
+            &[],
+            &["/output/linear-regression.dat"],
+        );
+        assert!(result.is_ok(), "error:{:?}", result);
         assert!(!DEBUG_IS_CALLED.load(Ordering::SeqCst));
     }
 
@@ -585,7 +594,6 @@ mod tests {
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
-    /// TODO REWORK!!
     fn test_performance_idash2017_with_attestation() {
         let input_vec = input_list(data_dir(LOGISTICS_REGRESSION_DATA_PATH), "/input/idash2017/").expect("Failed to parse input");
         let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
@@ -608,7 +616,6 @@ mod tests {
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
-    /// TODO REWORK!!
     fn test_performance_macd_with_attestation() {
         let input_vec = input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
         let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
@@ -630,7 +637,6 @@ mod tests {
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: intersection-sum, matching the setting in .
     /// data sources: private-set-inter-sum/*.dat
-    /// TODO REWORK!!!
     fn test_performance_set_intersection_sum_with_attestation() {
         let input_vec = input_list(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH), "/input/private-set-inter-sum/").expect("Failed to parse input");
         let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();

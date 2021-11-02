@@ -40,7 +40,7 @@ use crate::{
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
 use std::{boxed::Box, vec::Vec, string::String};
-use policy_utils::policy::principal::ExecutionStrategy;
+use policy_utils::principal::ExecutionStrategy;
 
 pub struct Options {
     pub environment_variables: Vec<(String, String)>,

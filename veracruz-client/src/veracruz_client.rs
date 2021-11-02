@@ -10,8 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
-use policy_utils::{policy::Policy, Platform};
-
+use policy_utils::{policy::Policy, Platform, parsers::enforce_leading_backslash}};
 use log::{error, info};
 use ring::signature::KeyPair;
 use rustls::Session;
@@ -20,7 +19,7 @@ use std::{
     path,
     str::from_utf8,
 };
-use veracruz_utils::{platform::Platform, VERACRUZ_RUNTIME_HASH_EXTENSION_ID};
+use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 use webpki;
 
 // Use Mockall for testing
