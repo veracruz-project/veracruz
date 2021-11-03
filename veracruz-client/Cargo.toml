@@ -15,10 +15,11 @@ sgx = ["sgx_types", "sgx_ucrypto", "transport-protocol/sgx_attestation"]
 tz = []
 nitro = []
 icecap = []
+linux = []
 mock = ["mockall", "mockito"]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "env_logger", "log"]
+cli = ["structopt", "env_logger"]
 
 [dependencies]
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
@@ -47,7 +48,7 @@ sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 env_logger = { version = "0.7", optional = true }
-log = { version = "0.4", optional = true }
+log = "=0.4.13"
 bitflags = "=1.2.1"
 backtrace = "=0.3.61"
 

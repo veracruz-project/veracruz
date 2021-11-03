@@ -9,12 +9,10 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::{
-    send_proxy_attestation_server_start,
-    veracruz_server::{VeracruzServer, VeracruzServerError},
-};
+use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
 use bincode::{deserialize, serialize};
 use err_derive::Error;
+use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
 use std::{
     env,
@@ -204,19 +202,12 @@ impl VeracruzServer for VeracruzServerIceCap {
             }
         }
 
-        let (challenge, device_id) = {
-            let resp = send_proxy_attestation_server_start(
-                policy.proxy_attestation_server_url(),
-                "psa",
-                FIRMWARE_VERSION,
-            )?;
-            if !resp.has_psa_attestation_init() {
-                return Err(VeracruzServerError::MissingFieldError(
-                    "psa_attestation_init",
-                ));
-            }
-            transport_protocol::parse_psa_attestation_init(resp.get_psa_attestation_init())?
-        };
+        let (device_id, challenge) = send_proxy_attestation_server_start(
+            policy.proxy_attestation_server_url(),
+            "psa",
+            FIRMWARE_VERSION,
+        )
+        .map_err(VeracruzServerError::HttpError)?;
 
         let (token, csr) = match server.send(&Request::Attestation {
             challenge,
@@ -239,7 +230,7 @@ impl VeracruzServer for VeracruzServerIceCap {
                 "{:}/PSA/AttestationToken",
                 policy.proxy_attestation_server_url()
             );
-            let resp = crate::post_buffer(&url, &req)?;
+            let resp = post_buffer(&url, &req).map_err(VeracruzServerError::HttpError)?;
             let resp = base64::decode(&resp)?;
             let pasr = transport_protocol::parse_proxy_attestation_server_response(&resp)
                 .map_err(VeracruzServerError::TransportProtocolError)?;
@@ -264,11 +255,11 @@ impl VeracruzServer for VeracruzServerIceCap {
         Ok(server)
     }
 
-    fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>> {
+    fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>> {
         unimplemented!()
     }
 
-    fn new_tls_session(&self) -> Result<u32> {
+    fn new_tls_session(&mut self) -> Result<u32> {
         match self.send(&Request::NewTlsSession)? {
             Response::NewTlsSession(session_id) => Ok(session_id),
             resp => Err(VeracruzServerError::IceCapError(

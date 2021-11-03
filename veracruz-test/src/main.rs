@@ -147,7 +147,7 @@ mod tests {
     /// A test of veracruz using network communication using a single session
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
-        let result = test_template::<Vec<u8>>(
+        let result = test_template(
             policy_path(GET_RANDOM_POLICY).as_path(),
             &vec![(
                 trust_path(CLIENT_CERT).as_path(),
@@ -166,18 +166,10 @@ mod tests {
         );
     }
 
-    #[derive(Debug, Deserialize)]
-    struct LinearRegression {
-        /// Gradient of the linear relationship.
-        gradient: f64,
-        /// Y-intercept of the linear relationship.
-        intercept: f64,
-    }
-
     /// A test of veracruz using network communication using two sessions (one for program and one for data)
     #[actix_rt::test]
     async fn veracruz_phase1_linear_regression_two_clients() {
-        let result = test_template::<LinearRegression>(
+        let result = test_template(
             policy_path(LINEAR_REGRESSION_DUAL_POLICY).as_path(),
             &vec![
                 (
@@ -205,7 +197,7 @@ mod tests {
     /// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
     #[actix_rt::test]
     async fn veracruz_phase2_linear_regression_three_clients() {
-        let result = test_template::<LinearRegression>(
+        let result = test_template(
             policy_path(LINEAR_REGRESSION_TRIPLE_POLICY).as_path(),
             &vec![
                 (
@@ -238,7 +230,7 @@ mod tests {
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_intersection_set_sum_three_clients() {
-        let result = test_template::<f64>(
+        let result = test_template(
             policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY).as_path(),
             &vec![
                 (
@@ -282,7 +274,7 @@ mod tests {
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision() {
-        let result = test_template::<f64>(
+        let result = test_template(
             policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY).as_path(),
             &vec![
                 (
@@ -322,7 +314,7 @@ mod tests {
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_string_edit_distance_three_clients() {
-        let result = test_template::<usize>(
+        let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY).as_path(),
             &vec![
                 (
@@ -358,7 +350,7 @@ mod tests {
     /// (one for program, one for the first data, one for the second data, and one for retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase3_string_edit_distance_four_clients() {
-        let result = test_template::<usize>(
+        let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY).as_path(),
             &vec![
                 (
@@ -458,7 +450,7 @@ mod tests {
         assert!(result.is_ok(), "error: {:?}", result);
     }
 
-    async fn test_template<T: std::fmt::Debug + serde::de::DeserializeOwned>(
+    async fn test_template(
         // Policy files
         policy_path: &Path,
         // List of client's certificates and private keys
@@ -539,8 +531,7 @@ mod tests {
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
                 let result = result_retriever_veracruz_client.get_results(program_name)?;
-                let result: T = pinecone::from_bytes(&result)?;
-                info!("            Result: {:?}", result);
+                info!("            Received {} bytes of result.", result.len());
             }
 
             for client_index in 0..client_configs.len() {

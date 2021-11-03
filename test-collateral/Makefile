@@ -207,7 +207,7 @@ dual_parallel_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_clie
 	./pgen --certificate program_client_cert.pem --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
 		--certificate data_client_cert.pem --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
  		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-	--veracruz-server-ip 127.0.0.1:3015 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
+		--veracruz-server-ip 127.0.0.1:3015 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--enable-clock true \
@@ -220,8 +220,8 @@ triple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert
 		--certificate result_client_cert.pem --capability "output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
  		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
 		--veracruz-server-ip 127.0.0.1:3016 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		 --execution-strategy Interpretation \
-		 --stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
+		--execution-strategy Interpretation \
+		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
@@ -326,7 +326,7 @@ number-stream-accumulation.json: pgen css-$(TEE).bin program_client_cert.pem dat
 basic_file_read_write.json: pgen css-$(TEE).bin client_rsa_cert.pem read-file.wasm 
 	./pgen --certificate client_rsa_cert.pem --capability "input.txt: $(WRITE_RIGHT), output : $(READ_RIGHT), read-file.wasm : $(WRITE_RIGHT)" \
 		--binary read-file.wasm --capability "input.txt: $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-        --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
+		--veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
 		--enclave-debug-mode true --execution-strategy Interpretation \
 		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
 		--enable-clock true \

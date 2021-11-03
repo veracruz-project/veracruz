@@ -14,13 +14,27 @@
 //! information on licensing and copyright.
 
 /// IO-related error type.
-#[cfg(feature = "nitro")]
 pub mod error;
+#[cfg(any(feature = "nitro", feature = "linux"))]
+/// FD-related material.
+pub mod fd;
+/// HTTP-related material.
+#[cfg(any(
+    feature = "nitro",
+    feature = "linux",
+    feature = "sgx",
+    feature = "icecap",
+    feature = "tz"
+))]
+pub mod http;
 #[cfg(feature = "nitro")]
 pub mod nitro;
 /// Buffer send- and receive-related functionality for raw file descriptors.
 #[cfg(feature = "nitro")]
 pub mod raw_fd;
+#[cfg(feature = "linux")]
+/// TCP-socket related material.
+pub mod tcp;
 /// A Nitro-specific abstraction over sockets.
 #[cfg(feature = "nitro")]
 pub mod vsocket;

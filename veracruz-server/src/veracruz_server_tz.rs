@@ -14,6 +14,7 @@ pub mod veracruz_server_tz {
 
     use crate::veracruz_server::*;
     use hex;
+    use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
     use lazy_static::lazy_static;
     use log::debug;
     use optee_teec::{
@@ -165,13 +166,16 @@ pub mod veracruz_server_tz {
             })
         }
 
-        fn plaintext_data(&self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(
+            &mut self,
+            data: Vec<u8>,
+        ) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             let parsed = transport_protocol::parse_runtime_manager_request(&data)?;
 
             unreachable!("Unimplemented");
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let mut context_opt = CONTEXT.lock()?;
             let context = context_opt
                 .as_mut()
@@ -324,11 +328,12 @@ pub mod veracruz_server_tz {
                     &mut operation,
                 )?;
             }
-            let (challenge, device_id) = VeracruzServerTZ::send_start(
+            let (device_id, challenge) = send_proxy_attestation_server_start(
                 proxy_attestation_server_url,
                 "psa",
                 &firmware_version,
-            )?;
+            )
+            .map_err(VeracruzServerError::HttpError)?;
 
             let p0 = ParamValue::new(device_id.try_into()?, 0, ParamType::ValueInout);
             let p1 = ParamTmpRef::new_input(&challenge);
@@ -401,7 +406,8 @@ pub mod veracruz_server_tz {
                 transport_protocol::serialize_native_psa_attestation_token(token, csr, device_id)?;
             let encoded_str = base64::encode(&proxy_attestation_server_request);
             let url = format!("{:}/PSA/AttestationToken", proxy_attestation_server_url);
-            let response = crate::post_buffer(&url, &encoded_str)?;
+            let response =
+                post_buffer(&url, &encoded_str).map_err(VeracruzServerError::HttpError)?;
 
             debug!(
                 "veracruz_server_tz::post_psa_attestation_token received buffer:{:?}",
@@ -439,25 +445,6 @@ pub mod veracruz_server_tz {
                 String::from_utf8(fwv_vec)?
             };
             return Ok(firmware_version);
-        }
-
-        fn send_start(
-            url_base: &str,
-            protocol: &str,
-            firmware_version: &str,
-        ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
-            let proxy_attestation_server_response =
-                crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
-            if proxy_attestation_server_response.has_psa_attestation_init() {
-                let (challenge, device_id) = transport_protocol::parse_psa_attestation_init(
-                    proxy_attestation_server_response.get_psa_attestation_init(),
-                )?;
-                Ok((challenge, device_id))
-            } else {
-                Err(VeracruzServerError::MissingFieldError(
-                    "proxy_attestation_server_response psa_attestation_init",
-                ))
-            }
         }
     }
 }

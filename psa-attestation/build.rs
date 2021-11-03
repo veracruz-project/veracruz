@@ -21,6 +21,8 @@ fn main() {
         cfg_if::cfg_if! {
             if #[cfg(feature = "tz")] {
                 "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc".to_string()
+            } else if #[cfg(feature = "linux")] {
+                "gcc".to_string()
             } else if #[cfg(feature = "sgx")] {
                 "gcc".to_string()
             } else if #[cfg(feature = "nitro")] {

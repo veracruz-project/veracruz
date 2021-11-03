@@ -34,3 +34,7 @@ pub use self::veracruz_server_nitro::veracruz_server_nitro::*;
 mod veracruz_server_icecap;
 #[cfg(feature = "icecap")]
 pub use self::veracruz_server_icecap::*;
+#[cfg(feature = "linux")]
+pub mod veracruz_server_linux;
+#[cfg(feature = "linux")]
+pub use self::veracruz_server_linux::veracruz_server_linux::*;

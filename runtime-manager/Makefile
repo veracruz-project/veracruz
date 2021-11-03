@@ -12,7 +12,7 @@
 OUT_DIR?=.
 FINAL_DIR?=.
 
-.PHONY: all sgx trustzone clean deprecated nitro
+.PHONY: all linux sgx trustzone clean deprecated nitro
 
 all: deprecated
 
@@ -21,7 +21,7 @@ INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 
 deprecated:
-	@echo $(WARNING_COLOR)"The default target, compiling sgx, is deprecated. Please explicitly choose target, sgx or trustzone." $(RESET_COLOR)
+	@echo $(WARNING_COLOR)"The default target, compiling sgx, is deprecated. Please explicitly choose target: linux, nitro, sgx, trustzone." $(RESET_COLOR)
 
 ############# SGX #################
 Signed_RustEnclave_RootName := runtime_manager.signed.so
@@ -81,7 +81,7 @@ $(Untrusted_Lib_Name): $(OUT_DIR)/runtime_manager_u.o
 	$(AR) rcsD $@ $(OUT_DIR)/runtime_manager_u.o
 	@echo $(INFO_COLOR) "AR >= $<" $(RESET_COLOR)
 
-RustEnclave_Link_Libs = -L$(CUSTOM_LIBRARY_PATH) -L$(OUT_DIR) -lruntime_manager_enclave 
+RustEnclave_Link_Libs = -L$(CUSTOM_LIBRARY_PATH) -L$(OUT_DIR) -lruntime_manager_enclave
 RustEnclave_Link_Flags = $(SGX_COMMON_CFLAGS) -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L$(SGX_LIBRARY_PATH) \
 	-Wl,--whole-archive -lsgx_trts -Wl,--no-whole-archive \
 	-Wl,--start-group -lsgx_tstdc -lsgx_tcxx -lsgx_tkey_exchange -lsgx_tservice -lsgx_tcrypto $(RustEnclave_Link_Libs) -Wl,--end-group \
@@ -142,6 +142,9 @@ css-nitro.bin: PCR0
 css-icecap.bin:
 	touch $@
 
+css-linux.bin: target/release/runtime_manager_enclave
+	cp $< $@
+
 $(FINAL_DIR)/$(TZ_UUID).ta: $(OUT_DIR)/$(TZ_UUID).ta
 	cp $< $@
 
@@ -171,6 +174,14 @@ runtime_manager.eif: target/x86_64-unknown-linux-musl/release/runtime_manager_en
 target/x86_64-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
 	cargo build --target x86_64-unknown-linux-musl --release --features nitro
 
+####### Linux (AArch64 and X64) processes  #########
+Linux_Src = $(COMMON_Src) src/runtime_manager_linux.rs src/main.rs
+
+target/release/runtime_manager_enclave: Cargo.toml $(Linux_Src)
+	cargo build --release --features linux
+
+linux: target/release/runtime_manager_enclave
+
 clean:
 	@cargo clean
 	@xargo clean
@@ -178,8 +189,8 @@ clean:
 	@rm -f runtime_manager_t.? runtime_manager_u.?
 	@rm -f $(FINAL_DIR)/$(Signed_RustEnclave_RootName)
 	@rm -f $(SGX_Enclave_Name)
-	@rm -f $(FINAL_DIR)/$(TZ_UUID).ta 
-	@rm -f $(OUT_DIR)/$(TZ_UUID).ta 
+	@rm -f $(FINAL_DIR)/$(TZ_UUID).ta
+	@rm -f $(OUT_DIR)/$(TZ_UUID).ta
 	@rm -f $(OUT_DIR)/stripped_ta
 	@rm -f $(OUT_DIR)/runtime_manager_enclave
 	@rm -f $(RustEnclave_Name)

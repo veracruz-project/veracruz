@@ -13,6 +13,7 @@
 pub mod veracruz_server_sgx {
 
     use crate::veracruz_server::*;
+    use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
     use lazy_static::lazy_static;
     use log::{debug, error};
     use policy_utils::policy::Policy;
@@ -21,7 +22,6 @@ pub mod veracruz_server_sgx {
         runtime_manager_new_session_enc, runtime_manager_tls_get_data_enc,
         runtime_manager_tls_get_data_needed_enc, runtime_manager_tls_send_data_enc,
     };
-    // NOTE: The `SgxEnclave` MUST appear before `sgx_root_enclave_bind` for stopping a linker error.
     #[rustfmt::skip]
     use sgx_urts::SgxEnclave;
     #[rustfmt::skip]
@@ -137,24 +137,16 @@ pub mod veracruz_server_sgx {
     }
 
     impl VeracruzServerSGX {
+        #[inline]
         fn send_start(
             &mut self,
             url_base: &str,
             protocol: &str,
             firmware_version: &str,
         ) -> Result<(Vec<u8>, i32), VeracruzServerError> {
-            let proxy_attestation_server_response =
-                crate::send_proxy_attestation_server_start(url_base, protocol, firmware_version)?;
-            if proxy_attestation_server_response.has_sgx_attestation_init() {
-                let attestation_init = proxy_attestation_server_response.get_sgx_attestation_init();
-                let (public_key, device_id) =
-                    transport_protocol::parse_sgx_attestation_init(attestation_init);
-                Ok((public_key, device_id))
-            } else {
-                Err(VeracruzServerError::MissingFieldError(
-                    "sgx_attestation_init",
-                ))
-            }
+            send_proxy_attestation_server_start(url_base, protocol, firmware_version)
+                .map_err(VeracruzServerError::HttpError)
+                .map(|(i, v)| (v, i))
         }
     }
 
@@ -172,7 +164,8 @@ pub mod veracruz_server_sgx {
 
             let url = format!("{:}/SGX/Msg1", url_base);
 
-            let received_body = crate::post_buffer(&url, &encoded_msg1)?;
+            let received_body =
+                post_buffer(&url, &encoded_msg1).map_err(VeracruzServerError::HttpError)?;
 
             let body_vec = base64::decode(&received_body)?;
             let parsed = transport_protocol::parse_proxy_attestation_server_response(&body_vec)?;
@@ -415,7 +408,8 @@ pub mod veracruz_server_sgx {
             let encoded_tokens = base64::encode(&serialized_tokens);
             let url = format!("{:}/SGX/Msg3", url_base);
 
-            let received_body = crate::post_buffer(&url, &encoded_tokens)?;
+            let received_body =
+                post_buffer(&url, &encoded_tokens).map_err(VeracruzServerError::HttpError)?;
             let received_bytes = base64::decode(&received_body).unwrap();
             let parsed =
                 transport_protocol::parse_proxy_attestation_server_response(&received_bytes)?;
@@ -581,11 +575,14 @@ pub mod veracruz_server_sgx {
             }
         }
 
-        fn plaintext_data(&self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(
+            &mut self,
+            _data: Vec<u8>,
+        ) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             unreachable!("Unimplemented");
         }
 
-        fn new_tls_session(&self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let mut session_id: u32 = 0;
             let mut result: u32 = 0;
             let ret = unsafe {

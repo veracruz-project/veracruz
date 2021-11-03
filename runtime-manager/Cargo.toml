@@ -20,8 +20,12 @@ sgx = ["transport-protocol/sgx", "session-manager/sgx", "veracruz-utils/sgx", "p
 tz = ["wasmi/std", "session-manager/tz", "execution-engine/tz", "veracruz-utils/tz", "policy-utils/tz", "libc", "optee-utee-sys", "optee-utee", "serde_json/alloc", "wasi-types/std"]
 nitro = [ "execution-engine/std", "execution-engine/nitro", "wasmi/non_sgx", "session-manager/nitro", "veracruz-utils/nitro", "policy-utils/std", "io-utils/nitro", "nsm_io", "nsm_lib", "ring/nitro", "nix", "byteorder", "bincode", "wasi-types/std"]
 icecap = ["veracruz-utils/icecap", "policy-utils/icecap", "transport-protocol/icecap", "execution-engine/icecap", "session-manager/icecap", "psa-attestation", "wasmi/non_sgx", "serde", "bincode", "log", "libm", "icecap-wrapper"]
+linux = ["execution-engine/std", "wasmi/non_sgx", "session-manager/std", "veracruz-utils/linux", "policy-utils/std", "io-utils/linux", "byteorder", "clap", "nix", "bincode", "wasi-types/std", "log", "env_logger"]
 
 [dependencies]
+clap = {version = "2.33", optional = true}
+log = {version = "=0.4.13", optional = true }
+env_logger = {version = "0.8.3", optional = true }
 session-manager = { path = "../session-manager"}
 lazy_static = {version = "1.4.0", features=["spin_no_std"] }
 execution-engine = { path = "../execution-engine" }
@@ -54,7 +58,6 @@ wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branc
 bitflags = "=1.2.1"
 psa-attestation = { path = "../psa-attestation", optional = true }
 icecap-wrapper = { path = "../icecap/crates-hack/crates/icecap-wrapper", optional = true }
-log = { version = "0.4", optional = true }
 half = "=1.7.1"
 http = "=0.2.4"
 

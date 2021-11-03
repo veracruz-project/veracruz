@@ -1,6 +1,6 @@
 //! AWS Nitro-Enclaves-specific material for the Runtime Manager enclave
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -19,8 +19,9 @@ use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 use nsm_io;
 use nsm_lib;
 use std::os::unix::io::AsRawFd;
-use veracruz_utils::platform::nitro::nitro::{
-    NitroRootEnclaveMessage, NitroStatus, RuntimeManagerMessage,
+use veracruz_utils::platform::{
+    nitro::nitro::NitroRootEnclaveMessage,
+    vm::{RuntimeManagerMessage, VMStatus},
 };
 
 use crate::managers;
@@ -84,7 +85,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                 let ns_result = managers::session_manager::new_session();
                 let return_message: RuntimeManagerMessage = match ns_result {
                     Ok(session_id) => RuntimeManagerMessage::TLSSession(session_id),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
                 };
                 return_message
             }
@@ -92,8 +93,8 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                 println!("runtime_manager_nitro::main CloseTLSSession");
                 let cs_result = managers::session_manager::close_session(session_id);
                 let return_message: RuntimeManagerMessage = match cs_result {
-                    Ok(_) => RuntimeManagerMessage::Status(NitroStatus::Success),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Ok(_) => RuntimeManagerMessage::Status(VMStatus::Success),
+                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
                 };
                 return_message
             }
@@ -101,7 +102,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                 println!("runtime_manager_nitro::main GetTLSDataNeeded");
                 let return_message = match managers::session_manager::get_data_needed(session_id) {
                     Ok(needed) => RuntimeManagerMessage::TLSDataNeeded(needed),
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
                 };
                 return_message
             }
@@ -109,8 +110,8 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                 println!("runtime_manager_nitro::main SendTLSData");
                 let return_message =
                     match managers::session_manager::send_data(session_id, &tls_data) {
-                        Ok(_) => RuntimeManagerMessage::Status(NitroStatus::Success),
-                        Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                        Ok(_) => RuntimeManagerMessage::Status(VMStatus::Success),
+                        Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
                     };
                 return_message
             }
@@ -120,18 +121,18 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                     Ok((active, output_data)) => {
                         RuntimeManagerMessage::TLSData(output_data, active)
                     }
-                    Err(_) => RuntimeManagerMessage::Status(NitroStatus::Fail),
+                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
                 };
                 return_message
             }
             RuntimeManagerMessage::ResetEnclave => {
                 // Do nothing here for now
                 println!("runtime_manager_nitro::main ResetEnclave");
-                RuntimeManagerMessage::Status(NitroStatus::Success)
+                RuntimeManagerMessage::Status(VMStatus::Success)
             }
             _ => {
                 println!("runtime_manager_nitro::main Unknown Opcode");
-                RuntimeManagerMessage::Status(NitroStatus::Unimplemented)
+                RuntimeManagerMessage::Status(VMStatus::Unimplemented)
             }
         };
         let return_buffer = bincode::serialize(&return_message)
@@ -196,5 +197,5 @@ fn initialize(
     println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;
 
-    return Ok(RuntimeManagerMessage::Status(NitroStatus::Success));
+    return Ok(RuntimeManagerMessage::Status(VMStatus::Success));
 }
