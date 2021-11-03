@@ -542,7 +542,7 @@ command-line parameter.",
 
 /// Executes the hashing program on the WASM binary, returning the computed
 /// SHA256 hash as a string.
-fn compute_hash(argument: &PathBuf) -> String {
+fn compute_file_hash(argument: &PathBuf) -> String {
     if let Ok(mut file) = File::open(argument) {
         let mut buffer = vec![];
 
@@ -581,7 +581,7 @@ fn compute_linux_enclave_hash(arguments: &Arguments) -> Option<String> {
         }
     };
 
-    let hash = compute_program_hash(css_file);
+    let hash = compute_file_hash(css_file);
 
     info!("Computed sha256sum of Linux CSS file: {:?}.", hash);
 
@@ -862,7 +862,7 @@ fn serialize_file_hash(arguments: &Arguments) -> Vec<FileHash> {
         .hashes
         .iter()
         .map(|(file_name, file_path)| {
-            let hash = compute_hash(file_path);
+            let hash = compute_file_hash(file_path);
             let file_name = enforce_leading_backslash(file_name).into_owned();
 
             FileHash::new(

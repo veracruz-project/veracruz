@@ -20,11 +20,10 @@ mod tests {
     use actix_rt::System;
     use env_logger;
     use lazy_static::lazy_static;
-    use log::{debug, info, Level};
+    use log::{debug, error, info, Level};
     use ring;
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
-    use serde::Deserialize;
     use std::{
         collections::HashMap,
         env,
@@ -265,7 +264,7 @@ mod tests {
     fn test_debug2_linear_regression_without_debug() {
         debug_setup();
         DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
-        let result = test_template::<LinearRegression,_>(
+        test_template(
             policy_path(NO_DEBUG_POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
@@ -273,8 +272,8 @@ mod tests {
             &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
             &[],
             &["/output/linear-regression.dat"],
-        );
-        assert!(result.is_ok(), "error:{:?}", result);
+        )
+        .unwrap();
         assert!(!DEBUG_IS_CALLED.load(Ordering::SeqCst));
     }
 
@@ -333,7 +332,7 @@ mod tests {
     #[test]
     /// Attempt to fetch the result without program nor data
     fn test_phase2_random_source_no_program_no_data() {
-        test_template(
+        let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
@@ -349,7 +348,7 @@ mod tests {
     #[test]
     /// Attempt to provision a wrong program
     fn test_phase2_incorrect_program_no_attestation() {
-        test_template(
+        let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
@@ -365,7 +364,7 @@ mod tests {
     #[test]
     /// Attempt to use an unauthorized key
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
-        test_template(
+        let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(UNAUTHORIZED_KEY),
@@ -381,7 +380,7 @@ mod tests {
     #[test]
     /// Attempt to use an unauthorized certificate
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
-        test_template(
+        let result = test_template(
             policy_path(POLICY),
             trust_path(UNAUTHORIZED_CERT),
             trust_path(CLIENT_KEY),
@@ -397,7 +396,7 @@ mod tests {
     #[test]
     /// A unauthorized client attempted to connect the service
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
-        test_template(
+        let result = test_template(
             policy_path(POLICY),
             trust_path(UNAUTHORIZED_CERT),
             trust_path(UNAUTHORIZED_KEY),
@@ -620,7 +619,7 @@ mod tests {
         let input_vec = input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
         let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
 
-        let result = test_template(
+        test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
@@ -641,7 +640,7 @@ mod tests {
         let input_vec = input_list(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH), "/input/private-set-inter-sum/").expect("Failed to parse input");
         let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
 
-        let result = test_template(
+        test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
@@ -774,7 +773,7 @@ mod tests {
             );
 
             for (remote_file_name, data_path) in program_path.iter() {
-                let time_provosion_data = Instant::now();
+                let time_provision_data = Instant::now();
 
                 check_hash(
                     &policy,
@@ -944,11 +943,10 @@ mod tests {
                     let response =
                         transport_protocol::parse_runtime_manager_response(&response)?;
                     let response = transport_protocol::parse_result(&response)?;
-                    let response = response.ok_or(VeracruzServerError::MissingFieldError(
+                    let result = response.ok_or(VeracruzServerError::MissingFieldError(
                         "Result retrievers response",
                     ))?;
-                    let result: T = pinecone::from_bytes(&response.as_slice())?;
-                    info!("             Client received result: {:?},", result);
+                    info!("             Client received result of len: {:?},", result.len());
                 }
             }
 

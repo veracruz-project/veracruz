@@ -208,7 +208,6 @@ impl ProtocolState {
             enable_clock: *self.global_policy.enable_clock(),
             ..Default::default()
         };
-        println!("file_name: {}", file_name);
         let program = self.read_file(client_id, file_name)?.ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
         let return_code = execute(&execution_strategy, self.vfs.spawn(&Principal::Program(file_name.to_string()))?, program, options)?;
 

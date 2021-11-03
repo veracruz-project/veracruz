@@ -66,7 +66,6 @@ mod tests {
     use log::info;
     use policy_utils::policy::Policy;
     use proxy_attestation_server;
-    use serde::Deserialize;
     use std::{
         env,
         io::Read,
@@ -451,8 +450,7 @@ mod tests {
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
                 let result = result_retriever_veracruz_client.get_results(remote_filename)?;
-                let result: T = pinecone::from_bytes(&result)?;
-                info!("            Result: {:?}", result);
+                info!("            Result of len: {:?}", result.len());
             }
 
             for client_index in 0..client_configs.len() {
