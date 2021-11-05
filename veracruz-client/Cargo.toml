@@ -11,13 +11,13 @@ path = "src/cli.rs"
 required-features = ["cli"]
 
 [features]
+# a feature to enable CLI-only dependencies
+# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
+cli = ["structopt", "env_logger"]
 icecap = []
 linux = []
 mock = ["mockall", "mockito"]
 nitro = []
-# a feature to enable CLI-only dependencies
-# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["env_logger", "structopt"]
 
 [dependencies]
 backtrace = "=0.3.61"

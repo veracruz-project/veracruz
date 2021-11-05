@@ -9,7 +9,7 @@ version = "0.0.0"
 [package.metadata]
 cargo-fuzz = true
 
-# Has to use 0.1.1 due to any later versions import arbitrary packages 
+# Has to use 0.1.1 due to any later versions import arbitrary packages
 # that are incompatable with the rust version we are using.
 [dependencies]
 libfuzzer-sys = "=0.1.1"
