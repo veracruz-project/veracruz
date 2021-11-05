@@ -11,6 +11,14 @@ path = "src/cli.rs"
 required-features = ["cli"]
 
 [features]
+# a feature to enable CLI-only dependencies
+# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
+cli = [
+  "actix-rt",
+  "env_logger",
+  "policy-utils/std",
+  "structopt",
+]
 debug = []
 icecap = [
   "veracruz-utils/icecap",
@@ -20,21 +28,18 @@ icecap = [
   "io-utils/icecap",
 ]
 linux = [
-  "veracruz-utils/linux",
   "bincode",
+  "io-utils/linux",
   "policy-utils/std",
-  "io-utils/linux"
+  "veracruz-utils/linux",
 ]
 nitro = [
-  "veracruz-utils/nitro",
   "bincode",
+  "io-utils/nitro",
   "nix",
   "policy-utils/std",
-  "io-utils/nitro",
+  "veracruz-utils/nitro",
 ]
-# a feature to enable CLI-only dependencies
-# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "actix-rt", "env_logger", "policy-utils/std"]
 
 [dependencies]
 actix-http = "2.2.0"

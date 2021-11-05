@@ -6,10 +6,26 @@ name = "veracruz-utils"
 version = "0.3.0"
 
 [features]
-icecap = ["serde/derive", "ring/non_sgx"]
-linux = ["ring/non_sgx", "serde/derive", "serde_json/std"]
-nitro = ["serde/derive", "ring/nitro", "serde_json/std"]
-std = ["serde/std", "ring/std", "rustls", "serde_json/std"]
+icecap = [
+  "ring/non_sgx",
+  "serde/derive",
+]
+linux = [
+  "ring/non_sgx",
+  "serde/derive",
+  "serde_json/std",
+]
+nitro = [
+  "ring/non_sgx",
+  "serde/derive",
+  "serde_json/std",
+]
+std = [
+  "ring/std",
+  "rustls",
+  "serde/std",
+  "serde_json/std",
+]
 
 [dependencies]
 err-derive = "0.2"

@@ -8,18 +8,18 @@ version = "0.3.0"
 [features]
 # NOTE: turn on the `std` on ring for Error trait
 icecap = [
-  "ring/std",
+  "policy-utils/icecap",
   "ring/non_sgx",
-  "policy-utils/icecap"
+  "ring/std",
 ]
 nitro = [
-  "ring/std",
+  "policy-utils/std",
   "ring/non_sgx",
-  "policy-utils/std"
+  "ring/std",
 ]
 std = [
+  "policy-utils/std",
   "ring/std",
-  "policy-utils/std"
 ]
 
 [dependencies]

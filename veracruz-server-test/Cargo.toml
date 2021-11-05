@@ -7,24 +7,29 @@ version = "0.3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-icecap = [
-  "veracruz-server/icecap",
-  "proxy-attestation-server/icecap",
-  "policy-utils/icecap",
-  "veracruz-utils/icecap",
-]
-linux = [
-  "veracruz-server/linux",
-  "policy-utils/std",
-  "veracruz-utils/linux",
-  "proxy-attestation-server/linux",
-]
-nitro = ["veracruz-server/nitro", "proxy-attestation-server/nitro", "policy-utils/std", "veracruz-utils/nitro"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
 # cannot connect)
 debug = ["veracruz-server/debug"]
+icecap = [
+  "policy-utils/icecap",
+  "proxy-attestation-server/icecap",
+  "veracruz-server/icecap",
+  "veracruz-utils/icecap",
+]
+linux = [
+  "policy-utils/std",
+  "proxy-attestation-server/linux",
+  "veracruz-server/linux",
+  "veracruz-utils/linux",
+]
+nitro = [
+  "policy-utils/std",
+  "proxy-attestation-server/nitro",
+  "veracruz-server/nitro",
+  "veracruz-utils/nitro",
+]
 
 [dependencies]
 actix-rt = "1.1.1"

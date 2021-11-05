@@ -14,11 +14,11 @@ cargo-features = ["resolver"]
 
 [workspace]
 members = [
-    "crates/proxy-attestation-server",
-    "crates/veracruz-client",
-    "crates/veracruz-server",
-    "crates/veracruz-server-test",
-    "crates/veracruz-test",
+  "crates/proxy-attestation-server",
+  "crates/veracruz-client",
+  "crates/veracruz-server",
+  "crates/veracruz-server-test",
+  "crates/veracruz-test",
 ]
 resolver = "2"
 

@@ -14,14 +14,14 @@ icecap = [
   "transport-protocol/icecap",
 ]
 linux = [
+  "proxy-attestation-server/linux",
   "veracruz-client/linux",
   "veracruz-server/linux",
-  "proxy-attestation-server/linux"
 ]
 nitro = [
+  "proxy-attestation-server/nitro",
   "veracruz-client/nitro",
   "veracruz-server/nitro",
-  "proxy-attestation-server/nitro"
 ]
 
 [dependencies]

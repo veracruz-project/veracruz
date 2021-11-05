@@ -26,7 +26,10 @@ cli = ["structopt"]
 # that use PSA for their native attestation.
 icecap = ["psa-attestation/icecap"]
 linux = ["psa-attestation/linux"]
-nitro = ["nitro-enclave-attestation-document", "psa-attestation/nitro"]
+nitro = [
+  "nitro-enclave-attestation-document",
+  "psa-attestation/nitro",
+]
 
 [dependencies]
 actix-http = "2.2.0"
