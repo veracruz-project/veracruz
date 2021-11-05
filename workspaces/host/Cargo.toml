@@ -1,28 +1,28 @@
 cargo-features = ["resolver"]
 
 [workspace]
-resolver = "2"
 members = [
-    "crates/test-collateral/generate-policy",
-    "crates/sdk/freestanding-execution-engine",
 
-    # Data generators
-    "crates/sdk/data-generators/csv-encoder",
-    "crates/sdk/data-generators/idash2017-logistic-regression-generator",
-    "crates/sdk/data-generators/image-processing-generator",
-    "crates/sdk/data-generators/intersection-set-sum-generator",
-    "crates/sdk/data-generators/linear-regression-generator",
-    "crates/sdk/data-generators/moving-average-convergence-divergence-generator",
-    "crates/sdk/data-generators/number-stream-generator",
-    "crates/sdk/data-generators/private-set-intersection-generator",
-    "crates/sdk/data-generators/private-set-intersection-sum-generator",
-    "crates/sdk/data-generators/shamir-secret-sharing",
-    "crates/sdk/data-generators/string-generator",
+  # Data generators
+  "crates/sdk/data-generators/csv-encoder",
+  "crates/sdk/data-generators/idash2017-logistic-regression-generator",
+  "crates/sdk/data-generators/image-processing-generator",
+  "crates/sdk/data-generators/intersection-set-sum-generator",
+  "crates/sdk/data-generators/linear-regression-generator",
+  "crates/sdk/data-generators/moving-average-convergence-divergence-generator",
+  "crates/sdk/data-generators/number-stream-generator",
+  "crates/sdk/data-generators/private-set-intersection-generator",
+  "crates/sdk/data-generators/private-set-intersection-sum-generator",
+  "crates/sdk/data-generators/shamir-secret-sharing",
+  "crates/sdk/data-generators/string-generator",
+  "crates/sdk/freestanding-execution-engine",
+  "crates/test-collateral/generate-policy",
 ]
+resolver = "2"
 
 [profile.release]
-lto = true
 codegen-units = 1
+lto = true
 opt-level = 3
 
 # patches for SGX
@@ -37,5 +37,5 @@ sgx_types = { path = "crates/third-party/rust-sgx-sdk/sgx_types", optional = tru
 sgx_ucrypto = { path = "crates/third-party/rust-sgx-sdk/sgx_ucrypto", optional = true }
 
 [patch.crates-io]
-serde = { git = "https://github.com/veracruz-project/serde.git", features=["derive"], branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }

@@ -1,21 +1,21 @@
 cargo-features = ["resolver"]
 
 [workspace]
-resolver = "2"
 members = [
-    "crates/execution-engine",
-    "crates/platform-services",
-    "crates/psa-attestation",
-    "crates/runtime-manager",
-    "crates/runtime-manager-bind",
-    "crates/session-manager",
-    "crates/transport-protocol",
-    "crates/veracruz-utils"
+  "crates/execution-engine",
+  "crates/platform-services",
+  "crates/psa-attestation",
+  "crates/runtime-manager",
+  "crates/runtime-manager-bind",
+  "crates/session-manager",
+  "crates/transport-protocol",
+  "crates/veracruz-utils",
 ]
+resolver = "2"
 
 [profile.release]
-lto = true
 codegen-units = 1
+lto = true
 opt-level = 3
 
 # patches for SGX
@@ -30,5 +30,5 @@ sgx_types = { path = "crates/third-party/rust-sgx-sdk/sgx_types", optional = tru
 sgx_ucrypto = { path = "crates/third-party/rust-sgx-sdk/sgx_ucrypto", optional = true }
 
 [patch.crates-io]
-serde = { git = "https://github.com/veracruz-project/serde.git", features=["derive"], branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
