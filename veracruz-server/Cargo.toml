@@ -21,11 +21,11 @@ cli = [
 ]
 debug = []
 icecap = [
-  "veracruz-utils/icecap",
-  "psa-attestation",
   "bincode",
   "policy-utils/icecap",
+  "psa-attestation",
   "io-utils/icecap",
+  "veracruz-utils/icecap",
 ]
 linux = [
   "bincode",

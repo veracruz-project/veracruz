@@ -52,6 +52,3 @@ actix-rt = "1.1.1"
 actix-session = "0.4.1"
 actix-web = "3.3.2"
 futures = "0.3"
-
-[patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
