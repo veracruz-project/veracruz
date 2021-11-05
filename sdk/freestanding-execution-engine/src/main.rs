@@ -56,16 +56,6 @@ const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUT
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
 
-/// The default dump status of `stdout`, if no alternative is provided on the
-/// command line.
-const DEFAULT_DUMP_STDOUT: bool = false;
-/// The default dump status of `stderr`, if no alternative is provided on the
-/// command line.
-const DEFAULT_DUMP_STDERR: bool = false;
-/// The default value of the clock flag, if no alternative is provided on the
-/// command line.
-const DEFAULT_ENABLE_CLOCK: bool = false;
-
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
 ////////////////////////////////////////////////////////////////////////////////
@@ -231,21 +221,9 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         Vec::new()
     };
 
-    let enable_clock = if matches.is_present("enable-clock") {
-        true
-    } else {
-        DEFAULT_ENABLE_CLOCK
-    };
-    let dump_stdout = if matches.is_present("dump-stdout") {
-        true
-    } else {
-        DEFAULT_DUMP_STDOUT
-    };
-    let dump_stderr = if matches.is_present("dump-stderr") {
-        true
-    } else {
-        DEFAULT_DUMP_STDERR
-    };
+    let enable_clock = matches.is_present("enable-clock");
+    let dump_stdout = matches.is_present("dump-stdout");
+    let dump_stderr = matches.is_present("dump-stderr");
 
     let environment_variables = match matches.values_of("env") {
         None => Vec::new(),
@@ -298,7 +276,7 @@ fn load_input_source<T: AsRef<Path>>(
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), &buffer, false)?;
+        vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), buffer, false)?;
     } else if file_path.is_dir() {
         for dir in file_path.read_dir()? {
             load_input_source(&dir?.path(), vfs)?;
@@ -383,6 +361,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "---- stdout dump ----\n{}---- stdout dump end ----\n",
             stdout_dump
         );
+       std::io::stdout().flush()?;
     }
 
     // Dump contents of stderr
@@ -393,6 +372,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "---- stderr dump ----\n{}---- stderr dump end ----\n",
             stderr_dump
         );
+        std::io::stderr().flush()?;
     }
 
     for file_path in cmdline.output_sources.iter() {

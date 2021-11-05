@@ -14,20 +14,20 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use policy_utils::principal::{Principal, RightsTable, FileRights};
+use policy_utils::principal::{FileRights, Principal, RightsTable};
+#[cfg(not(feature = "icecap"))]
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::{
     collections::HashMap,
     convert::{AsRef, TryFrom},
     ffi::OsString,
-    // TODO: wait for icecap support direct conversion bwtween bytes and os_str, bypassing
+    // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
     // potential utf-8 encoding check
     path::{Component, Path, PathBuf},
     string::String,
     sync::{Arc, Mutex, MutexGuard},
     vec::Vec,
 };
-#[cfg(not(feature = "icecap"))]
-use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
@@ -295,10 +295,7 @@ impl InodeImpl {
             _otherwise => return Err(ErrNo::NotDir),
         };
         let mut rst = Vec::new();
-        for (index, (path, inode)) in dir
-            .iter()
-            .enumerate()
-        {
+        for (index, (path, inode)) in dir.iter().enumerate() {
             // TODO: wait for icecap support direct conversion from os_str to bytes, bypassing
             // potential utf-8 encoding check when calling to_str
             #[cfg(feature = "icecap")]
@@ -361,13 +358,13 @@ impl InodeTable {
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
     fn install_standard_streams_inode(&mut self) -> FileSystemResult<()> {
         self.stdin = self.new_inode()?;
-        self.add_file(self.stdin, "stdin", self.stdin, "".as_bytes())?;
+        self.add_file(self.stdin, "stdin", self.stdin, Vec::new())?;
 
         self.stdout = self.new_inode()?;
-        self.add_file(self.stdout, "stdout", self.stdout, "".as_bytes())?;
+        self.add_file(self.stdout, "stdout", self.stdout, Vec::new())?;
 
         self.stderr = self.new_inode()?;
-        self.add_file(self.stderr, "stderr", self.stderr, "".as_bytes())?;
+        self.add_file(self.stderr, "stderr", self.stderr, Vec::new())?;
         Ok(())
     }
 
@@ -441,7 +438,7 @@ impl InodeTable {
     /// Pick a fresh inode.
     fn new_inode(&mut self) -> FileSystemResult<Inode> {
         let cur = self.next_inode_candidate;
-        // Consume all possible Inodes, or the next inode is already used. 
+        // Consume all possible Inodes, or the next inode is already used.
         if self.table.contains_key(&cur) {
             return Err(ErrNo::NFile);
         }
@@ -529,7 +526,7 @@ impl InodeTable {
         parent: Inode,
         path: T,
         new_inode: Inode,
-        raw_file_data: &[u8],
+        raw_file_data: Vec<u8>,
     ) -> FileSystemResult<()> {
         let path = path.as_ref();
         // Create missing directories in the `parent` inode if the path contains directory,
@@ -566,7 +563,7 @@ impl InodeTable {
             parent,
             file_stat,
             path: path.to_path_buf(),
-            data: InodeImpl::File(raw_file_data.to_vec()),
+            data: InodeImpl::File(raw_file_data),
         };
         // Add the map from the new inode to inode implementation.
         self.insert(new_inode.clone(), node)?;
@@ -640,9 +637,7 @@ impl FileSystem {
     /// Rust programs are going to expect that this is true, so we
     /// need to preallocate some files corresponding to those, here.
     #[inline]
-    pub fn new(
-        rights_table: RightsTable,
-    ) -> FileSystemResult<Self> {
+    pub fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
@@ -659,6 +654,9 @@ impl FileSystem {
         Ok(rst)
     }
 
+    /// This is the ONLY public API to create a new FileSystem (handler).
+    /// It return a FileSystem where directories are pre-opened with appropriate
+    /// capabilities in related to `principal`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -711,7 +709,8 @@ impl FileSystem {
                 "stderr" => (Fd(2), self.lock_inode_table()?.stderr()),
                 _otherwise => continue,
             };
-            let rights = Rights::from_bits(try_from_or_errno(*std_stream.rights())?).ok_or(ErrNo::Inval)?;
+            let rights =
+                Rights::from_bits(try_from_or_errno(*std_stream.rights())?).ok_or(ErrNo::Inval)?;
             self.install_fd(
                 fd_number,
                 FileType::RegularFile,
@@ -738,27 +737,13 @@ impl FileSystem {
                 match file {
                     // Extract right associated to stdin stdout stderr
                     Some(path) if path == "stdin" || path == "stdout" || path == "stderr" => {
-
                         let rights_u32 = match try_from_or_errno::<u64, u32>(u64::from(rights)) {
                             Ok(o) => o,
                             Err(_) => return None,
                         };
-                        let file_rights = FileRights::new(
-                            String::from(path),
-                            rights_u32,
-                        );
-
-                        //let stream_rights = if path == "stdin" {
-                            //StandardStream::Stdin(file_rights)
-                        //} else if path == "stdout" {
-                            //StandardStream::Stdout(file_rights)
-                        //} else if path == "stderr" {
-                            //StandardStream::Stderr(file_rights)
-                        //} else {
-                            //return None;
-                        //};
+                        let file_rights = FileRights::new(String::from(path), rights_u32);
                         Some(file_rights)
-                    },
+                    }
                     _other => None,
                 }
             })
@@ -769,14 +754,11 @@ impl FileSystem {
         let first_fd = Self::FIRST_FD.0;
 
         // Load all pre-opened directories. Create directories if necessary.
-        let rights_table_without_std = rights_table
-            .iter()
-            .filter(|(k, _)| {
-                let k = k.as_ref();
-                k != Path::new("stdin") && k != Path::new("stdout") && k != Path::new("stderr")
-            });
-        for (index, (path, rights)) in rights_table_without_std.enumerate()
-        {
+        let rights_table_without_std = rights_table.iter().filter(|(k, _)| {
+            let k = k.as_ref();
+            k != Path::new("stdin") && k != Path::new("stdout") && k != Path::new("stderr")
+        });
+        for (index, (path, rights)) in rights_table_without_std.enumerate() {
             let new_fd = Fd(try_from_or_errno::<usize, u32>(index)? + first_fd);
             let path = path.as_ref();
             // strip off the root
@@ -800,7 +782,8 @@ impl FileSystem {
             self.prestat_table.insert(new_fd, path.to_path_buf());
         }
         // Set the next_fd_candidate, it might waste few FDs.
-        self.next_fd_candidate = Fd(Self::FIRST_FD.0 + try_from_or_errno::<usize, u32>(rights_table.len())?);
+        self.next_fd_candidate =
+            Fd(Self::FIRST_FD.0 + try_from_or_errno::<usize, u32>(rights_table.len())?);
 
         Ok(())
     }
@@ -861,13 +844,13 @@ impl FileSystem {
     /// Return the inode and the associated inode entry, contained in file descriptor `fd`
     #[inline]
     fn get_inode_by_fd(&self, fd: &Fd) -> FileSystemResult<Inode> {
-        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode)
+        Ok(self.fd_table.get(fd).ok_or(ErrNo::BadF)?.inode)
     }
 
     /// Return the inode and the associated inode entry at the relative `path` in the file
     /// descriptor `fd`. Return Error if `fd` is not a directory.
     fn get_inode_by_fd_path<T: AsRef<Path>>(&self, fd: &Fd, path: T) -> FileSystemResult<Inode> {
-        let parent_inode = self.get_inode_by_fd(&fd)?;
+        let parent_inode = self.get_inode_by_fd(fd)?;
         Ok(self
             .lock_inode_table()?
             .get_inode_by_inode_path(&parent_inode, path)?
@@ -1054,7 +1037,7 @@ impl FileSystem {
     pub(crate) fn fd_pwrite(
         &mut self,
         fd: Fd,
-        buf: &[u8],
+        buf: Vec<u8>,
         offset: FileSize,
     ) -> FileSystemResult<Size> {
         self.check_right(&fd, Rights::FD_WRITE)?;
@@ -1062,7 +1045,7 @@ impl FileSystem {
 
         self.lock_inode_table()?
             .get_mut(&inode)?
-            .write_file(buf.to_vec(), offset)
+            .write_file(buf, offset)
     }
 
     /// A rust-style base implementation for `fd_read`. It directly calls `fd_pread` with the
@@ -1167,7 +1150,7 @@ impl FileSystem {
 
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
-    pub(crate) fn fd_write(&mut self, fd: Fd, buf: &[u8]) -> FileSystemResult<Size> {
+    pub(crate) fn fd_write(&mut self, fd: Fd, buf: Vec<u8>) -> FileSystemResult<Size> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
@@ -1318,7 +1301,7 @@ impl FileSystem {
                 self.check_right(&fd, Rights::PATH_CREATE_FILE)?;
                 let new_inode = self.lock_inode_table()?.new_inode()?;
                 self.lock_inode_table()?
-                    .add_file(parent_inode, path, new_inode, &vec![])?;
+                    .add_file(parent_inode, path, new_inode, Vec::new())?;
                 new_inode
             }
         };
@@ -1454,7 +1437,7 @@ impl FileSystem {
     pub(crate) fn sock_send(
         &mut self,
         socket: Fd,
-        _buf: &[u8],
+        _buf: Vec<u8>,
         _si_flags: SiFlags,
     ) -> FileSystemResult<Size> {
         self.check_right(&socket, Rights::FD_WRITE)?;
@@ -1501,7 +1484,7 @@ impl FileSystem {
     pub fn write_file_by_absolute_path<T: AsRef<Path>>(
         &mut self,
         file_name: T,
-        data: &[u8],
+        data: Vec<u8>,
         is_append: bool,
     ) -> Result<(), ErrNo> {
         let file_name = file_name.as_ref();
@@ -1625,7 +1608,7 @@ impl FileSystem {
 
     /// A public API for writing to stdin.
     #[inline]
-    pub fn write_stdin(&mut self, buf: &[u8]) -> FileSystemResult<Size> {
+    pub fn write_stdin(&mut self, buf: Vec<u8>) -> FileSystemResult<Size> {
         self.fd_write(Fd(0), buf)
     }
 
@@ -1649,6 +1632,6 @@ impl FileSystem {
         self.fd_read(fd, try_from_or_errno(len)?)
     }
 }
-fn try_from_or_errno<T, K:TryFrom<T>>(i: T) -> FileSystemResult<K> {
+fn try_from_or_errno<T, K: TryFrom<T>>(i: T) -> FileSystemResult<K> {
     K::try_from(i).map_err(|_| ErrNo::Inval)
 }

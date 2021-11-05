@@ -146,7 +146,11 @@ mod tests {
         let result = test_template(
             policy_path(SINGLE_CLIENT_POLICY),
             &vec![(trust_path(CLIENT_CERT), trust_path(CLIENT_KEY))],
-            &[(0, "/program/random-source.wasm", program_path(RANDOM_SOURCE_WASM))],
+            &[(
+                0,
+                "/program/random-source.wasm",
+                program_path(RANDOM_SOURCE_WASM),
+            )],
             &vec![],
             &vec![(0, "/output/random.dat")],
         )
@@ -164,11 +168,22 @@ mod tests {
         let result = test_template(
             policy_path(LINEAR_REGRESSION_DUAL_POLICY),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT),
+                    trust_path(PROGRAM_CLIENT_KEY),
+                ),
                 (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
             ],
-            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
-            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA))],
+            &[(
+                0,
+                "/program/linear-regression.wasm",
+                program_path(LINEAR_REGRESSION_WASM),
+            )],
+            &vec![(
+                1,
+                "/input/linear-regression.dat",
+                data_path(LINEAR_REGRESSION_DATA),
+            )],
             &vec![(1, "/output/linear-regression.dat")],
         )
         .await;
@@ -185,13 +200,30 @@ mod tests {
         let result = test_template(
             policy_path(LINEAR_REGRESSION_TRIPLE_POLICY),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT),
+                    trust_path(PROGRAM_CLIENT_KEY),
+                ),
                 (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
+                (
+                    trust_path(RESULT_CLIENT_CERT),
+                    trust_path(RESULT_CLIENT_KEY),
+                ),
             ],
-            &[(0, "/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
-            &vec![(1, "/input/linear-regression.dat", data_path(LINEAR_REGRESSION_DATA))],
-            &vec![(1, "/output/linear-regression.dat"), (2, "/output/linear-regression.dat")],
+            &[(
+                0,
+                "/program/linear-regression.wasm",
+                program_path(LINEAR_REGRESSION_WASM),
+            )],
+            &vec![(
+                1,
+                "/input/linear-regression.dat",
+                data_path(LINEAR_REGRESSION_DATA),
+            )],
+            &vec![
+                (1, "/output/linear-regression.dat"),
+                (2, "/output/linear-regression.dat"),
+            ],
         )
         .await;
         assert!(
@@ -208,14 +240,32 @@ mod tests {
         let result = test_template(
             policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT),
+                    trust_path(PROGRAM_CLIENT_KEY),
+                ),
                 (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
+                (
+                    trust_path(RESULT_CLIENT_CERT),
+                    trust_path(RESULT_CLIENT_KEY),
+                ),
             ],
-            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM))],
+            &[(
+                0,
+                "/program/intersection-set-sum.wasm",
+                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            )],
             &vec![
-                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)),
-                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
+                (
+                    1,
+                    "/input/intersection-advertisement-viewer.dat",
+                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                ),
+                (
+                    2,
+                    "/input/intersection-customer.dat",
+                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                ),
             ],
             &vec![(2, "/output/intersection-set-sum.dat")],
         )
@@ -234,14 +284,32 @@ mod tests {
         let result = test_template(
             policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT),
+                    trust_path(PROGRAM_CLIENT_KEY),
+                ),
                 (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
+                (
+                    trust_path(RESULT_CLIENT_CERT),
+                    trust_path(RESULT_CLIENT_KEY),
+                ),
             ],
-            &[(0, "/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM))],
+            &[(
+                0,
+                "/program/intersection-set-sum.wasm",
+                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            )],
             &vec![
-                (2, "/input/intersection-customer.dat", data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
-                (1, "/input/intersection-advertisement-viewer.dat", data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)),
+                (
+                    2,
+                    "/input/intersection-customer.dat",
+                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                ),
+                (
+                    1,
+                    "/input/intersection-advertisement-viewer.dat",
+                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                ),
             ],
             &vec![(2, "/output/intersection-set-sum.dat")],
         )
@@ -256,11 +324,21 @@ mod tests {
         let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT),
+                    trust_path(PROGRAM_CLIENT_KEY),
+                ),
                 (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
+                (
+                    trust_path(RESULT_CLIENT_CERT),
+                    trust_path(RESULT_CLIENT_KEY),
+                ),
             ],
-            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM))],
+            &[(
+                0,
+                "/program/string-edit-distance.wasm",
+                program_path(STRING_EDIT_DISTANCE_WASM),
+            )],
             &vec![
                 (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
                 (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
@@ -282,12 +360,25 @@ mod tests {
         let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY),
             &vec![
-                (trust_path(PROGRAM_CLIENT_CERT), trust_path(PROGRAM_CLIENT_KEY)),
+                (
+                    trust_path(PROGRAM_CLIENT_CERT),
+                    trust_path(PROGRAM_CLIENT_KEY),
+                ),
                 (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (trust_path(DATA_CLIENT_SECOND_CERT), trust_path(DATA_CLIENT_SECOND_KEY)),
-                (trust_path(RESULT_CLIENT_CERT), trust_path(RESULT_CLIENT_KEY)),
+                (
+                    trust_path(DATA_CLIENT_SECOND_CERT),
+                    trust_path(DATA_CLIENT_SECOND_KEY),
+                ),
+                (
+                    trust_path(RESULT_CLIENT_CERT),
+                    trust_path(RESULT_CLIENT_KEY),
+                ),
             ],
-            &[(0, "/program/string-edit-distance.wasm", program_path(STRING_EDIT_DISTANCE_WASM))],
+            &[(
+                0,
+                "/program/string-edit-distance.wasm",
+                program_path(STRING_EDIT_DISTANCE_WASM),
+            )],
             &vec![
                 (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
                 (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
@@ -328,7 +419,7 @@ mod tests {
             info!("### program provider read binary.");
             let program_data = read_binary_file(prog_path.as_path())?;
             info!("### program provider send binary.");
-            client.send_program("/program/linear-regression.wasm",&program_data)?;
+            client.send_program("/program/linear-regression.wasm", &program_data)?;
             info!("### program provider request shutdown.");
             client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
@@ -346,7 +437,7 @@ mod tests {
             info!("### data provider read input.");
             let data = read_binary_file(&data_filename.as_path())?;
             info!("### data provider send input.");
-            client.send_data("/input/linear-regression.dat",&data)?;
+            client.send_data("/input/linear-regression.dat", &data)?;
             info!("### data provider read result.");
             client.request_compute("/program/linear-regression.wasm")?;
             client.get_results("/output/linear-regression.dat")?;
@@ -400,10 +491,15 @@ mod tests {
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
             for (cert, key) in client_configs.iter() {
-                clients.push(veracruz_client::VeracruzClient::new(cert.as_ref(), key.as_ref(), &policy_json)?);
+                clients.push(veracruz_client::VeracruzClient::new(
+                    cert.as_ref(),
+                    key.as_ref(),
+                    &policy_json,
+                )?);
             }
             info!("### Step 3. Provisions programs.");
-            for (program_provider_index, remote_filename, data_filename) in program_providers.iter() {
+            for (program_provider_index, remote_filename, data_filename) in program_providers.iter()
+            {
                 let data_filename = data_filename.as_ref();
                 info!(
                     "            Client #{} provisions program {}.",

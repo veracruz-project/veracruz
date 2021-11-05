@@ -21,9 +21,9 @@ mod tests {
     use env_logger;
     use lazy_static::lazy_static;
     use log::{debug, error, info, Level};
-    use ring;
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
+    use ring;
     use std::{
         collections::HashMap,
         env,
@@ -124,7 +124,10 @@ mod tests {
             info!("SETUP.call_once called");
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
-                println!("spawned thread calling server with url:{:?}", proxy_attestation_server_url);
+                println!(
+                    "spawned thread calling server with url:{:?}",
+                    proxy_attestation_server_url
+                );
                 #[cfg(feature = "debug")]
                 let server = proxy_attestation_server::server::server(
                     proxy_attestation_server_url,
@@ -268,8 +271,14 @@ mod tests {
             policy_path(NO_DEBUG_POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
-            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
+            &[(
+                "/program/linear-regression.wasm",
+                program_path(LINEAR_REGRESSION_WASM),
+            )],
+            &[(
+                "/input/linear-regression.dat",
+                data_dir(LINEAR_REGRESSION_DATA),
+            )],
             &[],
             &["/output/linear-regression.dat"],
         )
@@ -321,7 +330,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/random-source.wasm", program_path(RANDOM_SOURCE_WASM))],
+            &[(
+                "/program/random-source.wasm",
+                program_path(RANDOM_SOURCE_WASM),
+            )],
             &[],
             &[],
             &["/output/random.dat"],
@@ -352,7 +364,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM))],
+            &[(
+                "/program/string-edit-distance.wasm",
+                program_path(STRING_EDIT_DISTANCE_WASM),
+            )],
             &[],
             &[],
             &["/output/random.dat"],
@@ -368,7 +383,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(UNAUTHORIZED_KEY),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM))],
+            &[(
+                "/program/random-source.wasm",
+                program_path(RANDOM_SOURCE_WASM),
+            )],
             &[],
             &[],
             &["/output/random.dat"],
@@ -384,7 +402,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(UNAUTHORIZED_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM))],
+            &[(
+                "/program/random-source.wasm",
+                program_path(RANDOM_SOURCE_WASM),
+            )],
             &[],
             &[],
             &["/output/random.dat"],
@@ -400,7 +421,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(UNAUTHORIZED_CERT),
             trust_path(UNAUTHORIZED_KEY),
-            &[("/program/random-source.wasm",program_path(RANDOM_SOURCE_WASM))],
+            &[(
+                "/program/random-source.wasm",
+                program_path(RANDOM_SOURCE_WASM),
+            )],
             &[],
             &[],
             &["/output/random.dat"],
@@ -421,8 +445,14 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
-            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
+            &[(
+                "/program/linear-regression.wasm",
+                program_path(LINEAR_REGRESSION_WASM),
+            )],
+            &[(
+                "/input/linear-regression.dat",
+                data_dir(LINEAR_REGRESSION_DATA),
+            )],
             &[],
             &["/output/linear-regression.dat"],
         )
@@ -436,7 +466,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
+            &[(
+                "/program/linear-regression.wasm",
+                program_path(LINEAR_REGRESSION_WASM),
+            )],
             &[],
             &[],
             &["/output/linear-regression.dat"],
@@ -463,11 +496,20 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/intersection-set-sum.wasm", program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM))],
+            &[(
+                "/program/intersection-set-sum.wasm",
+                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            )],
             &[
                 // message sends out in the reversed order
-                ("/input/intersection-customer.dat", data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
-                ("/input/intersection-advertisement-viewer.dat", data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA)),
+                (
+                    "/input/intersection-customer.dat",
+                    data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                ),
+                (
+                    "/input/intersection-advertisement-viewer.dat",
+                    data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                ),
             ],
             &[],
             &["/output/intersection-set-sum.dat"],
@@ -485,9 +527,14 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/string-edit-distance.wasm",program_path(STRING_EDIT_DISTANCE_WASM))],
-            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA)),
-              ("/input/hello-world-2.dat", data_dir(STRING_2_DATA))],
+            &[(
+                "/program/string-edit-distance.wasm",
+                program_path(STRING_EDIT_DISTANCE_WASM),
+            )],
+            &[
+                ("/input/hello-world-1.dat", data_dir(STRING_1_DATA)),
+                ("/input/hello-world-2.dat", data_dir(STRING_2_DATA)),
+            ],
             &[],
             &["/output/string-edit-distance.dat"],
         )
@@ -507,8 +554,14 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/linear-regression.wasm", program_path(LINEAR_REGRESSION_WASM))],
-            &[("/input/linear-regression.dat", data_dir(LINEAR_REGRESSION_DATA))],
+            &[(
+                "/program/linear-regression.wasm",
+                program_path(LINEAR_REGRESSION_WASM),
+            )],
+            &[(
+                "/input/linear-regression.dat",
+                data_dir(LINEAR_REGRESSION_DATA),
+            )],
             &[],
             &["/output/linear-regression.dat"],
         )
@@ -526,7 +579,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/private-set-intersection.wasm",program_path(PERSON_SET_INTERSECTION_WASM))],
+            &[(
+                "/program/private-set-intersection.wasm",
+                program_path(PERSON_SET_INTERSECTION_WASM),
+            )],
             &[
                 ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA)),
                 ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA)),
@@ -544,12 +600,16 @@ mod tests {
     /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
     /// A standard one data source and two stream sources scenario with attestation.
     fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
-        let stream_list = stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
+        let stream_list =
+            stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM))],
+            &[(
+                "/program/number-stream-accumulation.wasm",
+                program_path(NUMBER_STREM_WASM),
+            )],
             &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
             &stream_list,
             &["/output/accumulation.dat"],
@@ -564,7 +624,10 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM))],
+            &[(
+                "/program/number-stream-accumulation.wasm",
+                program_path(NUMBER_STREM_WASM),
+            )],
             &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
             &[],
             &["/output/accumulation.dat"],
@@ -575,12 +638,16 @@ mod tests {
     #[test]
     /// Attempt to provision stream data in the state of loading static data.
     fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
-        let stream_list = stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
+        let stream_list =
+            stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/number-stream-accumulation.wasm", program_path(NUMBER_STREM_WASM))],
+            &[(
+                "/program/number-stream-accumulation.wasm",
+                program_path(NUMBER_STREM_WASM),
+            )],
             &[],
             &stream_list,
             &["/output/accumulation.dat"],
@@ -594,18 +661,29 @@ mod tests {
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn test_performance_idash2017_with_attestation() {
-        let input_vec = input_list(data_dir(LOGISTICS_REGRESSION_DATA_PATH), "/input/idash2017/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
+        let input_vec = input_list(
+            data_dir(LOGISTICS_REGRESSION_DATA_PATH),
+            "/input/idash2017/",
+        )
+        .expect("Failed to parse input");
+        let input_vec: Vec<(&str, PathBuf)> =
+            input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
 
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/idash2017-logistic-regression.wasm", program_path(LOGISTICS_REGRESSION_WASM))],
+            &[(
+                "/program/idash2017-logistic-regression.wasm",
+                program_path(LOGISTICS_REGRESSION_WASM),
+            )],
             &input_vec,
             &[],
             // only read two outputs
-            &["/output/idash2017/generate-data-0.dat", "/output/idash2017/generate-data-1.dat"],
+            &[
+                "/output/idash2017/generate-data-0.dat",
+                "/output/idash2017/generate-data-1.dat",
+            ],
         );
         assert!(result.is_ok(), "error:{:?}", result);
     }
@@ -616,14 +694,19 @@ mod tests {
     /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
     fn test_performance_macd_with_attestation() {
-        let input_vec = input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
+        let input_vec =
+            input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
+        let input_vec: Vec<(&str, PathBuf)> =
+            input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
 
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/moving-average-convergence-divergence.wasm",program_path(MACD_WASM))],
+            &[(
+                "/program/moving-average-convergence-divergence.wasm",
+                program_path(MACD_WASM),
+            )],
             &input_vec,
             &[],
             &["/output/macd/generate-1000.dat"],
@@ -637,14 +720,22 @@ mod tests {
     /// computation: intersection-sum, matching the setting in .
     /// data sources: private-set-inter-sum/*.dat
     fn test_performance_set_intersection_sum_with_attestation() {
-        let input_vec = input_list(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH), "/input/private-set-inter-sum/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, PathBuf)> = input_vec.iter().map(|(s,k)| (&s[..],k.clone())).collect();
+        let input_vec = input_list(
+            data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
+            "/input/private-set-inter-sum/",
+        )
+        .expect("Failed to parse input");
+        let input_vec: Vec<(&str, PathBuf)> =
+            input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
 
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/private-set-intersection-sum.wasm",program_path(INTERSECTION_SET_SUM_WASM))],
+            &[(
+                "/program/private-set-intersection-sum.wasm",
+                program_path(INTERSECTION_SET_SUM_WASM),
+            )],
             &input_vec,
             &[],
             &["/output/private-set-inter-sum/data-2000-0"],
@@ -755,12 +846,15 @@ mod tests {
             .collect();
         let mut stream_id_paths: Vec<_> = stream_id_paths
             .iter()
-            .map(|v| v.iter().map(|(remote_path, path)| (remote_path.to_string(), path.as_ref().to_path_buf())).collect::<Vec<_>>())
+            .map(|v| {
+                v.iter()
+                    .map(|(remote_path, path)| {
+                        (remote_path.to_string(), path.as_ref().to_path_buf())
+                    })
+                    .collect::<Vec<_>>()
+            })
             .collect();
-        let output_files: Vec<_> = output_files
-            .iter()
-            .map(|path| path.to_string())
-            .collect();
+        let output_files: Vec<_> = output_files.iter().map(|path| path.to_string()).collect();
 
         // This is a closure, containing instructions from clients.
         // A separate thread is spawn and directly call this closure.
@@ -793,7 +887,7 @@ mod tests {
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
-                    &remote_file_name
+                    &remote_file_name,
                 )?;
                 info!(
                     "             Client received acknowledgement after sending program: {:?}",
@@ -852,7 +946,10 @@ mod tests {
 
             info!("### Step 7.  Stream providers request the program hash.");
             for (round, paths) in stream_id_paths.iter().enumerate() {
-                info!("             ------------ Streaming Round # {} ------------", round);
+                info!(
+                    "             ------------ Streaming Round # {} ------------",
+                    round
+                );
                 for (remote_file_name, data_path) in paths.iter() {
                     info!(
                         "             Stream providers provision secret data {}.",
@@ -920,8 +1017,7 @@ mod tests {
                         client_session_id,
                         &mut client_session,
                         ticket,
-                        &transport_protocol::serialize_request_result(remote_file_name)?
-                            .as_slice(),
+                        &transport_protocol::serialize_request_result(remote_file_name)?.as_slice(),
                     )?;
                     info!(
                         "             Computation result time (μs): {} with return code (undecoded) {:?}.",
@@ -933,20 +1029,22 @@ mod tests {
                 for remote_file_name in &output_files {
                     info!("             Read {}.", remote_file_name);
                     let response = read_file(
-                            client_session_id,
-                            &mut client_session,
-                            ticket,
-                            &client_tls_tx,
-                            &client_tls_rx,
-                            &remote_file_name,
-                        )?;
-                    let response =
-                        transport_protocol::parse_runtime_manager_response(&response)?;
+                        client_session_id,
+                        &mut client_session,
+                        ticket,
+                        &client_tls_tx,
+                        &client_tls_rx,
+                        &remote_file_name,
+                    )?;
+                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
                     let response = transport_protocol::parse_result(&response)?;
                     let result = response.ok_or(VeracruzServerError::MissingFieldError(
                         "Result retrievers response",
                     ))?;
-                    info!("             Client received result of len: {:?},", result.len());
+                    info!(
+                        "             Client received result of len: {:?},",
+                        result.len()
+                    );
                 }
             }
 
@@ -1024,9 +1122,12 @@ mod tests {
     /// Function produces a vec of pairs of remote (des) file and local (src) file path,
     /// which corresponds to provisioning/overwriting the content of the local file to the remote file.
     /// Read all files and diretory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
-    /// E.g. if call the function with '/local/path/' and '/remote/path/', 
+    /// E.g. if call the function with '/local/path/' and '/remote/path/',
     /// the result could be [(/remote/path/a.txt, /local/path/a.txt), (/remote/path/b/c.txt, /local/path/b/c.txt), ... ].
-    fn input_list<T: AsRef<Path>, K: AsRef<Path>>(dir_path: T, remote_dir_path: K) -> Result<Vec<(String, PathBuf)>, VeracruzServerError> {
+    fn input_list<T: AsRef<Path>, K: AsRef<Path>>(
+        dir_path: T,
+        remote_dir_path: K,
+    ) -> Result<Vec<(String, PathBuf)>, VeracruzServerError> {
         let mut rst = Vec::new();
         let dir_path = dir_path.as_ref();
         for entry in dir_path
@@ -1034,21 +1135,34 @@ mod tests {
             .expect(&format!("invalid path: {:?}", dir_path))
         {
             let entry = entry.expect("invalid entry").path();
-            let remote_entry_path = remote_dir_path.as_ref().join(entry.strip_prefix(dir_path).expect("Failed to strip entry prefix"));
+            let remote_entry_path = remote_dir_path.as_ref().join(
+                entry
+                    .strip_prefix(dir_path)
+                    .expect("Failed to strip entry prefix"),
+            );
             if entry.is_dir() {
                 rst.append(&mut input_list(entry, remote_entry_path)?)
             } else if entry.is_file() {
                 let entry_path = entry.to_str().expect("Failed to parse the entry path");
-                rst.push((remote_entry_path.to_str().expect("Failed to parse remote entry path").to_string(), PathBuf::from(entry_path)))
+                rst.push((
+                    remote_entry_path
+                        .to_str()
+                        .expect("Failed to parse remote entry path")
+                        .to_string(),
+                    PathBuf::from(entry_path),
+                ))
             }
         }
         Ok(rst)
     }
 
-    /// Function produces a vec of input lists. Each list corresponds to a round 
+    /// Function produces a vec of input lists. Each list corresponds to a round
     /// and is a vec of pairs of remote (des) file and local (src) file path,
     /// which corresponds to provisioning/appending the content of the local file to the remote file.
-    fn stream_list<T: AsRef<Path>, K: AsRef<Path>>(dir_path: T, remote_dir_path: K) -> Result<Vec<Vec<(String, PathBuf)>>, VeracruzServerError> {
+    fn stream_list<T: AsRef<Path>, K: AsRef<Path>>(
+        dir_path: T,
+        remote_dir_path: K,
+    ) -> Result<Vec<Vec<(String, PathBuf)>>, VeracruzServerError> {
         let remote_dir_path = remote_dir_path.as_ref();
         let mut rst = Vec::new();
         let dir_path = dir_path.as_ref();
@@ -1065,11 +1179,12 @@ mod tests {
     }
 
     /// Auxiliary function: read policy file
-    fn read_policy<T: AsRef<Path>>(fname: T) -> Result<(Policy, String, String), VeracruzServerError> {
+    fn read_policy<T: AsRef<Path>>(
+        fname: T,
+    ) -> Result<(Policy, String, String), VeracruzServerError> {
         let fname = fname.as_ref();
-        let policy_json =
-            std::fs::read_to_string(fname).expect(&format!("Cannot open file {}", fname.to_string_lossy()));
-
+        let policy_json = std::fs::read_to_string(fname)
+            .expect(&format!("Cannot open file {}", fname.to_string_lossy()));
 
         let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
         let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
@@ -1114,9 +1229,7 @@ mod tests {
             client_tls_rx,
         )?;
         info!("Policy hash OK...");
-        check_runtime_manager_hash(policy,
-                                   client_session,
-                                   test_target_platform)?;
+        check_runtime_manager_hash(policy, client_session, test_target_platform)?;
         Ok(())
     }
 

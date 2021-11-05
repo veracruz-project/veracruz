@@ -493,33 +493,6 @@ command-line parameter.",
         );
     }
 
-    //if let Some(stdin) = matches.value_of("stdin") {
-        //let stdin = String::from(stdin);
-        //let stdin2 = stdin.clone();
-        //check_capability(&[vec![stdin]]);
-        //arguments.stdin = Some(stdin2);
-    //} else {
-        //info!("No stdin configuration was passed as command line parameters.");
-    //}
-
-    //if let Some(stdout) = matches.value_of("stdout") {
-        //let stdout = String::from(stdout);
-        //let stdout2 = stdout.clone();
-        //check_capability(&[vec![stdout]]);
-        //arguments.stdout = Some(stdout2);
-    //} else {
-        //info!("No stdout configuration was passed as command line parameters.");
-    //}
-
-    //if let Some(stderr) = matches.value_of("stderr") {
-        //let stderr = String::from(stderr);
-        //let stderr2 = stderr.clone();
-        //check_capability(&[vec![stderr]]);
-        //arguments.stderr = Some(stderr2);
-    //} else {
-        //info!("No stderr configuration was passed as command line parameters.");
-    //}
-
     if let Some(enable_clock) = matches.value_of("enable-clock") {
         if let Ok(enable_clock) = bool::from_str(enable_clock) {
             arguments.enable_clock = enable_clock;

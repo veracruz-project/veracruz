@@ -101,8 +101,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for i in 0..iter {
         let (data, sample) = generate(&mut rng, size as usize);
-        let data = pinecone::to_vec(&data).unwrap();
-        let sample = pinecone::to_vec(&sample).unwrap();
+        let data = pinecone::to_vec(&data).map_err(|e| {
+            eprintln!("Cannot encode {:?} in pinecone", data);
+            e
+        })?;
+        let sample = pinecone::to_vec(&sample).map_err(|e| {
+            eprintln!("Cannot encode {:?} in pinecone", sample);
+            e
+        })?;
         let path = dir.join(format!("data-{}-{}", size, i));
         fs::create_dir_all(&path)?;
         std::fs::OpenOptions::new()

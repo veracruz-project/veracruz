@@ -268,9 +268,14 @@ pub trait MemoryHandler {
 
     /// Performs a scattered read from several locations, as specified by a list
     /// of `IoVec` structures, `scatters`, from the runtime state's memory.
-    fn read_iovec_scattered(&self, scatters: &[IoVec]) -> FileSystemResult<Vec<Vec<u8>>> {
+    /// NOTE: for performance, it reads in reversed so the caller can use `pop`
+    /// to take out the ownership.
+    fn read_iovec_scattered_in_reverse(
+        &self,
+        scatters: &[IoVec],
+    ) -> FileSystemResult<Vec<Vec<u8>>> {
         let mut rst = Vec::new();
-        for IoVec { buf, len } in scatters.iter() {
+        for IoVec { buf, len } in scatters.iter().rev() {
             rst.push(self.read_buffer(*buf, *len)?)
         }
         Ok(rst)
@@ -342,9 +347,12 @@ pub trait MemoryHandler {
 #[derive(Clone)]
 pub struct WasiWrapper {
     /// The synthetic filesystem associated with this machine.
-    /// Note: Veracruz runtime hold a the root FileSystem handler.
-    ///       Both the Veracruz runtime and this WasiWrapper can update, i.e. mutate, 
-    ///       the file system internal state, if passing capability check.
+    /// Note: Veracruz runtime should hold the root FileSystem handler.
+    ///       The FileSystem handler here should be a non-root handler spawned   
+    ///       fro the root one.
+    ///       Both the Veracruz runtime and this WasiWrapper can update, i.e. mutate,
+    ///       the file system internal state, if their local FileSystem handlers have
+    ///       the appropriate capabilities.
     ///       ---------------------------
     ///           Runtime  |  WasiWrapper
     /// FileSystem(handler)| FileSystem(handler)   
@@ -744,10 +752,10 @@ impl WasiWrapper {
         address: u32,
     ) -> FileSystemResult<()> {
         let iovecs = memory_ref.unpack_array::<IoVec>(iovec_base, iovec_count)?;
-        let bufs = memory_ref.read_iovec_scattered(&iovecs)?;
+        let mut bufs = memory_ref.read_iovec_scattered_in_reverse(&iovecs)?;
 
         let mut size_written = 0;
-        for buf in bufs.iter() {
+        while let Some(buf) = bufs.pop() {
             size_written +=
                 self.filesystem
                     .fd_pwrite(fd.into(), buf, offset + (size_written as u64))?;
@@ -870,10 +878,10 @@ impl WasiWrapper {
         address: u32,
     ) -> FileSystemResult<()> {
         let iovecs = memory_ref.unpack_array::<IoVec>(iovec_base, iovec_count)?;
-        let bufs = memory_ref.read_iovec_scattered(&iovecs)?;
+        let mut bufs = memory_ref.read_iovec_scattered_in_reverse(&iovecs)?;
 
         let mut size_written = 0;
-        for buf in bufs.iter() {
+        while let Some(buf) = bufs.pop() {
             size_written += self.filesystem.fd_write(fd.into(), buf)?;
         }
         memory_ref.write_u32(address, size_written)
@@ -1184,11 +1192,11 @@ impl WasiWrapper {
         address: u32,
     ) -> FileSystemResult<()> {
         let iovecs = memory_ref.unpack_array::<IoVec>(si_address, si_len)?;
-        let bufs = memory_ref.read_iovec_scattered(&iovecs)?;
+        let mut bufs = memory_ref.read_iovec_scattered_in_reverse(&iovecs)?;
         let si_flag: SiFlags = Self::decode_wasi_arg(si_flag)?;
 
         let mut size_written = 0;
-        for buf in bufs.iter() {
+        while let Some(buf) = bufs.pop() {
             size_written += self.filesystem.sock_send(socket.into(), buf, si_flag)?;
         }
         memory_ref.write_u32(address, size_written)

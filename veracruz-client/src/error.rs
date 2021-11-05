@@ -100,6 +100,8 @@ pub enum VeracruzClientError {
     UnableToReadError,
     #[error(display = "VeracruzClient: No match found for runtime isolate hash")]
     NoMatchingRuntimeIsolateHash,
+    #[error(display = "VeracruzClient: Invalid Path")]
+    InvalidPath,
 }
 
 impl From<x509_parser::error::PEMError> for VeracruzClientError {

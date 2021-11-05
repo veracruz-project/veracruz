@@ -105,8 +105,6 @@ to the memory at `environ_buf_size`.
 
 ### Times
 
-Veracruz does not support any time API for now.
-
 #### `clock_res_get`
 ```rust
 fn clock_res_get(id: ClockId) -> Result<Timestamp, ErrNo>;

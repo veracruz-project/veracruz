@@ -96,8 +96,6 @@ pub struct Policy {
     debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
-    ///// The rights table of the standard streams (`stdin`, `stdout`, `stderr`).
-    //std_streams_table: Vec<StandardStream>,
     /// The clock flag.  This dictates whether the WASM program will be able to
     /// call clock functions to e.g. get a clock's time or resolution.
     enable_clock: bool,
@@ -144,7 +142,6 @@ impl Policy {
             proxy_attestation_server_url,
             debug,
             execution_strategy,
-            //std_streams_table,
             enable_clock,
             policy_hash: None,
             file_hashes,
@@ -276,12 +273,6 @@ impl Policy {
         &self.execution_strategy
     }
 
-    ///// Return the rights of the standard streams, associated with this policy.
-    //#[inline]
-    //pub fn std_streams_table(&self) -> &Vec<StandardStream> {
-        //&self.std_streams_table
-    //}
-
     /// Returns the clock flag associated with this policy.
     #[inline]
     pub fn enable_clock(&self) -> &bool {
@@ -386,15 +377,6 @@ impl Policy {
                 hex::decode(file_hash.hash())?,
             );
         }
-        //for program in &self.programs {
-            //let program_file_name = program.program_file_name();
-            //let pi_hash = program.pi_hash();
-            //table.insert(
-                //program_file_name.to_string(),
-                //hex::decode(pi_hash)
-                    //.map_err(|_e| PolicyError::HexDecodeError(program_file_name.to_string()))?,
-            //);
-        //}
         Ok(table)
     }
 

@@ -82,7 +82,7 @@ fn dispatch_on_write(
     protocol_state.write_file(
         &Principal::Participant(client_id),
         file_name.as_str(),
-        data.as_slice(),
+        data,
     )?;
     let response = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::SUCCESS as i32,
@@ -102,7 +102,7 @@ fn dispatch_on_append(
     protocol_state.append_file(
         &Principal::Participant(client_id),
         file_name.as_str(),
-        data.as_slice(),
+        data,
     )?;
     let response = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::SUCCESS as i32,

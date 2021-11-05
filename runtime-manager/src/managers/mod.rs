@@ -89,7 +89,6 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let rights_table = global_policy.get_rights_table();
-        println!("right table: {:?}", rights_table);
         let digest_table = global_policy.get_file_hash_table()?;
         let vfs = FileSystem::new(rights_table)?;
 
@@ -123,11 +122,11 @@ impl ProtocolState {
         &mut self,
         client_id: &Principal,
         file_name: &str,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), RuntimeManagerError> {
         // Check the digest, if necessary
         if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
-            let incoming_digest = Self::sha_256_digest(data);
+            let incoming_digest = Self::sha_256_digest(&data);
             if incoming_digest.len() != digest.len() {
                 return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
             }
@@ -158,7 +157,7 @@ impl ProtocolState {
         &mut self,
         client_id: &Principal,
         file_name: &str,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), RuntimeManagerError> {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.

@@ -291,7 +291,7 @@ $ vc-client example/example-policy.json \
     --result output=-
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
-Requestion compute of <enclave>/example-binary.wasm
+Requesting compute of <enclave>/example-binary.wasm
 Reading <enclave>/output into <stdout>
 Hello World!
 Shutting down enclave

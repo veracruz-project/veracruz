@@ -242,6 +242,7 @@ impl Identity<String> {
     }
 }
 
+/// Defines a file and its expected hash. 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FileHash {
     file_path: String,

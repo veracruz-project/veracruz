@@ -39,8 +39,8 @@ use crate::{
     fs::FileSystem,
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
-use std::{boxed::Box, vec::Vec, string::String};
 use policy_utils::principal::ExecutionStrategy;
+use std::{boxed::Box, string::String, vec::Vec};
 
 pub struct Options {
     pub environment_variables: Vec<(String, String)>,
@@ -64,7 +64,7 @@ impl Default for Options {
 /// It currently supports `interp` or `JIT`, backed by `WASI` and `wasmtime`, respectively.
 /// Note that the `execute` function is essentially this library's
 /// interface to the outside world, and details exactly what external clients
-/// such as `freestanding-executuon-engine` and `runtime-manager` can rely on.
+/// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: FileSystem,

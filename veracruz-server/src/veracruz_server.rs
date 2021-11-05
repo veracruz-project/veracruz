@@ -19,8 +19,6 @@ use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use io_utils::{error::SocketError, http::HttpError};
-use log::debug;
-use std::io::Read;
 #[cfg(feature = "linux")]
 use veracruz_utils::platform::linux::LinuxRootEnclaveResponse;
 
