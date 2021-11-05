@@ -1,9 +1,9 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "An untrusted server/bridge that allows the outside world and the trusted Veracruz runtime to communicate with each other."
+edition = "2018"
 name = "veracruz-server"
 version = "0.3.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "An untrusted server/bridge that allows the outside world and the trusted Veracruz runtime to communicate with each other."
 
 [[bin]]
 name = "veracruz-server"
@@ -11,54 +11,88 @@ path = "src/cli.rs"
 required-features = ["cli"]
 
 [features]
-sgx = ["sgx_types", "sgx_urts", "transport-protocol/sgx_attestation", "runtime-manager-bind", "sgx-root-enclave-bind", "tempfile", "policy-utils/std", "io-utils/sgx"]
-tz = ["veracruz-utils/std", "veracruz-utils/tz", "transport-protocol/tz", "optee-teec", "uuid", "policy-utils/tz", "io-utils/tz"]
-nitro = ["veracruz-utils/nitro", "bincode", "serde/derive", "byteorder", "nix", "ssh2", "policy-utils/std", "io-utils/nitro"]
-icecap = ["veracruz-utils/icecap", "psa-attestation", "bincode", "serde/derive", "once_cell", "policy-utils/icecap", "io-utils/icecap"]
-linux = ["veracruz-utils/linux", "bincode", "serde/derive", "policy-utils/std", "io-utils/linux"]
 debug = []
+icecap = [
+  "veracruz-utils/icecap",
+  "psa-attestation",
+  "bincode",
+  "serde/derive",
+  "once_cell",
+  "policy-utils/icecap",
+  "io-utils/icecap",
+]
+linux = ["veracruz-utils/linux", "bincode", "serde/derive", "policy-utils/std", "io-utils/linux"]
+nitro = [
+  "veracruz-utils/nitro",
+  "bincode",
+  "serde/derive",
+  "byteorder",
+  "nix",
+  "ssh2",
+  "policy-utils/std",
+  "io-utils/nitro",
+]
+sgx = [
+  "sgx_types",
+  "sgx_urts",
+  "transport-protocol/sgx_attestation",
+  "runtime-manager-bind",
+  "sgx-root-enclave-bind",
+  "tempfile",
+  "policy-utils/std",
+  "io-utils/sgx",
+]
+tz = [
+  "veracruz-utils/std",
+  "veracruz-utils/tz",
+  "transport-protocol/tz",
+  "optee-teec",
+  "uuid",
+  "policy-utils/tz",
+  "io-utils/tz",
+]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
 cli = ["structopt", "actix-rt", "env_logger", "policy-utils/std"]
 
 [dependencies]
-dirs = "1.0.2"
-veracruz-utils = { path = "../veracruz-utils", optional = true }
-policy-utils = { path = "../policy-utils", optional = true  }
-io-utils = { path = "../io-utils", optional = true }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
-transport-protocol = { path = "../transport-protocol"}
-rouille = "=3.2.1"
-base64 = "0.10.1"
-untrusted = "0.6.2"
-ring = "0.16"
-stringreader = "0.1"
-curl = "=0.4.35"
-lazy_static = "1.4"
-actix-web = "3.3.2"
 actix-http = "2.2.0"
-futures = "0.3"
-log = "=0.4.13"
-err-derive = "0.2"
-pinecone = "0.2"
-hex = "=0.4.2"
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+actix-rt = { version = "1.0.0", optional = true }
+actix-web = "3.3.2"
+base64 = "0.10.1"
 bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
-serde = { git = "https://github.com/veracruz-project/serde.git", default-features = false, optional = true}
 byteorder = { version = "1.3.2", optional = true }
+curl = "=0.4.35"
+dirs = "1.0.2"
+env_logger = { version = "0.7", optional = true }
+err-derive = "0.2"
+futures = "0.3"
+hex = "=0.4.2"
+http = "=0.2.4"
+io-utils = { path = "../io-utils", optional = true }
+lazy_static = "1.4"
+log = "=0.4.13"
 nix = { version = "0.15", optional = true }
-ssh2 = {version = "0.8.3", optional = true }
-tempfile = { version = "3.2.0", optional = true }
+once_cell = { version = "1.7", optional = true }
+optee-teec = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
+pinecone = "0.2"
+policy-utils = { path = "../policy-utils", optional = true }
+psa-attestation = { path = "../psa-attestation", optional = true }
+ring = "0.16"
+rouille = "=3.2.1"
+runtime-manager-bind = { path = "../runtime-manager-bind", optional = true }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+serde = { git = "https://github.com/veracruz-project/serde.git", default-features = false, optional = true }
+serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
+sgx-root-enclave-bind = { path = "../sgx-root-enclave-bind", optional = true }
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-runtime-manager-bind = { path = "../runtime-manager-bind", optional = true }
-sgx-root-enclave-bind = { path = "../sgx-root-enclave-bind", optional = true }
-optee-teec = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
-uuid = { version = "0.7", optional = true }
+ssh2 = { version = "0.8.3", optional = true }
+stringreader = "0.1"
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
-env_logger = { version = "0.7", optional = true }
-actix-rt = { version = "1.0.0", optional = true }
-http = "=0.2.4"
-psa-attestation = { path = "../psa-attestation", optional = true }
-once_cell = { version = "1.7", optional = true }
+tempfile = { version = "3.2.0", optional = true }
+transport-protocol = { path = "../transport-protocol" }
+untrusted = "0.6.2"
+uuid = { version = "0.7", optional = true }
+veracruz-utils = { path = "../veracruz-utils", optional = true }
+webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }

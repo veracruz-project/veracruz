@@ -1,19 +1,17 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "Computes the edit distance of two strings using the Rust `strsim` library."
+edition = "2018"
 name = "string-edit-distance"
 version = "0.3.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "Computes the edit distance of two strings using the Rust `strsim` library."
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.14"
 pinecone = { version = "0.2.3", features = ["use-std"] }
 strsim = "0.10.0"
-anyhow = "1.0.14"
 
 [profile.release]
-opt-level = 3
-lto = true
 codegen-units = 1
-
+lto = true
+opt-level = 3

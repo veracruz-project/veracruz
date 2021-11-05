@@ -1,16 +1,15 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "Computes the moving-average-convergence-divergence (MACD) metric of a dataset.  This is often used in financial mathematics."
+edition = "2018"
 name = "moving-average-convergence-divergence"
 version = "0.3.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "Computes the moving-average-convergence-divergence (MACD) metric of a dataset.  This is often used in financial mathematics."
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.14"
 pinecone = { version = "0.2.3", features = ["use-std"] }
 serde = { version = "1.0.3", features = ["derive"] }
-anyhow = "1.0.14"
 
 [profile.release]
 codegen-units = 1

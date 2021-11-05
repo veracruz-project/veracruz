@@ -1,13 +1,12 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "A utility for generating synthetic images for use with the `image-processing` example."
+edition = "2018"
 name = "image-processing-generator"
 version = "0.1.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "A utility for generating synthetic images for use with the `image-processing` example."
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "2.33"
 bitflags = "=1.2.1"
+clap = "2.33"
 image = "0.23.14"

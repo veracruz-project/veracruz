@@ -1,11 +1,11 @@
 [package]
 name = "trustzone-root-enclave"
 # NOTE: when you update this version, please also update the psa entry in populate-test-database.sh in veracruz-server-test and veracruz-test 
-version = "0.3.0"
 authors = ["The Veracruz Development Team"]
-edition = "2018"
 build = "build.rs"
 description = "TLS endpoint code for clients interacting with a trusted Veracruz runtime"
+edition = "2018"
+version = "0.3.0"
 
 [[bin]]
 name = "trustzone-root-enclave"
@@ -16,16 +16,16 @@ default = ["tz"]
 tz = []
 
 [dependencies]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
-transport-protocol = { path = "../transport-protocol", features=["tz"] }
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz"}
-psa-attestation = { path = "../psa-attestation", features=["tz"]}
-optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
-veracruz-utils = { path = "../veracruz-utils", features = ["tz"] }
-lazy_static = {version = "1.4.0", features=["spin_no_std"] }
-ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz" }
 bitflags = "=1.2.1"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
+optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
+protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
+psa-attestation = { path = "../psa-attestation", features = ["tz"] }
+ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz" }
+transport-protocol = { path = "../transport-protocol", features = ["tz"] }
+veracruz-utils = { path = "../veracruz-utils", features = ["tz"] }
 
 [build-dependencies]
 uuid = { version = "=0.7.4", features = ["v4"] }

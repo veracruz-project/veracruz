@@ -1,17 +1,17 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "A utility for generating secrets for Veracruz's Shamir secret sharing example."
+edition = "2018"
 name = "shamir-secret-sharing"
 version = "0.3.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "A utility for generating secrets for Veracruz's Shamir secret sharing example."
 
 [profile.release]
+codegen-units = 1
 lto = true
 opt-level = 3
-codegen-units = 1
 
 [dependencies]
-structopt = { version="0.3", features=["wrap_help"] }
-rand = "0.8.3"
-hex = "0.4"
 bitflags = "=1.2.1"
+hex = "0.4"
+rand = "0.8.3"
+structopt = { version = "0.3", features = ["wrap_help"] }

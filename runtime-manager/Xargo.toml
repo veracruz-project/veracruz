@@ -1,9 +1,9 @@
-[dependencies.std]
-git = "https://github.com/veracruz-project/rust.git"
-branch = "veracruz"
 
 [patch.crates-io]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
 compiler_builtins = { git = "https://github.com/veracruz-project/compiler-builtins.git", branch = "veracruz" }
-rustc-std-workspace-core = { git = "https://github.com/veracruz-project/rust.git", branch = "veracruz" }
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
 rustc-std-workspace-alloc = { git = "https://github.com/veracruz-project/rust.git", branch = "veracruz" }
+rustc-std-workspace-core = { git = "https://github.com/veracruz-project/rust.git", branch = "veracruz" }
+[dependencies.std]
+branch = "veracruz"
+git = "https://github.com/veracruz-project/rust.git"

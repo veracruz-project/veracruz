@@ -1,25 +1,25 @@
 [package]
+authors = ["The Veracruz Development Team"]
+build = "build.rs"
+description = "Veracruz protocol message wire-format parsing and serialization code for the trusted Veracruz runtime"
+edition = "2018"
 name = "transport-protocol"
 version = "0.3.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "Veracruz protocol message wire-format parsing and serialization code for the trusted Veracruz runtime"
-build = "build.rs"
 
 [features]
+icecap = []
 sgx = ["protobuf/mesalock_sgx", "sgx_types", "sgx_tstd"]
 sgx_attestation = ["sgx_types"]
 tz = []
-icecap = []
 
 [dependencies]
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
 err-derive = "0.2"
-sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
+sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
 [build-dependencies]
 protoc-rust = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { branch="veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }
+sgx_alloc = { branch = "veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }

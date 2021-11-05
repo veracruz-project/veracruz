@@ -1,10 +1,9 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "Generates Veracruz policy files from a set of command line parameters."
+edition = "2018"
 name = "generate-policy"
 version = "0.1.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "Generates Veracruz policy files from a set of command line parameters."
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -15,8 +14,8 @@ data-encoding = "2.3.2"
 env_logger = "0.8.2"
 http = "=0.2.4"
 log = "=0.4.13"
+policy-utils = { path = "../../policy-utils", features = ["std"] }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
-policy-utils = {path = "../../policy-utils", features = ["std"]}
 serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", features = ["std"] }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", features = ["std"] }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz", features = ['std'] }
