@@ -27,3 +27,7 @@ rustflags = [
 [target.arm-unknown-linux-gnueabihf]
 linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc"
 ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc-ar"
+
+[net]
+retry = 3
+git-fetch-with-cli = true
