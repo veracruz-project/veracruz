@@ -21,8 +21,9 @@ use policy_utils::principal::{FileRights, Principal, RightsTable};
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
 use std::{
+    cmp::min,
     collections::HashMap,
-    convert::{AsRef, TryFrom},
+    convert::{AsRef, TryFrom, TryInto},
     ffi::OsString,
     // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
     // potential utf-8 encoding check
@@ -84,15 +85,15 @@ impl InodeEntry {
     /// Read maximum `max` bytes from the offset `offset`.
     /// Return ErrNo::IsDir if it is not a file.
     #[inline]
-    pub(self) fn read_file(&self, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
-        self.data.read_file(max, offset)
+    pub(self) fn read_file(&self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
+        self.data.read_file(buf, offset)
     }
 
     /// Write `buf` to the file from the offset `offset`,
     /// update the file status and return the number of written bytes.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
     #[inline]
-    pub(self) fn write_file(&mut self, buf: Vec<u8>, offset: FileSize) -> FileSystemResult<Size> {
+    pub(self) fn write_file(&mut self, buf: &[u8], offset: FileSize) -> FileSystemResult<usize> {
         let rst = self.data.write_file(buf, offset)?;
         self.file_stat.file_size = self.data.len()?;
         Ok(rst)
@@ -179,7 +180,7 @@ impl InodeImpl {
 
     /// Read maximum `max` bytes from the offset `offset`.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
-    pub(self) fn read_file(&self, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
+    pub(self) fn read_file(&self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
         let bytes = match self {
             Self::File(b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
@@ -196,18 +197,14 @@ impl InodeImpl {
         //             | rst                  |
         //             ------------------------
         let (_, to_read) = bytes.split_at(offset);
-        let read_length = if max < to_read.len() {
-            max
-        } else {
-            to_read.len()
-        };
-        let (rst, _) = to_read.split_at(read_length);
-        Ok(rst.to_vec())
+        let read_length = min(buf.len(), to_read.len());
+        buf[..read_length].copy_from_slice(&to_read[..read_length]);
+        Ok(read_length)
     }
 
     /// Write `buf` to the file from the offset `offset` and return the number of written bytes.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
-    pub(self) fn write_file(&mut self, buf: Vec<u8>, offset: FileSize) -> FileSystemResult<Size> {
+    pub(self) fn write_file(&mut self, buf: &[u8], offset: FileSize) -> FileSystemResult<usize> {
         let bytes = match self {
             Self::File(b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
@@ -224,13 +221,12 @@ impl InodeImpl {
         //             | buf                            |
         //             ----------------------------------
         let remain_length = bytes.len() - offset;
-        if remain_length <= buf.len() {
-            let mut grow_vec = vec![0; buf.len() - remain_length];
-            bytes.append(&mut grow_vec);
+        if buf.len() > remain_length{
+            bytes.resize(buf.len() - remain_length, 0);
         }
-        let rst = buf.len();
-        bytes[offset..(offset + rst)].copy_from_slice(&buf);
-        Ok(rst as Size)
+        let write_length = buf.len();
+        bytes[offset..(offset + write_length)].copy_from_slice(&buf);
+        Ok(write_length)
     }
 
     /// Truncate the file.
@@ -998,18 +994,27 @@ impl FileSystem {
     /// how a particular execution engine handles the memory.
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM. Hence, the method here return the read bytes as `Vec<u8>`.
-    pub(crate) fn fd_pread(
+    pub(crate) fn fd_pread<B: AsMut<[u8]>>(
         &self,
         fd: Fd,
-        buffer_len: usize,
+        bufs: &mut [B],
         offset: FileSize,
-    ) -> FileSystemResult<Vec<u8>> {
+    ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        self.lock_inode_table()?
-            .get(&inode)?
-            .read_file(buffer_len, offset)
+        let f = self.lock_inode_table()?;
+        let f = f.get(&inode)?;
+
+        let mut offset = offset;
+        let mut len = 0;
+        for buf in bufs {
+            let delta = f.read_file(buf.as_mut(), offset)?;
+            offset += u64::try_from(delta).unwrap();
+            len += delta;
+        }
+
+        Ok(len)
     }
 
     /// Return the status of a pre-opened Fd `fd`.
@@ -1035,29 +1040,42 @@ impl FileSystem {
     /// how a particular execution engine handles the memory.
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM.
-    pub(crate) fn fd_pwrite(
+    pub(crate) fn fd_pwrite<B: AsRef<[u8]>>(
         &mut self,
         fd: Fd,
-        buf: Vec<u8>,
+        bufs: &[B],
         offset: FileSize,
-    ) -> FileSystemResult<Size> {
+    ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        self.lock_inode_table()?
-            .get_mut(&inode)?
-            .write_file(buf, offset)
+        let mut f = self.lock_inode_table()?;
+        let f = f.get_mut(&inode)?;
+
+        let mut offset = offset;
+        let mut len = 0;
+        for buf in bufs {
+            let delta = f.write_file(buf.as_ref(), offset)?;
+            offset += u64::try_from(delta).unwrap();
+            len += delta;
+        }
+
+        Ok(len)
     }
 
     /// A rust-style base implementation for `fd_read`. It directly calls `fd_pread` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
-    pub(crate) fn fd_read(&mut self, fd: Fd, len: usize) -> FileSystemResult<Vec<u8>> {
+    pub(crate) fn fd_read<B: AsMut<[u8]>>(
+        &mut self,
+        fd: Fd,
+        bufs: &mut [B]
+    ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_READ)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
-        let rst = self.fd_pread(fd, len, offset)?;
-        self.fd_seek(fd, rst.len() as i64, Whence::Current)?;
-        Ok(rst)
+        let read_len = self.fd_pread(fd, bufs, offset)?;
+        self.fd_seek(fd, read_len as i64, Whence::Current)?;
+        Ok(read_len)
     }
 
     /// The implementation of `fd_readdir`.
@@ -1151,11 +1169,15 @@ impl FileSystem {
 
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
-    pub(crate) fn fd_write(&mut self, fd: Fd, buf: Vec<u8>) -> FileSystemResult<Size> {
+    pub(crate) fn fd_write<B: AsRef<[u8]>>(
+        &mut self,
+        fd: Fd,
+        bufs: &[B]
+    ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
-        let rst = self.fd_pwrite(fd, buf, offset)?;
+        let rst = self.fd_pwrite(fd, bufs, offset)?;
         self.fd_seek(fd, rst as i64, Whence::Current)?;
         Ok(rst)
     }
@@ -1423,22 +1445,22 @@ impl FileSystem {
 
     /// The stub implementation of `sock_recv`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn sock_recv(
+    pub(crate) fn sock_recv<B: AsMut<[u8]>>(
         &mut self,
         socket: Fd,
-        _buffer_len: usize,
+        _bufs: &[B],
         _ri_flags: RiFlags,
-    ) -> FileSystemResult<(Vec<u8>, RoFlags)> {
+    ) -> FileSystemResult<(Size, RoFlags)> {
         self.check_right(&socket, Rights::FD_READ)?;
         Err(ErrNo::NoSys)
     }
 
     /// The stub implementation of `sock_send`. Return unsupported error `NoSys`.
     #[inline]
-    pub(crate) fn sock_send(
+    pub(crate) fn sock_send<B: AsRef<[u8]>>(
         &mut self,
         socket: Fd,
-        _buf: Vec<u8>,
+        _bufs: &[B],
         _si_flags: SiFlags,
     ) -> FileSystemResult<Size> {
         self.check_right(&socket, Rights::FD_WRITE)?;
@@ -1519,7 +1541,7 @@ impl FileSystem {
         if is_append {
             self.fd_seek(fd, 0, Whence::End)?;
         }
-        self.fd_write(fd, data)?;
+        self.fd_write(fd, &[data])?;
         self.fd_close(fd)?;
         Ok(())
     }
@@ -1553,9 +1575,11 @@ impl FileSystem {
             return Err(ErrNo::Access);
         }
         let file_stat = self.fd_filestat_get(fd)?;
-        let rst = self.fd_read(fd, try_from_or_errno(file_stat.file_size)?)?;
+        let mut vec = vec![0u8; file_stat.file_size as usize];
+        let read_size = self.fd_read(fd, &mut [&mut vec[..]])?;
+        debug_assert_eq!(read_size, vec.len());
         self.fd_close(fd)?;
-        Ok(rst)
+        Ok(vec)
     }
 
     /// Read all files recursively on path `path`.
@@ -1609,8 +1633,8 @@ impl FileSystem {
 
     /// A public API for writing to stdin.
     #[inline]
-    pub fn write_stdin(&mut self, buf: Vec<u8>) -> FileSystemResult<Size> {
-        self.fd_write(Fd(0), buf)
+    pub fn write_stdin(&mut self, buf: &[u8]) -> FileSystemResult<usize> {
+        self.fd_write(Fd(0), &[buf])
     }
 
     /// A public API for reading from stdout.
@@ -1630,7 +1654,10 @@ impl FileSystem {
         // read the length of a stream
         let inode = self.get_inode_by_fd(&fd)?;
         let len = self.lock_inode_table()?.get(&inode)?.len()?;
-        self.fd_read(fd, try_from_or_errno(len)?)
+        let mut vec = vec![0u8; len as usize];
+        let read_len = self.fd_read(fd, &mut [&mut vec[..]])?;
+        debug_assert_eq!(read_len, vec.len());
+        Ok(vec)
     }
 }
 fn try_from_or_errno<T, K: TryFrom<T>>(i: T) -> FileSystemResult<K> {

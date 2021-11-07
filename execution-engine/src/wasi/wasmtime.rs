@@ -59,8 +59,23 @@ macro_rules! convert_wasi_arg {
 
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WasiWrapper on any VFS call.
-impl<'a> MemoryHandler for Caller<'a> {
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()> {
+impl<'a> MemoryHandler<'a> for Caller<'a> {
+    /// A type representing a direct reference to memory
+    ///
+    /// Note this may both lock the underlying engine and allocate memory (if
+    /// the engines underlying memory is not linear). These should generally
+    /// be short-lived to pass to other APIs.
+    type Slice = &'a [u8];
+
+    /// A type representing a direct mutable reference to memory
+    ///
+    /// Note this may both lock the underlying engine and allocate memory (if
+    /// the engines underlying memory is not linear). These should generally
+    /// be short-lived to pass to other APIs.
+    type SliceMut = &'a mut [u8];
+
+    /// Get an immutable slice of the memory
+    fn get_slice(&'a self, address: u32, length: u32) -> FileSystemResult<Self::Slice> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -68,16 +83,17 @@ impl<'a> MemoryHandler for Caller<'a> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        let address = address as usize;
-        unsafe {
-            std::slice::from_raw_parts_mut(memory.data_ptr().add(address), buffer.len())
-                .copy_from_slice(buffer)
-        };
-        Ok(())
+        // NOTE this is currently unsafe, but has a safe variant in recent
+        // versions of wasmtime
+        Ok(
+            &(unsafe { memory.data_unchecked() })[
+                usize::try_from(address).unwrap()
+                    .. usize::try_from(address + length).unwrap()]
+        )
     }
 
-    fn read_buffer(&self, address: u32, length: u32) -> FileSystemResult<Vec<u8>> {
-        let length = length as usize;
+    /// Get a mutable slice of the memory
+    fn get_slice_mut(&'a mut self, address: u32, length: u32) -> FileSystemResult<Self::SliceMut> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -85,14 +101,25 @@ impl<'a> MemoryHandler for Caller<'a> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        let mut bytes: Vec<u8> = vec![0; length];
-        unsafe {
-            bytes.copy_from_slice(std::slice::from_raw_parts(
-                memory.data_ptr().add(address as usize),
-                length,
-            ))
+        // NOTE this is currently unsafe, but has a safe variant in recent
+        // versions of wasmtime
+        Ok(
+            &mut (unsafe { memory.data_unchecked_mut() })[
+                usize::try_from(address).unwrap()
+                    .. usize::try_from(address + length).unwrap()]
+        )
+    }
+
+    /// Get the size of available memory
+    fn get_size(&'a self) -> FileSystemResult<u32> {
+        let memory = match self
+            .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
+            .and_then(|export| export.into_memory())
+        {
+            Some(s) => s,
+            None => return Err(ErrNo::NoMem),
         };
-        Ok(bytes)
+        Ok(u32::try_from(memory.data_size()).unwrap())
     }
 }
 
