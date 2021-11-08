@@ -1,17 +1,16 @@
 [package]
+authors = ["The Veracruz Development Team"]
+description = "A utility for generating synthetic datasets for use with the `intersection-set-sum` example."
+edition = "2018"
 name = "intersection-set-sum-generator"
 version = "0.3.0"
-authors = ["The Veracruz Development Team"]
-edition = "2018"
-description = "A utility for generating synthetic datasets for use with the `intersection-set-sum` example."
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pinecone = "0.2"
+bitflags = "=1.2.1"
+clap = "2.33"
 csv = "1.0"
-serde = { version = "1.0.103", features = ["derive"] }
+pinecone = "0.2"
 rand = "0.7"
 rand_distr = "0.3"
-clap = "2.33"
-bitflags = "=1.2.1"
+serde = { version = "1.0.103", features = ["derive"] }
