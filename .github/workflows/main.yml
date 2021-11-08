@@ -31,8 +31,10 @@ jobs:
       - name: Compile SDK
         id: sdk
         run: |
+          export PATH=/work/veracruz/bin:$PATH
           cd /work/veracruz
           make sdk
+          git --igit-dump-log
 
       # Pack cache
       - name: Pack cache
@@ -78,11 +80,13 @@ jobs:
       - name: Running sgx test script
         id: sgx-test
         run: |
+            export PATH=/work/veracruz/bin:$PATH
             cd /work/veracruz
             make sgx
             make sgx-veracruz-server-test-dry-run
             make sgx-veracruz-test-dry-run
             make sgx-veracruz-client-test
+            git --igit-dump-log
 
   tz:
     runs-on: ubuntu-latest
@@ -112,6 +116,7 @@ jobs:
       - name: Running trustzone test script
         id: tz-test
         run: |
+            export PATH=/work/veracruz/bin:$PATH
             cd /work/rust-optee-trustzone-sdk
             . ./environment
             cd /work/veracruz
@@ -119,6 +124,7 @@ jobs:
             make trustzone-veracruz-server-test
             make trustzone-veracruz-test
             make trustzone-veracruz-client-test
+            git --igit-dump-log
 
   linux:
     runs-on: ubuntu-latest
@@ -147,11 +153,13 @@ jobs:
       - name: Running linux test script
         id: linux-test
         run: |
+            export PATH=/work/veracruz/bin:$PATH
             cd /work/veracruz
             make linux
             make linux-veracruz-server-test
             make linux-veracruz-test
             make linux-veracruz-client-test
+            git --igit-dump-log
 
   icecap:
     runs-on: ubuntu-latest
@@ -165,8 +173,7 @@ jobs:
         with:
           submodules: recursive
       - name: Build and test Veracruz on IceCap
-        run: bash /work/veracruz/icecap/ci/run.sh
-
-
-
-
+        run: |
+            export PATH=/work/veracruz/bin:$PATH
+            bash /work/veracruz/icecap/ci/run.sh
+            git --igit-dump-log

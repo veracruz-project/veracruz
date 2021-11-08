@@ -1,0 +1,88 @@
+#!/usr/bin/perl
+
+# Look for a different program on the PATH with the same name and
+# try running it several times until it exits with 0.
+
+use strict;
+use Cwd qw(getcwd realpath);
+use Fcntl qw(:flock);
+
+# Configuration:
+my $attempts = 10;
+my $delay = 20;
+my $logfile = "/tmp/igit-log";
+my $logname = "igit"; # something to grep for
+
+my $cwd = getcwd();
+
+open(my $log, ">>", $logfile) || die "Failed to open $logfile";
+flock($log, LOCK_EX); # Blocks till it locks!
+
+if ($#ARGV == 0 && $ARGV[0] eq "--igit-dump-log") {
+    print "$logname: LOG START\n";
+    open(my $f, "<", $logfile) || &error("read log");
+    while (my $x = <$f>) {
+        print $x;
+    }
+    print "$logname: LOG FINISH\n";
+    close($f);
+    open(my $f, ">", $logfile) || &error("truncate log");
+    close($f);
+    exit(0);
+}
+
+# Get name of this program, which in our case will be "git".
+$0 =~ m!/.*[^/]$! || &error("\$0 = $0");
+$0 =~ m!([^/]+)$! || die;
+my $progname = $1;
+
+# Find real program.
+defined $ENV{"PATH"} || &error("Undefined PATH");
+my $thisprog = realpath($0);
+my $realprog;
+foreach my $d (split(/:/, $ENV{"PATH"})) {
+    my $t = "$d/$progname";
+    next if realpath($t) eq $thisprog;
+    if (-f $t && -x $t) {
+        $realprog = $t;
+        last;
+    }
+}
+defined $realprog || &error("Cannot find $progname on PATH");
+
+# xx: We expect these commands to fail sometimes:
+if (grep(/^cat-file$/, @ARGV) || "@ARGV" eq "submodule update --init") {
+    $attempts = 1;
+}
+
+foreach my $i (1 .. $attempts) {
+    if ($i > 1) {
+        sleep($delay);
+    }
+    if (!system($realprog, @ARGV)) {
+        if ($i == 1) {
+            &log("SUCCESS: $cwd: @ARGV");
+        } else {
+            &log("SUCCESS ON TRY $i: $cwd: @ARGV");
+        }
+        exit(0);
+    }
+}
+if ($attempts > 1) {
+    &log("FAILED $attempts TIMES: $cwd: @ARGV");
+} else {
+    &log("FAILED: $cwd: @ARGV");
+}
+exit(1);
+
+sub error {
+    my ($message) = @_;
+    my $t = "ERROR: $message: $cwd: @ARGV";
+    &log($t);
+    die "$logname: $t\n";
+}
+
+sub log {
+    my ($message) = @_;
+    print $log "$logname: $message\n";
+}
