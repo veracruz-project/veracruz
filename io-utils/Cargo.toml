@@ -12,7 +12,7 @@ nitro = ["serde_json/std", "base64/std", "nix", "byteorder"]
 
 [dependencies]
 base64 = { version = "0.13.0", default-features = false, optional = true }
-bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
+bincode = { version = "1.2.1", default-features = false, optional = true }
 byteorder = { version = "1.4.3", optional = true }
 curl = "0.4.35"
 err-derive = "0.2"

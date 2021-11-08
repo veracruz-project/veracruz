@@ -8,12 +8,10 @@ version = "0.3.0"
 [features]
 icecap = [
   "policy-utils/icecap",
-  "ring/non_sgx",
   "ring/std",
 ]
 nitro = [
   "policy-utils/std",
-  "ring/non_sgx",
   "ring/std",
 ]
 std = [

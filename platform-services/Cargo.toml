@@ -16,7 +16,7 @@ name = "platform_services"
 path = "./src/lib.rs"
 
 [dependencies]
-cfg-if = "0.1.10"
+cfg-if = "1"
 getrandom = { version = "0.1.14", optional = true }
 half = "=1.7.1"
 nix = { version = "0.22", optional = true }
