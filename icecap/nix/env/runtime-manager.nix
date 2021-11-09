@@ -14,6 +14,7 @@
 , libsel4, libs, sysroot-rs
 , libc-supplement
 , icecapPlat
+, kebabToCaml
 }:
 
 let
@@ -30,9 +31,11 @@ let
       target.${rustTargetName}.rustflags = [
         "--cfg=icecap_plat=\"${icecapPlat}\""
         "--sysroot=${sysroot-rs}"
-        "-l" "static=icecap_pure"
+        "-l" "static=icecap-utils"
+        "-L" "${libs.icecap-utils}/lib"
+        "-l" "static=icecap-pure"
         "-L" "${libs.icecap-pure}/lib"
-        "-l" "static=c_supplement"
+        "-l" "static=c-supplement"
         "-L" "${libc-supplement}/lib"
       ];
     }
@@ -40,7 +43,7 @@ let
 
 in
 
-mkShell (crateUtils.baseEnv // {
+mkShell (crateUtils.baseEnv // rec {
 
   depsBuildBuild = [
     buildPackages.stdenv.cc
@@ -62,19 +65,11 @@ mkShell (crateUtils.baseEnv // {
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
 
-  # BINDGEN_EXTRA_CLANG_ARGS = [
-  #   "-I${libsel4}/include"
-  #   "-I${libs.icecap-autoconf}/include"
-  # ];
+  BINDGEN_EXTRA_CLANG_ARGS = map (x: "-I${x}/include") buildInputs;
 
-  # HACK
-  "CC_${lib.replaceStrings [ "-" ] [ "_" ] rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
+  "CC_${kebabToCaml rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
 
   shellHook = ''
-    # NOTE
-    # If this ever ceases to suffice, see $BINDGEN_EXTRA_CLANG_ARGS for the host binaries.
-    export BINDGEN_EXTRA_CLANG_ARGS="$NIX_CFLAGS_COMPILE"
-
     build_dir=build/${name}
     build_dir_inverse=../..
     target_dir=build/target

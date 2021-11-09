@@ -12,6 +12,7 @@
 , crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
 , pkgconfig, openssl, sqlite
+, kebabToCaml
 }:
 
 { name }:
@@ -53,7 +54,7 @@ mkShell (crateUtils.baseEnv // rec {
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
 
-  "CC_${lib.replaceStrings [ "-" ] [ "_" ] rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
+  "CC_${kebabToCaml rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
 
   shellHook = ''
     # NOTE

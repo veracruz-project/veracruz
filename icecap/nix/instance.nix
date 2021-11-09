@@ -94,18 +94,24 @@ in lib.fix (self: with self; {
     };
   };
 
-  env = {
-    runtime-manager = configured.callPackage ./env/runtime-manager.nix {
-      inherit libc-supplement;
+  env =
+    let
+      kebabToCaml = lib.replaceStrings [ "-" ] [ "_" ];
+      callTest = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {
+        inherit kebabToCaml;
+      };
+    in {
+      runtime-manager = configured.callPackage ./env/runtime-manager.nix {
+        inherit libc-supplement kebabToCaml;
+      };
+      veracruz-server-test = callTest {
+        name = "veracruz-server-test";
+      };
+      veracruz-test = callTest {
+        name = "veracruz-test";
+      };
+      sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
     };
-    veracruz-server-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
-      name = "veracruz-server-test";
-    };
-    veracruz-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
-      name = "veracruz-test";
-    };
-    sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
-  };
 
   libc-supplement = configured.libs.mk {
     name = "c-supplement";
