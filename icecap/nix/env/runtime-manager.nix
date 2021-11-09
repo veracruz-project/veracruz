@@ -53,7 +53,6 @@ mkShell (crateUtils.baseEnv // {
 
   buildInputs = [
     libsel4
-    libs.icecap-autoconf
     libs.icecap-runtime
     libs.icecap-utils
     libs.icecap-pure
