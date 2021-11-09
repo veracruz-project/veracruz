@@ -26,16 +26,13 @@
 use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
-use policy_utils::principal::{ExecutionStrategy, FileRights, Principal, StandardStream};
+use policy_utils::principal::{ExecutionStrategy, Principal};
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     error::Error,
-    fs::File,
-    io::Read,
+    fs::{create_dir_all, File},
+    io::{Read, Write},
     path::{Path, PathBuf},
-    str::FromStr,
-    sync::{Arc, Mutex},
     time::Instant,
     vec::Vec,
 };
@@ -58,18 +55,6 @@ const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUT
                                the Veracruz root directory for detailed authorship information.";
 /// Application version number.
 const VERSION: &'static str = "pre-alpha";
-/// Application version number.
-const OUTPUT_FILE: &'static str = "output";
-
-/// The default dump status of `stdout`, if no alternative is provided on the
-/// command line.
-const DEFAULT_DUMP_STDOUT: &'static str = "false";
-/// The default dump status of `stderr`, if no alternative is provided on the
-/// command line.
-const DEFAULT_DUMP_STDERR: &'static str = "false";
-/// The default value of the clock flag, if no alternative is provided on the
-/// command line.
-const DEFAULT_ENABLE_CLOCK: &'static str = "false";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -77,8 +62,10 @@ const DEFAULT_ENABLE_CLOCK: &'static str = "false";
 
 /// A struct capturing all of the command line options passed to the program.
 struct CommandLineOptions {
-    /// The list of file names passed as data-sources.
-    data_sources: Vec<String>,
+    /// The list of file names passed as input data-sources.
+    input_sources: Vec<String>,
+    /// The list of file names passed as ouput.
+    output_sources: Vec<String>,
     /// The filename passed as the WASM program to be executed.
     binary: String,
     /// The execution strategy to use when performing the computation.
@@ -105,11 +92,26 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         .author(AUTHORS)
         .about(ABOUT)
         .arg(
-            Arg::with_name("data")
-                .short("d")
-                .long("data")
-                .value_name("FILES")
-                .help("Space-separated paths to the data source files on disk.")
+            Arg::with_name("input")
+                .short("i")
+                .long("input-source")
+                .value_name("DIRECTORIES")
+                .help(
+                    "Space-separated paths to the input directories on disk. The directories are \
+                     copied into the root directory in Veracruz space. The program is granted \
+                     with read capabilities.",
+                )
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output-source")
+                .value_name("DIRECTORIES")
+                .help(
+                    "Space-separated paths to the output directories. The directories are copied \
+                     into disk on the host. The program is granted with write capabilities.",
+                )
                 .multiple(true),
         )
         .arg(
@@ -117,7 +119,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("p")
                 .long("program")
                 .value_name("FILE")
-                .help("Path to the WASM binary on disk.")
+                .help("Path to the WASM binary to be executed.")
                 .multiple(false)
                 .required(true),
         )
@@ -133,17 +135,15 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         )
         .arg(
             Arg::with_name("dump-stdout")
-                .short("o")
+                .short("d")
                 .long("dump-stdout")
-                .help("Whether the contents of stdout should be dumped before exiting.")
-                .value_name("BOOLEAN"),
+                .help("Whether the contents of stdout should be dumped before exiting"),
         )
         .arg(
             Arg::with_name("dump-stderr")
                 .short("e")
                 .long("dump-stderr")
-                .help("Whether the contents of stderr should be dumped before exiting.")
-                .value_name("BOOLEAN"),
+                .help("Whether the contents of stderr should be dumped before exiting"),
         )
         .arg(
             Arg::with_name("enable-clock")
@@ -152,8 +152,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .help(
                     "Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
                      enabled.",
-                )
-                .value_name("BOOLEAN"),
+                ),
         )
         .arg(
             Arg::with_name("arg")
@@ -200,58 +199,31 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     } else {
         return Err("No binary file provided.".into());
     };
-    let data_sources = if let Some(data) = matches.values_of("data") {
-        let data_sources: Vec<String> = data.map(|e| e.to_string()).collect();
+    let input_sources = if let Some(data) = matches.values_of("input") {
+        let input_sources: Vec<String> = data.map(|e| e.to_string()).collect();
         info!(
             "Selected {} data sources as input to computation.",
-            data_sources.len()
+            input_sources.len()
         );
-        data_sources
+        input_sources
     } else {
         Vec::new()
     };
 
-    let dump_stdout = {
-        let dump_stdout = matches
-            .value_of("dump-stdout")
-            .unwrap_or(DEFAULT_DUMP_STDOUT);
-        if let Ok(dump_stdout) = bool::from_str(dump_stdout) {
-            if dump_stdout {
-                info!("stdout configured to be dumped before exiting.");
-            }
-            dump_stdout
-        } else {
-            return Err(format!("Expecting a boolean, but found {}", dump_stdout).into());
-        }
+    let output_sources = if let Some(data) = matches.values_of("output") {
+        let output_sources: Vec<String> = data.map(|e| e.to_string()).collect();
+        info!(
+            "Selected {} data sources as input to computation.",
+            output_sources.len()
+        );
+        output_sources
+    } else {
+        Vec::new()
     };
 
-    let dump_stderr = {
-        let dump_stderr = matches
-            .value_of("dump-stderr")
-            .unwrap_or(DEFAULT_DUMP_STDERR);
-        if let Ok(dump_stderr) = bool::from_str(dump_stderr) {
-            if dump_stderr {
-                info!("stderr configured to be dumped before exiting.");
-            }
-            dump_stderr
-        } else {
-            return Err(format!("Expecting a boolean, but found {}", dump_stderr).into());
-        }
-    };
-
-    let enable_clock = {
-        let enable_clock = matches
-            .value_of("enable-clock")
-            .unwrap_or(DEFAULT_ENABLE_CLOCK);
-        if let Ok(enable_clock) = bool::from_str(enable_clock) {
-            if enable_clock {
-                info!("Clock functions are enabled.");
-            }
-            enable_clock
-        } else {
-            return Err(format!("Expecting a boolean, but found {}", enable_clock).into());
-        }
-    };
+    let enable_clock = matches.is_present("enable-clock");
+    let dump_stdout = matches.is_present("dump-stdout");
+    let dump_stderr = matches.is_present("dump-stderr");
 
     let environment_variables = match matches.values_of("env") {
         None => Vec::new(),
@@ -268,7 +240,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     };
 
     Ok(CommandLineOptions {
-        data_sources,
+        input_sources,
+        output_sources,
         binary,
         execution_strategy,
         dump_stdout,
@@ -279,52 +252,37 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     })
 }
 
-/// Reads a WASM file from disk (actually, will read any file, but we only need
-/// it for WASM here) and return a collection of bytes corresponding to that
-/// file.  Will abort the program if anything goes wrong.
-fn load_file(file_path: &str) -> Result<(String, Vec<u8>), Box<dyn Error>> {
-    info!("Opening file '{}' for reading.", file_path);
-
-    let mut file = File::open(file_path)?;
-    let mut contents = Vec::new();
-
-    file.read_to_end(&mut contents)?;
-
-    Ok((
-        Path::new(file_path)
-            .file_name()
-            .ok_or(format!("Failed to obtain file name on {}", file_path))?
-            .to_str()
-            .ok_or(format!(
-                "Failed to convert file name to string on {}",
-                file_path
-            ))?
-            .to_string(),
-        contents,
-    ))
-}
-
 /// Loads the specified data sources, as provided on the command line, for
 /// reading and massages them into metadata frames, ready for
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
-fn load_data_sources(
-    cmdline: &CommandLineOptions, vfs: Arc<Mutex<FileSystem>>,
+fn load_input_sources(
+    input_sources: &Vec<String>, vfs: &mut FileSystem,
 ) -> Result<(), Box<dyn Error>> {
-    for (id, file_path) in cmdline.data_sources.iter().enumerate() {
-        info!(
-            "Loading data source '{}' with id {} for reading.",
-            file_path, id
-        );
+    for file_path in input_sources.iter() {
+        let file_path = Path::new(file_path);
+        load_input_source(&file_path, vfs)?;
+    }
+    Ok(())
+}
+
+fn load_input_source<T: AsRef<Path>>(
+    file_path: T, vfs: &mut FileSystem,
+) -> Result<(), Box<dyn Error>> {
+    let file_path = file_path.as_ref();
+    info!("Loading data source '{:?}'.", file_path);
+    if file_path.is_file() {
         let mut file = File::open(file_path)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        vfs.lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .write_file_by_filename(&Principal::InternalSuperUser, &file_path, &buffer, false)?;
-
-        info!("Loading '{}' into vfs.", file_path);
+        vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), buffer, false)?;
+    } else if file_path.is_dir() {
+        for dir in file_path.read_dir()? {
+            load_input_source(&dir?.path(), vfs)?;
+        }
+    } else {
+        return Err(format!("Error on load {:?}", file_path).into());
     }
     Ok(())
 }
@@ -337,66 +295,47 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
-    let (prog_file_name, program) = load_file(&cmdline.binary)?;
+    let program_path = &cmdline.binary;
+    let prog_file_abs_path = Path::new("/").join(program_path.clone());
 
     let mut right_table = HashMap::new();
     let mut file_table = HashMap::new();
-    let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK;
-    let write_right = Rights::PATH_OPEN
+    let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
+    let write_right = read_right
         | Rights::FD_WRITE
-        | Rights::FD_SEEK
         | Rights::PATH_CREATE_FILE
-        | Rights::PATH_FILESTAT_SET_SIZE;
+        | Rights::PATH_FILESTAT_SET_SIZE
+        | Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
-    let std_streams_table = vec![
-        StandardStream::Stdin(FileRights::new(
-            String::from("stdin"),
-            u64::from(read_right) as u32,
-        )),
-        StandardStream::Stdout(FileRights::new(
-            String::from("stdout"),
-            u64::from(write_right) as u32,
-        )),
-        StandardStream::Stderr(FileRights::new(
-            String::from("stderr"),
-            u64::from(write_right) as u32,
-        )),
-    ];
-
-    // Manually create the Right table for the VFS.
-    file_table.insert(PathBuf::from(prog_file_name.clone()), write_right);
-    for file_path in cmdline.data_sources.iter() {
-        file_table.insert(PathBuf::from(file_path), read_right);
+    file_table.insert(PathBuf::from("stdin"), read_right);
+    file_table.insert(PathBuf::from("stdout"), write_right);
+    file_table.insert(PathBuf::from("stderr"), write_right);
+    // Add read permission to input path
+    for file_path in cmdline.input_sources.iter() {
+        // NOTE: inject the root path.
+        file_table.insert(Path::new("/").join(file_path), read_right);
     }
-    for std_stream in &std_streams_table {
-        let (path, rights) = match std_stream {
-            StandardStream::Stdin(file_rights) => (file_rights.file_name(), file_rights.rights()),
-            StandardStream::Stdout(file_rights) => (file_rights.file_name(), file_rights.rights()),
-            StandardStream::Stderr(file_rights) => (file_rights.file_name(), file_rights.rights()),
-        };
-        let rights = Rights::try_from(*rights as u64)
-            .map_err(|e| format!("Failed to convert u64 to Rights: {:?}", e))?;
-        file_table.insert(PathBuf::from(path), rights);
+    // Add write permission to output path
+    for file_path in cmdline.output_sources.iter() {
+        // NOTE: inject the root path.
+        file_table.insert(Path::new("/").join(file_path), write_right);
     }
-    file_table.insert(PathBuf::from(OUTPUT_FILE), write_right);
-    right_table.insert(Principal::Program(prog_file_name.to_string()), file_table);
+    let program_id = Principal::Program(
+        prog_file_abs_path
+            .to_str()
+            .ok_or("Failed to convert program path to a string.")?
+            .to_string(),
+    );
+    right_table.insert(program_id.clone(), file_table);
+    info!("The final right tables: {:?}", right_table);
 
-    let vfs = Arc::new(Mutex::new(FileSystem::new(right_table, &std_streams_table)));
-    vfs.lock()
-        .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-        .write_file_by_filename(
-            &Principal::InternalSuperUser,
-            &prog_file_name,
-            &program,
-            false,
-        )?;
-    info!("WASM program {} loaded into VFS.", prog_file_name);
+    let mut vfs = FileSystem::new(right_table)?;
 
-    load_data_sources(&cmdline, vfs.clone())?;
+    load_input_sources(&cmdline.input_sources, &mut vfs)?;
     info!("Data sources loaded.");
 
-    info!("Invoking main.");
+    info!("Invoking main on {:?}.", prog_file_abs_path);
     let main_time = Instant::now();
     let options = Options {
         environment_variables: cmdline.environment_variables,
@@ -404,10 +343,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         enable_clock: cmdline.enable_clock,
         ..Default::default()
     };
+    let program = vfs.read_file_by_absolute_path(prog_file_abs_path)?;
     let return_code = execute(
         &cmdline.execution_strategy,
-        vfs.clone(),
-        &prog_file_name,
+        vfs.spawn(&program_id)?,
+        program,
         options,
     )?;
     info!("return code: {:?}", return_code);
@@ -415,25 +355,51 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dump contents of stdout
     if cmdline.dump_stdout {
-        let buf = vfs
-            .lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_filename(&Principal::InternalSuperUser, "stdout")?;
-        let stdout_dump = std::str::from_utf8(&buf)
-            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        print!("{}", stdout_dump);
+        let buf = vfs.read_stdout()?;
+        let stdout_dump = std::str::from_utf8(&buf)?;
+        print!(
+            "---- stdout dump ----\n{}---- stdout dump end ----\n",
+            stdout_dump
+        );
+       std::io::stdout().flush()?;
     }
 
     // Dump contents of stderr
     if cmdline.dump_stderr {
-        let buf = vfs
-            .lock()
-            .map_err(|e| format!("Failed to lock vfs, error: {:?}", e))?
-            .read_file_by_filename(&Principal::InternalSuperUser, "stderr")?;
-        let stderr_dump = std::str::from_utf8(&buf)
-            .map_err(|e| format!("Failed to convert byte stream to UTF-8 string: {:?}", e))?;
-        eprint!("{}", stderr_dump);
+        let buf = vfs.read_stderr()?;
+        let stderr_dump = std::str::from_utf8(&buf)?;
+        eprint!(
+            "---- stderr dump ----\n{}---- stderr dump end ----\n",
+            stderr_dump
+        );
+        std::io::stderr().flush()?;
     }
 
+    for file_path in cmdline.output_sources.iter() {
+        for (output_path, buf) in vfs
+            .read_all_files_by_absolute_path(Path::new("/").join(file_path))?
+            .iter()
+        {
+            let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
+            if let Some(parent_path) = output_path.parent() {
+                if parent_path != Path::new("") {
+                    create_dir_all(parent_path)?;
+                }
+            }
+            let mut to_write = File::create(output_path)?;
+            to_write.write_all(&buf)?;
+
+            // Try to decode
+            let decode: String = match pinecone::from_bytes(buf) {
+                Ok(o) => o,
+                Err(_) =>
+                    match std::str::from_utf8(buf) {
+                        Ok(oo) => oo.to_string(),
+                        Err(_) => "(Cannot Parse as a utf8 string)".to_string(),
+                    },
+            };
+            info!("{:?}: {:?}", output_path, decode);
+        }
+    }
     Ok(())
 }

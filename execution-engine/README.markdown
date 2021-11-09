@@ -105,8 +105,6 @@ to the memory at `environ_buf_size`.
 
 ### Times
 
-Veracruz does not support any time API for now.
-
 #### `clock_res_get`
 ```rust
 fn clock_res_get(id: ClockId) -> Result<Timestamp, ErrNo>;
@@ -114,16 +112,12 @@ fn clock_res_get(id: u32, resolution: u32) -> u16;
 ```
 Write the time resolution as `u64` to the memory at `resolution`. 
 
-**NOT SUPPORTED**
-
-#### `clock_res_get`
+#### `clock_time_get`
 ```rust
 fn clock_time_get(id: ClockId, precision: Timestamp) -> Result<Timestamp, ErrNo>;
 fn clock_time_get(id: u32, precision: u64, time: u32) -> u16;
 ```
 Write the time of `precision` to the memory at `time`. 
-
-**NOT SUPPORTED**
 
 ### Files
 
@@ -263,7 +257,13 @@ buf --> |  dirent[0] path[0] dirent[1] path[1] ... ... ... ...|
         ^  ... ... ...       size         ... ... ...  ^
 ```
 
-**NOT SUPPORTED**
+Each `dirent[i]` contains:
+- `next` the offset of the next dir entry
+- `inode` 
+- `name_len` the length of the `path[i]`
+- `file_type`
+Given the wasm program compiled from Rust, it is required to fill the buf as much as possible. Particularly, if `dirent[i]` is able to fit in while `path[i]` is not, then it should fill `dirent[i]`.
+**QUESTION:** the semantic of `next` in the `dirent`. It seems to be implementation-dependent, hence in our implementation, it is simply a counter.
 
 #### `fd_renumber`
 ```
@@ -375,8 +375,6 @@ fn path_create_directory(fd: Fd, path_addr: u32, path_len: u32) -> u16;
 Read the new directory path at address `path_addr` of length `path_len`.
 Then create a new directory starting from the directory opened by the file descriptor `fd`.
 
-**NOT SUPPORTED**
-
 #### `path_remove_directory`
 ```rust
 fn path_remove_directory(fd: Fd, path: String) -> Result<(), ErrNo>;
@@ -395,7 +393,6 @@ fn path_filestat_get(fd: u32, flags: u32, path_addr: u32, path_len: u32, file_st
 Read the path at address `path_addr` of length `path_len`.
 Then write the status of the file at the path starting from the directory opened by the file descriptor `fd`. 
 
-**NOT SUPPORTED**
 #### `path_filestat_set_times`
 ```
 fn path_filestat_set_times(fd: Fd, lookup_flags: LookupFlags, path: String, atime: Timestamp, mtime: Timestamp, fst_flags: SetTimeFlags) -> Result<(), ErrNo>;
@@ -553,11 +550,6 @@ WASM passes a `u32` as the `flags` parameter.
 ## Some Possible Future Directions
 
  * Test suite for WASI ABI.
- * More WASI functionality: 
-    - Add the support for directories. 
-    - Separate file descriptor spaces for different principals, 
-      e.g. participants and programs. Pre-opened file descriptors in each 
-      space have the rights match the policy file.
  * Event-oriented models: WASI poll could be implemented to allow Veracruz
    programs to wait for events.
  * Streaming, producer/consumer and multi-program graphs: file-like objects

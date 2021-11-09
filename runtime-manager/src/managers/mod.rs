@@ -9,8 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use execution_engine::{execute, fs::FileSystem, Options};
-use lazy_static::lazy_static;
 #[cfg(feature = "tz")]
 use optee_utee::trace_println;
 use policy_utils::{policy::Policy, principal::Principal};
@@ -22,13 +20,13 @@ use std::sync::Mutex;
 
 use std::{
     collections::HashMap,
-    string::String,
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
-    },
+    path::PathBuf,
+    string::{String, ToString},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
     vec::Vec,
 };
+use lazy_static::lazy_static;
+use execution_engine::{fs::FileSystem, execute};
 use wasi_types::ErrNo;
 
 pub mod error;
@@ -50,8 +48,6 @@ lazy_static! {
     static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
-const OUTPUT_FILE: &'static str = "output";
-
 ////////////////////////////////////////////////////////////////////////////////
 // Error and response codes and messages.
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,11 +64,6 @@ pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
 /// Veracruz platform, containing information that must be persisted across the
 /// different rounds of the provisioning process and the fixed global policy.
 pub(crate) struct ProtocolState {
-    /// This flag indicates if new data or program is arrived since last execution.
-    /// It decides if it is necessary to run a program when result retriever requests reading
-    /// result.
-    /// TODO: more defined tracking, e.g. flag per available program in the policy?
-    is_modified: bool,
     /// The fixed, global policy parameterising the computation.  This should
     /// not change...
     global_policy: Policy,
@@ -81,10 +72,10 @@ pub(crate) struct ProtocolState {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    /// The ref to the VFS.
-    vfs: Arc<Mutex<FileSystem>>,
+    /// The ref to the VFS, this is a FS handler with super user capability.
+    vfs: FileSystem,
     /// Digest table. Certain files must match the digest before writting to the filesystem.
-    digest_table: HashMap<String, Vec<u8>>,
+    digest_table: HashMap<PathBuf, Vec<u8>>,
 }
 
 impl ProtocolState {
@@ -98,9 +89,8 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let rights_table = global_policy.get_rights_table();
-        let std_streams_table = global_policy.std_streams_table();
-        let digest_table = global_policy.get_digest_table()?;
-        let vfs = Arc::new(Mutex::new(FileSystem::new(rights_table, std_streams_table)));
+        let digest_table = global_policy.get_file_hash_table()?;
+        let vfs = FileSystem::new(rights_table)?;
 
         Ok(ProtocolState {
             global_policy,
@@ -108,15 +98,7 @@ impl ProtocolState {
             expected_shutdown_sources,
             vfs,
             digest_table,
-            is_modified: true,
         })
-    }
-
-    /// Force re-execute the program even if there is no new data coming from participants.
-    #[inline]
-    pub fn reload(&mut self) -> Result<(), RuntimeManagerError> {
-        self.is_modified = true;
-        Ok(())
     }
 
     /// Returns the global policy associated with the protocol state.
@@ -140,11 +122,11 @@ impl ProtocolState {
         &mut self,
         client_id: &Principal,
         file_name: &str,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), RuntimeManagerError> {
         // Check the digest, if necessary
-        if let Some(digest) = self.digest_table.get(file_name) {
-            let incoming_digest = Self::sha_256_digest(data);
+        if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
+            let incoming_digest = Self::sha_256_digest(&data);
             if incoming_digest.len() != digest.len() {
                 return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
             }
@@ -154,11 +136,11 @@ impl ProtocolState {
                 }
             }
         }
-        // Set the modified flag
-        self.is_modified = true;
-        self.vfs
-            .lock()?
-            .write_file_by_filename(client_id, file_name, data, false)?;
+        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
+            file_name,
+            data,
+            false,
+        )?;
         Ok(())
     }
 
@@ -175,16 +157,17 @@ impl ProtocolState {
         &mut self,
         client_id: &Principal,
         file_name: &str,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), RuntimeManagerError> {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
-        if self.digest_table.contains_key(file_name) {
+        if self.digest_table.contains_key(&PathBuf::from(file_name)) {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
-        self.is_modified = true;
-        self.vfs.lock()?.write_file_by_filename(
-            client_id, file_name, data, // set the append flag to true
+        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
+            file_name,
+            data,
+            // set the append flag to true
             true,
         )?;
         Ok(())
@@ -196,10 +179,9 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        let rst = self
-            .vfs
-            .lock()?
-            .read_file_by_filename(client_id, file_name)?;
+        let rst = self.vfs.spawn(client_id)?.read_file_by_absolute_path(
+            file_name,
+        )?;
         if rst.len() == 0 {
             return Ok(None);
         }
@@ -218,46 +200,27 @@ impl ProtocolState {
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
-    pub(crate) fn execute(&mut self, file_name: &str, client_id: u64) -> ProvisioningResult {
+    /// The client must have the right to read the program.
+    pub(crate) fn execute(&mut self, client_id: &Principal, file_name: &str) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
-        let options = Options {
+        let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
             ..Default::default()
         };
-        let return_code = execute(&execution_strategy, self.vfs.clone(), file_name, options)?;
+        let program = self.read_file(client_id, file_name)?.ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
+        let return_code = execute(&execution_strategy, self.vfs.spawn(&Principal::Program(file_name.to_string()))?, program, options)?;
 
-        let response = if return_code == 0 {
-            let result = self.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
-            Self::response_success(result)
-        } else {
-            Self::response_error_code_returned(return_code)
-        };
-
-        self.is_modified = false;
+        let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))
-    }
-
-    #[inline]
-    fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
-        transport_protocol::serialize_result(
-            transport_protocol::ResponseStatus::SUCCESS as i32,
-            result,
-        )
-        .unwrap_or_else(|err| panic!(err))
     }
 
     #[inline]
     fn response_error_code_returned(error_code: u32) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(
-            transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED as i32,
+            transport_protocol::ResponseStatus::SUCCESS as i32,
             Some(error_code.to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!(err))
-    }
-
-    #[inline]
-    fn is_modified(&self) -> bool {
-        self.is_modified
     }
 }
 

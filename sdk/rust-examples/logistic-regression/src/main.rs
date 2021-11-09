@@ -25,13 +25,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing and copyright
 //! information.
 
+use anyhow::anyhow;
 use rusty_machine::{
     learning::{logistic_reg::LogisticRegressor, SupModel},
     linalg::{Matrix, Vector},
 };
 use serde::Deserialize;
 use std::fs;
-use anyhow::anyhow;
 
 /// This is a row of the input that each contributor to the computation
 /// provides: it consists of a vector, representing an N-dimension
@@ -198,10 +198,20 @@ fn read_all_datasets(input: &[Vec<u8>]) -> anyhow::Result<Vec<Dataset>> {
         }
 
         match dimension {
-            None => dimension = Some(dataset.dimension().ok_or_else(|| anyhow!("empty dimensions"))?),
+            None => {
+                dimension = Some(
+                    dataset
+                        .dimension()
+                        .ok_or_else(|| anyhow!("empty dimensions"))?,
+                )
+            }
             Some(dim) => {
                 // Unwrap is safe as we have checked that the dataset is not empty.
-                if dataset.dimension().ok_or_else(|| anyhow!("empty dataset"))? != dim {
+                if dataset
+                    .dimension()
+                    .ok_or_else(|| anyhow!("empty dataset"))?
+                    != dim
+                {
                     return Err(anyhow!("bad dimensions"));
                 } else {
                     result.push(dataset);
@@ -218,8 +228,8 @@ fn read_all_datasets(input: &[Vec<u8>]) -> anyhow::Result<Vec<Dataset>> {
 /// if the deserialization of any dataset fails for any reason, or if the
 /// datasets have differing dimensionalities.
 fn read_input() -> anyhow::Result<Dataset> {
-    let i0 = fs::read("/input-0")?;
-    let i1 = fs::read("/input-1")?;
+    let i0 = fs::read("/input/logistic-regression-0.dat")?;
+    let i1 = fs::read("/input/logistic-regression-1.dat")?;
     let datas = read_all_datasets(&vec![i0, i1])?;
     Ok(flatten(&datas))
 }
@@ -241,7 +251,9 @@ fn train(dataset: &Dataset) -> anyhow::Result<Vec<f64>> {
 
     regressor.train(&inputs, &targets)?;
 
-    let parameters = regressor.parameters().ok_or_else(|| anyhow!("empty parameters"))?;
+    let parameters = regressor
+        .parameters()
+        .ok_or_else(|| anyhow!("empty parameters"))?;
 
     Ok(parameters.to_owned().into_vec())
 }
@@ -254,6 +266,6 @@ fn main() -> anyhow::Result<()> {
     let dataset = read_input()?;
     let model = train(&dataset)?;
     let result_encode = pinecone::to_vec::<Vec<f64>>(&model)?;
-    fs::write("/output", result_encode)?;
+    fs::write("/output/logistic-regression.dat", result_encode)?;
     Ok(())
 }

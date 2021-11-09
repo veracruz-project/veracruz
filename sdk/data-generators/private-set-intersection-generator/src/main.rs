@@ -11,8 +11,7 @@
 
 use clap::{App, Arg};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::{error::Error, fs::File, io::prelude::*};
+use std::{collections::HashSet, error::Error, fs::File, io::Write};
 
 /// The format of the contents of the input sets, encoding meta-data about an employee.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]

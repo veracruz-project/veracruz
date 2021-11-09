@@ -10,7 +10,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use super::{ProtocolState, ProvisioningResult, RuntimeManagerError, OUTPUT_FILE};
+use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
 use lazy_static::lazy_static;
 use policy_utils::principal::Principal;
 use std::sync::Mutex;
@@ -40,17 +40,6 @@ fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
         .unwrap_or_else(|err| panic!(err))
 }
 
-/// Encodes an error code indicating that the enclace is not ready to receive a
-/// particular type of message.
-#[deprecated]
-fn response_not_ready() -> super::ProvisioningResult {
-    let rst = transport_protocol::serialize_result(
-        transport_protocol::ResponseStatus::FAILED_NOT_READY as i32,
-        None,
-    )?;
-    Ok(Some(rst))
-}
-
 /// Encodes an error code indicating that somebody sent an invalid or malformed
 /// protocol request.
 fn response_invalid_request() -> super::ProvisioningResult {
@@ -78,36 +67,12 @@ fn dispatch_on_result(
     protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> ProvisioningResult {
-    if !protocol_state.is_modified() {
-        let result = protocol_state.read_file(&Principal::Participant(client_id), OUTPUT_FILE)?;
-        let response = response_success(result);
-        return Ok(Some(response));
-    }
-    protocol_state.execute(&file_name, client_id)
+    protocol_state.execute(&Principal::Participant(client_id), &file_name)
 }
 
-/// Provisions a program into the VFS.  Fails if the client has no permission.
-///
-/// Note: this doesn't invalidate the host state if something is wrong with the
-/// program, as the program provider can try again by uploading another program,
-/// which seems benign.  Should this change?
-fn dispatch_on_program(
-    protocol_state: &mut ProtocolState,
-    transport_protocol::Program {
-        file_name, code, ..
-    }: transport_protocol::Program,
-    client_id: u64,
-) -> ProvisioningResult {
-    protocol_state.write_file(&Principal::Participant(client_id), &file_name, &code)?;
-    let response = transport_protocol::serialize_result(
-        transport_protocol::ResponseStatus::SUCCESS as i32,
-        None,
-    )?;
-    Ok(Some(response))
-}
 
-/// Provisions a data source into the VFS. Fails if the client has no permission.
-fn dispatch_on_data(
+/// Write a file into the VFS. It will overwrite previous content. Fails if the client has no permission.
+fn dispatch_on_write(
     protocol_state: &mut ProtocolState,
     transport_protocol::Data {
         data, file_name, ..
@@ -117,7 +82,7 @@ fn dispatch_on_data(
     protocol_state.write_file(
         &Principal::Participant(client_id),
         file_name.as_str(),
-        data.as_slice(),
+        data,
     )?;
     let response = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::SUCCESS as i32,
@@ -126,8 +91,8 @@ fn dispatch_on_data(
     Ok(Some(response))
 }
 
-/// Provisions a data source into the VFS. Fails if the client has no permission.
-fn dispatch_on_stream(
+/// Append a file in the VFS. Fails if the client has no permission.
+fn dispatch_on_append(
     protocol_state: &mut ProtocolState,
     transport_protocol::Data {
         data, file_name, ..
@@ -137,7 +102,7 @@ fn dispatch_on_stream(
     protocol_state.append_file(
         &Principal::Participant(client_id),
         file_name.as_str(),
-        data.as_slice(),
+        data,
     )?;
     let response = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::SUCCESS as i32,
@@ -146,12 +111,17 @@ fn dispatch_on_stream(
     Ok(Some(response))
 }
 
-/// Signals the next round of computation.
-/// The next result request is guaranteed to execute the
-/// program before reading the result from the VFS.
-fn dispatch_on_next_round(protocol_state: &mut ProtocolState) -> ProvisioningResult {
-    protocol_state.reload()?;
-    Ok(Some(response_success(None)))
+/// Read a file from the VFS. Fails if the client has no permission.
+fn dispatch_on_read(
+    protocol_state: &mut ProtocolState,
+    transport_protocol::Read {
+        file_name, ..
+    }: transport_protocol::Read,
+    client_id: u64,
+) -> ProvisioningResult {
+    let result = protocol_state.read_file(&Principal::Participant(client_id), file_name.as_str())?;
+    let response = response_success(result);
+    Ok(Some(response))
 }
 
 /// Branches on a decoded protobuf message, `request`, and invokes appropriate
@@ -168,8 +138,8 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         .ok_or_else(|| RuntimeManagerError::UninitializedProtocolState)?;
 
     match request {
-        MESSAGE::data(data) => dispatch_on_data(protocol_state, data, client_id),
-        MESSAGE::program(prog) => dispatch_on_program(protocol_state, prog, client_id),
+        MESSAGE::write_file(data) => dispatch_on_write(protocol_state, data, client_id),
+        MESSAGE::append_file(data) => dispatch_on_append(protocol_state, data, client_id),
         MESSAGE::request_pi_hash(_) => {
             Ok(Some(transport_protocol::serialize_pi_hash(b"deprecated")?))
         }
@@ -177,9 +147,6 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         MESSAGE::request_result(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
         }
-        MESSAGE::request_state(_) => Ok(Some(transport_protocol::serialize_machine_state(
-            u8::from(0),
-        )?)),
         MESSAGE::request_shutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
             if is_dead {
@@ -187,8 +154,7 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
             }
             Ok(Some(response_success(None)))
         }
-        MESSAGE::stream(stream) => dispatch_on_stream(protocol_state, stream, client_id),
-        MESSAGE::request_next_round(_) => dispatch_on_next_round(protocol_state),
+        MESSAGE::read_file(read) => dispatch_on_read(protocol_state, read, client_id),
         _otherwise => response_invalid_request(),
     }
 }

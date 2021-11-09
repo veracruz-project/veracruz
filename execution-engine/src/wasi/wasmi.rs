@@ -18,8 +18,6 @@ use crate::{
     Options,
 };
 use num::FromPrimitive;
-use policy_utils::principal::Principal;
-use std::sync::{Arc, Mutex};
 use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
@@ -75,8 +73,6 @@ pub(crate) struct WASMIRuntimeState {
     program_module: Option<ModuleRef>,
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<MemoryRef>,
-    /// Ref to the program that is executed
-    program: Principal,
 }
 pub(crate) type WasiResult = Result<ErrNo, FatalEngineError>;
 
@@ -498,13 +494,12 @@ impl Externals for WASMIRuntimeState {
 impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     #[inline]
-    pub fn new(filesystem: Arc<Mutex<FileSystem>>, program_name: std::string::String) -> Self {
-        Self {
-            vfs: WasiWrapper::new(filesystem, Principal::Program(program_name)),
-            program: Principal::NoCap,
+    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
+        Ok(Self {
+            vfs: WasiWrapper::new(filesystem, enable_clock)?,
             program_module: None,
             memory: None,
-        }
+        })
         //NOTE: cannot find a way to immediately call the load_program here,
         // therefore we might eliminate the Option on program_module and memory.
     }
@@ -1223,15 +1218,11 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// execution.
     fn invoke_entry_point(
         &mut self,
-        file_name: &str,
+        program: Vec<u8>,
         options: Options,
     ) -> Result<u32, FatalEngineError> {
-        self.vfs.environment_variables = options.environment_variables;
-        self.vfs.program_arguments = options.program_arguments;
+        self.load_program(&program)?;
         self.vfs.enable_clock = options.enable_clock;
-        let program = self.vfs.read_file_by_filename(file_name)?;
-        self.load_program(program.as_slice())?;
-        self.program = Principal::Program(file_name.to_string());
 
         let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
         let exit_code = self.vfs.exit_code();

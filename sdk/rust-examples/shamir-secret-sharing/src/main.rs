@@ -28,7 +28,8 @@
 use anyhow;
 use std::{fs, io};
 
-// lookup tables for log and exp of polynomials in GF(256), 
+#[rustfmt::skip]
+// lookup tables for log and exp of polynomials in GF(256),
 const GF256_LOG: [u8; 256] = [
     0xff, 0x00, 0x19, 0x01, 0x32, 0x02, 0x1a, 0xc6,
     0x4b, 0xc7, 0x1b, 0x68, 0x33, 0xee, 0xdf, 0x03, 
@@ -64,7 +65,8 @@ const GF256_LOG: [u8; 256] = [
     0x0d, 0x63, 0x8c, 0x80, 0xc0, 0xf7, 0x70, 0x07,
 ];
 
-const GF256_EXP: [u8; 2*255] = [
+#[rustfmt::skip]
+const GF256_EXP: [u8; 2 * 255] = [
     0x01, 0x03, 0x05, 0x0f, 0x11, 0x33, 0x55, 0xff,
     0x1a, 0x2e, 0x72, 0x96, 0xa1, 0xf8, 0x13, 0x35,
     0x5f, 0xe1, 0x38, 0x48, 0xd8, 0x73, 0x95, 0xa4,
@@ -97,7 +99,6 @@ const GF256_EXP: [u8; 2*255] = [
     0x8f, 0x8a, 0x85, 0x94, 0xa7, 0xf2, 0x0d, 0x17,
     0x39, 0x4b, 0xdd, 0x7c, 0x84, 0x97, 0xa2, 0xfd,
     0x1c, 0x24, 0x6c, 0xb4, 0xc7, 0x52, 0xf6,
-
     0x01, 0x03, 0x05, 0x0f, 0x11, 0x33, 0x55, 0xff,
     0x1a, 0x2e, 0x72, 0x96, 0xa1, 0xf8, 0x13, 0x35,
     0x5f, 0xe1, 0x38, 0x48, 0xd8, 0x73, 0x95, 0xa4,
@@ -137,10 +138,7 @@ fn gf256_mul(a: u8, b: u8) -> u8 {
     if a == 0 || b == 0 {
         0
     } else {
-        GF256_EXP[
-            usize::from(GF256_LOG[usize::from(a)])
-            + usize::from(GF256_LOG[usize::from(b)])
-        ]
+        GF256_EXP[usize::from(GF256_LOG[usize::from(a)]) + usize::from(GF256_LOG[usize::from(b)])]
     }
 }
 
@@ -197,19 +195,17 @@ fn shares_read_all() -> io::Result<Vec<Vec<u8>>> {
     // open files until one fails
     let mut shares = vec![];
     for i in 0.. {
-        let filename = format!("/input-{}", i);
+        let filename = format!("/input/shamir-{}.dat", i);
         let share = match fs::read(filename) {
             Ok(share) => share,
-            Err(err) => {
-                match err.kind() {
-                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => break,
-                    _ => return Err(err),
-                }
-            }
+            Err(err) => match err.kind() {
+                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => break,
+                _ => return Err(err),
+            },
         };
 
         shares.push(share);
-    };
+    }
 
     Ok(shares)
 }
@@ -223,6 +219,6 @@ fn main() -> anyhow::Result<()> {
     let secret = shares_reconstruct(&shares);
 
     // write our output
-    fs::write("/output", &secret)?;
+    fs::write("/output/shamir.dat", &secret)?;
     Ok(())
 }

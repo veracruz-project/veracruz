@@ -12,15 +12,11 @@
 use hex;
 use rand;
 use rand::Rng;
-use std::{
-    convert::TryFrom,
-    error,
-    iter,
-};
+use std::{convert::TryFrom, error, iter};
 use structopt::StructOpt;
 
-
-// lookup tables for log and exp of polynomials in GF(256), 
+// lookup tables for log and exp of polynomials in GF(256),
+#[rustfmt::skip]
 const GF256_LOG: [u8; 256] = [
     0xff, 0x00, 0x19, 0x01, 0x32, 0x02, 0x1a, 0xc6,
     0x4b, 0xc7, 0x1b, 0x68, 0x33, 0xee, 0xdf, 0x03, 
@@ -56,6 +52,7 @@ const GF256_LOG: [u8; 256] = [
     0x0d, 0x63, 0x8c, 0x80, 0xc0, 0xf7, 0x70, 0x07,
 ];
 
+#[rustfmt::skip]
 const GF256_EXP: [u8; 2*255] = [
     0x01, 0x03, 0x05, 0x0f, 0x11, 0x33, 0x55, 0xff,
     0x1a, 0x2e, 0x72, 0x96, 0xa1, 0xf8, 0x13, 0x35,
@@ -129,10 +126,7 @@ fn gf256_mul(a: u8, b: u8) -> u8 {
     if a == 0 || b == 0 {
         0
     } else {
-        GF256_EXP[
-            usize::from(GF256_LOG[usize::from(a)])
-            + usize::from(GF256_LOG[usize::from(b)])
-        ]
+        GF256_EXP[usize::from(GF256_LOG[usize::from(a)]) + usize::from(GF256_LOG[usize::from(b)])]
     }
 }
 
@@ -151,10 +145,8 @@ fn gf256_eval(f: &[u8], x: u8) -> u8 {
 fn gf256_generate(secret: u8, degree: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     iter::once(secret)
-        .chain(
-            iter::repeat_with(|| rng.gen_range(1..=255))
-                .take(degree)
-        ).collect()
+        .chain(iter::repeat_with(|| rng.gen_range(1..=255)).take(degree))
+        .collect()
 }
 
 /// find f(0) using Lagrange interpolation
@@ -182,16 +174,19 @@ fn shares_generate(secret: &[u8], n: usize, k: usize) -> Vec<Vec<u8>> {
     // we need to store x for each point somewhere, so just prepend
     // each array with it
     for i in 0..n {
-        shares[i].push(u8::try_from(i+1).expect("exceeded 255 shares"));
+        shares[i].push(u8::try_from(i + 1).expect("exceeded 255 shares"));
     }
 
     for x in secret {
         // generate random polynomial for each byte
-        let f = gf256_generate(*x, k-1);
+        let f = gf256_generate(*x, k - 1);
 
         // assign each share a point at f(i)
         for i in 0..n {
-            shares[i].push(gf256_eval(&f, u8::try_from(i+1).expect("exceeeded 255 shares")));
+            shares[i].push(gf256_eval(
+                &f,
+                u8::try_from(i + 1).expect("exceeeded 255 shares"),
+            ));
         }
     }
 
@@ -220,9 +215,8 @@ fn shares_reconstruct<S: AsRef<[u8]>>(shares: &[S]) -> Vec<u8> {
     secret
 }
 
-
 #[derive(Debug, StructOpt)]
-#[structopt(rename_all="kebab")]
+#[structopt(rename_all = "kebab")]
 struct Opt {
     /// Secret to split into shares
     #[structopt()]
@@ -241,11 +235,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let opt = Opt::from_args();
 
     // create shares
-    let shares = shares_generate(
-        opt.secret.as_bytes(),
-        opt.n,
-        opt.k.unwrap_or(opt.n)
-    );
+    let shares = shares_generate(opt.secret.as_bytes(), opt.n, opt.k.unwrap_or(opt.n));
 
     // check that we can reconstruct our original secret
     let secret = shares_reconstruct(&shares);

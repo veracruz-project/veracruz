@@ -15,9 +15,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
+use anyhow;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs};
-use anyhow;
 
 /// The format of the contents of the input sets, encoding meta-data about an employee.
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
@@ -36,9 +36,9 @@ struct Person {
 /// returns a `Vec` of all hash-sets, one from each input provider.  Fails with
 /// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
 fn read_inputs() -> anyhow::Result<Vec<HashSet<Person>>> {
-    let input0 = fs::read("/input-0")?;
+    let input0 = fs::read("/input/private-set-1.dat")?;
     let data0 = pinecone::from_bytes(&input0)?;
-    let input1 = fs::read("/input-1")?;
+    let input1 = fs::read("/input/private-set-2.dat")?;
     let data1 = pinecone::from_bytes(&input1)?;
     Ok(vec![data0, data1])
 }
@@ -70,6 +70,6 @@ fn main() -> anyhow::Result<()> {
     let inputs = read_inputs()?;
     let result = set_intersection(&inputs);
     let result_encode = pinecone::to_vec::<HashSet<Person>>(&result)?;
-    fs::write("/output", result_encode)?;
+    fs::write("/output/private-set.dat", result_encode)?;
     Ok(())
 }

@@ -165,7 +165,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .parse::<i64>()
         .map_err(|_| "Failed to parse the gamma-up value.")?;
     let gamma_down = matches
-        .value_of("gamma_up")
+        .value_of("gamma_down")
         .ok_or("Failed to read the gamma-down value.")?
         .parse::<i64>()
         .map_err(|_| "Failed to parse the gamma-down value.")?;

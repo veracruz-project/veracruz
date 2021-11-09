@@ -40,8 +40,7 @@ use crate::{
     wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
 use policy_utils::principal::ExecutionStrategy;
-use std::sync::Mutex;
-use std::{boxed::Box, string::String, string::ToString, sync::Arc, vec::Vec};
+use std::{boxed::Box, string::String, vec::Vec};
 
 pub struct Options {
     pub environment_variables: Vec<(String, String)>,
@@ -59,32 +58,32 @@ impl Default for Options {
     }
 }
 
-/// The top-level function executes program `program_name` on
+/// The top-level function executes program `program` on
 /// the `filesystem` handler, in which inputs, outputs and programs are stored.
 /// The function requires execution `strategy`.
 /// It currently supports `interp` or `JIT`, backed by `WASI` and `wasmtime`, respectively.
 /// Note that the `execute` function is essentially this library's
 /// interface to the outside world, and details exactly what external clients
-/// such as `freestanding-executuon-engine` and `runtime-manager` can rely on.
+/// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    filesystem: Arc<Mutex<FileSystem>>,
-    program_name: &str,
+    filesystem: FileSystem,
+    program: Vec<u8>,
     options: Options,
 ) -> Result<u32, FatalEngineError> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, program_name.to_string()))
+            Box::new(WASMIRuntimeState::new(filesystem, options.enable_clock)?)
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(feature = "std")] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, program_name.to_string())?)
+                    Box::new(WasmtimeRuntimeState::new(filesystem, options.enable_clock)?)
                 } else {
                     return Err(FatalEngineError::EngineIsNotReady);
                 }
             }
         }
     };
-    engine.invoke_entry_point(program_name, options)
+    engine.invoke_entry_point(program, options)
 }

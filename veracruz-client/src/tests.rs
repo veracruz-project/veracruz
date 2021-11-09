@@ -17,7 +17,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-const POLICY_FILENAME: &'static str = "../test-collateral/one_data_source_policy.json";
+const POLICY_FILENAME: &'static str = "../test-collateral/single_client.json";
 const TRIPLE_POLICY_FILENAME: &'static str = "../test-collateral/triple_policy.json";
 const CLIENT_CERT_FILENAME: &'static str = "../test-collateral/client_rsa_cert.pem";
 const CLIENT_KEY_FILENAME: &'static str = "../test-collateral/client_rsa_key.pem";

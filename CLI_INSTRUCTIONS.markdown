@@ -280,17 +280,19 @@ Connecting to 127.0.0.1:3017
 Submitting <enclave>/input-2 from /dev/fd/63
 ```
 
-And finally, we can request the result using an identity with the
-"RequestResult" role:
+And finally, we can request a computation and read the result using an identity
+with the "RequestResult" role:
 
 ``` bash
 $ vc-client example/example-policy.json \
     --identity example/example-result-cert.pem \
     --key example/example-result-key.pem \
-    --result example-binary.wasm=-
+    --compute example-binary.wasm \
+    --result output=-
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
-Reading <enclave>/example-binary.wasm into <stdout>
+Requesting compute of <enclave>/example-binary.wasm
+Reading <enclave>/output into <stdout>
 Hello World!
 Shutting down enclave
 ```
