@@ -4,4 +4,4 @@ class Composition(BaseRealmComposition):
     def compose(self):
         pass
 
-Composition.run()
+Composition.from_env().run()

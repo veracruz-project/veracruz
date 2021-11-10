@@ -156,7 +156,7 @@ jobs:
   icecap:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-e27e7bf9b4
+      image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-f1a457a655
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:

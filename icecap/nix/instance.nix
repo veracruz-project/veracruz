@@ -14,11 +14,7 @@ let
   inherit (pkgs.dev) runCommand writeScript nukeReferences;
   inherit (pkgs.none.icecap) icecapSrc crateUtils elfUtils platUtils;
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
-
-  inherit (configured)
-    icecapFirmware icecapPlat selectIceCapPlatOr
-    mkIceDL mkDynDLSpec
-    globalCrates;
+  inherit (configured) icecapFirmware icecapPlat selectIceCapPlatOr mkRealm;
 
   runtimeManagerElf = ../build/runtime-manager/out/runtime_manager_enclave.elf;
 
@@ -86,13 +82,8 @@ in lib.fix (self: with self; {
     ];
   };
 
-  spec = mkDynDLSpec {
-    cdl = "${ddl}/icecap.cdl";
-    root = "${ddl}/links";
-  };
-
-  ddl = mkIceDL {
-    src = ./realm/ddl;
+  spec = mkRealm {
+    script = ../src/python/realm.py;
     config = {
       realm_id = 0;
       num_cores = 1;
@@ -103,22 +94,24 @@ in lib.fix (self: with self; {
     };
   };
 
-  icecapCratesEnv = crateUtils.collectEnv icecapCrates;
-  icecapCrates = lib.attrValues (crateUtils.closure icecapWrapperCrate);
-  icecapWrapperCrate = configured.callPackage ../src/rust/icecap-wrapper/cargo.nix {};
-
-  env = {
-    runtime-manager = configured.callPackage ./env/runtime-manager.nix {
-      inherit icecapCrates libc-supplement;
+  env =
+    let
+      kebabToCaml = lib.replaceStrings [ "-" ] [ "_" ];
+      callTest = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {
+        inherit kebabToCaml;
+      };
+    in {
+      runtime-manager = configured.callPackage ./env/runtime-manager.nix {
+        inherit libc-supplement kebabToCaml;
+      };
+      veracruz-server-test = callTest {
+        name = "veracruz-server-test";
+      };
+      veracruz-test = callTest {
+        name = "veracruz-test";
+      };
+      sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
     };
-    veracruz-server-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
-      name = "veracruz-server-test";
-    };
-    veracruz-test = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {} {
-      name = "veracruz-test";
-    };
-    sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
-  };
 
   libc-supplement = configured.libs.mk {
     name = "c-supplement";

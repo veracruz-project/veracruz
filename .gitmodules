@@ -21,3 +21,6 @@
 [submodule "veracruz-mcu-client/nanopb"]
 	path = veracruz-mcu-client/nanopb
 	url = https://github.com/nanopb/nanopb
+[submodule "icecap/icecap"]
+	path = icecap/icecap
+	url = https://gitlab.com/arm-research/security/icecap/icecap.git

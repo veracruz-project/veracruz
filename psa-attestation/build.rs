@@ -10,7 +10,6 @@
 //! information on licensing and copyright.
 
 extern crate bindgen;
-extern crate target_build_utils;
 
 use std::env;
 use std::path::PathBuf;

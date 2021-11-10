@@ -10,7 +10,6 @@
 ICECAP_PLAT ?= virt
 
 build_dir := build
-generated_crates := $(build_dir)/crates
 test_system := $(build_dir)/test-system
 now := $(build_dir)/NOW
 
@@ -24,26 +23,6 @@ all:
 
 $(build_dir):
 	mkdir $@
-
-.PHONY: crates
-crates:
-	$(nix_build) $(nix_expression) -A $(nix_attribute_path).$@ -o $(generated_crates)
-
-# HACK
-# The IceCap crates only exist in the context of the IceCap build. We bundle
-# them all together by exposing them all through one crate called
-# 'icecap-wrapper', located at ./crate-hack/crates/icecap-wrapper. Outside of
-# the context of the IceCap build, this crate is a symlink to
-# ./src/rust/crates/icecap-wrapper-dummy. Inside the context of the IceCap
-# build, this crate is a symlink to ./build/crates/icecap-wrapper-dummy. This
-# hack will be unecessary once we have per-isolate backend workspaces.
-.PHONY: link-crates
-link-crates: crates
-	ln -sfT ../$(generated_crates) crates-hack/crates
-
-.PHONY: unlink-crates
-unlink-crates:
-	ln -sfT dummy-crates crates-hack/crates
 
 # HACK
 # Certificate expiry matters require the time in the host and realm to align
@@ -59,7 +38,7 @@ update-time:
 	rm -f $(now)
 
 .PHONY: runtime-manager
-runtime-manager: $(now) link-crates
+runtime-manager: $(now)
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
 
 .PHONY: veracruz-server-test
@@ -99,7 +78,7 @@ test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-ser
 set-key-permissions:
 	chmod 0400 nix/host/token-ssh-key.priv
 
-run_tests_body = eval $$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link)
+run_tests_body = script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && eval $$script
 
 .PHONY: run-tests
 run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-collateral
@@ -117,12 +96,14 @@ run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-ma
 
 # Clean everything specific to the IceCap build, all of which is contained in this ./icecap directory
 .PHONY: clean
-clean: unlink-crates
+clean:
 	rm -rf $(build_dir)
 
 # This is a bit heavy-handed, but useful for achieving a clean slate for 'sdk' and 'test-collateral'
 .PHONY: deep-clean
 deep-clean: clean
 	cd .. && git clean -Xdff \
+		--exclude='!icecap/icecap/nixpkgs/' \
+		--exclude='!icecap/icecap/nixpkgs/**' \
 		--exclude='!icecap/docker/hacking/nix-root/' \
 		--exclude='!icecap/docker/hacking/nix-root/**'

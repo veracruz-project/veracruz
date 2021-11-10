@@ -29,6 +29,7 @@ test-collateral/invalid_policy/**
 test-collateral/idash2017/
 test-collateral/macd/
 test-collateral/private-set-inter-sum/
+test-collateral/number-stream/
 test-collateral/pgen
 test-collateral/proxy-attestation-server.db
 *.vscode/

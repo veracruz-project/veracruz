@@ -12,6 +12,7 @@
 , crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
 , pkgconfig, openssl, sqlite
+, kebabToCaml
 }:
 
 { name }:
@@ -52,6 +53,8 @@ mkShell (crateUtils.baseEnv // rec {
 
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
+
+  "CC_${kebabToCaml rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
 
   shellHook = ''
     # NOTE
@@ -98,7 +101,7 @@ mkShell (crateUtils.baseEnv // rec {
     # cargo test --no-run doesn't give the test binary a predictable filename, so we have to find it ourselves
     distinguish() {
       d=$target_dir/${rustTargetName}/${if debug then "debug" else "release"}/deps
-      f="$(find $d -executable -type f -name "${crateUtils.kebabToSnake name}-*" -printf "%T@ %p\n" \
+      f="$(find $d -executable -type f -name "${lib.replaceStrings [ "-" ] [ "_" ] name}-*" -printf "%T@ %p\n" \
         | sort -n \
         | tail -n 1 \
         | cut -d ' ' -f 2 \

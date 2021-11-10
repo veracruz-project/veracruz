@@ -8,11 +8,13 @@
 # and copyright information.
 
 { lib, stdenv, buildPackages, mkShell
-, rustc, cargo, git, cacert
+, rustc, cargo, git, cacert, rustfmt
 , crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
-, liboutline, sysroot-rs
-, icecapCrates, libc-supplement
+, libsel4, libs, sysroot-rs
+, libc-supplement
+, icecapPlat
+, kebabToCaml
 }:
 
 let
@@ -27,46 +29,47 @@ let
     crateUtils.baseCargoConfig
     {
       target.${rustTargetName}.rustflags = [
+        "--cfg=icecap_plat=\"${icecapPlat}\""
         "--sysroot=${sysroot-rs}"
-        "-l" "static=c_supplement"
+        "-l" "static=icecap-utils"
+        "-L" "${libs.icecap-utils}/lib"
+        "-l" "static=icecap-pure"
+        "-L" "${libs.icecap-pure}/lib"
+        "-l" "static=c-supplement"
         "-L" "${libc-supplement}/lib"
       ];
-    }
-    {
-      target.${rustTargetName} = crateUtils.clobber (lib.forEach icecapCrates (crate:
-        lib.optionalAttrs (crate.buildScript != null) {
-          ${"dummy-link-${crate.name}"} = crate.buildScript;
-        }
-      ));
     }
   ]);
 
 in
 
-mkShell (crateUtils.baseEnv // {
+mkShell (crateUtils.baseEnv // rec {
 
   depsBuildBuild = [
     buildPackages.stdenv.cc
   ];
 
   nativeBuildInputs = [
-    rustc cargo git cacert
+    rustc cargo git cacert rustfmt
     protobuf perl python3
   ];
 
   buildInputs = [
-    liboutline
+    libsel4
+    libs.icecap-runtime
+    libs.icecap-utils
+    libs.icecap-pure
     libc-supplement
   ];
 
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
 
-  shellHook = ''
-    # NOTE
-    # If this ever ceases to suffice, see $BINDGEN_EXTRA_CLANG_ARGS for the host binaries. 
-    export BINDGEN_EXTRA_CLANG_ARGS="$NIX_CFLAGS_COMPILE"
+  BINDGEN_EXTRA_CLANG_ARGS = map (x: "-I${x}/include") buildInputs;
 
+  "CC_${kebabToCaml rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
+
+  shellHook = ''
     build_dir=build/${name}
     build_dir_inverse=../..
     target_dir=build/target

@@ -13,7 +13,7 @@
 #pragma once
 
 #include <stddef.h>
-#include <icecap_utils.h>
+#include <icecap-utils.h>
 
 #define printf icecap_utils_debug_printf
 
