@@ -13,6 +13,12 @@ OUT_DIR ?= $(abspath .)
 FINAL_DIR ?= $(abspath .)
 WORKSPACE_DIR = $(abspath ..)
 
+ifeq ($(shell uname -m),aarch64)
+	ARCH = aarch64
+else
+	ARCH = x86_64
+endif
+
 all: nitro wasm-files policy-files
 
 include $(WORKSPACE_DIR)/shared.mk
@@ -38,19 +44,21 @@ nitro: runtime_manager.eif
 css-nitro.bin: PCR0
 	cp $< $@
 
-runtime_manager.eif: target/x86_64-unknown-linux-musl/release/runtime_manager_enclave crates/runtime-manager/Dockerfile
+runtime_manager.eif: target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave crates/runtime-manager/Dockerfile
 	rm -rf docker
-	mkdir -p docker/target/x86_64-unknown-linux-musl/release
-	cp target/x86_64-unknown-linux-musl/release/runtime_manager_enclave docker/target/x86_64-unknown-linux-musl/release
+	mkdir -p docker/target/$(ARCH)-unknown-linux-musl/release
+	cp target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave docker/target/$(ARCH)-unknown-linux-musl/release
 	cp crates/runtime-manager/Dockerfile docker
+	perl -i -pe "s/x86_64/$(ARCH)/" docker/Dockerfile
 	nitro-cli build-enclave --docker-dir docker --docker-uri runtime_manager --output-file runtime_manager.eif > measurements.json
 	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
 	rm -rf docker
 
-target/x86_64-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
-	rustup target add x86_64-unknown-linux-musl
+target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
+	rustup target add $(ARCH)-unknown-linux-musl
+	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
 	cargo build -Z package-features -Z unstable-options --bin runtime_manager_enclave \
-	  --target x86_64-unknown-linux-musl --release --features nitro \
+	  --target $(ARCH)-unknown-linux-musl --release --features nitro \
 	  -p runtime_manager_enclave --verbose
 
 clean:
