@@ -23,7 +23,7 @@ let
 
   configured = pkgs.none.icecap.configured.virt;
 
-  inherit (configured) icecapFirmware icecapPlat mkDynDLSpec mkIceDL;
+  inherit (configured) icecapFirmware icecapPlat mkDynDLSpec mkRealm;
   inherit (pkgs.dev) writeText linkFarm;
   inherit (pkgs.none.icecap) platUtils;
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
@@ -47,13 +47,8 @@ let
     ];
   };
 
-  spec = mkDynDLSpec {
-    cdl = "${ddl}/icecap.cdl";
-    root = "${ddl}/links";
-  };
-
-  ddl = mkIceDL {
-    src = ./cdl;
+  spec = mkRealm {
+    script = ./realm.py;
     config = {
       inherit salt;
       realm_id = 0;
