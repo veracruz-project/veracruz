@@ -42,13 +42,22 @@ use crate::{
 use policy_utils::principal::ExecutionStrategy;
 use std::{boxed::Box, string::String, vec::Vec};
 
+/// Runtime options for a program.
 pub struct Options {
+    /// A list of key-value pairs corresponding to the environment variables of the
+    /// program, if any.
     pub environment_variables: Vec<(String, String)>,
+    /// A list of strings, corresponding to the command-line arguments of the program,
+    /// if any.
     pub program_arguments: Vec<String>,
+    /// Whether clock-related functionality is enabled for the program.  If not
+    /// enabled, clock- and time-related WASI host-calls return an unimpleemnted
+    /// status code.
     pub enable_clock: bool,
 }
 
 impl Default for Options {
+    #[inline]
     fn default() -> Options {
         Options {
             environment_variables: Vec::new(),
@@ -77,7 +86,7 @@ pub fn execute(
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
-                if #[cfg(feature = "std")] {
+                if #[cfg(any(feature = "std", feature = "nitro"))] {
                     Box::new(WasmtimeRuntimeState::new(filesystem, options.enable_clock)?)
                 } else {
                     return Err(FatalEngineError::EngineIsNotReady);
