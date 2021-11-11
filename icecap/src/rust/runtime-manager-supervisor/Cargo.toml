@@ -1,0 +1,22 @@
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
+# and copyright information.
+
+[package]
+name = "runtime-manager-supervisor"
+version = "0.3.0"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+
+[dependencies]
+icecap-std = { path = "../../../icecap/src/rust/crates/icecap/icecap-std" }
+icecap-start-generic = { path = "../../../icecap/src/rust/crates/icecap/icecap-start/generic" }
+serde = { version = "*", default-features = false, features = [ "alloc", "derive"] }
+
+[build-dependencies]
+clang-sys = "=1.2.1"

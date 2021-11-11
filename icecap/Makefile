@@ -41,6 +41,10 @@ update-time:
 runtime-manager: $(now)
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
 
+.PHONY: runtime-manager-supervisor
+runtime-manager-supervisor: $(now)
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
+
 .PHONY: veracruz-server-test
 veracruz-server-test:
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
@@ -60,17 +64,17 @@ test-collateral: sdk
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 
 .PHONY: test-system
-test-system: $(now) runtime-manager veracruz-server-test veracruz-test test-collateral
+test-system: $(now) runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test test-collateral
 	$(test_system_body)
 
 # Convenient shortcut
 .PHONY: test-system-stale-test-collateral
-test-system-stale-test-collateral: $(now) runtime-manager veracruz-server-test veracruz-test # implicit prerequisite: test-collateral
+test-system-stale-test-collateral: $(now) runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test # implicit prerequisite: test-collateral
 	$(test_system_body)
 
 # Convenient shortcut
 .PHONY: test-system-stale
-test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-collateral
+test-system-stale: $(now) # implicit prerequisites: runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test test-collateral
 	$(test_system_body)
 
 # Permission constraints required by the OpenSSH client cannot be expressed in Git or Nix
@@ -81,17 +85,17 @@ set-key-permissions:
 run_tests_body = script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && eval $$script
 
 .PHONY: run-tests
-run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-collateral
+run-tests: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test test-collateral
 	$(run_tests_body)
 
 # Convenient shortcut
 .PHONY: run-tests-stale-test-collateral
-run-tests-stale-test-collateral: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test # implicit prerequisite: test-collateral
+run-tests-stale-test-collateral: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test # implicit prerequisite: test-collateral
 	$(run_tests_body)
 
 # Convenient shortcut
 .PHONY: run-tests-stale
-run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-collateral
+run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test test-collateral
 	$(run_tests_body)
 
 # Clean everything specific to the IceCap build, all of which is contained in this ./icecap directory

@@ -129,12 +129,22 @@ veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 
+errno = "=0.2.5"
+
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
 sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
 sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
+
+[patch."https://github.com/veracruz-project/wasmtime.git"]
+wasmtime = { path = "../icecap/deps/wasmtime/crates/wasmtime" }
+
+[patch.crates-io]
+atty = { path = "../icecap/deps/atty" }
+errno = { path = "../icecap/deps/errno" }
+directories = { path = "../icecap/deps/directories" }
 
 [profile.release]
 lto = true

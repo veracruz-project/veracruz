@@ -24,3 +24,15 @@
 [submodule "icecap/icecap"]
 	path = icecap/icecap
 	url = https://gitlab.com/arm-research/security/icecap/icecap.git
+[submodule "icecap/deps/wasmtime"]
+	path = icecap/deps/wasmtime
+	url = git@github.com:nspin/wasmtime.git
+[submodule "icecap/deps/atty"]
+	path = icecap/deps/atty
+	url = git@gitlab.com:arm-research/security/icecap/internal/archive/obsolete/minor-patches/rust/atty.git
+[submodule "icecap/deps/errno"]
+	path = icecap/deps/errno
+	url = git@gitlab.com:arm-research/security/icecap/internal/archive/obsolete/minor-patches/rust/errno.git
+[submodule "icecap/deps/directories"]
+	path = icecap/deps/directories
+	url = git@gitlab.com:arm-research/security/icecap/internal/archive/obsolete/minor-patches/rust/directories.git

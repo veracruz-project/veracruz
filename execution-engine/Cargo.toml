@@ -8,7 +8,7 @@ version = "0.3.0"
 [features]
 default = []
 # NOTE: Introduce non_sgx in the dependencies to deal with sgx-related modification.
-icecap = ["platform-services/icecap", "policy-utils/icecap", "wasmi/non_sgx"]
+icecap = ["platform-services/icecap", "policy-utils/icecap", "wasmi/non_sgx", "wasmtime"]
 nitro = ["platform-services/nitro", "policy-utils/std", "wasmtime", "wasi-types/std"]
 sgx = [
   "sgx_tstd",

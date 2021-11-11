@@ -14,6 +14,7 @@ let
 in lib.flip lib.mapAttrs veracruz (_plat: attrs: {
   crates = attrs.icecapCratesEnv;
   runtime-manager = attrs.env.runtime-manager;
+  runtime-manager-supervisor = attrs.env.runtime-manager-supervisor;
   veracruz-server-test = attrs.env.veracruz-server-test;
   veracruz-test = attrs.env.veracruz-test;
   sdk = attrs.env.sdk-and-test-collateral;

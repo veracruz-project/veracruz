@@ -17,11 +17,11 @@
 , kebabToCaml
 }:
 
+{ name, path, features ? [], sysroot ? false }:
+
 let
 
-  name = "runtime-manager";
-
-  manifestPath = toString (../../.. + "/${name}/Cargo.toml");
+  manifestPath = toString (path + "/Cargo.toml");
 
   debug = false;
 
@@ -30,13 +30,14 @@ let
     {
       target.${rustTargetName}.rustflags = [
         "--cfg=icecap_plat=\"${icecapPlat}\""
-        "--sysroot=${sysroot-rs}"
         "-l" "static=icecap-utils"
         "-L" "${libs.icecap-utils}/lib"
         "-l" "static=icecap-pure"
         "-L" "${libs.icecap-pure}/lib"
         "-l" "static=c-supplement"
         "-L" "${libc-supplement}/lib"
+      ] ++ lib.optionals sysroot [
+        "--sysroot=${sysroot-rs}"
       ];
     }
   ]);
@@ -77,9 +78,11 @@ mkShell (crateUtils.baseEnv // rec {
     build() {
       setup && \
       (cd $build_dir && cargo build \
-         -Z unstable-options \
+        -Z unstable-options \
+        -Zfeatures=host_dep \
         --manifest-path ${manifestPath} \
-        --target ${rustTargetName} --features icecap \
+        --target ${rustTargetName} \
+        --features "${lib.concatStringsSep " " features}" \
         ${lib.optionalString (!debug) "--release"} \
         --target-dir $build_dir_inverse/$target_dir \
         --out-dir ./out \

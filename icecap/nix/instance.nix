@@ -17,6 +17,7 @@ let
   inherit (configured) icecapFirmware icecapPlat selectIceCapPlatOr mkRealm;
 
   runtimeManagerElf = ../build/runtime-manager/out/runtime_manager_enclave.elf;
+  runtimeManagerSupervisorElf = ../build/runtime-manager-supervisor/out/runtime-manager-supervisor.elf;
 
   testElf = {
     veracruz-server-test = ../build/veracruz-server-test/out/veracruz-server-test;
@@ -88,6 +89,7 @@ in lib.fix (self: with self; {
       realm_id = 0;
       num_cores = 1;
       components = {
+        runtime_manager_supervisor.image = elfUtils.split runtimeManagerSupervisorElf;
         runtime_manager.image = elfUtils.split runtimeManagerElf;
         runtime_manager.heap_size = 64 * 1048576; # 64M (HACK overstimate)
       };
@@ -100,9 +102,19 @@ in lib.fix (self: with self; {
       callTest = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {
         inherit kebabToCaml;
       };
-    in {
-      runtime-manager = configured.callPackage ./env/runtime-manager.nix {
+      callRealm = configured.callPackage ./env/realm-generic.nix {
         inherit libc-supplement kebabToCaml;
+      };
+    in {
+      runtime-manager = callRealm {
+        name = "runtime-manager";
+        path = ../../runtime-manager;
+        features = [ "icecap" ];
+        sysroot = true;
+      };
+      runtime-manager-supervisor = callRealm {
+        name = "runtime-manager-supervisor";
+        path = ../src/rust/runtime-manager-supervisor;
       };
       veracruz-server-test = callTest {
         name = "veracruz-server-test";
