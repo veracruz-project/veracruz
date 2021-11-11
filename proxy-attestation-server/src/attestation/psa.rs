@@ -168,25 +168,30 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
 
     let received_enclave_hash: Vec<u8> = payload_vec[47..79].to_vec();
 
-    let expected_enclave_hash: Vec<u8> = {
-        let connection = crate::orm::establish_connection()?;
-        crate::orm::get_firmware_version_hash(
-            &connection,
-            &"psa".to_string(),
-            &attestation_context.firmware_version,
-        )?
-        .ok_or(ProxyAttestationServerError::MissingFieldError(
-            "firmware version",
-        ))?
-    };
-    if expected_enclave_hash != received_enclave_hash {
-        return Err(ProxyAttestationServerError::MismatchError {
-            variable: "received_enclave_hash",
-            expected: expected_enclave_hash,
-            received: received_enclave_hash.to_vec(),
-        });
+    let is_ca = cfg!(feature = "linux");
+
+    #[cfg(feature = "linux")]
+    {
+        let expected_enclave_hash: Vec<u8> = {
+            let connection = crate::orm::establish_connection()?;
+            crate::orm::get_firmware_version_hash(
+                &connection,
+                &"psa".to_string(),
+                &attestation_context.firmware_version,
+            )?
+            .ok_or(ProxyAttestationServerError::MissingFieldError(
+                "firmware version",
+            ))?
+        };
+        if expected_enclave_hash != received_enclave_hash {
+            return Err(ProxyAttestationServerError::MismatchError {
+                variable: "received_enclave_hash",
+                expected: expected_enclave_hash,
+                received: received_enclave_hash.to_vec(),
+            });
+        }
     }
-    let is_ca = cfg!(any(feature = "tz", feature = "linux"));
+    
     let cert = crate::attestation::convert_csr_to_certificate(&csr, is_ca, &received_enclave_hash)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);

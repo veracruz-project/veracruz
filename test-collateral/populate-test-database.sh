@@ -17,12 +17,6 @@ then
 	echo $sgx_hash
 fi
 
-# Nitro hash
-if [ -f ../nitro-root-enclave/PCR0 ]
-then
-	nitro_hash=$(cat ../nitro-root-enclave/PCR0)
-fi
-
 diesel --config-file ../proxy-attestation-server/diesel.toml --database-url $db setup
 echo "INSERT INTO firmware_versions VALUES(1, 'sgx', '0.3.0', '${sgx_hash:-}');" > tmp.sql
 echo "INSERT INTO firmware_versions VALUES(2, 'psa', '0.3.0', 'deadbeefdeadbeefdeadbeefdeadbeeff00dcafef00dcafef00dcafef00dcafe');" >> tmp.sql

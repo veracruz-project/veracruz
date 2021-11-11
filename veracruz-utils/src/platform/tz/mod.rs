@@ -37,3 +37,16 @@ pub fn transmute_to_u32(src: &[u8]) -> Vec<u32> {
     }
     return dest;
 }
+
+// Note: the following static value should not be a static value
+// It should be the hash value of the current program (trustzone-root-enclave), and it
+// should be retrieved from the OS, not from itself (bootstrapping trust
+// kinda doesn't work that way).
+// However, OPTEE doesn't really provide this feature at the moment,
+// therefore we've got this dirty hack here that COMPLETELY COMPROMISES
+// the security of the system. THIS IS FOR DEMONSTRATION PURPOSES ONLY
+// AND IS NOT SECURE IN ANY MEANINGFUL WAY!
+pub static TRUSTZONE_RUNTIME_MANAGER_HASH: [u8; 32] = [
+    0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+    0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe, 0xf0, 0x0d, 0xca, 0xfe,
+];

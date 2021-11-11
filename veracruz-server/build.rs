@@ -45,15 +45,6 @@ fn main() {
         };
 
         let make_result = Command::new("make")
-            .current_dir("../trustzone-root-enclave")
-            .args(&[out_dir_arg.clone(), final_dir_arg.clone()])
-            .status()
-            .unwrap();
-        if !make_result.success() {
-            panic!("veracruz-server::build.rs: make trustzone-root-enclave failed");
-        }
-
-        let make_result = Command::new("make")
             .current_dir("../runtime-manager")
             .args(&["trustzone".to_string(), out_dir_arg, final_dir_arg])
             .status()
