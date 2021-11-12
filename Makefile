@@ -197,7 +197,8 @@ sgx-psa-attestation: sgx-env
 	cd psa-attestation && cargo build --features sgx
 
 tz-psa-attestation: trustzone-env
-	cd psa-attestation && cargo build --target aarch64-unknown-linux-gnu --features tz
+	cd psa-attestation && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		cargo build --target aarch64-unknown-linux-gnu --features tz
 
 trustzone-veracruz-server-test: trustzone-test-collateral trustzone trustzone-test-env veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
