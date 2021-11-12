@@ -220,9 +220,8 @@ impl InodeImpl {
         //             ----------------------------------
         //             | buf                            |
         //             ----------------------------------
-        let remain_length = bytes.len() - offset;
-        if buf.len() > remain_length{
-            bytes.resize(buf.len() - remain_length, 0);
+        if offset + buf.len() > bytes.len() {
+            bytes.resize(offset + buf.len(), 0);
         }
         let write_length = buf.len();
         bytes[offset..(offset + write_length)].copy_from_slice(&buf);

@@ -14,13 +14,13 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
-        WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
+        MemoryHandler, MemorySlice, MemorySliceMut, WasiAPIName, WasiWrapper,
     },
     Options,
 };
 use lazy_static::lazy_static;
-use std::{convert::TryFrom, marker::PhantomData, sync::Mutex, vec::Vec};
+use std::{convert::TryFrom, sync::Mutex, vec::Vec};
 use wasi_types::ErrNo;
 use wasmtime::{Caller, Extern, ExternType, Func, Instance, Memory, Module, Store, Val, ValType};
 
@@ -57,14 +57,13 @@ macro_rules! convert_wasi_arg {
     };
 }
 
-pub struct WasmtimeSlice<'a> {
+pub struct WasmtimeSlice {
     memory: Memory,
     address: usize,
     length: usize,
-    _phantom: PhantomData<&'a [u8]>,
 }
 
-impl<'a> AsRef<[u8]> for WasmtimeSlice<'a> {
+impl AsRef<[u8]> for WasmtimeSlice {
     fn as_ref(&self) -> &[u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
         // versions of wasmtime
@@ -72,13 +71,17 @@ impl<'a> AsRef<[u8]> for WasmtimeSlice<'a> {
     }
 }
 
-impl<'a> AsMut<[u8]> for WasmtimeSlice<'a> {
+impl AsMut<[u8]> for WasmtimeSlice {
     fn as_mut(&mut self) -> &mut [u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
         // versions of wasmtime
         &mut (unsafe { self.memory.data_unchecked_mut() })[self.address .. self.address+self.length]
     }
 }
+
+impl MemorySlice for WasmtimeSlice {}
+impl MemorySliceMut for WasmtimeSlice {}
+
 
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WasiWrapper on any VFS call.
@@ -88,17 +91,21 @@ impl MemoryHandler for Caller<'_> {
     /// Note this may both lock the underlying engine and allocate memory (if
     /// the engines underlying memory is not linear). These should generally
     /// be short-lived to pass to other APIs.
-    type Slice<'a> = WasmtimeSlice<'a>;
+    type Slice = WasmtimeSlice;
 
     /// A type representing a direct mutable reference to memory
     ///
     /// Note this may both lock the underlying engine and allocate memory (if
     /// the engines underlying memory is not linear). These should generally
     /// be short-lived to pass to other APIs.
-    type SliceMut<'a> = WasmtimeSlice<'a>;
+    type SliceMut = WasmtimeSlice;
 
     /// Get an immutable slice of the memory
-    fn get_slice<'a>(&'a self, address: u32, length: u32) -> FileSystemResult<Self::Slice<'a>> {
+    fn get_slice<'a>(
+        &'a self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -106,12 +113,11 @@ impl MemoryHandler for Caller<'_> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        Ok(WasmtimeSlice{
+        Ok(Bound::new(WasmtimeSlice{
             memory,
             address: address as usize,
             length: length as usize,
-            _phantom: PhantomData
-        })
+        }))
 //
 //
 //        // NOTE this is currently unsafe, but has a safe variant in recent
@@ -124,7 +130,11 @@ impl MemoryHandler for Caller<'_> {
     }
 
     /// Get a mutable slice of the memory
-    fn get_slice_mut<'a>(&'a mut self, address: u32, length: u32) -> FileSystemResult<Self::SliceMut<'a>> {
+    fn get_slice_mut<'a>(
+        &'a mut self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -132,12 +142,11 @@ impl MemoryHandler for Caller<'_> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        Ok(WasmtimeSlice{
+        Ok(BoundMut::new(WasmtimeSlice{
             memory,
             address: address as usize,
             length: length as usize,
-            _phantom: PhantomData
-        })
+        }))
 //        let memory = match self
 //            .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
 //            .and_then(|export| export.into_memory())

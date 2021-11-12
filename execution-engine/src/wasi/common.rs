@@ -27,8 +27,8 @@ use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, mem::size_of,
-    slice, slice::from_raw_parts, slice::from_raw_parts_mut,
+    convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData,
+    mem::size_of, ops::Deref, ops::DerefMut, slice, slice::from_raw_parts, slice::from_raw_parts_mut,
     string::String, vec::Vec,
 };
 use wasi_types::{
@@ -257,6 +257,71 @@ impl Unpack for Event {
 }
 
 
+pub trait MemorySlice: AsRef<[u8]> {
+    #[inline]
+    fn as_raw_parts(&self) -> (*const u8, usize) {
+        let ref_ = self.as_ref();
+        (ref_.as_ptr(), ref_.len())
+    }
+}
+
+pub trait MemorySliceMut: AsMut<[u8]> {
+    #[inline]
+    fn as_raw_parts_mut(&mut self) -> (*mut u8, usize) {
+        let ref_ = self.as_mut();
+        (ref_.as_mut_ptr(), ref_.len())
+    }
+}
+
+impl MemorySlice for &'static [u8] {}
+impl MemorySliceMut for &'static mut [u8] {}
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct Bound<'a, T>(T, PhantomData<&'a T>);
+
+impl<'a, T> Bound<'a, T> {
+    #[inline]
+    pub fn new(t: T) -> Self {
+        Self(t, PhantomData)
+    }
+}
+
+impl<'a, T> Deref for Bound<'a, T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+
+#[derive(Debug)]
+pub struct BoundMut<'a, T>(T, PhantomData<&'a mut T>);
+
+impl<'a, T> BoundMut<'a, T> {
+    #[inline]
+    pub fn new(t: T) -> Self {
+        Self(t, PhantomData)
+    }
+}
+
+impl<'a, T> Deref for BoundMut<'a, T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<'a, T> DerefMut for BoundMut<'a, T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+
 /// A type wrapping an array of IoVecs, this indirection is needed
 /// to hold the MemoryHandler::Slice type which needs to be stored
 /// somewhere
@@ -294,12 +359,20 @@ impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
 /// NOTE: we purposely choose u32 here as the execution engine is likely received u32 as
 /// parameters
 pub trait MemoryHandler  {
-    type Slice<'a>: AsRef<[u8]>;
-    type SliceMut<'a>: AsMut<[u8]>;
+    type Slice: MemorySlice;
+    type SliceMut: MemorySliceMut;
 
-    fn get_slice<'a>(&'a self, address: u32, length: u32) -> FileSystemResult<Self::Slice<'a>>;
+    fn get_slice<'a>(
+        &'a self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<Bound<'a, Self::Slice>>;
 
-    fn get_slice_mut<'a>(&'a mut self, address: u32, length: u32) -> FileSystemResult<Self::SliceMut<'a>>;
+    fn get_slice_mut<'a>(
+        &'a mut self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>>;
 
     fn get_size(&self) -> FileSystemResult<u32>;
 
@@ -414,7 +487,7 @@ pub trait MemoryHandler  {
         &'a self,
         address: u32,
         count: u32
-    ) -> FileSystemResult<IoVecSlices<'a, Self::Slice<'a>>> {
+    ) -> FileSystemResult<IoVecSlices<'a, Bound<'a, Self::Slice>>> {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
         let memory = self.get_slice(0, self.get_size()?)?;
@@ -461,7 +534,7 @@ pub trait MemoryHandler  {
         &'a mut self,
         address: u32,
         count: u32
-    ) -> FileSystemResult<IoVecSlicesMut<'a, Self::SliceMut<'a>>> {
+    ) -> FileSystemResult<IoVecSlicesMut<'a, BoundMut<'a, Self::SliceMut>>> {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
         let size = (&*self).get_size()?;

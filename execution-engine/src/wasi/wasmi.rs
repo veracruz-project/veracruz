@@ -12,8 +12,8 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
-        WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
+        MemoryHandler, WasiAPIName, WasiWrapper,
     },
     Options,
 };
@@ -65,17 +65,21 @@ impl MemoryHandler for MemoryRef {
     /// Note this may both lock the underlying engine and allocate memory (if
     /// the engines underlying memory is not linear). These should generally
     /// be short-lived to pass to other APIs.
-    type Slice<'a> = &'a [u8]; // WasmiSlice<'a>;
+    type Slice = &'static [u8]; // WasmiSlice<'a>;
 
     /// A type representing a direct mutable reference to memory
     ///
     /// Note this may both lock the underlying engine and allocate memory (if
     /// the engines underlying memory is not linear). These should generally
     /// be short-lived to pass to other APIs.
-    type SliceMut<'a> = &'a mut [u8]; // WasmiSliceMut<'a>;
+    type SliceMut = &'static mut [u8]; // WasmiSliceMut<'a>;
 
     /// Get an immutable slice of the memory
-    fn get_slice<'a>(&'a self, _address: u32, _length: u32) -> FileSystemResult<Self::Slice<'a>> {
+    fn get_slice<'a>(
+        &'a self,
+        _address: u32,
+        _length: u32
+    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
         todo!()
 //        let x: &[u8] = self.with_direct_access(|r: &[u8]| { r });
 //        Ok(x)
@@ -83,7 +87,11 @@ impl MemoryHandler for MemoryRef {
     }
 
     /// Get a mutable slice of the memory
-    fn get_slice_mut<'a>(&'a mut self, _address: u32, _length: u32) -> FileSystemResult<Self::SliceMut<'a>> {
+    fn get_slice_mut<'a>(
+        &'a mut self,
+        _address: u32,
+        _length: u32
+    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
         todo!()
         //Ok(self.with_direct_access_mut(|r| r))
         //Ok(Box::new(self.direct_access_mut()))
