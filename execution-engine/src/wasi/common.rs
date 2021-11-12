@@ -28,8 +28,8 @@ use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData,
-    mem::size_of, ops::Deref, ops::DerefMut, slice, slice::from_raw_parts, slice::from_raw_parts_mut,
-    string::String, vec::Vec,
+    mem, mem::size_of, ops::Deref, ops::DerefMut, slice::from_raw_parts,
+    slice::from_raw_parts_mut, string::String, vec::Vec,
 };
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
@@ -264,9 +264,9 @@ impl Unpack for Event {
 /// the underlying type is movable even when references are borrowed.
 ///
 /// This is true for most types you may want to implement MemorySlice for,
-/// such as &[u8], MutexGuard<'a, [u8]>, or even Vec<u8>. But this will fail
+/// such as `&[u8]`, `MutexGuard<[u8]>`, or even `Vec<u8>`. But this will fail
 /// if your as_ref implementation returns references into the original struct,
-/// which is allowed for AsRef<[u8]>, such as in the case of [u8; 128].
+/// which is allowed for AsRef<[u8]>, such as in the case of `[u8; 128]`.
 ///
 /// Of course, this behavior is invalid for normal Rust references, since
 /// preventing underlying data moves is the whole point of the borrow-checker
@@ -606,13 +606,50 @@ pub trait MemoryHandler  {
                 ]
             )?;
 
+            // Ok here's the gooey center of the the copy-less iovecs. This may
+            // seem unnecessary but this code finds itself on the hot-path of
+            // execution the moment io gets involved.
+            //
+            // We want to reference directly into the engine's underlying memory
+            // if possible, and MemorySlice trait takes care of that (see MemorySlice
+            // for even more mess). But we take the simple reference a bit further
+            // here with iovecs since we want to reference multiple slices of
+            // the underlying memory while maintaining the lifetime of the original
+            // MemorySlice.
+            //
+            // To provide this for any generic AsRef<[u8]> type requires a possibly
+            // self-referential type, which gets incredibly hairy in Rust. The "safe"
+            // way to do this would be to move the MemorySlice onto the heap
+            // and pin it with Box::pin, though this requires memory allocation
+            // and still requires pointers and a bit of unsafety to tie everything
+            // together.
+            //
+            // In theory you could pin the MemorySlice to the stack, however it would
+            // need to be allocated in the callers stack and passed to this function,
+            // _greatly_ complicating this API (requiring MaybeUninit in any caller?).
+            //
+            // As an alternative, we can just require that the associated MemorySlice
+            // type is movable, even behind a borrow. This is outside of Rust's
+            // rules, but is actually reasonable for most types we would want to use
+            // for MemorySlice. This requirement is satisfied by `&[u8]`,
+            // `MutexGaurd<[u8]>`, and even Vec<u8>, but not by any type where `as_ref`
+            // referenced data in original struct, such as `[u8; 128]`.
+            //
+            // ---
+            //
+            // Of course this sort of lifetime isn't checkable by Rust, since preventing
+            // borrowed moves is the whole point of the borrow checker, so we need
+            // to use a bit of unsafety to strip away the lifetime.
+            //
+            // Note, we still enforce the correct lifetimes for any callers! This
+            // is accomplished by the `Bound` wrapper. There's more info on this
+            // on the `MemorySlice` and `Bound` traits/types
+            //
             let slice = &memory.as_ref()[
                 usize::try_from(iovec.buf).unwrap()
                     .. usize::try_from(iovec.buf+iovec.len).unwrap()
             ];
-            let ptr = slice.as_ptr();
-            let len = slice.len();
-            slices.push(unsafe { slice::from_raw_parts(ptr, len) });
+            slices.push(unsafe { mem::transmute::<&'_ [u8], &'a [u8]>(slice) });
         }
 
         Ok(IoVecSlices{_ref: memory, slices})
@@ -631,35 +668,40 @@ pub trait MemoryHandler  {
     ) -> FileSystemResult<IoVecSlicesMut<'a, BoundMut<'a, Self::SliceMut>>> {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
-        let size = (&*self).get_size()?;
-        let mut memory = self.get_slice_mut(0, size)?;
-        let slices = (0..count)
-            .map(|i| -> FileSystemResult<&mut [u8]> {
-                let iovec = IoVec::unpack(
-                    &memory.as_mut()[
-                        usize::try_from(address + i*IoVec::SIZE).unwrap()
-                            .. usize::try_from(address + (i+1)*IoVec::SIZE).unwrap()
-                    ]
-                )?;
+        let mut memory = self.get_slice_mut(0, self.get_size()?)?;
+        let mut slices = vec![];
+        for i in 0..count {
+            let iovec = IoVec::unpack(
+                &memory.as_mut()[
+                    usize::try_from(address + i*IoVec::SIZE).unwrap()
+                        .. usize::try_from(address + (i+1)*IoVec::SIZE).unwrap()
+                ]
+            )?;
 
-                // The _correct_ thing to do here is to
-                // 1. allocate and read all iovecs first
-                // 2. sort the iovecs by address
-                // 3. check for overlapping ranges
-                // 4. repeat slice::split_at to separate memory into sub-slices
-                //    containing the slices specified by iovec
-                //
-                // Or we can just use a tiny be of unsafety here
-                //
-                let slice = &mut memory.as_mut()[
-                    usize::try_from(iovec.buf).unwrap()
-                        .. usize::try_from(iovec.buf+iovec.len).unwrap()
-                ];
-                let ptr = slice.as_mut_ptr();
-                let len = slice.len();
-                Ok(unsafe { slice::from_raw_parts_mut(ptr, len)})
-            })
-            .collect::<FileSystemResult<Vec<_>>>()?;
+            // Ok here's the gooey center of the the copy-less iovecs. This may
+            // seem unnecessary but this code finds itself on the hot-path of
+            // execution the moment io gets involved.
+            //
+            // See `unpack_iovec` for more info about what is going on here
+            //
+
+            // The _correct_ thing to do here is to
+            // 1. allocate and read all iovecs first
+            // 2. sort the iovecs by address
+            // 3. check for overlapping ranges
+            // 4. repeat slice::split_at to separate memory into sub-slices
+            //    containing the slices specified by iovec
+            //
+            // Or we can not do that and just construct mutable slices that may
+            // more may not overlap. If they overlap the worst thing that should
+            // happen is malformed iovecs get malformed data back.
+            //
+            let slice = &mut memory.as_mut()[
+                usize::try_from(iovec.buf).unwrap()
+                    .. usize::try_from(iovec.buf+iovec.len).unwrap()
+            ];
+            slices.push(unsafe { mem::transmute::<&'_ mut [u8], &'a mut [u8]>(slice) });
+        }
 
         Ok(IoVecSlicesMut{_ref: memory, slices})
     }
