@@ -37,67 +37,28 @@ impl HostError for FatalEngineError {}
 // The WASMI host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
 
-///// Newtype for locked references to memory in wasmi, required for
-///// general MemoryHandler trait
-//struct WasmiSlice<'a>(Box<dyn AsRef<[u8]> + 'a>);
-//
-//impl AsRef<[u8]> for WasmiSlice<'_> {
-//    fn as_ref<'a>(&'a self) -> &'a [u8] {
-//        self.as_ref()
-//    }
-//}
-//
-///// Newtype for locked references to memory in wasmi, required for
-///// general MemoryHandler trait
-//struct WasmiSliceMut<'a>(Box<dyn AsMut<[u8]> + 'a>);
-//
-//impl AsMut<[u8]> for WasmiSliceMut<'_> {
-//    fn as_mut<'a>(&'a mut self) -> &'a mut [u8] {
-//        self.as_mut()
-//    }
-//}
-
 /// Impl the MemoryHandler for MemoryRef.
 /// This allows passing the MemoryRef to WasiWrapper on any VFS call.
 impl MemoryHandler for MemoryRef {
-    /// A type representing a direct reference to memory
-    ///
-    /// Note this may both lock the underlying engine and allocate memory (if
-    /// the engines underlying memory is not linear). These should generally
-    /// be short-lived to pass to other APIs.
-    type Slice = &'static [u8]; // WasmiSlice<'a>;
+    type Slice = &'static [u8];
+    type SliceMut = &'static mut [u8];
 
-    /// A type representing a direct mutable reference to memory
-    ///
-    /// Note this may both lock the underlying engine and allocate memory (if
-    /// the engines underlying memory is not linear). These should generally
-    /// be short-lived to pass to other APIs.
-    type SliceMut = &'static mut [u8]; // WasmiSliceMut<'a>;
-
-    /// Get an immutable slice of the memory
     fn get_slice<'a>(
         &'a self,
         _address: u32,
         _length: u32
     ) -> FileSystemResult<Bound<'a, Self::Slice>> {
         todo!()
-//        let x: &[u8] = self.with_direct_access(|r: &[u8]| { r });
-//        Ok(x)
-        //Ok(Box::new(self.direct_access()))
     }
 
-    /// Get a mutable slice of the memory
     fn get_slice_mut<'a>(
         &'a mut self,
         _address: u32,
         _length: u32
     ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
         todo!()
-        //Ok(self.with_direct_access_mut(|r| r))
-        //Ok(Box::new(self.direct_access_mut()))
     }
 
-    /// Get the size of available memory
     fn get_size(&self) -> FileSystemResult<u32> {
         todo!()
     }
