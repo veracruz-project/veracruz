@@ -28,8 +28,8 @@ use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData,
-    mem, mem::size_of, ops::Deref, ops::DerefMut, slice::from_raw_parts,
-    slice::from_raw_parts_mut, string::String, vec::Vec,
+    mem, mem::size_of, ops::Deref, ops::DerefMut, slice,
+    slice::from_raw_parts, slice::from_raw_parts_mut, string::String, vec::Vec,
 };
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
@@ -378,19 +378,47 @@ impl<'a, T> DerefMut for BoundMut<'a, T> {
 }
 
 
+/// Number of iovecs to store internally before needing dynamic memory
+const IOVECSLICES_SOO_COUNT: usize = 2;
+
 /// A type wrapping an array of IoVecs as directly-accessible slices.
 ///
 /// This indirection is needed to hold the MemoryHandler::Slice type which
 /// needs to be stored somewhere
 ///
+/// This may allocated, though most iovecs are fairly small. As an extra
+/// optimization, if there are only 1 or 2 iovecs, these are stored directly
+/// in the struct with no allocation. 1 iovec is the most common, though
+/// 2 iovecs is used sometimes for things like appending newlines to stdout.
+/// At the time of writing I have never seen >2 iovecs used in a call, though
+/// it's certainly possible for aggresively optimized io.
+///
 pub struct IoVecSlices<'a, R> {
     _ref: R,
-    slices: Vec<&'a [u8]>,
+    slices: IoVecSlicesStorage<'a>,
+}
+
+enum IoVecSlicesStorage<'a> {
+    Small([Option<&'a [u8]>; IOVECSLICES_SOO_COUNT]),
+    Large(Vec<&'a [u8]>),
 }
 
 impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
     fn as_ref(&self) -> &[&'a [u8]] {
-        &self.slices
+        match &self.slices {
+            IoVecSlicesStorage::Small(arr) => {
+                // looks a bit scary, but is just casting our `[Option<&[u8]>; 2]`
+                // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
+                // unsafety to do this without memory allocation.
+                let len = arr.iter().take_while(|x| x.is_some()).count();
+                unsafe {
+                    slice::from_raw_parts(arr.as_ptr() as *const &'a [u8], len)
+                }
+            }
+            IoVecSlicesStorage::Large(vec) => {
+                &vec
+            }
+        }
     }
 }
 
@@ -399,14 +427,39 @@ impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
 /// This indirection is needed to hold the MemoryHandler::SliceMut type which
 /// needs to be stored somewhere
 ///
+/// This may allocated, though most iovecs are fairly small. As an extra
+/// optimization, if there are only 1 or 2 iovecs, these are stored directly
+/// in the struct with no allocation. 1 iovec is the most common, though
+/// 2 iovecs is used sometimes for things like appending newlines to stdout.
+/// At the time of writing I have never seen >2 iovecs used in a call, though
+/// it's certainly possible for aggresively optimized io.
+///
 pub struct IoVecSlicesMut<'a, R> {
     _ref: R,
-    slices: Vec<&'a mut [u8]>,
+    slices: IoVecSlicesMutStorage<'a>,
+}
+
+enum IoVecSlicesMutStorage<'a> {
+    Small([Option<&'a mut [u8]>; 2]),
+    Large(Vec<&'a mut [u8]>),
 }
 
 impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
     fn as_mut(&mut self) -> &mut [&'a mut [u8]] {
-        &mut self.slices
+        match &mut self.slices {
+            IoVecSlicesMutStorage::Small(arr) => {
+                // looks a bit scary, but is just casting our `[Option<&[u8]>; 2]`
+                // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
+                // unsafety to do this without memory allocation.
+                let len = arr.iter().take_while(|x| x.is_some()).count();
+                unsafe {
+                    slice::from_raw_parts_mut(arr.as_mut_ptr() as *mut &'a mut [u8], len)
+                }
+            }
+            IoVecSlicesMutStorage::Large(ref mut vec) => {
+                vec
+            }
+        }
     }
 }
 
@@ -597,8 +650,7 @@ pub trait MemoryHandler  {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
         let memory = self.get_slice(0, self.get_size()?)?;
-        let mut slices = vec![];
-        for i in 0..count {
+        let slices = (0..count).map(|i| -> FileSystemResult<&'a [u8]> {
             let iovec = IoVec::unpack(
                 &memory.as_ref()[
                     usize::try_from(address + i*IoVec::SIZE).unwrap()
@@ -649,10 +701,26 @@ pub trait MemoryHandler  {
                 usize::try_from(iovec.buf).unwrap()
                     .. usize::try_from(iovec.buf+iovec.len).unwrap()
             ];
-            slices.push(unsafe { mem::transmute::<&'_ [u8], &'a [u8]>(slice) });
-        }
+            Ok(unsafe { mem::transmute::<&'_ [u8], &'a [u8]>(slice) })
+        });
 
-        Ok(IoVecSlices{_ref: memory, slices})
+        if count <= IOVECSLICES_SOO_COUNT as u32 {
+            let mut slices = slices.fuse();
+            let slices = [
+                slices.next().transpose()?,
+                slices.next().transpose()?,
+            ];
+            Ok(IoVecSlices{
+                _ref: memory,
+                slices: IoVecSlicesStorage::Small(slices),
+            })
+        } else {
+            let slices = slices.collect::<FileSystemResult<Vec<_>>>()?;
+            Ok(IoVecSlices{
+                _ref: memory,
+                slices: IoVecSlicesStorage::Large(slices),
+            })
+        }
     }
 
     /// Unpack an array of mutable iovec references
@@ -669,8 +737,7 @@ pub trait MemoryHandler  {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
         let mut memory = self.get_slice_mut(0, self.get_size()?)?;
-        let mut slices = vec![];
-        for i in 0..count {
+        let slices = (0..count).map(|i| -> FileSystemResult<&'a mut [u8]> {
             let iovec = IoVec::unpack(
                 &memory.as_mut()[
                     usize::try_from(address + i*IoVec::SIZE).unwrap()
@@ -700,10 +767,26 @@ pub trait MemoryHandler  {
                 usize::try_from(iovec.buf).unwrap()
                     .. usize::try_from(iovec.buf+iovec.len).unwrap()
             ];
-            slices.push(unsafe { mem::transmute::<&'_ mut [u8], &'a mut [u8]>(slice) });
-        }
+            Ok(unsafe { mem::transmute::<&'_ mut [u8], &'a mut [u8]>(slice) })
+        });
 
-        Ok(IoVecSlicesMut{_ref: memory, slices})
+        if count <= IOVECSLICES_SOO_COUNT as u32 {
+            let mut slices = slices.fuse();
+            let slices = [
+                slices.next().transpose()?,
+                slices.next().transpose()?,
+            ];
+            Ok(IoVecSlicesMut{
+                _ref: memory,
+                slices: IoVecSlicesMutStorage::Small(slices),
+            })
+        } else {
+            let slices = slices.collect::<FileSystemResult<Vec<_>>>()?;
+            Ok(IoVecSlicesMut{
+                _ref: memory,
+                slices: IoVecSlicesMutStorage::Large(slices),
+            })
+        }
     }
 
     /// Write the content to the buf_address and the starting address to buf_pointers.
