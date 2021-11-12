@@ -37,60 +37,60 @@ impl HostError for FatalEngineError {}
 // The WASMI host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Newtype for locked references to memory in wasmi, required for
-/// general MemoryHandler trait
-struct WasmiSlice<'a>(Box<dyn AsRef<[u8]> + 'a>);
-
-impl AsRef<[u8]> for WasmiSlice<'_> {
-    fn as_ref<'a>(&'a self) -> &'a [u8] {
-        self.as_ref()
-    }
-}
-
-/// Newtype for locked references to memory in wasmi, required for
-/// general MemoryHandler trait
-struct WasmiSliceMut<'a>(Box<dyn AsMut<[u8]> + 'a>);
-
-impl AsMut<[u8]> for WasmiSliceMut<'_> {
-    fn as_mut<'a>(&'a mut self) -> &'a mut [u8] {
-        self.as_mut()
-    }
-}
+///// Newtype for locked references to memory in wasmi, required for
+///// general MemoryHandler trait
+//struct WasmiSlice<'a>(Box<dyn AsRef<[u8]> + 'a>);
+//
+//impl AsRef<[u8]> for WasmiSlice<'_> {
+//    fn as_ref<'a>(&'a self) -> &'a [u8] {
+//        self.as_ref()
+//    }
+//}
+//
+///// Newtype for locked references to memory in wasmi, required for
+///// general MemoryHandler trait
+//struct WasmiSliceMut<'a>(Box<dyn AsMut<[u8]> + 'a>);
+//
+//impl AsMut<[u8]> for WasmiSliceMut<'_> {
+//    fn as_mut<'a>(&'a mut self) -> &'a mut [u8] {
+//        self.as_mut()
+//    }
+//}
 
 /// Impl the MemoryHandler for MemoryRef.
 /// This allows passing the MemoryRef to WasiWrapper on any VFS call.
-impl<'a> MemoryHandler<'a> for MemoryRef {
+impl MemoryHandler for MemoryRef {
     /// A type representing a direct reference to memory
     ///
     /// Note this may both lock the underlying engine and allocate memory (if
     /// the engines underlying memory is not linear). These should generally
     /// be short-lived to pass to other APIs.
-    type Slice = &'a [u8]; // WasmiSlice<'a>;
+    type Slice<'a> = &'a [u8]; // WasmiSlice<'a>;
 
     /// A type representing a direct mutable reference to memory
     ///
     /// Note this may both lock the underlying engine and allocate memory (if
     /// the engines underlying memory is not linear). These should generally
     /// be short-lived to pass to other APIs.
-    type SliceMut = &'a mut [u8]; // WasmiSliceMut<'a>;
+    type SliceMut<'a> = &'a mut [u8]; // WasmiSliceMut<'a>;
 
     /// Get an immutable slice of the memory
-    fn get_slice(&'a self, _address: u32, _length: u32) -> FileSystemResult<Self::Slice> {
+    fn get_slice<'a>(&'a self, _address: u32, _length: u32) -> FileSystemResult<Self::Slice<'a>> {
         todo!()
-//        let x: &'a [u8] = self.with_direct_access(|r: &'a [u8]| { r });
+//        let x: &[u8] = self.with_direct_access(|r: &[u8]| { r });
 //        Ok(x)
         //Ok(Box::new(self.direct_access()))
     }
 
     /// Get a mutable slice of the memory
-    fn get_slice_mut(&'a mut self, _address: u32, _length: u32) -> FileSystemResult<Self::SliceMut> {
+    fn get_slice_mut<'a>(&'a mut self, _address: u32, _length: u32) -> FileSystemResult<Self::SliceMut<'a>> {
         todo!()
         //Ok(self.with_direct_access_mut(|r| r))
         //Ok(Box::new(self.direct_access_mut()))
     }
 
     /// Get the size of available memory
-    fn get_size(&'a self) -> FileSystemResult<u32> {
+    fn get_size(&self) -> FileSystemResult<u32> {
         todo!()
     }
 }

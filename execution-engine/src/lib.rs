@@ -17,6 +17,9 @@
 
 #![cfg_attr(feature = "sgx", no_std)]
 
+#![allow(incomplete_features)]
+#![feature(generic_associated_types)]
+
 #[cfg(feature = "sgx")]
 #[macro_use]
 extern crate sgx_tstd as std;
