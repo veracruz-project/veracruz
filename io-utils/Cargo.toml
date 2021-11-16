@@ -20,6 +20,7 @@ curl = "=0.4.35"
 err-derive = "0.2"
 log = "=0.4.13"
 nix = { version = "0.15", optional = true }
+openssl-sys = "=0.9.70"
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", default-features = false }
 stringreader = "0.1"
