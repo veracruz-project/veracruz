@@ -26,7 +26,9 @@ WASM_PROG_LIST = random-source.wasm \
 				moving-average-convergence-divergence.wasm \
 				private-set-intersection-sum.wasm \
 				number-stream-accumulation.wasm \
-				read-file.wasm
+				read-file.wasm \
+				shamir-secret-sharing.wasm
+
 
 WASM_PROG_FILES = $(patsubst %.wasm, $(OUT_DIR)/%.wasm, $(WASM_PROG_LIST))
 
@@ -87,25 +89,15 @@ ifeq ($(PLATFORM), Linux)
 	CERTIFICATE_EXPIRY := "$(shell date --rfc-2822 -d 'now + 100 days')"
 endif
 
-POLICY_FILES ?= get_random_policy.json \
-				one_data_source_policy.json \
-				two_data_source_string_edit_distance_policy.json \
-				two_data_source_intersection_set_policy.json \
-				two_data_source_private_set_intersection_policy.json \
-				dual_policy.json \
-				triple_policy.json \
-				triple_parties_two_data_sources_sum_policy.json \
-				permuted_triple_parties_two_data_sources_sum_policy.json \
-				triple_parties_two_data_sources_string_edit_distance_policy.json \
-				dual_parallel_policy.json \
-				quadruple_policy.json \
-				test_multiple_key_policy.json \
-				idash2017_logistic_regression_policy.json \
-				moving_average_convergence_divergence.json \
-				private_set_intersection_sum.json \
-				number-stream-accumulation.json \
-				basic_file_read_write.json
-
+POLICY_FILES ?= \
+	single_client.json \
+	single_client_no_debug.json \
+	dual_policy.json \
+	triple_policy_1.json \
+	triple_policy_2.json \
+	triple_policy_3.json \
+	triple_policy_4.json \
+	quadruple_policy.json
 
 PGEN = $(WORKSPACE_DIR)/host/target/release/generate-policy
 
@@ -120,6 +112,7 @@ CLIENT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_cert.pem
 PROGRAM_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/program_client_cert.pem
 DATA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/data_client_cert.pem
 RESULT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/result_client_cert.pem
+NEVER_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_cert.pem
 EXPIRED_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/expired_cert.pem
 
 CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(EXPIRED_CRT) \
@@ -132,166 +125,53 @@ $(OUT_DIR)/invalid_policy: $(WORKSPACE_DIR)/../test-collateral/invalid_policy/*.
 	mkdir -p $@
 	cp $(WORKSPACE_DIR)/../test-collateral/invalid_policy/*.json $@
 
-$(OUT_DIR)/get_random_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/random-source.wasm
-	cd $(OUT_DIR) ; $(PGEN) --enclave-debug-mode true \
-		--certificate $(CLIENT_CRT) --capability "output : $(READ_RIGHT), random-source.wasm : $(WRITE_RIGHT)" \
-		--binary random-source.wasm --capability "output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010  \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
+$(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
+	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
+	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+            --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
+	    --enclave-debug-mode true $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
-$(OUT_DIR)/one_data_source_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/linear-regression.wasm
+$(OUT_DIR)/single_client_no_debug.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
+	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
+	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+            --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
+	    $(PGEN_COMMON_PARAMS) --output-policy-file $@
+
+$(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
-		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
 		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
+		--enable-clock true $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
-$(OUT_DIR)/test_multiple_key_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/moving-average-convergence-divergence.wasm
+$(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), moving-average-convergence-divergence.wasm : $(WRITE_RIGHT)" \
-		--binary moving-average-convergence-divergence.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+	    --veracruz-server-ip 127.0.0.1:3013 --proxy-attestation-server-ip 127.0.0.1:3010 \
+	    --enable-clock true $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
-$(OUT_DIR)/two_data_source_string_edit_distance_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/string-edit-distance.wasm
+# Generate all the triple policy but on different port.
+$(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT), string-edit-distance.wasm : $(WRITE_RIGHT)" \
-		--binary string-edit-distance.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3013 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    --certificate $(RESULT_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+	    --veracruz-server-ip 127.0.0.1:$(shell echo "3020 + $*" | bc) \
+	    --proxy-attestation-server-ip 127.0.0.1:3010 \
+	    --enable-clock true $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
-$(OUT_DIR)/two_data_source_intersection_set_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/intersection-set-sum.wasm
+$(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT), intersection-set-sum.wasm : $(WRITE_RIGHT)" \
-		--binary intersection-set-sum.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3022 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/two_data_source_private_set_intersection_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/private-set-intersection.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT), private-set-intersection.wasm : $(WRITE_RIGHT)" \
-		--binary private-set-intersection.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/linear-regression.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT)" \
-		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3014 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/linear-regression.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
-		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3015 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/triple_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/linear-regression.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
-		--certificate $(RESULT_CRT) --capability "output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
-		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3016 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		 --stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/triple_parties_two_data_sources_sum_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/intersection-set-sum.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "intersection-set-sum.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT)" \
-		--certificate $(RESULT_CRT) --capability "input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT)" \
-		--binary intersection-set-sum.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3017 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/permuted_triple_parties_two_data_sources_sum_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/intersection-set-sum.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "intersection-set-sum.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT)" \
-		--certificate $(RESULT_CRT) --capability "input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT)" \
-		--binary intersection-set-sum.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3018 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/triple_parties_two_data_sources_string_edit_distance_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/string-edit-distance.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "string-edit-distance.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT)" \
-		--certificate $(RESULT_CRT) --capability "input-1 : $(WRITE_RIGHT), output : $(READ_RIGHT)" \
-		--binary string-edit-distance.wasm  --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3019 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/string-edit-distance.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "string-edit-distance.wasm : $(WRITE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "input-0 : $(WRITE_RIGHT)" \
-		--certificate $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_cert.pem --capability "input-1 : $(WRITE_RIGHT)" \
-		--certificate $(RESULT_CRT) --capability "output : $(READ_RIGHT)" \
-		--binary string-edit-distance.wasm --capability "input-0 : $(READ_RIGHT), input-1 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3020 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/invalid_policy_one_expired_data_source_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/linear-regression.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(EXPIRED_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), linear-regression.wasm : $(WRITE_RIGHT)" \
-		--binary linear-regression.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3021 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/idash2017_logistic_regression_policy.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/idash2017-logistic-regression.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), idash2017-logistic-regression.wasm : $(WRITE_RIGHT)" \
-		--binary idash2017-logistic-regression.wasm  --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3023 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/moving_average_convergence_divergence.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/moving-average-convergence-divergence.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), moving-average-convergence-divergence.wasm : $(WRITE_RIGHT)" \
-		--binary moving-average-convergence-divergence.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3024 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/private_set_intersection_sum.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/private-set-intersection-sum.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), private-set-intersection-sum.wasm : $(WRITE_RIGHT)" \
-		--binary private-set-intersection-sum.wasm --capability "input-0 : $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3025 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/number-stream-accumulation.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/number-stream-accumulation.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "stream-0 : $(WRITE_RIGHT), stream-1 : $(WRITE_RIGHT), input-0 : $(WRITE_RIGHT), output : $(READ_RIGHT), number-stream-accumulation.wasm : $(WRITE_RIGHT)" \
-		--binary number-stream-accumulation.wasm --capability "stream-0 : $(READ_RIGHT), stream-1 : $(READ_RIGHT), input-0 : $(READ_RIGHT), output : $(READ_WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3026 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
-
-$(OUT_DIR)/basic_file_read_write.json: $(PGEN) $(CREDENTIALS) $(OUT_DIR)/read-file.wasm
-	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(CLIENT_CRT) --capability "input.txt: $(WRITE_RIGHT), output : $(READ_RIGHT), read-file.wasm : $(WRITE_RIGHT)" \
-		--binary read-file.wasm --capability "input.txt: $(READ_RIGHT), output : $(WRITE_RIGHT)" \
-        --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
-		--stdin "stdin : $(READ_RIGHT)" --stdout "stdout : $(WRITE_RIGHT)" --stderr "stderr : $(WRITE_RIGHT)" \
-		$(PGEN_COMMON_PARAMS) --output-policy-file $@
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    --certificate $(NEVER_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    --certificate $(RESULT_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+	    --veracruz-server-ip 127.0.0.1:3030 --proxy-attestation-server-ip 127.0.0.1:3010 \
+	    --enable-clock true $(PGEN_COMMON_PARAMS) --output-policy-file $@
