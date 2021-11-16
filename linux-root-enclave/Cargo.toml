@@ -18,7 +18,6 @@ lazy_static = "1.4.0"
 log = "0.4.13"
 net2 = "0.2.37"
 nix = "0.20.0"
-openssl-sys = "=0.9.70"
 psa-attestation = { path = "../psa-attestation", features = ["linux"] }
 ring = "0.16.11"
 serde = { version = "1.0.115", features = ["derive"] }

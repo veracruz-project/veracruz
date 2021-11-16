@@ -56,7 +56,6 @@ io-utils = { path = "../io-utils", optional = true }
 lazy_static = "1.4"
 log = "0.4.13"
 nix = { version = "0.15", optional = true }
-openssl-sys = "=0.9.70"
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", optional = true }
 psa-attestation = { path = "../psa-attestation", optional = true }
