@@ -22,7 +22,7 @@ echo "Checking code formatting of files staged for commit."
 
 for file in $(git diff --name-only --staged \*.rs); do
     RUSTFMT="$(rustfmt --edition=2018 --check --skip-children --unstable-features $file)"
-    SPACES="$(sed -n '/[\t ]$/p' $file)"
+    SPACES="$(perl -ne 'print if /[ \t]$/;' $file)"
     if [ "$RUSTFMT" != "" -o "$SPACES" != "" ]; then
         printf "[ERROR]: $file\n"
         if [ "$RUSTFMT" != "" ]; then
