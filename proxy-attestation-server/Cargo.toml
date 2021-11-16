@@ -53,6 +53,7 @@ log = "=0.4.13"
 nb-connect = "=1.0.3"
 nitro-enclave-attestation-document = { git = "https://github.com/veracruz-project/nitro-enclave-attestation-document.git", branch = "main", optional = true }
 openssl = "0.10.24"
+openssl-sys = "=0.9.70"
 percent-encoding = "2.1"
 psa-attestation = { path = "../psa-attestation" }
 rand = "0.7"
