@@ -109,12 +109,14 @@ trustzone-cli: trustzone-env
 	# build CLIs in top-level crates
 	cd proxy-attestation-server && \
 		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=$(AARCH64_GCC) \
 		OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
 		OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) \
 		C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
 		cargo build --target aarch64-unknown-linux-gnu --features tz --features cli
 	cd veracruz-server && \
 		CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=$(AARCH64_GCC) \
 		OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
 		OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) \
 		C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
@@ -198,12 +200,14 @@ sgx-psa-attestation: sgx-env
 
 tz-psa-attestation: trustzone-env
 	cd psa-attestation && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) \
+		CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=$(AARCH64_GCC) \
 		cargo build --target aarch64-unknown-linux-gnu --features tz
 
 trustzone-veracruz-server-test: trustzone-test-collateral trustzone trustzone-test-env veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
         && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
                 OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
+		CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=$(AARCH64_GCC) \
                 cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1 \
 		&& ./cp-veracruz-server-test-tz.sh
 	chmod u+x run_veracruz_server_test_tz.sh
@@ -213,6 +217,7 @@ trustzone-veracruz-test: trustzone-test-collateral trustzone trustzone-test-env 
 	cd veracruz-test \
         && CC_aarch64_unknown_linux_gnu=$(AARCH64_GCC) OPENSSL_INCLUDE_DIR=$(OPENSSL_INCLUDE_DIR) \
                 OPENSSL_LIB_DIR=$(OPENSSL_LIB_DIR) C_INCLUDE_PATH=$(TRUSTZONE_C_INCLUDE_PATH) \
+		CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=$(AARCH64_GCC) \
                 cargo test --target aarch64-unknown-linux-gnu --no-run --features tz -- --test-threads=1
 	cd veracruz-test && ./cp-veracruz-tz.sh
 	chmod u+x run_veracruz_test_tz.sh
