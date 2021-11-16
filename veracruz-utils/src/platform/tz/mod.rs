@@ -9,7 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub mod root_enclave_opcode;
 pub mod runtime_manager_opcode;
 
 pub fn transmute_from_u32(src: &[u32]) -> Vec<u8> {
@@ -39,7 +38,7 @@ pub fn transmute_to_u32(src: &[u8]) -> Vec<u32> {
 }
 
 // Note: the following static value should not be a static value
-// It should be the hash value of the current program (trustzone-root-enclave), and it
+// It should be the hash value of the current program, and it
 // should be retrieved from the OS, not from itself (bootstrapping trust
 // kinda doesn't work that way).
 // However, OPTEE doesn't really provide this feature at the moment,

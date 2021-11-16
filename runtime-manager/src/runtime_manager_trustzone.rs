@@ -35,7 +35,7 @@ fn print_error_and_return(message: String) -> ErrorKind {
 
 use ring::digest;
 
-// Yes, I'm doing what you think I'm doing here. Each instance of the TrustZone root enclave
+// Yes, I'm doing what you think I'm doing here. Each instance of the TrustZone runtime manager
 // will have the same private key. Yes, I'm embedding that key in the source
 // code. I could come up with a complicated system for auto generating a key
 // for each instance, and then populate the device database with they key.
@@ -121,7 +121,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> OpteeResult<()> {
             // p1 - challenge
             // p2 - token buffer
             // p3 - CSR buffer
-            debug_message("trustzone-root-enclave::invoke_command NativeAttestation Opcode started".to_string());
+            debug_message("RuntimeManagerOpcode::Attestation Attestation Opcode started".to_string());
 
             let mut values = unsafe {
                 params.0.as_value().map_err(|err| {
@@ -174,14 +174,14 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> OpteeResult<()> {
                     ))
                 })?;
 
-            debug_message(format!("trustzone-root-enclave::invoke_command calling native_attestation function"));
+            debug_message(format!("RuntimeManagerOpcode::Attestation calling native_attestation function"));
             let token = native_attestation(&challenge, &csr).map_err(|err| {
                 print_error_and_return(format!(
                     "RuntimeManagerOpcode::Attestation call to native_attestation failed:{:?}",
                     err
                 ))
             })?;
-            debug_message(format!("trustzone-root-enclave::invoke_command returned from native_attestation function"));
+            debug_message(format!("RuntimeManagerOpcode::Attestation returned from native_attestation function"));
             token_buf.buffer().write(&token).map_err(|err| {
                 print_error_and_return(format!(
                     "RuntimeManagerOpcode::Attestation failed to place token in token_buf:{:?}",
@@ -189,7 +189,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> OpteeResult<()> {
                 ))
             })?;
 
-            debug_message(format!("trustzone-root-enclave::invoke_command setting token.len:{:}", token.len()));
+            debug_message(format!("RuntimeManagerOpcode::Attestation setting token.len:{:}", token.len()));
             values.set_a(token.len() as u32);
 
             csr_buf.buffer().write(&csr).map_err(|err| {
@@ -382,7 +382,7 @@ fn native_attestation(challenge: &Vec<u8>, csr: &Vec<u8>) -> Result<Vec<u8>, Str
     };
     if status != 0 {
         return Err(format!(
-            "trustzone-root-enclave::create psa_initial_attest_load key failed with code:{:}",
+            "runtime_manager_truztone::native_attestation psa_initial_attest_load key failed with code:{:}",
             status
         ))?;
     }
@@ -410,7 +410,7 @@ fn native_attestation(challenge: &Vec<u8>, csr: &Vec<u8>) -> Result<Vec<u8>, Str
     };
     if status != 0 {
         return Err(format!(
-            "trustzone-root-enclave::native_attestation psa_initial_attest_get_token failed with error code:{:}",
+            "runtime_manager_truztone::native_attestation psa_initial_attest_get_token failed with error code:{:}",
             status
         ));
     }
@@ -423,7 +423,7 @@ fn native_attestation(challenge: &Vec<u8>, csr: &Vec<u8>) -> Result<Vec<u8>, Str
     };
     if status != 0 {
         return Err(format!(
-            "trustzone-root-enclave::native_attestation psa_initial_attest_remove_key failed with error code:{:?}",
+            "runtime_manager_truztone::native_attestation psa_initial_attest_remove_key failed with error code:{:?}",
             status
         ));
     }
