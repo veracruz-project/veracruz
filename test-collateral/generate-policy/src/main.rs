@@ -332,7 +332,7 @@ binary.",
         )
         .arg(
             Arg::with_name("enable-clock")
-                .short("c")
+                .short("n")
                 .long("enable-clock")
                 .help(
                     "Specifies whether the Veracruz trusted runtime should allow the WASM \
