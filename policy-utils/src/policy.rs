@@ -32,15 +32,15 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(clippy::too_many_arguments)]
+
 use super::Platform;
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, Identity, Principal, Program, RightsTable, FileHash},
+    principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable},
 };
-use ring;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -64,7 +64,7 @@ pub struct Policy {
     identities: Vec<Identity<String>>,
     /// The candidate programs that can be loaded in the execution engine.
     programs: Vec<Program>,
-    /// The list of files, e.g. binaries and configurations, that must match given hashes. 
+    /// The list of files, e.g. binaries and configurations, that must match given hashes.
     file_hashes: Vec<FileHash>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
@@ -251,7 +251,7 @@ impl Policy {
                 }
             },
         };
-        return Ok(&hash);
+        Ok(&hash)
     }
 
     /// Returns the URL of the proxy attestation service, associated with this
@@ -281,8 +281,8 @@ impl Policy {
 
     /// Returns the hash of the source JSON representation, if available
     #[inline]
-    pub fn policy_hash<'a>(&'a self) -> Option<&'a str> {
-        self.policy_hash.as_ref().map(|s| s.as_str())
+    pub fn policy_hash(&self) -> Option<&str> {
+        self.policy_hash.as_deref()
     }
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
@@ -373,7 +373,7 @@ impl Policy {
 
         for file_hash in self.file_hashes.iter() {
             table.insert(
-                PathBuf::from(file_hash.file_path()), 
+                PathBuf::from(file_hash.file_path()),
                 hex::decode(file_hash.hash())?,
             );
         }

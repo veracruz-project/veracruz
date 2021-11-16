@@ -40,7 +40,7 @@ fn read_csv(filename: &str) -> Result<Vec<csv::StringRecord>, Box<dyn Error>> {
     Ok(buffer)
 }
 
-fn extract_columns(entries: &Vec<csv::StringRecord>) -> Result<HashSet<Person>, Box<dyn Error>> {
+fn extract_columns(entries: &[csv::StringRecord]) -> Result<HashSet<Person>, Box<dyn Error>> {
     let mut buffer = HashSet::new();
 
     for entry in entries.iter() {
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for private set intersection")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Convert the [INPUT] csv file to pinecone. Each entry in the file comprises name (String), employee_id (String), age (u8), and grade (u8).") 
+        .about("Convert the [INPUT] csv file to pinecone. Each entry in the file comprises name (String), employee_id (String), age (u8), and grade (u8).")
         .arg(
             Arg::with_name("input_file")
                 .short("f")

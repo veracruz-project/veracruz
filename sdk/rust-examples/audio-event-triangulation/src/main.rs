@@ -13,12 +13,9 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use anyhow;
-use std::{
-    convert::TryInto,
-    fs,
-    io,
-};
+#![allow(clippy::many_single_char_names)]
+
+use std::{convert::TryInto, fs, io};
 use thiserror::Error;
 
 /// An individual audio event
@@ -69,15 +66,16 @@ fn decode_audio_event(event: &[u8]) -> anyhow::Result<AudioEvent> {
         Err(AudioEventError::InvalidAudioEvent)?;
     }
 
-    Ok(AudioEvent{
+    Ok(AudioEvent {
         timestamp: u32::from_le_bytes(event[0..4].try_into().unwrap()),
         location: (
-            i32::from_le_bytes(event[4.. 8].try_into().unwrap()),
-            i32::from_le_bytes(event[8..12].try_into().unwrap())
+            i32::from_le_bytes(event[4..8].try_into().unwrap()),
+            i32::from_le_bytes(event[8..12].try_into().unwrap()),
         ),
-        samples: (12..event.len()).step_by(2)
-            .map(|i| i16::from_le_bytes(event[i..i+2].try_into().unwrap()))
-            .collect::<Vec<_>>()
+        samples: (12..event.len())
+            .step_by(2)
+            .map(|i| i16::from_le_bytes(event[i..i + 2].try_into().unwrap()))
+            .collect::<Vec<_>>(),
     })
 }
 
@@ -92,8 +90,8 @@ fn decode_audio_event(event: &[u8]) -> anyhow::Result<AudioEvent> {
 fn triangulate(events: &[AudioEvent]) -> (i32, i32) {
     // solving
     // (x−x1)^2 + (y−y1)^2 = d1^2
-    // (x−x2)^2 + (y−y2)^2 = d2^2 
-    // (x−x3)^2 + (y−y3)^2 = d3^2 
+    // (x−x2)^2 + (y−y2)^2 = d2^2
+    // (x−x3)^2 + (y−y3)^2 = d3^2
     //
     // let
     // a = (-2x1 + 2x2)
@@ -117,15 +115,15 @@ fn triangulate(events: &[AudioEvent]) -> (i32, i32) {
     let d2 = events[1].power();
     let d3 = events[2].power();
 
-    let a = -2.0*x1 + 2.0*x2;
-    let b = -2.0*y1 + 2.0*y2;
-    let c = d1.powf(2.0)-d2.powf(2.0) - x1.powf(2.0)+x2.powf(2.0) - y1.powf(2.0)+y2.powf(2.0);
-    let d = -2.0*x2 + 2.0*x3;
-    let e = -2.0*y2 + 2.0*y3;
-    let f = d2.powf(2.0)-d3.powf(2.0) - x2.powf(2.0)+x3.powf(2.0) - y2.powf(2.0)+y3.powf(2.0);
+    let a = -2.0 * x1 + 2.0 * x2;
+    let b = -2.0 * y1 + 2.0 * y2;
+    let c = d1.powf(2.0) - d2.powf(2.0) - x1.powf(2.0) + x2.powf(2.0) - y1.powf(2.0) + y2.powf(2.0);
+    let d = -2.0 * x2 + 2.0 * x3;
+    let e = -2.0 * y2 + 2.0 * y3;
+    let f = d2.powf(2.0) - d3.powf(2.0) - x2.powf(2.0) + x3.powf(2.0) - y2.powf(2.0) + y3.powf(2.0);
 
-    let x = (c*e - f*b) / (e*a - b*d);
-    let y = (c*d - a*f) / (b*d - a*e);
+    let x = (c * e - f * b) / (e * a - b * d);
+    let y = (c * d - a * f) / (b * d - a * e);
 
     (y as i32, x as i32)
 }
@@ -133,7 +131,10 @@ fn triangulate(events: &[AudioEvent]) -> (i32, i32) {
 /// Encode a pair of latitude/longitude GPS coordinates into
 /// little-endian bytes
 fn encode_location(location: (i32, i32)) -> Vec<u8> {
-    location.0.to_le_bytes().iter()
+    location
+        .0
+        .to_le_bytes()
+        .iter()
         .chain(location.1.to_le_bytes().iter())
         .map(|x| *x)
         .collect::<Vec<_>>()
@@ -149,19 +150,18 @@ fn main() -> anyhow::Result<()> {
         let filename = format!("/input-{}", i);
         let event = match fs::read(filename) {
             Ok(event) => event,
-            Err(err) => {
-                match err.kind() {
-                    io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => break,
-                    _ => Err(err)?,
-                }
-            }
+            Err(err) => match err.kind() {
+                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => break,
+                _ => Err(err)?,
+            },
         };
 
         raw_events.push(event);
     }
 
     // decode
-    let events = raw_events.iter()
+    let events = raw_events
+        .iter()
         .map(|raw_event| decode_audio_event(&raw_event[..]))
         .collect::<Result<Vec<_>, _>>()?;
 

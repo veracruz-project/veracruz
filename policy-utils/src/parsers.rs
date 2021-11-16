@@ -14,11 +14,7 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "std")]
-use std::{
-    borrow::Cow,
-    ffi,
-    path,
-};
+use std::{borrow::Cow, ffi, path};
 
 /// parser for a single file path either in the form of
 /// --program a.wasm or --program b=a.wasm if a file should
@@ -34,7 +30,7 @@ pub fn parse_renamable_path(s: &ffi::OsStr) -> Result<(String, path::PathBuf), f
         .to_str()
         .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
-    match s.splitn(2, "=").collect::<Vec<_>>().as_slice() {
+    match s.splitn(2, '=').collect::<Vec<_>>().as_slice() {
         [name, path] => Ok((String::from(*name), path::PathBuf::from(*path))),
         [path] => Ok((String::from(*path), path::PathBuf::from(*path))),
         _ => unreachable!(),
@@ -59,7 +55,7 @@ pub fn parse_renamable_paths(
         .to_str()
         .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
-    s.split(",")
+    s.split(',')
         .map(|s| parse_renamable_path(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()
 }
@@ -70,11 +66,10 @@ pub fn parse_renamable_paths(
 /// the "current directory" is always the root. This avoid easy typing
 /// mistakes.
 #[cfg(feature = "std")]
-pub fn enforce_leading_backslash<'a>(path: &'a str) -> Cow<'a, str> {
+pub fn enforce_leading_backslash(path: &str) -> Cow<str> {
     if !path.starts_with('/') {
         Cow::Owned(format!("/{}", path))
     } else {
         Cow::Borrowed(path)
     }
 }
-

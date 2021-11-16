@@ -85,8 +85,8 @@ impl Dataset {
 
     /// Checks if the dataset is empty.
     #[inline]
-    pub fn empty(&self) -> bool {
-        self.points.len() == 0
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
     }
 
     /// Returns the number of rows of data entries in the dataset.
@@ -98,7 +98,7 @@ impl Dataset {
     /// Returns the dimension of each input point in the dataset (assuming the
     /// dataset is self-consistent!).  Returns `None` iff the dataset is empty.
     pub fn dimension(&self) -> Option<usize> {
-        if self.points.len() == 0 {
+        if self.is_empty() {
             None
         } else {
             Some(self.points[0].dimension())
@@ -127,8 +127,8 @@ impl Dataset {
     /// `f64` form along with the dimensions (row/column) of the underlying
     /// point matrix.
     pub fn points_one_dimensional_vector(&self) -> (usize, usize, Vec<f64>) {
-        if self.points.len() == 0 {
-            return (0, 0, Vec::new());
+        if self.is_empty() {
+            (0, 0, Vec::new())
         } else {
             let cols = self.points[0].dimension();
             let rows = self.rows();
@@ -190,10 +190,10 @@ fn read_all_datasets(input: &[Vec<u8>]) -> anyhow::Result<Vec<Dataset>> {
     let mut result = Vec::new();
     let mut dimension: Option<usize> = None;
 
-    for i in input.into_iter() {
+    for i in input.iter() {
         let dataset = read_dataset(&i)?;
 
-        if dataset.empty() {
+        if dataset.is_empty() {
             continue;
         }
 

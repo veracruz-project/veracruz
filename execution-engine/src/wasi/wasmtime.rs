@@ -9,6 +9,8 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+#![allow(clippy::too_many_arguments)]
+
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
@@ -105,9 +107,9 @@ fn check_main(tau: &ExternType) -> EntrySignature {
         ExternType::Func(tau) => {
             let params: Vec<ValType> = tau.params().collect();
 
-            if params == &[ValType::I32, ValType::I32] {
+            if params == [ValType::I32, ValType::I32] {
                 EntrySignature::ArgvAndArgc
-            } else if params == &[] {
+            } else if params == [] {
                 EntrySignature::NoParameters
             } else {
                 EntrySignature::NoEntryFound

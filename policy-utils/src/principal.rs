@@ -68,7 +68,7 @@ impl FileRights {
 
     /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
     #[inline]
-    pub fn to_right_map(file_right_vec: &[FileRights]) -> HashMap<PathBuf, Rights> {
+    pub fn compute_right_map(file_right_vec: &[FileRights]) -> HashMap<PathBuf, Rights> {
         file_right_vec.iter().fold(
             HashMap::new(),
             |mut acc, FileRights { file_name, rights }| {
@@ -96,11 +96,7 @@ pub struct Program {
 impl Program {
     /// Creates a veracruz program.
     #[inline]
-    pub fn new<T>(
-        program_file_name: String,
-        id: T,
-        file_rights: Vec<FileRights>,
-    ) -> Self
+    pub fn new<T>(program_file_name: String, id: T, file_rights: Vec<FileRights>) -> Self
     where
         T: Into<u32>,
     {
@@ -126,7 +122,7 @@ impl Program {
     /// Return file rights map associated to the program.
     #[inline]
     pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::to_right_map(&self.file_rights)
+        FileRights::compute_right_map(&self.file_rights)
     }
 }
 
@@ -193,7 +189,7 @@ impl<U> Identity<U> {
     /// Return file rights map associated to the program.
     #[inline]
     pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::to_right_map(&self.file_rights)
+        FileRights::compute_right_map(&self.file_rights)
     }
 
     /// Returns the certificate associated with this identity.
@@ -242,7 +238,7 @@ impl Identity<String> {
     }
 }
 
-/// Defines a file and its expected hash. 
+/// Defines a file and its expected hash.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FileHash {
     file_path: String,

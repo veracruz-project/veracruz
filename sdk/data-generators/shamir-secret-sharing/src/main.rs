@@ -9,8 +9,6 @@
 //! See the file `LICENSE.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use hex;
-use rand;
 use rand::Rng;
 use std::{convert::TryFrom, error, iter};
 use structopt::StructOpt;
@@ -19,7 +17,7 @@ use structopt::StructOpt;
 #[rustfmt::skip]
 const GF256_LOG: [u8; 256] = [
     0xff, 0x00, 0x19, 0x01, 0x32, 0x02, 0x1a, 0xc6,
-    0x4b, 0xc7, 0x1b, 0x68, 0x33, 0xee, 0xdf, 0x03, 
+    0x4b, 0xc7, 0x1b, 0x68, 0x33, 0xee, 0xdf, 0x03,
     0x64, 0x04, 0xe0, 0x0e, 0x34, 0x8d, 0x81, 0xef,
     0x4c, 0x71, 0x08, 0xc8, 0xf8, 0x69, 0x1c, 0xc1,
     0x7d, 0xc2, 0x1d, 0xb5, 0xf9, 0xb9, 0x27, 0x6a,
@@ -161,13 +159,14 @@ fn gf256_interpolate(xs: &[u8], ys: &[u8]) -> u8 {
             }
         }
 
-        y = y ^ gf256_mul(li, *y0);
+        y ^= gf256_mul(li, *y0);
     }
 
     y
 }
 
 /// generate n shares requiring k shares to reconstruct
+#[allow(clippy::needless_range_loop)]
 fn shares_generate(secret: &[u8], n: usize, k: usize) -> Vec<Vec<u8>> {
     let mut shares = vec![vec![]; n];
 
