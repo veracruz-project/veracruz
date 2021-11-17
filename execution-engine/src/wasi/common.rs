@@ -91,6 +91,7 @@ pub enum WasiAPIName {
     SOCK_RECV,
     SOCK_SEND,
     SOCK_SHUTDOWN,
+    _LAST,
 }
 
 impl TryFrom<&str> for WasiAPIName {
@@ -142,6 +143,23 @@ impl TryFrom<&str> for WasiAPIName {
             "sock_recv" => WasiAPIName::SOCK_RECV,
             "sock_send" => WasiAPIName::SOCK_SEND,
             "sock_shutdown" => WasiAPIName::SOCK_SHUTDOWN,
+            _otherwise => return Err(()),
+        };
+        Ok(rst)
+    }
+}
+
+/// List of Veracruz API.
+#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
+pub enum VeracruzAPIName {
+    FD_CREATE,
+}
+
+impl TryFrom<&str> for VeracruzAPIName {
+    type Error = ();
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let rst = match s {
+            "fd_create" => VeracruzAPIName::FD_CREATE,
             _otherwise => return Err(()),
         };
         Ok(rst)
@@ -845,6 +863,8 @@ impl WasiWrapper {
     pub(crate) const LINEAR_MEMORY_NAME: &'static str = "memory";
     /// The name of the containing module for all WASI imports.
     pub(crate) const WASI_SNAPSHOT_MODULE_NAME: &'static str = "wasi_snapshot_preview1";
+    /// The name of the containing module for Veracruz imports.
+    pub(crate) const VERACRUZ_SI_MODULE_NAME: &'static str = "veracruz_si";
 
     ////////////////////////////////////////////////////////////////////////////
     // Creating and modifying runtime states.
@@ -1922,6 +1942,16 @@ impl WasiWrapper {
         strace.arg_dec(socket);
         strace.arg_hex(sd_flag);
         strace.result(result)
+    }
+
+    /// This function, added for Veracruz, creates a new anonymous file.
+    pub(crate) fn fd_create<T: MemoryHandler>(
+        &mut self,
+        memory_ref: &mut T,
+        address: u32,
+    ) -> FileSystemResult<()> {
+        let new_fd = self.filesystem.fd_create()?;
+        memory_ref.write_u32(address, new_fd.into())
     }
 
     ///////////////////////////////////////

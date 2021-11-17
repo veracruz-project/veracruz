@@ -15,8 +15,8 @@ use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
         Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError,
-        HostFunctionIndexOrName, MemoryHandler, MemorySlice, MemorySliceMut, WasiAPIName,
-        WasiWrapper,
+        HostFunctionIndexOrName, MemoryHandler, MemorySlice, MemorySliceMut, VeracruzAPIName,
+        WasiAPIName, WasiWrapper,
     },
     Options,
 };
@@ -217,78 +217,110 @@ impl WasmtimeRuntimeState {
         let mut exports: Vec<Extern> = Vec::new();
 
         for import in module.imports() {
-            if import.module() != WasiWrapper::WASI_SNAPSHOT_MODULE_NAME {
-                return Err(FatalEngineError::InvalidWASMModule);
-            }
             let import_name = import.name().unwrap_or("");
-            let host_call_body = match WasiAPIName::try_from(import_name).map_err(|_| {
-                FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
-                    import_name.to_string(),
-                ))
-            })? {
-                WasiAPIName::ARGS_GET => Func::wrap(&store, Self::wasi_arg_get),
-                WasiAPIName::ARGS_SIZES_GET => Func::wrap(&store, Self::wasi_args_sizes_get),
-                WasiAPIName::ENVIRON_GET => Func::wrap(&store, Self::wasi_environ_get),
-                WasiAPIName::ENVIRON_SIZES_GET => Func::wrap(&store, Self::wasi_environ_size_get),
-                WasiAPIName::CLOCK_RES_GET => Func::wrap(&store, Self::wasi_clock_res_get),
-                WasiAPIName::CLOCK_TIME_GET => Func::wrap(&store, Self::wasi_clock_time_get),
-                WasiAPIName::FD_ADVISE => Func::wrap(&store, Self::wasi_fd_advise),
-                WasiAPIName::FD_ALLOCATE => Func::wrap(&store, Self::wasi_fd_allocate),
-                WasiAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
-                WasiAPIName::FD_DATASYNC => Func::wrap(&store, Self::wasi_fd_datasync),
-                WasiAPIName::FD_FDSTAT_GET => Func::wrap(&store, Self::wasi_fd_fdstat_get),
-                WasiAPIName::FD_FDSTAT_SET_FLAGS => {
-                    Func::wrap(&store, Self::wasi_fd_fdstat_set_flags)
+            match import.module() {
+                WasiWrapper::WASI_SNAPSHOT_MODULE_NAME => {
+                    let host_call_body = match WasiAPIName::try_from(import_name).map_err(|_| {
+                        FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
+                            import_name.to_string(),
+                        ))
+                    })? {
+                        WasiAPIName::ARGS_GET => Func::wrap(&store, Self::wasi_arg_get),
+                        WasiAPIName::ARGS_SIZES_GET => {
+                            Func::wrap(&store, Self::wasi_args_sizes_get)
+                        }
+                        WasiAPIName::ENVIRON_GET => Func::wrap(&store, Self::wasi_environ_get),
+                        WasiAPIName::ENVIRON_SIZES_GET => {
+                            Func::wrap(&store, Self::wasi_environ_size_get)
+                        }
+                        WasiAPIName::CLOCK_RES_GET => Func::wrap(&store, Self::wasi_clock_res_get),
+                        WasiAPIName::CLOCK_TIME_GET => {
+                            Func::wrap(&store, Self::wasi_clock_time_get)
+                        }
+                        WasiAPIName::FD_ADVISE => Func::wrap(&store, Self::wasi_fd_advise),
+                        WasiAPIName::FD_ALLOCATE => Func::wrap(&store, Self::wasi_fd_allocate),
+                        WasiAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
+                        WasiAPIName::FD_DATASYNC => Func::wrap(&store, Self::wasi_fd_datasync),
+                        WasiAPIName::FD_FDSTAT_GET => Func::wrap(&store, Self::wasi_fd_fdstat_get),
+                        WasiAPIName::FD_FDSTAT_SET_FLAGS => {
+                            Func::wrap(&store, Self::wasi_fd_fdstat_set_flags)
+                        }
+                        WasiAPIName::FD_FDSTAT_SET_RIGHTS => {
+                            Func::wrap(&store, Self::wasi_fd_fdstat_set_rights)
+                        }
+                        WasiAPIName::FD_FILESTAT_GET => {
+                            Func::wrap(&store, Self::wasi_fd_filestat_get)
+                        }
+                        WasiAPIName::FD_FILESTAT_SET_SIZE => {
+                            Func::wrap(&store, Self::wasi_fd_filestat_set_size)
+                        }
+                        WasiAPIName::FD_FILESTAT_SET_TIMES => {
+                            Func::wrap(&store, Self::wasi_fd_filestat_set_times)
+                        }
+                        WasiAPIName::FD_PREAD => Func::wrap(&store, Self::wasi_fd_pread),
+                        WasiAPIName::FD_PRESTAT_GET => {
+                            Func::wrap(&store, Self::wasi_fd_prestat_get)
+                        }
+                        WasiAPIName::FD_PRESTAT_DIR_NAME => {
+                            Func::wrap(&store, Self::wasi_fd_prestat_dir_name)
+                        }
+                        WasiAPIName::FD_PWRITE => Func::wrap(&store, Self::wasi_fd_pwrite),
+                        WasiAPIName::FD_READ => Func::wrap(&store, Self::wasi_fd_read),
+                        WasiAPIName::FD_READDIR => Func::wrap(&store, Self::wasi_fd_readdir),
+                        WasiAPIName::FD_RENUMBER => Func::wrap(&store, Self::wasi_fd_renumber),
+                        WasiAPIName::FD_SEEK => Func::wrap(&store, Self::wasi_fd_seek),
+                        WasiAPIName::FD_SYNC => Func::wrap(&store, Self::wasi_fd_sync),
+                        WasiAPIName::FD_TELL => Func::wrap(&store, Self::wasi_fd_tell),
+                        WasiAPIName::FD_WRITE => Func::wrap(&store, Self::wasi_fd_write),
+                        WasiAPIName::PATH_CREATE_DIRECTORY => {
+                            Func::wrap(&store, Self::wasi_path_create_directory)
+                        }
+                        WasiAPIName::PATH_FILESTAT_GET => {
+                            Func::wrap(&store, Self::wasi_path_filestat_get)
+                        }
+                        WasiAPIName::PATH_FILESTAT_SET_TIMES => {
+                            Func::wrap(&store, Self::wasi_path_filestat_set_times)
+                        }
+                        WasiAPIName::PATH_LINK => Func::wrap(&store, Self::wasi_path_link),
+                        WasiAPIName::PATH_OPEN => Func::wrap(&store, Self::wasi_path_open),
+                        WasiAPIName::PATH_READLINK => Func::wrap(&store, Self::wasi_path_readlink),
+                        WasiAPIName::PATH_REMOVE_DIRECTORY => {
+                            Func::wrap(&store, Self::wasi_path_remove_directory)
+                        }
+                        WasiAPIName::PATH_RENAME => Func::wrap(&store, Self::wasi_path_rename),
+                        WasiAPIName::PATH_SYMLINK => Func::wrap(&store, Self::wasi_path_symlink),
+                        WasiAPIName::PATH_UNLINK_FILE => {
+                            Func::wrap(&store, Self::wasi_path_unlink_file)
+                        }
+                        WasiAPIName::POLL_ONEOFF => Func::wrap(&store, Self::wasi_poll_oneoff),
+                        WasiAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
+                        WasiAPIName::PROC_RAISE => Func::wrap(&store, Self::wasi_proc_raise),
+                        WasiAPIName::SCHED_YIELD => Func::wrap(&store, Self::wasi_sched_yield),
+                        WasiAPIName::RANDOM_GET => Func::wrap(&store, Self::wasi_random_get),
+                        WasiAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
+                        WasiAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
+                        WasiAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
+                        WasiAPIName::_LAST => unreachable!(),
+                    };
+                    exports.push(Extern::Func(host_call_body))
                 }
-                WasiAPIName::FD_FDSTAT_SET_RIGHTS => {
-                    Func::wrap(&store, Self::wasi_fd_fdstat_set_rights)
+                WasiWrapper::VERACRUZ_SI_MODULE_NAME => {
+                    let host_call_body =
+                        match VeracruzAPIName::try_from(import_name).map_err(|_| {
+                            FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
+                                import_name.to_string(),
+                            ))
+                        })? {
+                            VeracruzAPIName::FD_CREATE => {
+                                Func::wrap(&store, Self::veracruz_si_fd_create)
+                            }
+                        };
+                    exports.push(Extern::Func(host_call_body))
                 }
-                WasiAPIName::FD_FILESTAT_GET => Func::wrap(&store, Self::wasi_fd_filestat_get),
-                WasiAPIName::FD_FILESTAT_SET_SIZE => {
-                    Func::wrap(&store, Self::wasi_fd_filestat_set_size)
+                _ => {
+                    return Err(FatalEngineError::InvalidWASMModule);
                 }
-                WasiAPIName::FD_FILESTAT_SET_TIMES => {
-                    Func::wrap(&store, Self::wasi_fd_filestat_set_times)
-                }
-                WasiAPIName::FD_PREAD => Func::wrap(&store, Self::wasi_fd_pread),
-                WasiAPIName::FD_PRESTAT_GET => Func::wrap(&store, Self::wasi_fd_prestat_get),
-                WasiAPIName::FD_PRESTAT_DIR_NAME => {
-                    Func::wrap(&store, Self::wasi_fd_prestat_dir_name)
-                }
-                WasiAPIName::FD_PWRITE => Func::wrap(&store, Self::wasi_fd_pwrite),
-                WasiAPIName::FD_READ => Func::wrap(&store, Self::wasi_fd_read),
-                WasiAPIName::FD_READDIR => Func::wrap(&store, Self::wasi_fd_readdir),
-                WasiAPIName::FD_RENUMBER => Func::wrap(&store, Self::wasi_fd_renumber),
-                WasiAPIName::FD_SEEK => Func::wrap(&store, Self::wasi_fd_seek),
-                WasiAPIName::FD_SYNC => Func::wrap(&store, Self::wasi_fd_sync),
-                WasiAPIName::FD_TELL => Func::wrap(&store, Self::wasi_fd_tell),
-                WasiAPIName::FD_WRITE => Func::wrap(&store, Self::wasi_fd_write),
-                WasiAPIName::PATH_CREATE_DIRECTORY => {
-                    Func::wrap(&store, Self::wasi_path_create_directory)
-                }
-                WasiAPIName::PATH_FILESTAT_GET => Func::wrap(&store, Self::wasi_path_filestat_get),
-                WasiAPIName::PATH_FILESTAT_SET_TIMES => {
-                    Func::wrap(&store, Self::wasi_path_filestat_set_times)
-                }
-                WasiAPIName::PATH_LINK => Func::wrap(&store, Self::wasi_path_link),
-                WasiAPIName::PATH_OPEN => Func::wrap(&store, Self::wasi_path_open),
-                WasiAPIName::PATH_READLINK => Func::wrap(&store, Self::wasi_path_readlink),
-                WasiAPIName::PATH_REMOVE_DIRECTORY => {
-                    Func::wrap(&store, Self::wasi_path_remove_directory)
-                }
-                WasiAPIName::PATH_RENAME => Func::wrap(&store, Self::wasi_path_rename),
-                WasiAPIName::PATH_SYMLINK => Func::wrap(&store, Self::wasi_path_symlink),
-                WasiAPIName::PATH_UNLINK_FILE => Func::wrap(&store, Self::wasi_path_unlink_file),
-                WasiAPIName::POLL_ONEOFF => Func::wrap(&store, Self::wasi_poll_oneoff),
-                WasiAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
-                WasiAPIName::PROC_RAISE => Func::wrap(&store, Self::wasi_proc_raise),
-                WasiAPIName::SCHED_YIELD => Func::wrap(&store, Self::wasi_sched_yield),
-                WasiAPIName::RANDOM_GET => Func::wrap(&store, Self::wasi_random_get),
-                WasiAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
-                WasiAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
-                WasiAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
-            };
-            exports.push(Extern::Func(host_call_body))
+            }
         }
 
         let instance = Instance::new(&store, &module, &exports)?;
@@ -814,6 +846,11 @@ impl WasmtimeRuntimeState {
         let sd_flag = convert_wasi_arg!(sd_flag, u8);
         let mut vfs = lock_vfs!();
         Self::convert_to_errno(vfs.sock_shutdown(&mut caller, socket, sd_flag))
+    }
+
+    fn veracruz_si_fd_create(mut caller: Caller, address: u32) -> u32 {
+        let mut vfs = lock_vfs!();
+        Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
 }
 
