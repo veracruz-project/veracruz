@@ -36,6 +36,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+
 ////////////////////////////////////////////////////////////////////////////////
 // Reading input
 ////////////////////////////////////////////////////////////////////////////////
@@ -119,7 +120,7 @@ fn normalize_data_inplace(dataset: &mut Dataset) -> anyhow::Result<()> {
         row.iter_mut()
             .zip(maximum_abs_values.iter())
             .for_each(|(d, m)| {
-                *d = *d / *m;
+                *d /= *m;
             })
     });
     Ok(())
@@ -127,17 +128,17 @@ fn normalize_data_inplace(dataset: &mut Dataset) -> anyhow::Result<()> {
 
 /// Returns the length of each row in the data set.  All rows are assumed to have the
 /// same length, and the input `dataset` is assumed to have at least one row.
-fn get_factor_len(dataset: &Dataset) -> anyhow::Result<usize> {
+fn get_factor_len(dataset: &[Vec<f64>]) -> anyhow::Result<usize> {
     match dataset.first() {
         // No element in the dataset
-        None => return Err(anyhow!("empty dataset")),
+        None => Err(anyhow!("empty dataset")),
         Some(first) => Ok(first.len()),
     }
 }
 
 /// Consumes `w_data` and `v_data` and returns updated values.
 fn plain_nlgd_iteration(
-    dataset: &Dataset,
+    dataset: &[Vec<f64>],
     w_data: Vec<f64>,
     v_data: Vec<f64>,
     approximate_degree: u64,
@@ -151,7 +152,7 @@ fn plain_nlgd_iteration(
 }
 
 /// Multply the matrix in dataset by `w_data`.
-fn plain_ip(dataset: &Dataset, data_vec: &[f64]) -> anyhow::Result<Vec<f64>> {
+fn plain_ip(dataset: &[Vec<f64>], data_vec: &[f64]) -> anyhow::Result<Vec<f64>> {
     if get_factor_len(&dataset)? != data_vec.len() {
         return Err(anyhow!("bad factor len"));
     }
@@ -167,14 +168,14 @@ fn plain_ip(dataset: &Dataset, data_vec: &[f64]) -> anyhow::Result<Vec<f64>> {
 }
 
 // Look-up tables for sigmoid computations.
-static DEGREE_3: &'static [f64] = &[-0.5, 0.15012, -0.001593];
-static DEGREE_5: &'static [f64] = &[-0.5, 0.19131, -0.0045963, 0.0000412332];
-static DEGREE_7: &'static [f64] = &[-0.5, 0.216884, -0.00819276, 0.000165861, -0.00000119581];
+static DEGREE_3: &[f64] = &[-0.5, 0.15012, -0.001593];
+static DEGREE_5: &[f64] = &[-0.5, 0.19131, -0.0045963, 0.0000412332];
+static DEGREE_7: &[f64] = &[-0.5, 0.216884, -0.00819276, 0.000165861, -0.00000119581];
 
 /// ASSUME approximate_degree == 3 or approximate_degree == 5 or approximate_degree == 7.
 /// Do scalar multiplication between ip_vec and DEGREE_* then multiply with dataset.
 fn plain_sigmoid(
-    dataset: &Dataset,
+    dataset: &[Vec<f64>],
     ip_vec: &[f64],
     approximate_degree: u64,
     gamma: f64,
@@ -231,7 +232,7 @@ fn plain_nlgd_step(
 }
 
 /// Calculate the quality of the result.
-fn calculate_auc(dataset: &Dataset, w_data: &[f64]) -> anyhow::Result<(f64, f64)> {
+fn calculate_auc(dataset: &[Vec<f64>], w_data: &[f64]) -> anyhow::Result<(f64, f64)> {
     let mut tn = 0.0 as f64;
     let mut fp = 0.0 as f64;
     let mut theta_tn = Vec::new();

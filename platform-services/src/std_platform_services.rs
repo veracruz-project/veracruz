@@ -16,13 +16,12 @@
 
 use super::result;
 
-use getrandom;
 use nix::{errno::Errno, sys::time::TimeValLike, time};
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the random number
 /// source provided by the host operating system, as provided by `getrandom`.
 pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
-    if let Ok(_) = getrandom::getrandom(buffer) {
+    if getrandom::getrandom(buffer).is_ok() {
         return result::Result::Success(());
     }
     result::Result::UnknownError

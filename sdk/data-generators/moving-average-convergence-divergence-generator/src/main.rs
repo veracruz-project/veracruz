@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for moving average convergence divergence algorithm")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Generate a vector of f64. In `generate` mode, it generates random data. In `external` mode, it reads the first [SIZE] numbers from an external data source.") 
+        .about("Generate a vector of f64. In `generate` mode, it generates random data. In `external` mode, it reads the first [SIZE] numbers from an external data source.")
         // Command for generate random data
         .subcommand(
             App::new("generate")
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut reader = csv::ReaderBuilder::new()
                 .delimiter(b',')
                 .has_headers(false)
-                .from_path(input_file.clone())?;
+                .from_path(input_file)?;
 
             let mut dataset = Vec::new();
             for record in reader.records() {

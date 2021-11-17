@@ -24,6 +24,8 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
+#![allow(clippy::type_complexity)]
+
 use anyhow::anyhow;
 use std::{
     fs,
@@ -119,17 +121,13 @@ fn dec(data: &[f64]) -> Vec<i32> {
                     let dec_point: f64 = if mul.abs() < f64::EPSILON || mul.is_sign_positive() {
                         0.0
                     } else {
-                        //  mul.is_sign_negative()
                         1.0
                     };
                     // decision
                     let decision = dec_point * (first - second);
                     if decision.abs() < f64::EPSILON {
                         0
-                    } else if decision.is_sign_negative() {
-                        1
                     } else {
-                        // is_sign_positive
                         1
                     }
                 }

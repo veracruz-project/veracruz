@@ -83,7 +83,7 @@ impl FromStr for Platform {
             "nitro" => Ok(Platform::Nitro),
             "icecap" => Ok(Platform::IceCap),
             "linux" => Ok(Platform::Linux),
-            _ => Err(PlatformError::InvalidPlatform(format!("{}", s))),
+            _ => Err(PlatformError::InvalidPlatform(String::from(s))),
         }
     }
 }

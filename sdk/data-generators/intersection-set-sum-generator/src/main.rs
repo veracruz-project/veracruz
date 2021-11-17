@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut adv: Vec<String> = customer
         .choose_multiple(&mut rng, difference as usize)
         .cloned()
-        .map(|(id, _)| id.to_string())
+        .map(|(id, _)| id)
         .collect();
     let mut extra: Vec<String> = (row..(row + row - difference))
         .map(|n| format!("{}", n))

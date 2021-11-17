@@ -393,7 +393,7 @@ impl ModuleImportResolver for WASMIRuntimeState {
             ))
         })?;
 
-        if !TypeCheck::check_signature(index.clone(), signature) {
+        if !TypeCheck::check_signature(index, signature) {
             Err(Error::Instantiation(format!(
                 "Function {} has an unexpected type-signature: {:?}.",
                 field_name, signature

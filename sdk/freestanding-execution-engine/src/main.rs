@@ -43,18 +43,17 @@ use wasi_types::Rights;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// About freestanding-execution-engine/Veracruz.
-const ABOUT: &'static str = "Veracruz: a platform for practical secure multi-party \
-                             computations.\nThis is freestanding-execution-engine, an offline \
-                             counterpart of the Veracruz execution engine that is part of the \
-                             Veracruz platform.  This can be used to test and develop WASM \
-                             programs before deployment on the platform.";
+const ABOUT: &str = "Veracruz: a platform for practical secure multi-party computations.\nThis is \
+                     freestanding-execution-engine, an offline counterpart of the Veracruz \
+                     execution engine that is part of the Veracruz platform.  This can be used to \
+                     test and develop WASM programs before deployment on the platform.";
 /// The name of the application.
-const APPLICATION_NAME: &'static str = "freestanding-execution-engine";
+const APPLICATION_NAME: &str = "freestanding-execution-engine";
 /// The authors list.
-const AUTHORS: &'static str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in \
-                               the Veracruz root directory for detailed authorship information.";
+const AUTHORS: &str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in the \
+                       Veracruz root directory for detailed authorship information.";
 /// Application version number.
-const VERSION: &'static str = "pre-alpha";
+const VERSION: &str = "pre-alpha";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -229,7 +228,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         None => Vec::new(),
         Some(x) =>
             x.map(|e| {
-                let n = e.find("=").unwrap();
+                let n = e.find('=').unwrap();
                 (e[0..n].to_string(), e[n + 1..].to_string())
             })
             .collect(),
@@ -257,7 +256,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
 fn load_input_sources(
-    input_sources: &Vec<String>, vfs: &mut FileSystem,
+    input_sources: &[String], vfs: &mut FileSystem,
 ) -> Result<(), Box<dyn Error>> {
     for file_path in input_sources.iter() {
         let file_path = Path::new(file_path);
@@ -341,7 +340,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         environment_variables: cmdline.environment_variables,
         program_arguments: cmdline.program_arguments,
         enable_clock: cmdline.enable_clock,
-        ..Default::default()
     };
     let program = vfs.read_file_by_absolute_path(prog_file_abs_path)?;
     let return_code = execute(
@@ -361,7 +359,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "---- stdout dump ----\n{}---- stdout dump end ----\n",
             stdout_dump
         );
-       std::io::stdout().flush()?;
+        std::io::stdout().flush()?;
     }
 
     // Dump contents of stderr

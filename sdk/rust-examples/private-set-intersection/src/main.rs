@@ -49,8 +49,8 @@ fn read_inputs() -> anyhow::Result<Vec<HashSet<Person>>> {
 fn set_intersection(sets: &[HashSet<Person>]) -> HashSet<Person> {
     let mut result = HashSet::new();
 
-    if sets.len() == 0 {
-        return result;
+    if sets.is_empty() {
+        result
     } else {
         result = sets[0].clone();
         let tail = &sets[1..sets.len()];

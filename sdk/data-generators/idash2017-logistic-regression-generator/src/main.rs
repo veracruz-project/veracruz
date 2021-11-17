@@ -207,7 +207,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 })
                 .collect();
             let mut header: Vec<String> = (0..column + 1).map(|n| format!("Col{}", n)).collect();
-            header[0] = format!("Y");
+            header[0] = String::from("Y");
             (file_prefix.to_string(), header, dataset)
         }
         ("external", Some(sub_args)) => {
@@ -343,7 +343,11 @@ fn read_csv(filename: &str, is_y_first: bool) -> Result<(Vec<String>, Dataset), 
     Ok((header, rst))
 }
 
-fn write_csv(filename: &str, header: &[String], dataset: &Dataset) -> Result<(), Box<dyn Error>> {
+fn write_csv(
+    filename: &str,
+    header: &[String],
+    dataset: &[Vec<f64>],
+) -> Result<(), Box<dyn Error>> {
     let mut wtr = csv::WriterBuilder::new().from_path(filename)?;
     wtr.serialize(header)?;
     for data in dataset.iter() {
