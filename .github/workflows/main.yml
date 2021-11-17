@@ -21,6 +21,11 @@ jobs:
 
     steps:
 
+      # Remove pre-installed .Net, Android, and Glasgow Haskell Compiler
+      - name: Free-up disk space
+        id: disk-space
+        run: sudo rm -rf /usr/local/share/boost && sudo rm -rf /usr/share/dotnet && sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/ghc
+
       # Check out the repo, using the action from github
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -59,6 +64,11 @@ jobs:
 
     steps:
 
+      # Remove pre-installed .Net, Android, and Glasgow Haskell Compiler
+      - name: Free-up disk space
+        id: disk-space
+        run: sudo rm -rf /usr/local/share/boost && sudo rm -rf /usr/share/dotnet && sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/ghc
+
       # Download the artifact containing repo and sdk artifact, using the action from github
       - name: Download veracruz cache artifact
         uses: actions/download-artifact@v2
@@ -76,10 +86,11 @@ jobs:
 
       # Run the sgx test
       - name: Running sgx test script
-        id: sgx-test
+        id: sgx-build-and-test
         run: |
             cd /work/veracruz
             make sgx
+            make sgx-cli
             make sgx-veracruz-server-test-dry-run
             make sgx-veracruz-test-dry-run
             make sgx-veracruz-client-test
@@ -93,6 +104,11 @@ jobs:
     needs: [check-repo-and-compile-sdk]
 
     steps:
+
+      # Remove pre-installed .Net, Android, and Glasgow Haskell Compiler
+      - name: Free-up disk space
+        id: disk-space
+        run: sudo rm -rf /usr/local/share/boost && sudo rm -rf /usr/share/dotnet && sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/ghc
 
       # Download the artifact containing repo and sdk artifact, using the action from github
       - name: Download veracruz cache artifact
@@ -110,7 +126,7 @@ jobs:
             rm veracruz.tar
 
       - name: Running trustzone test script
-        id: tz-test
+        id: tz-build-and-test
         run: |
             cd /work/rust-optee-trustzone-sdk
             . ./environment
@@ -129,6 +145,11 @@ jobs:
         - ${{ github.workspace }}:/work/veracruz
     needs: [check-repo-and-compile-sdk]
     steps:
+      # Remove pre-installed .Net, Android, and Glasgow Haskell Compiler
+      - name: Free-up disk space
+        id: disk-space
+        run: sudo rm -rf /usr/local/share/boost && sudo rm -rf /usr/share/dotnet && sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/ghc
+
       # Download the artifact containing repo and sdk artifact, using the action from github
       - name: Download veracruz cache artifact
         uses: actions/download-artifact@v2
@@ -137,7 +158,7 @@ jobs:
           path: /
       # Unpack
       - name: Unpack veracruz cache artifact
-        id: tz-unpack
+        id: linux-unpack
         run: |
             cd /
             mkdir -p /work/veracruz
@@ -146,10 +167,11 @@ jobs:
             tar -xvf veracruz.tar
             rm veracruz.tar
       - name: Running linux test script
-        id: linux-test
+        id: linux-build-and-test
         run: |
             cd /work/veracruz
             make linux
+            make linux-cli
             make linux-veracruz-server-test
             make linux-veracruz-test
             make linux-veracruz-client-test
@@ -168,6 +190,34 @@ jobs:
       - name: Build and test Veracruz on IceCap
         run: bash /work/veracruz/icecap/ci/run.sh
 
+  nitro:
+     runs-on: ubuntu-latest
+     container:
+       image: ghcr.io/veracruz-project/veracruz/veracruz-nitro:latest
+       volumes: 
+         - ${{ github.workspace }}:/work/veracruz 
+     needs: [check-repo-and-compile-sdk]
 
+     steps:
 
-
+       # Download the artifact containing repo and sdk artifact, using the action from github
+       - name: Download veracruz cache artifact
+         uses: actions/download-artifact@v2
+         with:
+           name: veracruz.tar
+           path: /
+       # Unpack
+       - name: Unpack veracruz cache artifact
+         id: nitro-unpack
+         run: |
+             cd /
+             mkdir -p /work/veracruz
+             tar -C /work/veracruz -xvf veracruz.tar
+             rm veracruz.tar
+       
+       - name: Running Nitro test script
+         id: nitro-build
+         run: |
+             cd /work/veracruz
+             make nitro
+             make nitro-cli
