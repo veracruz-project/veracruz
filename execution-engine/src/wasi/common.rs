@@ -18,7 +18,7 @@
 #![allow(non_camel_case_types, clippy::too_many_arguments)]
 
 use crate::{
-    fs::{FileSystem, FileSystemResult},
+    fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
     Options,
 };
 
@@ -562,7 +562,7 @@ pub trait MemoryHandler  {
 
     /// Write the `buffer` to `address`.
     fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()> {
-        self.get_slice_mut(address, u32::try_from(buffer.len()).unwrap())?
+        self.get_slice_mut(address, u32::try_from_or_errno(buffer.len())?)?
             .as_mut()
             .copy_from_slice(buffer);
         Ok(())
@@ -571,7 +571,7 @@ pub trait MemoryHandler  {
     /// Read into the `buffer` from `address`.
     fn read_buffer(&self, address: u32, buffer: &mut [u8]) -> FileSystemResult<()> {
         buffer.copy_from_slice(
-            self.get_slice(address, u32::try_from(buffer.len()).unwrap())?
+            self.get_slice(address, u32::try_from_or_errno(buffer.len())?)?
                 .as_ref()
         );
         Ok(())
@@ -580,7 +580,7 @@ pub trait MemoryHandler  {
     /// Reads a string at `address` of `length` from the runtime state's memory,
     /// starting at base address `address`.  If it fails, return ErrNo.
     fn read_cstring(&self, address: u32, length: u32) -> FileSystemResult<String> {
-        let mut bytes = vec![0u8; usize::try_from(length).unwrap()];
+        let mut bytes = vec![0u8; usize::try_from_or_errno(length)?];
         self.read_buffer(address, &mut bytes)?;
         let rst = String::from_utf8(bytes).map_err(|_e| ErrNo::IlSeq)?;
         Ok(rst)
@@ -658,8 +658,8 @@ pub trait MemoryHandler  {
         let slices = (0..count).map(|i| -> FileSystemResult<&'a [u8]> {
             let iovec = IoVec::unpack(
                 &memory.as_ref()[
-                    usize::try_from(address + i*IoVec::SIZE).unwrap()
-                        .. usize::try_from(address + (i+1)*IoVec::SIZE).unwrap()
+                    usize::try_from_or_errno(address + i*IoVec::SIZE)?
+                        .. usize::try_from_or_errno(address + (i+1)*IoVec::SIZE)?
                 ]
             )?;
 
@@ -703,8 +703,8 @@ pub trait MemoryHandler  {
             // on the `MemorySlice` and `Bound` traits/types
             //
             let slice = &memory.as_ref()[
-                usize::try_from(iovec.buf).unwrap()
-                    .. usize::try_from(iovec.buf+iovec.len).unwrap()
+                usize::try_from_or_errno(iovec.buf)?
+                    .. usize::try_from_or_errno(iovec.buf+iovec.len)?
             ];
             Ok(unsafe { mem::transmute::<&'_ [u8], &'a [u8]>(slice) })
         });
@@ -745,8 +745,8 @@ pub trait MemoryHandler  {
         let slices = (0..count).map(|i| -> FileSystemResult<&'a mut [u8]> {
             let iovec = IoVec::unpack(
                 &memory.as_mut()[
-                    usize::try_from(address + i*IoVec::SIZE).unwrap()
-                        .. usize::try_from(address + (i+1)*IoVec::SIZE).unwrap()
+                    usize::try_from_or_errno(address + i*IoVec::SIZE)?
+                        .. usize::try_from_or_errno(address + (i+1)*IoVec::SIZE)?
                 ]
             )?;
 
@@ -769,8 +769,8 @@ pub trait MemoryHandler  {
             // happen is malformed iovecs get malformed data back.
             //
             let slice = &mut memory.as_mut()[
-                usize::try_from(iovec.buf).unwrap()
-                    .. usize::try_from(iovec.buf+iovec.len).unwrap()
+                usize::try_from_or_errno(iovec.buf)?
+                    .. usize::try_from_or_errno(iovec.buf+iovec.len)?
             ];
             Ok(unsafe { mem::transmute::<&'_ mut [u8], &'a mut [u8]>(slice) })
         });

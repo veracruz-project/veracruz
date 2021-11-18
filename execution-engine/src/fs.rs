@@ -171,7 +171,7 @@ impl InodeImpl {
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemResult<()> {
         match self {
             Self::File(file) => {
-                file.resize(try_from_or_errno(size)?, fill_byte);
+                file.resize(<_>::try_from_or_errno(size)?, fill_byte);
                 Ok(())
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
@@ -186,7 +186,7 @@ impl InodeImpl {
             Self::Directory(_) => return Err(ErrNo::IsDir),
         };
         // NOTE: It should be safe to convert a u64 to usize.
-        let offset = try_from_or_errno(offset)?;
+        let offset = <_>::try_from_or_errno(offset)?;
         //          offset
         //             v
         // ---------------------------------------------
@@ -210,7 +210,7 @@ impl InodeImpl {
             Self::Directory(_) => return Err(ErrNo::IsDir),
         };
         // NOTE: It should be safe to convert a u64 to usize.
-        let offset = try_from_or_errno(offset)?;
+        let offset = <_>::try_from_or_errno(offset)?;
         //          offset
         //             v  .. remain_length .. v
         // ----------------------------------------------
@@ -301,9 +301,9 @@ impl InodeImpl {
             #[cfg(not(feature = "icecap"))]
             let path_byte = path.as_os_str().as_bytes().to_vec();
             let dir_ent = DirEnt {
-                next: (try_from_or_errno::<usize, u64>(index)? + 1u64).into(),
+                next: (u64::try_from_or_errno(index)? + 1u64).into(),
                 inode: *inode,
-                name_len: try_from_or_errno(path_byte.len())?,
+                name_len: <_>::try_from_or_errno(path_byte.len())?,
                 file_type: inode_table.get(&inode)?.file_stat.file_type,
             };
             rst.push((dir_ent, path_byte))
@@ -550,7 +550,7 @@ impl InodeTable {
             inode: new_inode,
             file_type: FileType::RegularFile,
             num_links: 0,
-            file_size: try_from_or_errno(file_size)?,
+            file_size: <_>::try_from_or_errno(file_size)?,
             atime: Timestamp::from_nanos(0),
             mtime: Timestamp::from_nanos(0),
             ctime: Timestamp::from_nanos(0),
@@ -706,7 +706,7 @@ impl FileSystem {
                 _otherwise => continue,
             };
             let rights =
-                Rights::from_bits(try_from_or_errno(*std_stream.rights())?).ok_or(ErrNo::Inval)?;
+                Rights::from_bits(<_>::try_from_or_errno(*std_stream.rights())?).ok_or(ErrNo::Inval)?;
             self.install_fd(
                 fd_number,
                 FileType::RegularFile,
@@ -733,7 +733,7 @@ impl FileSystem {
                 match file {
                     // Extract right associated to stdin stdout stderr
                     Some(path) if path == "stdin" || path == "stdout" || path == "stderr" => {
-                        let rights_u32 = match try_from_or_errno::<u64, u32>(u64::from(rights)) {
+                        let rights_u32 = match u32::try_from_or_errno(u64::from(rights)) {
                             Ok(o) => o,
                             Err(_) => return None,
                         };
@@ -755,7 +755,7 @@ impl FileSystem {
             k != Path::new("stdin") && k != Path::new("stdout") && k != Path::new("stderr")
         });
         for (index, (path, rights)) in rights_table_without_std.enumerate() {
-            let new_fd = Fd(try_from_or_errno::<usize, u32>(index)? + first_fd);
+            let new_fd = Fd(u32::try_from_or_errno(index)? + first_fd);
             let path = path.as_ref();
             // strip off the root
             let relative_path = path.strip_prefix("/").unwrap_or(path);
@@ -779,7 +779,7 @@ impl FileSystem {
         }
         // Set the next_fd_candidate, it might waste few FDs.
         self.next_fd_candidate =
-            Fd(Self::FIRST_FD.0 + try_from_or_errno::<usize, u32>(rights_table.len())?);
+            Fd(Self::FIRST_FD.0 + u32::try_from_or_errno(rights_table.len())?);
 
         Ok(())
     }
@@ -1009,7 +1009,7 @@ impl FileSystem {
         let mut len = 0;
         for buf in bufs {
             let delta = f.read_file(buf.as_mut(), offset)?;
-            offset += u64::try_from(delta).unwrap();
+            offset += u64::try_from_or_errno(delta)?;
             len += delta;
         }
 
@@ -1021,7 +1021,7 @@ impl FileSystem {
     pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemResult<Prestat> {
         let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
         let resource_type = PreopenType::Dir {
-            name_len: try_from_or_errno(path.as_os_str().len())?,
+            name_len: <_>::try_from_or_errno(path.as_os_str().len())?,
         };
         Ok(Prestat { resource_type })
     }
@@ -1055,7 +1055,7 @@ impl FileSystem {
         let mut len = 0;
         for buf in bufs {
             let delta = f.write_file(buf.as_ref(), offset)?;
-            offset += u64::try_from(delta).unwrap();
+            offset += u64::try_from_or_errno(delta)?;
             len += delta;
         }
 
@@ -1091,7 +1091,7 @@ impl FileSystem {
             let inode_table = self.lock_inode_table()?;
             inode_table.get(&dir_inode)?.read_dir(&inode_table)?
         };
-        let cookie = try_from_or_errno(cookie.0)?;
+        let cookie = <_>::try_from_or_errno(cookie.0)?;
         if dirs.len() < cookie {
             return Ok(Vec::new());
         }
@@ -1133,7 +1133,7 @@ impl FileSystem {
         // NOTE: Ensure the computation does not overflow.
         let new_offset: FileSize = if delta >= 0 {
             // It is safe to convert a positive i64 to u64.
-            let t_offset = new_base_offset + try_from_or_errno::<i64, u64>(delta.abs())?;
+            let t_offset = new_base_offset + u64::try_from_or_errno(delta.abs())?;
             // If offset is greater the file size, then expand the file.
             if t_offset > file_size {
                 self.fd_filestat_set_size(fd, t_offset)?;
@@ -1141,10 +1141,10 @@ impl FileSystem {
             t_offset
         } else {
             // It is safe to convert a positive i64 to u64.
-            if try_from_or_errno::<i64, u64>(delta.abs())? > new_base_offset {
+            if u64::try_from_or_errno(delta.abs())? > new_base_offset {
                 return Err(ErrNo::SPipe);
             }
-            new_base_offset - try_from_or_errno::<i64, u64>(delta.abs())?
+            new_base_offset - u64::try_from_or_errno(delta.abs())?
         };
 
         // Update the offset
@@ -1659,6 +1659,16 @@ impl FileSystem {
         Ok(vec)
     }
 }
-fn try_from_or_errno<T, K: TryFrom<T>>(i: T) -> FileSystemResult<K> {
-    K::try_from(i).map_err(|_| ErrNo::Inval)
+
+pub(crate) trait TryFromOrErrNo<T>: Sized {
+    fn try_from_or_errno(t: T) -> FileSystemResult<Self>;
+}
+
+impl<T, U> TryFromOrErrNo<T> for U
+where
+    U: TryFrom<T> + Sized
+{
+    fn try_from_or_errno(t: T) -> FileSystemResult<Self> {
+        Self::try_from(t).map_err(|_| ErrNo::Inval)
+    }
 }
