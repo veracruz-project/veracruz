@@ -153,7 +153,12 @@ impl TryFrom<&str> for WasiAPIName {
 
 /// Unpack a sequence of `bytes` and return a `T`.
 pub trait Unpack: Sized {
+    /// Size in bytes of the structure in the Wasm memory space. Note that this
+    /// may be different than the resulting type since it is in a different
+    /// memory space on a machine that likely has different pointer sizes.
     const SIZE: u32;
+
+    /// Unpack the `T`
     fn unpack(bytes: &[u8]) -> FileSystemResult<Self>;
 }
 
@@ -386,7 +391,7 @@ const IOVECSLICES_SOO_COUNT: usize = 2;
 /// This indirection is needed to hold the MemoryHandler::Slice type which
 /// needs to be stored somewhere
 ///
-/// This may allocated, though most iovecs are fairly small. As an extra
+/// This may allocate, though most iovecs are fairly small. As an extra
 /// optimization, if there are only 1 or 2 iovecs, these are stored directly
 /// in the struct with no allocation. 1 iovec is the most common, though
 /// 2 iovecs is used sometimes for things like appending newlines to stdout.
@@ -427,7 +432,7 @@ impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
 /// This indirection is needed to hold the MemoryHandler::SliceMut type which
 /// needs to be stored somewhere
 ///
-/// This may allocated, though most iovecs are fairly small. As an extra
+/// This may allocate, though most iovecs are fairly small. As an extra
 /// optimization, if there are only 1 or 2 iovecs, these are stored directly
 /// in the struct with no allocation. 1 iovec is the most common, though
 /// 2 iovecs is used sometimes for things like appending newlines to stdout.
@@ -923,7 +928,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `args_sizes_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn args_sizes_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -941,7 +946,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `environ_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn environ_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -960,7 +965,7 @@ impl WasiWrapper {
     }
 
     /// THe implementation of the WASI `environ_sizes_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn environ_sizes_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -980,7 +985,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `clock_res_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn clock_res_get<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1001,7 +1006,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn clock_time_get<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1023,7 +1028,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_advise<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1038,7 +1043,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_allocate` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_allocate<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1072,7 +1077,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_fdstat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_fdstat_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -1084,7 +1089,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_fdstat_set_flags` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_fdstat_set_flags<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1097,7 +1102,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_fdstat_set_rights` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_fdstat_set_rights<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1113,7 +1118,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_filestat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_filestat_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -1137,7 +1142,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_filestat_set_times` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_filestat_set_times<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1157,7 +1162,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_pread<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1193,7 +1198,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_prestat_dir_name` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_prestat_dir_name<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1215,7 +1220,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_pwrite` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_pwrite<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1237,7 +1242,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_read` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_read<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1257,7 +1262,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_readdir` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_readdir<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1328,7 +1333,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_tell` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_tell<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -1340,7 +1345,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `fd_write` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn fd_write<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1360,7 +1365,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_create_directory` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_create_directory<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1374,7 +1379,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_filestat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_filestat_get<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1392,7 +1397,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_filestat_set_times` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_filestat_set_times<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1420,7 +1425,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_link<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1441,7 +1446,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_open` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_open<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1476,7 +1481,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_readlink` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_readlink<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1503,7 +1508,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_remove_directory` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_remove_directory<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1517,7 +1522,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_rename` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_rename<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1536,7 +1541,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_symlink` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_symlink<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1553,7 +1558,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `path_unlink_file` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn path_unlink_file<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1567,7 +1572,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `poll_oneoff` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn poll_oneoff<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1624,7 +1629,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn sock_recv<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1650,7 +1655,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `sock_send` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn sock_send<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1673,7 +1678,7 @@ impl WasiWrapper {
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.                  
+    /// interact with the execution engine.
     pub(crate) fn sock_shutdown<T: MemoryHandler>(
         &mut self,
         _: &mut T,
