@@ -23,7 +23,7 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::{
     cmp::min,
     collections::HashMap,
-    convert::{AsRef, TryFrom, TryInto},
+    convert::{AsRef, TryFrom},
     ffi::OsString,
     // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
     // potential utf-8 encoding check

@@ -18,7 +18,7 @@ use crate::{
     Options,
 };
 use num::FromPrimitive;
-use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
+use std::{boxed::Box, convert::TryFrom, mem, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef, HostError,
@@ -45,22 +45,55 @@ impl MemoryHandler for MemoryRef {
 
     fn get_slice<'a>(
         &'a self,
-        _address: u32,
-        _length: u32
+        address: u32,
+        length: u32
     ) -> FileSystemResult<Bound<'a, Self::Slice>> {
-        todo!()
+        let address = usize::try_from(address).unwrap();
+        let length = usize::try_from(length).unwrap();
+        // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
+        // this function, `direct_access`, that allows access through an `impl AsRef<[u8]>`.
+        // For now the best we can do is a bit of unsafe code.
+        //
+        // Note that MemoryRef is already not threadsafe, so we don't have to worry
+        // about locking.
+        //
+        Ok(Bound::new(
+            self.with_direct_access(|slice| {
+                let slice = &slice[address .. address+length];
+                unsafe {
+                    mem::transmute::<&'_ [u8], &'static [u8]>(slice)
+                }
+            })
+        ))
     }
 
     fn get_slice_mut<'a>(
         &'a mut self,
-        _address: u32,
-        _length: u32
+        address: u32,
+        length: u32
     ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
-        todo!()
+        let address = usize::try_from(address).unwrap();
+        let length = usize::try_from(length).unwrap();
+        // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
+        // this function, `direct_access`, that allows access through an `impl AsRef<[u8]>`.
+        // For now the best we can do is a bit of unsafe code.
+        //
+        // Note that MemoryRef is already not threadsafe, so we don't have to worry
+        // about locking.
+        //
+        Ok(BoundMut::new(
+            self.with_direct_access_mut(|slice| {
+                let slice = &mut slice[address .. address+length];
+                unsafe {
+                    mem::transmute::<&'_ mut [u8], &'static mut [u8]>(slice)
+                }
+            })
+        ))
     }
 
     fn get_size(&self) -> FileSystemResult<u32> {
-        todo!()
+        let bytes = wasmi::memory_units::Bytes::from(self.current_size()).0;
+        Ok(u32::try_from(bytes).unwrap())
     }
 }
 
