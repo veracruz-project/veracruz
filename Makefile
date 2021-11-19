@@ -302,6 +302,31 @@ clean:
 	$(MAKE) clean -C linux-root-enclave
 	rm -rf bin
 
+# clean-quick cleans everything but LLVM (in wasm-checker)
+quick-clean:
+	# remove databases since these can easily fall out of date
+	rm -f proxy-attestation-server/proxy-attestation-server.db
+	rm -f veracruz-server-test/proxy-attestation-server.db
+	rm -f veracruz-test/proxy-attestation-server.db
+	# clean code
+	cd runtime-manager-bind && cargo clean 
+	cd sgx-root-enclave-bind && cargo clean
+	cd psa-attestation && cargo clean
+	cd proxy-attestation-server && cargo clean
+	cd session-manager && cargo clean
+	cd veracruz-utils && cargo clean
+	cd veracruz-server-test && cargo clean
+	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
+	cd nitro-root-enclave-server && cargo clean
+	$(MAKE) clean -C runtime-manager
+	$(MAKE) clean -C sgx-root-enclave
+	$(MAKE) clean -C veracruz-server
+	$(MAKE) clean -C test-collateral 
+	$(MAKE) clean -C trustzone-root-enclave
+	$(MAKE) quick-clean -C sdk
+	$(MAKE) clean -C nitro-root-enclave
+	rm -rf bin
+
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
 	$(MAKE) -C sdk clean
