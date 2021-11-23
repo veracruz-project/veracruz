@@ -9,10 +9,6 @@ rustflags = [
     "-C", "link-dead-code",
 ]
 
-[target.aarch64-unknown-linux-gnu]
-linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc"
-ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc-ar"
-
 [target.arm-unknown-optee-trustzone]
 linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-ld.bfd"
 ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-ar"
@@ -23,7 +19,3 @@ rustflags = [
     "-C", "link-arg=-pie",
     "-C", "link-dead-code",
 ]
-
-[target.arm-unknown-linux-gnueabihf]
-linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc"
-ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-gcc-ar"

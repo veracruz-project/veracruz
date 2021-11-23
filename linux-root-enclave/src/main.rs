@@ -564,13 +564,18 @@ fn native_attestation(
     let mut token_buffer = Vec::with_capacity(1024);
     let mut token_size = 0u64;
 
+    #[cfg(target_arch = "aarch64")]
+    let enclave_name = std::ptr::null() as *const u8;
+    #[cfg(target_arch = "x86_64")]
+    let enclave_name = std::ptr::null() as *const i8;
+
     if 0 != unsafe {
         psa_initial_attest_get_token(
             LINUX_ROOT_ENCLAVE_MEASUREMENT.as_ptr() as *const u8,
             LINUX_ROOT_ENCLAVE_MEASUREMENT.len() as u64,
             csr_hash.as_ptr() as *const u8,
             csr_hash.len() as u64,
-            std::ptr::null() as *const i8,
+            enclave_name,
             0,
             challenge.as_ptr() as *const u8,
             challenge.len() as u64,
