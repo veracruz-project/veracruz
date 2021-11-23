@@ -14,14 +14,14 @@ tz = ["base64/std"]
 
 [dependencies]
 base64 = { version = "0.13.0", default-features = false, optional = true }
-bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
+bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz-v1", default-features = false, optional = true }
 byteorder = { version = "1.3", optional = true }
 curl = "=0.4.35"
 err-derive = "0.2"
 log = "=0.4.13"
 nix = { version = "0.15", optional = true }
 openssl-sys = "=0.9.70"
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", default-features = false }
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz-v1", features = ["derive"] }
+serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz-v1", default-features = false }
 stringreader = "0.1"
 transport-protocol = { path = "../transport-protocol" }

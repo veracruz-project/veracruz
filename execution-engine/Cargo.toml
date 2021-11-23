@@ -35,7 +35,7 @@ tz = [
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
-byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch = "veracruz" }
+byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch = "veracruz-v1" }
 cfg-if = "1"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
@@ -45,13 +45,13 @@ num-traits = { version = "0.2", default-features = false }
 pinecone = "0.2"
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
-sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
-sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
-typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
-wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
-wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz-v1", features = ["derive"] }
+sgx_alloc = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }
+sgx_tstd = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }
+typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz-v1" }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz-v1" }
+wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz-v1" }
+wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz-v1", optional = true }
 wast = "=35.0.0"
 
 [lib]
@@ -59,4 +59,4 @@ name = "execution_engine"
 path = "./src/lib.rs"
 
 [patch.crates-io]
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz-v1", features = ["derive"] }

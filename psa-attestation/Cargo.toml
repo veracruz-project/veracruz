@@ -19,7 +19,7 @@ sgx = []
 tz = []
 
 [dependencies]
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz-v1" }
 
 [build-dependencies]
 bindgen = "0.53.1"
