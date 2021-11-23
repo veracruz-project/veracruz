@@ -16,7 +16,6 @@ icecap = [
   "veracruz-utils/icecap",
   "psa-attestation",
   "bincode",
-  "serde/derive",
   "policy-utils/icecap",
   "io-utils/icecap",
 ]
