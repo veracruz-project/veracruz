@@ -12,14 +12,12 @@ icecap = [
   "proxy-attestation-server/icecap",
   "policy-utils/icecap",
   "veracruz-utils/icecap",
-  "psa-attestation/icecap",
 ]
 linux = [
   "veracruz-server/linux",
   "policy-utils/std",
   "veracruz-utils/linux",
   "proxy-attestation-server/linux",
-  "psa-attestation/linux",
 ]
 nitro = ["veracruz-server/nitro", "proxy-attestation-server/nitro", "policy-utils/std", "veracruz-utils/nitro"]
 sgx = [
@@ -29,7 +27,6 @@ sgx = [
   "veracruz-server/sgx",
   "proxy-attestation-server/sgx",
   "transport-protocol/sgx_attestation",
-  "psa-attestation/sgx",
   "policy-utils/std",
   "veracruz-utils/std",
 ]
@@ -37,7 +34,6 @@ tz = [
   "veracruz-server/tz",
   "proxy-attestation-server/tz",
   "transport-protocol/tz",
-  "psa-attestation/tz",
   "policy-utils/std",
   "veracruz-utils/std",
 ]
@@ -49,38 +45,23 @@ debug = ["veracruz-server/debug"]
 
 [dependencies]
 actix-rt = "1.1.1"
-base64 = "0.10.1"
 curl = "=0.4.35"
 env_logger = "0.7"
-futures = "0.3"
 hex = "=0.4.2"
 http = "=0.2.4"
 lazy_static = "1.4"
-local_ipaddress = "0.1.3"
 log = "=0.4.13"
-openssl = "0.10.24"
-percent-encoding = "2.1.0"
-pinecone = "0.2"
 policy-utils = { path = "../policy-utils", optional = true }
-protobuf = "2.6"
 proxy-attestation-server = { path = "../proxy-attestation-server" }
-psa-attestation = { path = "../psa-attestation" }
-rand = "0.7.0"
-regex = "1.4"
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
-serde_json = "1.0"
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_ucrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_urts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-stringreader = "0.1.1"
 transport-protocol = { path = "../transport-protocol" }
-untrusted = "0.6.2"
 veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
-webpki-roots = { git = "https://github.com/veracruz-project/webpki-roots.git", branch = "veracruz" }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
 sgx_alloc = { branch = "veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }

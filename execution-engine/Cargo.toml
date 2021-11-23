@@ -16,12 +16,22 @@ sgx = [
   "platform-services/sgx",
   "serde/mesalock_sgx",
   "typetag/mesalock_sgx",
-  "ring/mesalock_sgx",
   "policy-utils/sgx",
   "wasi-types/sgx",
 ]
-std = ["wasmi/non_sgx", "platform-services/std", "wasmtime", "ring/non_sgx", "policy-utils/std", "wasi-types/std"]
-tz = ["platform-services/tz", "wasmi/non_sgx", "ring/non_sgx", "policy-utils/tz", "wasi-types/std"]
+std = [
+  "wasmi/non_sgx",
+  "platform-services/std",
+  "wasmtime",
+  "policy-utils/std",
+  "wasi-types/std"
+]
+tz = [
+  "platform-services/tz",
+  "wasmi/non_sgx",
+  "policy-utils/tz",
+  "wasi-types/std"
+]
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
@@ -35,7 +45,6 @@ num-traits = { version = "0.2", default-features = false }
 pinecone = "0.2"
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
 sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }

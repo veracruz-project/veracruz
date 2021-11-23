@@ -9,7 +9,6 @@ version = "0.3.0"
 [dependencies]
 anyhow = "1.0.14"
 pinecone = { version = "0.2.3", features = ["use-std"] }
-serde = { version = "1.0.3", features = ["derive"] }
 
 [profile.release]
 codegen-units = 1

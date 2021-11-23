@@ -10,4 +10,5 @@ version = "0.3.0"
 bitflags = "=1.2.1"
 clap = "2.33"
 pinecone = "0.2"
+# Required for std::error::Error from pinecone
 serde = { version = "1.0.103", features = ["derive"] }
