@@ -21,6 +21,7 @@ icecap = [
   "policy-utils/icecap",
   "transport-protocol/icecap",
   "execution-engine/icecap",
+  "serde",
   "session-manager/icecap",
   "psa-attestation",
   "bincode",
@@ -109,6 +110,7 @@ psa-attestation = { path = "../psa-attestation", optional = true }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
+serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 session-manager = { path = "../session-manager" }
 sgx_tcrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_tdh = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
