@@ -19,7 +19,12 @@ icecap = [
   "policy-utils/icecap",
   "io-utils/icecap",
 ]
-linux = ["veracruz-utils/linux", "bincode", "serde/derive", "policy-utils/std", "io-utils/linux"]
+linux = [
+  "veracruz-utils/linux",
+  "bincode",
+  "policy-utils/std",
+  "io-utils/linux"
+]
 nitro = [
   "veracruz-utils/nitro",
   "bincode",
