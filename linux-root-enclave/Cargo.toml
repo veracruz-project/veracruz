@@ -21,7 +21,6 @@ nix = "0.20.0"
 openssl-sys = "=0.9.70"
 psa-attestation = { path = "../psa-attestation", features = ["linux"] }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", features = ["non_sgx"] }
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils/", features = ["linux"] }
 

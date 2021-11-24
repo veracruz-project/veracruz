@@ -21,10 +21,9 @@ icecap = [
   "policy-utils/icecap",
   "transport-protocol/icecap",
   "execution-engine/icecap",
+  "serde",
   "session-manager/icecap",
   "psa-attestation",
-  "wasmi/non_sgx",
-  "serde",
   "bincode",
   "log",
   "libm",
@@ -32,12 +31,10 @@ icecap = [
 ]
 linux = [
   "execution-engine/std",
-  "wasmi/non_sgx",
   "session-manager/std",
   "veracruz-utils/linux",
   "policy-utils/std",
   "io-utils/linux",
-  "byteorder",
   "clap",
   "nix",
   "bincode",
@@ -48,7 +45,6 @@ linux = [
 nitro = [
   "execution-engine/std",
   "execution-engine/nitro",
-  "wasmi/non_sgx",
   "session-manager/nitro",
   "veracruz-utils/nitro",
   "policy-utils/std",
@@ -57,7 +53,6 @@ nitro = [
   "nsm_lib",
   "ring/nitro",
   "nix",
-  "byteorder",
   "bincode",
   "wasi-types/std",
 ]
@@ -66,7 +61,6 @@ sgx = [
   "session-manager/sgx",
   "veracruz-utils/sgx",
   "policy-utils/sgx",
-  "wasmi/mesalock_sgx",
   "execution-engine/sgx",
   "rustls/mesalock_sgx",
   "protobuf/mesalock_sgx",
@@ -78,7 +72,6 @@ sgx = [
   "wasi-types/sgx",
 ]
 tz = [
-  "wasmi/std",
   "session-manager/tz",
   "execution-engine/tz",
   "veracruz-utils/tz",
@@ -86,7 +79,6 @@ tz = [
   "libc",
   "optee-utee-sys",
   "optee-utee",
-  "serde_json/alloc",
   "wasi-types/std",
   "psa-attestation/tz"
 ]
@@ -94,7 +86,6 @@ tz = [
 [dependencies]
 bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
 bitflags = "=1.2.1"
-byteorder = { version = "1.3", optional = true }
 clap = { version = "2.33", optional = true }
 env_logger = { version = "0.8.3", optional = true }
 err-derive = "0.2"
@@ -128,7 +119,6 @@ sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
-wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 
 [build-dependencies]
 libloading = "=0.5.2"

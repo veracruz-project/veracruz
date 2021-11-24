@@ -13,4 +13,3 @@ csv = "1.0"
 pinecone = "0.2"
 rand = "0.7"
 rand_distr = "0.3"
-serde = { version = "1.0.103", features = ["derive"] }
