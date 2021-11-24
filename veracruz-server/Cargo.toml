@@ -83,7 +83,7 @@ ring = "0.16"
 rouille = "=3.2.1"
 runtime-manager-bind = { path = "../runtime-manager-bind", optional = true }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-serde = { git = "https://github.com/veracruz-project/serde.git", default-features = false, optional = true }
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz", default-features = false, optional = true }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 sgx-root-enclave-bind = { path = "../sgx-root-enclave-bind", optional = true }
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
