@@ -57,10 +57,10 @@ RUST_SGX_SDK_PATH = ../third-party/rust-sgx-sdk
 $(EDL_Files): $(SGX_EDGER8R) runtime_manager.edl
 	$(SGX_EDGER8R) --use-prefix --trusted runtime_manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --trusted-dir .
 	$(SGX_EDGER8R) --use-prefix --untrusted runtime_manager.edl --search-path $(SGX_SDK)/include --search-path $(RUST_SGX_SDK_PATH)/edl --untrusted-dir .
-	cp -u runtime_manager_t.c $(OUT_DIR)
-	cp -u runtime_manager_u.c $(OUT_DIR)
-	cp -u runtime_manager_u.h $(OUT_DIR)
-	cp -u runtime_manager_t.h $(OUT_DIR)
+	cp runtime_manager_t.c $(OUT_DIR)
+	cp runtime_manager_u.c $(OUT_DIR)
+	cp runtime_manager_u.h $(OUT_DIR)
+	cp runtime_manager_t.h $(OUT_DIR)
 	@echo $(INFO_COLOR) "GEN => $(EDL_Files)" $(RESET_COLOR)
 
 SGX_COMMON_CFLAGS += -O0 -g

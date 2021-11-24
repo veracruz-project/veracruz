@@ -14,15 +14,15 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
-        WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
+        MemoryHandler, MemorySlice, MemorySliceMut, WasiAPIName, WasiWrapper,
     },
     Options,
 };
 use lazy_static::lazy_static;
 use std::{convert::TryFrom, sync::Mutex, vec::Vec};
 use wasi_types::ErrNo;
-use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};
+use wasmtime::{Caller, Extern, ExternType, Func, Instance, Memory, Module, Store, Val, ValType};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
@@ -57,10 +57,53 @@ macro_rules! convert_wasi_arg {
     };
 }
 
+/// An implementation of MemorySlice for Wasmtime
+///
+/// We can get direct access through the data and data_mut functions.
+/// Conveniently, Memory is managed by internal reference counting, and already
+/// isn't thread-safe, so we don't have to worry too much about the complex
+/// lifetime requirements of MemorySlice.
+///
+/// This currently requires unsafe code for data_unchecked and data_unchecked_mut,
+/// but these already have safe versions in the most recent version of Wasmtime.
+///
+pub struct WasmtimeSlice {
+    memory: Memory,
+    address: usize,
+    length: usize,
+}
+
+impl AsRef<[u8]> for WasmtimeSlice {
+    fn as_ref(&self) -> &[u8] {
+        // NOTE this is currently unsafe, but has a safe variant in recent
+        // versions of wasmtime
+        &(unsafe { self.memory.data_unchecked() })[self.address .. self.address+self.length]
+    }
+}
+
+impl AsMut<[u8]> for WasmtimeSlice {
+    fn as_mut(&mut self) -> &mut [u8] {
+        // NOTE this is currently unsafe, but has a safe variant in recent
+        // versions of wasmtime
+        &mut (unsafe { self.memory.data_unchecked_mut() })[self.address .. self.address+self.length]
+    }
+}
+
+impl MemorySlice for WasmtimeSlice {}
+impl MemorySliceMut for WasmtimeSlice {}
+
+
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WasiWrapper on any VFS call.
-impl<'a> MemoryHandler for Caller<'a> {
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()> {
+impl MemoryHandler for Caller<'_> {
+    type Slice = WasmtimeSlice;
+    type SliceMut = WasmtimeSlice;
+
+    fn get_slice<'a>(
+        &'a self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -68,16 +111,18 @@ impl<'a> MemoryHandler for Caller<'a> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        let address = address as usize;
-        unsafe {
-            std::slice::from_raw_parts_mut(memory.data_ptr().add(address), buffer.len())
-                .copy_from_slice(buffer)
-        };
-        Ok(())
+        Ok(Bound::new(WasmtimeSlice{
+            memory,
+            address: address as usize,
+            length: length as usize,
+        }))
     }
 
-    fn read_buffer(&self, address: u32, length: u32) -> FileSystemResult<Vec<u8>> {
-        let length = length as usize;
+    fn get_slice_mut<'a>(
+        &'a mut self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -85,14 +130,22 @@ impl<'a> MemoryHandler for Caller<'a> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        let mut bytes: Vec<u8> = vec![0; length];
-        unsafe {
-            bytes.copy_from_slice(std::slice::from_raw_parts(
-                memory.data_ptr().add(address as usize),
-                length,
-            ))
+        Ok(BoundMut::new(WasmtimeSlice{
+            memory,
+            address: address as usize,
+            length: length as usize,
+        }))
+    }
+
+    fn get_size(&self) -> FileSystemResult<u32> {
+        let memory = match self
+            .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
+            .and_then(|export| export.into_memory())
+        {
+            Some(s) => s,
+            None => return Err(ErrNo::NoMem),
         };
-        Ok(bytes)
+        Ok(u32::try_from(memory.data_size()).unwrap())
     }
 }
 

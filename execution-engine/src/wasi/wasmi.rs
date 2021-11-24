@@ -12,13 +12,13 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName, MemoryHandler,
-        WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
+        MemoryHandler, WasiAPIName, WasiWrapper,
     },
     Options,
 };
 use num::FromPrimitive;
-use std::{boxed::Box, convert::TryFrom, string::ToString, vec::Vec};
+use std::{boxed::Box, convert::TryFrom, mem, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef, HostError,
@@ -40,25 +40,60 @@ impl HostError for FatalEngineError {}
 /// Impl the MemoryHandler for MemoryRef.
 /// This allows passing the MemoryRef to WasiWrapper on any VFS call.
 impl MemoryHandler for MemoryRef {
-    /// Writes a buffer of bytes, `buffer`, to the runtime state's memory at
-    /// address, `address`.  Success on returing ErrNo::Success,
-    /// Fails with `ErrNo::NoMem` if no memory is registered in the runtime state.
-    #[inline]
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()> {
-        if let Err(_e) = self.set(address, buffer) {
-            return Err(ErrNo::NoMem);
-        }
-        Ok(())
+    type Slice = &'static [u8];
+    type SliceMut = &'static mut [u8];
+
+    fn get_slice<'a>(
+        &'a self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
+        let address = usize::try_from(address).unwrap();
+        let length = usize::try_from(length).unwrap();
+        // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
+        // this function, `direct_access`, that allows access through an `impl AsRef<[u8]>`.
+        // For now the best we can do is a bit of unsafe code.
+        //
+        // Note that MemoryRef is already not threadsafe, so we don't have to worry
+        // about locking.
+        //
+        Ok(Bound::new(
+            self.with_direct_access(|slice| {
+                let slice = &slice[address .. address+length];
+                unsafe {
+                    mem::transmute::<&'_ [u8], &'static [u8]>(slice)
+                }
+            })
+        ))
     }
 
-    /// Read a buffer of bytes from the runtime state's memory at
-    /// address, `address`. Return the bytes or Err with ErrNo,
-    /// e.g. `Err(ErrNo::NoMem)` if no memory is registered in the runtime state.
-    #[inline]
-    fn read_buffer(&self, address: u32, length: u32) -> FileSystemResult<Vec<u8>> {
-        self.get(address, length as usize)
-            .map_err(|_e| ErrNo::Fault)
-            .map(|buf| buf.to_vec())
+    fn get_slice_mut<'a>(
+        &'a mut self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
+        let address = usize::try_from(address).unwrap();
+        let length = usize::try_from(length).unwrap();
+        // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
+        // this function, `direct_access`, that allows access through an `impl AsRef<[u8]>`.
+        // For now the best we can do is a bit of unsafe code.
+        //
+        // Note that MemoryRef is already not threadsafe, so we don't have to worry
+        // about locking.
+        //
+        Ok(BoundMut::new(
+            self.with_direct_access_mut(|slice| {
+                let slice = &mut slice[address .. address+length];
+                unsafe {
+                    mem::transmute::<&'_ mut [u8], &'static mut [u8]>(slice)
+                }
+            })
+        ))
+    }
+
+    fn get_size(&self) -> FileSystemResult<u32> {
+        let bytes = wasmi::memory_units::Bytes::from(self.current_size()).0;
+        Ok(u32::try_from(bytes).unwrap())
     }
 }
 

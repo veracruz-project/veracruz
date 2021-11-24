@@ -18,7 +18,7 @@
 #![allow(non_camel_case_types, clippy::too_many_arguments)]
 
 use crate::{
-    fs::{FileSystem, FileSystemResult},
+    fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
     Options,
 };
 
@@ -27,7 +27,9 @@ use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::TryFrom, io::Cursor, mem::size_of, slice::from_raw_parts, string::String, vec::Vec,
+    convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData,
+    mem, mem::size_of, ops::Deref, ops::DerefMut, slice,
+    slice::from_raw_parts, slice::from_raw_parts_mut, string::String, vec::Vec,
 };
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
@@ -150,12 +152,20 @@ impl TryFrom<&str> for WasiAPIName {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Unpack a sequence of `bytes` and return a `T`.
-pub trait Unpack<T> {
-    fn unpack(bytes: &[u8]) -> FileSystemResult<T>;
+pub trait Unpack: Sized {
+    /// Size in bytes of the structure in the Wasm memory space. Note that this
+    /// may be different than the resulting type since it is in a different
+    /// memory space on a machine that likely has different pointer sizes.
+    const SIZE: u32;
+
+    /// Unpack the `T`
+    fn unpack(bytes: &[u8]) -> FileSystemResult<Self>;
 }
 
-impl Unpack<IoVec> for IoVec {
-    fn unpack(bytes: &[u8]) -> FileSystemResult<IoVec> {
+impl Unpack for IoVec {
+    const SIZE: u32 = size_of::<Self>() as u32;
+
+    fn unpack(bytes: &[u8]) -> FileSystemResult<Self> {
         if bytes.len() != size_of::<IoVec>() {
             return Err(ErrNo::Inval);
         }
@@ -166,8 +176,10 @@ impl Unpack<IoVec> for IoVec {
     }
 }
 
-impl Unpack<Subscription> for Subscription {
-    fn unpack(bytes: &[u8]) -> FileSystemResult<Subscription> {
+impl Unpack for Subscription {
+    const SIZE: u32 = size_of::<Self>() as u32;
+
+    fn unpack(bytes: &[u8]) -> FileSystemResult<Self> {
         if bytes.len() != size_of::<Subscription>() {
             return Err(ErrNo::Inval);
         }
@@ -215,8 +227,10 @@ impl Unpack<Subscription> for Subscription {
     }
 }
 
-impl Unpack<Event> for Event {
-    fn unpack(bytes: &[u8]) -> FileSystemResult<Event> {
+impl Unpack for Event {
+    const SIZE: u32 = size_of::<Self>() as u32;
+
+    fn unpack(bytes: &[u8]) -> FileSystemResult<Self> {
         if bytes.len() != size_of::<Event>() {
             return Err(ErrNo::Inval);
         }
@@ -247,52 +261,328 @@ impl Unpack<Event> for Event {
     }
 }
 
-/// The memory handler for interacting with the wasm memory space.
-/// An execution engine must implement `write_buffer` and `read_buffer`
-/// before using the WasiWrapper, because the WASI implementation requires
-/// an extra memory handler as the first parameter.
+/// A trait for slices of memory that MemoryHandler operates on
 ///
-/// NOTE: we purposely choose u32 here as the execution engine is likely received u32 as
-/// parameters
-pub trait MemoryHandler {
+/// Note! This is not the same as just AsRef<[u8]>!
+///
+/// MemorySlice is an AsRef<[u8]> with the additional requirement that
+/// the underlying type is movable even when references are borrowed.
+///
+/// This is true for most types you may want to implement MemorySlice for,
+/// such as `&[u8]`, `MutexGuard<[u8]>`, or even `Vec<u8>`. But this will fail
+/// if your as_ref implementation returns references into the original struct,
+/// which is allowed for AsRef<[u8]>, such as in the case of `[u8; 128]`.
+///
+/// Of course, this behavior is invalid for normal Rust references, since
+/// preventing underlying data moves is the whole point of the borrow-checker
+/// in the first place. So we need to access the underlying data through
+/// pointers or reborrowed dereferences in order to create disjoint lifetimes.
+///
+/// This means implementors of MemorySlice will most like require unsafe code.
+///
+/// ---
+///
+/// In exchange for the requirement that the underlying type is movable,
+/// consumers of MemorySlice promise to manually enforce the expected lifetime
+/// of the MemorySlice. That is, accesses to the underlying borrows are only
+/// legal while the MemorySlice is allocated.
+///
+/// To help with this, we introduce a new wrapper, Bound<'a, T>, for explicitly
+/// limiting the lifetime of traits like MemorySlice.
+///
+/// So, while we can't leverage Rust's borrow checker to enforce these
+/// lifetimes, we can at least ensure that the proper lifetimes are enforced
+/// for any code that depends on MemoryHandler.
+///
+pub trait MemorySlice: AsRef<[u8]> {
+    #[inline]
+    fn as_raw_parts(&self) -> (*const u8, usize) {
+        let ref_ = self.as_ref();
+        (ref_.as_ptr(), ref_.len())
+    }
+}
+
+/// A trait for slices of mutable memory that MemoryHandler operates on
+///
+/// Note! This is not the same as just AsMut<[u8]>!
+///
+/// See MemorySlice for more info
+///
+pub trait MemorySliceMut: AsMut<[u8]> {
+    #[inline]
+    fn as_raw_parts_mut(&mut self) -> (*mut u8, usize) {
+        let ref_ = self.as_mut();
+        (ref_.as_mut_ptr(), ref_.len())
+    }
+}
+
+impl MemorySlice for &'static [u8] {}
+impl MemorySliceMut for &'static mut [u8] {}
+
+
+/// Bound<'a, T> is a wrappper that explicitly enforces unrelated lifetimes
+/// on objects
+///
+/// It combines PhantomData and Deref to provide a simple wrapper that is
+/// garaunteed by the borrow checker to not outlive the provided lifetime.
+///
+/// This wrapper is useful for reintroducing lifetimes that have been stripped
+/// away be unsafe code.
+///
+#[derive(Debug, Copy, Clone)]
+pub struct Bound<'a, T>(T, PhantomData<&'a T>);
+
+impl<'a, T> Bound<'a, T> {
+    #[inline]
+    pub fn new(t: T) -> Self {
+        Self(t, PhantomData)
+    }
+}
+
+impl<'a, T> Deref for Bound<'a, T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+
+/// BoundMut<'a, T> is a wrappper that explicitly enforces unrelated lifetimes
+/// on objects
+///
+/// It combines PhantomData and DerefMut to provide a simple wrapper that is
+/// garaunteed by the borrow checker to not outlive the provided lifetime.
+///
+/// This wrapper is useful for reintroducing lifetimes that have been stripped
+/// away be unsafe code.
+///
+#[derive(Debug)]
+pub struct BoundMut<'a, T>(T, PhantomData<&'a mut T>);
+
+impl<'a, T> BoundMut<'a, T> {
+    #[inline]
+    pub fn new(t: T) -> Self {
+        Self(t, PhantomData)
+    }
+}
+
+impl<'a, T> Deref for BoundMut<'a, T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<'a, T> DerefMut for BoundMut<'a, T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+
+/// Number of iovecs to store internally before needing dynamic memory
+const IOVECSLICES_SOO_COUNT: usize = 2;
+
+/// A type wrapping an array of IoVecs as directly-accessible slices.
+///
+/// This indirection is needed to hold the MemoryHandler::Slice type which
+/// needs to be stored somewhere
+///
+/// This may allocate, though most iovecs are fairly small. As an extra
+/// optimization, if there are only 1 or 2 iovecs, these are stored directly
+/// in the struct with no allocation. 1 iovec is the most common, though
+/// 2 iovecs is used sometimes for things like appending newlines to stdout.
+/// At the time of writing I have never seen >2 iovecs used in a call, though
+/// it's certainly possible for aggresively optimized io.
+///
+pub struct IoVecSlices<'a, R> {
+    _ref: R,
+    slices: IoVecSlicesStorage<'a>,
+}
+
+enum IoVecSlicesStorage<'a> {
+    Small([Option<&'a [u8]>; IOVECSLICES_SOO_COUNT]),
+    Large(Vec<&'a [u8]>),
+}
+
+impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
+    fn as_ref(&self) -> &[&'a [u8]] {
+        match &self.slices {
+            IoVecSlicesStorage::Small(arr) => {
+                // looks a bit scary, but is just casting our `[Option<&[u8]>; 2]`
+                // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
+                // unsafety to do this without memory allocation.
+                let len = arr.iter().take_while(|x| x.is_some()).count();
+                unsafe {
+                    slice::from_raw_parts(arr.as_ptr() as *const &'a [u8], len)
+                }
+            }
+            IoVecSlicesStorage::Large(vec) => {
+                &vec
+            }
+        }
+    }
+}
+
+/// A type wrapping a mutable array of IoVecs as directly-accessible slices.
+///
+/// This indirection is needed to hold the MemoryHandler::SliceMut type which
+/// needs to be stored somewhere
+///
+/// This may allocate, though most iovecs are fairly small. As an extra
+/// optimization, if there are only 1 or 2 iovecs, these are stored directly
+/// in the struct with no allocation. 1 iovec is the most common, though
+/// 2 iovecs is used sometimes for things like appending newlines to stdout.
+/// At the time of writing I have never seen >2 iovecs used in a call, though
+/// it's certainly possible for aggresively optimized io.
+///
+pub struct IoVecSlicesMut<'a, R> {
+    _ref: R,
+    slices: IoVecSlicesMutStorage<'a>,
+}
+
+enum IoVecSlicesMutStorage<'a> {
+    Small([Option<&'a mut [u8]>; 2]),
+    Large(Vec<&'a mut [u8]>),
+}
+
+impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
+    fn as_mut(&mut self) -> &mut [&'a mut [u8]] {
+        match &mut self.slices {
+            IoVecSlicesMutStorage::Small(arr) => {
+                // looks a bit scary, but is just casting our `[Option<&[u8]>; 2]`
+                // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
+                // unsafety to do this without memory allocation.
+                let len = arr.iter().take_while(|x| x.is_some()).count();
+                unsafe {
+                    slice::from_raw_parts_mut(arr.as_mut_ptr() as *mut &'a mut [u8], len)
+                }
+            }
+            IoVecSlicesMutStorage::Large(ref mut vec) => {
+                vec
+            }
+        }
+    }
+}
+
+
+/// A MemoryHandler trait for interacting with the wasm memory space.
+///
+/// The API here is a bit tricky because we want to be able to leverage
+/// direct access to linear memory if available, and this is provided in
+/// different ways by different engines.
+///
+/// To make this extra confusing, we would normally use GATs to implement
+/// this, but they are unfinished and only available on nightly. So instead
+/// we need to use a bit of unsafe code in order to provide the correct
+/// lifetimes.
+///
+/// As a user, don't worry! The resulting API should be completely safe to use
+/// within Rust's rules. As an implementor maybe worry a little bit.
+///
+/// ---
+///
+/// At minimum, an implementation must implement `get_slice`, `get_slice_mut`,
+/// and `get_size. Without GATs, we can't describe the correct lifetimes in
+/// this trait, so instead we require that `get_slice` and `get_slice` return
+/// associated types that implement a "lifetime-less" MemorySlice trait. It's
+/// up to the implementor to satisfy this, which most likely means unsafe code
+/// going through a pointer-type-cast in order to create a disjoint lifetime.
+///
+/// To keep this from just being completely unsafe, we reintroduce the lifetime
+/// requirements with the Bound and BoundMut wrappers. These wrappers ensure
+/// the structure remains allocated for the original lifetime, but in a scope
+/// where we can describe the lifetime in the MemoryHandler trait.
+///
+/// ---
+///
+/// In addition to all this, MemorySlice and MemorySliceMut have a special
+/// requirement that the underlying struct is movable even behind a reference.
+/// This is described in more detail in the documentation of MemorySlice, and
+/// is required for the self-referential slices used in IoVecSlice and
+/// IoVecSliceMut without an unnecessary memory allocation.
+///
+/// ---
+///
+/// NOTE: we purposely choose u32 here as the execution engine is likely
+/// received u32 as parameters.
+///
+pub trait MemoryHandler  {
+    /// A type representing a direct reference to memory
+    ///
+    /// This may both lock the underlying engine and allocate memory (if the
+    /// engines underlying memory is not directly accessible). These should
+    /// generally be short-lived to pass to other APIs.
+    ///
+    /// Note these have an additional requirement that the underlying type
+    /// be movable even when borrowed! See MemorySlice for more info.
+    ///
+    type Slice: MemorySlice;
+
+    /// A type representing a direct mutable reference to memory
+    ///
+    /// This may both lock the underlying engine and allocate memory (if the
+    /// engines underlying memory is not directly accessible). These should
+    /// generally be short-lived to pass to other APIs.
+    ///
+    /// Note these have an additional requirement that the underlying type
+    /// be movable even when borrowed! See MemorySliceMut for more info.
+    ///
+    type SliceMut: MemorySliceMut;
+
+    /// Get an immutable slice of the memory
+    ///
+    /// The resulting type can be used as an AsRef<[u8]>, but is explicitly
+    /// bounded such that it can only be used in the lifetime of the underlying
+    /// MemoryHandler.
+    ///
+    fn get_slice<'a>(
+        &'a self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<Bound<'a, Self::Slice>>;
+
+    /// Get a mutable slice of the memory
+    ///
+    /// The resulting type can be used as an AsMut<[u8]>, but is explicitly
+    /// bounded such that it can only be used in the lifetime of the underlying
+    /// MemoryHandler.
+    ///
+    fn get_slice_mut<'a>(
+        &'a mut self,
+        address: u32,
+        length: u32
+    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>>;
+
+    /// Get the size of the underlying memory
+    fn get_size(&self) -> FileSystemResult<u32>;
+
     /// Write the `buffer` to `address`.
-    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()>;
-    /// Read `length` bytes from `address`.
-    fn read_buffer(&self, address: u32, length: u32) -> FileSystemResult<Vec<u8>>;
+    fn write_buffer(&mut self, address: u32, buffer: &[u8]) -> FileSystemResult<()> {
+        self.get_slice_mut(address, u32::try_from_or_errno(buffer.len())?)?
+            .as_mut()
+            .copy_from_slice(buffer);
+        Ok(())
+    }
+
+    /// Read into the `buffer` from `address`.
+    fn read_buffer(&self, address: u32, buffer: &mut [u8]) -> FileSystemResult<()> {
+        buffer.copy_from_slice(
+            self.get_slice(address, u32::try_from_or_errno(buffer.len())?)?
+                .as_ref()
+        );
+        Ok(())
+    }
 
     /// Reads a string at `address` of `length` from the runtime state's memory,
     /// starting at base address `address`.  If it fails, return ErrNo.
     fn read_cstring(&self, address: u32, length: u32) -> FileSystemResult<String> {
-        let bytes = self.read_buffer(address, length)?;
+        let mut bytes = vec![0u8; usize::try_from_or_errno(length)?];
+        self.read_buffer(address, &mut bytes)?;
         let rst = String::from_utf8(bytes).map_err(|_e| ErrNo::IlSeq)?;
-        Ok(rst)
-    }
-
-    /// Performs a scattered read from several locations, as specified by a list
-    /// of `IoVec` structures, `scatters`, from the runtime state's memory.
-    /// NOTE: for performance, it reads in reversed so the caller can use `pop`
-    /// to take out the ownership.
-    fn read_iovec_scattered_in_reverse(
-        &self,
-        scatters: &[IoVec],
-    ) -> FileSystemResult<Vec<Vec<u8>>> {
-        let mut rst = Vec::new();
-        for IoVec { buf, len } in scatters.iter().rev() {
-            rst.push(self.read_buffer(*buf, *len)?)
-        }
-        Ok(rst)
-    }
-
-    /// Reads a list of `IoVec` structures from a byte buffer.  Fails if reading of
-    /// any `IoVec` fails, for any reason.
-    fn unpack_array<T: Unpack<T>>(&self, ptr: u32, count: u32) -> FileSystemResult<Vec<T>> {
-        let size = size_of::<T>();
-        let all_bytes = self.read_buffer(ptr, count * (size as u32))?;
-        let mut rst = Vec::new();
-
-        for bytes in all_bytes.chunks(size) {
-            rst.push(T::unpack(bytes)?)
-        }
         Ok(rst)
     }
 
@@ -301,16 +591,207 @@ pub trait MemoryHandler {
         self.write_buffer(address, &u32::to_le_bytes(number))
     }
 
+    /// The default implementation for reading a u32 from `address`.
+    fn read_u32(&self, address: u32) -> FileSystemResult<u32> {
+        let mut bytes = [0u8; 4];
+        self.read_buffer(address, &mut bytes)?;
+        Ok(u32::from_le_bytes(bytes))
+    }
+
     /// The default implementation for writing a u64 to `address`.
     fn write_u64(&mut self, address: u32, number: u64) -> FileSystemResult<()> {
         self.write_buffer(address, &u64::to_le_bytes(number))
     }
 
-    /// The default implementation for writing a struct to `address`.
+    /// The default implementation for reading a u32 from `address`.
+    fn read_u64(&self, address: u32) -> FileSystemResult<u64> {
+        let mut bytes = [0u8; 8];
+        self.read_buffer(address, &mut bytes)?;
+        Ok(u64::from_le_bytes(bytes))
+    }
+
+    /// The default implementation for writing any Sized struct to `address`.
     fn write_struct<T: Sized>(&mut self, address: u32, element: &T) -> FileSystemResult<()> {
-        let byte: &[u8] =
+        let bytes: &[u8] =
             unsafe { from_raw_parts((element as *const T) as *const u8, size_of::<T>()) };
-        self.write_buffer(address, &byte)
+        self.write_buffer(address, bytes)
+    }
+
+    /// The default implementation for reading any Sized struct from `address`.
+    fn read_struct<T: Sized>(&self, address: u32, element: &mut T) -> FileSystemResult<()> {
+        let bytes: &mut [u8] =
+            unsafe { from_raw_parts_mut((element as *mut T) as *mut u8, size_of::<T>()) };
+        self.read_buffer(address, bytes)
+    }
+
+    /// The default implementation for reading an Unpack from `address`.
+    fn unpack<T: Unpack>(&self, address: u32) -> FileSystemResult<T> {
+        let bytes = self.get_slice(address, T::SIZE)?;
+        T::unpack(bytes.as_ref())
+    }
+
+    /// Unpack an array of Unpacks
+    fn unpack_array<T: Unpack>(
+        &self,
+        address: u32,
+        count: u32
+    ) -> FileSystemResult<Vec<T>> {
+        (0..count)
+            .map(|i| self.unpack(address + i*T::SIZE))
+            .collect()
+    }
+
+    /// Unpack an array of iovec references
+    ///
+    /// The result of this is an array of slices that read directly from
+    /// the underlying memory. The type is complicated in order to ensure the
+    /// correct lifetime, but it can be treated as a "simple" AsRef<&[&[u8]]>.
+    ///
+    fn unpack_iovec<'a>(
+        &'a self,
+        address: u32,
+        count: u32
+    ) -> FileSystemResult<IoVecSlices<'a, Bound<'a, Self::Slice>>> {
+        // Just get a reference to all of memory, it's easier to manipulate
+        // it this way
+        let memory = self.get_slice(0, self.get_size()?)?;
+        let slices = (0..count).map(|i| -> FileSystemResult<&'a [u8]> {
+            let iovec = IoVec::unpack(
+                &memory.as_ref()[
+                    usize::try_from_or_errno(address + i*IoVec::SIZE)?
+                        .. usize::try_from_or_errno(address + (i+1)*IoVec::SIZE)?
+                ]
+            )?;
+
+            // Ok here's the gooey center of the the copy-less iovecs. This may
+            // seem unnecessary but this code finds itself on the hot-path of
+            // execution the moment io gets involved.
+            //
+            // We want to reference directly into the engine's underlying memory
+            // if possible, and MemorySlice trait takes care of that (see MemorySlice
+            // for even more mess). But we take the simple reference a bit further
+            // here with iovecs since we want to reference multiple slices of
+            // the underlying memory while maintaining the lifetime of the original
+            // MemorySlice.
+            //
+            // To provide this for any generic AsRef<[u8]> type requires a possibly
+            // self-referential type, which gets incredibly hairy in Rust. The "safe"
+            // way to do this would be to move the MemorySlice onto the heap
+            // and pin it with Box::pin, though this requires memory allocation
+            // and still requires pointers and a bit of unsafety to tie everything
+            // together.
+            //
+            // In theory you could pin the MemorySlice to the stack, however it would
+            // need to be allocated in the callers stack and passed to this function,
+            // _greatly_ complicating this API (requiring MaybeUninit in any caller?).
+            //
+            // As an alternative, we can just require that the associated MemorySlice
+            // type is movable, even behind a borrow. This is outside of Rust's
+            // rules, but is actually reasonable for most types we would want to use
+            // for MemorySlice. This requirement is satisfied by `&[u8]`,
+            // `MutexGaurd<[u8]>`, and even Vec<u8>, but not by any type where `as_ref`
+            // referenced data in original struct, such as `[u8; 128]`.
+            //
+            // ---
+            //
+            // Of course this sort of lifetime isn't checkable by Rust, since preventing
+            // borrowed moves is the whole point of the borrow checker, so we need
+            // to use a bit of unsafety to strip away the lifetime.
+            //
+            // Note, we still enforce the correct lifetimes for any callers! This
+            // is accomplished by the `Bound` wrapper. There's more info on this
+            // on the `MemorySlice` and `Bound` traits/types
+            //
+            let slice = &memory.as_ref()[
+                usize::try_from_or_errno(iovec.buf)?
+                    .. usize::try_from_or_errno(iovec.buf+iovec.len)?
+            ];
+            Ok(unsafe { mem::transmute::<&'_ [u8], &'a [u8]>(slice) })
+        });
+
+        if count <= IOVECSLICES_SOO_COUNT as u32 {
+            let mut slices = slices.fuse();
+            let slices = [
+                slices.next().transpose()?,
+                slices.next().transpose()?,
+            ];
+            Ok(IoVecSlices{
+                _ref: memory,
+                slices: IoVecSlicesStorage::Small(slices),
+            })
+        } else {
+            let slices = slices.collect::<FileSystemResult<Vec<_>>>()?;
+            Ok(IoVecSlices{
+                _ref: memory,
+                slices: IoVecSlicesStorage::Large(slices),
+            })
+        }
+    }
+
+    /// Unpack an array of mutable iovec references
+    ///
+    /// The result of this is an array of slices that writes directly into
+    /// the underlying memory. The type is complicated in order to ensure the
+    /// correct lifetime, but it can be treated as a "simple" AsMut<&mut [&mut [u8]]>.
+    ///
+    fn unpack_iovec_mut<'a>(
+        &'a mut self,
+        address: u32,
+        count: u32
+    ) -> FileSystemResult<IoVecSlicesMut<'a, BoundMut<'a, Self::SliceMut>>> {
+        // Just get a reference to all of memory, it's easier to manipulate
+        // it this way
+        let mut memory = self.get_slice_mut(0, self.get_size()?)?;
+        let slices = (0..count).map(|i| -> FileSystemResult<&'a mut [u8]> {
+            let iovec = IoVec::unpack(
+                &memory.as_mut()[
+                    usize::try_from_or_errno(address + i*IoVec::SIZE)?
+                        .. usize::try_from_or_errno(address + (i+1)*IoVec::SIZE)?
+                ]
+            )?;
+
+            // Ok here's the gooey center of the the copy-less iovecs. This may
+            // seem unnecessary but this code finds itself on the hot-path of
+            // execution the moment io gets involved.
+            //
+            // See `unpack_iovec` for more info about what is going on here
+            //
+
+            // The _correct_ thing to do here is to
+            // 1. allocate and read all iovecs first
+            // 2. sort the iovecs by address
+            // 3. check for overlapping ranges
+            // 4. repeat slice::split_at to separate memory into sub-slices
+            //    containing the slices specified by iovec
+            //
+            // Or we can not do that and just construct mutable slices that may
+            // more may not overlap. If they overlap the worst thing that should
+            // happen is malformed iovecs get malformed data back.
+            //
+            let slice = &mut memory.as_mut()[
+                usize::try_from_or_errno(iovec.buf)?
+                    .. usize::try_from_or_errno(iovec.buf+iovec.len)?
+            ];
+            Ok(unsafe { mem::transmute::<&'_ mut [u8], &'a mut [u8]>(slice) })
+        });
+
+        if count <= IOVECSLICES_SOO_COUNT as u32 {
+            let mut slices = slices.fuse();
+            let slices = [
+                slices.next().transpose()?,
+                slices.next().transpose()?,
+            ];
+            Ok(IoVecSlicesMut{
+                _ref: memory,
+                slices: IoVecSlicesMutStorage::Small(slices),
+            })
+        } else {
+            let slices = slices.collect::<FileSystemResult<Vec<_>>>()?;
+            Ok(IoVecSlicesMut{
+                _ref: memory,
+                slices: IoVecSlicesMutStorage::Large(slices),
+            })
+        }
     }
 
     /// Write the content to the buf_address and the starting address to buf_pointers.
@@ -688,21 +1169,18 @@ impl WasiWrapper {
         fd: u32,
         iovec_base: u32,
         iovec_count: u32,
-        mut offset: u64,
+        offset: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let iovecs = memory_ref.unpack_array::<IoVec>(iovec_base, iovec_count)?;
-
-        let mut size_read = 0;
-        for iovec in iovecs.iter() {
-            let to_write = self
-                .filesystem
-                .fd_pread(fd.into(), iovec.len as usize, offset)?;
-            offset += to_write.len() as u64;
-            memory_ref.write_buffer(iovec.buf, &to_write)?;
-            size_read += to_write.len() as u32;
-        }
-        memory_ref.write_u32(address, size_read)
+        let size_read = {
+            let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
+            self.filesystem.fd_pread(
+                fd.into(),
+                iovecs.as_mut(),
+                offset
+            )?
+        };
+        memory_ref.write_u32(address, size_read as u32)
     }
 
     /// The implementation of the WASI `fd_prestat_get` function. It requires an extra `memory_ref` to
@@ -752,16 +1230,15 @@ impl WasiWrapper {
         offset: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let iovecs = memory_ref.unpack_array::<IoVec>(iovec_base, iovec_count)?;
-        let mut bufs = memory_ref.read_iovec_scattered_in_reverse(&iovecs)?;
-
-        let mut size_written = 0;
-        while let Some(buf) = bufs.pop() {
-            size_written +=
-                self.filesystem
-                    .fd_pwrite(fd.into(), buf, offset + (size_written as u64))?;
-        }
-        memory_ref.write_u32(address, size_written)
+        let size_written = {
+            let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
+            self.filesystem.fd_pwrite(
+                fd.into(),
+                iovecs.as_ref(),
+                offset
+            )?
+        };
+        memory_ref.write_u32(address, size_written as u32)
     }
 
     /// The implementation of the WASI `fd_read` function. It requires an extra `memory_ref` to
@@ -774,15 +1251,14 @@ impl WasiWrapper {
         iovec_count: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let iovecs = memory_ref.unpack_array::<IoVec>(iovec_base, iovec_count)?;
-
-        let mut size_read = 0;
-        for iovec in iovecs.iter() {
-            let to_write = self.filesystem.fd_read(fd.into(), iovec.len as usize)?;
-            memory_ref.write_buffer(iovec.buf, &to_write)?;
-            size_read += to_write.len() as u32;
-        }
-        memory_ref.write_u32(address, size_read)
+        let size_read = {
+            let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
+            self.filesystem.fd_read(
+                fd.into(),
+                iovecs.as_mut(),
+            )?
+        };
+        memory_ref.write_u32(address, size_read as u32)
     }
 
     /// The implementation of the WASI `fd_readdir` function. It requires an extra `memory_ref` to
@@ -878,14 +1354,14 @@ impl WasiWrapper {
         iovec_count: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let iovecs = memory_ref.unpack_array::<IoVec>(iovec_base, iovec_count)?;
-        let mut bufs = memory_ref.read_iovec_scattered_in_reverse(&iovecs)?;
-
-        let mut size_written = 0;
-        while let Some(buf) = bufs.pop() {
-            size_written += self.filesystem.fd_write(fd.into(), buf)?;
-        }
-        memory_ref.write_u32(address, size_written)
+        let size_written = {
+            let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
+            self.filesystem.fd_write(
+                fd.into(),
+                iovecs.as_ref(),
+            )?
+        };
+        memory_ref.write_u32(address, size_written as u32)
     }
 
     /// The implementation of the WASI `path_create_directory` function. It requires an extra `memory_ref` to
@@ -1164,21 +1640,18 @@ impl WasiWrapper {
         ro_data_len: u32,
         ro_flag: u32,
     ) -> FileSystemResult<()> {
-        let iovecs = memory_ref.unpack_array::<IoVec>(ri_address, ri_len)?;
-        let ri_flag: RiFlags = Self::decode_wasi_arg(ri_flag)?;
-
-        let mut size_read = 0;
-        let mut ro_rst = RoFlags::empty();
-        for iovec in iovecs.iter() {
-            let (to_write, next_ro_rst) =
-                self.filesystem
-                    .sock_recv(socket.into(), iovec.len as usize, ri_flag)?;
-            memory_ref.write_buffer(iovec.buf, &to_write)?;
-            size_read += to_write.len() as u32;
-            ro_rst |= next_ro_rst;
-        }
-        memory_ref.write_u32(ro_data_len, size_read)?;
-        memory_ref.write_buffer(ro_flag, &u16::to_le_bytes(ro_rst.bits()))
+        let (size_read, ro_flags) = {
+            let mut iovecs = memory_ref.unpack_iovec_mut(ri_address, ri_len)?;
+            let ri_flags: RiFlags = Self::decode_wasi_arg(ri_flag)?;
+            self.filesystem.sock_recv(
+                socket.into(),
+                iovecs.as_mut(),
+                ri_flags
+            )?
+        };
+        let ro_flags = RoFlags::empty() | ro_flags;
+        memory_ref.write_u32(ro_data_len, size_read as u32)?;
+        memory_ref.write_buffer(ro_flag, &u16::to_le_bytes(ro_flags.bits()))
     }
 
     /// The implementation of the WASI `sock_send` function. It requires an extra `memory_ref` to
@@ -1192,15 +1665,16 @@ impl WasiWrapper {
         si_flag: u16,
         address: u32,
     ) -> FileSystemResult<()> {
-        let iovecs = memory_ref.unpack_array::<IoVec>(si_address, si_len)?;
-        let mut bufs = memory_ref.read_iovec_scattered_in_reverse(&iovecs)?;
-        let si_flag: SiFlags = Self::decode_wasi_arg(si_flag)?;
-
-        let mut size_written = 0;
-        while let Some(buf) = bufs.pop() {
-            size_written += self.filesystem.sock_send(socket.into(), buf, si_flag)?;
-        }
-        memory_ref.write_u32(address, size_written)
+        let size_written = {
+            let iovecs = memory_ref.unpack_iovec(si_address, si_len)?;
+            let si_flags: SiFlags = Self::decode_wasi_arg(si_flag)?;
+            self.filesystem.sock_send(
+                socket.into(),
+                iovecs.as_ref(),
+                si_flags
+            )?
+        };
+        memory_ref.write_u32(address, size_written as u32)
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
