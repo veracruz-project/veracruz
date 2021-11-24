@@ -29,6 +29,7 @@ byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch 
 cfg-if = "1"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+nulllib = { git = "https://github.com/egrimley-arm/nulllib.git", branch = "main" }
 num = { version = "0.4", default-features = false }
 num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
