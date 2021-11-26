@@ -37,6 +37,11 @@ tz = [
 anyhow = { version = "1.0", default-features = false }
 byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch = "veracruz" }
 cfg-if = "1"
+# cmake is not a dependency of this crate, but we have to stop cmake 0.1.46,
+# which needs a newer version of cmake (one that accepts --parallel) than
+# the one which comes with Ubuntu 18.04.5, currently used by our CI tests,
+# from being picked up by psa-crypto-sys.
+cmake = "<0.1.46"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 num = { version = "0.4", default-features = false }
@@ -45,6 +50,7 @@ num-traits = { version = "0.2", default-features = false }
 pinecone = "0.2"
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
+psa-crypto = { git = "https://github.com/egrimley-arm/rust-psa-crypto.git", branch = "veracruz" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
 sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
