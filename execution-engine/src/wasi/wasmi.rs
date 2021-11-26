@@ -13,11 +13,11 @@ use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
         Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
-        MemoryHandler, WasiAPIName, WasiWrapper,
+        MemoryHandler, VeracruzAPIName, WasiAPIName, WasiWrapper,
     },
     Options,
 };
-use num::FromPrimitive;
+use num::{FromPrimitive, ToPrimitive};
 use std::{boxed::Box, convert::TryFrom, mem, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
@@ -25,6 +25,47 @@ use wasmi::{
     MemoryDescriptor, MemoryRef, Module, ModuleImportResolver, ModuleInstance, ModuleRef,
     RuntimeArgs, RuntimeValue, Signature, TableDescriptor, TableRef, Trap, ValueType,
 };
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum APIName {
+    WasiAPIName(WasiAPIName),
+    VeracruzAPIName(VeracruzAPIName),
+}
+
+impl FromPrimitive for APIName {
+    fn from_i64(n: i64) -> Option<Self> {
+        if n < 0 {
+            None
+        } else {
+            Self::from_u64(n as u64)
+        }
+    }
+    fn from_u64(n: u64) -> Option<Self> {
+        if n == 0 {
+            None
+        } else if n < WasiAPIName::_LAST as u64 {
+            Some(APIName::WasiAPIName(WasiAPIName::from_u64(n).unwrap()))
+        } else {
+            match VeracruzAPIName::from_u64(n - WasiAPIName::_LAST as u64) {
+                Some(x) => Some(APIName::VeracruzAPIName(x)),
+                None => None,
+            }
+        }
+    }
+}
+
+impl ToPrimitive for APIName {
+    fn to_i64(&self) -> Option<i64> {
+        Some(self.to_u64().unwrap() as i64)
+    }
+    fn to_u64(&self) -> Option<u64> {
+        match self {
+            APIName::WasiAPIName(WasiAPIName::_LAST) => unreachable!(),
+            APIName::WasiAPIName(x) => x.to_u64(),
+            APIName::VeracruzAPIName(x) => Some(WasiAPIName::_LAST as u64 + x.to_u64().unwrap()),
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Veracruz host errors.
@@ -198,7 +239,7 @@ impl TypeCheck {
 
     /// Checks the function signature, `signature`, has the correct type for the
     /// host call coded by `index`.
-    pub(self) fn check_signature(index: WasiAPIName, signature: &Signature) -> bool {
+    pub(self) fn check_signature(index: APIName, signature: &Signature) -> bool {
         // Match the parameters
         let expected_params = Self::get_params(index);
         if signature.params() != expected_params.as_slice() {
@@ -206,7 +247,7 @@ impl TypeCheck {
         }
         // Match the return type. Apart from proc_exit, which has no return,
         // the rest should return ErrNo.
-        if index == WasiAPIName::PROC_EXIT {
+        if index == APIName::WasiAPIName(WasiAPIName::PROC_EXIT) {
             signature.return_type() == None
         } else {
             signature.return_type() == Some(Self::ERRNO)
@@ -214,153 +255,163 @@ impl TypeCheck {
     }
 
     /// Return the parameters list of a wasi function call `index`.
-    pub(crate) fn get_params(index: WasiAPIName) -> Vec<ValueType> {
+    pub(crate) fn get_params(index: APIName) -> Vec<ValueType> {
         match index {
-            WasiAPIName::ARGS_GET => vec![Self::POINTER, Self::POINTER],
-            WasiAPIName::ARGS_SIZES_GET => vec![Self::POINTER, Self::POINTER],
-            WasiAPIName::ENVIRON_GET => vec![Self::POINTER, Self::POINTER],
-            WasiAPIName::ENVIRON_SIZES_GET => vec![Self::POINTER, Self::POINTER],
-            WasiAPIName::CLOCK_RES_GET => vec![Self::CLOCKID, Self::POINTER],
-            WasiAPIName::CLOCK_TIME_GET => vec![Self::CLOCKID, Self::TIMESTAMP, Self::POINTER],
-            WasiAPIName::FD_ADVISE => vec![Self::FD, Self::FILESIZE, Self::FILESIZE, Self::ADVICE],
-            WasiAPIName::FD_ALLOCATE => vec![Self::FD, Self::FILESIZE, Self::FILESIZE],
-            WasiAPIName::FD_CLOSE => vec![Self::FD],
-            WasiAPIName::FD_DATASYNC => vec![Self::FD],
-            WasiAPIName::FD_FDSTAT_GET => vec![Self::FD, Self::POINTER],
-            WasiAPIName::FD_FDSTAT_SET_FLAGS => vec![Self::FD, Self::FDFLAGS],
-            WasiAPIName::FD_FDSTAT_SET_RIGHTS => vec![Self::FD, Self::RIGHTS, Self::RIGHTS],
-            WasiAPIName::FD_FILESTAT_GET => vec![Self::FD, Self::POINTER],
-            WasiAPIName::FD_FILESTAT_SET_SIZE => vec![Self::FD, Self::FILESIZE],
-            WasiAPIName::FD_FILESTAT_SET_TIMES => {
-                vec![Self::FD, Self::TIMESTAMP, Self::TIMESTAMP, Self::FSTFLAGS]
-            }
-            WasiAPIName::FD_PREAD => vec![
-                Self::FD,
-                Self::CIOVEC_ARRAY_BASE,
-                Self::CIOVEC_ARRAY_LENGTH,
-                Self::FILESIZE,
-                Self::POINTER,
-            ],
-            WasiAPIName::FD_PRESTAT_GET => vec![Self::FD, Self::POINTER],
-            WasiAPIName::FD_PRESTAT_DIR_NAME => vec![Self::FD, Self::POINTER, Self::SIZE],
-            WasiAPIName::FD_PWRITE => vec![
-                Self::FD,
-                Self::CIOVEC_ARRAY_BASE,
-                Self::CIOVEC_ARRAY_LENGTH,
-                Self::FILESIZE,
-                Self::POINTER,
-            ],
-            WasiAPIName::FD_READ => vec![
-                Self::FD,
-                Self::IOVEC_ARRAY_BASE,
-                Self::IOVEC_ARRAY_LENGTH,
-                Self::POINTER,
-            ],
-            WasiAPIName::FD_READDIR => vec![
-                Self::FD,
-                Self::POINTER,
-                Self::SIZE,
-                Self::DIRCOOKIE,
-                Self::POINTER,
-            ],
-            WasiAPIName::FD_RENUMBER => vec![Self::FD, Self::FD],
-            WasiAPIName::FD_SEEK => vec![Self::FD, Self::FILEDELTA, Self::WHENCE, Self::POINTER],
-            WasiAPIName::FD_SYNC => vec![Self::FD],
-            WasiAPIName::FD_TELL => vec![Self::FD, Self::POINTER],
-            WasiAPIName::FD_WRITE => vec![
-                Self::FD,
-                Self::CIOVEC_ARRAY_BASE,
-                Self::CIOVEC_ARRAY_LENGTH,
-                Self::POINTER,
-            ],
-            WasiAPIName::PATH_CREATE_DIRECTORY => vec![Self::FD, Self::POINTER, Self::SIZE_T],
-            WasiAPIName::PATH_FILESTAT_GET => vec![
-                Self::FD,
-                Self::LOOKUP_FLAGS,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::POINTER,
-            ],
-            WasiAPIName::PATH_FILESTAT_SET_TIMES => vec![
-                Self::FD,
-                Self::LOOKUP_FLAGS,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::TIMESTAMP,
-                Self::TIMESTAMP,
-                Self::FSTFLAGS,
-            ],
-            WasiAPIName::PATH_LINK => vec![
-                Self::FD,
-                Self::LOOKUP_FLAGS,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::FD,
-                Self::POINTER,
-                Self::SIZE_T,
-            ],
-            WasiAPIName::PATH_OPEN => vec![
-                Self::FD,
-                Self::LOOKUP_FLAGS,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::OFLAGS,
-                Self::RIGHTS,
-                Self::RIGHTS,
-                Self::FDFLAGS,
-                Self::POINTER,
-            ],
-            WasiAPIName::PATH_READLINK => vec![
-                Self::FD,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::POINTER,
-            ],
-            WasiAPIName::PATH_REMOVE_DIRECTORY => vec![Self::FD, Self::POINTER, Self::SIZE_T],
-            WasiAPIName::PATH_RENAME => vec![
-                Self::FD,
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::FD,
-                Self::POINTER,
-                Self::SIZE_T,
-            ],
-            WasiAPIName::PATH_SYMLINK => vec![
-                Self::POINTER,
-                Self::SIZE_T,
-                Self::FD,
-                Self::POINTER,
-                Self::SIZE_T,
-            ],
-            WasiAPIName::PATH_UNLINK_FILE => vec![Self::FD, Self::POINTER, Self::SIZE_T],
-            WasiAPIName::POLL_ONEOFF => vec![
-                Self::CONST_POINTER,
-                Self::POINTER,
-                Self::SIZE,
-                Self::POINTER,
-            ],
-            WasiAPIName::PROC_EXIT => vec![Self::EXITCODE],
-            WasiAPIName::PROC_RAISE => vec![Self::SIGNAL],
-            WasiAPIName::SCHED_YIELD => vec![],
-            WasiAPIName::RANDOM_GET => vec![Self::POINTER, Self::SIZE],
-            WasiAPIName::SOCK_RECV => vec![
-                Self::FD,
-                Self::IOVEC_ARRAY_BASE,
-                Self::IOVEC_ARRAY_LENGTH,
-                Self::RIFLAGS,
-                Self::POINTER,
-                Self::POINTER,
-            ],
-            WasiAPIName::SOCK_SEND => vec![
-                Self::FD,
-                Self::CIOVEC_ARRAY_BASE,
-                Self::CIOVEC_ARRAY_LENGTH,
-                Self::SIFLAGS,
-                Self::POINTER,
-            ],
-            WasiAPIName::SOCK_SHUTDOWN => vec![Self::FD, Self::SDFLAGS],
+            APIName::WasiAPIName(index) => match index {
+                WasiAPIName::ARGS_GET => vec![Self::POINTER, Self::POINTER],
+                WasiAPIName::ARGS_SIZES_GET => vec![Self::POINTER, Self::POINTER],
+                WasiAPIName::ENVIRON_GET => vec![Self::POINTER, Self::POINTER],
+                WasiAPIName::ENVIRON_SIZES_GET => vec![Self::POINTER, Self::POINTER],
+                WasiAPIName::CLOCK_RES_GET => vec![Self::CLOCKID, Self::POINTER],
+                WasiAPIName::CLOCK_TIME_GET => vec![Self::CLOCKID, Self::TIMESTAMP, Self::POINTER],
+                WasiAPIName::FD_ADVISE => {
+                    vec![Self::FD, Self::FILESIZE, Self::FILESIZE, Self::ADVICE]
+                }
+                WasiAPIName::FD_ALLOCATE => vec![Self::FD, Self::FILESIZE, Self::FILESIZE],
+                WasiAPIName::FD_CLOSE => vec![Self::FD],
+                WasiAPIName::FD_DATASYNC => vec![Self::FD],
+                WasiAPIName::FD_FDSTAT_GET => vec![Self::FD, Self::POINTER],
+                WasiAPIName::FD_FDSTAT_SET_FLAGS => vec![Self::FD, Self::FDFLAGS],
+                WasiAPIName::FD_FDSTAT_SET_RIGHTS => vec![Self::FD, Self::RIGHTS, Self::RIGHTS],
+                WasiAPIName::FD_FILESTAT_GET => vec![Self::FD, Self::POINTER],
+                WasiAPIName::FD_FILESTAT_SET_SIZE => vec![Self::FD, Self::FILESIZE],
+                WasiAPIName::FD_FILESTAT_SET_TIMES => {
+                    vec![Self::FD, Self::TIMESTAMP, Self::TIMESTAMP, Self::FSTFLAGS]
+                }
+                WasiAPIName::FD_PREAD => vec![
+                    Self::FD,
+                    Self::CIOVEC_ARRAY_BASE,
+                    Self::CIOVEC_ARRAY_LENGTH,
+                    Self::FILESIZE,
+                    Self::POINTER,
+                ],
+                WasiAPIName::FD_PRESTAT_GET => vec![Self::FD, Self::POINTER],
+                WasiAPIName::FD_PRESTAT_DIR_NAME => vec![Self::FD, Self::POINTER, Self::SIZE],
+                WasiAPIName::FD_PWRITE => vec![
+                    Self::FD,
+                    Self::CIOVEC_ARRAY_BASE,
+                    Self::CIOVEC_ARRAY_LENGTH,
+                    Self::FILESIZE,
+                    Self::POINTER,
+                ],
+                WasiAPIName::FD_READ => vec![
+                    Self::FD,
+                    Self::IOVEC_ARRAY_BASE,
+                    Self::IOVEC_ARRAY_LENGTH,
+                    Self::POINTER,
+                ],
+                WasiAPIName::FD_READDIR => vec![
+                    Self::FD,
+                    Self::POINTER,
+                    Self::SIZE,
+                    Self::DIRCOOKIE,
+                    Self::POINTER,
+                ],
+                WasiAPIName::FD_RENUMBER => vec![Self::FD, Self::FD],
+                WasiAPIName::FD_SEEK => {
+                    vec![Self::FD, Self::FILEDELTA, Self::WHENCE, Self::POINTER]
+                }
+                WasiAPIName::FD_SYNC => vec![Self::FD],
+                WasiAPIName::FD_TELL => vec![Self::FD, Self::POINTER],
+                WasiAPIName::FD_WRITE => vec![
+                    Self::FD,
+                    Self::CIOVEC_ARRAY_BASE,
+                    Self::CIOVEC_ARRAY_LENGTH,
+                    Self::POINTER,
+                ],
+                WasiAPIName::PATH_CREATE_DIRECTORY => vec![Self::FD, Self::POINTER, Self::SIZE_T],
+                WasiAPIName::PATH_FILESTAT_GET => vec![
+                    Self::FD,
+                    Self::LOOKUP_FLAGS,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::POINTER,
+                ],
+                WasiAPIName::PATH_FILESTAT_SET_TIMES => vec![
+                    Self::FD,
+                    Self::LOOKUP_FLAGS,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::TIMESTAMP,
+                    Self::TIMESTAMP,
+                    Self::FSTFLAGS,
+                ],
+                WasiAPIName::PATH_LINK => vec![
+                    Self::FD,
+                    Self::LOOKUP_FLAGS,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::FD,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                ],
+                WasiAPIName::PATH_OPEN => vec![
+                    Self::FD,
+                    Self::LOOKUP_FLAGS,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::OFLAGS,
+                    Self::RIGHTS,
+                    Self::RIGHTS,
+                    Self::FDFLAGS,
+                    Self::POINTER,
+                ],
+                WasiAPIName::PATH_READLINK => vec![
+                    Self::FD,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::POINTER,
+                ],
+                WasiAPIName::PATH_REMOVE_DIRECTORY => vec![Self::FD, Self::POINTER, Self::SIZE_T],
+                WasiAPIName::PATH_RENAME => vec![
+                    Self::FD,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::FD,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                ],
+                WasiAPIName::PATH_SYMLINK => vec![
+                    Self::POINTER,
+                    Self::SIZE_T,
+                    Self::FD,
+                    Self::POINTER,
+                    Self::SIZE_T,
+                ],
+                WasiAPIName::PATH_UNLINK_FILE => vec![Self::FD, Self::POINTER, Self::SIZE_T],
+                WasiAPIName::POLL_ONEOFF => vec![
+                    Self::CONST_POINTER,
+                    Self::POINTER,
+                    Self::SIZE,
+                    Self::POINTER,
+                ],
+                WasiAPIName::PROC_EXIT => vec![Self::EXITCODE],
+                WasiAPIName::PROC_RAISE => vec![Self::SIGNAL],
+                WasiAPIName::SCHED_YIELD => vec![],
+                WasiAPIName::RANDOM_GET => vec![Self::POINTER, Self::SIZE],
+                WasiAPIName::SOCK_RECV => vec![
+                    Self::FD,
+                    Self::IOVEC_ARRAY_BASE,
+                    Self::IOVEC_ARRAY_LENGTH,
+                    Self::RIFLAGS,
+                    Self::POINTER,
+                    Self::POINTER,
+                ],
+                WasiAPIName::SOCK_SEND => vec![
+                    Self::FD,
+                    Self::CIOVEC_ARRAY_BASE,
+                    Self::CIOVEC_ARRAY_LENGTH,
+                    Self::SIFLAGS,
+                    Self::POINTER,
+                ],
+                WasiAPIName::SOCK_SHUTDOWN => vec![Self::FD, Self::SDFLAGS],
+                WasiAPIName::_LAST => unreachable!(),
+            },
+            APIName::VeracruzAPIName(index) => match index {
+                VeracruzAPIName::FD_CREATE => vec![Self::POINTER],
+            },
         }
     }
 
@@ -370,7 +421,7 @@ impl TypeCheck {
         args: &RuntimeArgs,
         index: WasiAPIName,
     ) -> Result<(), FatalEngineError> {
-        if args.len() == Self::get_params(index).len() {
+        if args.len() == Self::get_params(APIName::WasiAPIName(index)).len() {
             Ok(())
         } else {
             Err(index.into())
@@ -421,12 +472,16 @@ impl ModuleImportResolver for WASMIRuntimeState {
     /// "Resolves" a H-call by translating from a H-call name, `field_name` to
     /// the corresponding H-call code, and dispatching appropriately.
     fn resolve_func(&self, field_name: &str, signature: &Signature) -> Result<FuncRef, Error> {
-        let index = WasiAPIName::try_from(field_name).map_err(|_| {
-            Error::Instantiation(format!(
+        let index = if let Ok(x) = WasiAPIName::try_from(field_name) {
+            APIName::WasiAPIName(x)
+        } else if let Ok(x) = VeracruzAPIName::try_from(field_name) {
+            APIName::VeracruzAPIName(x)
+        } else {
+            return Err(Error::Instantiation(format!(
                 "Unknown function {} with signature: {:?}.",
                 field_name, signature
-            ))
-        })?;
+            )));
+        };
 
         if !TypeCheck::check_signature(index, signature) {
             Err(Error::Instantiation(format!(
@@ -434,7 +489,10 @@ impl ModuleImportResolver for WASMIRuntimeState {
                 field_name, signature
             )))
         } else {
-            Ok(FuncInstance::alloc_host(signature.clone(), index as usize))
+            Ok(FuncInstance::alloc_host(
+                signature.clone(),
+                index.to_usize().unwrap(),
+            ))
         }
     }
 
@@ -469,56 +527,62 @@ impl Externals for WASMIRuntimeState {
         index: usize,
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
-        let wasi_call_index = WasiAPIName::from_u32(index as u32).ok_or(
+        let call_index = APIName::from_u64(index as u64).ok_or(
             FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Index(index)),
         )?;
 
-        let return_code = match wasi_call_index {
-            WasiAPIName::ARGS_GET => self.wasi_args_get(args),
-            WasiAPIName::ARGS_SIZES_GET => self.wasi_args_sizes_get(args),
-            WasiAPIName::ENVIRON_GET => self.wasi_environ_get(args),
-            WasiAPIName::ENVIRON_SIZES_GET => self.wasi_environ_sizes_get(args),
-            WasiAPIName::CLOCK_RES_GET => self.wasi_clock_res_get(args),
-            WasiAPIName::CLOCK_TIME_GET => self.wasi_clock_time_get(args),
-            WasiAPIName::FD_ADVISE => self.wasi_fd_advise(args),
-            WasiAPIName::FD_ALLOCATE => self.wasi_fd_allocate(args),
-            WasiAPIName::FD_CLOSE => self.wasi_fd_close(args),
-            WasiAPIName::FD_DATASYNC => self.wasi_fd_datasync(args),
-            WasiAPIName::FD_FDSTAT_GET => self.wasi_fd_fdstat_get(args),
-            WasiAPIName::FD_FDSTAT_SET_FLAGS => self.wasi_fd_fdstat_set_flags(args),
-            WasiAPIName::FD_FDSTAT_SET_RIGHTS => self.wasi_fd_fdstat_set_rights(args),
-            WasiAPIName::FD_FILESTAT_GET => self.wasi_fd_filestat_get(args),
-            WasiAPIName::FD_FILESTAT_SET_SIZE => self.wasi_fd_filestat_set_size(args),
-            WasiAPIName::FD_FILESTAT_SET_TIMES => self.wasi_fd_filestat_set_times(args),
-            WasiAPIName::FD_PREAD => self.wasi_fd_pread(args),
-            WasiAPIName::FD_PRESTAT_GET => self.wasi_fd_prestat_get(args),
-            WasiAPIName::FD_PRESTAT_DIR_NAME => self.wasi_fd_prestat_dir_name(args),
-            WasiAPIName::FD_PWRITE => self.wasi_fd_pwrite(args),
-            WasiAPIName::FD_READ => self.wasi_fd_read(args),
-            WasiAPIName::FD_READDIR => self.wasi_fd_readdir(args),
-            WasiAPIName::FD_RENUMBER => self.wasi_fd_renumber(args),
-            WasiAPIName::FD_SEEK => self.wasi_fd_seek(args),
-            WasiAPIName::FD_SYNC => self.wasi_fd_sync(args),
-            WasiAPIName::FD_TELL => self.wasi_fd_tell(args),
-            WasiAPIName::FD_WRITE => self.wasi_fd_write(args),
-            WasiAPIName::PATH_CREATE_DIRECTORY => self.wasi_path_create_directory(args),
-            WasiAPIName::PATH_FILESTAT_GET => self.wasi_path_filestat_get(args),
-            WasiAPIName::PATH_FILESTAT_SET_TIMES => self.wasi_path_filestat_set_times(args),
-            WasiAPIName::PATH_LINK => self.wasi_path_link(args),
-            WasiAPIName::PATH_OPEN => self.wasi_path_open(args),
-            WasiAPIName::PATH_READLINK => self.wasi_path_readlink(args),
-            WasiAPIName::PATH_REMOVE_DIRECTORY => self.wasi_path_remove_directory(args),
-            WasiAPIName::PATH_RENAME => self.wasi_path_rename(args),
-            WasiAPIName::PATH_SYMLINK => self.wasi_path_symlink(args),
-            WasiAPIName::PATH_UNLINK_FILE => self.wasi_path_unlink_file(args),
-            WasiAPIName::POLL_ONEOFF => self.wasi_poll_oneoff(args),
-            WasiAPIName::PROC_EXIT => self.wasi_proc_exit(args),
-            WasiAPIName::PROC_RAISE => self.wasi_proc_raise(args),
-            WasiAPIName::SCHED_YIELD => self.wasi_sched_yield(args),
-            WasiAPIName::RANDOM_GET => self.wasi_random_get(args),
-            WasiAPIName::SOCK_RECV => self.wasi_sock_recv(args),
-            WasiAPIName::SOCK_SEND => self.wasi_sock_send(args),
-            WasiAPIName::SOCK_SHUTDOWN => self.wasi_sock_shutdown(args),
+        let return_code = match call_index {
+            APIName::WasiAPIName(wasi_call_index) => match wasi_call_index {
+                WasiAPIName::ARGS_GET => self.wasi_args_get(args),
+                WasiAPIName::ARGS_SIZES_GET => self.wasi_args_sizes_get(args),
+                WasiAPIName::ENVIRON_GET => self.wasi_environ_get(args),
+                WasiAPIName::ENVIRON_SIZES_GET => self.wasi_environ_sizes_get(args),
+                WasiAPIName::CLOCK_RES_GET => self.wasi_clock_res_get(args),
+                WasiAPIName::CLOCK_TIME_GET => self.wasi_clock_time_get(args),
+                WasiAPIName::FD_ADVISE => self.wasi_fd_advise(args),
+                WasiAPIName::FD_ALLOCATE => self.wasi_fd_allocate(args),
+                WasiAPIName::FD_CLOSE => self.wasi_fd_close(args),
+                WasiAPIName::FD_DATASYNC => self.wasi_fd_datasync(args),
+                WasiAPIName::FD_FDSTAT_GET => self.wasi_fd_fdstat_get(args),
+                WasiAPIName::FD_FDSTAT_SET_FLAGS => self.wasi_fd_fdstat_set_flags(args),
+                WasiAPIName::FD_FDSTAT_SET_RIGHTS => self.wasi_fd_fdstat_set_rights(args),
+                WasiAPIName::FD_FILESTAT_GET => self.wasi_fd_filestat_get(args),
+                WasiAPIName::FD_FILESTAT_SET_SIZE => self.wasi_fd_filestat_set_size(args),
+                WasiAPIName::FD_FILESTAT_SET_TIMES => self.wasi_fd_filestat_set_times(args),
+                WasiAPIName::FD_PREAD => self.wasi_fd_pread(args),
+                WasiAPIName::FD_PRESTAT_GET => self.wasi_fd_prestat_get(args),
+                WasiAPIName::FD_PRESTAT_DIR_NAME => self.wasi_fd_prestat_dir_name(args),
+                WasiAPIName::FD_PWRITE => self.wasi_fd_pwrite(args),
+                WasiAPIName::FD_READ => self.wasi_fd_read(args),
+                WasiAPIName::FD_READDIR => self.wasi_fd_readdir(args),
+                WasiAPIName::FD_RENUMBER => self.wasi_fd_renumber(args),
+                WasiAPIName::FD_SEEK => self.wasi_fd_seek(args),
+                WasiAPIName::FD_SYNC => self.wasi_fd_sync(args),
+                WasiAPIName::FD_TELL => self.wasi_fd_tell(args),
+                WasiAPIName::FD_WRITE => self.wasi_fd_write(args),
+                WasiAPIName::PATH_CREATE_DIRECTORY => self.wasi_path_create_directory(args),
+                WasiAPIName::PATH_FILESTAT_GET => self.wasi_path_filestat_get(args),
+                WasiAPIName::PATH_FILESTAT_SET_TIMES => self.wasi_path_filestat_set_times(args),
+                WasiAPIName::PATH_LINK => self.wasi_path_link(args),
+                WasiAPIName::PATH_OPEN => self.wasi_path_open(args),
+                WasiAPIName::PATH_READLINK => self.wasi_path_readlink(args),
+                WasiAPIName::PATH_REMOVE_DIRECTORY => self.wasi_path_remove_directory(args),
+                WasiAPIName::PATH_RENAME => self.wasi_path_rename(args),
+                WasiAPIName::PATH_SYMLINK => self.wasi_path_symlink(args),
+                WasiAPIName::PATH_UNLINK_FILE => self.wasi_path_unlink_file(args),
+                WasiAPIName::POLL_ONEOFF => self.wasi_poll_oneoff(args),
+                WasiAPIName::PROC_EXIT => self.wasi_proc_exit(args),
+                WasiAPIName::PROC_RAISE => self.wasi_proc_raise(args),
+                WasiAPIName::SCHED_YIELD => self.wasi_sched_yield(args),
+                WasiAPIName::RANDOM_GET => self.wasi_random_get(args),
+                WasiAPIName::SOCK_RECV => self.wasi_sock_recv(args),
+                WasiAPIName::SOCK_SEND => self.wasi_sock_send(args),
+                WasiAPIName::SOCK_SHUTDOWN => self.wasi_sock_shutdown(args),
+                WasiAPIName::_LAST => unreachable!(),
+            },
+            APIName::VeracruzAPIName(veracruz_call_index) => match veracruz_call_index {
+                VeracruzAPIName::FD_CREATE => self.veracruz_fd_create(args),
+            },
         }?;
         Ok(Some(RuntimeValue::I32((return_code as i16).into())))
     }
@@ -559,7 +623,8 @@ impl WASMIRuntimeState {
     fn load_program(&mut self, buffer: &[u8]) -> Result<(), FatalEngineError> {
         let module = Module::from_buffer(buffer)?;
         let env_resolver = wasmi::ImportsBuilder::new()
-            .with_resolver(WasiWrapper::WASI_SNAPSHOT_MODULE_NAME, self);
+            .with_resolver(WasiWrapper::WASI_SNAPSHOT_MODULE_NAME, self)
+            .with_resolver(WasiWrapper::VERACRUZ_SI_MODULE_NAME, self);
 
         let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
         if not_started_module_ref.has_start() {
@@ -1226,6 +1291,11 @@ impl WASMIRuntimeState {
         let socket = args.nth_checked::<u32>(0)?;
         let sd_flag = args.nth::<u8>(1);
         Self::convert_to_errno(self.vfs.sock_shutdown(&mut self.memory()?, socket, sd_flag))
+    }
+
+    fn veracruz_fd_create(&mut self, args: RuntimeArgs) -> WasiResult {
+        let address = args.nth_checked::<u32>(0)?;
+        Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
 }
 
