@@ -8,7 +8,7 @@
 # and copyright information.
 
 { lib, stdenv, buildPackages, mkShell
-, rustc, cargo, git, cacert, rustfmt
+, rustc, cargo, cmake, git, cacert, rustfmt
 , crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
 , libsel4, libs, sysroot-rs
@@ -50,7 +50,7 @@ mkShell (crateUtils.baseEnv // rec {
   ];
 
   nativeBuildInputs = [
-    rustc cargo git cacert rustfmt
+    rustc cargo cmake git cacert rustfmt
     protobuf perl python3
   ];
 
