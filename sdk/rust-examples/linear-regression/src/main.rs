@@ -85,11 +85,28 @@ fn linear_regression(data: &[(f64, f64)]) -> LinearRegression {
     }
 }
 
+mod veracruz_si_import {
+    #[link(wasm_import_module = "veracruz_si")]
+    extern "C" {
+        pub fn test_psa_crypto() -> u32;
+    }
+}
+
+mod veracruz_si {
+    pub fn test_psa_crypto() -> u32 {
+        unsafe { crate::veracruz_si_import::test_psa_crypto() }
+    }
+}
+
 /// Entry point.  The program expects a single data item, which is expected to
 /// be a Rust vector of pairs of `f64` values.  Writes back a Bincode-encoded
 /// `LinearRegression` struct as output.  Whoever receives the result is assumed
 /// to know how to decode the result.
 fn main() -> anyhow::Result<()> {
+    if veracruz_si::test_psa_crypto() != 0 {
+        eprintln!("test_psa_crypto() failed");
+        panic!("xx");
+    }
     let data = read_input()?;
     let result = linear_regression(&data);
     let result_encode = pinecone::to_vec(&result)?;

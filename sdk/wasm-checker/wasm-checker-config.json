@@ -44,6 +44,8 @@
         "random_get",
         "sock_recv",
         "sock_send",
-        "sock_shutdown"
+        "sock_shutdown",
+
+        "test_psa_crypto"
     ]
 }
