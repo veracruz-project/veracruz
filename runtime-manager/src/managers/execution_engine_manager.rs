@@ -25,7 +25,7 @@ use transport_protocol::transport_protocol::{
 
 lazy_static! {
     // TODO: wrap into a runtime manager management object.
-    static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
+    static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, (u64, Vec<u8>)>> = Mutex::new(HashMap::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -149,10 +149,15 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
     }
 }
 
-/// Tries to parse the incoming data into a `RuntimeManagerRequest`.  If this is not
-/// possible, returns `Err(reason)`.  If we still need to receive more data in
-/// order to parse a full request, returns `Ok(None)`.  Otherwise, returns
-/// `Ok(request)` for the parsed request.
+/// Append received chunks to the session's incoming buffer until the protocol
+/// buffer, serializing a request, is complete and can be deserialized.
+/// The first chunk of the series is prefixed with the protocol buffer's total
+/// length.
+/// If the incoming buffer reaches its expected length, then the protocol buffer
+/// is considered complete and parsed into a `RuntimeManagerRequest` before
+/// flushing the incoming buffer and returning `Ok(request)`.
+/// Otherwise, if we still need to receive more data in order to parse a full
+/// request, returns `Ok(None)`.
 ///
 /// TODO: harden this against potential malfeasance.  See the note, below.
 fn parse_incoming_buffer(
@@ -162,33 +167,52 @@ fn parse_incoming_buffer(
     let mut incoming_buffer_hash = INCOMING_BUFFER_HASH.lock()?;
 
     // First, make sure there is an entry in the hash for the TLS session.
-    if incoming_buffer_hash.get(&tls_session_id).is_none() {
-        incoming_buffer_hash.insert(tls_session_id, Vec::new());
+    // If not, this means we are receiving the first chunk of the protocol
+    // buffer.
+    let mut input = if incoming_buffer_hash.get(&tls_session_id).is_none() {
+        // Extract the protocol buffer's total length as u64
+        let input_data = input.split_off(8);
+        let mut expected_length: [u8; 8] = [0; 8];
+        expected_length.copy_from_slice(input.as_slice());
+        let expected_length = u64::from_be_bytes(expected_length);
+
+        // Insert the expected length in the hash table
+        incoming_buffer_hash.insert(tls_session_id, (expected_length, Vec::new()));
+
+        input_data
     }
+    else {
+        input
+    };
 
     // This should not panic, given the above.  If it does, something is wrong.
-    let incoming_buffer = incoming_buffer_hash.get_mut(&tls_session_id).ok_or(
+    let (expected_length, incoming_buffer) = incoming_buffer_hash.get_mut(&tls_session_id).ok_or(
         RuntimeManagerError::UnavailableIncomeBufferError(tls_session_id as u64),
     )?;
 
     incoming_buffer.append(&mut input);
 
-    // NB: `parse_from_bytes()` returning failure is interpreted as meaning the
-    // full protocol buffer has not yet been received. So we return `Ok(None)`
-    // with the hope that eventually we will receive all of it, and then
-    // `parse_from_bytes()` will return `Ok(parsed)`. In a well-behaving system,
-    // this is reasonable.  In a poorly-behaved system (under attack, clients
-    // just getting confused) it is not reasonable, and can eventually result in
-    // "Out of Memory" or Garbage out.
+    // We return `Ok(None)` as long as the full protocol buffer has not yet been
+    // received. Once received, `parse_from_bytes()` parses it and returns
+    // `Ok(parsed)`.
+    // In a well-behaving system, this is reasonable.  In a poorly-behaved
+    // system (under attack, clients just getting confused) it is not
+    // reasonable, and can eventually result in "Out of Memory" or Garbage out.
     //
     // TODO: It would be nice to check the error, and then determine if this might
     // be the case or if it is hopeless and we could just error out.
-    match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer)
-    {
-        Err(_) => Ok(None),
-        Ok(parsed) => {
-            incoming_buffer_hash.remove(&tls_session_id);
-            Ok(Some(parsed))
+
+	if incoming_buffer.len() < *expected_length as usize {
+		return Ok(None)
+	}
+    else {
+        match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer)
+        {
+            Err(_) => Ok(None),
+            Ok(parsed) => {
+                incoming_buffer_hash.remove(&tls_session_id);
+                Ok(Some(parsed))
+            }
         }
     }
 }

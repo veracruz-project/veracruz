@@ -447,7 +447,9 @@ impl VeracruzClient {
             None => (),
         }
 
-        self.tls_session.write_all(&data[..])?;
+        // Write the data to the TLS session, prefixed by the data length.
+        let data_len = u64::to_be_bytes(data.len() as u64);
+        self.tls_session.write_all(&[&data_len, &data[..]].concat())?;
 
         let mut outgoing_data_vec = Vec::new();
         let outgoing_data = Vec::new();
