@@ -151,13 +151,18 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
 
 /// Append received chunks to the session's incoming buffer until the protocol
 /// buffer, serializing a request, is complete and can be deserialized.
-/// The first chunk of the series is prefixed with the protocol buffer's total
-/// length.
+/// Each request is serialized on the client side, prefixed by its length, then
+/// passed to the TLS client which encrypts it and splits it into an array of
+/// 16KB TLS records, sent one by one to the runtime manager.
+/// The first chunk received by the runtime manager therefore contains the
+/// protocol buffer's total length.
 /// If the incoming buffer reaches its expected length, then the protocol buffer
 /// is considered complete and parsed into a `RuntimeManagerRequest` before
 /// flushing the incoming buffer and returning `Ok(request)`.
-/// Otherwise, if we still need to receive more data in order to parse a full
-/// request, returns `Ok(None)`.
+/// Otherwise, the runtime manager knows it still needs to receive more data in
+/// order to parse a full request, and returns `Ok(None)`.
+/// This technique significantly decreases buffer processing time hence latency,
+/// especially when dealing with large requests, e.g. files.
 ///
 /// TODO: harden this against potential malfeasance.  See the note, below.
 fn parse_incoming_buffer(
