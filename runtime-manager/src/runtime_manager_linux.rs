@@ -225,7 +225,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
 
     // Configure TCP to flush outgoing buffers immediately. This reduces latency
     // when dealing with small packets
-    fd.set_nodelay(true);
+    let _ = fd.set_nodelay(true);
 
     info!("TCP listener connected on {:?}.", client_addr);
 

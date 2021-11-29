@@ -339,7 +339,7 @@ pub mod veracruz_server_linux {
 
             // Configure TCP to flush outgoing buffers immediately. This reduces
             // latency when dealing with small packets
-            runtime_manager_socket.set_nodelay(true);
+            let _ = runtime_manager_socket.set_nodelay(true);
 
             info!(
                 "Connected to Runtime Manager enclave at address {}.",
