@@ -174,21 +174,18 @@ fn parse_incoming_buffer(
     // First, make sure there is an entry in the hash for the TLS session.
     // If not, this means we are receiving the first chunk of the protocol
     // buffer.
-    let mut input = if incoming_buffer_hash.get(&tls_session_id).is_none() {
+    if incoming_buffer_hash.get(&tls_session_id).is_none() {
         // Extract the protocol buffer's total length as u64
-        let input_data = input.split_off(8);
-        let mut expected_length: [u8; 8] = [0; 8];
-        expected_length.copy_from_slice(input.as_slice());
-        let expected_length = u64::from_be_bytes(expected_length);
+        let remaining_data = input.split_off(8);
+        let mut expected_length_bytes: [u8; 8] = [0; 8];
+        expected_length_bytes.copy_from_slice(input.as_slice());
+        let expected_length = u64::from_be_bytes(expected_length_bytes);
 
         // Insert the expected length in the hash table
         incoming_buffer_hash.insert(tls_session_id, (expected_length, Vec::new()));
 
-        input_data
+        input = remaining_data;
     }
-    else {
-        input
-    };
 
     // This should not panic, given the above.  If it does, something is wrong.
     let (expected_length, incoming_buffer) = incoming_buffer_hash.get_mut(&tls_session_id).ok_or(
