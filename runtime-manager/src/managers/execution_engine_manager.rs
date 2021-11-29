@@ -204,12 +204,12 @@ fn parse_incoming_buffer(
     // TODO: It would be nice to check the error, and then determine if this might
     // be the case or if it is hopeless and we could just error out.
 
-	if incoming_buffer.len() < *expected_length as usize {
-		return Ok(None)
-	}
-    else {
-        match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer)
-        {
+    if incoming_buffer.len() < *expected_length as usize {
+        return Ok(None);
+    } else {
+        match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(
+            &incoming_buffer,
+        ) {
             Err(_) => Ok(None),
             Ok(parsed) => {
                 incoming_buffer_hash.remove(&tls_session_id);
