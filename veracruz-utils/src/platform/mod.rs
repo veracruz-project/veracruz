@@ -19,7 +19,5 @@ pub mod icecap;
 pub mod linux;
 #[cfg(feature = "nitro")]
 pub mod nitro;
-#[cfg(feature = "tz")]
-pub mod tz;
 #[cfg(any(feature = "nitro", feature = "linux"))]
 pub mod vm;

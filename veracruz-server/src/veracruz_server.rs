@@ -75,9 +75,6 @@ pub enum VeracruzServerError {
     /// A HTTP error was produced.
     #[error(display = "Http error: {}.", _0)]
     HttpError(HttpError),
-    #[cfg(feature = "sgx")]
-    #[error(display = "VeracruzServer: SGXError: {:?}.", _0)]
-    SGXError(sgx_types::sgx_status_t),
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
@@ -115,12 +112,6 @@ pub enum VeracruzServerError {
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),
-    #[cfg(feature = "tz")]
-    #[error(display = "VeracruzServer: UUIDError: {:?}.", _0)]
-    UUIDError(#[error(source)] uuid::parser::ParseError),
-    #[cfg(feature = "tz")]
-    #[error(display = "VeracruzServer: OpteeError: {:?}.", _0)]
-    OpteeError(#[error(source)] optee_teec::Error),
     #[cfg(feature = "icecap")]
     #[error(display = "VeracruzServer: IceCap error: {:?}", _0)]
     IceCapError(IceCapError),
@@ -204,18 +195,6 @@ pub enum VeracruzServerError {
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         VeracruzServerError::LockError(format!("{:?}", error))
-    }
-}
-
-#[cfg(feature = "sgx")]
-impl From<sgx_types::sgx_status_t> for VeracruzServerError {
-    fn from(error: sgx_types::sgx_status_t) -> Self {
-        match error {
-            sgx_types::sgx_status_t::SGX_SUCCESS => {
-                panic!("Expected an error code but received an success status")
-            }
-            e => VeracruzServerError::SGXError(e),
-        }
     }
 }
 

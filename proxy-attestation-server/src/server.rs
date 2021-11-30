@@ -12,7 +12,7 @@
 use crate::attestation;
 #[cfg(feature = "nitro")]
 use crate::attestation::nitro;
-#[cfg(any(feature = "linux", feature = "tz", feature = "icecap"))]
+#[cfg(any(feature = "linux", feature = "icecap"))]
 use crate::attestation::psa;
 
 use lazy_static::lazy_static;
@@ -175,13 +175,13 @@ async fn psa_router(
     psa_request: web::Path<String>,
     input_data: String,
 ) -> ProxyAttestationServerResponder {
-    #[cfg(any(feature = "linux", feature = "tz", feature = "icecap"))]
+    #[cfg(any(feature = "linux", feature = "icecap"))]
     if psa_request.into_inner().as_str() == "AttestationToken" {
         psa::attestation_token(input_data)
     } else {
         Err(ProxyAttestationServerError::UnsupportedRequestError)
     }
-    #[cfg(not(any(feature = "tz", feature = "linux", feature = "icecap")))]
+    #[cfg(not(any(feature = "linux", feature = "icecap")))]
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 

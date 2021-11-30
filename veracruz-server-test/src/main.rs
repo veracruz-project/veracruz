@@ -85,7 +85,7 @@ mod tests {
     static SETUP: Once = Once::new();
     static DEBUG_SETUP: Once = Once::new();
     lazy_static! {
-        // This is a semi-hack to test of if the debug is called in the SGX env.
+        // This is a semi-hack to test of if the debug is called.
         // In each run this flag should be set false.
         static ref DEBUG_IS_CALLED: AtomicBool = AtomicBool::new(false);
         // A global flag, between the server thread and the client thread in the test_template.
