@@ -1,6 +1,5 @@
 [package]
 authors = ["The Veracruz Development Team"]
-build = "build.rs"
 description = "The trusted Veracruz runtime's command-and-control module.  Co-ordinates and directs the rest of the runtime."
 edition = "2018"
 name = "runtime_manager_enclave"
