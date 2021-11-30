@@ -20,6 +20,8 @@ fn main() {
         cfg_if::cfg_if! {
             if #[cfg(feature = "linux")] {
                 "gcc".to_string()
+            } else if #[cfg(feature = "nitro")] {
+                "gcc".to_string()
             } else {
                 env::var(format!("CC_{}", env::var("TARGET").unwrap().replace("-", "_"))).unwrap()
             }
