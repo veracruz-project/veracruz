@@ -1,25 +1,3 @@
-[target.aarch64-unknown-optee-trustzone]
-linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-ld"
-ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc-ar"
-rustflags = [
-    "-C", "link-arg=-nostdlib",
-    "-C", "link-arg=-Tta.lds",
-    "-C", "link-arg=--sort-section=alignment",
-    "-C", "link-arg=-pie",
-    "-C", "link-dead-code",
-]
-
-[target.arm-unknown-optee-trustzone]
-linker = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-ld.bfd"
-ar = "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch32/bin/arm-linux-gnueabihf-ar"
-rustflags = [
-    "-C", "link-arg=-nostdlib",
-    "-C", "link-arg=-Tta.lds",
-    "-C", "link-arg=--sort-section=alignment",
-    "-C", "link-arg=-pie",
-    "-C", "link-dead-code",
-]
-
 [net]
 retry = 3
 git-fetch-with-cli = true

@@ -22,7 +22,7 @@ use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
     parse_proxy_attestation_server_response, parse_psa_attestation_init,
-    parse_sgx_attestation_init, serialize_start_msg, ProxyAttestationServerResponse,
+    serialize_start_msg, ProxyAttestationServerResponse,
     TransportProtocolError,
 };
 
@@ -278,7 +278,6 @@ where
 
     #[cfg(any(
         feature = "linux",
-        feature = "tz",
         feature = "nitro",
         feature = "icecap"
     ))]
@@ -298,19 +297,6 @@ where
         Ok((device_id, challenge))
     } else {
         error!("Unexpected response from Proxy Attestation Service.  Expecting PSA attestation initialization message.");
-
-        Err(HttpError::ProtocolError(response))
-    }
-    #[cfg(feature = "sgx")]
-    if response.has_sgx_attestation_init() {
-        let (challenge, device_id) =
-            parse_sgx_attestation_init(response.get_sgx_attestation_init());
-
-        info!("Device ID and challenge successfully obtained from Proxy Attestation Service.");
-
-        Ok((device_id, challenge))
-    } else {
-        error!("Unexpected response from Proxy Attestation Service.  Expecting SGX attestation initialization message.");
 
         Err(HttpError::ProtocolError(response))
     }

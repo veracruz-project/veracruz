@@ -45,10 +45,6 @@ mod tests {
     use veracruz_server::VeracruzServerLinux as VeracruzServerEnclave;
     #[cfg(feature = "nitro")]
     use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
-    #[cfg(feature = "sgx")]
-    use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
-    #[cfg(feature = "tz")]
-    use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
     use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
     // Policy files
@@ -799,10 +795,6 @@ mod tests {
         let test_target_platform: Platform = Platform::Linux;
         #[cfg(feature = "nitro")]
         let test_target_platform: Platform = Platform::Nitro;
-        #[cfg(feature = "sgx")]
-        let test_target_platform: Platform = Platform::SGX;
-        #[cfg(feature = "tz")]
-        let test_target_platform: Platform = Platform::TrustZone;
         #[cfg(feature = "icecap")]
         let test_target_platform: Platform = Platform::IceCap;
 

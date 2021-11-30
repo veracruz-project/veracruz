@@ -10,10 +10,6 @@
 	path = psa-attestation/lib/mbed-crypto
 	url = https://github.com/veracruz-project/mbed-crypto.git
     branch = veracruz
-[submodule "third_party/rust-sgx-sdk"]
-	path = third-party/rust-sgx-sdk
-	url = https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git
-    branch = veracruz
 [submodule "docker"]
 	path = docker
 	url = https://github.com/veracruz-project/veracruz-docker-image.git

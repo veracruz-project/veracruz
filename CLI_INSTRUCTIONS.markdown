@@ -13,9 +13,8 @@ Veracruz.
 
 First lets make sure we've built and installed the Veracruz binaries. For
 this part you need to specify which Trusted Execution Environment (TEE) you are
-using. So for example, if you are running Veracruz on SGX, you would
-run `make sgx-cli-install`, if you are using TrustZone, you would
-run `make trustzone-cli-install`.
+using. So for example, if you are running Veracruz on Nitro, you would
+run `make nitro-cli-install`.
 
 We're also going to need a WebAssembly toolchain to build our example binary.
 This can be built using `make sdk`. Fortunately, you can combine these two
@@ -23,7 +22,7 @@ rules, allowing you to maximize the time you have to get coffee while the code
 is compiling:
 
 ``` bash
-$ make sgx-cli-install sdk
+$ make nitro-cli-install sdk
 ...
 ```
 

@@ -9,13 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#[cfg(feature = "tz")]
-use optee_utee::trace_println;
 use policy_utils::{policy::Policy, principal::Principal};
-#[cfg(feature = "sgx")]
-use sgx_types::sgx_status_t;
-#[cfg(feature = "sgx")]
-use std::ffi::CString;
 use std::sync::Mutex;
 
 use std::{
@@ -248,32 +242,6 @@ pub fn error_message(message: String, error_code: u32) {
 /// should only print something to *stdoout* on the host's machine if the debug
 /// configuration flag is set in the Veracruz global policy.
 fn print_message(message: String, code: u32) {
-    #[cfg(feature = "sgx")]
-    {
-        let mut ocall_ret = sgx_status_t::SGX_SUCCESS;
-        let ocall_rst = unsafe {
-            crate::runtime_manager_sgx::debug_and_error_output_ocall(
-                &mut ocall_ret,
-                CString::new(message).unwrap().as_ptr(),
-                code,
-            )
-        };
-        if ocall_ret != sgx_status_t::SGX_SUCCESS || ocall_rst != sgx_status_t::SGX_SUCCESS {
-            // NOTE: This function is the exit point for Err.
-            //       If it has a problem, just panic.
-            panic!();
-        }
-    }
-    #[cfg(feature = "tz")]
-    if code == 0 {
-        trace_println!("Enclave debug message \"{}\"", message);
-    } else {
-        trace_println!(
-            "Enclave returns error code {} and message \"{}\"",
-            code,
-            message
-        );
-    }
     #[cfg(feature = "linux")]
     if code == 0 {
         eprintln!("Enclave debug message \"{}\"", message);

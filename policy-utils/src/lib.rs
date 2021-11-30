@@ -29,12 +29,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![cfg_attr(feature = "sgx", no_std)]
-
-#[cfg(feature = "sgx")]
-#[macro_use]
-extern crate sgx_tstd as std;
-
 #[cfg(feature = "std")]
 use error::PlatformError;
 #[cfg(feature = "std")]
@@ -61,10 +55,6 @@ pub enum Platform {
     /// The enclave is running as a Linux process, either unprotected or as part of a
     /// protected Virtual Machine-like enclaving mechanism.
     Linux,
-    /// The enclave is running under Intel SGX.
-    SGX,
-    /// The enclave is running under Arm TrustZone.
-    TrustZone,
     /// The enclave is running under AWS Nitro enclaves.
     Nitro,
     /// The enclave is running under IceCap.
@@ -78,8 +68,6 @@ impl FromStr for Platform {
     type Err = PlatformError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "sgx" => Ok(Platform::SGX),
-            "trustzone" => Ok(Platform::TrustZone),
             "nitro" => Ok(Platform::Nitro),
             "icecap" => Ok(Platform::IceCap),
             "linux" => Ok(Platform::Linux),
@@ -93,8 +81,6 @@ impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Platform::Linux => write!(f, "linux"),
-            Platform::SGX => write!(f, "sgx"),
-            Platform::TrustZone => write!(f, "trustzone"),
             Platform::Nitro => write!(f, "nitro"),
             Platform::IceCap => write!(f, "icecap"),
             Platform::Mock => write!(f, "mock"),

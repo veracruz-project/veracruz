@@ -77,10 +77,6 @@ pub struct Policy {
     ciphersuite: String,
     /// The hash of the Veracruz trusted runtime for Linux applications.
     runtime_manager_hash_linux: Option<String>,
-    /// The hash of the Veracruz trusted runtime for SGX enclaves.
-    runtime_manager_hash_sgx: Option<String>,
-    /// The hash of the Veracruz trusted runtime for TrustZone TAs.
-    runtime_manager_hash_tz: Option<String>,
     /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
     runtime_manager_hash_nitro: Option<String>,
     /// The hash of the Veracruz trusted runtime for IceCap.
@@ -116,8 +112,6 @@ impl Policy {
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
         runtime_manager_hash_linux: Option<String>,
-        runtime_manager_hash_sgx: Option<String>,
-        runtime_manager_hash_tz: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
         runtime_manager_hash_icecap: Option<String>,
         proxy_attestation_server_url: String,
@@ -135,8 +129,6 @@ impl Policy {
             enclave_cert_expiry,
             ciphersuite,
             runtime_manager_hash_linux,
-            runtime_manager_hash_sgx,
-            runtime_manager_hash_tz,
             runtime_manager_hash_nitro,
             runtime_manager_hash_icecap,
             proxy_attestation_server_url,
@@ -210,22 +202,6 @@ impl Policy {
                     ))
                 }
             },
-            Platform::SGX => match &self.runtime_manager_hash_sgx {
-                Some(hash) => hash,
-                None => {
-                    return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_sgx".to_string(),
-                    ))
-                }
-            },
-            Platform::TrustZone => match &self.runtime_manager_hash_tz {
-                Some(hash) => hash,
-                None => {
-                    return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_tz".to_string(),
-                    ))
-                }
-            },
             Platform::Nitro => match &self.runtime_manager_hash_nitro {
                 Some(hash) => hash,
                 None => {
@@ -242,11 +218,11 @@ impl Policy {
                     ))
                 }
             },
-            Platform::Mock => match &self.runtime_manager_hash_sgx {
+            Platform::Mock => match &self.runtime_manager_hash_nitro {
                 Some(hash) => hash,
                 None => {
                     return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_sgx".to_string(),
+                        "runtime_manager_hash_nitro".to_string(),
                     ))
                 }
             },

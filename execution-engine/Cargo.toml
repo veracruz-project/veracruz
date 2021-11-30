@@ -10,26 +10,11 @@ default = []
 # NOTE: Introduce non_sgx in the dependencies to deal with sgx-related modification.
 icecap = ["platform-services/icecap", "policy-utils/icecap", "wasmi/non_sgx"]
 nitro = ["platform-services/nitro", "policy-utils/std", "wasmtime", "wasi-types/std"]
-sgx = [
-  "sgx_tstd",
-  "wasmi/mesalock_sgx",
-  "platform-services/sgx",
-  "serde/mesalock_sgx",
-  "typetag/mesalock_sgx",
-  "policy-utils/sgx",
-  "wasi-types/sgx",
-]
 std = [
   "wasmi/non_sgx",
   "platform-services/std",
   "wasmtime",
   "policy-utils/std",
-  "wasi-types/std"
-]
-tz = [
-  "platform-services/tz",
-  "wasmi/non_sgx",
-  "policy-utils/tz",
   "wasi-types/std"
 ]
 
@@ -46,8 +31,6 @@ pinecone = "0.2"
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
-sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
-sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
 typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz" }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }

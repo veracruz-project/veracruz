@@ -14,9 +14,7 @@ use err_derive::Error;
 use nix;
 #[cfg(feature = "linux")]
 use std::io::Error as IOError;
-#[cfg(any(feature = "tz", feature = "linux", feature = "nitro", feature = "icecap"))]
-use std::sync::PoisonError;
-#[cfg(feature = "sgx")]
+#[cfg(any(feature = "linux", feature = "nitro", feature = "icecap"))]
 use std::sync::PoisonError;
 
 use veracruz_utils::csr::CertError;
@@ -45,9 +43,6 @@ pub enum RuntimeManagerError {
     LockError(std::string::String),
     #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]
     UninitializedSessionError(&'static str),
-    #[cfg(feature = "sgx")]
-    #[error(display = "RuntimeManager: SGXError: {:?}.", _0)]
-    SGXError(sgx_types::sgx_status_t),
     #[error(display = "RuntimeManager: ParseIntError: {:?}", _0)]
     ParseIntError(#[error(source)] core::num::ParseIntError),
     #[error(display = "RuntimeManager: {} failed with error code {:?}.", _0, _1)]
@@ -101,17 +96,5 @@ pub enum RuntimeManagerError {
 impl<T> From<PoisonError<T>> for RuntimeManagerError {
     fn from(error: PoisonError<T>) -> Self {
         RuntimeManagerError::LockError(format!("{:?}", error))
-    }
-}
-
-#[cfg(feature = "sgx")]
-impl From<sgx_types::sgx_status_t> for RuntimeManagerError {
-    fn from(error: sgx_types::sgx_status_t) -> Self {
-        match error {
-            sgx_types::sgx_status_t::SGX_SUCCESS => {
-                panic!("Expected an error code but received an success status")
-            }
-            e => RuntimeManagerError::SGXError(e),
-        }
     }
 }
