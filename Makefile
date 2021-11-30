@@ -81,6 +81,19 @@ nitro-cli:
 	# symlink backwards compatible names
 	ln -sf $(BIN_DIR)/generate-policy               $(BIN_DIR)/pgen
 
+# Using wildcard in the dependencies because if they are there, and newer, it
+# should be rebuilt, but if they aren't there, they don't need to be built
+# (they are optional)
+veracruz-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin)
+	cd veracruz-test && \
+		bash ../test-collateral/populate-test-database.sh
+
+# Using wildcard in the dependencies because if they are there, and newer, it
+# should be rebuilt, but if they aren't there, they don't need to be built
+# (they are optional)
+veracruz-server-test/proxy-attestation-server.db: $(wildcard sgx-root-enclave/css.bin)
+	cd veracruz-server-test && \
+		bash ../test-collateral/populate-test-database.sh
 linux: sdk
 	pwd
 	RUSTFLAGS=$(LINUX_RUST_FLAG) $(MAKE) -C runtime-manager linux
