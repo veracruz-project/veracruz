@@ -212,6 +212,15 @@ pub fn parse_nitro_attestation_doc(
     (proto.get_doc().to_vec(), proto.get_device_id())
 }
 
+pub fn serialize_cert_chain(enclave_cert: &[u8], root_cert: &[u8]) -> TransportProtocolResult {
+    let mut cert_chain = transport_protocol::CertChain::new();
+    cert_chain.set_root_cert(root_cert.to_vec());
+    cert_chain.set_enclave_cert(enclave_cert.to_vec());
+    let mut response = transport_protocol::ProxyAttestationServerResponse::new();
+    response.set_cert_chain(cert_chain);
+    return Ok(response.write_to_bytes()?);
+}
+
 pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> TransportProtocolResult {
     let mut request = transport_protocol::ProxyAttestationServerResponse::new();
     let mut pai = transport_protocol::PsaAttestationInit::new();
