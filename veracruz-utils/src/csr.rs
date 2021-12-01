@@ -207,8 +207,11 @@ pub const COMPUTE_ENCLAVE_CERT_TEMPLATE: CertTemplate = CertTemplate {
 
 const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
 
-const CERTIFICATE_VALID_FROM: [u32; 6]= [2021, 5, 2, 17, 1, 0];
-const CERTIFICATE_EXPIRY: [u32; 6] = [2021, 11, 29, 17, 1, 0];
+// It would probably be better for these times to be generated as offsets
+// from the current time, but all this code is expected to be removed
+// before the end of 2022 in any case, when root enclaves are removed.
+const CERTIFICATE_VALID_FROM: [u32; 6]= [2021, 1, 1, 0, 0, 0]; // 2021-01-01
+const CERTIFICATE_EXPIRY: [u32; 6] = [2031, 2, 1, 0, 0, 0]; // 2031-02-01
 
 pub fn generate_csr(template: &CsrTemplate, private_key: &EcdsaKeyPair) -> Result<Vec<u8>, CertError> {
     let public_key = private_key.public_key().as_ref().clone();
