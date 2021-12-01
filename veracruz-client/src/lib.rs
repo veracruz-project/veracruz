@@ -9,9 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-// NB: added to avoid a compile-failure in Rust's futures library.
-#![feature(proc_macro_hygiene)]
-
 pub mod veracruz_client;
 pub use self::veracruz_client::*;
 pub mod attestation;
