@@ -95,6 +95,13 @@ jobs:
             make sgx-veracruz-test-dry-run
             make sgx-veracruz-client-test
 
+      # Upload Cargo.lock files, using the action from github
+      - name: Upload Cargo.lock files
+        uses: actions/upload-artifact@v2
+        with:
+          name: sgx-cargo-lock.tar
+          path: /work/veracruz/**/Cargo.lock
+
   tz:
     runs-on: ubuntu-latest
     container:
@@ -137,6 +144,13 @@ jobs:
             make trustzone-veracruz-test
             make trustzone-veracruz-client-test
 
+      # Upload Cargo.lock files, using the action from github
+      - name: Upload Cargo.lock files
+        uses: actions/upload-artifact@v2
+        with:
+          name: tz-cargo-lock.tar
+          path: /work/veracruz/**/Cargo.lock
+
   linux:
     runs-on: ubuntu-latest
     container:
@@ -176,6 +190,13 @@ jobs:
             make linux-veracruz-test
             make linux-veracruz-client-test
 
+      # Upload Cargo.lock files, using the action from github
+      - name: Upload Cargo.lock files
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-cargo-lock.tar
+          path: /work/veracruz/**/Cargo.lock
+
   icecap:
     runs-on: ubuntu-latest
     container:
@@ -190,12 +211,20 @@ jobs:
       - name: Build and test Veracruz on IceCap
         run: bash /work/veracruz/icecap/ci/run.sh
 
+     # Upload Cargo.lock files, using the action from github
+      - name: Upload Cargo.lock files
+        uses: actions/upload-artifact@v2
+        with:
+          name: icecap-cargo-lock.tar
+          path: /work/veracruz/**/Cargo.lock
+
+
   nitro:
      runs-on: ubuntu-latest
      container:
        image: ghcr.io/veracruz-project/veracruz/veracruz-nitro:latest
-       volumes: 
-         - ${{ github.workspace }}:/work/veracruz 
+       volumes:
+         - ${{ github.workspace }}:/work/veracruz
      needs: [check-repo-and-compile-sdk]
 
      steps:
@@ -214,10 +243,17 @@ jobs:
              mkdir -p /work/veracruz
              tar -C /work/veracruz -xvf veracruz.tar
              rm veracruz.tar
-       
+
        - name: Running Nitro test script
          id: nitro-build
          run: |
              cd /work/veracruz
              make nitro
              make nitro-cli
+
+       # Upload Cargo.lock files, using the action from github
+       - name: Upload Cargo.lock files
+         uses: actions/upload-artifact@v2
+         with:
+             name: nitro-cargo-lock.tar
+             path: /work/veracruz/**/Cargo.lock
