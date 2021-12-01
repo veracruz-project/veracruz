@@ -167,9 +167,11 @@ Nitro_Src = $(COMMON_Src) src/runtime_manager_nitro.rs src/main.rs
 
 nitro: runtime_manager.eif
 
-runtime_manager.eif: target/x86_64-unknown-linux-musl/release/runtime_manager_enclave Dockerfile
-	nitro-cli build-enclave --docker-dir . --docker-uri runtime_manager --output-file runtime_manager.eif > measurements.json
+runtime_manager.eif: target/x86_64-unknown-linux-musl/release/runtime_manager_enclave dockerdir/Dockerfile
+	ln -f target/x86_64-unknown-linux-musl/release/runtime_manager_enclave dockerdir/
+	nitro-cli build-enclave --docker-dir dockerdir --docker-uri runtime_manager --output-file $@.new > measurements.json
 	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
+	mv $@.new $@
 
 target/x86_64-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
 	cargo build --target x86_64-unknown-linux-musl --release --features nitro
