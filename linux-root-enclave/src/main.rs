@@ -19,7 +19,7 @@
 //! pre-generated `LINUX_ROOT_ENCLAVE_PRIVATE_KEY` embedded in the source below)
 //! which need fixing if they are to be used in a security-sensitive setting.
 //!
-//! See the comparable Intel SGX or AWS Nitro flows for a secure and reliable
+//! See the comparable AWS Nitro flow for a secure and reliable
 //! implementation of attestation for Veracruz.
 //!
 //! # Authors

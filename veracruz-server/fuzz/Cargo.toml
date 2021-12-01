@@ -25,16 +25,9 @@ webpki-roots = "0.16"
 [dependencies.veracruz-server]
 path = ".."
 
-[features]
-sgx = ["veracruz-server/sgx"]
-
 # Prevent this from interfering with workspaces
 [workspace]
 members = ["."]
-
-[[bin]]
-name = "init_veracruz_server"
-path = "fuzz_targets/init_veracruz_server.rs"
 
 [[bin]]
 name = "provision_data"

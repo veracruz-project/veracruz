@@ -11,12 +11,6 @@
 
 #![crate_name = "transport_protocol"]
 #![crate_type = "staticlib"]
-#![cfg_attr(feature = "sgx", no_std)]
-#![cfg_attr(feature = "sgx", feature(rustc_private))]
-
-#[cfg(feature = "sgx")]
-#[macro_use]
-extern crate sgx_tstd as std;
 
 // The protocol buffer generator generates some deprecated code.
 // I cannot fix this, but the warnings are cluttering my output.

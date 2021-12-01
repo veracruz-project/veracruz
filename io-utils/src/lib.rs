@@ -22,9 +22,7 @@ pub mod fd;
 #[cfg(any(
     feature = "nitro",
     feature = "linux",
-    feature = "sgx",
     feature = "icecap",
-    feature = "tz"
 ))]
 pub mod http;
 #[cfg(feature = "nitro")]
