@@ -117,6 +117,9 @@ policy-files: $(POLICY_FILES)
 proxy-attestation-server.db:
 	bash ./populate-test-database.sh proxy-attestation-server.db
 
+$(RUNTIME_MANAGER_CSS_BIN):
+	$(MAKE) css-$(TEE).bin -C ../runtime-manager
+
 css-$(TEE).bin: $(RUNTIME_MANAGER_CSS_BIN)
 	$(MAKE) css-$(TEE).bin -C ../runtime-manager
 	cp $< $@
