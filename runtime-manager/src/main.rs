@@ -13,7 +13,6 @@
 
 #![cfg_attr(any(feature = "icecap"), no_main)]
 #![crate_name = "runtime_manager_enclave"]
-#![feature(rustc_private)]
 #![cfg_attr(any(feature = "icecap"), feature(format_args_nl))]
 
 #[cfg(feature = "linux")]
