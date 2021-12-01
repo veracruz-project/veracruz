@@ -34,7 +34,7 @@ serde = { git = "https://github.com/veracruz-project/serde.git", features = ["de
 typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz" }
 wasi-types = { git = "https://github.com/egrimley-arm/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
-wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
+wasmtime = { git = "https://github.com/egrimley-arm/wasmtime.git", branch = "veracruz", optional = true }
 wast = "=35.0.0"
 
 [lib]
