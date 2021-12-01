@@ -13,7 +13,7 @@ execution-engine = { path = "../../execution-engine", features = ["std"] }
 log = "0.4.13"
 pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
 policy-utils = { path = "../../policy-utils", features = ["std"] }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/egrimley-arm/wasi-types.git", branch = "veracruz" }
 
 [[bin]]
 name = "freestanding-execution-engine"
