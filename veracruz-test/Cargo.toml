@@ -49,7 +49,7 @@ futures = "0.3"
 http = "=0.2.4"
 lazy_static = "1.4"
 log = "=0.4.13"
-pinecone = "0.2"
+pinecone = { git = "https://github.com/egrimley-arm/pinecone.git", branch = "veracruz" }
 policy-utils = { path = "../policy-utils", features = ["std"] }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
 sgx_alloc = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
