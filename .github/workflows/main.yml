@@ -15,7 +15,7 @@ jobs:
   check-repo-and-compile-sdk:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v1
       volumes:
         - ${{ github.workspace }}:/work/veracruz
 
@@ -57,7 +57,7 @@ jobs:
   sgx:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v1
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     needs: [check-repo-and-compile-sdk]
@@ -105,7 +105,7 @@ jobs:
   tz:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v1
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     needs: [check-repo-and-compile-sdk]
@@ -154,7 +154,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
+      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v1
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     needs: [check-repo-and-compile-sdk]
@@ -200,7 +200,7 @@ jobs:
   icecap:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-f1a457a655
+      image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-v1
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -222,7 +222,7 @@ jobs:
   nitro:
      runs-on: ubuntu-latest
      container:
-       image: ghcr.io/veracruz-project/veracruz/veracruz-nitro:latest
+       image: ghcr.io/veracruz-project/veracruz/veracruz-nitro:ci-v1
        volumes:
          - ${{ github.workspace }}:/work/veracruz
      needs: [check-repo-and-compile-sdk]
