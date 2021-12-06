@@ -60,6 +60,6 @@ veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz", optional = true }
-sgx_types = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz", optional = true }
-sgx_ucrypto = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz", optional = true }
+sgx_alloc = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }
+sgx_types = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }
+sgx_ucrypto = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }

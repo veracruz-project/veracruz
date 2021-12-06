@@ -84,7 +84,7 @@ tz = [
 ]
 
 [dependencies]
-bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz", default-features = false, optional = true }
+bincode = { git = "https://github.com/veracruz-project/bincode.git", branch = "veracruz-v1", default-features = false, optional = true }
 bitflags = "=1.2.1"
 clap = { version = "2.33", optional = true }
 env_logger = { version = "0.8.3", optional = true }
@@ -96,21 +96,21 @@ http = "=0.2.4"
 icecap-wrapper = { path = "../icecap/src/rust/icecap-wrapper", optional = true }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz-v1", optional = true }
 libm = { version = "0.2", optional = true }
 log = { version = "=0.4.13", optional = true }
 nix = { version = "0.15", optional = true }
 nsm_io = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
-optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
+optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz-v1", optional = true }
+optee-utee-sys = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz-v1", optional = true }
 policy-utils = { path = "../policy-utils" }
-protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }
+protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz-v1" }
 psa-attestation = { path = "../psa-attestation", optional = true }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz-v1" }
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz-v1" }
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
+serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz-v1" }
 session-manager = { path = "../session-manager" }
 sgx_tcrypto = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 sgx_tdh = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
@@ -118,15 +118,15 @@ sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.g
 sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz-v1" }
 
 [build-dependencies]
 libloading = "=0.5.2"
 uuid = { version = "0.7", features = ["v4"] }
 
 [patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
-sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
+sgx_alloc = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }
+sgx_tstd = { git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", branch = "veracruz-v1", optional = true }
 
 [profile.release]
 lto = true
