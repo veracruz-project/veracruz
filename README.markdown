@@ -33,7 +33,7 @@ We maintain a list of open issues, ideas for new features, and possible improvem
 Many issues in our issue tracker are marked as being suitable for new contributors to the project.
 
 Veracruz maintains a public Slack channel for discussion about the project under the Confidential Compute Consortium's workspace.
-You can access this channel [here](https://join.slack.com/t/confidentialcomputing/shared_invite/zt-nckyewk3-WoMUPIrPdxXCCXrjCnFApw).
+You can access this channel [here](https://join.slack.com/t/confidentialcomputing/shared_invite/zt-wmtekhvm-zXF_U1b5AtRpt~0cZTJgbQ).
 Anybody and everybody is welcome to join to meet the team and discuss the project!
 
 We also have a weekly open Zoom meeting that you are welcome to join which is held every Thursday, 15:00 (BST) / 10:00 (CDT), and last for an hour.
