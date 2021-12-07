@@ -15,12 +15,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![cfg_attr(feature = "sgx", no_std)]
-
-#[cfg(feature = "sgx")]
-#[macro_use]
-extern crate sgx_tstd as std;
-
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;

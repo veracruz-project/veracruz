@@ -28,11 +28,8 @@ In the `veracruz-server-test` directory in the main Veracruz repository.  These
 tests are intended to exercise the Veracruz server through a local functional
 interface.
 
-The tests are organized into phases, numbered 1--4. This is because the
-TrustZone/OPTEE environment cannot run all of the tests subsequently without a
-system restart (this is an issue that we are working to address), and the
-phases allow easy selection of a subset of the tests that can be executed in
-one go.
+The tests are organized into phases, numbered 1--4. The phases allow easy
+selection of a subset of the tests that can be executed in one go.
 
 ## Veracruz-test
 
@@ -100,5 +97,4 @@ Veracruz-server-tests are phased, as discussed above.
 | veracruz-client        | test_veracruz_client_new_invalid_enclave_name                                         | Test VeracruzClient new when provided with an invalid URL for the Veracruz server | one_data_source_policy.json | n/a | n/a | written |
 | veracruz-client        | veracruz_client_policy_violations                                                     | Test VeracruzClient's policy enforcement by setting up new VeracruzClient instances, and then calling them using invalid client credentials for the policy | | n/a | n/a | not written |
 | veracruz-client        | veracruz_client_session                                                               | Test VeracruzClient's ability to send and receive data | one_data_source_policy.json | n/a | n/a | ignored - need to rewrite to the new interfaces |
-| proxy-attestation-server | test_sgx_attestation                                                | Test the proxy attestation server's SGX Attestation flow | n/a | n/a | n/a | written |
 | proxy-attestation-server | test_psa_attestation                                                | Test the proxy attestation server's PSA Atttestation flow | n/a | n/a | n/a | written |

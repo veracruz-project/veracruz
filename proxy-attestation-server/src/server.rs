@@ -12,10 +12,8 @@
 use crate::attestation;
 #[cfg(feature = "nitro")]
 use crate::attestation::nitro;
-#[cfg(any(feature = "linux", feature = "tz", feature = "icecap"))]
+#[cfg(any(feature = "linux", feature = "icecap"))]
 use crate::attestation::psa;
-#[cfg(feature = "sgx")]
-use crate::attestation::sgx;
 
 use lazy_static::lazy_static;
 use std::net::ToSocketAddrs;
@@ -173,32 +171,17 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
 }
 
 #[allow(unused)]
-async fn sgx_router(
-    psa_request: web::Path<String>,
-    input_data: String,
-) -> ProxyAttestationServerResponder {
-    #[cfg(feature = "sgx")]
-    match psa_request.into_inner().as_str() {
-        "Msg1" => sgx::msg1(input_data),
-        "Msg3" => sgx::msg3(input_data),
-        _ => Err(ProxyAttestationServerError::UnsupportedRequestError),
-    }
-    #[cfg(not(feature = "sgx"))]
-    Err(ProxyAttestationServerError::UnimplementedRequestError)
-}
-
-#[allow(unused)]
 async fn psa_router(
     psa_request: web::Path<String>,
     input_data: String,
 ) -> ProxyAttestationServerResponder {
-    #[cfg(any(feature = "linux", feature = "tz", feature = "icecap"))]
+    #[cfg(any(feature = "linux", feature = "icecap"))]
     if psa_request.into_inner().as_str() == "AttestationToken" {
         psa::attestation_token(input_data)
     } else {
         Err(ProxyAttestationServerError::UnsupportedRequestError)
     }
-    #[cfg(not(any(feature = "tz", feature = "linux", feature = "icecap")))]
+    #[cfg(not(any(feature = "linux", feature = "icecap")))]
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
@@ -255,7 +238,6 @@ where
             .wrap(middleware::Logger::default())
             .route("/VerifyPAT", web::post().to(verify_iat))
             .route("/Start", web::post().to(attestation::start))
-            .route("/SGX/{sgx_request}", web::post().to(sgx_router))
             .route("/PSA/{psa_request}", web::post().to(psa_router))
             .route("/Nitro/{nitro_request}", web::post().to(nitro_router))
     })

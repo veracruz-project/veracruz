@@ -19,7 +19,7 @@ executes a program to completion (or failure!).  The Execution Engine exposes a 
 ABI to the WASM binary, and abstracts over the different execution strategies
 available for executing a program: at the moment the JIT strategy is only
 available when using seL4 (or `freestanding-execution-engine`---see below) with
-interpretation as the only selectable execution strategy for TrustZone and SGX
+interpretation as the only selectable execution strategy for Nitro
 (we are currently working on changing this).
 - Transport protocol: is a support library that manages the parsing and
 serialization of `protobuf` messages used in the various Veracruz wire
@@ -51,20 +51,12 @@ communication between the various principals and the isolate.
 ## The Veracruz hybrid proxied-attestation service
 
 Veracruz uses a custom attestation service which sits between client code and
-the native attestation service of a particular enclave implementation (e.g.
-the Intel Attestation Service for Intel SGX).  It contains the following
-components:
+the native attestation service of a particular enclave implementation.
+It contains the following components:
 
 - psa-attestation: support code for the Arm PSA Attestation Protocol and
 Token.  This is the attestation protocol that the Veracruz attestation
 service exposes to client code.
-- The SGX Root Enclave (see the
-`sgx-root-enclave` directory): this is the root attestation isolate that is
-assumed to be present on the delegate's machine, for SGX attestation, and
-which challenges the authenticity of other isolates initialized on the machine
-using local attestation.  This isolate must be authenticated using remote
-attestation, making use of the native attestation service for the isolation
-technology in use to protect the Veracruz runtime.
 - Proxy Attestation Server: this is the attestation service proper, which
   maintains a database of registered keys and identities, and which can be contacted
   by clients to authenticate an isolate enrolled in the service.

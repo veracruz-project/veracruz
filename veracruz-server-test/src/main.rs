@@ -45,10 +45,6 @@ mod tests {
     use veracruz_server::VeracruzServerLinux as VeracruzServerEnclave;
     #[cfg(feature = "nitro")]
     use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
-    #[cfg(feature = "sgx")]
-    use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
-    #[cfg(feature = "tz")]
-    use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
     use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
     // Policy files
@@ -89,7 +85,7 @@ mod tests {
     static SETUP: Once = Once::new();
     static DEBUG_SETUP: Once = Once::new();
     lazy_static! {
-        // This is a semi-hack to test of if the debug is called in the SGX env.
+        // This is a semi-hack to test of if the debug is called.
         // In each run this flag should be set false.
         static ref DEBUG_IS_CALLED: AtomicBool = AtomicBool::new(false);
         // A global flag, between the server thread and the client thread in the test_template.
@@ -799,10 +795,6 @@ mod tests {
         let test_target_platform: Platform = Platform::Linux;
         #[cfg(feature = "nitro")]
         let test_target_platform: Platform = Platform::Nitro;
-        #[cfg(feature = "sgx")]
-        let test_target_platform: Platform = Platform::SGX;
-        #[cfg(feature = "tz")]
-        let test_target_platform: Platform = Platform::TrustZone;
         #[cfg(feature = "icecap")]
         let test_target_platform: Platform = Platform::IceCap;
 

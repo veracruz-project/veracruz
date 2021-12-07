@@ -35,9 +35,6 @@ pub enum ProxyAttestationServerError {
     OpenSSLError(#[error(source)] openssl::error::ErrorStack),
     #[error(display = "ProxyAttestationServer: CurlError: {:?}.", _0)]
     CurlError(#[error(source)] curl::Error),
-    #[cfg(feature = "sgx")]
-    #[error(display = "ProxyAttestationServer: SGXError: {:?}.", _0)]
-    SGXError(sgx_types::sgx_status_t),
     #[error(display = "ProxyAttestationServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
     #[error(
@@ -55,8 +52,6 @@ pub enum ProxyAttestationServerError {
     UnsafeCallError(&'static str, u32),
     #[error(display = "ProxyAttestationServer: No proxy PSA attestation token.")]
     NoProxyPSAAttestationTokenError,
-    #[error(display = "ProxyAttestationServer: No SGX attestation token.")]
-    NoSGXAttestationTokenError,
     #[error(display = "ProxyAttestationServer: Failed to obtain device with ID {}.", _0)]
     NoDeviceError(i32),
     #[error(
@@ -84,18 +79,6 @@ pub enum ProxyAttestationServerError {
     IOError(#[error(source)] std::io::Error),
     #[error(display = "ProxyAttestationServer: BadState error")]
     BadStateError,
-}
-
-#[cfg(feature = "sgx")]
-impl From<sgx_types::sgx_status_t> for ProxyAttestationServerError {
-    fn from(error: sgx_types::sgx_status_t) -> Self {
-        match error {
-            sgx_types::sgx_status_t::SGX_SUCCESS => {
-                panic!("Expected an error code but received an success status")
-            }
-            e => ProxyAttestationServerError::SGXError(e),
-        }
-    }
 }
 
 impl<T> From<std::sync::PoisonError<T>> for ProxyAttestationServerError {

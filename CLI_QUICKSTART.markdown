@@ -17,14 +17,13 @@ First thing is we need to build the actual Veracruz command-line interfaces,
 a WebAssembly toolchain, and the test-collateral artifacts. These can be
 compiled using make, however we need to specify which Trusted Execution
 Environment (TEE) we are building for. So for example, if you are running
-Veracruz on SGX, you would run `make sgx-cli-install`, if you are using
-TrustZone, you would run `make trustzone-cli-install`.
+Veracruz on Nitro, you would run `make nitro-cli-install`.
 
 These can be combined into one command to maximize the time you have to
 make coffee while the code is compiling:
 
 ``` bash
-$ make sgx-cli-install sgx-test-collateral sdk
+$ make nitro-cli-install nitro-test-collateral sdk
 ...
 ```
 

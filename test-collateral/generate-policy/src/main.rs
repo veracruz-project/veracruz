@@ -870,8 +870,6 @@ fn serialize_json(arguments: &Arguments) -> Value {
         serialize_enclave_certificate_timepoint(arguments),
         POLICY_CIPHERSUITE.to_string(),
         linux_hash.clone(),
-        sgx_hash.clone(),
-        Some(HEXLOWER.encode(&veracruz_utils::platform::tz::TRUSTZONE_RUNTIME_MANAGER_HASH)),
         compute_nitro_enclave_hash(arguments),
         compute_icecap_enclave_hash(arguments),
         format!(

@@ -87,10 +87,6 @@ fuzz_target!(|buffer: &[u8]| {
 });
 
 use veracruz_server::veracruz_server::VeracruzServer;
-#[cfg(feature = "sgx")]
-use veracruz_server::VeracruzServerSGX as VeracruzServerEnclave;
-#[cfg(feature = "tz")]
-use veracruz_server::VeracruzServerTZ as VeracruzServerEnclave;
 
 fn init_veracruz_server_and_tls_session(
     policy: Policy,

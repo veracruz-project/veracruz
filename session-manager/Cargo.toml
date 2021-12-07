@@ -6,14 +6,6 @@ name = "session-manager"
 version = "0.3.0"
 
 [features]
-sgx = [
-  "policy-utils/sgx",
-  "sgx_tstd",
-  "sgx_types",
-  "rustls/mesalock_sgx",
-  "webpki/mesalock_sgx",
-  "ring/mesalock_sgx",
-]
 # NOTE: turn on the `std` on ring for Error trait
 icecap = [
   "ring/std",
@@ -29,24 +21,10 @@ std = [
   "ring/std",
   "policy-utils/std"
 ]
-tz = [
-  "policy-utils/tz",
-  "webpki/default",
-  "ring/std",
-  "ring/non_sgx",
-  "optee-utee",
-  "rustls/default",
-]
 
 [dependencies]
 err-derive = "0.2"
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
 policy-utils = { path = "../policy-utils" }
 ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
-sgx_types = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
-
-[patch."https://github.com/apache/teaclave-sgx-sdk.git"]
-sgx_alloc = { branch = "veracruz", git = 'https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git', optional = true }

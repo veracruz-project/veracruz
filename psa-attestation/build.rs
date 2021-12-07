@@ -18,11 +18,7 @@ use std::process::Command;
 fn main() {
     let cc = {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "tz")] {
-                "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-gcc".to_string()
-            } else if #[cfg(feature = "linux")] {
-                "gcc".to_string()
-            } else if #[cfg(feature = "sgx")] {
+            if #[cfg(feature = "linux")] {
                 "gcc".to_string()
             } else if #[cfg(feature = "nitro")] {
                 "gcc".to_string()
@@ -59,29 +55,6 @@ fn main() {
         .unwrap();
     if !make_status.success() {
         panic!("mbedtls failed to build");
-    }
-    // fun fact: mbedtls/mbed-crytpo is already part of the optee code. So
-    // on an optee build, we end up with symbol collisions.
-    // However, it does not appear to contain the PSA Crypto symbols.
-    // Thus, we sorta just need to have both copies right now.
-    // The following renames the colliding symbols, sorta just brushing the
-    // problem under the rug (until it comes back to bite me later, which it
-    // it will)
-    #[cfg(feature = "tz")]
-    let rename_status = Command::new(
-        "/work/rust-optee-trustzone-sdk/optee/toolchains/aarch64/bin/aarch64-linux-gnu-objcopy",
-    )
-    .current_dir(target_dir.clone())
-    .args(&[
-        "--redefine-syms",
-        &format!("{}/redefined_symbols", project_dir),
-        "./libmbedcrypto.a",
-    ])
-    .status()
-    .unwrap();
-    #[cfg(feature = "tz")]
-    if !rename_status.success() {
-        panic!("rename of mbed-crypto symbols failed");
     }
 
     let t_cose_dir = format!("{:}/lib/t_cose", project_dir);

@@ -27,13 +27,7 @@ use cfg_if::cfg_if;
 pub mod result;
 
 cfg_if! {
-    if #[cfg(feature = "sgx")] {
-        #[path="sgx_platform_services.rs"]
-        mod imp;
-    } else if #[cfg(feature = "tz")] {
-        #[path="tz_platform_services.rs"]
-        mod imp;
-    } else if #[cfg(feature = "nitro")] {
+    if #[cfg(feature = "nitro")] {
         #[path="nitro_platform_services.rs"]
         mod imp;
     } else if #[cfg(feature = "icecap")] {
@@ -45,7 +39,7 @@ cfg_if! {
 
     } else {
         compile_error!(
-            "Unrecognised feature: platforms supported are SGX, TZ, Nitro, and std.");
+            "Unrecognised feature: platforms supported are Nitro and std.");
     }
 }
 

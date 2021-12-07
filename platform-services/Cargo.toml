@@ -9,9 +9,7 @@ version = "0.3.0"
 default = []
 icecap = []
 nitro = ["nsm_io", "nsm_lib"]
-sgx = ["sgx_trts"]
 std = ["getrandom", "nix"]
-tz = ["optee-utee"]
 
 [lib]
 name = "platform_services"
@@ -24,8 +22,6 @@ half = "=1.7.1"
 nix = { version = "0.22", optional = true }
 nsm_io = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
-optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz", optional = true }
-sgx_trts = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 
 [profile.release]
 codegen-units = 1

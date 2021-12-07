@@ -349,8 +349,6 @@ impl VeracruzClient {
     fn compare_runtime_hash(&self, received: &[u8]) -> Result<(), VeracruzClientError> {
         let platforms = vec![
             Platform::Linux,
-            Platform::SGX,
-            Platform::TrustZone,
             Platform::Nitro,
             Platform::IceCap,
         ];
