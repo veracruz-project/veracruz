@@ -28,7 +28,6 @@ pub use crate::runtime_manager_icecap::*;
 pub mod runtime_manager_nitro;
 
 pub mod managers;
-mod runtime_manager;
 
 #[cfg(feature = "nitro")]
 fn main() -> Result<(), String> {
