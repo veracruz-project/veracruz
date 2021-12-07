@@ -8,7 +8,7 @@ version = "0.3.0"
 
 [dependencies]
 anyhow = "1.0.14"
-pinecone = { git = "https://github.com/egrimley-arm/pinecone.git", branch = "veracruz", features = ["use-std"] }
+pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz", features = ["use-std"] }
 rusty-machine = "0.5.4"
 serde = { version = "1.0.3", features = ["derive"] }
 

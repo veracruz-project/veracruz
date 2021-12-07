@@ -34,7 +34,7 @@ futures = "0.3"
 http = "=0.2.4"
 lazy_static = "1.4"
 log = "=0.4.13"
-pinecone = { git = "https://github.com/egrimley-arm/pinecone.git", branch = "veracruz", features = ["use-std"] }
+pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz", features = ["use-std"] }
 policy-utils = { path = "../policy-utils", features = ["std"] }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
 transport-protocol = { path = "../transport-protocol" }
