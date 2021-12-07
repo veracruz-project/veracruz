@@ -36,10 +36,9 @@ cfg_if! {
     } else if #[cfg(feature = "std")] {
         #[path="std_platform_services.rs"]
         mod imp;
-
     } else {
         compile_error!(
-            "Unrecognised feature: platforms supported are Nitro and std.");
+            "Unrecognised feature: platforms supported are Icecap, Nitro and std.");
     }
 }
 

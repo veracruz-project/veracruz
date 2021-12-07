@@ -17,10 +17,7 @@ Veracruz runtime and the outside world.
 - Execution Engine: is the WASM execution engine for Veracruz, and which actually
 executes a program to completion (or failure!).  The Execution Engine exposes a custom
 ABI to the WASM binary, and abstracts over the different execution strategies
-available for executing a program: at the moment the JIT strategy is only
-available when using seL4 (or `freestanding-execution-engine`---see below) with
-interpretation as the only selectable execution strategy for Nitro
-(we are currently working on changing this).
+available for executing a program.
 - Transport protocol: is a support library that manages the parsing and
 serialization of `protobuf` messages used in the various Veracruz wire
 protocols.
