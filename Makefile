@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all sdk setup-githooks nitro-veracruz-client-test clean clean-cargo-lock fmt linux linux-veracruz-server-test linux-veracruz-server-test-dry-run linux-test-collateral linux-veracruz-client-test linux-veracruz-test-dry-run linux-veracruz-test linux-cli
+.PHONY: all sdk setup-githooks nitro-veracruz-client-test clean clean-cargo-lock fmt fmt-check linux linux-veracruz-server-test linux-veracruz-server-test-dry-run linux-test-collateral linux-veracruz-client-test linux-veracruz-test-dry-run linux-veracruz-test linux-cli
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
@@ -252,10 +252,30 @@ fmt:
 	$(MAKE) fmt -C sdk
 	cd session-manager && cargo fmt
 	$(MAKE) fmt -C test-collateral
-	cd transport-protocol && cargo fmt
+	# This hits a bug in rustfmt due to path-renamed modules
+	# cd transport-protocol && cargo fmt
 	cd veracruz-client && cargo fmt
-	$(MAKE) fmt -C veracruz-mcu-client
 	cd veracruz-server && cargo fmt
 	cd veracruz-server-test && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
+
+fmt-check:
+	cd execution-engine && cargo fmt -- --check
+	cd io-utils && cargo fmt -- --check
+	cd linux-root-enclave && cargo fmt -- --check
+	cd platform-services && cargo fmt -- --check
+	cd policy-utils && cargo fmt -- --check
+	cd proxy-attestation-server && cargo fmt -- --check
+	cd psa-attestation && cargo fmt -- --check
+	$(MAKE) fmt-check -C runtime-manager
+	$(MAKE) fmt-check -C sdk
+	cd session-manager && cargo fmt -- --check
+	$(MAKE) fmt-check -C test-collateral
+	# This hits a bug in rustfmt due to path-renamed modules
+	# cd transport-protocol && cargo fmt -- --check
+	cd veracruz-client && cargo fmt -- --check
+	cd veracruz-server && cargo fmt -- --check
+	cd veracruz-server-test && cargo fmt -- --check
+	cd veracruz-test && cargo fmt -- --check
+	cd veracruz-utils && cargo fmt -- --check

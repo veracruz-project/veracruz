@@ -69,7 +69,7 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean clean-cargo-lock doc fmt freestanding-execution-engine wasm-checker env update
+.PHONY: all clean clean-cargo-lock doc fmt fmt-check freestanding-execution-engine wasm-checker env update
 
 all: wasm-checker $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-execution-engine
 
@@ -115,6 +115,15 @@ fmt:
         	$(MAKE) -C $$example fmt; \
     	done
 	$(MAKE) -C freestanding-execution-engine/ fmt
+
+fmt-check:
+	for data in $(RELATIVE_DATA_GEN); do \
+                $(MAKE) -C $$data fmt-check; \
+        done
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
+                $(MAKE) -C $$example fmt-check; \
+        done
+	$(MAKE) -C freestanding-execution-engine/ fmt-check
 
 doc:
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \

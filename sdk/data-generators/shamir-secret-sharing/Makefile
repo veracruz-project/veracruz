@@ -14,7 +14,7 @@ TARGET_DATS = share-1.dat share-2.dat share-3.dat
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
 
-.PHONY: all clean quick-clean fmt
+.PHONY: all clean quick-clean fmt fmt-check
 
 all: $(TARGET_DIR_DATS)
 
@@ -42,3 +42,6 @@ quick-clean:
 
 fmt:
 	cargo fmt
+
+fmt-check:
+	cargo fmt -- --check
