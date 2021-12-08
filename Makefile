@@ -182,7 +182,7 @@ clean:
 	cd transport-protocol && cargo clean
 	cd veracruz-client && cargo clean
 	$(MAKE) clean -C veracruz-mcu-client
-	$(MAKE) clean -C veracruz-server
+	cd veracruz-server && cargo clean
 	cd veracruz-server-test && cargo clean
 	cd veracruz-test && cargo clean
 	cd veracruz-utils && cargo clean
@@ -210,7 +210,7 @@ quick-clean:
 	cd transport-protocol && cargo clean
 	cd veracruz-client && cargo clean
 	$(MAKE) quick-clean -C veracruz-mcu-client
-	$(MAKE) quick-clean -C veracruz-server
+	cd veracruz-server && cargo clean
 	cd veracruz-server-test && cargo clean	
 	cd veracruz-test && cargo clean
 	cd veracruz-utils && cargo clean
@@ -239,7 +239,7 @@ update:
 	cd transport-protocol && cargo update
 	cd veracruz-client && cargo update
 	$(MAKE) update -C veracruz-mcu-client
-	$(MAKE) update -C veracruz-server
+	cd veracruz-server && cargo update
 	cd veracruz-server-test && cargo update
 	cd veracruz-test && cargo update
 	cd veracruz-utils && cargo update
@@ -260,7 +260,7 @@ fmt:
 	cd transport-protocol && cargo fmt
 	cd veracruz-client && cargo fmt
 	$(MAKE) fmt -C veracruz-mcu-client
-	$(MAKE) fmt -C veracruz-server
+	cd veracruz-server && cargo fmt
 	cd veracruz-server-test && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt

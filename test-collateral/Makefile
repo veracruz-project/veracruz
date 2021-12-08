@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all policy-files clean pgen
+.PHONY: all policy-files clean quick-clean pgen
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
@@ -198,10 +198,21 @@ $(DATA_DIRS) : %: ../sdk/datasets/%
 doc:
 	$(MAKE) -C generate-policy doc
 
+fmt:
+	$(MAKE) -C generate-policy fmt
+
 clean:
 	rm -f pgen
 	rm -f *.json
 	rm -f css-$(TEE).bin
 	rm -f *.dat
 	$(MAKE) -C generate-policy clean
+	rm -f *.wasm
+
+quick-clean:
+	rm -f pgen
+	rm -f *.json
+	rm -f css-$(TEE).bin
+	rm -f *.dat
+	$(MAKE) -C generate-policy quick-clean
 	rm -f *.wasm
