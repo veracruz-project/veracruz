@@ -12,8 +12,8 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
-        MemoryHandler, WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError,
+        HostFunctionIndexOrName, MemoryHandler, WasiAPIName, WasiWrapper,
     },
     Options,
 };
@@ -46,7 +46,7 @@ impl MemoryHandler for MemoryRef {
     fn get_slice<'a>(
         &'a self,
         address: u32,
-        length: u32
+        length: u32,
     ) -> FileSystemResult<Bound<'a, Self::Slice>> {
         let address = usize::try_from(address).unwrap();
         let length = usize::try_from(length).unwrap();
@@ -57,20 +57,16 @@ impl MemoryHandler for MemoryRef {
         // Note that MemoryRef is already not threadsafe, so we don't have to worry
         // about locking.
         //
-        Ok(Bound::new(
-            self.with_direct_access(|slice| {
-                let slice = &slice[address .. address+length];
-                unsafe {
-                    mem::transmute::<&'_ [u8], &'static [u8]>(slice)
-                }
-            })
-        ))
+        Ok(Bound::new(self.with_direct_access(|slice| {
+            let slice = &slice[address..address + length];
+            unsafe { mem::transmute::<&'_ [u8], &'static [u8]>(slice) }
+        })))
     }
 
     fn get_slice_mut<'a>(
         &'a mut self,
         address: u32,
-        length: u32
+        length: u32,
     ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
         let address = usize::try_from(address).unwrap();
         let length = usize::try_from(length).unwrap();
@@ -81,14 +77,10 @@ impl MemoryHandler for MemoryRef {
         // Note that MemoryRef is already not threadsafe, so we don't have to worry
         // about locking.
         //
-        Ok(BoundMut::new(
-            self.with_direct_access_mut(|slice| {
-                let slice = &mut slice[address .. address+length];
-                unsafe {
-                    mem::transmute::<&'_ mut [u8], &'static mut [u8]>(slice)
-                }
-            })
-        ))
+        Ok(BoundMut::new(self.with_direct_access_mut(|slice| {
+            let slice = &mut slice[address..address + length];
+            unsafe { mem::transmute::<&'_ mut [u8], &'static mut [u8]>(slice) }
+        })))
     }
 
     fn get_size(&self) -> FileSystemResult<u32> {
