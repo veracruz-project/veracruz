@@ -175,7 +175,6 @@ clean:
 	cd proxy-attestation-server && cargo clean
 	cd psa-attestation && cargo clean
 	$(MAKE) clean -C runtime-manager
-	cd runtime-manager-bind && cargo clean
 	$(MAKE) clean -C sdk
 	cd session-manager && cargo clean
 	$(MAKE) clean -C test-collateral
@@ -203,7 +202,6 @@ quick-clean:
 	cd proxy-attestation-server && cargo clean
 	cd psa-attestation && cargo clean
 	$(MAKE) quick-clean -C runtime-manager
-	cd runtime-manager-bind && cargo clean
 	$(MAKE) quick-clean -C sdk
 	cd session-manager && cargo clean
 	$(MAKE) quick-clean -C test-collateral
@@ -219,7 +217,7 @@ quick-clean:
 clean-cargo-lock:
 	$(MAKE) -C sdk clean-cargo-lock
 	$(MAKE) -C test-collateral clean-cargo-lock
-	rm -f $(addsuffix /Cargo.lock,execution-engine io-utils linux-root-enclave platform-services policy-utils proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
+	rm -f $(addsuffix /Cargo.lock,execution-engine io-utils linux-root-enclave platform-services policy-utils proxy-attestation-server psa-attestation runtime-manager session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
@@ -232,7 +230,6 @@ update:
 	cd proxy-attestation-server && cargo update
 	cd psa-attestation && cargo update
 	$(MAKE) update -C runtime-manager
-	cd runtime-manager-bind && cargo update
 	$(MAKE) update -C sdk
 	cd session-manager && cargo update
 	$(MAKE) update -C test-collateral
@@ -253,7 +250,6 @@ fmt:
 	cd proxy-attestation-server && cargo fmt
 	cd psa-attestation && cargo fmt
 	$(MAKE) fmt -C runtime-manager
-	cd runtime-manager-bind && cargo fmt
 	$(MAKE) fmt -C sdk
 	cd session-manager && cargo fmt
 	$(MAKE) fmt -C test-collateral
