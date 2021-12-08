@@ -191,7 +191,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             });
         }
     }
-    
+
     let cert = crate::attestation::convert_csr_to_certificate(&csr, is_ca, &received_enclave_hash)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);

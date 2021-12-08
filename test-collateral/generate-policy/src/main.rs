@@ -28,7 +28,7 @@ use policy_utils::{
     parsers::enforce_leading_backslash,
     parsers::parse_renamable_paths,
     policy::Policy,
-    principal::{ExecutionStrategy, FileRights, Identity, Program, FileHash},
+    principal::{ExecutionStrategy, FileHash, FileRights, Identity, Program},
 };
 use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
@@ -372,7 +372,7 @@ list of files may be provided.")
                 }
             })
             .flatten()
-            .collect::<Vec<_>>();               
+            .collect::<Vec<_>>();
         arguments.program_binaries = binaries_list.clone();
         arguments.hashes.append(&mut binaries_list);
     } else {
@@ -730,11 +730,7 @@ fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
             let file_permissions = serialize_capability(capability);
             let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
 
-            Program::new(
-                program_file_name,
-                id as u32,
-                file_permissions,
-            )
+            Program::new(program_file_name, id as u32, file_permissions)
         })
         .collect()
 }
@@ -785,9 +781,9 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         split
             .next()
             .expect(&format!("Failed to parse {}, empty string", cap_string))
-            .trim()
+            .trim(),
     )
-        .into_owned();
+    .into_owned();
     let string_number = split
         .next()
         .expect(&format!(
@@ -838,10 +834,7 @@ fn serialize_file_hash(arguments: &Arguments) -> Vec<FileHash> {
             let hash = compute_file_hash(file_path);
             let file_name = enforce_leading_backslash(file_name).into_owned();
 
-            FileHash::new(
-                file_name,
-                hash,
-            )
+            FileHash::new(file_name, hash)
         })
         .collect()
 }

@@ -70,7 +70,6 @@ fn dispatch_on_result(
     protocol_state.execute(&Principal::Participant(client_id), &file_name)
 }
 
-
 /// Write a file into the VFS. It will overwrite previous content. Fails if the client has no permission.
 fn dispatch_on_write(
     protocol_state: &mut ProtocolState,
@@ -79,11 +78,7 @@ fn dispatch_on_write(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.write_file(
-        &Principal::Participant(client_id),
-        file_name.as_str(),
-        data,
-    )?;
+    protocol_state.write_file(&Principal::Participant(client_id), file_name.as_str(), data)?;
     let response = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::SUCCESS as i32,
         None,
@@ -99,11 +94,7 @@ fn dispatch_on_append(
     }: transport_protocol::Data,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.append_file(
-        &Principal::Participant(client_id),
-        file_name.as_str(),
-        data,
-    )?;
+    protocol_state.append_file(&Principal::Participant(client_id), file_name.as_str(), data)?;
     let response = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::SUCCESS as i32,
         None,
@@ -114,12 +105,11 @@ fn dispatch_on_append(
 /// Read a file from the VFS. Fails if the client has no permission.
 fn dispatch_on_read(
     protocol_state: &mut ProtocolState,
-    transport_protocol::Read {
-        file_name, ..
-    }: transport_protocol::Read,
+    transport_protocol::Read { file_name, .. }: transport_protocol::Read,
     client_id: u64,
 ) -> ProvisioningResult {
-    let result = protocol_state.read_file(&Principal::Participant(client_id), file_name.as_str())?;
+    let result =
+        protocol_state.read_file(&Principal::Participant(client_id), file_name.as_str())?;
     let response = response_success(result);
     Ok(Some(response))
 }

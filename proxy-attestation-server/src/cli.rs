@@ -16,7 +16,6 @@ use proxy_attestation_server;
 use std::{env, path, process};
 use structopt::StructOpt;
 
-
 /// A bit of extra parsing to allow omitting addr/port
 fn parse_bind_addr(s: &str) -> String {
     // Rust's SocketAddr parser requires an explicit address/port, add 0.0.0.0
@@ -31,7 +30,7 @@ fn parse_bind_addr(s: &str) -> String {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(rename_all="kebab")]
+#[structopt(rename_all = "kebab")]
 struct Opt {
     /// URL to serve on
     #[structopt(parse(from_str=parse_bind_addr))]
@@ -54,7 +53,6 @@ struct Opt {
     #[structopt(long)]
     debug: bool,
 }
-
 
 /// Entry point
 fn main() {
@@ -89,7 +87,7 @@ fn main() {
         &opt.url,
         &opt.ca_cert,
         &opt.ca_key,
-        opt.debug
+        opt.debug,
     ) {
         Ok(proxy_attestation_server) => proxy_attestation_server,
         Err(err) => {

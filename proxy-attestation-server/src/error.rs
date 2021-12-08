@@ -31,7 +31,10 @@ pub enum ProxyAttestationServerError {
     Utf8Error(#[error(source)] std::str::Utf8Error),
     #[error(display = "ProxyAttestationServer: SerdeJsonError: {:?}.", _0)]
     SerdeJsonError(#[error(source)] serde_json::Error),
-    #[error(display = "ProxyAttestationServer: OpenSSLError (an error stack): {:#?}.", _0)]
+    #[error(
+        display = "ProxyAttestationServer: OpenSSLError (an error stack): {:#?}.",
+        _0
+    )]
     OpenSSLError(#[error(source)] openssl::error::ErrorStack),
     #[error(display = "ProxyAttestationServer: CurlError: {:?}.", _0)]
     CurlError(#[error(source)] curl::Error),
@@ -48,11 +51,18 @@ pub enum ProxyAttestationServerError {
         expected: std::vec::Vec<u8>,
         received: std::vec::Vec<u8>,
     },
-    #[error(display = "ProxyAttestationServer: {} failed with error code {:?}.", _0, _1)]
+    #[error(
+        display = "ProxyAttestationServer: {} failed with error code {:?}.",
+        _0,
+        _1
+    )]
     UnsafeCallError(&'static str, u32),
     #[error(display = "ProxyAttestationServer: No proxy PSA attestation token.")]
     NoProxyPSAAttestationTokenError,
-    #[error(display = "ProxyAttestationServer: Failed to obtain device with ID {}.", _0)]
+    #[error(
+        display = "ProxyAttestationServer: Failed to obtain device with ID {}.",
+        _0
+    )]
     NoDeviceError(i32),
     #[error(
         display = "ProxyAttestationServer: Missing {}, which is caused by non-existence, empty field, null, etc.",
@@ -63,7 +73,9 @@ pub enum ProxyAttestationServerError {
     FailedToVerifyError(&'static str),
     #[error(display = "ProxyAttestationServer: Unknown attestation protocol.")]
     UnknownAttestationTokenError,
-    #[error(display = "ProxyAttestationServer: Unsupported request (not implemented in this platform).")]
+    #[error(
+        display = "ProxyAttestationServer: Unsupported request (not implemented in this platform)."
+    )]
     UnimplementedRequestError,
     #[error(display = "ProxyAttestationServer: Unsupported request (not found).")]
     UnsupportedRequestError,
@@ -95,7 +107,9 @@ impl error::ResponseError for ProxyAttestationServerError {
         match self {
             ProxyAttestationServerError::DirectMessageError(_, e) => e.clone(),
             ProxyAttestationServerError::UnimplementedRequestError
-            | ProxyAttestationServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
+            | ProxyAttestationServerError::UnknownAttestationTokenError => {
+                StatusCode::NOT_IMPLEMENTED
+            }
             ProxyAttestationServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
             _otherwise => StatusCode::INTERNAL_SERVER_ERROR,
         }

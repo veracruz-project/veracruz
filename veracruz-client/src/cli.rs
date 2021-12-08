@@ -90,8 +90,11 @@ struct Opt {
     /// policy file.
     ///
     #[structopt(
-        short, long, multiple=true, number_of_values=1,
-        visible_alias="computes"
+        short,
+        long,
+        multiple = true,
+        number_of_values = 1,
+        visible_alias = "computes"
     )]
     compute: Vec<String>,
 
@@ -265,8 +268,7 @@ fn main() {
 
     // request compute(s)?
     for compute_name in opt.compute {
-        qprintln!(opt, "Requesting compute of <enclave>/{}",
-            compute_name);
+        qprintln!(opt, "Requesting compute of <enclave>/{}", compute_name);
         did_something = true;
 
         match veracruz_client.request_compute(&compute_name) {

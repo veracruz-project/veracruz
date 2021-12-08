@@ -21,9 +21,8 @@ use log::{error, info};
 use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
-    parse_proxy_attestation_server_response, parse_psa_attestation_init,
-    serialize_start_msg, ProxyAttestationServerResponse,
-    TransportProtocolError,
+    parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
+    ProxyAttestationServerResponse, TransportProtocolError,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -276,11 +275,7 @@ where
 
     info!("Response successfully parsed.");
 
-    #[cfg(any(
-        feature = "linux",
-        feature = "nitro",
-        feature = "icecap"
-    ))]
+    #[cfg(any(feature = "linux", feature = "nitro", feature = "icecap"))]
     if response.has_psa_attestation_init() {
         let (challenge, device_id) =
             parse_psa_attestation_init(response.get_psa_attestation_init()).map_err(|e| {

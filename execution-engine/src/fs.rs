@@ -705,8 +705,8 @@ impl FileSystem {
                 "stderr" => (Fd(2), self.lock_inode_table()?.stderr()),
                 _otherwise => continue,
             };
-            let rights =
-                Rights::from_bits(<_>::try_from_or_errno(*std_stream.rights())?).ok_or(ErrNo::Inval)?;
+            let rights = Rights::from_bits(<_>::try_from_or_errno(*std_stream.rights())?)
+                .ok_or(ErrNo::Inval)?;
             self.install_fd(
                 fd_number,
                 FileType::RegularFile,
@@ -778,8 +778,7 @@ impl FileSystem {
             self.prestat_table.insert(new_fd, path.to_path_buf());
         }
         // Set the next_fd_candidate, it might waste few FDs.
-        self.next_fd_candidate =
-            Fd(Self::FIRST_FD.0 + u32::try_from_or_errno(rights_table.len())?);
+        self.next_fd_candidate = Fd(Self::FIRST_FD.0 + u32::try_from_or_errno(rights_table.len())?);
 
         Ok(())
     }
@@ -1067,7 +1066,7 @@ impl FileSystem {
     pub(crate) fn fd_read<B: AsMut<[u8]>>(
         &mut self,
         fd: Fd,
-        bufs: &mut [B]
+        bufs: &mut [B],
     ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_READ)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
@@ -1171,7 +1170,7 @@ impl FileSystem {
     pub(crate) fn fd_write<B: AsRef<[u8]>>(
         &mut self,
         fd: Fd,
-        bufs: &[B]
+        bufs: &[B],
     ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
@@ -1666,7 +1665,7 @@ pub(crate) trait TryFromOrErrNo<T>: Sized {
 
 impl<T, U> TryFromOrErrNo<T> for U
 where
-    U: TryFrom<T> + Sized
+    U: TryFrom<T> + Sized,
 {
     fn try_from_or_errno(t: T) -> FileSystemResult<Self> {
         Self::try_from(t).map_err(|_| ErrNo::Inval)

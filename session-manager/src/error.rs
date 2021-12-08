@@ -62,7 +62,11 @@ pub enum SessionManagerError {
     PeerCertificateError,
     /// The length of a variable (e.g. the number of expected peer certificates)
     /// did not match expectations.
-    #[error(display = "Session manager: invalid length of variable `{}`, expected {}", _0, _1)]
+    #[error(
+        display = "Session manager: invalid length of variable `{}`, expected {}",
+        _0,
+        _1
+    )]
     InvalidLengthError(&'static str, usize),
     /// A principal has not been assigned any roles in the Veracruz computation.
     #[error(
