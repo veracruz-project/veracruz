@@ -1,4 +1,4 @@
-			# Makefile
+# Makefile
 #
 # AUTHORS
 #
@@ -12,7 +12,8 @@
 OUT_DIR?=.
 FINAL_DIR?=.
 
-.PHONY: all linux clean deprecated nitro
+.PHONY: all linux clean quick-clean fmt deprecated nitro
+
 
 all: deprecated
 
@@ -83,14 +84,27 @@ target/release/runtime_manager_enclave: Cargo.toml $(Linux_Src)
 
 linux: target/release/runtime_manager_enclave
 
+####### Utility targets #######
+
 clean:
 	@cargo clean
 	@xargo clean
-	@rm -rf target
-	@rm -f runtime_manager_t.? runtime_manager_u.?
-	@rm -f $(FINAL_DIR)/$(Signed_RustEnclave_RootName)
-	@rm -f $(OUT_DIR)/stripped_ta
+	@rm -rf ./target
+	@rm -f ./runtime_manager_t.? ./runtime_manager_u.?
 	@rm -f $(OUT_DIR)/runtime_manager_enclave
 	@rm -f $(RustEnclave_Name)
-	@rm -rf bin/
-	@rm -f css-*.bin
+	@rm -rf ./bin/
+	@rm -f ./css-*.bin
+
+quick-clean:
+	@cargo clean
+	@xargo clean
+	@rm -rf ./target
+	@rm -f ./runtime_manager_t.? ./runtime_manager_u.?
+	@rm -f $(OUT_DIR)/runtime_manager_enclave
+	@rm -f $(RustEnclave_Name)
+	@rm -rf ./bin/
+	@rm -f ./css-*.bin
+
+fmt:
+	cargo fmt
