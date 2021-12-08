@@ -64,6 +64,5 @@ serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "v
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
-uuid = { version = "0.7", optional = true }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
 webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }

@@ -21,8 +21,5 @@ serde = { git = "https://github.com/veracruz-project/serde.git", default-feature
 # Required
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", default-features = false }
 
-[build-dependencies]
-uuid = { version = "0.7", features = ["v4"] }
-
 [patch.crates-io]
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed", optional = true }
