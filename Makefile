@@ -161,77 +161,106 @@ linux-veracruz-test: linux-test-collateral linux veracruz-test/proxy-attestation
 		&& RUSTFLAGS=$(LINUX_RUST_FLAG) cargo test --features linux -- --test-threads=1
 
 clean:
-	# remove databases since these can easily fall out of date
+	# remove databases and binaries since these can easily fall out of date
+	rm -rf bin
 	rm -f proxy-attestation-server/proxy-attestation-server.db
 	rm -f veracruz-server-test/proxy-attestation-server.db
 	rm -f veracruz-test/proxy-attestation-server.db
 	# clean code
-	cd psa-attestation && cargo clean
+	cd execution-engine && cargo clean
+	cd io-utils && cargo clean
+	cd linux-root-enclave && cargo clean
+	cd platform-services && cargo clean
+	cd policy-utils && cargo clean
 	cd proxy-attestation-server && cargo clean
-	cd session-manager && cargo clean
-	cd veracruz-utils && cargo clean
-	cd veracruz-server && cargo clean
-	cd veracruz-server-test && cargo clean
-	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
+	cd psa-attestation && cargo clean
 	$(MAKE) clean -C runtime-manager
-	$(MAKE) clean -C test-collateral 
+	cd runtime-manager-bind && cargo clean
 	$(MAKE) clean -C sdk
-	$(MAKE) clean -C linux-root-enclave
-	rm -rf bin
+	cd session-manager && cargo clean
+	$(MAKE) clean -C test-collateral
+	cd transport-protocol && cargo clean
+	cd veracruz-client && cargo clean
+	$(MAKE) clean -C veracruz-mcu-client
+	$(MAKE) clean -C veracruz-server
+	cd veracruz-server-test && cargo clean
+	cd veracruz-test && cargo clean
+	cd veracruz-utils && cargo clean
 
 # clean-quick cleans everything but LLVM (in wasm-checker)
 quick-clean:
-	# remove databases since these can easily fall out of date
+	# remove databases and binaries since these can easily fall out of date
+	rm -rf bin
 	rm -f proxy-attestation-server/proxy-attestation-server.db
 	rm -f veracruz-server-test/proxy-attestation-server.db
 	rm -f veracruz-test/proxy-attestation-server.db
 	# clean code
-	cd psa-attestation && cargo clean
+	cd execution-engine && cargo clean
+	cd io-utils && cargo clean
+	cd linux-root-enclave && cargo clean
+	cd platform-services && cargo clean
+	cd policy-utils && cargo clean
 	cd proxy-attestation-server && cargo clean
-	cd session-manager && cargo clean
-	cd veracruz-utils && cargo clean
-	cd veracruz-server-test && cargo clean
-	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
-	cd nitro-root-enclave-server && cargo clean
-	$(MAKE) clean -C runtime-manager
-	$(MAKE) clean -C veracruz-server
-	$(MAKE) clean -C test-collateral 
+	cd psa-attestation && cargo clean
+	$(MAKE) quick-clean -C runtime-manager
+	cd runtime-manager-bind && cargo clean
 	$(MAKE) quick-clean -C sdk
-	$(MAKE) clean -C nitro-root-enclave
-	rm -rf bin
+	cd session-manager && cargo clean
+	$(MAKE) quick-clean -C test-collateral
+	cd transport-protocol && cargo clean
+	cd veracruz-client && cargo clean
+	$(MAKE) quick-clean -C veracruz-mcu-client
+	$(MAKE) quick-clean -C veracruz-server
+	cd veracruz-server-test && cargo clean	
+	cd veracruz-test && cargo clean
+	cd veracruz-utils && cargo clean
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
-	$(MAKE) -C sdk clean
-	$(MAKE) -C test-collateral clean
-	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
+	$(MAKE) -C sdk clean-cargo-lock
+	$(MAKE) -C test-collateral clean-cargo-lock
+	rm -f $(addsuffix /Cargo.lock,execution-engine io-utils linux-root-enclave platform-services policy-utils proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
 update:
-	cd session-manager && cargo update
 	cd execution-engine && cargo update
+	cd io-utils && cargo update
+	cd linux-root-enclave && cargo update
+	cd platform-services && cargo update
+	cd policy-utils && cargo update
+	cd proxy-attestation-server && cargo update
+	cd psa-attestation && cargo update
+	$(MAKE) update -C runtime-manager
+	cd runtime-manager-bind && cargo update
+	$(MAKE) update -C sdk
+	cd session-manager && cargo update
+	$(MAKE) update -C test-collateral
 	cd transport-protocol && cargo update
 	cd veracruz-client && cargo update
-	cd runtime-manager && cargo update
-	cd psa-attestation && cargo update
+	$(MAKE) update -C veracruz-mcu-client
+	$(MAKE) update -C veracruz-server
 	cd veracruz-server-test && cargo update
-	cd veracruz-server && cargo update
 	cd veracruz-test && cargo update
 	cd veracruz-utils && cargo update
-	cd proxy-attestation-server && cargo update
 
 fmt:
-	cd session-manager && cargo fmt
 	cd execution-engine && cargo fmt
+	cd io-utils && cargo fmt
+	cd linux-root-enclave && cargo fmt
+	cd platform-services && cargo fmt
+	cd policy-utils && cargo fmt
+	cd proxy-attestation-server && cargo fmt
+	cd psa-attestation && cargo fmt
+	$(MAKE) fmt -C runtime-manager
+	cd runtime-manager-bind && cargo fmt
+	$(MAKE) fmt -C sdk
+	cd session-manager && cargo fmt
+	$(MAKE) fmt -C test-collateral
 	cd transport-protocol && cargo fmt
 	cd veracruz-client && cargo fmt
-	cd runtime-manager && cargo fmt
-	cd psa-attestation && cargo fmt
+	$(MAKE) fmt -C veracruz-mcu-client
+	$(MAKE) fmt -C veracruz-server
 	cd veracruz-server-test && cargo fmt
-	cd veracruz-server && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
-	cd proxy-attestation-server && cargo fmt
-	cd linux-root-enclave && cargo fmt
-	$(MAKE) -C sdk fmt
