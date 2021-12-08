@@ -9,7 +9,7 @@ version = "0.3.0"
 [dependencies]
 bitflags = "=1.2.1"
 clap = "2.33"
-pinecone = "0.2"
+pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
 rand = "0.7"
 # Needed for std::error::Error for Pinecone.
 serde = { version = "1.0.103", features = ["derive"] }
