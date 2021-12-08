@@ -27,9 +27,9 @@ use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData,
-    mem, mem::size_of, ops::Deref, ops::DerefMut, slice,
-    slice::from_raw_parts, slice::from_raw_parts_mut, string::String, vec::Vec,
+    convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData, mem,
+    mem::size_of, ops::Deref, ops::DerefMut, slice, slice::from_raw_parts,
+    slice::from_raw_parts_mut, string::String, vec::Vec,
 };
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
@@ -319,7 +319,6 @@ pub trait MemorySliceMut: AsMut<[u8]> {
 impl MemorySlice for &'static [u8] {}
 impl MemorySliceMut for &'static mut [u8] {}
 
-
 /// Bound<'a, T> is a wrappper that explicitly enforces unrelated lifetimes
 /// on objects
 ///
@@ -346,7 +345,6 @@ impl<'a, T> Deref for Bound<'a, T> {
         &self.0
     }
 }
-
 
 /// BoundMut<'a, T> is a wrappper that explicitly enforces unrelated lifetimes
 /// on objects
@@ -382,7 +380,6 @@ impl<'a, T> DerefMut for BoundMut<'a, T> {
     }
 }
 
-
 /// Number of iovecs to store internally before needing dynamic memory
 const IOVECSLICES_SOO_COUNT: usize = 2;
 
@@ -416,13 +413,9 @@ impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
                 // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
                 // unsafety to do this without memory allocation.
                 let len = arr.iter().take_while(|x| x.is_some()).count();
-                unsafe {
-                    slice::from_raw_parts(arr.as_ptr() as *const &'a [u8], len)
-                }
+                unsafe { slice::from_raw_parts(arr.as_ptr() as *const &'a [u8], len) }
             }
-            IoVecSlicesStorage::Large(vec) => {
-                &vec
-            }
+            IoVecSlicesStorage::Large(vec) => &vec,
         }
     }
 }
@@ -457,17 +450,12 @@ impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
                 // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
                 // unsafety to do this without memory allocation.
                 let len = arr.iter().take_while(|x| x.is_some()).count();
-                unsafe {
-                    slice::from_raw_parts_mut(arr.as_mut_ptr() as *mut &'a mut [u8], len)
-                }
+                unsafe { slice::from_raw_parts_mut(arr.as_mut_ptr() as *mut &'a mut [u8], len) }
             }
-            IoVecSlicesMutStorage::Large(ref mut vec) => {
-                vec
-            }
+            IoVecSlicesMutStorage::Large(ref mut vec) => vec,
         }
     }
 }
-
 
 /// A MemoryHandler trait for interacting with the wasm memory space.
 ///
@@ -510,7 +498,7 @@ impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
 /// NOTE: we purposely choose u32 here as the execution engine is likely
 /// received u32 as parameters.
 ///
-pub trait MemoryHandler  {
+pub trait MemoryHandler {
     /// A type representing a direct reference to memory
     ///
     /// This may both lock the underlying engine and allocate memory (if the
@@ -542,7 +530,7 @@ pub trait MemoryHandler  {
     fn get_slice<'a>(
         &'a self,
         address: u32,
-        length: u32
+        length: u32,
     ) -> FileSystemResult<Bound<'a, Self::Slice>>;
 
     /// Get a mutable slice of the memory
@@ -554,7 +542,7 @@ pub trait MemoryHandler  {
     fn get_slice_mut<'a>(
         &'a mut self,
         address: u32,
-        length: u32
+        length: u32,
     ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>>;
 
     /// Get the size of the underlying memory
@@ -572,7 +560,7 @@ pub trait MemoryHandler  {
     fn read_buffer(&self, address: u32, buffer: &mut [u8]) -> FileSystemResult<()> {
         buffer.copy_from_slice(
             self.get_slice(address, u32::try_from_or_errno(buffer.len())?)?
-                .as_ref()
+                .as_ref(),
         );
         Ok(())
     }
@@ -631,13 +619,9 @@ pub trait MemoryHandler  {
     }
 
     /// Unpack an array of Unpacks
-    fn unpack_array<T: Unpack>(
-        &self,
-        address: u32,
-        count: u32
-    ) -> FileSystemResult<Vec<T>> {
+    fn unpack_array<T: Unpack>(&self, address: u32, count: u32) -> FileSystemResult<Vec<T>> {
         (0..count)
-            .map(|i| self.unpack(address + i*T::SIZE))
+            .map(|i| self.unpack(address + i * T::SIZE))
             .collect()
     }
 
@@ -650,17 +634,15 @@ pub trait MemoryHandler  {
     fn unpack_iovec<'a>(
         &'a self,
         address: u32,
-        count: u32
+        count: u32,
     ) -> FileSystemResult<IoVecSlices<'a, Bound<'a, Self::Slice>>> {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
         let memory = self.get_slice(0, self.get_size()?)?;
         let slices = (0..count).map(|i| -> FileSystemResult<&'a [u8]> {
             let iovec = IoVec::unpack(
-                &memory.as_ref()[
-                    usize::try_from_or_errno(address + i*IoVec::SIZE)?
-                        .. usize::try_from_or_errno(address + (i+1)*IoVec::SIZE)?
-                ]
+                &memory.as_ref()[usize::try_from_or_errno(address + i * IoVec::SIZE)?
+                    ..usize::try_from_or_errno(address + (i + 1) * IoVec::SIZE)?],
             )?;
 
             // Ok here's the gooey center of the the copy-less iovecs. This may
@@ -702,26 +684,21 @@ pub trait MemoryHandler  {
             // is accomplished by the `Bound` wrapper. There's more info on this
             // on the `MemorySlice` and `Bound` traits/types
             //
-            let slice = &memory.as_ref()[
-                usize::try_from_or_errno(iovec.buf)?
-                    .. usize::try_from_or_errno(iovec.buf+iovec.len)?
-            ];
+            let slice = &memory.as_ref()[usize::try_from_or_errno(iovec.buf)?
+                ..usize::try_from_or_errno(iovec.buf + iovec.len)?];
             Ok(unsafe { mem::transmute::<&'_ [u8], &'a [u8]>(slice) })
         });
 
         if count <= IOVECSLICES_SOO_COUNT as u32 {
             let mut slices = slices.fuse();
-            let slices = [
-                slices.next().transpose()?,
-                slices.next().transpose()?,
-            ];
-            Ok(IoVecSlices{
+            let slices = [slices.next().transpose()?, slices.next().transpose()?];
+            Ok(IoVecSlices {
                 _ref: memory,
                 slices: IoVecSlicesStorage::Small(slices),
             })
         } else {
             let slices = slices.collect::<FileSystemResult<Vec<_>>>()?;
-            Ok(IoVecSlices{
+            Ok(IoVecSlices {
                 _ref: memory,
                 slices: IoVecSlicesStorage::Large(slices),
             })
@@ -737,17 +714,15 @@ pub trait MemoryHandler  {
     fn unpack_iovec_mut<'a>(
         &'a mut self,
         address: u32,
-        count: u32
+        count: u32,
     ) -> FileSystemResult<IoVecSlicesMut<'a, BoundMut<'a, Self::SliceMut>>> {
         // Just get a reference to all of memory, it's easier to manipulate
         // it this way
         let mut memory = self.get_slice_mut(0, self.get_size()?)?;
         let slices = (0..count).map(|i| -> FileSystemResult<&'a mut [u8]> {
             let iovec = IoVec::unpack(
-                &memory.as_mut()[
-                    usize::try_from_or_errno(address + i*IoVec::SIZE)?
-                        .. usize::try_from_or_errno(address + (i+1)*IoVec::SIZE)?
-                ]
+                &memory.as_mut()[usize::try_from_or_errno(address + i * IoVec::SIZE)?
+                    ..usize::try_from_or_errno(address + (i + 1) * IoVec::SIZE)?],
             )?;
 
             // Ok here's the gooey center of the the copy-less iovecs. This may
@@ -768,26 +743,21 @@ pub trait MemoryHandler  {
             // more may not overlap. If they overlap the worst thing that should
             // happen is malformed iovecs get malformed data back.
             //
-            let slice = &mut memory.as_mut()[
-                usize::try_from_or_errno(iovec.buf)?
-                    .. usize::try_from_or_errno(iovec.buf+iovec.len)?
-            ];
+            let slice = &mut memory.as_mut()[usize::try_from_or_errno(iovec.buf)?
+                ..usize::try_from_or_errno(iovec.buf + iovec.len)?];
             Ok(unsafe { mem::transmute::<&'_ mut [u8], &'a mut [u8]>(slice) })
         });
 
         if count <= IOVECSLICES_SOO_COUNT as u32 {
             let mut slices = slices.fuse();
-            let slices = [
-                slices.next().transpose()?,
-                slices.next().transpose()?,
-            ];
-            Ok(IoVecSlicesMut{
+            let slices = [slices.next().transpose()?, slices.next().transpose()?];
+            Ok(IoVecSlicesMut {
                 _ref: memory,
                 slices: IoVecSlicesMutStorage::Small(slices),
             })
         } else {
             let slices = slices.collect::<FileSystemResult<Vec<_>>>()?;
-            Ok(IoVecSlicesMut{
+            Ok(IoVecSlicesMut {
                 _ref: memory,
                 slices: IoVecSlicesMutStorage::Large(slices),
             })
@@ -1174,11 +1144,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let size_read = {
             let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
-            self.filesystem.fd_pread(
-                fd.into(),
-                iovecs.as_mut(),
-                offset
-            )?
+            self.filesystem
+                .fd_pread(fd.into(), iovecs.as_mut(), offset)?
         };
         memory_ref.write_u32(address, size_read as u32)
     }
@@ -1232,11 +1199,8 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let size_written = {
             let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
-            self.filesystem.fd_pwrite(
-                fd.into(),
-                iovecs.as_ref(),
-                offset
-            )?
+            self.filesystem
+                .fd_pwrite(fd.into(), iovecs.as_ref(), offset)?
         };
         memory_ref.write_u32(address, size_written as u32)
     }
@@ -1253,10 +1217,7 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let size_read = {
             let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
-            self.filesystem.fd_read(
-                fd.into(),
-                iovecs.as_mut(),
-            )?
+            self.filesystem.fd_read(fd.into(), iovecs.as_mut())?
         };
         memory_ref.write_u32(address, size_read as u32)
     }
@@ -1356,10 +1317,7 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let size_written = {
             let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
-            self.filesystem.fd_write(
-                fd.into(),
-                iovecs.as_ref(),
-            )?
+            self.filesystem.fd_write(fd.into(), iovecs.as_ref())?
         };
         memory_ref.write_u32(address, size_written as u32)
     }
@@ -1643,11 +1601,8 @@ impl WasiWrapper {
         let (size_read, ro_flags) = {
             let mut iovecs = memory_ref.unpack_iovec_mut(ri_address, ri_len)?;
             let ri_flags: RiFlags = Self::decode_wasi_arg(ri_flag)?;
-            self.filesystem.sock_recv(
-                socket.into(),
-                iovecs.as_mut(),
-                ri_flags
-            )?
+            self.filesystem
+                .sock_recv(socket.into(), iovecs.as_mut(), ri_flags)?
         };
         let ro_flags = RoFlags::empty() | ro_flags;
         memory_ref.write_u32(ro_data_len, size_read as u32)?;
@@ -1668,11 +1623,8 @@ impl WasiWrapper {
         let size_written = {
             let iovecs = memory_ref.unpack_iovec(si_address, si_len)?;
             let si_flags: SiFlags = Self::decode_wasi_arg(si_flag)?;
-            self.filesystem.sock_send(
-                socket.into(),
-                iovecs.as_ref(),
-                si_flags
-            )?
+            self.filesystem
+                .sock_send(socket.into(), iovecs.as_ref(), si_flags)?
         };
         memory_ref.write_u32(address, size_written as u32)
     }

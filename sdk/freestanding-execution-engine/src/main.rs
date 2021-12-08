@@ -226,8 +226,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
 
     let environment_variables = match matches.values_of("env") {
         None => Vec::new(),
-        Some(x) =>
-            x.map(|e| {
+        Some(x) => x
+            .map(|e| {
                 let n = e.find('=').unwrap();
                 (e[0..n].to_string(), e[n + 1..].to_string())
             })
@@ -256,7 +256,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
 /// the computation.  May abort the program if something goes wrong when reading
 /// any data source.
 fn load_input_sources(
-    input_sources: &[String], vfs: &mut FileSystem,
+    input_sources: &[String],
+    vfs: &mut FileSystem,
 ) -> Result<(), Box<dyn Error>> {
     for file_path in input_sources.iter() {
         let file_path = Path::new(file_path);
@@ -266,7 +267,8 @@ fn load_input_sources(
 }
 
 fn load_input_source<T: AsRef<Path>>(
-    file_path: T, vfs: &mut FileSystem,
+    file_path: T,
+    vfs: &mut FileSystem,
 ) -> Result<(), Box<dyn Error>> {
     let file_path = file_path.as_ref();
     info!("Loading data source '{:?}'.", file_path);
@@ -390,11 +392,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Try to decode
             let decode: String = match pinecone::from_bytes(buf) {
                 Ok(o) => o,
-                Err(_) =>
-                    match std::str::from_utf8(buf) {
-                        Ok(oo) => oo.to_string(),
-                        Err(_) => "(Cannot Parse as a utf8 string)".to_string(),
-                    },
+                Err(_) => match std::str::from_utf8(buf) {
+                    Ok(oo) => oo.to_string(),
+                    Err(_) => "(Cannot Parse as a utf8 string)".to_string(),
+                },
             };
             info!("{:?}: {:?}", output_path, decode);
         }

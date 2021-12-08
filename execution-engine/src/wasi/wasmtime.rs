@@ -14,8 +14,9 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, HostFunctionIndexOrName,
-        MemoryHandler, MemorySlice, MemorySliceMut, WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError,
+        HostFunctionIndexOrName, MemoryHandler, MemorySlice, MemorySliceMut, WasiAPIName,
+        WasiWrapper,
     },
     Options,
 };
@@ -77,7 +78,7 @@ impl AsRef<[u8]> for WasmtimeSlice {
     fn as_ref(&self) -> &[u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
         // versions of wasmtime
-        &(unsafe { self.memory.data_unchecked() })[self.address .. self.address+self.length]
+        &(unsafe { self.memory.data_unchecked() })[self.address..self.address + self.length]
     }
 }
 
@@ -85,13 +86,12 @@ impl AsMut<[u8]> for WasmtimeSlice {
     fn as_mut(&mut self) -> &mut [u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
         // versions of wasmtime
-        &mut (unsafe { self.memory.data_unchecked_mut() })[self.address .. self.address+self.length]
+        &mut (unsafe { self.memory.data_unchecked_mut() })[self.address..self.address + self.length]
     }
 }
 
 impl MemorySlice for WasmtimeSlice {}
 impl MemorySliceMut for WasmtimeSlice {}
-
 
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WasiWrapper on any VFS call.
@@ -102,7 +102,7 @@ impl MemoryHandler for Caller<'_> {
     fn get_slice<'a>(
         &'a self,
         address: u32,
-        length: u32
+        length: u32,
     ) -> FileSystemResult<Bound<'a, Self::Slice>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
@@ -111,7 +111,7 @@ impl MemoryHandler for Caller<'_> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        Ok(Bound::new(WasmtimeSlice{
+        Ok(Bound::new(WasmtimeSlice {
             memory,
             address: address as usize,
             length: length as usize,
@@ -121,7 +121,7 @@ impl MemoryHandler for Caller<'_> {
     fn get_slice_mut<'a>(
         &'a mut self,
         address: u32,
-        length: u32
+        length: u32,
     ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
@@ -130,7 +130,7 @@ impl MemoryHandler for Caller<'_> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        Ok(BoundMut::new(WasmtimeSlice{
+        Ok(BoundMut::new(WasmtimeSlice {
             memory,
             address: address as usize,
             length: length as usize,
