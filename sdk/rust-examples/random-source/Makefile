@@ -11,7 +11,7 @@
 
 VERACRUZ_TARGET_PATH = $(shell cd ../../../ && pwd)
 
-.PHONY: all doc clean fmt
+.PHONY: all doc clean quick-clean fmt
 
 all:
 	cargo build --target wasm32-wasi --release
@@ -26,3 +26,5 @@ clean:
 	cargo clean
 	rm -f Cargo.lock
 
+quick-clean:
+	cargo clean

@@ -9,7 +9,7 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all doc clean fmt
+.PHONY: all doc clean quick-clean fmt
 
 all:
 	cargo build --target wasm32-wasi --release
@@ -23,3 +23,6 @@ fmt:
 clean:
 	cargo clean
 	rm -f Cargo.lock
+
+quick-clean:
+	cargo clean

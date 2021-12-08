@@ -24,7 +24,7 @@ GENERATED_DATA_TARGET_DATS = $(addprefix $(GENERATED_DATA_FILE_PREFIX),$(INDICE_
 GENERATED_DATA_TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(GENERATED_DATA_TARGET_DATS))
 SEED = 0
 
-.PHONY: all clean external fmt
+.PHONY: all clean external quick-clean fmt
 
 all: $(GENERATED_DATA_TARGET_DIR_DATS)
 
@@ -52,6 +52,11 @@ $(TARGET_DATS) : %.dat : $(SOURCE_FILES)
 	done
 
 clean:
+	cargo clean
+	rm -f *.dat
+	rm -rf $(TARGET_DIR)
+
+quick-clean:
 	cargo clean
 	rm -f *.dat
 	rm -rf $(TARGET_DIR)

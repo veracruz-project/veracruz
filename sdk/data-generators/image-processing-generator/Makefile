@@ -17,7 +17,7 @@ TARGET_DAT = $(addprefix $(TARGET_PREFIX), .png)
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
 
-.PHONY: all clean fmt
+.PHONY: all clean quick-clean fmt
 
 all: $(TARGET_DIR_DAT)
 
@@ -32,6 +32,11 @@ $(TARGET_DAT):
 	cargo run -- --file_prefix $(TARGET_PREFIX) --image_path $(IMAGE_PATH) --width $(WIDTH) --height $(HEIGHT); 
 
 clean:
+	cargo clean
+	rm -f *.png
+	rm -f $(TARGET_DIR_DAT)
+
+quick-clean:
 	cargo clean
 	rm -f *.png
 	rm -f $(TARGET_DIR_DAT)

@@ -235,7 +235,6 @@ update:
 	$(MAKE) update -C test-collateral
 	cd transport-protocol && cargo update
 	cd veracruz-client && cargo update
-	$(MAKE) update -C veracruz-mcu-client
 	cd veracruz-server && cargo update
 	cd veracruz-server-test && cargo update
 	cd veracruz-test && cargo update

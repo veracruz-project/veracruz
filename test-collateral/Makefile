@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all policy-files clean quick-clean pgen
+.PHONY: all policy-files clean quick-clean clean-cargo-lock pgen update
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
@@ -216,3 +216,9 @@ quick-clean:
 	rm -f *.dat
 	$(MAKE) -C generate-policy quick-clean
 	rm -f *.wasm
+
+clean-cargo-lock:
+	rm -f freestanding-execution-engine/Cargo.lock
+
+update:
+	$(MAKE) -C generate-policy update

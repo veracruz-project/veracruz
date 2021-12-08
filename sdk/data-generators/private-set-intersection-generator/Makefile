@@ -14,7 +14,7 @@ TARGET_DATS = private-set-1.dat private-set-2.dat
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
 
-.PHONY: all clean fmt
+.PHONY: all clean quick-clean fmt
 
 all: $(TARGET_DIR_DATS)
 
@@ -29,6 +29,11 @@ $(TARGET_DATS) : %.dat : %.csv
 	cargo run -- --input_file $<
 
 clean:
+	cargo clean
+	rm -f *.dat
+	rm -f $(TARGET_DIR_DATS)
+
+quick-clean:
 	cargo clean
 	rm -f *.dat
 	rm -f $(TARGET_DIR_DATS)

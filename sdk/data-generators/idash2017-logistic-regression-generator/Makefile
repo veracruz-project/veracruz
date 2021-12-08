@@ -29,7 +29,7 @@ GENERATED_DATA_TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(GENERATED_DATA_TARG
 SEED = 0
 COMMON_CONFIG =  --fold=$(FOLD) --num_of_iter=$(NUM_ITER) --sigmoid=$(SIGMOID) --gamma_up=$(GAMMA_UP) --gamma_down=$(GAMMA_DOWN) --seed=$(SEED)
 
-.PHONY: all clean external fmt
+.PHONY: all clean quick-clean external fmt
 
 all: $(GENERATED_DATA_TARGET_DIR_DATS)
 
@@ -62,6 +62,12 @@ $(TARGET_DATS) : %.dat : $(SOURCE_FILES)
 	cargo run -- $(COMMON_CONFIG) external --input_file=uis.txt     --is_label_first=false 
 
 clean:
+	cargo clean
+	rm -f *.dat
+	rm -f *.csv
+	rm -rf $(TARGET_DIR)
+
+quick-clean:
 	cargo clean
 	rm -f *.dat
 	rm -f *.csv

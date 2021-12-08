@@ -14,7 +14,7 @@ TARGET_DATS = share-1.dat share-2.dat share-3.dat
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
 
-.PHONY: all clean fmt
+.PHONY: all clean quick-clean fmt
 
 all: $(TARGET_DIR_DATS)
 
@@ -31,6 +31,11 @@ $(TARGET_DATS):
 		| split -l1 -a1 --numeric-suffixes=1 --additional-suffix=.dat - share- )
 
 clean:
+	cargo clean
+	rm -f *.dat
+	rm -f $(TARGET_DIR_DATS)
+
+quick-clean:
 	cargo clean
 	rm -f *.dat
 	rm -f $(TARGET_DIR_DATS)

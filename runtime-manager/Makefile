@@ -12,7 +12,7 @@
 OUT_DIR?=.
 FINAL_DIR?=.
 
-.PHONY: all linux clean quick-clean fmt deprecated nitro
+.PHONY: all linux clean quick-clean fmt deprecated nitro update
 
 
 all: deprecated
@@ -84,3 +84,6 @@ quick-clean:
 
 fmt:
 	cargo fmt
+
+update:
+	cargo update
