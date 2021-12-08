@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all sdk setup-githooks nitro-veracruz-client-test clean clean-cargo-lock fmt fmt-check linux linux-veracruz-server-test linux-veracruz-server-test-dry-run linux-test-collateral linux-veracruz-client-test linux-veracruz-test-dry-run linux-veracruz-test linux-cli
+.PHONY: all sdk install-rustfmt setup-githooks nitro-veracruz-client-test clean clean-cargo-lock fmt fmt-check linux linux-veracruz-server-test linux-veracruz-server-test-dry-run linux-test-collateral linux-veracruz-client-test linux-veracruz-test-dry-run linux-veracruz-test linux-cli
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
@@ -24,8 +24,10 @@ BIN_DIR ?= /usr/local/cargo/bin
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
 
-setup-githooks:
+install-rustfmt:
 	rustup component add rustfmt
+
+setup-githooks: install-rustfmt
 	git config core.hooksPath githooks
 
 # Build all of the SDK and examples
@@ -240,7 +242,7 @@ update:
 	cd veracruz-test && cargo update
 	cd veracruz-utils && cargo update
 
-fmt:
+fmt: install-rustfmt
 	cd execution-engine && cargo fmt
 	cd io-utils && cargo fmt
 	cd linux-root-enclave && cargo fmt
@@ -260,7 +262,7 @@ fmt:
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
 
-fmt-check:
+fmt-check: install-rustfmt
 	cd execution-engine && cargo fmt -- --check
 	cd io-utils && cargo fmt -- --check
 	cd linux-root-enclave && cargo fmt -- --check
