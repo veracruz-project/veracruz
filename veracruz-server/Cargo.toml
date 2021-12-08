@@ -58,7 +58,6 @@ policy-utils = { path = "../policy-utils", optional = true }
 psa-attestation = { path = "../psa-attestation", optional = true }
 ring = "0.16"
 rouille = "=3.2.1"
-runtime-manager-bind = { path = "../runtime-manager-bind", optional = true }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }

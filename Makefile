@@ -166,7 +166,6 @@ clean:
 	rm -f veracruz-server-test/proxy-attestation-server.db
 	rm -f veracruz-test/proxy-attestation-server.db
 	# clean code
-	cd runtime-manager-bind && cargo clean 
 	cd psa-attestation && cargo clean
 	cd proxy-attestation-server && cargo clean
 	cd session-manager && cargo clean
@@ -187,7 +186,6 @@ quick-clean:
 	rm -f veracruz-server-test/proxy-attestation-server.db
 	rm -f veracruz-test/proxy-attestation-server.db
 	# clean code
-	cd runtime-manager-bind && cargo clean 
 	cd psa-attestation && cargo clean
 	cd proxy-attestation-server && cargo clean
 	cd session-manager && cargo clean
@@ -206,7 +204,7 @@ quick-clean:
 clean-cargo-lock:
 	$(MAKE) -C sdk clean
 	$(MAKE) -C test-collateral clean
-	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager runtime-manager-bind session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
+	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
