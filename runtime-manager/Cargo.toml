@@ -87,9 +87,5 @@ transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
-[build-dependencies]
-libloading = "=0.5.2"
-uuid = { version = "0.7", features = ["v4"] }
-
 [profile.release]
 lto = true
