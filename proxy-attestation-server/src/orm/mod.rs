@@ -13,9 +13,7 @@ pub mod models;
 pub mod schema;
 
 use crate::error::ProxyAttestationServerError;
-use diesel::{
-    prelude::SqliteConnection, Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
-};
+use diesel::{prelude::SqliteConnection, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use dotenv::dotenv;
 use hex;
 use schema::devices;
@@ -29,7 +27,10 @@ pub fn establish_connection() -> Result<SqliteConnection, ProxyAttestationServer
     Ok(SqliteConnection::establish(&database_url)?)
 }
 
-pub fn query_device<'a>(conn: &SqliteConnection, device_id: i32) -> Result<Vec<u8>, ProxyAttestationServerError> {
+pub fn query_device<'a>(
+    conn: &SqliteConnection,
+    device_id: i32,
+) -> Result<Vec<u8>, ProxyAttestationServerError> {
     let hashes: Vec<String> = devices::table
         .filter(devices::device_id.eq(device_id))
         .select(devices::pubkey_hash)

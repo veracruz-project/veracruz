@@ -1,4 +1,4 @@
-			# Makefile
+# Makefile
 #
 # AUTHORS
 #
@@ -12,7 +12,8 @@
 OUT_DIR?=.
 FINAL_DIR?=.
 
-.PHONY: all linux clean deprecated nitro
+.PHONY: all linux clean quick-clean fmt fmt-check deprecated nitro update
+
 
 all: deprecated
 
@@ -26,30 +27,6 @@ deprecated:
 ############# Source code #################
 
 COMMON_Src = src/managers/*.rs
-
-############# Files generated from the EDL File ###############
-EDL_Files := $(OUT_DIR)/runtime_manager_t.c $(OUT_DIR)/runtime_manager_t.h $(OUT_DIR)/runtime_manager_u.c $(OUT_DIR)/runtime_manager_u.h
-
-RustEnclave_Link_Libs = -L$(CUSTOM_LIBRARY_PATH) -L$(OUT_DIR) -lruntime_manager_enclave
-RustEnclave_Link_Flags = -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles \
-	-Wl,--whole-archive -Wl,--no-whole-archive \
-	-Wl,--start-group $(RustEnclave_Link_Libs) -Wl,--end-group \
-	-Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
-	-Wl,-pie,-eenclave_entry -Wl,--export-dynamic  \
-	-Wl,--defsym,__ImageBase=0 \
-	-Wl,--gc-sections \
-	-Wl,--version-script=./Enclave.lds
-
-RustEnclave_Name := $(OUT_DIR)/runtime_manager.so
-
-
-$(RustEnclave_Name): $(OUT_DIR)/runtime_manager_t.o 
-	@$(CXX) $(OUT_DIR)/runtime_manager_t.o -o $@ -L$(OUT_DIR) $(RustEnclave_Link_Flags)
-	@echo $(INFO_COLOR) "LINK =>  $@" $(RESET_COLOR)
-
-$(RuntimeManager_u_Object): $(OUT_DIR)/runtime_manager_u.o
-	$(AR) rcsD $@ $(OUT_DIR)/runtime_manager_u.o
-	@echo $(INFO_COLOR) "AR => $@" $(RESET_COLOR)
 
 css-nitro.bin: PCR0
 	cp $< $@
@@ -83,14 +60,33 @@ target/release/runtime_manager_enclave: Cargo.toml $(Linux_Src)
 
 linux: target/release/runtime_manager_enclave
 
+####### Utility targets #######
+
 clean:
 	@cargo clean
 	@xargo clean
-	@rm -rf target
-	@rm -f runtime_manager_t.? runtime_manager_u.?
-	@rm -f $(FINAL_DIR)/$(Signed_RustEnclave_RootName)
-	@rm -f $(OUT_DIR)/stripped_ta
+	@rm -rf ./target
+	@rm -f ./runtime_manager_t.? ./runtime_manager_u.?
 	@rm -f $(OUT_DIR)/runtime_manager_enclave
 	@rm -f $(RustEnclave_Name)
-	@rm -rf bin/
-	@rm -f css-*.bin
+	@rm -rf ./bin/
+	@rm -f ./css-*.bin
+
+quick-clean:
+	@cargo clean
+	@xargo clean
+	@rm -rf ./target
+	@rm -f ./runtime_manager_t.? ./runtime_manager_u.?
+	@rm -f $(OUT_DIR)/runtime_manager_enclave
+	@rm -f $(RustEnclave_Name)
+	@rm -rf ./bin/
+	@rm -f ./css-*.bin
+
+fmt:
+	cargo fmt
+
+fmt-check:
+	cargo fmt -- --check
+
+update:
+	cargo update

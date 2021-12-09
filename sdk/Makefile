@@ -69,7 +69,7 @@ DATA_GENERATORS = idash2017-logistic-regression-generator \
 DATA_GENERATORS_PATH = data-generators
 RELATIVE_DATA_GEN = $(addprefix $(DATA_GENERATORS_PATH)/, $(DATA_GENERATORS))
 
-.PHONY: all clean doc fmt freestanding-execution-engine wasm-checker env
+.PHONY: all clean clean-cargo-lock doc fmt fmt-check freestanding-execution-engine wasm-checker env update
 
 all: wasm-checker $(RELATIVE_DATA) $(RELATIVE_RUST_EXAMPLES) freestanding-execution-engine
 
@@ -116,6 +116,15 @@ fmt:
     	done
 	$(MAKE) -C freestanding-execution-engine/ fmt
 
+fmt-check:
+	for data in $(RELATIVE_DATA_GEN); do \
+                $(MAKE) -C $$data fmt-check; \
+        done
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
+                $(MAKE) -C $$example fmt-check; \
+        done
+	$(MAKE) -C freestanding-execution-engine/ fmt-check
+
 doc:
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
                 $(MAKE) -C $$example doc; \
@@ -133,13 +142,30 @@ clean:
 	$(MAKE) -C freestanding-execution-engine/ clean
 	$(MAKE) -C wasm-checker/ clean
 
+clean-cargo-lock:
+	$(MAKE) -C freestanding-execution-engine clean-cargo-lock
+	for data in $(RELATIVE_DATA_GEN); do \
+                rm -f $(addprefix ./$$data/, Cargo.lock); \
+        done
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
+		rm -f $(addprefix ./$$example/, Cargo.lock); \
+        done
+
 quick-clean:
 	for data in $(RELATIVE_DATA_GEN); do \
-		$(MAKE) -C $$data clean; \
+		$(MAKE) -C $$data quick-clean; \
 	done
 	rm -rf datasets
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
-		$(MAKE) -C $$example clean; \
+		$(MAKE) -C $$example quick-clean; \
 	done
-	$(MAKE) -C freestanding-execution-engine/ clean
-	#$(MAKE) -C wasm-checker/ clean
+	$(MAKE) -C freestanding-execution-engine/ quick-clean
+
+update:
+	for data in $(RELATIVE_DATA_GEN); do \
+		cd $(addprefix $(shell pwd)/,$$data) && cargo update; \
+        done
+	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
+		cd $(addprefix $(shell pwd)/,$$example) && cargo update; \
+        done
+	$(MAKE) -C freestanding-execution-engine/ update

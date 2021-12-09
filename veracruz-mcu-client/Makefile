@@ -64,6 +64,14 @@ clean:
 	rm -rf policy.h policy.c
 	rm -rf build
 
+.PHONY: quick-clean
+quick-clean:
+	rm -rf samples/audio-event-triangulation/clap.h samples/audio-event-triangulation/clap.c
+	rm -rf samples/shamir-secret-sharing/binary.h samples/shamir-secret-sharing/binary.c
+	rm -rf transport_protocol.pb.h transport_protocol.pb.c
+	rm -rf policy.h policy.c
+	rm -rf build
+
 # rules for the audio-event-triangulation demo
 .PHONY: build-demo
 build-demo:

@@ -10,8 +10,8 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
-use policy_utils::{policy::Policy, Platform, parsers::enforce_leading_backslash};
 use log::{error, info};
+use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use ring::signature::KeyPair;
 use rustls::Session;
 use std::{
@@ -41,8 +41,7 @@ impl VeracruzClient {
     /// Read all the bytes in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_all_bytes_in_file<P: AsRef<Path>>(filename: P) -> Result<Vec<u8>, VeracruzClientError>
-    {
+    fn read_all_bytes_in_file<P: AsRef<Path>>(filename: P) -> Result<Vec<u8>, VeracruzClientError> {
         let mut file = std::fs::File::open(filename)?;
         let mut buffer = std::vec::Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -54,8 +53,7 @@ impl VeracruzClient {
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
     // TODO: use generic functions to unify read_cert and read_private_key
-    fn read_cert<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate, VeracruzClientError>
-    {
+    fn read_cert<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate, VeracruzClientError> {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let cert_vec = rustls::internal::pemfile::certs(&mut cursor)
@@ -71,8 +69,9 @@ impl VeracruzClient {
     /// Read the private in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_private_key<P: AsRef<Path>>(filename: P) -> Result<rustls::PrivateKey, VeracruzClientError>
-    {
+    fn read_private_key<P: AsRef<Path>>(
+        filename: P,
+    ) -> Result<rustls::PrivateKey, VeracruzClientError> {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let pkey_vec = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
@@ -119,8 +118,7 @@ impl VeracruzClient {
     fn check_certificate_validity<P: AsRef<Path>>(
         client_cert_filename: P,
         public_key: &[u8],
-    ) -> Result<(), VeracruzClientError>
-    {
+    ) -> Result<(), VeracruzClientError> {
         let cert_file = std::fs::File::open(&client_cert_filename)?;
         let parsed_cert = x509_parser::pem::Pem::read(std::io::BufReader::new(cert_file))?;
         let parsed_cert = parsed_cert
@@ -151,8 +149,7 @@ impl VeracruzClient {
         client_cert_filename: P1,
         client_key_filename: P2,
         policy_json: &str,
-    ) -> Result<VeracruzClient, VeracruzClientError>
-    {
+    ) -> Result<VeracruzClient, VeracruzClientError> {
         let policy = Policy::from_json(&policy_json)?;
         let policy_hash = policy
             .policy_hash()
@@ -176,8 +173,7 @@ impl VeracruzClient {
         client_key_filename: P2,
         policy: Policy,
         policy_hash: String,
-    ) -> Result<VeracruzClient, VeracruzClientError>
-    {
+    ) -> Result<VeracruzClient, VeracruzClientError> {
         let client_cert = Self::read_cert(&client_cert_filename)?;
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
@@ -231,11 +227,19 @@ impl VeracruzClient {
     }
 
     /// Check the policy and runtime hashes, and then send the `program` to the remote `path`.
-    pub fn send_program<P: AsRef<Path>>(&mut self, path: P, program: &[u8]) -> Result<(), VeracruzClientError> {
+    pub fn send_program<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        program: &[u8],
+    ) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
-        let path = enforce_leading_backslash(path.as_ref().to_str().ok_or(VeracruzClientError::InvalidPath)?);
+        let path = enforce_leading_backslash(
+            path.as_ref()
+                .to_str()
+                .ok_or(VeracruzClientError::InvalidPath)?,
+        );
         let serialized_program = transport_protocol::serialize_program(&program, &path)?;
         let response = self.send(&serialized_program)?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
@@ -249,11 +253,19 @@ impl VeracruzClient {
     }
 
     /// Check the policy and runtime hashes, and then send the `data` to the remote `path`.
-    pub fn send_data<P: AsRef<Path>>(&mut self, path: P, data: &[u8]) -> Result<(), VeracruzClientError> {
+    pub fn send_data<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        data: &[u8],
+    ) -> Result<(), VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
-        let path = enforce_leading_backslash(path.as_ref().to_str().ok_or(VeracruzClientError::InvalidPath)?);
+        let path = enforce_leading_backslash(
+            path.as_ref()
+                .to_str()
+                .ok_or(VeracruzClientError::InvalidPath)?,
+        );
         let serialized_data = transport_protocol::serialize_program_data(&data, &path)?;
         let response = self.send(&serialized_data)?;
 
@@ -269,18 +281,28 @@ impl VeracruzClient {
 
     /// Check the policy and runtime hashes, and request the veracruz to execute the program at the
     /// remote `path`.
-    pub fn request_compute<P: AsRef<Path>>(&mut self, path: P) -> Result<Vec<u8>, VeracruzClientError> {
+    pub fn request_compute<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
-        let path = enforce_leading_backslash(path.as_ref().to_str().ok_or(VeracruzClientError::InvalidPath)?);
+        let path = enforce_leading_backslash(
+            path.as_ref()
+                .to_str()
+                .ok_or(VeracruzClientError::InvalidPath)?,
+        );
         let serialized_read_result = transport_protocol::serialize_request_result(&path)?;
         let response = self.send(&serialized_read_result)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
-            return Err(VeracruzClientError::ResponseError("request_compute", status));
+            return Err(VeracruzClientError::ResponseError(
+                "request_compute",
+                status,
+            ));
         }
         if !parsed_response.has_result() {
             return Err(VeracruzClientError::VeracruzServerResponseNoResultError);
@@ -289,13 +311,16 @@ impl VeracruzClient {
         return Ok(response_data.clone());
     }
 
-
     /// Check the policy and runtime hashes, and read the result at the remote `path`.
     pub fn get_results<P: AsRef<Path>>(&mut self, path: P) -> Result<Vec<u8>, VeracruzClientError> {
         self.check_policy_hash()?;
         self.check_runtime_hash()?;
 
-        let path = enforce_leading_backslash(path.as_ref().to_str().ok_or(VeracruzClientError::InvalidPath)?);
+        let path = enforce_leading_backslash(
+            path.as_ref()
+                .to_str()
+                .ok_or(VeracruzClientError::InvalidPath)?,
+        );
         let serialized_read_result = transport_protocol::serialize_read_file(&path)?;
         let response = self.send(&serialized_read_result)?;
 
@@ -347,11 +372,7 @@ impl VeracruzClient {
 
     /// Check if the hash `received` matches those in the policy.
     fn compare_runtime_hash(&self, received: &[u8]) -> Result<(), VeracruzClientError> {
-        let platforms = vec![
-            Platform::Linux,
-            Platform::Nitro,
-            Platform::IceCap,
-        ];
+        let platforms = vec![Platform::Linux, Platform::Nitro, Platform::IceCap];
         for platform in platforms {
             let expected = match self.policy.runtime_manager_hash(&platform) {
                 Err(_) => continue, // no hash found for this platform
@@ -560,20 +581,23 @@ impl VeracruzClient {
 
     // APIs for testing: expose internal functions
     #[cfg(test)]
-    pub fn pub_read_all_bytes_in_file<P: AsRef<Path>>(filename: P) -> Result<Vec<u8>, VeracruzClientError>
-    {
+    pub fn pub_read_all_bytes_in_file<P: AsRef<Path>>(
+        filename: P,
+    ) -> Result<Vec<u8>, VeracruzClientError> {
         VeracruzClient::read_all_bytes_in_file(filename)
     }
 
     #[cfg(test)]
-    pub fn pub_read_cert<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate, VeracruzClientError>
-    {
+    pub fn pub_read_cert<P: AsRef<Path>>(
+        filename: P,
+    ) -> Result<rustls::Certificate, VeracruzClientError> {
         VeracruzClient::read_cert(filename)
     }
 
     #[cfg(test)]
-    pub fn pub_read_private_key<P: AsRef<Path>>(filename: P) -> Result<rustls::PrivateKey, VeracruzClientError>
-    {
+    pub fn pub_read_private_key<P: AsRef<Path>>(
+        filename: P,
+    ) -> Result<rustls::PrivateKey, VeracruzClientError> {
         VeracruzClient::read_private_key(filename)
     }
 

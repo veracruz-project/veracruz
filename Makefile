@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
-.PHONY: all sdk setup-githooks nitro-veracruz-client-test clean clean-cargo-lock fmt linux linux-veracruz-server-test linux-veracruz-server-test-dry-run linux-test-collateral linux-veracruz-client-test linux-veracruz-test-dry-run linux-veracruz-test linux-cli
+.PHONY: all sdk install-rustfmt setup-githooks nitro-veracruz-client-test clean clean-cargo-lock fmt fmt-check linux linux-veracruz-server-test linux-veracruz-server-test-dry-run linux-test-collateral linux-veracruz-client-test linux-veracruz-test-dry-run linux-veracruz-test linux-cli
 
 WARNING_COLOR := "\e[1;33m"
 INFO_COLOR := "\e[1;32m"
@@ -24,8 +24,10 @@ BIN_DIR ?= /usr/local/cargo/bin
 all:
 	@echo $(WARNING_COLOR)"Please explicitly choose a target."$(RESET_COLOR)
 
-setup-githooks:
+install-rustfmt:
 	rustup component add rustfmt
+
+setup-githooks: install-rustfmt
 	git config core.hooksPath githooks
 
 # Build all of the SDK and examples
@@ -161,77 +163,121 @@ linux-veracruz-test: linux-test-collateral linux veracruz-test/proxy-attestation
 		&& RUSTFLAGS=$(LINUX_RUST_FLAG) cargo test --features linux -- --test-threads=1
 
 clean:
-	# remove databases since these can easily fall out of date
+	# remove databases and binaries since these can easily fall out of date
+	rm -rf bin
 	rm -f proxy-attestation-server/proxy-attestation-server.db
 	rm -f veracruz-server-test/proxy-attestation-server.db
 	rm -f veracruz-test/proxy-attestation-server.db
 	# clean code
-	cd psa-attestation && cargo clean
+	cd execution-engine && cargo clean
+	cd io-utils && cargo clean
+	cd linux-root-enclave && cargo clean
+	cd platform-services && cargo clean
+	cd policy-utils && cargo clean
 	cd proxy-attestation-server && cargo clean
+	cd psa-attestation && cargo clean
+	$(MAKE) clean -C runtime-manager
+	$(MAKE) clean -C sdk
 	cd session-manager && cargo clean
-	cd veracruz-utils && cargo clean
+	$(MAKE) clean -C test-collateral
+	cd transport-protocol && cargo clean
+	cd veracruz-client && cargo clean
+	$(MAKE) clean -C veracruz-mcu-client
 	cd veracruz-server && cargo clean
 	cd veracruz-server-test && cargo clean
-	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
-	$(MAKE) clean -C runtime-manager
-	$(MAKE) clean -C test-collateral 
-	$(MAKE) clean -C sdk
-	$(MAKE) clean -C linux-root-enclave
-	rm -rf bin
+	cd veracruz-test && cargo clean
+	cd veracruz-utils && cargo clean
 
 # clean-quick cleans everything but LLVM (in wasm-checker)
 quick-clean:
-	# remove databases since these can easily fall out of date
+	# remove databases and binaries since these can easily fall out of date
+	rm -rf bin
 	rm -f proxy-attestation-server/proxy-attestation-server.db
 	rm -f veracruz-server-test/proxy-attestation-server.db
 	rm -f veracruz-test/proxy-attestation-server.db
 	# clean code
-	cd psa-attestation && cargo clean
+	cd execution-engine && cargo clean
+	cd io-utils && cargo clean
+	cd linux-root-enclave && cargo clean
+	cd platform-services && cargo clean
+	cd policy-utils && cargo clean
 	cd proxy-attestation-server && cargo clean
-	cd session-manager && cargo clean
-	cd veracruz-utils && cargo clean
-	cd veracruz-server-test && cargo clean
-	cd veracruz-test && cargo clean && rm -f proxy-attestation-server.db
-	cd nitro-root-enclave-server && cargo clean
-	$(MAKE) clean -C runtime-manager
-	$(MAKE) clean -C veracruz-server
-	$(MAKE) clean -C test-collateral 
+	cd psa-attestation && cargo clean
+	$(MAKE) quick-clean -C runtime-manager
 	$(MAKE) quick-clean -C sdk
-	$(MAKE) clean -C nitro-root-enclave
-	rm -rf bin
+	cd session-manager && cargo clean
+	$(MAKE) quick-clean -C test-collateral
+	cd transport-protocol && cargo clean
+	cd veracruz-client && cargo clean
+	$(MAKE) quick-clean -C veracruz-mcu-client
+	cd veracruz-server && cargo clean
+	cd veracruz-server-test && cargo clean	
+	cd veracruz-test && cargo clean
+	cd veracruz-utils && cargo clean
 
 # NOTE: this target deletes ALL cargo.lock.
 clean-cargo-lock:
-	$(MAKE) -C sdk clean
-	$(MAKE) -C test-collateral clean
-	rm -f $(addsuffix /Cargo.lock,execution-engine platform-services proxy-attestation-server psa-attestation runtime-manager session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
+	$(MAKE) -C sdk clean-cargo-lock
+	$(MAKE) -C test-collateral clean-cargo-lock
+	rm -f $(addsuffix /Cargo.lock,execution-engine io-utils linux-root-enclave platform-services policy-utils proxy-attestation-server psa-attestation runtime-manager session-manager transport-protocol veracruz-client veracruz-server veracruz-server-test veracruz-test veracruz-utils)
 
 # update dependencies, note does NOT change Cargo.toml, useful if
 # patched/github dependencies have changed without version bump
 update:
-	cd session-manager && cargo update
 	cd execution-engine && cargo update
+	cd io-utils && cargo update
+	cd linux-root-enclave && cargo update
+	cd platform-services && cargo update
+	cd policy-utils && cargo update
+	cd proxy-attestation-server && cargo update
+	cd psa-attestation && cargo update
+	$(MAKE) update -C runtime-manager
+	$(MAKE) update -C sdk
+	cd session-manager && cargo update
+	$(MAKE) update -C test-collateral
 	cd transport-protocol && cargo update
 	cd veracruz-client && cargo update
-	cd runtime-manager && cargo update
-	cd psa-attestation && cargo update
-	cd veracruz-server-test && cargo update
 	cd veracruz-server && cargo update
+	cd veracruz-server-test && cargo update
 	cd veracruz-test && cargo update
 	cd veracruz-utils && cargo update
-	cd proxy-attestation-server && cargo update
 
-fmt:
-	cd session-manager && cargo fmt
+fmt: install-rustfmt
 	cd execution-engine && cargo fmt
-	cd transport-protocol && cargo fmt
-	cd veracruz-client && cargo fmt
-	cd runtime-manager && cargo fmt
+	cd io-utils && cargo fmt
+	cd linux-root-enclave && cargo fmt
+	cd platform-services && cargo fmt
+	cd policy-utils && cargo fmt
+	cd proxy-attestation-server && cargo fmt
 	cd psa-attestation && cargo fmt
-	cd veracruz-server-test && cargo fmt
+	$(MAKE) fmt -C runtime-manager
+	$(MAKE) fmt -C sdk
+	cd session-manager && cargo fmt
+	$(MAKE) fmt -C test-collateral
+	# This hits a bug in rustfmt due to path-renamed modules
+	# cd transport-protocol && cargo fmt
+	cd veracruz-client && cargo fmt
 	cd veracruz-server && cargo fmt
+	cd veracruz-server-test && cargo fmt
 	cd veracruz-test && cargo fmt
 	cd veracruz-utils && cargo fmt
-	cd proxy-attestation-server && cargo fmt
-	cd linux-root-enclave && cargo fmt
-	$(MAKE) -C sdk fmt
+
+fmt-check: install-rustfmt
+	cd execution-engine && cargo fmt -- --check
+	cd io-utils && cargo fmt -- --check
+	cd linux-root-enclave && cargo fmt -- --check
+	cd platform-services && cargo fmt -- --check
+	cd policy-utils && cargo fmt -- --check
+	cd proxy-attestation-server && cargo fmt -- --check
+	cd psa-attestation && cargo fmt -- --check
+	$(MAKE) fmt-check -C runtime-manager
+	$(MAKE) fmt-check -C sdk
+	cd session-manager && cargo fmt -- --check
+	$(MAKE) fmt-check -C test-collateral
+	# This hits a bug in rustfmt due to path-renamed modules
+	# cd transport-protocol && cargo fmt -- --check
+	cd veracruz-client && cargo fmt -- --check
+	cd veracruz-server && cargo fmt -- --check
+	cd veracruz-server-test && cargo fmt -- --check
+	cd veracruz-test && cargo fmt -- --check
+	cd veracruz-utils && cargo fmt -- --check

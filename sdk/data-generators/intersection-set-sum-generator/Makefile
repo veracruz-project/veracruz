@@ -18,7 +18,7 @@ SEED = 0
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
 
-.PHONY: all clean fmt
+.PHONY: all clean quick-clean fmt fmt-check
 
 all: $(TARGET_DIR_DATS)
 
@@ -37,5 +37,13 @@ clean:
 	rm -f *.dat
 	rm -f $(TARGET_DIR_DATS)
 
+quick-clean:
+	cargo clean
+	rm -f *.dat
+	rm -f $(TARGET_DIR_DATS)
+
 fmt:
 	cargo fmt
+
+fmt-check:
+	cargo fmt -- --check

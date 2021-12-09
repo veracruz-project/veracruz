@@ -12,6 +12,8 @@
 use policy_utils::{policy::Policy, principal::Principal};
 use std::sync::Mutex;
 
+use execution_engine::{execute, fs::FileSystem};
+use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -19,8 +21,6 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
     vec::Vec,
 };
-use lazy_static::lazy_static;
-use execution_engine::{fs::FileSystem, execute};
 use wasi_types::ErrNo;
 
 pub mod error;
@@ -130,11 +130,9 @@ impl ProtocolState {
                 }
             }
         }
-        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
-            file_name,
-            data,
-            false,
-        )?;
+        self.vfs
+            .spawn(client_id)?
+            .write_file_by_absolute_path(file_name, data, false)?;
         Ok(())
     }
 
@@ -159,9 +157,7 @@ impl ProtocolState {
             return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
         }
         self.vfs.spawn(client_id)?.write_file_by_absolute_path(
-            file_name,
-            data,
-            // set the append flag to true
+            file_name, data, // set the append flag to true
             true,
         )?;
         Ok(())
@@ -173,9 +169,10 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
-        let rst = self.vfs.spawn(client_id)?.read_file_by_absolute_path(
-            file_name,
-        )?;
+        let rst = self
+            .vfs
+            .spawn(client_id)?
+            .read_file_by_absolute_path(file_name)?;
         if rst.len() == 0 {
             return Ok(None);
         }
@@ -201,8 +198,15 @@ impl ProtocolState {
             enable_clock: *self.global_policy.enable_clock(),
             ..Default::default()
         };
-        let program = self.read_file(client_id, file_name)?.ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
-        let return_code = execute(&execution_strategy, self.vfs.spawn(&Principal::Program(file_name.to_string()))?, program, options)?;
+        let program = self
+            .read_file(client_id, file_name)?
+            .ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
+        let return_code = execute(
+            &execution_strategy,
+            self.vfs.spawn(&Principal::Program(file_name.to_string()))?,
+            program,
+            options,
+        )?;
 
         let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))
@@ -248,8 +252,7 @@ fn print_message(message: String, code: u32) {
     } else {
         eprintln!(
             "Enclave returns error code {} and message \"{}\"",
-            code,
-            message
+            code, message
         );
     }
 }

@@ -20,7 +20,7 @@ TARGET_DATS = $(foreach base_name,$(BASENAME),$(addprefix $(base_name),$(INDICE_
 TARGET_DIR = ../../datasets/private-set-inter-sum/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
 
-.PHONY: all clean fmt
+.PHONY: all clean quick-clean fmt fmt-check
 
 all: $(TARGET_DIR_DATS)
 
@@ -38,5 +38,13 @@ clean:
 	rm -f *.dat
 	rm -rf $(TARGET_DIR)
 
+quick-clean:
+	cargo clean
+	rm -f *.dat
+	rm -rf $(TARGET_DIR)
+
 fmt:
 	cargo fmt
+
+fmt-check:
+	cargo fmt -- --check

@@ -32,7 +32,13 @@ jobs:
         with:
           submodules: recursive
 
-      # Compile all examples and data sources in the sdk
+      # Check source file formatting, then compile all examples and data sources in the SDK
+      - name: Check source file formatting
+        id: rustfmt-check
+        run: |
+          cd /work/veracruz
+          make fmt-check
+
       - name: Compile SDK
         id: sdk
         run: |
