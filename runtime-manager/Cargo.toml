@@ -65,6 +65,8 @@ err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
 half = "=1.7.1"
 hex = { version = "=0.4.2", default-features = false }
+# In hermit-abi 0.1.20 the "edition" was changed from "2018" to "2021":
+hermit-abi = "=0.1.19"
 http = "=0.2.4"
 icecap-wrapper = { path = "../icecap/src/rust/icecap-wrapper", optional = true }
 io-utils = { path = "../io-utils", optional = true }
