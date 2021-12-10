@@ -46,8 +46,8 @@ css-nitro.bin: PCR0
 
 runtime_manager.eif: target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave crates/runtime-manager/dockerdir/Dockerfile
 	rm -rf docker
-	mkdir -p docker/target/$(ARCH)-unknown-linux-musl/release
-	cp target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave docker/target/$(ARCH)-unknown-linux-musl/release
+	mkdir -p docker
+	cp target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave docker
 	cp crates/runtime-manager/dockerdir/Dockerfile docker
 	perl -i -pe "s/x86_64/$(ARCH)/" docker/Dockerfile
 	nitro-cli build-enclave --docker-dir docker --docker-uri runtime_manager --output-file runtime_manager.eif > measurements.json
