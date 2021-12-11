@@ -16,11 +16,11 @@ let
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
   inherit (configured) icecapFirmware icecapPlat selectIceCapPlatOr mkRealm;
 
-  runtimeManagerElf = ../build/runtime-manager/out/runtime_manager_enclave.elf;
+  runtimeManagerElf = ../build/bin/runtime_manager_enclave.elf;
 
   testElf = {
-    veracruz-server-test = ../build/veracruz-server-test/out/veracruz-server-test;
-    veracruz-test = ../build/veracruz-test/out/veracruz-test;
+    veracruz-server-test = ../build/bin/veracruz-server-test;
+    veracruz-test = ../build/bin/veracruz-test;
   };
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
@@ -94,24 +94,13 @@ in lib.fix (self: with self; {
     };
   };
 
-  env =
-    let
-      kebabToCaml = lib.replaceStrings [ "-" ] [ "_" ];
-      callTest = pkgs.linux.icecap.callPackage ./env/host-test-generic.nix {
-        inherit kebabToCaml;
-      };
-    in {
-      runtime-manager = configured.callPackage ./env/runtime-manager.nix {
-        inherit libc-supplement kebabToCaml;
-      };
-      veracruz-server-test = callTest {
-        name = "veracruz-server-test";
-      };
-      veracruz-test = callTest {
-        name = "veracruz-test";
-      };
-      sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
+  env = {
+    realm = configured.callPackage ./env/realm.nix {
+      inherit libc-supplement;
     };
+    host = pkgs.linux.icecap.callPackage ./env/host.nix {};
+    sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
+  };
 
   libc-supplement = configured.libs.mk {
     name = "c-supplement";

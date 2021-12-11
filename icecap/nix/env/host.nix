@@ -9,27 +9,11 @@
 
 { lib, stdenv, buildPackages, mkShell
 , rustc, cargo, git, cacert
-, crateUtils, nixToToml, rustTargetName
 , protobuf, perl, python3
 , pkgconfig, openssl, sqlite
-, kebabToCaml
 }:
 
-{ name }:
-
-let
-
-  manifestPath = toString (../../.. + "/${name}/Cargo.toml");
-
-  debug = false;
-
-  cargoConfig = nixToToml (crateUtils.clobber [
-    crateUtils.baseCargoConfig
-  ]);
-
-in
-
-mkShell (crateUtils.baseEnv // rec {
+mkShell rec {
 
   # By default, Nix injects hardening options into C compilation.
   # For now, to reduce build complexity, disable that.
@@ -49,12 +33,8 @@ mkShell (crateUtils.baseEnv // rec {
     openssl sqlite
   ];
 
-  PKG_CONFIG_ALLOW_CROSS = 1;
-
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
-
-  "CC_${kebabToCaml rustTargetName}" = "${stdenv.cc.targetPrefix}cc";
 
   shellHook = ''
     # NOTE
@@ -75,39 +55,5 @@ mkShell (crateUtils.baseEnv // rec {
       -isystem ${stdenv.cc.cc}/lib/gcc/${stdenv.hostPlatform.config}/${lib.getVersion stdenv.cc.cc}/include \
       $NIX_CFLAGS_COMPILE \
     "
-
-    build_dir=build/${name}
-    build_dir_inverse=../..
-    target_dir=build/target
-
-    build() {
-      setup && \
-      (cd $build_dir && cargo test --no-run \
-        --manifest-path ${manifestPath} \
-        --target ${rustTargetName} --features icecap \
-        ${lib.optionalString (!debug) "--release"} \
-        -j$NIX_BUILD_CORES \
-        --target-dir $build_dir_inverse/$target_dir \
-        "$@"
-      ) && \
-      distinguish
-    }
-
-    setup() {
-      mkdir -p $build_dir/.cargo
-      ln -sf ${cargoConfig} $build_dir/.cargo/config
-    }
-
-    # cargo test --no-run doesn't give the test binary a predictable filename, so we have to find it ourselves
-    distinguish() {
-      d=$target_dir/${rustTargetName}/${if debug then "debug" else "release"}/deps
-      f="$(find $d -executable -type f -name "${lib.replaceStrings [ "-" ] [ "_" ] name}-*" -printf "%T@ %p\n" \
-        | sort -n \
-        | tail -n 1 \
-        | cut -d ' ' -f 2 \
-      )"
-      install -D -T "$f" $build_dir/out/${name}
-    }
   '';
-
-})
+}
