@@ -64,7 +64,7 @@ env_logger = { version = "0.8.3", optional = true }
 err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
 half = "=1.7.1"
-hex = { version = "=0.4.2", default-features = false }
+hex = { version = "0.4.2" }
 http = "=0.2.4"
 icecap-wrapper = { path = "../icecap/src/rust/icecap-wrapper", optional = true }
 io-utils = { path = "../io-utils", optional = true }

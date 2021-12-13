@@ -11,7 +11,7 @@ std = ["serde/std", "serde_json/std", "ring", "x509-parser", "rustls", "wasi-typ
 
 [dependencies]
 err-derive = { version = "0.2", default-features = false }
-hex = { version = "=0.4.2", default-features = false }
+hex = { version = "0.4.2" }
 
 lexical-core = { version = "0.8.2", default-features = false }
 ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", optional = true }

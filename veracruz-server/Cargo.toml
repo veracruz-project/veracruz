@@ -46,7 +46,7 @@ curl = "=0.4.35"
 env_logger = { version = "0.7", optional = true }
 err-derive = "0.2"
 futures = "0.3"
-hex = "=0.4.2"
+hex = "0.4.2"
 http = "=0.2.4"
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = "1.4"
