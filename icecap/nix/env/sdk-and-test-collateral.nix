@@ -9,7 +9,7 @@
 
 { lib, mkShell
 , crateUtils
-, rustc, cargo, git, cacert
+, rustup, git, cacert
 , cmake, python3, perl
 , file, bc, xxd
 , sqlite, diesel-cli
@@ -22,7 +22,7 @@ mkShell rec {
   hardeningDisable = [ "all" ];
 
   nativeBuildInputs = [
-    rustc cargo git cacert
+    rustup git cacert
     cmake python3 perl
     file bc xxd
     sqlite diesel-cli

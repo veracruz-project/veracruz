@@ -8,7 +8,7 @@
 # and copyright information.
 
 { lib, stdenv, buildPackages, mkShell
-, rustc, cargo, git, cacert
+, rustup, git, cacert
 , protobuf, perl, python3
 , pkgconfig, openssl, sqlite
 }:
@@ -24,7 +24,7 @@ mkShell rec {
   ];
 
   nativeBuildInputs = [
-    rustc cargo git cacert
+    rustup git cacert
     protobuf perl python3
     pkgconfig
   ];
