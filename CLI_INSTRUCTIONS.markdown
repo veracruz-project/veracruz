@@ -22,7 +22,7 @@ rules, allowing you to maximize the time you have to get coffee while the code
 is compiling:
 
 ``` bash
-$ make nitro-cli-install sdk
+$ make sdk nitro-cli-install
 ...
 ```
 
