@@ -12,6 +12,8 @@ ICECAP_PLAT ?= virt
 build_dir := build
 target_dir := $(build_dir)/target
 bin_dir := $(build_dir)/bin
+sysroot_target_dir := $(build_dir)/sysroot-target
+sysroot_dir := $(build_dir)/sysroot
 
 kebab_to_caml = $(subst -,_,$(1))
 capitalize = $(shell echo $(1) | tr '[:lower:]' '[:upper:]')

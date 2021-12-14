@@ -18,7 +18,7 @@ nix_shell := nix-shell --pure
 nix_expression := targets.nix
 nix_attribute_path := $(ICECAP_PLAT)
 
-inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) inner-$@
+inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) $@
 
 
 # HACK
@@ -38,6 +38,10 @@ update-time:
 .PHONY: runtime-manager
 runtime-manager: $(now)
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.realm --run '$(call inner_make_cmd,realm)'
+
+.PHONY: sysroot
+sysroot:
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.realm --run '$(MAKE) -f mk/realm.mk ICECAP_PLAT=$(ICECAP_PLAT) sysroot'
 
 .PHONY: veracruz-server-test
 veracruz-server-test:
