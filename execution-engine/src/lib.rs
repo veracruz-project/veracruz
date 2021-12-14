@@ -45,9 +45,11 @@ pub struct Options {
     /// if any.
     pub program_arguments: Vec<String>,
     /// Whether clock-related functionality is enabled for the program.  If not
-    /// enabled, clock- and time-related WASI host-calls return an unimpleemnted
+    /// enabled, clock- and time-related WASI host-calls return an unimplemented
     /// status code.
     pub enable_clock: bool,
+    /// Whether strace-like output is enabled.
+    pub enable_strace: bool,
 }
 
 impl Default for Options {
@@ -57,6 +59,7 @@ impl Default for Options {
             environment_variables: Vec::new(),
             program_arguments: Vec::new(),
             enable_clock: false,
+            enable_strace: false,
         }
     }
 }

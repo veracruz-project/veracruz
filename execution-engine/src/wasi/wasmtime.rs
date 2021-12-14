@@ -826,6 +826,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
         VFS_INSTANCE.lock()?.environment_variables = options.environment_variables;
         VFS_INSTANCE.lock()?.program_arguments = options.program_arguments;
         VFS_INSTANCE.lock()?.enable_clock = options.enable_clock;
+        VFS_INSTANCE.lock()?.enable_strace = options.enable_strace;
         Self::invoke_entry_point(program)
     }
 }

@@ -80,6 +80,8 @@ struct CommandLineOptions {
     environment_variables: Vec<(String, String)>,
     /// Command-line arguments for the program, including argv[0].
     program_arguments: Vec<String>,
+    /// Whether strace is enabled.
+    enable_strace: bool,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
@@ -167,6 +169,11 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .value_name("VAR=VAL")
                 .multiple(true),
         )
+        .arg(
+            Arg::with_name("strace")
+                .long("strace")
+                .help("Enable strace-like output for WASI calls."),
+        )
         .get_matches();
 
     info!("Parsed command line.");
@@ -237,6 +244,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         None => Vec::new(),
         Some(x) => x.map(|e| e.to_string()).collect(),
     };
+    let enable_strace = matches.is_present("strace");
 
     Ok(CommandLineOptions {
         input_sources,
@@ -248,6 +256,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         enable_clock,
         environment_variables,
         program_arguments,
+        enable_strace,
     })
 }
 
@@ -342,6 +351,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         environment_variables: cmdline.environment_variables,
         program_arguments: cmdline.program_arguments,
         enable_clock: cmdline.enable_clock,
+        enable_strace: cmdline.enable_strace,
+        ..Default::default()
     };
     let program = vfs.read_file_by_absolute_path(prog_file_abs_path)?;
     let return_code = execute(
