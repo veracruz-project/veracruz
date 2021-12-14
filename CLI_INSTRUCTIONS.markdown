@@ -23,7 +23,7 @@ rules, allowing you to maximize the time you have to get coffee while the code
 is compiling:
 
 ``` bash
-$ make sgx-cli-install sdk
+$ make sdk sgx-cli-install
 ...
 ```
 
