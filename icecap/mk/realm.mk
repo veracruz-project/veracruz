@@ -20,7 +20,7 @@ icecap_rustflags := \
 	-l static=icecap-pure \
 	-l static=c-supplement \
 	$(icecap_c_lib_flags) \
-	--sysroot=$(sysroot_dir)
+	--sysroot=$(abspath $(sysroot_dir))
 
 define realm_crate_body
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
