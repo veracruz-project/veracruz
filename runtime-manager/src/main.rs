@@ -11,6 +11,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![feature(rustc_private)] // added to stop E0658
+
 #![cfg_attr(any(feature = "icecap"), no_main)]
 #![crate_name = "runtime_manager_enclave"]
 #![cfg_attr(any(feature = "icecap"), feature(format_args_nl))]
