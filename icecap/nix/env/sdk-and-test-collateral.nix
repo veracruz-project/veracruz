@@ -15,7 +15,7 @@
 , sqlite, diesel-cli
 }:
 
-mkShell (crateUtils.baseEnv // rec {
+mkShell rec {
 
   # By default, Nix injects hardening options into C compilation.
   # For now, to reduce build complexity, disable that.
@@ -28,4 +28,4 @@ mkShell (crateUtils.baseEnv // rec {
     sqlite diesel-cli
   ];
 
-})
+}
