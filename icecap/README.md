@@ -1,4 +1,4 @@
-# Veracruz on IceCap (WIP)
+# Veracruz on IceCap
 
 IceCap: https://gitlab.com/arm-research/security/icecap/icecap
 
