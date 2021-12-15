@@ -102,10 +102,8 @@ $(RELATIVE_DATA):
 
 env:
 # Don't use rustup if we are building in a Nix shell
-ifeq ($(IN_NIX_SHELL),)
 	rustup target add wasm32-wasi
 	rustup component add rust-src rust-std
-endif
 
 fmt:
 	for data in $(RELATIVE_DATA_GEN); do \
