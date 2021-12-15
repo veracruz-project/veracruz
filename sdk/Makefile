@@ -28,22 +28,22 @@ RUST_EXAMPLES = idash2017-logistic-regression \
 		   nop \
 		   private-set-intersection-sum \
 		   string-edit-distance \
- 		   number-stream-accumulation \
+		   number-stream-accumulation \
 		   read-file \
- 		   image-processing \
+		   image-processing \
 		   shamir-secret-sharing
 RUST_EXAMPLE_DIR = rust-examples/
 # Navigate to the actual wasm programs.
 RELATIVE_RUST_EXAMPLES = $(foreach EXAMPLE,$(RUST_EXAMPLES),$(CARGO_TARGET_DIR)/wasm32-wasi/release/$(EXAMPLE).wasm)
 # All dataset filenames
 DATA = hello-world-1.dat \
- 	   hello-world-2.dat \
+	   hello-world-2.dat \
 	   intersection-advertisement-viewer.dat \
 	   intersection-customer.dat \
 	   linear-regression.dat \
 	   private-set-1.dat \
 	   private-set-2.dat \
- 	   number-stream-1.dat \
+	   number-stream-1.dat \
 	   number-stream-2.dat \
 	   number-stream-init.dat \
 	   share-1.dat \
@@ -110,8 +110,8 @@ fmt:
 		$(MAKE) -C $$data fmt; \
 	done
 	for example in $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $(RELATIVE_RUST_EXAMPLES)))); do \
-        	$(MAKE) -C $$example fmt; \
-    	done
+		$(MAKE) -C $$example fmt; \
+	done
 	$(MAKE) -C freestanding-execution-engine/ fmt
 
 fmt-check:
