@@ -24,4 +24,5 @@
 [submodule "icecap/local/rust"]
 	path = icecap/local/rust
 	url = https://gitlab.com/egrimley/rust.git
+	fetchRecurseSubmodules = false
 	branch = icecap-sysroot-bump
