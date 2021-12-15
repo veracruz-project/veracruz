@@ -40,8 +40,18 @@ define realm_crate_body
  endef
 
 .PHONY: runtime-manager
-runtime-manager:
+runtime-manager: sysroot-install
 	$(call realm_crate_body,runtime-manager)
+
+# This should probably depend on timestamps somehow.
+.PHONY: sysroot-install
+sysroot-install: sysroot
+	d=$(sysroot_dir)/lib/rustlib/aarch64-icecap/lib ; \
+	mkdir -p $$d ; \
+	ln -f $(sysroot_target_dir)/aarch64-icecap/release/deps/lib*.rlib $$d ; \
+	d=$(sysroot_dir)/lib/rustlib/x86_64-unknown-linux-gnu/lib/ ; \
+	mkdir -p $$d ; \
+	ln -f $(sysroot_target_dir)/release/deps/*.so $$d
 
 sysroot_rustflags := \
 	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
