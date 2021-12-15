@@ -27,7 +27,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 num = { version = "0.4", default-features = false }
 num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
-pinecone = "0.2"
+pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }

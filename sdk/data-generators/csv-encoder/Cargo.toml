@@ -12,7 +12,7 @@ clap = "2.33.0"
 csv = "1.0"
 env_logger = "0.7.1"
 log = "0.4.8"
-pinecone = "0.2.3"
+pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
 toml = "0.5.6"
 
 [profile.release]
