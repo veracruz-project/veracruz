@@ -130,7 +130,7 @@ single_client.json: pgen css-$(TEE).bin client_rsa_cert.pem $(WASM_PROG_FILES)
 	./pgen --certificate client_rsa_cert.pem --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
         --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--enclave-debug-mode true --execution-strategy Interpretation \
+		--enclave-debug-mode true --execution-strategy JIT \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
@@ -138,7 +138,7 @@ single_client_no_debug.json: pgen css-$(TEE).bin client_rsa_cert.pem $(WASM_PROG
 	./pgen --certificate client_rsa_cert.pem --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
         --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
+		--execution-strategy JIT \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
 
@@ -147,7 +147,7 @@ dual_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_cert.p
 		--certificate data_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
 		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
+		--execution-strategy JIT \
 		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
@@ -157,7 +157,7 @@ dual_parallel_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_clie
 		--certificate data_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
 		--veracruz-server-ip 127.0.0.1:3013 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
+		--execution-strategy JIT \
 		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
@@ -170,7 +170,7 @@ $(TRIPLE_POLICY_FILE) : triple_policy_%.json : pgen css-$(TEE).bin program_clien
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
 		--veracruz-server-ip 127.0.0.1:$(shell echo "3020 + $(patsubst triple_policy_%.json,%,$@)" | bc) \
 	    --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
+		--execution-strategy JIT \
 		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
@@ -182,7 +182,7 @@ quadruple_policy.json: pgen css-$(TEE).bin program_client_cert.pem data_client_c
 		--certificate result_client_cert.pem --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
 		--veracruz-server-ip 127.0.0.1:3030 --proxy-attestation-server-ip 127.0.0.1:3010 --output-policy-file $@ --certificate-expiry $(CERTIFICATE_EXPIRY) \
-		--execution-strategy Interpretation \
+		--execution-strategy JIT \
 		--enable-clock true \
 		--css-file $(RUNTIME_MANAGER_CSS_BIN) --pcr-file $(RUNTIME_MANAGER_PCR0) \
 		--proxy-attestation-server-cert ../test-collateral/CACert.pem
