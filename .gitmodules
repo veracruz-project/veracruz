@@ -21,3 +21,7 @@
 	path = icecap/icecap
 	url = https://gitlab.com/egrimley/icecap.git
 	branch = next
+[submodule "icecap/local/rust"]
+	path = icecap/local/rust
+	url = https://gitlab.com/egrimley/rust.git
+	branch = icecap-sysroot-bump
