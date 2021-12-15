@@ -19,8 +19,7 @@
 	url = https://github.com/nanopb/nanopb
 [submodule "icecap/icecap"]
 	path = icecap/icecap
-	url = https://gitlab.com/egrimley/icecap.git
-	branch = next
+	url = https://gitlab.com/arm-research/security/icecap/icecap.git
 [submodule "icecap/local/rust"]
 	path = icecap/local/rust
 	url = https://gitlab.com/egrimley/rust.git
