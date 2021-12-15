@@ -17,7 +17,7 @@ from icedl.utils import PAGE_SIZE_BITS, BLOCK_SIZE_BITS, BLOCK_SIZE, block_at
 REQUEST_BADGE = 1
 FAULT_BADGE = 2
 
-MMAP_BASE = block_at(0x10, 0, 0) << BLOCK_SIZE_BITS
+MMAP_BASE = block_at(0x18, 0, 0) << BLOCK_SIZE_BITS
 
 class RuntimeManager(GenericElfComponent):
 
@@ -86,16 +86,18 @@ class RuntimeManagerSupervisor(GenericElfComponent):
         assert self.runtime_manager_tcb is None
         self.runtime_manager_tcb = thread.tcb
         self._arg['runtime_manager_tcb'] = self.cspace().alloc(self.runtime_manager_tcb, read=True, write=True)
-        thread.component.cspace().alloc(self.ep, badge=FAULT_BADGE, write=True, grant=True)
+        slot = thread.component.cspace().alloc(self.ep, badge=FAULT_BADGE, write=True, grant=True)
+        thread.tcb.fault_ep_slot = slot
 
     def after(self, runtime_manager):
         self._arg['runtime_manager_pgd'] = self.cspace().alloc(runtime_manager.pd(), write=True)
 
-        for i in range(4):
-            large_frame_addr = MMAP_BASE + 512 * i * BLOCK_SIZE
+        for i in range(6):
+            large_frame_addr = MMAP_BASE + 512 * i * BLOCK_SIZE + BLOCK_SIZE
             large_frame_obj = self.alloc(ObjectType.seL4_FrameObject, name='dummy_large_frame_{}'.format(i), size=BLOCK_SIZE)
             large_frame = self.cspace().alloc(large_frame_obj)
-            runtime_manager.addr_space().add_hack_page(large_frame_addr, BLOCK_SIZE, Cap(large_frame_obj, read=True, write=True))
+            # these should go unused
+            runtime_manager.addr_space().add_hack_page(large_frame_addr, BLOCK_SIZE, Cap(large_frame_obj, read=False, write=False))
             self.hack_large_pages.append(large_frame)
 
     def arg_json(self):

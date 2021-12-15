@@ -23,10 +23,12 @@
 	url = https://github.com/nanopb/nanopb
 [submodule "icecap/icecap"]
 	path = icecap/icecap
-	url = https://gitlab.com/arm-research/security/icecap/icecap.git
+	url = https://gitlab.com/geky/icecap.git
+	branch = veracruz-wasmtime
 [submodule "icecap/deps/wasmtime"]
 	path = icecap/deps/wasmtime
-	url = git@github.com:nspin/wasmtime.git
+	url = git@github.com:veracruz-project/wasmtime.git
+	branch = icecap
 [submodule "icecap/deps/atty"]
 	path = icecap/deps/atty
 	url = git@gitlab.com:arm-research/security/icecap/internal/archive/obsolete/minor-patches/rust/atty.git
@@ -36,3 +38,19 @@
 [submodule "icecap/deps/directories"]
 	path = icecap/deps/directories
 	url = git@gitlab.com:arm-research/security/icecap/internal/archive/obsolete/minor-patches/rust/directories.git
+[submodule "icecap/deps/getrandom"]
+	path = icecap/deps/getrandom
+	url = git@github.com:veracruz-project/getrandom.git
+	branch = icecap
+[submodule "icecap/deps/directories-next"]
+	path = icecap/deps/directories-next
+	url = git@github.com:veracruz-project/dirs.git
+	branch = icecap
+[submodule "icecap/deps/region"]
+	path = icecap/deps/region
+	url = git@github.com:veracruz-project/region-rs.git
+	branch = icecap
+[submodule "icecap/deps/libc"]
+	path = icecap/deps/libc
+	url = git@github.com:veracruz-project/libc.git
+	branch = icecap

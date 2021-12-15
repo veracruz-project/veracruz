@@ -8,17 +8,11 @@
 # and copyright information.
 
 [package]
-name = "runtime-manager-supervisor"
+name = "runtime-manager-types"
 version = "0.3.0"
 authors = ["The Veracruz Development Team"]
 edition = "2018"
 
 [dependencies]
-icecap-std = { path = "../../../icecap/src/rust/crates/icecap/icecap-std" }
-icecap-start-generic = { path = "../../../icecap/src/rust/crates/icecap/icecap-start/generic" }
 serde = { version = "*", default-features = false, features = [ "alloc", "derive"] }
-runtime-manager-types = { path = "../runtime-manager-types" }
 libc = { path = "../../../deps/libc" }
-
-[build-dependencies]
-clang-sys = "=1.2.1"

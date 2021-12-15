@@ -27,8 +27,10 @@ icecap = [
   "serde",
   "bincode",
   "log",
+  "libc",
   "libm",
   "icecap-wrapper",
+  "indexmap",
 ]
 linux = [
   "execution-engine/std",
@@ -102,6 +104,7 @@ half = "=1.7.1"
 hex = { version = "=0.4.2", default-features = false }
 http = "=0.2.4"
 icecap-wrapper = { path = "../icecap/src/rust/icecap-wrapper", optional = true }
+indexmap = { version = "1.7.0", optional = true, features = ["std"]}
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }
@@ -131,6 +134,8 @@ wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "verac
 
 errno = "=0.2.5"
 
+runtime-manager-types = { path = "../icecap/src/rust/runtime-manager-types" }
+
 [build-dependencies]
 uuid = { version = "0.7", features = ["v4"] }
 
@@ -145,6 +150,10 @@ wasmtime = { path = "../icecap/deps/wasmtime/crates/wasmtime" }
 atty = { path = "../icecap/deps/atty" }
 errno = { path = "../icecap/deps/errno" }
 directories = { path = "../icecap/deps/directories" }
+directories-next = { path = "../icecap/deps/directories-next/directories" }
+region = { path = "../icecap/deps/region" }
+libc = { path = "../icecap/deps/libc" }
+getrandom = { path = "../icecap/deps/getrandom" }
 
 [profile.release]
 lto = true

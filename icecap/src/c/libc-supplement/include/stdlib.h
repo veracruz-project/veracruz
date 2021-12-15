@@ -16,4 +16,8 @@
 
 void *calloc(size_t nelem, size_t elsize);
 
+static inline void *malloc(size_t nelem) {
+    return calloc(nelem, 1);
+}
+
 void free(void *ptr);

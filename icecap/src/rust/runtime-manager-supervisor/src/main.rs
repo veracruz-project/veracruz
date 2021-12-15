@@ -13,11 +13,16 @@
 
 use serde::{Deserialize, Serialize};
 
+use icecap_std::sel4::fault::*;
+use icecap_std::rpc_sel4::*;
 use icecap_std::prelude::*;
 use icecap_std::logger::{DisplayMode, Level, Logger};
-use icecap_std::rpc_sel4::RPCClient;
 use icecap_std::runtime as icecap_runtime;
 use icecap_start_generic::declare_generic_main;
+use icecap_std::sel4::FrameSize;
+
+use runtime_manager_types::*;
+use libc::*;
 
 declare_generic_main!(main);
 
@@ -54,20 +59,45 @@ fn main(config: Config) -> Fallible<()> {
     init_logging();
     // debug_println!("{:x?}", config);
 
-    for cap in &config.pool.hack_large_pages {
+    for (i, cap) in config.pool.hack_large_pages.iter().enumerate() {
         cap.unmap()?;
     }
-
-    // test
-    let page = config.pool.large_pages.pop().unwrap();
-    let vaddr = config.mmap_base;
-    page.map(config.runtime_manager_pgd, vaddr, CapRights::read_write(), VMAttributes::default())?;
 
     debug_println!("supervisor main loop");
     loop {
         let (info, badge) = config.ep.recv();
         if badge == config.request_badge {
+            let request = rpc_server::recv::<MmapRequest>(&info);
+            debug_println!("got request {:?}", request);
+
+            let response = match request {
+                MmapRequest::MmapRequest(request) => {
+                    MmapResponse::MmapResponse(config.mmap_base as uintptr_t)
+                }
+                MmapRequest::MunmapRequest(request) => {
+                    todo!()
+                },
+            };
+            rpc_server::reply(&response);
+
         } else if badge == config.fault_badge {
+            let fault = Fault::get(info);
+            debug_println!("got fault {:?}", fault);
+            match fault {
+                Fault::VMFault(fault) => {
+                    let addr = fault.addr as usize;
+
+                    // round down to nearest block
+                    let rounded_addr = addr & !((1usize << FrameSize::Large.bits())-1);
+                    let page = config.pool.large_pages.pop().unwrap();
+                    page.map(config.runtime_manager_pgd, rounded_addr, CapRights::read_write(), VMAttributes::default())?;
+
+                    reply(MessageInfo::empty());
+                }
+                _ => {
+                    panic!("unexpected fault: {:?}", fault);
+                }
+            }
         } else {
             panic!()
         }

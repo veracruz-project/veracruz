@@ -9,6 +9,7 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use anyhow;
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
@@ -20,7 +21,7 @@ use crate::{
 use lazy_static::lazy_static;
 use std::{convert::TryFrom, sync::Mutex, vec::Vec};
 use wasi_types::ErrNo;
-use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Val, ValType};
+use wasmtime::{Caller, Extern, ExternType, Func, Instance, Module, Store, Trap, Val, ValType};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
@@ -680,7 +681,7 @@ impl WasmtimeRuntimeState {
         Self::convert_to_errno(vfs.poll_oneoff(&mut caller, subscriptions, events, size, address))
     }
 
-    fn wasi_proc_exit(mut caller: Caller, exit_code: u32) {
+    fn wasi_proc_exit(mut caller: Caller, exit_code: u32) -> Result<(), Trap> {
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             // NOTE: We have no choice but panic here, since this function cannot return error!
@@ -690,6 +691,8 @@ impl WasmtimeRuntimeState {
             )),
         };
         vfs.proc_exit(&mut caller, exit_code);
+        // proc_exit doesn't return, we can map that into wasmtime by raising an exit trap
+        Err(Trap::i32_exit(exit_code as i32))
     }
 
     fn wasi_proc_raise(mut caller: Caller, signal: u32) -> u32 {
