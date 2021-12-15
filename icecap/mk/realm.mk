@@ -72,7 +72,7 @@ sysroot:
 		-Z unstable-options \
 		-Z binary-dep-depinfo \
 		--release \
-		--manifest-path sysroot/Cargo.toml \
+		--manifest-path sysroot/workspace/Cargo.toml \
 		--target $(rust_target) \
 		-j$$(nproc) \
 		--target-dir $(sysroot_target_dir)
