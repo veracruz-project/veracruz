@@ -22,4 +22,4 @@
 	url = https://gitlab.com/egrimley/icecap.git
 [submodule "icecap/sysroot/rust"]
 	path = icecap/sysroot/rust
-	url = https://gitlab.com/egrimley/rust.git
+	url = https://gitlab.com/arm-research/security/icecap/rust.git
