@@ -63,7 +63,6 @@ let
     pkgs.dev.icecap.cargo
     pkgs.musl.icecap.icecap-host
     pkgs.linux.dropbear
-    configured.sysroot-rs
     configured.libs.icecap-pure
   ];
 
