@@ -18,6 +18,7 @@ REQUEST_BADGE = 1
 FAULT_BADGE = 2
 
 MMAP_BASE = block_at(0x18, 0, 0) << BLOCK_SIZE_BITS
+LARGE_PAGES_SIZE = 2*1024*1024*1024 # 2GiB
 
 class RuntimeManager(GenericElfComponent):
 
@@ -75,7 +76,7 @@ class RuntimeManagerSupervisor(GenericElfComponent):
                         self.alloc(ObjectType.seL4_FrameObject, name='block_{}'.format(i), size=BLOCK_SIZE),
                         read=True, write=True,
                         )
-                    for i in range(64)
+                    for i in range(LARGE_PAGES_SIZE // BLOCK_SIZE)
                     ],
                 'hack_large_pages': self.hack_large_pages,
                 }
