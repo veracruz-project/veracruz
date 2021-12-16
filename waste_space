@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+
+error_df()
+{
+    echo
+    echo df -H
+    df -H
+}
+trap error_df EXIT
+
+x=0
+while sleep 1 ; do
+    x=$(($x+1))
+    echo dd $x
+    dd if=/dev/urandom of=space.$x bs=1M count=1024
+    if [ $x = 50 ] ; then
+        exit
+    fi
+done
