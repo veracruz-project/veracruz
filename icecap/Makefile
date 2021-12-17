@@ -58,7 +58,7 @@ sdk:
 .PHONY: test-collateral
 test-collateral: sdk
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -C ../test-collateral TEE=icecap'
-
+	rm -rf ../sdk
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 
