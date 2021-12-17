@@ -1250,6 +1250,7 @@ impl ExecutionEngine for WASMIRuntimeState {
     ) -> Result<u32, FatalEngineError> {
         self.load_program(&program)?;
         self.vfs.enable_clock = options.enable_clock;
+        self.vfs.enable_strace = options.enable_strace;
 
         let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
         let exit_code = self.vfs.exit_code();

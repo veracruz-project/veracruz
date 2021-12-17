@@ -19,6 +19,7 @@
 
 use crate::{
     fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
+    wasi::strace::Strace,
     Options,
 };
 
@@ -574,6 +575,13 @@ pub trait MemoryHandler {
         Ok(rst)
     }
 
+    /// The default implementation for reading a u16 from `address`.
+    fn read_u16(&self, address: u32) -> FileSystemResult<u16> {
+        let mut bytes = [0u8; 2];
+        self.read_buffer(address, &mut bytes)?;
+        Ok(u16::from_le_bytes(bytes))
+    }
+
     /// The default implementation for writing a u32 to `address`.
     fn write_u32(&mut self, address: u32, number: u32) -> FileSystemResult<()> {
         self.write_buffer(address, &u32::to_le_bytes(number))
@@ -591,7 +599,7 @@ pub trait MemoryHandler {
         self.write_buffer(address, &u64::to_le_bytes(number))
     }
 
-    /// The default implementation for reading a u32 from `address`.
+    /// The default implementation for reading a u64 from `address`.
     fn read_u64(&self, address: u32) -> FileSystemResult<u64> {
         let mut bytes = [0u8; 8];
         self.read_buffer(address, &mut bytes)?;
@@ -826,6 +834,8 @@ pub struct WasiWrapper {
     exit_code: Option<u32>,
     /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.
     pub(crate) enable_clock: bool,
+    /// Whether strace is enabled.
+    pub(crate) enable_strace: bool,
 }
 
 impl WasiWrapper {
@@ -850,6 +860,7 @@ impl WasiWrapper {
             program_arguments: Vec::new(),
             exit_code: None,
             enable_clock,
+            enable_strace: false,
         })
     }
 
@@ -877,6 +888,10 @@ impl WasiWrapper {
         }
     }
 
+    fn strace(&self, func: &str) -> Strace {
+        Strace::func(self.enable_strace, func)
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // WASI implementation
     ////////////////////////////////////////////////////////////////////////////
@@ -889,12 +904,17 @@ impl WasiWrapper {
         address_for_string_ptrs: u32,
         buf_address: u32,
     ) -> FileSystemResult<()> {
-        let buffer = self
-            .program_arguments
-            .iter()
-            .map(|arg| format!("{}\0", arg).into_bytes())
-            .collect::<Vec<_>>();
-        memory_ref.write_string_list(&buffer, buf_address, address_for_string_ptrs)
+        let mut strace = self.strace("args_get");
+        let result = (|| {
+            let buffer = self
+                .program_arguments
+                .iter()
+                .map(|arg| format!("{}\0", arg).into_bytes())
+                .collect::<Vec<_>>();
+            memory_ref.write_string_list(&buffer, buf_address, address_for_string_ptrs)
+        })();
+        strace.arg_dots();
+        strace.result(result)
     }
 
     /// The implementation of the WASI `args_sizes_get` function. It requires an extra `memory_ref` to
@@ -905,14 +925,19 @@ impl WasiWrapper {
         address_for_counts: u32,
         address_for_buffer_size: u32,
     ) -> FileSystemResult<()> {
-        let environc = self.program_arguments.len() as u32;
-        let environ_buf_size = self
-            .program_arguments
-            .iter()
-            .fold(0, |acc, arg| acc + format!("{}\0", arg).as_bytes().len());
+        let mut strace = self.strace("args_sizes_get");
+        let result = (|| {
+            let environc = self.program_arguments.len() as u32;
+            let environ_buf_size = self
+                .program_arguments
+                .iter()
+                .fold(0, |acc, arg| acc + format!("{}\0", arg).as_bytes().len());
 
-        memory_ref.write_u32(address_for_counts, environc)?;
-        memory_ref.write_u32(address_for_buffer_size, environ_buf_size as u32)
+            memory_ref.write_u32(address_for_counts, environc)?;
+            memory_ref.write_u32(address_for_buffer_size, environ_buf_size as u32)
+        })();
+        strace.arg_dots();
+        strace.result(result)
     }
 
     /// The implementation of the WASI `environ_get` function. It requires an extra `memory_ref` to
@@ -923,15 +948,20 @@ impl WasiWrapper {
         address_for_string_ptrs: u32,
         buf_address: u32,
     ) -> FileSystemResult<()> {
-        let buffer = self
-            .environment_variables
-            .iter()
-            .map(|(key, value)| {
-                let environ = format!("{}={}\0", key, value);
-                environ.into_bytes()
-            })
-            .collect::<Vec<_>>();
-        memory_ref.write_string_list(&buffer, buf_address, address_for_string_ptrs)
+        let mut strace = self.strace("environ_get");
+        let result = (|| {
+            let buffer = self
+                .environment_variables
+                .iter()
+                .map(|(key, value)| {
+                    let environ = format!("{}={}\0", key, value);
+                    environ.into_bytes()
+                })
+                .collect::<Vec<_>>();
+            memory_ref.write_string_list(&buffer, buf_address, address_for_string_ptrs)
+        })();
+        strace.arg_dots();
+        strace.result(result)
     }
 
     /// THe implementation of the WASI `environ_sizes_get` function. It requires an extra `memory_ref` to
@@ -942,16 +972,21 @@ impl WasiWrapper {
         address_for_counts: u32,
         address_for_buffer_size: u32,
     ) -> FileSystemResult<()> {
-        let environc = self.environment_variables.len() as u32;
-        let environ_buf_size = self
-            .environment_variables
-            .iter()
-            .fold(0, |acc, (key, value)| {
-                acc + format!("{}={}\0", key, value).as_bytes().len()
-            });
+        let mut strace = self.strace("environ_sizes_get");
+        let result = (|| {
+            let environc = self.environment_variables.len() as u32;
+            let environ_buf_size = self
+                .environment_variables
+                .iter()
+                .fold(0, |acc, (key, value)| {
+                    acc + format!("{}={}\0", key, value).as_bytes().len()
+                });
 
-        memory_ref.write_u32(address_for_counts, environc)?;
-        memory_ref.write_u32(address_for_buffer_size, environ_buf_size as u32)
+            memory_ref.write_u32(address_for_counts, environc)?;
+            memory_ref.write_u32(address_for_buffer_size, environ_buf_size as u32)
+        })();
+        strace.arg_dots();
+        strace.result(result)
     }
 
     /// The implementation of the WASI `clock_res_get` function. It requires an extra `memory_ref` to
@@ -962,17 +997,23 @@ impl WasiWrapper {
         clock_id: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let result = if !self.enable_clock {
-            Err(ErrNo::Access)
-        } else {
-            let clock_id = clock_id as u8;
-            match getclockres(clock_id) {
-                result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
-                result::Result::Unavailable => Err(ErrNo::NoSys),
-                _ => Err(ErrNo::Inval),
-            }
-        }?;
-        memory_ref.write_u64(address, result.as_nanos())
+        let mut strace = self.strace("clock_res_get");
+        let result = (|| {
+            let result = if !self.enable_clock {
+                Err(ErrNo::Access)
+            } else {
+                let clock_id = clock_id as u8;
+                match getclockres(clock_id) {
+                    result::Result::Success(resolution) => Ok(Timestamp::from_nanos(resolution)),
+                    result::Result::Unavailable => Err(ErrNo::NoSys),
+                    _ => Err(ErrNo::Inval),
+                }
+            }?;
+            memory_ref.write_u64(address, result.as_nanos())
+        })();
+        strace.arg_dec(clock_id);
+        strace.arg_p_u64(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
@@ -981,20 +1022,27 @@ impl WasiWrapper {
         &mut self,
         memory_ref: &mut T,
         clock_id: u32,
-        _precision: u64,
+        precision: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let result = if !self.enable_clock {
-            Err(ErrNo::Access)
-        } else {
-            let clock_id = clock_id as u8;
-            match getclocktime(clock_id) {
-                result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
-                result::Result::Unavailable => Err(ErrNo::NoSys),
-                _ => Err(ErrNo::Inval),
-            }
-        }?;
-        memory_ref.write_u64(address, result.as_nanos())
+        let mut strace = self.strace("clock_time_get");
+        let result = (|| {
+            let result = if !self.enable_clock {
+                Err(ErrNo::Access)
+            } else {
+                let clock_id = clock_id as u8;
+                match getclocktime(clock_id) {
+                    result::Result::Success(timespec) => Ok(Timestamp::from_nanos(timespec)),
+                    result::Result::Unavailable => Err(ErrNo::NoSys),
+                    _ => Err(ErrNo::Inval),
+                }
+            }?;
+            memory_ref.write_u64(address, result.as_nanos())
+        })();
+        strace.arg_dec(clock_id);
+        strace.arg_dec(precision);
+        strace.arg_p_u64(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
@@ -1007,9 +1055,16 @@ impl WasiWrapper {
         len: u64,
         advice: u8,
     ) -> FileSystemResult<()> {
-        let advice: Advice = Self::decode_wasi_arg(advice)?;
-
-        self.filesystem.fd_advise(fd.into(), offset, len, advice)
+        let mut strace = self.strace("fd_advise");
+        let result = (|| {
+            let advice: Advice = Self::decode_wasi_arg(advice)?;
+            self.filesystem.fd_advise(fd.into(), offset, len, advice)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_dec(offset);
+        strace.arg_dec(len);
+        strace.arg_dec(advice);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_allocate` function. It requires an extra `memory_ref` to
@@ -1021,7 +1076,12 @@ impl WasiWrapper {
         offset: u64,
         len: u64,
     ) -> FileSystemResult<()> {
-        self.filesystem.fd_allocate(fd.into(), offset, len)
+        let mut strace = self.strace("fd_allocate");
+        let result = self.filesystem.fd_allocate(fd.into(), offset, len);
+        strace.arg_dec(fd);
+        strace.arg_dec(offset);
+        strace.arg_dec(len);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_close` function. It requires an extra `memory_ref` to
@@ -1032,7 +1092,10 @@ impl WasiWrapper {
         _memory_ref: &T,
         fd: u32,
     ) -> FileSystemResult<()> {
-        self.filesystem.fd_close(fd.into())
+        let mut strace = self.strace("fd_close");
+        let result = self.filesystem.fd_close(fd.into());
+        strace.arg_dec(fd);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_datasync` function. It requires an extra `memory_ref` to
@@ -1043,7 +1106,10 @@ impl WasiWrapper {
         _: &mut T,
         fd: u32,
     ) -> FileSystemResult<()> {
-        self.filesystem.fd_datasync(fd.into())
+        let mut strace = self.strace("fd_datasync");
+        let result = self.filesystem.fd_datasync(fd.into());
+        strace.arg_dec(fd);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_fdstat_get` function. It requires an extra `memory_ref` to
@@ -1054,8 +1120,14 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let stat = self.filesystem.fd_fdstat_get(fd.into())?;
-        memory_ref.write_struct(address, &stat)
+        let mut strace = self.strace("fd_fdstat_get");
+        let result = (|| {
+            let stat = self.filesystem.fd_fdstat_get(fd.into())?;
+            memory_ref.write_struct(address, &stat)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_fdstat(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_fdstat_set_flags` function. It requires an extra `memory_ref` to
@@ -1066,9 +1138,14 @@ impl WasiWrapper {
         fd: u32,
         flags: u16,
     ) -> FileSystemResult<()> {
-        let flags: FdFlags = Self::decode_wasi_arg(flags)?;
-
-        self.filesystem.fd_fdstat_set_flags(fd.into(), flags)
+        let mut strace = self.strace("fd_fdstat_set_flags");
+        let result = (|| {
+            let flags: FdFlags = Self::decode_wasi_arg(flags)?;
+            self.filesystem.fd_fdstat_set_flags(fd.into(), flags)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_hex(flags);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_fdstat_set_rights` function. It requires an extra `memory_ref` to
@@ -1080,11 +1157,17 @@ impl WasiWrapper {
         rights_base: u64,
         rights_inheriting: u64,
     ) -> FileSystemResult<()> {
-        let rights_base: Rights = Self::decode_wasi_arg(rights_base)?;
-        let rights_inheriting: Rights = Self::decode_wasi_arg(rights_inheriting)?;
-
-        self.filesystem
-            .fd_fdstat_set_rights(fd.into(), rights_base, rights_inheriting)
+        let mut strace = self.strace("fd_fdstat_set_rights");
+        let result = (|| {
+            let rights_base: Rights = Self::decode_wasi_arg(rights_base)?;
+            let rights_inheriting: Rights = Self::decode_wasi_arg(rights_inheriting)?;
+            self.filesystem
+                .fd_fdstat_set_rights(fd.into(), rights_base, rights_inheriting)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_hex(rights_base);
+        strace.arg_hex(rights_inheriting);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_filestat_get` function. It requires an extra `memory_ref` to
@@ -1095,8 +1178,14 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let stat = self.filesystem.fd_filestat_get(fd.into());
-        memory_ref.write_struct(address, &stat)
+        let mut strace = self.strace("fd_filestat_get");
+        let result = (|| {
+            let stat = self.filesystem.fd_filestat_get(fd.into());
+            memory_ref.write_struct(address, &stat)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_filestat(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_filestat_set_size` function. It requires an extra `memory_ref` to
@@ -1108,7 +1197,11 @@ impl WasiWrapper {
         fd: u32,
         size: u64,
     ) -> FileSystemResult<()> {
-        self.filesystem.fd_filestat_set_size(fd.into(), size)
+        let mut strace = self.strace("fd_filestat_set_size");
+        let result = self.filesystem.fd_filestat_set_size(fd.into(), size);
+        strace.arg_dec(fd);
+        strace.arg_dec(size);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_filestat_set_times` function. It requires an extra `memory_ref` to
@@ -1121,14 +1214,22 @@ impl WasiWrapper {
         mtime: u64,
         fst_flag: u16,
     ) -> FileSystemResult<()> {
-        let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
-        self.filesystem.fd_filestat_set_times(
-            fd.into(),
-            atime.into(),
-            mtime.into(),
-            fst_flag,
-            self.filestat_time(),
-        )
+        let mut strace = self.strace("fd_filestat_set_times");
+        let result = (|| {
+            let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
+            self.filesystem.fd_filestat_set_times(
+                fd.into(),
+                atime.into(),
+                mtime.into(),
+                fst_flag,
+                self.filestat_time(),
+            )
+        })();
+        strace.arg_dec(fd);
+        strace.arg_dec(atime);
+        strace.arg_dec(mtime);
+        strace.arg_hex(fst_flag);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
@@ -1142,12 +1243,20 @@ impl WasiWrapper {
         offset: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let size_read = {
-            let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
-            self.filesystem
-                .fd_pread(fd.into(), iovecs.as_mut(), offset)?
-        };
-        memory_ref.write_u32(address, size_read as u32)
+        let mut strace = self.strace("fd_pread");
+        let result = (|| {
+            let size_read = {
+                let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
+                self.filesystem
+                    .fd_pread(fd.into(), iovecs.as_mut(), offset)?
+            };
+            memory_ref.write_u32(address, size_read as u32)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_iovec(result, memory_ref, iovec_base, iovec_count, address);
+        strace.arg_dec(offset);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_prestat_get` function. It requires an extra `memory_ref` to
@@ -1159,9 +1268,15 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let fd = Fd(fd);
-        let pre = self.filesystem.fd_prestat_get(fd)?;
-        memory_ref.write_struct(address, &pre)
+        let mut strace = self.strace("fd_prestat_get");
+        let result = (|| {
+            let fd = Fd(fd);
+            let pre = self.filesystem.fd_prestat_get(fd)?;
+            memory_ref.write_struct(address, &pre)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_prestat_out(result, memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_prestat_dir_name` function. It requires an extra `memory_ref` to
@@ -1173,17 +1288,23 @@ impl WasiWrapper {
         address: u32,
         size: u32,
     ) -> FileSystemResult<()> {
-        let size = size as usize;
-
-        let result = self
-            .filesystem
-            .fd_prestat_dir_name(fd.into())?
-            .into_os_string();
-        if result.len() > size as usize {
-            return Err(ErrNo::NameTooLong);
-        }
-        let result = result.into_string().map_err(|_| ErrNo::Inval)?;
-        memory_ref.write_buffer(address, result.as_bytes())
+        let mut strace = self.strace("fd_prestat_dir_name");
+        let result = (|| {
+            let size = size as usize;
+            let result = self
+                .filesystem
+                .fd_prestat_dir_name(fd.into())?
+                .into_os_string();
+            if result.len() > size as usize {
+                return Err(ErrNo::NameTooLong);
+            }
+            let result = result.into_string().map_err(|_| ErrNo::Inval)?;
+            memory_ref.write_buffer(address, result.as_bytes())
+        })();
+        strace.arg_dec(fd);
+        strace.arg_path(memory_ref, address, size);
+        strace.arg_dec(size);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_pwrite` function. It requires an extra `memory_ref` to
@@ -1197,12 +1318,20 @@ impl WasiWrapper {
         offset: u64,
         address: u32,
     ) -> FileSystemResult<()> {
-        let size_written = {
-            let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
-            self.filesystem
-                .fd_pwrite(fd.into(), iovecs.as_ref(), offset)?
-        };
-        memory_ref.write_u32(address, size_written as u32)
+        let mut strace = self.strace("fd_pwrite");
+        let result = (|| {
+            let size_written = {
+                let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
+                self.filesystem
+                    .fd_pwrite(fd.into(), iovecs.as_ref(), offset)?
+            };
+            memory_ref.write_u32(address, size_written as u32)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_iovec(result, memory_ref, iovec_base, iovec_count, address);
+        strace.arg_dec(offset);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_read` function. It requires an extra `memory_ref` to
@@ -1215,11 +1344,18 @@ impl WasiWrapper {
         iovec_count: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let size_read = {
-            let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
-            self.filesystem.fd_read(fd.into(), iovecs.as_mut())?
-        };
-        memory_ref.write_u32(address, size_read as u32)
+        let mut strace = self.strace("fd_read");
+        let result = (|| {
+            let size_read = {
+                let mut iovecs = memory_ref.unpack_iovec_mut(iovec_base, iovec_count)?;
+                self.filesystem.fd_read(fd.into(), iovecs.as_mut())?
+            };
+            memory_ref.write_u32(address, size_read as u32)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_iovec(result, memory_ref, iovec_base, iovec_count, address);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_readdir` function. It requires an extra `memory_ref` to
@@ -1233,30 +1369,38 @@ impl WasiWrapper {
         cookie: u64,
         result_ptr: u32,
     ) -> FileSystemResult<()> {
-        let dir_entries = self.filesystem.fd_readdir(fd.into(), cookie.into())?;
+        let mut strace = self.strace("fd_readdir");
+        let result = (|| {
+            let dir_entries = self.filesystem.fd_readdir(fd.into(), cookie.into())?;
 
-        let mut written = 0;
-        for (dir, path) in dir_entries {
-            //NOTE: `buf_len` is the number of bytes dir entries can store.
-            //      If there is not enough space, stop writing and leave the rest of the buffer
-            //      untouched.
-            written += size_of::<DirEnt>() as u32;
-            if written > buf_len {
-                written = buf_len;
-                break;
-            }
-            memory_ref.write_struct(buf_ptr, &dir)?;
-            buf_ptr += size_of::<DirEnt>() as u32;
+            let mut written = 0;
+            for (dir, path) in dir_entries {
+                //NOTE: `buf_len` is the number of bytes dir entries can store.
+                //      If there is not enough space, stop writing and leave the rest of the buffer
+                //      untouched.
+                written += size_of::<DirEnt>() as u32;
+                if written > buf_len {
+                    written = buf_len;
+                    break;
+                }
+                memory_ref.write_struct(buf_ptr, &dir)?;
+                buf_ptr += size_of::<DirEnt>() as u32;
 
-            written += path.len() as u32;
-            if written > buf_len {
-                written = buf_len;
-                break;
+                written += path.len() as u32;
+                if written > buf_len {
+                    written = buf_len;
+                    break;
+                }
+                memory_ref.write_buffer(buf_ptr, &path)?;
+                buf_ptr += path.len() as u32;
             }
-            memory_ref.write_buffer(buf_ptr, &path)?;
-            buf_ptr += path.len() as u32;
-        }
-        memory_ref.write_u32(result_ptr, written as u32)
+            memory_ref.write_u32(result_ptr, written as u32)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_dirents(memory_ref, buf_ptr, buf_len, result_ptr);
+        strace.arg_dec(cookie);
+        strace.arg_p_u32(memory_ref, result_ptr);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_renumber` function. It requires an extra `memory_ref` to
@@ -1268,7 +1412,11 @@ impl WasiWrapper {
         old_fd: u32,
         new_fd: u32,
     ) -> FileSystemResult<()> {
-        self.filesystem.fd_renumber(old_fd.into(), new_fd.into())
+        let mut strace = self.strace("fd_renumber");
+        let result = self.filesystem.fd_renumber(old_fd.into(), new_fd.into());
+        strace.arg_dec(old_fd);
+        strace.arg_dec(new_fd);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_seek` function.
@@ -1280,17 +1428,27 @@ impl WasiWrapper {
         whence: u8,
         address: u32,
     ) -> FileSystemResult<()> {
-        let whence: Whence = Self::decode_wasi_arg(whence)?;
-
-        let new_offset = self.filesystem.fd_seek(fd.into(), offset, whence)?;
-        memory_ref.write_u64(address, new_offset)
+        let mut strace = self.strace("fd_seek");
+        let result = (|| {
+            let whence: Whence = Self::decode_wasi_arg(whence)?;
+            let new_offset = self.filesystem.fd_seek(fd.into(), offset, whence)?;
+            memory_ref.write_u64(address, new_offset)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_dec(offset);
+        strace.arg_dec(whence);
+        strace.arg_p_u64(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_sync` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.
     #[inline]
     pub(crate) fn fd_sync<T: MemoryHandler>(&mut self, _: &mut T, fd: u32) -> FileSystemResult<()> {
-        self.filesystem.fd_sync(fd.into())
+        let mut strace = self.strace("fd_sync");
+        let result = self.filesystem.fd_sync(fd.into());
+        strace.arg_dec(fd);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_tell` function. It requires an extra `memory_ref` to
@@ -1301,8 +1459,14 @@ impl WasiWrapper {
         fd: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let offset = self.filesystem.fd_tell(fd.into())?;
-        memory_ref.write_u64(address, offset)
+        let mut strace = self.strace("fd_tell");
+        let result = (|| {
+            let offset = self.filesystem.fd_tell(fd.into())?;
+            memory_ref.write_u64(address, offset)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_p_u64(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `fd_write` function. It requires an extra `memory_ref` to
@@ -1315,11 +1479,18 @@ impl WasiWrapper {
         iovec_count: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let size_written = {
-            let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
-            self.filesystem.fd_write(fd.into(), iovecs.as_ref())?
-        };
-        memory_ref.write_u32(address, size_written as u32)
+        let mut strace = self.strace("fd_write");
+        let result = (|| {
+            let size_written = {
+                let iovecs = memory_ref.unpack_iovec(iovec_base, iovec_count)?;
+                self.filesystem.fd_write(fd.into(), iovecs.as_ref())?
+            };
+            memory_ref.write_u32(address, size_written as u32)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_iovec(result, memory_ref, iovec_base, iovec_count, address);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_create_directory` function. It requires an extra `memory_ref` to
@@ -1331,9 +1502,14 @@ impl WasiWrapper {
         path_address: u32,
         path_length: u32,
     ) -> FileSystemResult<()> {
-        let path = memory_ref.read_cstring(path_address, path_length)?;
-
-        self.filesystem.path_create_directory(fd.into(), path)
+        let mut strace = self.strace("path_create_directory");
+        let result = (|| {
+            let path = memory_ref.read_cstring(path_address, path_length)?;
+            self.filesystem.path_create_directory(fd.into(), path)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_path(memory_ref, path_address, path_length);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_filestat_get` function. It requires an extra `memory_ref` to
@@ -1347,11 +1523,18 @@ impl WasiWrapper {
         path_length: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let path = memory_ref.read_cstring(path_address, path_length)?;
-        let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
-
-        let stat = self.filesystem.path_filestat_get(fd.into(), flags, path)?;
-        memory_ref.write_struct(address, &stat)
+        let mut strace = self.strace("path_filestat_get");
+        let result = (|| {
+            let path = memory_ref.read_cstring(path_address, path_length)?;
+            let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
+            let stat = self.filesystem.path_filestat_get(fd.into(), flags, path)?;
+            memory_ref.write_struct(address, &stat)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_hex(flags);
+        strace.arg_path(memory_ref, path_address, path_length);
+        strace.arg_filestat(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_filestat_set_times` function. It requires an extra `memory_ref` to
@@ -1367,19 +1550,29 @@ impl WasiWrapper {
         mtime: u64,
         fst_flag: u16,
     ) -> FileSystemResult<()> {
-        let path = memory_ref.read_cstring(path_address, path_length)?;
-        let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
-        let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
+        let mut strace = self.strace("path_filestat_set_times");
+        let result = (|| {
+            let path = memory_ref.read_cstring(path_address, path_length)?;
+            let flags: LookupFlags = Self::decode_wasi_arg(flags)?;
+            let fst_flag: SetTimeFlags = Self::decode_wasi_arg(fst_flag)?;
 
-        self.filesystem.path_filestat_set_times(
-            fd.into(),
-            flags,
-            path,
-            atime.into(),
-            mtime.into(),
-            fst_flag,
-            self.filestat_time(),
-        )
+            self.filesystem.path_filestat_set_times(
+                fd.into(),
+                flags,
+                path,
+                atime.into(),
+                mtime.into(),
+                fst_flag,
+                self.filestat_time(),
+            )
+        })();
+        strace.arg_dec(fd);
+        strace.arg_hex(flags);
+        strace.arg_path(memory_ref, path_address, path_length);
+        strace.arg_dec(atime);
+        strace.arg_dec(mtime);
+        strace.arg_hex(fst_flag);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
@@ -1395,12 +1588,20 @@ impl WasiWrapper {
         new_address: u32,
         new_path_len: u32,
     ) -> FileSystemResult<()> {
-        let old_flags: LookupFlags = Self::decode_wasi_arg(old_flags)?;
-        let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
-        let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
-
-        self.filesystem
-            .path_link(old_fd.into(), old_flags, old_path, new_fd.into(), new_path)
+        let mut strace = self.strace("path_link");
+        let result = (|| {
+            let old_flags: LookupFlags = Self::decode_wasi_arg(old_flags)?;
+            let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
+            let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
+            self.filesystem
+                .path_link(old_fd.into(), old_flags, old_path, new_fd.into(), new_path)
+        })();
+        strace.arg_dec(old_fd);
+        strace.arg_hex(old_flags);
+        strace.arg_path(memory_ref, old_address, old_path_len);
+        strace.arg_dec(new_fd);
+        strace.arg_path(memory_ref, new_address, new_path_len);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_open` function. It requires an extra `memory_ref` to
@@ -1418,24 +1619,36 @@ impl WasiWrapper {
         fd_flags: u16,
         address: u32,
     ) -> FileSystemResult<()> {
-        let fd = Fd(fd);
-        let path = memory_ref.read_cstring(path_address, path_length)?;
-        let dir_flags: LookupFlags = Self::decode_wasi_arg(dir_flags)?;
-        let oflags: OpenFlags = Self::decode_wasi_arg(oflags)?;
-        let fs_rights_base: Rights = Self::decode_wasi_arg(fs_rights_base)?;
-        let fs_rights_inheriting: Rights = Self::decode_wasi_arg(fs_rights_inheriting)?;
-        let fd_flags: FdFlags = Self::decode_wasi_arg(fd_flags)?;
+        let mut strace = self.strace("path_open");
+        let result = (|| {
+            let fd = Fd(fd);
+            let path = memory_ref.read_cstring(path_address, path_length)?;
+            let dir_flags: LookupFlags = Self::decode_wasi_arg(dir_flags)?;
+            let oflags: OpenFlags = Self::decode_wasi_arg(oflags)?;
+            let fs_rights_base: Rights = Self::decode_wasi_arg(fs_rights_base)?;
+            let fs_rights_inheriting: Rights = Self::decode_wasi_arg(fs_rights_inheriting)?;
+            let fd_flags: FdFlags = Self::decode_wasi_arg(fd_flags)?;
 
-        let new_fd = self.filesystem.path_open(
-            fd,
-            dir_flags,
-            &path,
-            oflags,
-            fs_rights_base,
-            fs_rights_inheriting,
-            fd_flags,
-        )?;
-        memory_ref.write_u32(address, new_fd.into())
+            let new_fd = self.filesystem.path_open(
+                fd,
+                dir_flags,
+                &path,
+                oflags,
+                fs_rights_base,
+                fs_rights_inheriting,
+                fd_flags,
+            )?;
+            memory_ref.write_u32(address, new_fd.into())
+        })();
+        strace.arg_dec(fd);
+        strace.arg_hex(dir_flags);
+        strace.arg_path(memory_ref, path_address, path_length);
+        strace.arg_hex(oflags);
+        strace.arg_rights(fs_rights_base);
+        strace.arg_rights(fs_rights_inheriting);
+        strace.arg_hex(fd_flags);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_readlink` function. It requires an extra `memory_ref` to
@@ -1450,19 +1663,26 @@ impl WasiWrapper {
         buf_len: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let path = memory_ref.read_cstring(path_address, path_length)?;
-
-        let mut rst = self.filesystem.path_readlink(fd.into(), path)?;
-        let buf_len = buf_len as usize;
-        let to_write = if buf_len < rst.len() {
-            buf_len
-        } else {
-            rst.len()
-        };
-        //NOTE: it should at most shrink the size of rst.
-        rst.resize(to_write, 0);
-        memory_ref.write_buffer(buf, &rst)?;
-        memory_ref.write_u32(address, to_write as u32)
+        let mut strace = self.strace("path_readlink");
+        let result = (|| {
+            let path = memory_ref.read_cstring(path_address, path_length)?;
+            let mut rst = self.filesystem.path_readlink(fd.into(), path)?;
+            let buf_len = buf_len as usize;
+            let to_write = if buf_len < rst.len() {
+                buf_len
+            } else {
+                rst.len()
+            };
+            //NOTE: it should at most shrink the size of rst.
+            rst.resize(to_write, 0);
+            memory_ref.write_buffer(buf, &rst)?;
+            memory_ref.write_u32(address, to_write as u32)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_path(memory_ref, path_address, path_length);
+        strace.arg_path(memory_ref, buf, buf_len);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_remove_directory` function. It requires an extra `memory_ref` to
@@ -1474,9 +1694,14 @@ impl WasiWrapper {
         path_address: u32,
         path_length: u32,
     ) -> FileSystemResult<()> {
-        let path = memory_ref.read_cstring(path_address, path_length)?;
-
-        self.filesystem.path_remove_directory(fd.into(), path)
+        let mut strace = self.strace("path_remove_directory");
+        let result = (|| {
+            let path = memory_ref.read_cstring(path_address, path_length)?;
+            self.filesystem.path_remove_directory(fd.into(), path)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_path(memory_ref, path_address, path_length);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_rename` function. It requires an extra `memory_ref` to
@@ -1491,11 +1716,18 @@ impl WasiWrapper {
         new_address: u32,
         new_path_len: u32,
     ) -> FileSystemResult<()> {
-        let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
-        let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
-
-        self.filesystem
-            .path_rename(old_fd.into(), old_path, new_fd.into(), new_path)
+        let mut strace = self.strace("path_rename");
+        let result = (|| {
+            let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
+            let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
+            self.filesystem
+                .path_rename(old_fd.into(), old_path, new_fd.into(), new_path)
+        })();
+        strace.arg_dec(old_fd);
+        strace.arg_path(memory_ref, old_address, old_path_len);
+        strace.arg_dec(new_fd);
+        strace.arg_path(memory_ref, new_address, old_path_len);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_symlink` function. It requires an extra `memory_ref` to
@@ -1509,10 +1741,16 @@ impl WasiWrapper {
         new_address: u32,
         new_path_len: u32,
     ) -> FileSystemResult<()> {
-        let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
-        let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
-
-        self.filesystem.path_symlink(old_path, fd.into(), new_path)
+        let mut strace = self.strace("path_symlink");
+        let result = (|| {
+            let old_path = memory_ref.read_cstring(old_address, old_path_len)?;
+            let new_path = memory_ref.read_cstring(new_address, new_path_len)?;
+            self.filesystem.path_symlink(old_path, fd.into(), new_path)
+        })();
+        strace.arg_path(memory_ref, old_address, old_path_len);
+        strace.arg_dec(fd);
+        strace.arg_path(memory_ref, new_address, old_path_len);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `path_unlink_file` function. It requires an extra `memory_ref` to
@@ -1524,9 +1762,14 @@ impl WasiWrapper {
         path_address: u32,
         path_len: u32,
     ) -> FileSystemResult<()> {
-        let path = memory_ref.read_cstring(path_address, path_len)?;
-
-        self.filesystem.path_unlink_file(fd.into(), path)
+        let mut strace = self.strace("path_unlink_file");
+        let result = (|| {
+            let path = memory_ref.read_cstring(path_address, path_len)?;
+            self.filesystem.path_unlink_file(fd.into(), path)
+        })();
+        strace.arg_dec(fd);
+        strace.arg_path(memory_ref, path_address, path_len);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `poll_oneoff` function. It requires an extra `memory_ref` to
@@ -1539,18 +1782,25 @@ impl WasiWrapper {
         size: u32,
         address: u32,
     ) -> FileSystemResult<()> {
-        let subscriptions = memory_ref.unpack_array::<Subscription>(subscriptions, size)?;
-        let events = memory_ref.unpack_array::<Event>(events, size)?;
-
-        let rst = self.filesystem.poll_oneoff(subscriptions, events)?;
-        memory_ref.write_u32(address, rst)
+        let mut strace = self.strace("poll_oneoff");
+        let result = (|| {
+            let subscriptions = memory_ref.unpack_array::<Subscription>(subscriptions, size)?;
+            let events = memory_ref.unpack_array::<Event>(events, size)?;
+            let rst = self.filesystem.poll_oneoff(subscriptions, events)?;
+            memory_ref.write_u32(address, rst)
+        })();
+        strace.arg_subscriptions(memory_ref, subscriptions, size);
+        strace.arg_events(memory_ref, events, size);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `proc_exit` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.
     #[inline]
     pub(crate) fn proc_exit<T: MemoryHandler>(&mut self, _: &mut T, exit_code: u32) {
-        self.exit_code = Some(exit_code);
+        let _strace = self.strace("proc_exit");
+        self.exit_code = Some(exit_code)
     }
 
     /// The implementation of the WASI `proc_raise` function. It requires an extra `memory_ref` to
@@ -1561,15 +1811,21 @@ impl WasiWrapper {
         _: &mut T,
         signal: u8,
     ) -> FileSystemResult<()> {
-        let _signal: Signal = Self::decode_wasi_arg(signal)?;
-        Err(ErrNo::NoSys)
+        let mut strace = self.strace("proc_raise");
+        let result = (|| {
+            let _signal: Signal = Self::decode_wasi_arg(signal)?;
+            Err(ErrNo::NoSys)
+        })();
+        strace.arg_dec(signal);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `sched_yield` function. It requires an extra `memory_ref` to
     /// interact with the execution engine.
     #[inline]
     pub(crate) fn sched_yield<T: MemoryHandler>(&mut self, _: &mut T) -> FileSystemResult<()> {
-        Err(ErrNo::NoSys)
+        let mut strace = self.strace("sched_yield");
+        strace.result(Err(ErrNo::NoSys))
     }
 
     pub(crate) fn random_get<T: MemoryHandler>(
@@ -1578,12 +1834,17 @@ impl WasiWrapper {
         buf_ptr: u32,
         length: u32,
     ) -> FileSystemResult<()> {
-        let mut bytes = vec![0; length as usize];
-        if getrandom(&mut bytes).is_success() {
-            memory_ref.write_buffer(buf_ptr, &bytes)
-        } else {
-            Err(ErrNo::NoSys)
-        }
+        let mut strace = self.strace("random_get");
+        let result = (|| {
+            let mut bytes = vec![0; length as usize];
+            if getrandom(&mut bytes).is_success() {
+                memory_ref.write_buffer(buf_ptr, &bytes)
+            } else {
+                Err(ErrNo::NoSys)
+            }
+        })();
+        strace.arg_buffer(memory_ref, buf_ptr, length);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
@@ -1598,15 +1859,24 @@ impl WasiWrapper {
         ro_data_len: u32,
         ro_flag: u32,
     ) -> FileSystemResult<()> {
-        let (size_read, ro_flags) = {
-            let mut iovecs = memory_ref.unpack_iovec_mut(ri_address, ri_len)?;
-            let ri_flags: RiFlags = Self::decode_wasi_arg(ri_flag)?;
-            self.filesystem
-                .sock_recv(socket.into(), iovecs.as_mut(), ri_flags)?
-        };
-        let ro_flags = RoFlags::empty() | ro_flags;
-        memory_ref.write_u32(ro_data_len, size_read as u32)?;
-        memory_ref.write_buffer(ro_flag, &u16::to_le_bytes(ro_flags.bits()))
+        let mut strace = self.strace("sock_recv");
+        let result = (|| {
+            let (size_read, ro_flags) = {
+                let mut iovecs = memory_ref.unpack_iovec_mut(ri_address, ri_len)?;
+                let ri_flags: RiFlags = Self::decode_wasi_arg(ri_flag)?;
+                self.filesystem
+                    .sock_recv(socket.into(), iovecs.as_mut(), ri_flags)?
+            };
+            let ro_flags = RoFlags::empty() | ro_flags;
+            memory_ref.write_u32(ro_data_len, size_read as u32)?;
+            memory_ref.write_buffer(ro_flag, &u16::to_le_bytes(ro_flags.bits()))
+        })();
+        strace.arg_dec(socket);
+        strace.arg_iovec(result, memory_ref, ri_address, ri_len, ro_data_len);
+        strace.arg_hex(ri_flag);
+        strace.arg_p_u32(memory_ref, ro_data_len);
+        strace.arg_p_u16_hex(memory_ref, ro_flag);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `sock_send` function. It requires an extra `memory_ref` to
@@ -1620,13 +1890,20 @@ impl WasiWrapper {
         si_flag: u16,
         address: u32,
     ) -> FileSystemResult<()> {
-        let size_written = {
-            let iovecs = memory_ref.unpack_iovec(si_address, si_len)?;
-            let si_flags: SiFlags = Self::decode_wasi_arg(si_flag)?;
-            self.filesystem
-                .sock_send(socket.into(), iovecs.as_ref(), si_flags)?
-        };
-        memory_ref.write_u32(address, size_written as u32)
+        let mut strace = self.strace("sock_send");
+        let result = (|| {
+            let size_written = {
+                let iovecs = memory_ref.unpack_iovec(si_address, si_len)?;
+                let si_flags: SiFlags = Self::decode_wasi_arg(si_flag)?;
+                self.filesystem
+                    .sock_send(socket.into(), iovecs.as_ref(), si_flags)?
+            };
+            memory_ref.write_u32(address, size_written as u32)
+        })();
+        strace.arg_iovec(result, memory_ref, si_address, si_len, address);
+        strace.arg_hex(si_flag);
+        strace.arg_p_u32(memory_ref, address);
+        strace.result(result)
     }
 
     /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
@@ -1637,9 +1914,14 @@ impl WasiWrapper {
         socket: u32,
         sd_flag: u8,
     ) -> FileSystemResult<()> {
-        let sd_flag: SdFlags = Self::decode_wasi_arg(sd_flag)?;
-
-        self.filesystem.sock_shutdown(socket.into(), sd_flag)
+        let mut strace = self.strace("sock_shutdown");
+        let result = (|| {
+            let sd_flag: SdFlags = Self::decode_wasi_arg(sd_flag)?;
+            self.filesystem.sock_shutdown(socket.into(), sd_flag)
+        })();
+        strace.arg_dec(socket);
+        strace.arg_hex(sd_flag);
+        strace.result(result)
     }
 
     ///////////////////////////////////////
