@@ -20,7 +20,7 @@ icecap_rustflags := \
 	-l static=icecap-pure \
 	-l static=c-supplement \
 	$(icecap_c_lib_flags) \
-  	--sysroot=$(ICECAP_RUST_SYSROOT)
+	--sysroot=$(abspath $(sysroot_dir))
 
 define realm_crate_body
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
@@ -39,6 +39,39 @@ define realm_crate_body
 			--out-dir $(bin_dir)
  endef
 
-.PHONY: inner-runtime-manager
-inner-runtime-manager:
+.PHONY: runtime-manager
+runtime-manager: sysroot-install
 	$(call realm_crate_body,runtime-manager)
+
+.PHONY: sysroot-install
+sysroot-install: sysroot
+	d=$(sysroot_dir)/lib/rustlib/aarch64-icecap/lib ; \
+	mkdir -p $$d ; \
+	cp -u $(sysroot_target_dir)/aarch64-icecap/release/deps/lib*.rlib $$d ; \
+	d=$(sysroot_dir)/lib/rustlib/x86_64-unknown-linux-gnu/lib/ ; \
+	mkdir -p $$d ; \
+	cp -u $(sysroot_target_dir)/release/deps/*.so $$d
+
+sysroot_rustflags := \
+	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
+	$(icecap_c_lib_flags) \
+	-C force-unwind-tables=yes -C embed-bitcode=yes \
+	-Z force-unstable-if-unmarked \
+	--sysroot /dev/null
+
+.PHONY: sysroot
+sysroot:
+	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
+	$(call cargo_target_config_prefix,$(rust_target))RUSTFLAGS="$(sysroot_rustflags)" \
+	$(call cargo_target_config_prefix,$(rust_target))LINKER="$(LD)" \
+	BINDGEN_EXTRA_CLANG_ARGS="$(icecap_c_include_flags)" \
+	RUSTC_BOOTSTRAP=1 \
+	__CARGO_DEFAULT_LIB_METADATA="icecap-sysroot" \
+	cargo build \
+		-Z unstable-options \
+		-Z binary-dep-depinfo \
+		--release \
+		--manifest-path sysroot/workspace/Cargo.toml \
+		--target $(rust_target) \
+		-j$$(nproc) \
+		--target-dir $(sysroot_target_dir)

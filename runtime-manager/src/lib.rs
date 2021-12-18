@@ -10,6 +10,5 @@
 //! information on licensing and copyright.
 
 #![crate_name = "runtime_manager_enclave"]
-#![feature(rustc_private)]
 
 pub mod managers;

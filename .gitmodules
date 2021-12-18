@@ -20,3 +20,6 @@
 [submodule "icecap/icecap"]
 	path = icecap/icecap
 	url = https://gitlab.com/arm-research/security/icecap/icecap.git
+[submodule "icecap/sysroot/rust"]
+	path = icecap/sysroot/rust
+	url = https://gitlab.com/arm-research/security/icecap/rust.git
