@@ -57,8 +57,7 @@ runtime_manager.eif: target/$(ARCH)-unknown-linux-musl/release/runtime_manager_e
 target/$(ARCH)-unknown-linux-musl/release/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
 	rustup target add $(ARCH)-unknown-linux-musl
 	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
-	cargo build -Z package-features -Z unstable-options --bin runtime_manager_enclave \
-	  --target $(ARCH)-unknown-linux-musl --release --features nitro \
+	cargo build --target $(ARCH)-unknown-linux-musl --release --features nitro \
 	  -p runtime_manager_enclave --verbose
 
 clean:
