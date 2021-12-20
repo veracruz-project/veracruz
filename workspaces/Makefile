@@ -2,6 +2,8 @@ shared:
 	$(MAKE) -C applications
 	$(MAKE) -C host
 
+all: shared linux nitro
+
 linux:
 	$(MAKE) -C linux-host
 	$(MAKE) -C linux-runtime
