@@ -27,10 +27,10 @@ icecap = [
   "bincode",
   "log",
   "libm",
-#  "icecap-core",
-#  "icecap-event-server-types",
-#  "icecap-start-generic",
-#  "icecap-std-external",
+  "icecap-core",
+  "icecap-event-server-types",
+  "icecap-start-generic",
+  "icecap-std-external",
 ]
 linux = [
   "execution-engine/std",
@@ -68,10 +68,10 @@ execution-engine = { path = "../execution-engine" }
 half = "=1.7.1"
 hex = { version = "0.4.2" }
 http = "=0.2.4"
-# icecap-core = { path = "../icecap/crates/icecap/icecap-core", optional = true }
-# icecap-event-server-types = { path = "../icecap/crates/components/event-server/types", optional = true }
-# icecap-start-generic = { path = "../icecap/crates/icecap/icecap-start/generic", optional = true }
-# icecap-std-external = { path = "../icecap/crates/std-support/icecap-std-external", optional = true }
+icecap-core = { path = "../icecap/crates/icecap/icecap-core", optional = true }
+icecap-event-server-types = { path = "../icecap/crates/components/event-server/types", optional = true }
+icecap-start-generic = { path = "../icecap/crates/icecap/icecap-start/generic", optional = true }
+icecap-std-external = { path = "../icecap/crates/std-support/icecap-std-external", optional = true }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }

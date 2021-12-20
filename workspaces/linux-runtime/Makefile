@@ -34,11 +34,10 @@ COMMON_Src = $(SRC_DIR)/src/managers/*.rs
 Linux_Src = $(COMMON_Src) $(SRC_DIR)/src/runtime_manager_linux.rs $(SRC_DIR)/src/main.rs
 
 target/release/runtime_manager_enclave: Cargo.toml $(Linux_Src)
-	cargo build --release --features linux
+	cargo build --release --features linux -p runtime_manager_enclave
 
 target/release/linux-root-enclave: Cargo.toml crates/linux-root-enclave/src/main.rs
-	cargo build --release --features linux
-
+	cargo build --release -p linux-root-enclave
 
 linux: css-linux.bin target/release/linux-root-enclave
 
