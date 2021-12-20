@@ -285,11 +285,13 @@ pub mod veracruz_server_linux {
 
             let proxy_attestation_server_url = policy_json.proxy_attestation_server_url();
 
-            let linux_root_enclave_path = PathBuf::from(env::var("LINUX_ROOT_ENCLAVE_PATH").
-                unwrap_or(LINUX_ROOT_ENCLAVE_PATH.to_string()));
+            let linux_root_enclave_path = PathBuf::from(
+                env::var("LINUX_ROOT_ENCLAVE_PATH").unwrap_or(LINUX_ROOT_ENCLAVE_PATH.to_string()),
+            );
             info!(
                 "Launching Linux Root enclave: {} with proxy attestation server URL: {}.",
-                linux_root_enclave_path.to_string_lossy(), proxy_attestation_server_url
+                linux_root_enclave_path.to_string_lossy(),
+                proxy_attestation_server_url
             );
 
             let mut linux_root_process = Command::new(linux_root_enclave_path)

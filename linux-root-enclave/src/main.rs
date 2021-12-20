@@ -227,8 +227,10 @@ where
 /// Returns the measurement of the Runtime Manager binary.
 #[inline]
 fn get_runtime_manager_hash() -> Result<Vec<u8>, LinuxRootEnclaveError> {
-    let runtime_manager_enclave_path = PathBuf::from(env::var("RUNTIME_MANAGER_ENCLAVE_PATH").
-        unwrap_or(RUNTIME_MANAGER_ENCLAVE_PATH.to_string()));
+    let runtime_manager_enclave_path = PathBuf::from(
+        env::var("RUNTIME_MANAGER_ENCLAVE_PATH")
+            .unwrap_or(RUNTIME_MANAGER_ENCLAVE_PATH.to_string()),
+    );
     measure_binary(runtime_manager_enclave_path)
 }
 
@@ -317,15 +319,18 @@ fn launch_new_runtime_manager_enclave() -> Result<u32, LinuxRootEnclaveError> {
 
     info!("Assigned port {} to new enclave.", port);
 
-    let runtime_manager_enclave_path = PathBuf::from(env::var("RUNTIME_MANAGER_ENCLAVE_PATH").
-        unwrap_or(RUNTIME_MANAGER_ENCLAVE_PATH.to_string()));
+    let runtime_manager_enclave_path = PathBuf::from(
+        env::var("RUNTIME_MANAGER_ENCLAVE_PATH")
+            .unwrap_or(RUNTIME_MANAGER_ENCLAVE_PATH.to_string()),
+    );
     let command = Command::new(&runtime_manager_enclave_path)
         .arg(format!("--port={}", port))
         .spawn()
         .map_err(|e| {
             error!(
                 "Failed to launch Runtime Manager enclave ({}).  Error produced: {}.",
-                &runtime_manager_enclave_path.to_string_lossy(), e
+                &runtime_manager_enclave_path.to_string_lossy(),
+                e
             );
 
             LinuxRootEnclaveError::GeneralIOError(e)
