@@ -31,10 +31,10 @@ define host_crate_body
 		install -D -T "$$f" $(bin_dir)/$(1)
 endef
 
-.PHONY: inner-veracruz-server-test
-inner-veracruz-server-test:
+.PHONY: veracruz-server-test
+veracruz-server-test:
 	$(call host_crate_body,veracruz-server-test)
 
-.PHONY: inner-veracruz-test
-inner-veracruz-test:
+.PHONY: veracruz-test
+veracruz-test:
 	$(call host_crate_body,veracruz-test)

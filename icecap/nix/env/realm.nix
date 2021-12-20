@@ -8,9 +8,9 @@
 # and copyright information.
 
 { lib, stdenv, buildPackages, mkShell
-, rustc, cargo, git, cacert, rustfmt
+, rustup, git, cacert, rustfmt
 , protobuf, perl, python3
-, libsel4, libs, sysroot-rs
+, libsel4, libs
 , libc-supplement
 }:
 
@@ -25,7 +25,7 @@ mkShell rec {
   ];
 
   nativeBuildInputs = [
-    rustc cargo git cacert rustfmt
+    rustup git cacert rustfmt
     protobuf perl python3
   ];
 
@@ -39,7 +39,5 @@ mkShell rec {
 
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
-
-  ICECAP_RUST_SYSROOT = sysroot-rs;
 
 }

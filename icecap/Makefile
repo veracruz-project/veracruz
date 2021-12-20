@@ -18,7 +18,7 @@ nix_shell := nix-shell --pure
 nix_expression := targets.nix
 nix_attribute_path := $(ICECAP_PLAT)
 
-inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) inner-$@
+inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) $@
 
 
 # HACK
@@ -39,6 +39,10 @@ update-time:
 runtime-manager: $(now)
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.realm --run '$(call inner_make_cmd,realm)'
 
+.PHONY: sysroot
+sysroot:
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.realm --run '$(call inner_make_cmd,realm)'
+
 .PHONY: veracruz-server-test
 veracruz-server-test:
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.host --run '$(call inner_make_cmd,host)'
@@ -54,7 +58,9 @@ sdk:
 .PHONY: test-collateral
 test-collateral: sdk
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -C ../test-collateral TEE=icecap'
-
+ifeq ($(GITHUB_CI),true)
+	rm -rf ../sdk # HACK needed to save disc space on github.com
+endif
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 
