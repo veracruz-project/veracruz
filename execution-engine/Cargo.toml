@@ -20,7 +20,7 @@ std = [
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
-byteorder = { git = "https://github.com/veracruz-project/byteorder.git", branch = "veracruz" }
+byteorder = "1.4.3"
 cfg-if = "1"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
