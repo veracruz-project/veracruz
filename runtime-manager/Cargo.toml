@@ -27,6 +27,7 @@ icecap = [
   "bincode",
   "log",
   "libm",
+  "libc",
   "icecap-core",
   "icecap-event-server-types",
   "icecap-start-generic",
@@ -45,15 +46,14 @@ linux = [
   "env_logger",
 ]
 nitro = [
+  "bincode",
   "execution-engine/std",
   "execution-engine/nitro",
-  "session-manager/nitro",
-  "veracruz-utils/nitro",
-  "policy-utils/std",
   "io-utils/nitro",
+  "libc",
+  "policy-utils/std",
   "nsm_io",
   "nsm_lib",
-  "ring/nitro",
   "nix",
   "bincode",
 ]
@@ -90,7 +90,9 @@ serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "v
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
+wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace", optional = true }
+
 
 [profile.release]
 lto = true

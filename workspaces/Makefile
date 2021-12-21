@@ -24,4 +24,12 @@ nitro-clean:
 	$(MAKE) -C nitro-host clean
 	$(MAKE) -C nitro-runtime clean
 
+icecap:
+	$(MAKE) -C icecap-runtime runtime-manager
+	$(MAKE) -C icecap-host test-system
+
+icecap-clean:
+	$(MAKE) -C icecap-host clean
+	$(MAKE) -C icecap-runtime clean
+
 clean-all: clean linux-clean nitro-clean

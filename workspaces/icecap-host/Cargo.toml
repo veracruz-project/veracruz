@@ -1,0 +1,20 @@
+cargo-features = ["resolver"]
+
+[workspace]
+members = [
+  "crates/proxy-attestation-server",
+  "crates/veracruz-client",
+  "crates/veracruz-server",
+  "crates/veracruz-server-test",
+  "crates/veracruz-test",
+]
+resolver = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+
+[patch.crates-io]
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
+webpki = { git = "https://github.com/mathias-arm/webpki.git", branch = "unrecognized_extensions" }
