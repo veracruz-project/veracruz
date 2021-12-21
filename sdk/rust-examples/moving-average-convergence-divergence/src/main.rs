@@ -12,8 +12,8 @@
 //! [0]: https://www.investopedia.com/terms/m/macd.asp
 //!
 //! Inputs:                  One.
-//! Assumed form of inputs:  a Pinecone-encoded Rust vector of `f64` values.
-//! Ensured form of outputs: A Pinecone-encoded Rust vector of `f64` values.
+//! Assumed form of inputs:  a Postcard-encoded Rust vector of `f64` values.
+//! Ensured form of outputs: A Postcard-encoded Rust vector of `f64` values.
 //!
 //! ## Authors
 //!
@@ -36,11 +36,11 @@ use std::{
 // Reading inputs.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Reads precisely one input, which is assumed to be a Pinecone-encoded vector of `f64`
+/// Reads precisely one input, which is assumed to be a Postcard-encoded vector of `f64`
 /// values.
 fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<Vec<f64>> {
     let input = fs::read(path.as_ref())?;
-    Ok(pinecone::from_bytes(&input)?)
+    Ok(postcard::from_bytes(&input)?)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +167,7 @@ fn main() -> anyhow::Result<()> {
         let dataset = read_inputs(&path)?;
         let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
             computation(dataset.as_slice());
-        let result_encode = pinecone::to_vec::<Vec<f64>>(&decisions_wma_approx)?;
+        let result_encode = postcard::to_allocvec::<Vec<f64>>(&decisions_wma_approx)?;
         let mut output = PathBuf::from("/output/macd/");
         output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
         fs::write(output, result_encode)?;

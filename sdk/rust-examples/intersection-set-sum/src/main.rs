@@ -12,9 +12,9 @@
 //! web-store want to reveal anything to each other, other than that.
 //!
 //! Inputs:                  1.
-//! Assumed form of inputs:  Pinecone-encoded Rust Vectors of (x, y) co-ordinates, expressed as `f64`
+//! Assumed form of inputs:  Postcard-encoded Rust Vectors of (x, y) co-ordinates, expressed as `f64`
 //!                          values.
-//! Ensured form of outputs: A Pinecone-encoded `LinearRegression` struct (see below) consisting of
+//! Ensured form of outputs: A Postcard-encoded `LinearRegression` struct (see below) consisting of
 //!                          a gradient and a Y-intercept, representing the best linear fit for the
 //!                          input data.
 //!
@@ -65,8 +65,8 @@ fn read_inputs() -> anyhow::Result<(Vec<AdvertisementViewer>, Vec<Customer>)> {
     let adverts = fs::read("/input/intersection-advertisement-viewer.dat")?;
     let customs = fs::read("/input/intersection-customer.dat")?;
 
-    let adverts = pinecone::from_bytes(&adverts)?;
-    let customs = pinecone::from_bytes(&customs)?;
+    let adverts = postcard::from_bytes(&adverts)?;
+    let customs = postcard::from_bytes(&customs)?;
 
     Ok((adverts, customs))
 }
@@ -96,7 +96,7 @@ fn intersection_set_sum(vs: &[AdvertisementViewer], cs: &[Customer]) -> f64 {
 fn main() -> anyhow::Result<()> {
     let (adverts, customs) = read_inputs()?;
     let total = intersection_set_sum(&adverts, &customs);
-    let result_encode = pinecone::to_vec::<f64>(&total)?;
+    let result_encode = postcard::to_allocvec::<f64>(&total)?;
     fs::write("/output/intersection-set-sum.dat", result_encode)?;
     Ok(())
 }

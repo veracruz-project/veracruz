@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for linear regression")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Generate a vec of points, Vec<(f64,f64)>, and encode it by pinecone.")
+        .about("Generate a vec of points, Vec<(f64,f64)>, and encode it by postcard.")
         .arg(
             Arg::with_name("file_name")
                 .short("f")
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = File::create(format!("{}.txt", file_name))?;
     file.write_all(format!("{:?}", dataset).as_bytes())?;
 
-    let encode = pinecone::to_vec(&dataset).unwrap();
+    let encode = postcard::to_allocvec(&dataset).unwrap();
     let mut file = File::create(format!("{}.dat", file_name))?;
     file.write_all(&encode)?;
     Ok(())

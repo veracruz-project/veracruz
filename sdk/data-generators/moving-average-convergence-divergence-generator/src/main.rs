@@ -143,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let encode = pinecone::to_vec(dataset.split_at(size as usize).0)?;
+    let encode = postcard::to_allocvec(dataset.split_at(size as usize).0)?;
     let mut file = File::create(format!("{}-{}.dat", file_prefix, size))?;
     file.write_all(&encode)?;
     Ok(())

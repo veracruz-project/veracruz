@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for intersection set sum")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Generate customer and advertisement-viewer. The former contains a vector of customer identifiers and private values, of the type Vec<(String, f64)>. The latter contains a vector of customer identifiers, of the type Vec<String>. Both are encoded by pinecone.")
+        .about("Generate customer and advertisement-viewer. The former contains a vector of customer identifiers and private values, of the type Vec<(String, f64)>. The latter contains a vector of customer identifiers, of the type Vec<String>. Both are encoded by postcard.")
         .arg(
             Arg::with_name("file_prefix")
                 .short("f")
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
     customer.shuffle(&mut rng);
 
-    let encode = pinecone::to_vec(&customer)?;
+    let encode = postcard::to_allocvec(&customer)?;
     let mut file = File::create(format!("{}-customer.dat", file_prefix))?;
     file.write_all(&encode)?;
 
@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     adv.append(&mut extra);
     adv.shuffle(&mut rng);
 
-    let encode = pinecone::to_vec(&adv)?;
+    let encode = postcard::to_allocvec(&adv)?;
     let mut file = File::create(format!("{}-advertisement-viewer.dat", file_prefix))?;
     file.write_all(&encode)?;
 

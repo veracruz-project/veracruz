@@ -6,7 +6,7 @@
 //! converting the text representation of CSV file entries into numerical or
 //! other data types (such as 32-bit integers), per a schema, and then output
 //! selected columns of the converted CSV file into a uniform binary
-//! representation encoded with `pinecone`.
+//! representation encoded with `postcard`.
 //!
 //! This is useful for moving data into a Veracruz enclave (for use in e.g.
 //! privacy-preserving machine learning) in a form more convenient than CSV.
@@ -17,7 +17,7 @@
 //!
 //!     - *input* provides a path to a CSV file on disk.
 //!     - *output* provides a path to a binary encoding of the CSV file encoded
-//!       with `pinecone`, per a schema.
+//!       with `postcard`, per a schema.
 //!     - *schema* provides a path to a TOML schema file on disk describing how
 //!       the input CSV file should be encoded to produce the binary output of
 //!       this utility.
@@ -70,7 +70,7 @@
 //!
 //! # Output binaries
 //!
-//! Output binaries are encoded with `pinecone` as a vector of vectors of
+//! Output binaries are encoded with `postcard` as a vector of vectors of
 //! vectors of `u8` values.  That is: as a vector of rows with each entry in a
 //! row of the CSV file either dropped or encoded as vectors of Little Endian
 //! bytes for numerical types, or as the byte representation of a UTF-8 string
@@ -103,7 +103,7 @@ use toml::*;
 const APPLICATION_NAME: &str = "csv-encoder";
 const AUTHORS: &str = "The Veracruz Development Team.";
 const VERSION: &str = "0.2.0";
-const ABOUT: &str = "csv-encoder: encodes selected columns of a CSV file using pinecone.";
+const ABOUT: &str = "csv-encoder: encodes selected columns of a CSV file using postcard.";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command-line parsing.
@@ -601,7 +601,7 @@ fn read_csv(
 
 /// Encodes the input CSV file as a vector (rows) of vectors (column entries) of
 /// vectors of Little Endian bytes (byte encoding of each row-column entry)
-/// where the overall 3-dimensional vector is encoded with `pinecone`.  Encodes
+/// where the overall 3-dimensional vector is encoded with `postcard`.  Encodes
 /// each row-column entry according to the schema provided.  If this encoding
 /// does not fail, then opens up an output file, as specified by the command
 /// line flags, and writes the output.  Aborts the program if any parsing or
@@ -788,7 +788,7 @@ fn encode_csv_content(
 
     encoding.shrink_to_fit();
 
-    match pinecone::to_vec(&encoding) {
+    match postcard::to_allocvec(&encoding) {
         Ok(bytes) => {
             if let Err(error) =
                 File::create(config.get_output_filename()).and_then(|mut f| f.write_all(&bytes))
@@ -802,7 +802,7 @@ fn encode_csv_content(
             }
         }
         Err(error) => {
-            eprintln!("Encoding with pinecone failed with error: '{}'.", error);
+            eprintln!("Encoding with postcard failed with error: '{}'.", error);
             exit(-1)
         }
     }
@@ -810,7 +810,7 @@ fn encode_csv_content(
 
 /// Program entry point.  Reads the command line parameters, parses the TOML
 /// schema file, then row-by-row encodes the CSV file as directed by the schema,
-/// before dumping the `pinecone` encoded file to the output file specified on
+/// before dumping the `postcard` encoded file to the output file specified on
 /// the command line.
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();

@@ -7,10 +7,10 @@
 //! The result is a pair of the number of (function) calls and the final accumulation result.
 //!
 //! Inputs:                  One.
-//! Assumed 'input-0'  : A Pinecone-encoded Rust `f64` value.
-//! Assumed 'stream-0' : A Pinecone-encoded Rust vector of  `f64` values.
-//! Assumed 'stream-2' : A Pinecone-encoded Rust vector of  `f64` values.
-//! Ensured 'output'   : A Pinecone-encoded pair of `u64` and `f64`.
+//! Assumed 'input-0'  : A Postcard-encoded Rust `f64` value.
+//! Assumed 'stream-0' : A Postcard-encoded Rust vector of  `f64` values.
+//! Assumed 'stream-2' : A Postcard-encoded Rust vector of  `f64` values.
+//! Ensured 'output'   : A Postcard-encoded pair of `u64` and `f64`.
 //!
 //! ## Authors
 //!
@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
     let (count, last_result_or_init) = read_last_result_or_init()?;
     let (stream1, stream2) = read_stream((count * 8) as u64)?;
     let result_encode =
-        pinecone::to_vec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))?;
+        postcard::to_allocvec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))?;
     fs::write("/output/accumulation.dat", result_encode)?;
     Ok(())
 }
@@ -52,7 +52,7 @@ fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
             // Not found the last result, read the init.
             ErrorKind::NotFound => {
                 let input = fs::read("/input/number-stream-init.dat")?;
-                let init = pinecone::from_bytes(&input)?;
+                let init = postcard::from_bytes(&input)?;
                 return Ok((0, init));
             }
             _kind => return Err(anyhow!(e)),
@@ -62,7 +62,7 @@ fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
     let mut data = Vec::new();
     file.read_to_end(&mut data)?;
 
-    Ok(pinecone::from_bytes(&data)?)
+    Ok(postcard::from_bytes(&data)?)
 }
 
 /// Read from 'stream-0' and 'stream-1' at `offset`
@@ -71,13 +71,13 @@ fn read_stream(offset: u64) -> anyhow::Result<(f64, f64)> {
     stream0.seek(SeekFrom::Start(offset))?;
     let mut data0 = Vec::new();
     stream0.read_to_end(&mut data0)?;
-    let n1: f64 = pinecone::from_bytes(&data0)?;
+    let n1: f64 = postcard::from_bytes(&data0)?;
 
     let mut stream1 = File::open("/input/number-stream-2.dat")?;
     stream1.seek(SeekFrom::Start(offset))?;
     let mut data1 = Vec::new();
     stream1.read_to_end(&mut data1)?;
-    let n2: f64 = pinecone::from_bytes(&data1)?;
+    let n2: f64 = postcard::from_bytes(&data1)?;
 
     Ok((n1, n2))
 }

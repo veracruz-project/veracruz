@@ -4,7 +4,7 @@
 //!
 //! Inputs:                  2.
 //! Assumed form of inputs:  UTF-8 strings to compare.
-//! Ensured form of outputs: A Pinecone-encoded `usize` which captures the
+//! Ensured form of outputs: A Postcard-encoded `usize` which captures the
 //!                          Damerau-Lehventstein edit distance between the two
 //!                          strings.
 //!
@@ -24,7 +24,7 @@ use strsim::jaro_winkler;
 /// Reads two input strings via the H-call mechanism.  Fails
 ///
 /// - with `return_code::ErrorCode::BadInput` if the strings are not encoded
-///   in `pinecone` and therefore cannot be decoded,
+///   in `postcard` and therefore cannot be decoded,
 /// - with `return_code::ErrorCode::DataSourceCount` if the number of inputs
 ///   provided to the program is not exactly 2.
 ///
@@ -36,13 +36,13 @@ fn read_inputs() -> anyhow::Result<(String, String)> {
 }
 
 /// Entry point: assumes that the program has been supplied with two data sets,
-/// which are Rust strings encoded with Pinecone.  Fails if these assumptions
-/// are not met with an error code.  Writes a Pinecone-encoded `usize`, the
+/// which are Rust strings encoded with Postcard.  Fails if these assumptions
+/// are not met with an error code.  Writes a Postcard-encoded `usize`, the
 /// distance between the two strings, back as output.
 fn main() -> anyhow::Result<()> {
     let (left, right) = read_inputs()?;
     let distance = jaro_winkler(&left, &right);
-    let result_encode = pinecone::to_vec::<f64>(&distance)?;
+    let result_encode = postcard::to_allocvec::<f64>(&distance)?;
     fs::write("/output/string-edit-distance.dat", result_encode)?;
     Ok(())
 }

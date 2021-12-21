@@ -9,6 +9,4 @@ version = "0.3.0"
 [dependencies]
 bitflags = "=1.2.1"
 clap = "2.33"
-pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
-# Required for std::error::Error from pinecone
-serde = { version = "1.0.103", features = ["derive"] }
+postcard = { version = "0.7.2", features = [ "alloc", "use-std" ] }

@@ -11,9 +11,9 @@
 //! supermarket wants to reveal anything about their data to any other.
 //!
 //! Inputs:                  An arbitrary number.
-//! Assumed form of inputs:  an arbitrary number of Pinecone-encoded Rust `Dataset` structs (see
+//! Assumed form of inputs:  an arbitrary number of Postcard-encoded Rust `Dataset` structs (see
 //!                          below).
-//! Ensured form of outputs: A Pinecone-encoded Rust vector of `f64` values describing the
+//! Ensured form of outputs: A Postcard-encoded Rust vector of `f64` values describing the
 //!                          parameters of the learnt logistic regression model.
 //!
 //! ## Authors
@@ -170,10 +170,10 @@ fn flatten(ds: &[Dataset]) -> Dataset {
 
 /// Deserializes a Vector of `u8` values into a `Dataset`.  Fails with
 /// `return_code::ErrorCode::BadInput` if the bytes cannot be decoded from
-/// `pinecone` into a `Dataset` value, or if the dataset is not self-consistent
+/// `postcard` into a `Dataset` value, or if the dataset is not self-consistent
 /// with respect to the dimensions of each of its points.
 fn read_dataset(input: &[u8]) -> anyhow::Result<Dataset> {
-    let data = pinecone::from_bytes::<Dataset>(input)?;
+    let data = postcard::from_bytes::<Dataset>(input)?;
     if data.self_consistent() {
         Ok(data)
     } else {
@@ -261,11 +261,11 @@ fn train(dataset: &Dataset) -> anyhow::Result<Vec<f64>> {
 /// Entry point.  Reads an arbitrary number of input datasets, one from each
 /// source, concatenates them together into a single compound dataset, then
 /// trains a logistic regressor on this new dataset.  Input and output are
-/// assumed to be encoded by `pinecone`.
+/// assumed to be encoded by `postcard`.
 fn main() -> anyhow::Result<()> {
     let dataset = read_input()?;
     let model = train(&dataset)?;
-    let result_encode = pinecone::to_vec::<Vec<f64>>(&model)?;
+    let result_encode = postcard::to_allocvec::<Vec<f64>>(&model)?;
     fs::write("/output/logistic-regression.dat", result_encode)?;
     Ok(())
 }

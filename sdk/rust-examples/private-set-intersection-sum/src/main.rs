@@ -3,8 +3,8 @@
 //! ## Context
 //!
 //! Inputs:                  an arbitrary number.
-//! Assumed form of inputs:  an arbitrary number of Pinecone-encoded `HashSet<Person>` (see below).
-//! Ensured form of outputs: A Pinecone-encoded `HashSet<Person>` (see below).
+//! Assumed form of inputs:  an arbitrary number of Postcard-encoded `HashSet<Person>` (see below).
+//! Ensured form of outputs: A Postcard-encoded `HashSet<Person>` (see below).
 //!
 //! ## Authors
 //!
@@ -36,18 +36,18 @@ type Sample = Vec<Id>;
 // Reading inputs.
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Reads exactly one input, which is assumed to be a Pinecone-encoded `Input`
+/// Reads exactly one input, which is assumed to be a Postcard-encoded `Input`
 /// struct, as above.
 fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Data, Sample)> {
     let mut sample_path = path.as_ref().to_path_buf();
     sample_path.push("sample.dat");
     let sample = fs::read(sample_path)?;
-    let sample = pinecone::from_bytes(sample.as_slice())?;
+    let sample = postcard::from_bytes(sample.as_slice())?;
 
     let mut data_path = path.as_ref().to_path_buf();
     data_path.push("data.dat");
     let data = fs::read(data_path)?;
-    let data = pinecone::from_bytes(data.as_slice())?;
+    let data = postcard::from_bytes(data.as_slice())?;
     Ok((data, sample))
 }
 
@@ -66,13 +66,13 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 }
 
 /// The program entry point: reads exactly one input, decodes it and computes the set
-/// intersection-sum before re-encoding it into Pinecone and returning.
+/// intersection-sum before re-encoding it into Postcard and returning.
 fn main() -> anyhow::Result<()> {
     for path in fs::read_dir("/input/private-set-inter-sum/")? {
         let path = path?.path();
         let (data, sample) = read_inputs(&path)?;
         let result = set_intersection_sum(data, sample);
-        let result_encode = pinecone::to_vec::<(usize, u64)>(&result)?;
+        let result_encode = postcard::to_allocvec::<(usize, u64)>(&result)?;
         let mut output = PathBuf::from("/output/private-set-inter-sum/");
         output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
         fs::write(output, result_encode)?;

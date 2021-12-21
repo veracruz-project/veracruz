@@ -2,7 +2,7 @@
 //!
 //! ## Context
 //!
-//! Read from 'input.txt', encode then using pinecone and write to 'output'.
+//! Read from 'input.txt', encode then using postcard and write to 'output'.
 //!
 //! ## Authors
 //!
@@ -16,7 +16,7 @@
 use anyhow;
 use std::{fs, io::Write};
 
-/// Read from 'input.txt', encode then using pinecone and write to 'output'.
+/// Read from 'input.txt', encode then using postcard and write to 'output'.
 fn main() -> anyhow::Result<()> {
     let input = "/input/hello-world-1.dat";
     let output = "/output/hello-world-1.dat";
@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
         .create(true)
         .truncate(true)
         .open("/output/test/test.txt")?
-        .write(&pinecone::to_vec("hello")?)?;
+        .write(&postcard::to_allocvec("hello")?)?;
     println!("rust");
 
     input_string.append(&mut "\"read_dir on '/output':".as_bytes().to_vec());
@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
     }
     input_string.append(&mut "\"".as_bytes().to_vec());
 
-    let rst = pinecone::to_vec(&input_string)?;
+    let rst = postcard::to_allocvec(&input_string)?;
     std::fs::OpenOptions::new()
         .write(true)
         .create(true)

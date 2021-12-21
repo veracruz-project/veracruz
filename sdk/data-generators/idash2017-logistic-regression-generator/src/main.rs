@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Command for generate random data
         .subcommand(
             App::new("generate")
-               .about("Generate random raw data and shuffle it into [FOLD] datasets. Each dataset contains pinecone encode of a training set with the configuration and a testing set.")
+               .about("Generate random raw data and shuffle it into [FOLD] datasets. Each dataset contains postcard encode of a training set with the configuration and a testing set.")
                .version("pre-alpha")
                .author("The Veracruz Development Team")
                .arg(
@@ -119,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Command for generate data from external resource.
         .subcommand(
             App::new("external")
-               .about("Generate [FOLD] dataset from external resource. Each dataset contains pinecone encode of a training set with the configuration and a testing set.")
+               .about("Generate [FOLD] dataset from external resource. Each dataset contains postcard encode of a training set with the configuration and a testing set.")
                .version("pre-alpha")
                .author("The Veracruz Development Team")
                .arg(
@@ -241,7 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             &header,
             &train_set.to_vec(),
         )?;
-        let encode = pinecone::to_vec(&(
+        let encode = postcard::to_allocvec(&(
             train_set,
             test_set,
             num_of_iter,
