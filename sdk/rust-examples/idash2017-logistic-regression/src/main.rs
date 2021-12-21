@@ -16,9 +16,9 @@
 //! Rust to compare the performance of Veracruz against various versions of this original code.
 //!
 //! Inputs:                  An arbitrary number.
-//! Assumed form of inputs:  an arbitrary number of Pinecone-encoded Rust `Dataset` structs (see
+//! Assumed form of inputs:  an arbitrary number of Postcard-encoded Rust `Dataset` structs (see
 //!                          below).
-//! Ensured form of outputs: A Pinecone-encoded Rust vector of `f64` values describing the parameters
+//! Ensured form of outputs: A Postcard-encoded Rust vector of `f64` values describing the parameters
 //!                          of the learnt logistic regression model.
 //!
 //! ## Authors
@@ -47,14 +47,14 @@ type Dataset = Vec<Vec<f64>>;
 /// Reads the input `(training_set, test_set, number_of_iteration, degree_of_sigmoid, gamma_up,
 /// gamma_down)`.  Returns the following error codes:
 ///
-///   - [`return_code::ErrorCode::BadInput`] if the strings are not encoded in Pinecone and
+///   - [`return_code::ErrorCode::BadInput`] if the strings are not encoded in Postcard and
 ///     therefore cannot be decoded,
 ///   - [`return_code::ErrorCode::DataSourceCount`] if the number of inputs provided to the
 ///     program is not exactly 1.
 ///
 fn read_inputs<T: AsRef<Path>>(path: T) -> anyhow::Result<(Dataset, Dataset, u64, u64, i64, i64)> {
     let input = fs::read(path.as_ref())?;
-    Ok(pinecone::from_bytes(&input)?)
+    Ok(postcard::from_bytes(&input)?)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -283,7 +283,7 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> anyhow::Result<f64> {
 
 /// Entry point.  Reads an arbitrary number of input datasets, one from each source, concatenates
 /// them together into a single compound dataset, then trains a logistic regressor on this new
-/// dataset.  Input and output are assumed to be encoded in Pinecone.
+/// dataset.  Input and output are assumed to be encoded in Postcard.
 fn main() -> anyhow::Result<()> {
     for path in fs::read_dir("/input/idash2017")? {
         let path = path?.path();
@@ -301,7 +301,7 @@ fn main() -> anyhow::Result<()> {
             gamma_down,
         )?;
         println!("result: {:?}, {:?}, {:?}", w_data, correct, auc);
-        let result_encode = pinecone::to_vec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
+        let result_encode = postcard::to_allocvec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
         let mut output = PathBuf::from("/output/idash2017/");
         output.push(file_name);
         println!("output {:?}", output);

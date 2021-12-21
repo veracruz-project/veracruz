@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for streaming number")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Generate an initial f64 encoded by pinecone and then 2 vectors of streaming data, each of which contains [SIZE] numbers of f64 encoded individually by pinecone.") 
+        .about("Generate an initial f64 encoded by postcard and then 2 vectors of streaming data, each of which contains [SIZE] numbers of f64 encoded individually by postcard.")
        .arg(
            Arg::with_name("file_prefix")
                .short("f")
@@ -80,14 +80,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let init = normal.sample(&mut rng);
     let mut file = File::create(format!("{}-init.txt", file_prefix))?;
     file.write_all(format!("{:?}", init).as_bytes())?;
-    let encode = pinecone::to_vec(&init)?;
+    let encode = postcard::to_allocvec(&init)?;
     let mut file = File::create(format!("{}-init.dat", file_prefix))?;
     file.write_all(&encode)?;
 
     for round in 0..dataset_size {
         std::fs::create_dir_all(format!("{}/{}/", file_prefix, round))?;
         let number_1 = normal.sample(&mut rng);
-        let number_1 = pinecone::to_vec(&number_1)?;
+        let number_1 = postcard::to_allocvec(&number_1)?;
         std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .write(&number_1)?;
 
         let number_2 = normal.sample(&mut rng);
-        let number_2 = pinecone::to_vec(&number_2)?;
+        let number_2 = postcard::to_allocvec(&number_2)?;
         std::fs::OpenOptions::new()
             .write(true)
             .create(true)

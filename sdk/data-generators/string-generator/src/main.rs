@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for string")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Convert the [INPUT] txt file to pinecone.")
+        .about("Convert the [INPUT] txt file to postcard.")
         .arg(
             Arg::with_name("input_file")
                 .short("f")
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let data_string = read_to_string(&input_file)?;
 
-    let encode = pinecone::to_vec(&data_string)?;
+    let encode = postcard::to_allocvec(&data_string)?;
 
     let mut file = File::create(format!("{}.dat", file_prefix))?;
 

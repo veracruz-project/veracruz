@@ -137,8 +137,8 @@ pub enum VeracruzServerError {
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "VeracruzServer: PolicyError: {:?}.", _0)]
     VeracruzUtilError(#[error(source)] policy_utils::error::PolicyError),
-    #[error(display = "VeracruzServer: Pinecone Error: {:?}.", _0)]
-    PineconeError(#[error(source)] pinecone::Error),
+    #[error(display = "VeracruzServer: Postcard Error: {:?}.", _0)]
+    PostcardError(#[error(source)] postcard::Error),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]
     JoinError(std::boxed::Box<dyn std::any::Any + Send + 'static>),
     #[error(

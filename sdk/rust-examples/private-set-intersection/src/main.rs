@@ -3,8 +3,8 @@
 //! ## Context
 //!
 //! Inputs:                  an arbitrary number.
-//! Assumed form of inputs:  an arbitrary number of Pinecone-encoded `HashSet<Person>` (see below).
-//! Ensured form of outputs: A Pinecone-encoded `HashSet<Person>` (see below).
+//! Assumed form of inputs:  an arbitrary number of Postcard-encoded `HashSet<Person>` (see below).
+//! Ensured form of outputs: A Postcard-encoded `HashSet<Person>` (see below).
 //!
 //! ## Authors
 //!
@@ -37,9 +37,9 @@ struct Person {
 /// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
 fn read_inputs() -> anyhow::Result<Vec<HashSet<Person>>> {
     let input0 = fs::read("/input/private-set-1.dat")?;
-    let data0 = pinecone::from_bytes(&input0)?;
+    let data0 = postcard::from_bytes(&input0)?;
     let input1 = fs::read("/input/private-set-2.dat")?;
-    let data1 = pinecone::from_bytes(&input1)?;
+    let data1 = postcard::from_bytes(&input1)?;
     Ok(vec![data0, data1])
 }
 
@@ -69,7 +69,7 @@ fn set_intersection(sets: &[HashSet<Person>]) -> HashSet<Person> {
 fn main() -> anyhow::Result<()> {
     let inputs = read_inputs()?;
     let result = set_intersection(&inputs);
-    let result_encode = pinecone::to_vec::<HashSet<Person>>(&result)?;
+    let result_encode = postcard::to_allocvec::<HashSet<Person>>(&result)?;
     fs::write("/output/private-set.dat", result_encode)?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 [package]
 authors = ["The Veracruz Development Team"]
-description = "A utility for encoding CSV-structured data into the binary `pinecone` format.  Provides means of selecting columns and skipping incomplete rows."
+description = "A utility for encoding CSV-structured data into the binary `postcard` format.  Provides means of selecting columns and skipping incomplete rows."
 edition = "2018"
 name = "csv-encoder"
 version = "0.3.0"
@@ -12,7 +12,7 @@ clap = "2.33.0"
 csv = "1.0"
 env_logger = "0.7.1"
 log = "0.4.8"
-pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
+postcard = { version = "0.7.2", features = [ "alloc" ] }
 toml = "0.5.6"
 
 [profile.release]

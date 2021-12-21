@@ -93,8 +93,8 @@ mod tests {
     pub enum VeracruzTestError {
         #[error(display = "VeracruzTest: IOError: {:?}.", _0)]
         IOError(#[error(source)] std::io::Error),
-        #[error(display = "VeracruzTest: Pinecone Error: {:?}.", _0)]
-        PineconeError(#[error(source)] pinecone::Error),
+        #[error(display = "VeracruzTest: Postcard Error: {:?}.", _0)]
+        PostcardError(#[error(source)] postcard::Error),
         #[error(display = "VeracruzTest: VeracruzClientError: {:?}.", _0)]
         VeracruzClientError(#[error(source)] veracruz_client::VeracruzClientError),
         #[error(display = "VeracruzTest: PolicyError: {:?}.", _0)]

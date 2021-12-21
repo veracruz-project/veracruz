@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::{error::Error, fs, io::Write, path::Path, vec::Vec};
 
-// pinecone does not support u128, so we use two u64 representing the id
+// postcard does not support u128, so we use two u64 representing the id
 
 type Id = (u64, u64);
 type Value = u32;
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for privaite set intersection sum")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Generate a vector of private data comprising 128-bit identifiers and private values,  Vec<((u64, u64), u32)>, and a vector of sample comprising identifiers, Vec<(u64, u64)>. Identifiers are represented by two u64, because pinecone does not support u128.") 
+        .about("Generate a vector of private data comprising 128-bit identifiers and private values,  Vec<((u64, u64), u32)>, and a vector of sample comprising identifiers, Vec<(u64, u64)>. Identifiers are represented by two u64, because postcard does not support u128.")
         .arg(
             Arg::with_name("directory")
                 .short("d")
@@ -101,12 +101,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for i in 0..iter {
         let (data, sample) = generate(&mut rng, size as usize);
-        let data = pinecone::to_vec(&data).map_err(|e| {
-            eprintln!("Cannot encode {:?} in pinecone", data);
+        let data = postcard::to_allocvec(&data).map_err(|e| {
+            eprintln!("Cannot encode {:?} in postcard", data);
             e
         })?;
-        let sample = pinecone::to_vec(&sample).map_err(|e| {
-            eprintln!("Cannot encode {:?} in pinecone", sample);
+        let sample = postcard::to_allocvec(&sample).map_err(|e| {
+            eprintln!("Cannot encode {:?} in postcard", sample);
             e
         })?;
         let path = dir.join(format!("data-{}-{}", size, i));

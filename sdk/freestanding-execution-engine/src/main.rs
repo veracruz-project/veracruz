@@ -401,7 +401,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             to_write.write_all(&buf)?;
 
             // Try to decode
-            let decode: String = match pinecone::from_bytes(buf) {
+            let decode: String = match postcard::from_bytes(buf) {
                 Ok(o) => o,
                 Err(_) => match std::str::from_utf8(buf) {
                     Ok(oo) => oo.to_string(),

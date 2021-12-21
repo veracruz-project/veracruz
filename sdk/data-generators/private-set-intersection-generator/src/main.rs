@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("Data generator for private set intersection")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
-        .about("Convert the [INPUT] csv file to pinecone. Each entry in the file comprises name (String), employee_id (String), age (u8), and grade (u8).")
+        .about("Convert the [INPUT] csv file to postcard. Each entry in the file comprises name (String), employee_id (String), age (u8), and grade (u8).")
         .arg(
             Arg::with_name("input_file")
                 .short("f")
@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let records = read_csv(input_file)?;
     let columns = extract_columns(&records)?;
-    let encode = pinecone::to_vec(&columns)?;
+    let encode = postcard::to_allocvec(&columns)?;
     let mut file = File::create(format!("{}.dat", file_prefix))?;
     file.write_all(&encode)?;
 
