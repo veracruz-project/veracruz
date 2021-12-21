@@ -30,7 +30,7 @@ num-traits = { version = "0.2", default-features = false }
 pinecone = { git = "https://github.com/veracruz-project/pinecone.git", branch = "veracruz" }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
+serde = { git = "https://github.com/egrimley-arm/serde.git", features = ["derive"], branch = "cleanup_sgx" }
 typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz" }
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
@@ -42,4 +42,4 @@ name = "execution_engine"
 path = "./src/lib.rs"
 
 [patch.crates-io]
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
+serde = { git = "https://github.com/egrimley-arm/serde.git", features = ["derive"], branch = "cleanup_sgx" }

@@ -17,7 +17,7 @@ err-derive = "0.2"
 ring = { git = "https://github.com/veracruz-project/ring.git", version = "=0.16.11", branch = "veracruz", optional = true }
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz", optional = true }
-serde = { git = "https://github.com/veracruz-project/serde.git", default-features = false, branch = "veracruz", optional = true }
+serde = { git = "https://github.com/egrimley-arm/serde.git", default-features = false, branch = "cleanup_sgx", optional = true }
 # Required
 serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz", default-features = false }
 
