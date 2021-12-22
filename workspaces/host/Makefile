@@ -29,6 +29,7 @@ DATASETS = $(patsubst %, dataset-%, $(DATA_GENERATORS))
 
 datasets: all $(DATASETS)
 
+.PHONY:
 dataset-%:
 	$(MAKE) -C crates/sdk/data-generators/$* RUN_COMMAND=$(abspath target/release/$*)
 

@@ -37,7 +37,7 @@ policy-files:
 	$(MAKE) -C ../linux-runtime policy-files
 
 test-server: datasets policy-files $(PROXY_ATTESTATION_SERVER_DB)
-	$(CC) cargo test -p veracruz-server-test --features linux --no-run -- --nocapture
+	$(CC) $(TEST_PARAMETERS) cargo test -p veracruz-server-test --features linux --no-run -- --nocapture
 	$(CC) $(TEST_PARAMETERS) cargo test -p veracruz-server-test --features linux -- --test-threads=1 --nocapture
 	$(CC) $(TEST_PARAMETERS) cargo test -p veracruz-server-test test_debug --features linux  -- --ignored --test-threads=1
 
@@ -45,7 +45,7 @@ test-client:
 	$(CC) $(TEST_PARAMETERS) cargo test -p veracruz-client --lib --features "mock linux" -- --test-threads=1
 
 veracruz-test: datasets policy-files $(PROXY_ATTESTATION_SERVER_DB)
-	$(CC) cargo test -p veracruz-test --features linux --no-run
+	$(CC) $(TEST_PARAMETERS) cargo test -p veracruz-test --features linux --no-run
 	$(CC) $(TEST_PARAMETERS) cargo test -p veracruz-test --features linux -- --test-threads=1
 
 $(PROXY_ATTESTATION_SERVER_DB):
