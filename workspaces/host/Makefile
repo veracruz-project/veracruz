@@ -11,8 +11,11 @@
 
 .PHONY: all doc clean fmt datasets clean-datasets
 
+WORKSPACE_DIR = $(abspath ..)
+include $(WORKSPACE_DIR)/common.mk
+
 all: crates/sdk/wasm-checker/bin/wasm-checker
-	cargo build --release
+	cargo build $(PROFILE_FLAG)
 
 DATA_GENERATORS = idash2017-logistic-regression-generator \
                       intersection-set-sum-generator \
@@ -31,7 +34,7 @@ datasets: all $(DATASETS)
 
 .PHONY:
 dataset-%:
-	$(MAKE) -C crates/sdk/data-generators/$* RUN_COMMAND=$(abspath target/release/$*)
+	$(MAKE) -C crates/sdk/data-generators/$* RUN_COMMAND=$(abspath target/$(PROFILE_PATH)/$*)
 
 clean-datasets: $(patsubst %, clean-dataset-%, $(DATA_GENERATORS))
 

@@ -17,7 +17,7 @@ nix_shell := nix-shell --pure
 nix_expression := ../../icecap/targets.nix
 nix_attribute_path := $(ICECAP_PLAT)
 
-inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) $@
+inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) PROFILE=$(PROFILE) $@
 
 # HACK
 # Certificate expiry matters require the time in the host and realm to align

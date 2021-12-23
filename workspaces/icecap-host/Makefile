@@ -8,6 +8,7 @@
 # and copyright information.
 
 include ../../icecap/mk/common.mk
+include ../common.mk
 
 test_system := $(build_dir)/test-system
 now := $(build_dir)/NOW
@@ -17,7 +18,7 @@ nix_shell := nix-shell --pure
 nix_expression := targets.nix
 nix_attribute_path := $(ICECAP_PLAT)
 
-inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) $@
+inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) PROFILE=$(PROFILE) $@
 
 # HACK
 # Certificate expiry matters require the time in the host and realm to align
@@ -50,7 +51,7 @@ veracruz-test:
 
 .PHONY: test-collateral
 test-collateral: set-key-permissions
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -f test.mk test-collateral'
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral'
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 

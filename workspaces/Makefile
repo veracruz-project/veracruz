@@ -1,5 +1,7 @@
 default:
 
+include common.mk
+
 all: shared linux nitro
 
 shared:

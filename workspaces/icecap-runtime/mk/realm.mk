@@ -8,6 +8,7 @@
 # and copyright information.
 
 include ../../icecap/mk/common.mk
+include ../common.mk
 
 rust_target := aarch64-icecap
 
@@ -39,7 +40,7 @@ define realm_crate_body
 			--manifest-path Cargo.toml \
 			--target $(rust_target) \
 			-p runtime_manager_enclave --features icecap \
-			--release \
+			$(PROFILE_FLAG) \
 			-j$$(nproc) \
 			--target-dir $(target_dir) \
 			--out-dir $(bin_dir)

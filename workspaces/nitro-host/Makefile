@@ -12,9 +12,12 @@
 .PHONY: all doc clean fmt
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 
+WORKSPACE_DIR = $(abspath ..)
+include $(WORKSPACE_DIR)/common.mk
+
 all:
 	rustup target add x86_64-unknown-linux-musl
-	$(CC) cargo build --release \
+	$(CC) cargo build $(PROFILE_FLAG) \
 		--features proxy-attestation-server/nitro \
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \

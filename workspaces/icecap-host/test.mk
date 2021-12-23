@@ -2,6 +2,7 @@ OUT_DIR ?= $(abspath test-collateral)
 FINAL_DIR ?= $(abspath .)
 WORKSPACE_DIR = $(abspath ..)
 
+include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
 MEASUREMENT_FILE = $(abspath css-icecap.bin)

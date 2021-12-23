@@ -37,10 +37,10 @@ $(OUT_DIR):
 
 wasm-files: $(OUT_DIR) $(WASM_PROG_FILES)
 
-$(OUT_DIR)/%.wasm: $(WORKSPACE_DIR)/applications/target/wasm32-wasi/release/%.wasm
+$(OUT_DIR)/%.wasm: $(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm
 	cp $< $@
 
-$(WORKSPACE_DIR)/applications/target/wasm32-wasi/release/%.wasm:
+$(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm:
 	$(MAKE) -C $(WORKSPACE_DIR)/applications
 
 ###################################################
@@ -100,7 +100,7 @@ POLICY_FILES ?= \
 	triple_policy_4.json \
 	quadruple_policy.json
 
-PGEN = $(WORKSPACE_DIR)/host/target/release/generate-policy
+PGEN = $(WORKSPACE_DIR)/host/target/$(PROFILE_PATH)/generate-policy
 
 $(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.rs $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
