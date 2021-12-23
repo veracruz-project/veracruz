@@ -57,6 +57,7 @@ nitro = [
   "nix",
   "ring/nitro",
   "ring/std",
+  "session-manager/nitro",
   "veracruz-utils/nitro",
 ]
 
@@ -74,6 +75,7 @@ icecap-start-generic = { path = "../icecap/crates/icecap/icecap-start/generic", 
 icecap-std-external = { path = "../icecap/crates/std-support/icecap-std-external", optional = true }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }
 libm = { version = "0.2", optional = true }
 log = { version = "0.4.13", optional = true }
 nix = { version = "0.15", optional = true }
@@ -92,8 +94,6 @@ veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace", optional = true }
 
-# FIXME: this needs to be put back in for icecap
-# libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz", optional = true }
 
 [profile.release]
 lto = true

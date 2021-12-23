@@ -10,6 +10,7 @@ default = []
 icecap = [
   "platform-services/icecap",
   "policy-utils/icecap",
+  "wasi-types",
 ]
 nitro = [
   "platform-services/nitro",
