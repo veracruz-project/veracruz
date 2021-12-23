@@ -17,44 +17,47 @@ path = "src/main.rs"
 [features]
 default = []
 icecap = [
-  "veracruz-utils/icecap",
-  "policy-utils/icecap",
-  "transport-protocol/icecap",
-  "execution-engine/icecap",
-  "serde",
-  "session-manager/icecap",
-  "psa-attestation",
   "bincode",
-  "log",
-  "libm",
-  "libc",
+  "execution-engine/icecap",
   "icecap-core",
   "icecap-event-server-types",
   "icecap-start-generic",
   "icecap-std-external",
+  "libc",
+  "libm",
+  "log",
+  "policy-utils/icecap",
+  "psa-attestation",
+  "serde",
+  "session-manager/icecap",
+  "transport-protocol/icecap",
+  "veracruz-utils/icecap",
 ]
 linux = [
+  "bincode",
+  "clap",
+  "env_logger",
   "execution-engine/std",
+  "io-utils/linux",
+  "log",
+  "nix",
+  "policy-utils/std",
   "session-manager/std",
   "veracruz-utils/linux",
-  "policy-utils/std",
-  "io-utils/linux",
-  "clap",
-  "nix",
-  "bincode",
-  "log",
-  "env_logger",
 ]
 nitro = [
   "bincode",
   "execution-engine/std",
   "execution-engine/nitro",
   "io-utils/nitro",
+  "libc",
   "policy-utils/std",
   "nsm_io",
   "nsm_lib",
   "nix",
-  "bincode",
+  "ring/nitro",
+  "ring/std",
+  "veracruz-utils/nitro",
 ]
 
 [dependencies]
@@ -89,8 +92,7 @@ serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "v
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
-
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz", features = ["std"] }
 
 [profile.release]
 lto = true

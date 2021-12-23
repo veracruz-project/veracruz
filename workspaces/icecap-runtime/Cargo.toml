@@ -13,6 +13,6 @@ opt-level = 3
 
 [patch.crates-io]
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
-ring = { git = "https://github.com/mathias-arm/ring.git", branch = "icecap" }
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
-webpki = { git = "https://github.com/mathias-arm/webpki.git", branch = "unrecognized_extensions" }
+webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
