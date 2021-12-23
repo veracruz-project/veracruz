@@ -49,7 +49,7 @@ veracruz-test:
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.host --run '$(call inner_make_cmd,host)'
 
 .PHONY: test-collateral
-test-collateral:
+test-collateral: set-key-permissions
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -f test.mk test-collateral'
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
@@ -68,11 +68,13 @@ test-system-stale-test-collateral: $(now) runtime-manager veracruz-server-test v
 test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-collateral
 	$(test_system_body)
 
+nix/host/token-ssh-key.priv: ../../icecap/nix/host/token-ssh-key.priv
+	cp $< $@
+
 # Permission constraints required by the OpenSSH client cannot be expressed in Git or Nix
 .PHONY: set-key-permissions
-set-key-permissions:
-	chmod 0400 ../../icecap/nix/host/token-ssh-key.priv
-
+set-key-permissions: nix/host/token-ssh-key.priv
+	chmod 0400 nix/host/token-ssh-key.priv
 
 run_tests_body = script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && eval $$script
 
