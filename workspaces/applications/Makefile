@@ -8,7 +8,7 @@
 #
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
- 
+
 .PHONY: all doc clean fmt
 
 all:

@@ -24,13 +24,13 @@ all: $(TARGET_DIR_DAT)
 
 .SECONDEXPANSION:
 $(TARGET_DIR_DAT): % : $$(notdir $$@) $(TARGET_DIR)
-	cp -r $< $@ 
+	cp -r $< $@
 
 $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
-$(TARGET_DAT): 
-	$(RUN_COMMAND) --file_prefix $(TARGET_PREFIX) --size $(STREAM_ROUND) --seed $(SEED); 
+$(TARGET_DAT):
+	$(RUN_COMMAND) --file_prefix $(TARGET_PREFIX) --size $(STREAM_ROUND) --seed $(SEED);
 
 clean:
 	cargo clean
