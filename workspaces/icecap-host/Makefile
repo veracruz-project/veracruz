@@ -51,7 +51,11 @@ veracruz-test:
 
 .PHONY: test-collateral
 test-collateral: set-key-permissions
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral'
+	if [ -f /usr/local/cargo/bin/cargo ] ; then \
+		$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral ; \
+	else \
+		$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral' ; \
+	fi
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 
@@ -98,14 +102,15 @@ run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-ma
 .PHONY: clean
 clean:
 	rm -rf $(build_dir)
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -f test.mk clean'
+	if [ -f /usr/local/cargo/bin/cargo ] ; then \
+		$(MAKE) -f test.mk clean ; \
+	else \
+		$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -f test.mk clean' ; \
+	fi
 
 # This is a bit heavy-handed, but useful for achieving a clean slate for 'sdk' and 'test-collateral'
 .PHONY: deep-clean
 deep-clean: clean
 	cd ../.. && git clean -Xdff \
 		--exclude='!icecap/icecap/nixpkgs/' \
-		--exclude='!icecap/icecap/nixpkgs/**' \
-		--exclude='!icecap/docker/hacking/nix-root/' \
-		--exclude='!icecap/docker/hacking/nix-root/**'
-
+		--exclude='!icecap/icecap/nixpkgs/**'

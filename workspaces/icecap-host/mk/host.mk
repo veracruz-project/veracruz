@@ -10,6 +10,7 @@
 include ../../icecap/mk/common.mk
 include ../common.mk
 
+HOST_CC ?= cc
 rust_target := aarch64-unknown-linux-gnu
 
 define host_crate_body

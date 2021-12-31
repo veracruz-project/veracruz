@@ -10,6 +10,7 @@
 include ../../icecap/mk/common.mk
 include ../common.mk
 
+HOST_CC ?= cc
 rust_target := aarch64-icecap
 
 icecap_c_include_flags := $(foreach x,$(buildInputs),-I$(abspath $(x)/include))
@@ -67,7 +68,7 @@ sysroot-install: sysroot
 	cp -u $$src/lib*.rlib $$dst/ ; \
 	tidy_dest $$src $$dst ; \
 	src=$(sysroot_target_dir)/release/deps ; \
-	dst=$(sysroot_dir)/lib/rustlib/x86_64-unknown-linux-gnu/lib/ ; \
+	dst=$(sysroot_dir)/lib/rustlib/$(shell uname -m)-unknown-linux-gnu/lib/ ; \
 	mkdir -p $$dst ; \
 	cp -u $$src/*.so $$dst/ ; \
 	tidy_dest $$src $$dst
