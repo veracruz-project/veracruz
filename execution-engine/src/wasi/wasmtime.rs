@@ -23,7 +23,9 @@ use crate::{
 use lazy_static::lazy_static;
 use std::{convert::TryFrom, sync::Mutex, vec::Vec};
 use wasi_types::ErrNo;
-use wasmtime::{Caller, Extern, ExternType, Func, Instance, Memory, Module, Store, Val, ValType};
+use wasmtime::{
+    Caller, Engine, Extern, ExternType, Func, Instance, Memory, Module, Store, Val, ValType,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
@@ -208,7 +210,13 @@ impl WasmtimeRuntimeState {
     /// execution.
     pub(crate) fn invoke_entry_point(binary: Vec<u8>) -> Result<u32, FatalEngineError> {
         let store = Store::default();
-        let module = Module::new(store.engine(), binary)?;
+        let mut config = store.engine().config().clone();
+        config.wasm_simd(true);
+        let engine = Engine::new(&config).map_err(|e| {
+            FatalEngineError::AnyhowError(format!("Engine instantiation failed: {:?}", e))
+        })?;
+        let module = Module::new(&engine, binary)?;
+        let store = Store::new(&engine);
         let mut exports: Vec<Extern> = Vec::new();
 
         for import in module.imports() {
