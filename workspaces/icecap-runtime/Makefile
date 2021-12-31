@@ -27,13 +27,18 @@ inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) PROFILE=$(PROF
 $(now): | $(build_dir)
 	date +%s | tr -d '\n' > $@
 
+# Work-around for relative path inclusion in source code
+../../icecap/$(now): $(now)
+	mkdir -p ../../icecap/$(build_dir)
+	cp $< $@
+
 # Explicitly update the time in the host and the realm at the cost of some rebuilding
 .PHONY: update-time
 update-time:
-	rm -f $(now)
+	rm -f $(now) ../../icecap/$(now)
 
 .PHONY: runtime-manager
-runtime-manager: $(now)
+runtime-manager: $(now) ../../icecap/$(now)
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.realm --run '$(call inner_make_cmd,realm)'
 
 .PHONY: sysroot
