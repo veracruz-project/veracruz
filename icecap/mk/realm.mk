@@ -45,12 +45,25 @@ runtime-manager: sysroot-install
 
 .PHONY: sysroot-install
 sysroot-install: sysroot
-	d=$(sysroot_dir)/lib/rustlib/aarch64-icecap/lib ; \
-	mkdir -p $$d ; \
-	cp -u $(sysroot_target_dir)/aarch64-icecap/release/deps/lib*.rlib $$d ; \
-	d=$(sysroot_dir)/lib/rustlib/x86_64-unknown-linux-gnu/lib/ ; \
-	mkdir -p $$d ; \
-	cp -u $(sysroot_target_dir)/release/deps/*.so $$d
+	: # "tidy_dest $src $dst" removes files from $dst/ that are not
+	: # found in $src/. It does not matter if the glob fails to match.
+	tidy_dest() { \
+	    for x in "$$2"/* ; do \
+	        if ! [ -f "$$1"/"$${x##*/}" ] ; then \
+	            rm -f "$$x" ; \
+	        fi \
+	    done \
+	} ; \
+	src=$(sysroot_target_dir)/aarch64-icecap/release/deps ; \
+	dst=$(sysroot_dir)/lib/rustlib/aarch64-icecap/lib ; \
+	mkdir -p $$dst ; \
+	cp -u $$src/lib*.rlib $$dst/ ; \
+	tidy_dest $$src $$dst ; \
+	src=$(sysroot_target_dir)/release/deps ; \
+	dst=$(sysroot_dir)/lib/rustlib/x86_64-unknown-linux-gnu/lib/ ; \
+	mkdir -p $$dst ; \
+	cp -u $$src/*.so $$dst/ ; \
+	tidy_dest $$src $$dst
 
 sysroot_rustflags := \
 	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
