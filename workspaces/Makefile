@@ -16,9 +16,9 @@ include common.mk
 .PHONY: all clean icecap icecap-clean linux linux-clean nitro nitro-clean \
 	shared shared-clean
 
-all: shared linux nitro
+all: shared linux nitro icecap
 
-clean: shared-clean linux-clean nitro-clean
+clean: shared-clean linux-clean nitro-clean icecap-clean
 
 linux: shared
 	$(MAKE) -C linux-host
@@ -28,9 +28,7 @@ nitro: shared
 	$(MAKE) -C nitro-host
 	$(MAKE) -C nitro-runtime
 
-icecap: # shared
-	# shared is disabled because icecap uses its own
-	# environment to build applications and host
+icecap: shared
 	$(MAKE) -C icecap-runtime runtime-manager
 	$(MAKE) -C icecap-host test-system
 

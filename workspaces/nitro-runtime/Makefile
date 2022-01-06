@@ -9,43 +9,30 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-OUT_DIR ?= $(abspath .)
-FINAL_DIR ?= $(abspath .)
+.PHONY: all clean default nitro test-collateral
+
+default: all
+
 WORKSPACE_DIR = $(abspath ..)
-
-ifeq ($(shell uname -m),aarch64)
-	ARCH = aarch64
-else
-	ARCH = x86_64
-endif
-
-all: nitro wasm-files policy-files
+OUT_DIR ?= $(WORKSPACE_DIR)/nitro-host/test-collateral
+ARCH = $(shell uname -m)
 
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
-MEASUREMENT_FILE = $(abspath PCR0)
-MEASUREMENT_PARAMETER = --pcr-file $(MEASUREMENT_FILE)
-
-.PHONY: all clean nitro
-
-WARNING_COLOR := "\e[1;33m"
-INFO_COLOR := "\e[1;32m"
-RESET_COLOR := "\e[0m"
-
 ############# Source code #################
 SRC_DIR = $(abspath crates/runtime-manager)
 COMMON_Src = $(SRC_DIR)/src/managers/*.rs
-
-############# AWS Nitro Enclaves ###################
 Nitro_Src = $(COMMON_Src) $(SRC_DIR)/src/runtime_manager_nitro.rs $(SRC_DIR)/src/main.rs
 
-nitro: runtime_manager.eif
+all: nitro
+
+nitro: runtime_manager.eif PCR0 css-nitro.bin
 
 css-nitro.bin: PCR0
 	cp $< $@
 
-runtime_manager.eif: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave crates/runtime-manager/dockerdir/Dockerfile
+runtime_manager.eif PCR0: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave crates/runtime-manager/dockerdir/Dockerfile
 	rm -rf docker
 	mkdir -p docker
 	cp target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave docker
@@ -63,6 +50,4 @@ target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: Cargo
 
 clean:
 	@cargo clean
-	@rm -rf target
-	@rm -rf bin/
-	@rm -f css-*.bin
+	@rm -f css-nitro.bin PCR0

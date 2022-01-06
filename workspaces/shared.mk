@@ -14,6 +14,10 @@ INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 PLATFORM := $(shell uname)
 
+.PHONY: wasm-files datasets proxy-attestation-server-db policy-files test-collateral
+
+test-collateral: wasm-files datasets proxy-attestation-server-db $(MEASUREMENT_FILE) policy-files
+
 ###################################################
 # Wasm programs
 
@@ -32,16 +36,38 @@ WASM_PROG_LIST = random-source.wasm \
 
 WASM_PROG_FILES = $(patsubst %.wasm, $(OUT_DIR)/%.wasm, $(WASM_PROG_LIST))
 
+wasm-files: $(OUT_DIR) $(WASM_PROG_FILES)
+
 $(OUT_DIR):
 	@mkdir -p $@
-
-wasm-files: $(OUT_DIR) $(WASM_PROG_FILES)
 
 $(OUT_DIR)/%.wasm: $(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm
 	cp $< $@
 
 $(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm:
 	$(MAKE) -C $(WORKSPACE_DIR)/applications
+
+###################################################
+# Datasets
+
+datasets: $(OUT_DIR)
+	$(MAKE) -C ../host datasets
+	cp -r ../../sdk/datasets/* $(OUT_DIR)
+	cp ../../test-collateral/*.pem $(OUT_DIR)
+
+###################################################
+# Proxy Attestation Server database
+
+PROXY_ATTESTATION_SERVER_DB = $(abspath $(OUT_DIR)/..)/proxy-attestation-server.db
+
+proxy-attestation-server-db: $(PROXY_ATTESTATION_SERVER_DB)
+
+$(PROXY_ATTESTATION_SERVER_DB):
+	diesel setup --config-file crates/proxy-attestation-server/diesel.toml --database-url $@ \
+		--migration-dir crates/proxy-attestation-server/migrations
+	echo "INSERT INTO firmware_versions VALUES(2, 'psa', '0.3.0', 'deadbeefdeadbeefdeadbeefdeadbeeff00dcafef00dcafef00dcafef00dcafe');" > tmp.sql
+	sqlite3 $@ < tmp.sql
+	rm tmp.sql
 
 ###################################################
 # Generate Policy Files
@@ -106,7 +132,7 @@ $(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.r
 	$(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
-policy-files: $(OUT_DIR) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES)) $(OUT_DIR)/invalid_policy
+policy-files: $(OUT_DIR) $(MEASUREMENT_FILE) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES)) $(OUT_DIR)/invalid_policy
 	@echo $(INFO_COLOR)"GEN   =>  $(POLICY_FILES)"$(RESET_COLOR)
 
 PROGRAM_DIR = /program/
@@ -119,8 +145,7 @@ RESULT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/result_client_cert.pem
 NEVER_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_cert.pem
 EXPIRED_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/expired_cert.pem
 
-CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(EXPIRED_CRT) \
-	$(MEASUREMENT_FILE)
+CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(EXPIRED_CRT) $(MEASUREMENT_FILE)
 
 PGEN_COMMON_PARAMS = --proxy-attestation-server-cert $(CA_CRT) $(MEASUREMENT_PARAMETER) \
 	--certificate-expiry $(CERTIFICATE_EXPIRY) --execution-strategy Interpretation
