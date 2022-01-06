@@ -212,14 +212,13 @@ impl InodeImpl {
     /// or ErrNo::Again if it is a service and no output is available.
     pub(self) fn read_file(&self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
         match self {
-            Self::File(b) | Self::NativeModule(.., b) => Self::read_bytes_from_offset(b, max, offset),
-            //Self::NativeModule(.., None) => Err(ErrNo::Again),
+            Self::File(b) | Self::NativeModule(.., b) => Self::read_bytes_from_offset(b, buf, offset),
             Self::Directory(_) => Err(ErrNo::IsDir),
         }
     }
     
 
-    fn read_bytes_from_offset(bytes: &[u8], max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
+    fn read_bytes_from_offset(bytes: &[u8], buf: &mut[u8], offset: FileSize) -> FileSystemResult<usize> {
         // NOTE: It should be safe to convert a u64 to usize.
         let offset = <_>::try_from_or_errno(offset)?;
         //          offset
@@ -681,13 +680,13 @@ impl InodeTable {
         Ok(())
     }
 
-    fn read_file(&mut self, inode: Inode, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
-        let inode_impl = self.get_mut(&inode)?;
-        match inode_impl.read_file(max, offset) {
-            Ok(o) => Ok(o),
-            Err(e) => Err(e),
-        }
-    }
+    //fn read_file(&mut self, inode: Inode, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
+        //let inode_impl = self.get_mut(&inode)?;
+        //match inode_impl.read_file(max, offset) {
+            //Ok(o) => Ok(o),
+            //Err(e) => Err(e),
+        //}
+    //}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1149,7 +1148,6 @@ impl FileSystem {
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-//<<<<<<< HEAD
         let f = self.lock_inode_table()?;
         let f = f.get(&inode)?;
 
@@ -1162,11 +1160,6 @@ impl FileSystem {
         }
 
         Ok(len)
-//=======
-        //self.lock_inode_table()?
-            //.get_mut(&inode)?
-            //.read_file(buffer_len, offset)
-//>>>>>>> 3f45afee... Add the NativeModule in InodeImpl and Service trait in VFS.
     }
 
     /// Return the status of a pre-opened Fd `fd`.
@@ -1202,38 +1195,31 @@ impl FileSystem {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-//<<<<<<< HEAD
-        let mut f = self.lock_inode_table()?;
-        let f = f.get_mut(&inode)?;
-
-        let mut offset = offset;
-        let mut len = 0;
-        for buf in bufs {
-            let delta = f.write_file(buf.as_ref(), offset)?;
-            offset += u64::try_from_or_errno(delta)?;
-            len += delta;
-        }
-
-        Ok(len)
-//=======
         //// NOTE: Careful about the lock scope.,as a service may need to lock 
         //// the inode_table internally.
-        //let (size, is_service) = {
-            //let mut table = self.lock_inode_table()?;
-            //let inode = table.get_mut(&inode)?;
-            //(inode.write_file(buf, offset)?, inode.is_service())
-        //};
-        
-        //// If it is a service, it calls the service 
-        //if is_service {
-            //let (mut fs, service, input) = self.lock_inode_table()?.get_mut(&inode)?.service_handler()?;
-            //let service = service.lock().map_err(|_| ErrNo::Busy)?;
-            //if service.try_parse(&input)? {
-                //service.serve(&mut fs, &input)?;
-            //}
-        //}
-        //Ok(size)
-//>>>>>>> f35fa4c3... Update the service structure, it will be triggered on fd_write.
+        let (len, is_service) = {
+            let mut f = self.lock_inode_table()?;
+            let f = f.get_mut(&inode)?;
+
+            let mut offset = offset;
+            let mut len = 0;
+            for buf in bufs {
+                let delta = f.write_file(buf.as_ref(), offset)?;
+                offset += u64::try_from_or_errno(delta)?;
+                len += delta;
+            }
+            (len, f.is_service())
+        };
+
+        // If it is a service, it calls the service 
+        if is_service {
+            let (mut fs, service, input) = self.lock_inode_table()?.get_mut(&inode)?.service_handler()?;
+            let service = service.lock().map_err(|_| ErrNo::Busy)?;
+            if service.try_parse(&input)? {
+                service.serve(&mut fs, &input)?;
+            }
+        }
+        Ok(len)
     }
 
     /// A rust-style base implementation for `fd_read`. It directly calls `fd_pread` with the
