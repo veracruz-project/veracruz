@@ -24,7 +24,6 @@ fn main() -> anyhow::Result<()> {
     let mut input_string = fs::read(input)?;
 
     println!("hello");
-    fs::create_dir_all("/output/test")?;
     std::fs::OpenOptions::new()
         .write(true)
         .create(true)
@@ -35,7 +34,9 @@ fn main() -> anyhow::Result<()> {
 
     input_string.append(&mut "\"read_dir on '/output':".as_bytes().to_vec());
     for file in fs::read_dir("/output/")? {
-        input_string.append(&mut file?.path().to_str().unwrap().as_bytes().to_vec());
+        if let Ok(file) = file {
+            input_string.append(&mut file.path().to_str().unwrap().as_bytes().to_vec());
+        }
     }
     input_string.append(&mut "\"".as_bytes().to_vec());
 
