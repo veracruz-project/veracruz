@@ -1,5 +1,12 @@
 cargo-features = ["resolver"]
 
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Workspace for trusted IceCap services"
+edition = "2018"
+name = "icecap-runtime"
+version = "0.3.0"
+
 [workspace]
 members = [
   "crates/runtime-manager",

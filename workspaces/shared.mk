@@ -1,4 +1,4 @@
-# Makefile
+# shared.mk: Shared make rules for test programs / policies
 #
 # AUTHORS
 #
@@ -102,7 +102,8 @@ POLICY_FILES ?= \
 
 PGEN = $(WORKSPACE_DIR)/host/target/$(PROFILE_PATH)/generate-policy
 
-$(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.rs $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
+$(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.rs \
+	$(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
 policy-files: $(OUT_DIR) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES)) $(OUT_DIR)/invalid_policy

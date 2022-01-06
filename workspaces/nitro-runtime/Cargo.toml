@@ -1,14 +1,15 @@
 cargo-features = ["resolver"]
 
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Workspace for trusted Nitro services"
+edition = "2018"
+name = "linux-runtime"
+version = "0.3.0"
+
 [workspace]
 members = [
-  "crates/execution-engine",
-  "crates/platform-services",
-  "crates/psa-attestation",
   "crates/runtime-manager",
-  "crates/session-manager",
-  "crates/transport-protocol",
-  "crates/veracruz-utils",
 ]
 resolver = "2"
 

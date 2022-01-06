@@ -1,8 +1,14 @@
 cargo-features = ["resolver"]
 
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Workspace for locally-run programs"
+edition = "2018"
+name = "host"
+version = "0.3.0"
+
 [workspace]
 members = [
-
   # Data generators
   "crates/sdk/data-generators/csv-encoder",
   "crates/sdk/data-generators/idash2017-logistic-regression-generator",
@@ -15,6 +21,7 @@ members = [
   "crates/sdk/data-generators/private-set-intersection-sum-generator",
   "crates/sdk/data-generators/shamir-secret-sharing",
   "crates/sdk/data-generators/string-generator",
+
   "crates/sdk/freestanding-execution-engine",
   "crates/test-collateral/generate-policy",
 ]

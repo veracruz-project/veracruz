@@ -1,5 +1,12 @@
 cargo-features = ["resolver"]
 
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Workspace for untrusted Linux services and tests"
+edition = "2018"
+name = "linux-host"
+version = "0.3.0"
+
 [workspace]
 members = [
   "crates/proxy-attestation-server",

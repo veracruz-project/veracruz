@@ -1,5 +1,12 @@
 cargo-features = ["resolver"]
 
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Workspace for test applications"
+edition = "2018"
+name = "applications"
+version = "0.3.0"
+
 [workspace]
 members = [
   # "crates/sdk/rust-examples/audio-event-triangulation",

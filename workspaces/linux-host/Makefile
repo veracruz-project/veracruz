@@ -9,7 +9,8 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all doc clean fmt
+.PHONY: all doc clean fmt \
+	datasets policy-files test-dependencies test-server test-client veracruz-test
 
 WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
@@ -42,7 +43,6 @@ datasets:
 policy-files:
 	$(MAKE) -C ../linux-runtime policy-files
 
-.PHONY:
 test-dependencies: datasets policy-files $(PROXY_ATTESTATION_SERVER_DB) $(LINUX_ROOT_ENCLAVE) $(RUNTIME_MANAGER_ENCLAVE)
 
 test-server: test-dependencies
