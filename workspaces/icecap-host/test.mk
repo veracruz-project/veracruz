@@ -8,11 +8,11 @@ include $(WORKSPACE_DIR)/shared.mk
 MEASUREMENT_FILE = $(abspath css-icecap.bin)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 
-.PHONY: test-collateral
+.PHONY: clean test-collateral datasets
+
 test-collateral: proxy-attestation-server.db css-icecap.bin \
 	wasm-files policy-files datasets
 
-.PHONY: datasets
 datasets: $(OUT_DIR)
 	$(MAKE) -C ../host datasets
 	cp -r ../../sdk/datasets/* $(OUT_DIR)
