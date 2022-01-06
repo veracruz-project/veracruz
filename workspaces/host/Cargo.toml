@@ -1,11 +1,16 @@
-cargo-features = ["resolver"]
+# workspaces/host/Cargo.toml:
+# Workspace for locally-run programs
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# and copyright information.
 
-[package]
-authors = ["The Veracruz Development Team"]
-description = "Workspace for locally-run programs"
-edition = "2018"
-name = "host"
-version = "0.3.0"
+cargo-features = ["resolver"]
 
 [workspace]
 members = [

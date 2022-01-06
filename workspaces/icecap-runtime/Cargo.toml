@@ -1,11 +1,16 @@
-cargo-features = ["resolver"]
+# workspaces/icecap-runtime/Cargo.toml:
+# Workspace for trusted IceCap services
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# and copyright information.
 
-[package]
-authors = ["The Veracruz Development Team"]
-description = "Workspace for trusted IceCap services"
-edition = "2018"
-name = "icecap-runtime"
-version = "0.3.0"
+cargo-features = ["resolver"]
 
 [workspace]
 members = [
