@@ -14,13 +14,11 @@ icecap = [
 nitro = [
   "platform-services/nitro",
   "policy-utils/std",
-  "wasi-types/std",
   "wasmtime",
 ]
 std = [
   "platform-services/std",
   "policy-utils/std",
-  "wasi-types/std",
   "wasmtime",
 ]
 

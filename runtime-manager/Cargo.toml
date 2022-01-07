@@ -37,7 +37,6 @@ linux = [
   "clap",
   "nix",
   "bincode",
-  "wasi-types/std",
   "log",
   "env_logger",
 ]
@@ -53,7 +52,6 @@ nitro = [
   "ring/nitro",
   "nix",
   "bincode",
-  "wasi-types/std",
 ]
 
 [dependencies]
