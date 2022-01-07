@@ -15,7 +15,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v2
+      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-linux:ci-v2
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -32,7 +32,7 @@ jobs:
   icecap:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v2
+      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-icecap:ci-v2
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -45,11 +45,10 @@ jobs:
             make -C /work/veracruz/workspaces icecap
             make -C /work/veracruz/workspaces/icecap-host run-tests
 
-
   nitro:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci-v2
+      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-nitro:ci-v2
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
