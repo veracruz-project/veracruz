@@ -139,7 +139,7 @@ $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 $(OUT_DIR)/single_client_no_debug.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
 	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT)" \
-	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(prog_name)=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT)") \
             --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
 	    $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
