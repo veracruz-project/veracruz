@@ -92,7 +92,7 @@ serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "v
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz", features = ["std"] }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 
 [profile.release]
 lto = true
