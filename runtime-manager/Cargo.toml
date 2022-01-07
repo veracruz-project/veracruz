@@ -89,3 +89,6 @@ wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branc
 
 [profile.release]
 lto = true
+
+[patch.crates-io]
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
