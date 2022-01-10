@@ -1,0 +1,32 @@
+# workspaces/icecap-host/Cargo.toml:
+# Workspace for untrusted IceCap services and tests
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# and copyright information.
+
+cargo-features = ["resolver"]
+
+[workspace]
+members = [
+  "crates/proxy-attestation-server",
+  "crates/veracruz-client",
+  "crates/veracruz-server",
+  "crates/veracruz-server-test",
+  "crates/veracruz-test",
+]
+resolver = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+
+[patch.crates-io]
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
+webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }

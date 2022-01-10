@@ -1,0 +1,42 @@
+# workspaces/host/Cargo.toml:
+# Workspace for locally-run programs
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# and copyright information.
+
+cargo-features = ["resolver"]
+
+[workspace]
+members = [
+  # Data generators
+  "crates/sdk/data-generators/csv-encoder",
+  "crates/sdk/data-generators/idash2017-logistic-regression-generator",
+  "crates/sdk/data-generators/image-processing-generator",
+  "crates/sdk/data-generators/intersection-set-sum-generator",
+  "crates/sdk/data-generators/linear-regression-generator",
+  "crates/sdk/data-generators/moving-average-convergence-divergence-generator",
+  "crates/sdk/data-generators/number-stream-generator",
+  "crates/sdk/data-generators/private-set-intersection-generator",
+  "crates/sdk/data-generators/private-set-intersection-sum-generator",
+  "crates/sdk/data-generators/shamir-secret-sharing",
+  "crates/sdk/data-generators/string-generator",
+
+  "crates/sdk/freestanding-execution-engine",
+  "crates/test-collateral/generate-policy",
+]
+resolver = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+
+[patch.crates-io]
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }

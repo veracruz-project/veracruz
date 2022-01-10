@@ -16,6 +16,7 @@ TARGET_PREFIX = image-processing
 TARGET_DAT = $(addprefix $(TARGET_PREFIX), .png)
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean fmt fmt-check
 
@@ -28,8 +29,8 @@ $(TARGET_DIR_DAT): %.png : $$(notdir $$@) $(TARGET_DIR)
 $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
-$(TARGET_DAT): 
-	cargo run -- --file_prefix $(TARGET_PREFIX) --image_path $(IMAGE_PATH) --width $(WIDTH) --height $(HEIGHT); 
+$(TARGET_DAT):
+	$(RUN_COMMAND) --file_prefix $(TARGET_PREFIX) --image_path $(IMAGE_PATH) --width $(WIDTH) --height $(HEIGHT);
 
 clean:
 	cargo clean

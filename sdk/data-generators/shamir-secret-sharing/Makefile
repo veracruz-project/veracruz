@@ -13,6 +13,7 @@ TARGET_DATS = share-1.dat share-2.dat share-3.dat
 
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean fmt fmt-check
 
@@ -27,7 +28,7 @@ $(TARGET_DIR):
 
 $(TARGET_DATS):
 	$(strip \
-		cargo run -- "Hello World!" -n 3 \
+		$(RUN_COMMAND) "Hello World!" -n 3 \
 		| split -l1 -a1 --numeric-suffixes=1 --additional-suffix=.dat - share- )
 
 clean:

@@ -14,9 +14,9 @@ SIZE = 1000
 DIFF = 250
 TARGET_DATS = $(addprefix $(FILE_PREFIX)-,advertisement-viewer.dat customer.dat)
 SEED = 0
-
 TARGET_DIR = ../../datasets/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean fmt fmt-check
 
@@ -30,7 +30,7 @@ $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)
 
 $(TARGET_DATS) : %.dat : $(SOURCE_FILES) 
-	cargo run -- --file_prefix $(FILE_PREFIX) --size $(SIZE) --num_of_diff $(DIFF) --seed $(SEED)
+	$(RUN_COMMAND) --file_prefix $(FILE_PREFIX) --size $(SIZE) --num_of_diff $(DIFF) --seed $(SEED)
 
 clean:
 	cargo clean

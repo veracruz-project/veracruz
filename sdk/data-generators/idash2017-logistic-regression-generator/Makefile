@@ -28,6 +28,7 @@ GENERATED_DATA_TARGET_DATS = $(addprefix $(GENERATED_DATA_FILE_PREFIX),$(INDICE_
 GENERATED_DATA_TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(GENERATED_DATA_TARGET_DATS))
 SEED = 0
 COMMON_CONFIG =  --fold=$(FOLD) --num_of_iter=$(NUM_ITER) --sigmoid=$(SIGMOID) --gamma_up=$(GAMMA_UP) --gamma_down=$(GAMMA_DOWN) --seed=$(SEED)
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean external fmt fmt-check
 
@@ -38,7 +39,7 @@ $(GENERATED_DATA_TARGET_DIR_DATS): %.dat : $$(notdir $$@) $(TARGET_DIR)
 	cp $< $@ 
 
 $(GENERATED_DATA_TARGET_DATS) : %.dat :
-	cargo run -- $(COMMON_CONFIG) generate --file_prefix=$(GENERATED_DATA_FILE_PREFIX) \
+	$(RUN_COMMAND) $(COMMON_CONFIG) generate --file_prefix=$(GENERATED_DATA_FILE_PREFIX) \
 				--row=$(GENERATED_DATA_ROW) --column=$(GENERATED_DATA_COL)
 
 $(TARGET_DIR):
@@ -54,12 +55,12 @@ $(TARGET_DIR_DATS): %.dat : $$(notdir $$@) $(TARGET_DIR)
 	cp $< $@ 
 
 $(TARGET_DATS) : %.dat : $(SOURCE_FILES) 
-	cargo run -- $(COMMON_CONFIG) external --input_file=edin.txt    --is_label_first=false
-	cargo run -- $(COMMON_CONFIG) external --input_file=idash.txt   --is_label_first=true
-	cargo run -- $(COMMON_CONFIG) external --input_file=lbw.txt     --is_label_first=false 
-	cargo run -- $(COMMON_CONFIG) external --input_file=nhanes3.txt --is_label_first=false 
-	cargo run -- $(COMMON_CONFIG) external --input_file=pcs.txt     --is_label_first=false 
-	cargo run -- $(COMMON_CONFIG) external --input_file=uis.txt     --is_label_first=false 
+	$(RUN_COMMAND) $(COMMON_CONFIG) external --input_file=edin.txt    --is_label_first=false
+	$(RUN_COMMAND) $(COMMON_CONFIG) external --input_file=idash.txt   --is_label_first=true
+	$(RUN_COMMAND) $(COMMON_CONFIG) external --input_file=lbw.txt     --is_label_first=false
+	$(RUN_COMMAND) $(COMMON_CONFIG) external --input_file=nhanes3.txt --is_label_first=false
+	$(RUN_COMMAND) $(COMMON_CONFIG) external --input_file=pcs.txt     --is_label_first=false
+	$(RUN_COMMAND) $(COMMON_CONFIG) external --input_file=uis.txt     --is_label_first=false
 
 clean:
 	cargo clean

@@ -19,6 +19,7 @@ INDICE_SUFFIX = $(addprefix -,$(RANGE_SUFFIX))
 TARGET_DATS = $(foreach base_name,$(BASENAME),$(addprefix $(base_name),$(INDICE_SUFFIX)))
 TARGET_DIR = ../../datasets/private-set-inter-sum/
 TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(TARGET_DATS))
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean fmt fmt-check
 
@@ -30,7 +31,7 @@ $(TARGET_DIR):
 $(TARGET_DIR_DATS) : % : $(TARGET_DIR)
 	echo $@
 	for number in $(RANGE) ; do \
-    	cargo run -- --directory $(TARGET_DIR) --size $$number --num_of_sample $(SAMPLE_NUMBER) --seed 0 ; \
+		$(RUN_COMMAND) --directory $(TARGET_DIR) --size $$number --num_of_sample $(SAMPLE_NUMBER) --seed 0 ; \
 	done
 
 clean:

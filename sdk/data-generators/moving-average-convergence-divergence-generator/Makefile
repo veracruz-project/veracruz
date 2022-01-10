@@ -23,6 +23,7 @@ GENERATED_DATA_FILE_PREFIX = generate
 GENERATED_DATA_TARGET_DATS = $(addprefix $(GENERATED_DATA_FILE_PREFIX),$(INDICE_SUFFIX))
 GENERATED_DATA_TARGET_DIR_DATS = $(addprefix $(TARGET_DIR),$(GENERATED_DATA_TARGET_DATS))
 SEED = 0
+RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean external quick-clean fmt fmt-check
 
@@ -34,7 +35,7 @@ $(GENERATED_DATA_TARGET_DIR_DATS): %.dat : $$(notdir $$@) $(TARGET_DIR)
 
 $(GENERATED_DATA_TARGET_DATS) : %.dat :
 	for number in $(RANGE) ; do \
-    	cargo run -- generate --file_prefix $(GENERATED_DATA_FILE_PREFIX) --size $$number --seed $(SEED); \
+		$(RUN_COMMAND) generate --file_prefix $(GENERATED_DATA_FILE_PREFIX) --size $$number --seed $(SEED); \
 	done
 
 $(TARGET_DIR):
@@ -48,7 +49,7 @@ $(TARGET_DIR_DATS): %.dat : $$(notdir $$@) $(TARGET_DIR)
 
 $(TARGET_DATS) : %.dat : $(SOURCE_FILES) 
 	for number in $(RANGE) ; do \
-    	cargo run -- external --input_file $< --size $$number ; \
+		$(RUN_COMMAND) external --input_file $< --size $$number ; \
 	done
 
 clean:

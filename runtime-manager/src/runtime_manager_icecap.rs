@@ -14,22 +14,20 @@ extern crate alloc;
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 
-use icecap_wrapper::{
-    icecap_core::{
-        config::RingBufferConfig,
-        config::RingBufferKicksConfig,
-        finite_set::Finite,
-        logger::{DisplayMode, Level, Logger},
-        prelude::*,
-        rpc_sel4::RPCClient,
-        runtime as icecap_runtime,
-    },
-    icecap_event_server_types::{
-        calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
-    },
-    icecap_start_generic::declare_generic_main,
-    icecap_std_external,
+use icecap_core::{
+    config::RingBufferConfig,
+    config::RingBufferKicksConfig,
+    finite_set::Finite,
+    logger::{DisplayMode, Level, Logger},
+    prelude::*,
+    rpc_sel4::RPCClient,
+    runtime as icecap_runtime,
 };
+use icecap_event_server_types::{
+    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
+};
+use icecap_start_generic::declare_generic_main;
+use icecap_std_external;
 
 use veracruz_utils::platform::icecap::message::{Error, Request, Response};
 
