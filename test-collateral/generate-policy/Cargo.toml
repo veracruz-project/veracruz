@@ -17,4 +17,4 @@ ring = "0.16.11"
 serde = { version = "1.0.115", features = ["std"] }
 serde_json = { version = "1.0", features = ["std"] }
 veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
-wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }

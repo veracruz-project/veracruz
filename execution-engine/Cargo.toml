@@ -10,7 +10,6 @@ default = []
 icecap = [
   "platform-services/icecap",
   "policy-utils/icecap",
-  "wasi-types",
 ]
 nitro = [
   "platform-services/nitro",
@@ -39,8 +38,8 @@ policy-utils = { path = "../policy-utils" }
 ring = { version = "0.16.11", optional = true }
 serde = { version = "1.0.115", features = ["derive"] }
 typetag = "=0.1.6"
-wasi-types = { git = "https://github.com/mathias-arm/wasi-types.git", branch = "veracruz" }
-wasmi = { git = "https://github.com/mathias-arm/wasmi.git", branch = "workspace" }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 wasmtime = { version = "0.27", optional = true }
 wast = "35.0.0"
 
