@@ -1,4 +1,4 @@
-# Veracruz on IceCap (WIP)
+# Veracruz on IceCap
 
 IceCap: https://gitlab.com/arm-research/security/icecap/icecap
 
@@ -27,6 +27,8 @@ make clean
 make test-system ICECAP_PLAT=rpi4
 ls -L ./build/test-system/boot/
 ```
+
+After you've booted the board to a shell from the boot directory mentioned above, run the script `/run-tests` to run all tests. See `./nix/host/config.nix` or inspect `/run-tests` to discover how to test with more precision.
 
 For more detailed information about supported Raspberry Pi 4 variants and about running the test system contained in `./build/test-system/boot/`, see https://gitlab.com/arm-research/security/icecap/icecap.
 
