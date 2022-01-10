@@ -7,7 +7,7 @@ version = "0.3.0"
 
 [features]
 icecap = ["ring"]
-std = ["serde/std", "serde_json/std", "ring", "x509-parser", "rustls", "wasi-types/std"]
+std = ["serde/std", "serde_json/std", "ring", "x509-parser", "rustls"]
 
 [dependencies]
 err-derive = { version = "0.2", default-features = false }

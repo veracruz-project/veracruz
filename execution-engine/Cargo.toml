@@ -7,21 +7,26 @@ version = "0.3.0"
 
 [features]
 default = []
-# NOTE: Introduce non_sgx in the dependencies to deal with sgx-related modification.
-icecap = ["platform-services/icecap", "policy-utils/icecap", "wasmi/non_sgx"]
-nitro = ["platform-services/nitro", "policy-utils/std", "wasmtime", "wasi-types/std"]
-std = [
-  "wasmi/non_sgx",
-  "platform-services/std",
-  "wasmtime",
+icecap = [
+  "platform-services/icecap",
+  "policy-utils/icecap",
+]
+nitro = [
+  "platform-services/nitro",
   "policy-utils/std",
-  "wasi-types/std"
+  "wasmtime",
+]
+std = [
+  "platform-services/std",
+  "policy-utils/std",
+  "wasmtime",
 ]
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
 byteorder = "1.4.3"
 cfg-if = "1"
+ctor = "=0.1.16"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 num = { version = "0.4", default-features = false }
@@ -30,7 +35,7 @@ num-traits = { version = "0.2", default-features = false }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
-typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz" }
+typetag = "=0.1.6"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
@@ -41,4 +46,4 @@ name = "execution_engine"
 path = "./src/lib.rs"
 
 [patch.crates-io]
-serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
+serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
