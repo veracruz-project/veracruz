@@ -51,3 +51,6 @@ icecap-clean:
 shared-clean:
 	$(MAKE) -C applications clean
 	$(MAKE) -C host clean
+
+clean-cargo-lock:
+	rm -f */Cargo.lock

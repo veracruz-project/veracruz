@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean default nitro test-collateral
+.PHONY: all clean clean-cargo-lock default doc fmt nitro test-collateral
 
 default: all
 
@@ -48,6 +48,15 @@ target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: Cargo
 	cargo build --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) --features nitro \
 	  -p runtime_manager_enclave --verbose
 
+doc:
+	cargo doc
+
+fmt:
+	cargo fmt
+
 clean:
 	@cargo clean
 	@rm -f css-nitro.bin PCR0
+
+clean-cargo-lock:
+	rm -f Cargo.lock

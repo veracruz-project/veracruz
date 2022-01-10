@@ -108,6 +108,18 @@ clean:
 		$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -f test.mk clean' ; \
 	fi
 
+.PHONY: clean-cargo-lock
+clean-cargo-lock:
+	rm -f Cargo.lock
+
+.PHONY: doc
+doc:
+	cargo doc
+
+.PHONY: fmt
+fmt:
+	cargo fmt
+
 # This is a bit heavy-handed, but useful for achieving a clean slate for 'sdk' and 'test-collateral'
 .PHONY: deep-clean
 deep-clean: clean

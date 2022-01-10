@@ -9,7 +9,7 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all doc clean fmt
+.PHONY: all clean clean-cargo-lock doc fmt
 
 WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
@@ -26,3 +26,6 @@ fmt:
 
 clean:
 	cargo clean
+
+clean-cargo-lock:
+	rm -f Cargo.lock

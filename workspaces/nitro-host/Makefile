@@ -9,8 +9,8 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build doc clean fmt \
-	test-collateral test-dependencies test-server test-client veracruz-test
+.PHONY: all build clean clean-cargo-lock doc fmt \
+	test-client test-collateral test-dependencies test-server veracruz-test
 
 default: build
 
@@ -72,3 +72,6 @@ fmt:
 clean:
 	cargo clean
 	rm -rf $(OUT_DIR)
+
+clean-cargo-lock:
+	rm -f Cargo.lock

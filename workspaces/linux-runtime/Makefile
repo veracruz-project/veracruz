@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean linux
+.PHONY: all clean clean-cargo-lock doc fmt linux
 
 default: all
 
@@ -35,6 +35,15 @@ target/$(PROFILE_PATH)/runtime_manager_enclave target/$(PROFILE_PATH)/linux-root
 css-linux.bin: target/$(PROFILE_PATH)/runtime_manager_enclave
 	cp $< $@
 
+doc:
+	cargo doc
+
+fmt:
+	cargo fmt
+
 clean:
 	@cargo clean
 	@rm -f css-linux.bin
+
+clean-cargo-lock:
+	rm -f Cargo.lock

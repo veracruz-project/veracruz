@@ -50,6 +50,18 @@ sysroot:
 clean:
 	rm -rf $(build_dir)
 
+.PHONY: clean-cargo-lock
+clean-cargo-lock:
+	rm -f Cargo.lock
+
+.PHONY: doc
+doc:
+	cargo doc
+
+.PHONY: fmt
+fmt:
+	cargo fmt
+
 # This is a bit heavy-handed, but useful for achieving a clean slate for 'sdk' and 'test-collateral'
 .PHONY: deep-clean
 deep-clean: clean
