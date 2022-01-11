@@ -21,4 +21,5 @@ in lib.flip lib.mapAttrs veracruz (_plat: attrs: {
   test-collateral = attrs.env.sdk-and-test-collateral;
   test-system = attrs.runManual;
   run-tests = attrs.runTests;
+  veracruz-server = attrs.env.veracruz-server;
 })

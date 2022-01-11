@@ -105,6 +105,9 @@ in lib.fix (self: with self; {
       callRealm = configured.callPackage ./env/realm-generic.nix {
         inherit libc-supplement kebabToCaml;
       };
+      callHost = pkgs.linux.icecap.callPackage ./env/host-generic.nix {
+        inherit kebabToCaml;
+      };
     in {
       runtime-manager = callRealm {
         name = "runtime-manager";
@@ -123,6 +126,11 @@ in lib.fix (self: with self; {
         name = "veracruz-test";
       };
       sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
+      veracruz-server = callHost {
+        name = "veracruz-server";
+        path = ../../veracruz-server;
+        features = [ "icecap" "cli" ];
+      };
     };
 
   libc-supplement = configured.libs.mk {
