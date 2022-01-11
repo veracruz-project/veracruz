@@ -26,8 +26,8 @@ jobs:
       - name: Running linux test script
         id: linux-build-and-test
         run: |
-            make -C /work/veracruz/workspaces linux
-            make -C /work/veracruz/workspaces/linux-host test-client test-server veracruz-test
+            make -C /work/veracruz/workspaces linux PROFILE=dev
+            make -C /work/veracruz/workspaces/linux-host test-client test-server veracruz-test PROFILE=dev
 
   icecap:
     runs-on: ubuntu-latest
@@ -59,4 +59,4 @@ jobs:
       - name: Running Nitro test script
         id: nitro-build
         run: |
-            make -C /work/veracruz/workspaces nitro
+            make -C /work/veracruz/workspaces nitro PROFILE=dev
