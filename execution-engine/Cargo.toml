@@ -35,6 +35,7 @@ num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
+psa-crypto = { path = "../third-party/rust-psa-crypto/psa-crypto" }
 ring = { version = "0.16.11", optional = true }
 serde = { version = "1.0.115", features = ["derive"] }
 typetag = "=0.1.6"

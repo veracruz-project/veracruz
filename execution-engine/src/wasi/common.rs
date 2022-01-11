@@ -26,6 +26,7 @@ use crate::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
+use psa_crypto;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData, mem,
@@ -153,6 +154,7 @@ impl TryFrom<&str> for WasiAPIName {
 #[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
 pub enum VeracruzAPIName {
     FD_CREATE,
+    TEST_PSA_CRYPTO,
 }
 
 impl TryFrom<&str> for VeracruzAPIName {
@@ -160,6 +162,7 @@ impl TryFrom<&str> for VeracruzAPIName {
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let rst = match s {
             "fd_create" => VeracruzAPIName::FD_CREATE,
+            "test_psa_crypto" => VeracruzAPIName::TEST_PSA_CRYPTO,
             _otherwise => return Err(()),
         };
         Ok(rst)
@@ -1952,6 +1955,56 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let new_fd = self.filesystem.fd_create()?;
         memory_ref.write_u32(address, new_fd.into())
+    }
+
+    // This example is copied from rust-psa-crypto/.../asym_signature.rs.
+    fn test_signing(&self) {
+        use psa_crypto::operations::asym_signature::sign_hash;
+        use psa_crypto::operations::key_management::generate;
+        use psa_crypto::types::algorithm::{AsymmetricSignature, Hash};
+        use psa_crypto::types::key::{Attributes, Lifetime, Policy, Type, UsageFlags};
+        let mut usage_flags: UsageFlags = Default::default();
+        usage_flags.set_sign_hash().set_verify_hash();
+        let mut attributes = Attributes {
+            key_type: Type::RsaKeyPair,
+            bits: 1024,
+            lifetime: Lifetime::Volatile,
+            policy: Policy {
+                usage_flags,
+                permitted_algorithms: AsymmetricSignature::RsaPkcs1v15Sign {
+                    hash_alg: Hash::Sha256.into(),
+                }
+                .into(),
+            },
+        };
+        const HASH: [u8; 32] = [
+            0x69, 0x3E, 0xDB, 0x1B, 0x22, 0x79, 0x03, 0xF4, 0xC0, 0xBF, 0xD6, 0x91, 0x76, 0x37,
+            0x84, 0xA2, 0x94, 0x8E, 0x92, 0x50, 0x35, 0xC2, 0x8C, 0x5C, 0x3C, 0xCA, 0xFE, 0x18,
+            0xE8, 0x81, 0x37, 0x78,
+        ];
+        psa_crypto::init().unwrap();
+        let my_key = generate(attributes, None).unwrap();
+        let alg = AsymmetricSignature::RsaPkcs1v15Sign {
+            hash_alg: Hash::Sha256.into(),
+        };
+        let buffer_size = attributes.sign_output_size(alg).unwrap();
+        let mut signature = vec![0; buffer_size];
+
+        let size = sign_hash(my_key, alg, &HASH, &mut signature).unwrap();
+        signature.resize(size, 0);
+    }
+
+    /// This function, tests that we can initialise psa-crypto.
+    pub(crate) fn test_psa_crypto<T: MemoryHandler>(
+        &mut self,
+        _memory_ref: &mut T,
+    ) -> FileSystemResult<()> {
+        eprintln!("xx about to call psa_crypto::init()");
+        psa_crypto::init().unwrap();
+        eprintln!("xx just called psa_crypto::init()");
+        self.test_signing();
+        eprintln!("xx finished test_signing()");
+        Ok(())
     }
 
     ///////////////////////////////////////

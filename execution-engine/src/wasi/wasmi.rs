@@ -403,6 +403,7 @@ impl TypeCheck {
             },
             APIName::VeracruzAPIName(index) => match index {
                 VeracruzAPIName::FD_CREATE => vec![Self::POINTER],
+                VeracruzAPIName::TEST_PSA_CRYPTO => vec![],
             },
         }
     }
@@ -574,6 +575,7 @@ impl Externals for WASMIRuntimeState {
             },
             APIName::VeracruzAPIName(veracruz_call_index) => match veracruz_call_index {
                 VeracruzAPIName::FD_CREATE => self.veracruz_fd_create(args),
+                VeracruzAPIName::TEST_PSA_CRYPTO => self.veracruz_test_psa_crypto(args),
             },
         }?;
         Ok(Some(RuntimeValue::I32((return_code as i16).into())))
@@ -1288,6 +1290,10 @@ impl WASMIRuntimeState {
     fn veracruz_fd_create(&mut self, args: RuntimeArgs) -> WasiResult {
         let address = args.nth_checked::<u32>(0)?;
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
+    }
+
+    fn veracruz_test_psa_crypto(&mut self, _args: RuntimeArgs) -> WasiResult {
+        Self::convert_to_errno(self.vfs.test_psa_crypto(&mut self.memory()?))
     }
 }
 
