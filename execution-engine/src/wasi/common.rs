@@ -26,6 +26,7 @@ use crate::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
+use psa_crypto;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData, mem,
@@ -153,6 +154,7 @@ impl TryFrom<&str> for WasiAPIName {
 #[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
 pub enum VeracruzAPIName {
     FD_CREATE,
+    TEST_PSA_CRYPTO,
 }
 
 impl TryFrom<&str> for VeracruzAPIName {
@@ -160,6 +162,7 @@ impl TryFrom<&str> for VeracruzAPIName {
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let rst = match s {
             "fd_create" => VeracruzAPIName::FD_CREATE,
+            "test_psa_crypto" => VeracruzAPIName::TEST_PSA_CRYPTO,
             _otherwise => return Err(()),
         };
         Ok(rst)
@@ -1952,6 +1955,17 @@ impl WasiWrapper {
     ) -> FileSystemResult<()> {
         let new_fd = self.filesystem.fd_create()?;
         memory_ref.write_u32(address, new_fd.into())
+    }
+
+    /// This function, tests that we can initialise psa-crypto.
+    pub(crate) fn test_psa_crypto<T: MemoryHandler>(
+        &mut self,
+        _memory_ref: &mut T,
+    ) -> FileSystemResult<()> {
+        eprintln!("xx about to call psa_crypto::init()");
+        psa_crypto::init().unwrap();
+        eprintln!("xx just called psa_crypto::init()");
+        Ok(())
     }
 
     ///////////////////////////////////////

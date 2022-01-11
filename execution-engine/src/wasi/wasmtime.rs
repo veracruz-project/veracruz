@@ -314,6 +314,9 @@ impl WasmtimeRuntimeState {
                             VeracruzAPIName::FD_CREATE => {
                                 Func::wrap(&store, Self::veracruz_si_fd_create)
                             }
+                            VeracruzAPIName::TEST_PSA_CRYPTO => {
+                                Func::wrap(&store, Self::veracruz_si_test_psa_crypto)
+                            }
                         };
                     exports.push(Extern::Func(host_call_body))
                 }
@@ -851,6 +854,11 @@ impl WasmtimeRuntimeState {
     fn veracruz_si_fd_create(mut caller: Caller, address: u32) -> u32 {
         let mut vfs = lock_vfs!();
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
+    }
+
+    fn veracruz_si_test_psa_crypto(mut caller: Caller) -> u32 {
+        let mut vfs = lock_vfs!();
+        Self::convert_to_errno(vfs.test_psa_crypto(&mut caller))
     }
 }
 

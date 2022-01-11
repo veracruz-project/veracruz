@@ -27,6 +27,11 @@ anyhow = { version = "1.0", default-features = false }
 byteorder = "1.4.3"
 cfg-if = "1"
 ctor = "=0.1.16"
+# cmake is not a dependency of this crate, but we have to stop cmake 0.1.46,
+# which needs a newer version of cmake (one that accepts --parallel) than
+# the one which comes with Ubuntu 18.04.5, currently used by our CI tests,
+# from being picked up by psa-crypto-sys.
+cmake = "<0.1.46"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 num = { version = "0.4", default-features = false }
@@ -34,6 +39,7 @@ num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
+psa-crypto = { git = "https://github.com/egrimley-arm/rust-psa-crypto.git", branch = "veracruz" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 typetag = "=0.1.6"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
