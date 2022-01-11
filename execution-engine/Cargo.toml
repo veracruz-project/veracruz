@@ -34,6 +34,7 @@ num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
+psa-crypto = { path = "../rust-psa-crypto/psa-crypto" }
 serde = { git = "https://github.com/veracruz-project/serde.git", features = ["derive"], branch = "veracruz" }
 typetag = "=0.1.6"
 wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
