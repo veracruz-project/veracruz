@@ -40,7 +40,7 @@ serde = { git = "https://github.com/veracruz-project/serde.git", features = ["de
 sgx_alloc = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
 sgx_tstd = { branch = "veracruz", git = "https://github.com/veracruz-project/incubator-teaclave-sgx-sdk.git", optional = true }
 typetag = { git = "https://github.com/veracruz-project/typetag.git", branch = "veracruz" }
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", rev = "d1804374ad55c05ee1bbb33a9acba5bbec5af39f" }
 wasmi = { git = "https://github.com/veracruz-project/wasmi.git", branch = "veracruz" }
 wasmtime = { git = "https://github.com/veracruz-project/wasmtime.git", branch = "veracruz", optional = true }
 wast = "=35.0.0"
