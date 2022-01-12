@@ -25,6 +25,9 @@ let
     veracruz-server = ../build/veracruz-server/out/veracruz-server;
     proxy-attestation-server = ../build/proxy-attestation-server/out/proxy-attestation-server;
     veracruz-client = ../build/veracruz-client/out/veracruz-client;
+    vc-server = ../build/veracruz-server/out/veracruz-server;
+    vc-pas = ../build/proxy-attestation-server/out/proxy-attestation-server;
+    vc-client = ../build/veracruz-client/out/veracruz-client;
   };
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
