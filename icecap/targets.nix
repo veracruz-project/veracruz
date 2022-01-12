@@ -22,4 +22,5 @@ in lib.flip lib.mapAttrs veracruz (_plat: attrs: {
   test-system = attrs.runManual;
   run-tests = attrs.runTests;
   veracruz-server = attrs.env.veracruz-server;
+  run-server = attrs.runServer;
 })

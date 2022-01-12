@@ -22,6 +22,7 @@ let
   testElf = {
     veracruz-server-test = ../build/veracruz-server-test/out/veracruz-server-test;
     veracruz-test = ../build/veracruz-test/out/veracruz-test;
+    veracruz-server = ../build/veracruz-server/out/veracruz-server;
   };
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
@@ -213,4 +214,28 @@ in lib.fix (self: with self; {
       echo PASS
   '';
 
+  runServer = pkgs.dev.writeScript "run-server.sh" ''
+    #!${pkgs.dev.runtimeShell}
+    set -e
+
+    cleanup() {
+      kill $(jobs -p)
+    }
+
+    trap "exit" INT TERM
+    trap "cleanup" EXIT
+
+    ${runAuto}/run < /dev/null &
+
+    ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
+
+    ${pkgs.dev.openssh}/bin/ssh \
+      -o UserKnownHostsFile=/dev/null \
+      -o StrictHostKeyChecking=no \
+      -o Preferredauthentications=publickey \
+      -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
+      /run-server
+
+      echo done
+  '';
 })

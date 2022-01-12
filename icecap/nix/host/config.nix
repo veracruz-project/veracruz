@@ -58,6 +58,13 @@ let
       $test_cmd --test-threads=1 --nocapture --show-output "$@"
   '';
 
+  runServer = pkgs.writeScript "run-server.sh" ''
+    #!${config.build.extraUtils}/bin/sh
+    set -euv
+
+    veracruz-server --help
+  '';
+
 in {
   config = lib.mkMerge [
 
@@ -101,6 +108,7 @@ in {
 
         ln -s ${runTest} /run-test
         ln -s ${runTests} /run-tests
+        ln -s ${runServer} /run-server
 
         . ${testEnv}
         mkdir ${testDir}

@@ -8,6 +8,7 @@
 # and copyright information.
 
 ICECAP_PLAT ?= virt
+POLICY_FILE ?= policy.json
 
 build_dir := build
 test_system := $(build_dir)/test-system
@@ -51,6 +52,10 @@ veracruz-server-test:
 
 .PHONY: veracruz-test
 veracruz-test:
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
+
+.PHONY: veracruz-server
+veracruz-server:
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
 
 .PHONY: sdk
@@ -97,6 +102,10 @@ run-tests-stale-test-collateral: set-key-permissions $(now) runtime-manager runt
 .PHONY: run-tests-stale
 run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager runtime-manager-supervisor veracruz-server-test veracruz-test test-collateral
 	$(run_tests_body)
+
+.PHONY: run-server
+run-server: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server
+	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-server --no-out-link) && eval $$script
 
 # Clean everything specific to the IceCap build, all of which is contained in this ./icecap directory
 .PHONY: clean

@@ -876,6 +876,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
 dependencies = [
+ "num-bigint 0.4.3",
  "num-complex",
  "num-integer 0.1.44",
  "num-iter",
@@ -898,6 +899,17 @@ name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-integer 0.1.44",
+ "num-traits 0.2.14",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
 dependencies = [
  "autocfg 1.0.1",
  "num-integer 0.1.44",
@@ -972,6 +984,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d41702bd167c2df5520b384281bc111a4b5efcf7fbc4c9c222c815b07e0a6a6a"
 dependencies = [
  "autocfg 1.0.1",
+ "num-bigint 0.4.3",
  "num-integer 0.1.44",
  "num-traits 0.2.14",
 ]
@@ -1154,17 +1167,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba508cc11742c0dc5c1659771673afbab7a0efab23aa17e854cbab0837ed0b43"
 dependencies = [
  "unicode-xid 0.2.2",
-]
-
-[[package]]
-name = "proper"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f8341cc405296a2a6772633967b7e1da9a3d803a60de7ad8d600c07746b7171"
-dependencies = [
- "proc-macro2 1.0.32",
- "quote 1.0.10",
- "syn 1.0.81",
 ]
 
 [[package]]
@@ -1697,11 +1699,13 @@ checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
 [[package]]
 name = "wasi-types"
 version = "0.1.6"
-source = "git+https://github.com/veracruz-project/wasi-types.git?branch=veracruz#c770d3d4d6a41bca23ccefac01d9b9e69b931513"
+source = "git+https://github.com/veracruz-project/wasi-types.git?rev=d1804374ad55c05ee1bbb33a9acba5bbec5af39f#d1804374ad55c05ee1bbb33a9acba5bbec5af39f"
 dependencies = [
  "bitflags",
  "err-derive",
- "proper",
+ "num",
+ "num-derive",
+ "num-traits 0.2.14",
  "serde 1.0.115",
 ]
 

@@ -17,7 +17,7 @@ pinecone = "0.2.3"
 policy-utils = { path = "../../policy-utils", features = ["std"] }
 serde = { version = "1.0.103", features = ["derive"] }
 toml = "0.5.5"
-wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", branch = "veracruz" }
+wasi-types = { git = "https://github.com/veracruz-project/wasi-types.git", rev = "d1804374ad55c05ee1bbb33a9acba5bbec5af39f" }
 wast = "=35.0.0"
 wat = "<1.0.38"
 
