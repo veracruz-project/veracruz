@@ -255,6 +255,31 @@ in lib.fix (self: with self; {
       echo done
   '';
 
+  runQuickstart = pkgs.dev.writeScript "run-quickstart.sh" ''
+    #!${pkgs.dev.runtimeShell}
+    set -e
+
+    cleanup() {
+      kill $(jobs -p)
+    }
+
+    trap "exit" INT TERM
+    trap "cleanup" EXIT
+
+    ${runAuto}/run < /dev/null &
+
+    ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
+
+    ${pkgs.dev.openssh}/bin/ssh \
+      -o UserKnownHostsFile=/dev/null \
+      -o StrictHostKeyChecking=no \
+      -o Preferredauthentications=publickey \
+      -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
+      /run-quickstart
+
+      echo done
+  '';
+
   runBench = pkgs.dev.writeScript "run-bench.sh" ''
     #!${pkgs.dev.runtimeShell}
     set -e

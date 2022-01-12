@@ -65,6 +65,64 @@ let
     veracruz-server --help
   '';
 
+  runQuickstart = pkgs.writeScript "run-quickstart.sh" ''
+    #!${config.build.extraUtils}/bin/sh
+    set -euv
+
+    . ${testEnv}
+    
+    vc-pas :3010 \
+        --database-url="$VERACRUZ_DATABASE_URL" \
+        --ca-cert="$VERACRUZ_TEST_COLLATERAL/CACert.pem" \
+        --ca-key="$VERACRUZ_TEST_COLLATERAL/CAKey.pem" &
+    sleep 2
+
+    VERACRUZ_ICECAP_REALM_ID=0 \
+    VERACRUZ_ICECAP_REALM_SPEC=$VERACRUZ_REALM_SPEC \
+    VERACRUZ_ICECAP_REALM_ENDPOINT=/dev/icecap_channel_realm_$VERACRUZ_ICECAP_REALM_ID \
+      vc-server "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" &
+    sleep 2
+
+    # send program
+    vc-client "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" \
+      --identity "$VERACRUZ_TEST_COLLATERAL/program_client_cert.pem" \
+      --key "$VERACRUZ_TEST_COLLATERAL/program_client_key.pem" \
+      --program /program/shamir-secret-sharing.wasm="$VERACRUZ_TEST_COLLATERAL/shamir-secret-sharing.wasm"
+
+    # send data
+    xxd -r -p "$VERACRUZ_TEST_COLLATERAL/share-1.dat" > share-0.dat
+    vc-client "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" \
+      --identity "$VERACRUZ_TEST_COLLATERAL/data_client_cert.pem" \
+      --key "$VERACRUZ_TEST_COLLATERAL/data_client_key.pem" \
+      --data /input/shamir-0.dat=share-0.dat
+
+    xxd -r -p "$VERACRUZ_TEST_COLLATERAL/share-2.dat" > share-1.dat
+    vc-client "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" \
+      --identity "$VERACRUZ_TEST_COLLATERAL/data_client_cert.pem" \
+      --key "$VERACRUZ_TEST_COLLATERAL/data_client_key.pem" \
+      --data /input/shamir-1.dat=share-1.dat
+
+    xxd -r -p "$VERACRUZ_TEST_COLLATERAL/share-3.dat" > share-2.dat
+    vc-client "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" \
+      --identity "$VERACRUZ_TEST_COLLATERAL/data_client_cert.pem" \
+      --key "$VERACRUZ_TEST_COLLATERAL/data_client_key.pem" \
+      --data /input/shamir-2.dat=share-2.dat
+
+    # compute
+    vc-client "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" \
+      --identity "$VERACRUZ_TEST_COLLATERAL/program_client_cert.pem" \
+      --key "$VERACRUZ_TEST_COLLATERAL/program_client_key.pem" \
+      --compute /program/shamir-secret-sharing.wasm
+
+    # request result
+    vc-client "$VERACRUZ_TEST_COLLATERAL/triple_policy_1.json" \
+      --identity "$VERACRUZ_TEST_COLLATERAL/result_client_cert.pem" \
+      --key "$VERACRUZ_TEST_COLLATERAL/result_client_key.pem" \
+      --result /output/shamir.dat=-
+
+    echo
+  '';
+
   runBench = pkgs.writeScript "run-bench.sh" ''
     #!${config.build.extraUtils}/bin/sh
     set -euv
@@ -167,6 +225,7 @@ in {
         ln -s ${runTest} /run-test
         ln -s ${runTests} /run-tests
         ln -s ${runServer} /run-server
+        ln -s ${runQuickstart} /run-quickstart
         ln -s ${runBench} /run-bench
 
         . ${testEnv}
