@@ -58,6 +58,14 @@ veracruz-test:
 veracruz-server:
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
 
+.PHONY: proxy-attestation-server
+proxy-attestation-server:
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
+
+.PHONY: veracruz-client
+veracruz-client:
+	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run build
+
 .PHONY: sdk
 sdk:
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).$@ --run "make -C ../sdk"
@@ -106,6 +114,10 @@ run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-ma
 .PHONY: run-server
 run-server: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server
 	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-server --no-out-link) && eval $$script
+
+.PHONY: run-bench
+run-bench: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server proxy-attestation-server veracruz-client
+	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-bench --no-out-link) && eval $$script
 
 # Clean everything specific to the IceCap build, all of which is contained in this ./icecap directory
 .PHONY: clean

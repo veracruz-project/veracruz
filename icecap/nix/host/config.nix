@@ -65,6 +65,21 @@ let
     veracruz-server --help
   '';
 
+  runBench = pkgs.writeScript "run-bench.sh" ''
+    #!${config.build.extraUtils}/bin/sh
+    set -euv
+
+    . ${testEnv}
+
+    echo $VERACRUZ_REALM_SPEC
+    echo $VERACRUZ_TEST_COLLATERAL
+    echo $VERACRUZ_DATABASE_URL
+    
+    proxy-attestation-server --help
+    veracruz-server --help
+    veracruz-client --help
+  '';
+
 in {
   config = lib.mkMerge [
 
@@ -109,6 +124,7 @@ in {
         ln -s ${runTest} /run-test
         ln -s ${runTests} /run-tests
         ln -s ${runServer} /run-server
+        ln -s ${runBench} /run-bench
 
         . ${testEnv}
         mkdir ${testDir}

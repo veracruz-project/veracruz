@@ -22,5 +22,8 @@ in lib.flip lib.mapAttrs veracruz (_plat: attrs: {
   test-system = attrs.runManual;
   run-tests = attrs.runTests;
   veracruz-server = attrs.env.veracruz-server;
+  proxy-attestation-server = attrs.env.proxy-attestation-server;
+  veracruz-client = attrs.env.veracruz-client;
   run-server = attrs.runServer;
+  run-bench = attrs.runBench;
 })

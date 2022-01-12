@@ -23,6 +23,8 @@ let
     veracruz-server-test = ../build/veracruz-server-test/out/veracruz-server-test;
     veracruz-test = ../build/veracruz-test/out/veracruz-test;
     veracruz-server = ../build/veracruz-server/out/veracruz-server;
+    proxy-attestation-server = ../build/proxy-attestation-server/out/proxy-attestation-server;
+    veracruz-client = ../build/veracruz-client/out/veracruz-client;
   };
 
   proxyAttestationServerTestDatabase = ../../test-collateral/proxy-attestation-server.db;
@@ -127,9 +129,20 @@ in lib.fix (self: with self; {
         name = "veracruz-test";
       };
       sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
+
       veracruz-server = callHost {
         name = "veracruz-server";
         path = ../../veracruz-server;
+        features = [ "icecap" "cli" ];
+      };
+      proxy-attestation-server = callHost {
+        name = "proxy-attestation-server";
+        path = ../../proxy-attestation-server;
+        features = [ "icecap" "cli" ];
+      };
+      veracruz-client = callHost {
+        name = "veracruz-client";
+        path = ../../veracruz-client;
         features = [ "icecap" "cli" ];
       };
     };
@@ -235,6 +248,31 @@ in lib.fix (self: with self; {
       -o Preferredauthentications=publickey \
       -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
       /run-server
+
+      echo done
+  '';
+
+  runBench = pkgs.dev.writeScript "run-bench.sh" ''
+    #!${pkgs.dev.runtimeShell}
+    set -e
+
+    cleanup() {
+      kill $(jobs -p)
+    }
+
+    trap "exit" INT TERM
+    trap "cleanup" EXIT
+
+    ${runAuto}/run < /dev/null &
+
+    ${pkgs.dev.netcat}/bin/nc -l ${readyPort} < /dev/null
+
+    ${pkgs.dev.openssh}/bin/ssh \
+      -o UserKnownHostsFile=/dev/null \
+      -o StrictHostKeyChecking=no \
+      -o Preferredauthentications=publickey \
+      -i ${toString tokenSshKeyPriv} root@localhost -p ${sshPort} \
+      /run-bench
 
       echo done
   '';
