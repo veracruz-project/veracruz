@@ -50,7 +50,11 @@ fn read_cntvct_el0() -> u64 {
 
 /// Returns the clock resolution in nanoseconds.
 pub fn platform_getclockres(_clock_id: u8) -> Result<u64> {
-    Result::Success(1)
+    let freq = read_cntfrq_el0() as u64;
+
+    // precision is the same as asking how many nanoseconds
+    // pass in one tick
+    Result::Success(1_000_000_000*1 / freq)
 }
 
 /// Returns the clock time in nanoseconds.
