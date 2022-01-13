@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()>  {
     let now = Instant::now();
     let rst : Vec<T3> = from_bytes(&input)?;
     let rst = serde_json::to_string(&rst)?;
-    fs::write("/output/json_string.txt", rst)?;
+    fs::write("/output/pinecone_wasm.txt", rst)?;
     println!("time: {} ms", now.elapsed().as_micros());
     Ok(())
 }

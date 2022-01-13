@@ -56,7 +56,7 @@ struct T3 {
 fn main() {
     let mut rng = rand::thread_rng();
     let mut t3_array = Vec::new();
-    for _ in 0..10000 {
+    for _ in 0..1_000_000 {
         t3_array.push(gen_t3(&mut rng));
     }
 
