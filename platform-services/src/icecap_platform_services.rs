@@ -26,12 +26,39 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> Result<()> {
     Result::Success(())
 }
 
+
+// read hardware registers for freq and time info
+#[allow(deprecated)]
+#[inline(never)]
+fn read_cntfrq_el0() -> u32 {
+    unsafe {
+        let mut r: u32;
+        llvm_asm!("mrs $0, cntfrq_el0" : "=r"(r));
+        r
+    }
+}
+
+#[allow(deprecated)]
+#[inline(never)]
+fn read_cntvct_el0() -> u64 {
+    unsafe {
+        let mut r: u64;
+        llvm_asm!("mrs $0, cntvct_el0" : "=r"(r));
+        r
+    }
+}
+
 /// Returns the clock resolution in nanoseconds.
 pub fn platform_getclockres(_clock_id: u8) -> Result<u64> {
-    Result::Unavailable
+    Result::Success(1)
 }
 
 /// Returns the clock time in nanoseconds.
 pub fn platform_getclocktime(_clock_id: u8) -> Result<u64> {
-    Result::Unavailable
+    let freq = read_cntfrq_el0() as u64;
+    let t = read_cntvct_el0();
+
+    // returning time in nanoseconds
+    Result::Success(1_000_000_000*t / freq)
 }
+

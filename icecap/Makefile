@@ -116,11 +116,11 @@ run-server: set-key-permissions $(now) runtime-manager runtime-manager-superviso
 	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-server --no-out-link) && eval $$script
 
 .PHONY: run-quickstart
-run-quickstart: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server
+run-quickstart: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server test-collateral
 	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-quickstart --no-out-link) && eval $$script
 
 .PHONY: run-bench
-run-bench: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server proxy-attestation-server veracruz-client
+run-bench: set-key-permissions $(now) runtime-manager runtime-manager-supervisor veracruz-server proxy-attestation-server veracruz-client test-collateral
 	script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-bench --no-out-link) && eval $$script
 
 # Clean everything specific to the IceCap build, all of which is contained in this ./icecap directory

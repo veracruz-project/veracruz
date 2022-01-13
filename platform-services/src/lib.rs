@@ -20,6 +20,7 @@
 //! information on licensing and copyright.
 
 #![no_std]
+#![feature(llvm_asm)]
 
 use crate::result::Result;
 use cfg_if::cfg_if;
