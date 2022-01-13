@@ -78,7 +78,7 @@ wasm-checker:
 
 .SECONDEXPANSION:
 $(RELATIVE_RUST_EXAMPLES): %.wasm : $$(addsuffix /src/main.rs,$$(addprefix $(RUST_EXAMPLE_DIR),$$(basename $$(notdir $$@)))) env wasm-checker
-	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@)))
+	$(MAKE) -C $(addprefix $(RUST_EXAMPLE_DIR),$(basename $(notdir $@))) PROFILE=release
 	./wasm-checker/bin/wasm-checker -c ./wasm-checker/wasm-checker-config.json $@
 
 freestanding-execution-engine: env
