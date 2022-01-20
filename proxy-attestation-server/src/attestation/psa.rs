@@ -89,7 +89,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     let mut t_cose_ctx: t_cose_sign1_verify_ctx = unsafe { ::std::mem::zeroed() };
     unsafe { t_cose_sign1_verify_init(&mut t_cose_ctx, 0) };
 
-    let mut key_handle: u16 = 0;
+    let mut key_handle: u32 = 0;
     let lpk_ret = unsafe {
         t_cose_sign1_verify_load_public_key(
             &PUBLIC_KEY as *const u8,

@@ -12,9 +12,10 @@
 , protobuf, perl, python3
 , libsel4, userC
 , libc-supplement
+, cmake, stdenvToken
 }:
 
-mkShell rec {
+mkShell.override { stdenv = stdenvToken; } rec {
 
   # By default, Nix injects hardening options into C compilation.
   # For now, to reduce build complexity, disable that.
@@ -27,6 +28,7 @@ mkShell rec {
   nativeBuildInputs = [
     rustup git cacert rustfmt
     protobuf perl python3
+    cmake
   ];
 
   buildInputs = [

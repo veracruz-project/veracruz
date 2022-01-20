@@ -8,9 +8,9 @@
 #
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
- 
+
 OUT_DIR?=.
-INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../lib/mbed-crypto/include -I ../lib/QCBOR/inc -I ../lib/t_cose/inc -I ../lib/t_cose/inc/t_cose -I ../lib/psa_crypto/include/
+INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../../rust-psa-crypto/psa-crypto-sys/vendor/include -I ../lib/QCBOR/inc -I ../lib/t_cose/inc -I ../lib/t_cose/inc/t_cose -I ../lib/psa_crypto/include/
 
 .PHONY: clean all
 

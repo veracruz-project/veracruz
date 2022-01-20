@@ -15,5 +15,6 @@
 #include <stddef.h>
 
 void *calloc(size_t nelem, size_t elsize);
-
+void exit(int status);
 void free(void *ptr);
+int rand(void);
