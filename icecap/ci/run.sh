@@ -13,4 +13,4 @@ set -e
 
 cd /work/veracruz/icecap
 
-make run-tests GITHUB_CI=true
+make run-tests VERACRUZ_REMOTE_CI=true

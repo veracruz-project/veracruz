@@ -58,7 +58,7 @@ sdk:
 .PHONY: test-collateral
 test-collateral: sdk
 	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -C ../test-collateral TEE=icecap'
-ifeq ($(GITHUB_CI),true)
+ifeq ($(VERACRUZ_REMOTE_CI),true)
 	rm -rf ../sdk # HACK needed to save disc space on github.com
 endif
 

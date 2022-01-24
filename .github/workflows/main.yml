@@ -43,7 +43,7 @@ jobs:
       - name: Build and test Veracruz on IceCap
         run: |
             make -C /work/veracruz/workspaces icecap
-            make -C /work/veracruz/workspaces/icecap-host run-tests
+            make -C /work/veracruz/workspaces/icecap-host run-tests VERACRUZ_REMOTE_CI=true
 
   nitro:
     runs-on: ubuntu-latest

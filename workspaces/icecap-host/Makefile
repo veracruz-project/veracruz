@@ -56,6 +56,13 @@ test-collateral: set-key-permissions
 	else \
 		$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral' ; \
 	fi
+ifeq ($(VERACRUZ_REMOTE_CI),true)
+	df -H
+	du -xk / | sort -rn | head -n 20
+	rm -rf ../../sdk # HACK needed to save disc space on github.com
+	df -H
+	du -xk / | sort -rn | head -n 20
+endif
 
 test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
 
