@@ -20,6 +20,6 @@ nitro = []
 libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracruz" }
 
 [build-dependencies]
-bindgen = "0.53.1"
+bindgen = "0.59"
 cfg-if = "1.0"
 cmake = "0.1"
