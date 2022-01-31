@@ -10,7 +10,7 @@
 { lib, stdenv, buildPackages, mkShell
 , rustup, git, cacert, rustfmt
 , protobuf, perl, python3
-, libsel4, libs
+, libsel4, userC
 , libc-supplement
 , cmake, stdenvToken
 }:
@@ -33,11 +33,15 @@ mkShell.override { stdenv = stdenvToken; } rec {
 
   buildInputs = [
     libsel4
-    libs.icecap-runtime
-    libs.icecap-utils
-    libs.icecap-pure
+    userC.nonRootLibs.icecap-runtime
+    userC.nonRootLibs.icecap-utils
+    userC.nonRootLibs.compiler-some-libc
+    userC.nonRootLibs.icecap-some-libc
     libc-supplement
   ];
+
+  # Sets __STDC_HOSTED__=0
+  NIX_CFLAGS_COMPILE = [ "-ffreestanding" ];
 
   # For bindgen
   LIBCLANG_PATH = "${lib.getLib buildPackages.llvmPackages.libclang}/lib";
