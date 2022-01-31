@@ -3,7 +3,7 @@ let
   salt = builtins.getEnv "SALT";
 
   icecapRemote = builtins.fetchGit rec {
-    url = "https://gitlab.com/arm-research/security/icecap/icecap-refs.git";
+    url = "https://github.com/veracruz-project/icecap.git";
     ref = "refs/tags/icecap/keep/${builtins.substring 0 32 rev}";
     rev = icecapRev;
     submodules = true;
