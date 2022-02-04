@@ -9,13 +9,14 @@
 
 let
   icecap = import ../icecap;
+  inherit (icecap) hypervisor;
 
-  veracruz = with icecap; lib.flip lib.mapAttrs pkgs.none.icecap.configured (_: configured:
+  veracruz = with hypervisor.framework; lib.flip lib.mapAttrs pkgs.none.icecap.configured (_: configured:
     import ./instance.nix {
       inherit lib pkgs configured;
     }
   );
 
-in icecap // {
+in hypervisor // {
   inherit veracruz;
 }
