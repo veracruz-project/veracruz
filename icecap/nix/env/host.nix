@@ -11,6 +11,7 @@
 , rustup, git, cacert
 , protobuf, perl, python3
 , pkgconfig, openssl, sqlite
+, cmake
 }:
 
 mkShell rec {
@@ -27,6 +28,7 @@ mkShell rec {
     rustup git cacert
     protobuf perl python3
     pkgconfig
+    cmake
   ];
 
   buildInputs = [
