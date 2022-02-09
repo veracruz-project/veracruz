@@ -222,7 +222,7 @@ impl ProtocolState {
             transport_protocol::ResponseStatus::SUCCESS as i32,
             Some(error_code.to_le_bytes().to_vec()),
         )
-        .unwrap_or_else(|err| panic!("{}", err))
+        .unwrap_or_else(|err| panic!("{:?}", err))
     }
 }
 
