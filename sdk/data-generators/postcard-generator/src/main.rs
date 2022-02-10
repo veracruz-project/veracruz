@@ -15,7 +15,7 @@
 //! ```
 
 use clap::{App, Arg};
-use rand::{Rng, rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fs, string::String, vec::Vec};
 

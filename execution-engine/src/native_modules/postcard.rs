@@ -1,8 +1,8 @@
-use crate::fs::{Service, FileSystem, FileSystemResult};
-use wasi_types::ErrNo;
-use std::string::String;
-use serde::{Deserialize, Serialize};
+use crate::fs::{FileSystem, FileSystemResult, Service};
 use postcard::from_bytes;
+use serde::{Deserialize, Serialize};
+use std::string::String;
+use wasi_types::ErrNo;
 
 pub(crate) struct PostcardService;
 
@@ -34,15 +34,15 @@ pub struct T2 {
     u2: u64,
     u3: u64,
     t1: T1,
-    array1: [u16;7],
-    array2: [i32;13],
+    array1: [u16; 7],
+    array2: [i32; 13],
     e1: E1,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum E2 {
     ENUM1(T2),
-    ENUM2([u16;5]),
+    ENUM2([u16; 5]),
     ENUM3(u16),
 }
 
@@ -60,7 +60,14 @@ impl Service for PostcardService {
 
     fn serve(&self, fs: &mut FileSystem, inputs: &[u8]) -> FileSystemResult<()> {
         let v = from_bytes::<Vec<T3>>(inputs).map_err(|_| ErrNo::Inval)?;
-        fs.write_file_by_absolute_path("/services/postcard_result.dat", serde_json::to_string(&v).map_err(|_| ErrNo::Inval)?.as_bytes().to_vec(), false)?;
+        fs.write_file_by_absolute_path(
+            "/services/postcard_result.dat",
+            serde_json::to_string(&v)
+                .map_err(|_| ErrNo::Inval)?
+                .as_bytes()
+                .to_vec(),
+            false,
+        )?;
         Ok(())
     }
 
@@ -71,6 +78,6 @@ impl Service for PostcardService {
 
 impl PostcardService {
     pub(crate) fn new() -> Self {
-        Self{}
+        Self {}
     }
 }

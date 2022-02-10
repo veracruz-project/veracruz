@@ -681,10 +681,7 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[(
-                "/program/postcard-wasm.wasm",
-                program_path(POSTCARD_WASM),
-            )],
+            &[("/program/postcard-wasm.wasm", program_path(POSTCARD_WASM))],
             &[("/input/postcard.dat", data_dir(POSTCARD_DATA))],
             &[],
             &["/output/postcard_wasm.txt"],

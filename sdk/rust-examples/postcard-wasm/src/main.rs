@@ -1,9 +1,9 @@
-use std::fs;
-use std::string::String;
-use std::vec::Vec;
-use std::time::Instant;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::string::String;
+use std::time::Instant;
+use std::vec::Vec;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 enum E1 {
@@ -33,15 +33,15 @@ struct T2 {
     u2: u64,
     u3: u64,
     t1: T1,
-    array1: [u16;7],
-    array2: [i32;13],
+    array1: [u16; 7],
+    array2: [i32; 13],
     e1: E1,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 enum E2 {
     ENUM1(T2),
-    ENUM2([u16;5]),
+    ENUM2([u16; 5]),
     ENUM3(u16),
 }
 
@@ -52,10 +52,10 @@ struct T3 {
     e3: E2,
 }
 
-fn main() -> anyhow::Result<()>  {
+fn main() -> anyhow::Result<()> {
     let input = fs::read("/input/postcard.dat")?;
     let now = Instant::now();
-    let rst : Vec<T3> = from_bytes(&input)?;
+    let rst: Vec<T3> = from_bytes(&input)?;
     let rst = serde_json::to_string(&rst)?;
     fs::write("/output/postcard_wasm.txt", rst)?;
     println!("time: {} ms", now.elapsed().as_micros());

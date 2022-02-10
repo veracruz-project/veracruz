@@ -38,8 +38,10 @@ use std::{
 fn main() -> anyhow::Result<()> {
     let (count, last_result_or_init) = read_last_result_or_init()?;
     let (stream1, stream2) = read_stream((count * 8) as u64)?;
-    let result_encode =
-        postcard::to_allocvec::<(u64, f64)>(&(count + 1, (last_result_or_init + stream1 + stream2)))?;
+    let result_encode = postcard::to_allocvec::<(u64, f64)>(&(
+        count + 1,
+        (last_result_or_init + stream1 + stream2),
+    ))?;
     fs::write("/output/accumulation.dat", result_encode)?;
     Ok(())
 }
