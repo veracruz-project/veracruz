@@ -2,7 +2,6 @@ use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::string::String;
-use std::time::Instant;
 use std::vec::Vec;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -54,10 +53,8 @@ struct T3 {
 
 fn main() -> anyhow::Result<()> {
     let input = fs::read("/input/postcard.dat")?;
-    let now = Instant::now();
     let rst: Vec<T3> = from_bytes(&input)?;
     let rst = serde_json::to_string(&rst)?;
     fs::write("/output/postcard_wasm.txt", rst)?;
-    println!("time: {} ms", now.elapsed().as_micros());
     Ok(())
 }

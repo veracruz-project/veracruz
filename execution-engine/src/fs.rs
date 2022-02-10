@@ -394,16 +394,16 @@ impl Debug for InodeTable {
         write!(f, "Inode Table:\n")?;
         for (k, v) in self.table.iter() {
             match &v.data {
-                InodeImpl::File(_) => write!(f, "\t{:?} -> file", k)?,
+                InodeImpl::File(_) => write!(f, "\t{:?} -> file\n", k)?,
                 InodeImpl::NativeModule(_, service, _) => write!(
                     f,
-                    "\t{:?} -> service {}",
+                    "\t{:?} -> service {}\n",
                     k,
                     service
                         .try_lock()
                         .map_or_else(|_| "(failed to lock)".to_string(), |o| o.name().to_string())
                 )?,
-                InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}", k, d)?,
+                InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
             }
         }
         Ok(())
