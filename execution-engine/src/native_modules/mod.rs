@@ -9,4 +9,4 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub(crate) mod pinecone;
+pub(crate) mod postcard;

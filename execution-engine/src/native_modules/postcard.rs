@@ -2,9 +2,9 @@ use crate::fs::{Service, FileSystem, FileSystemResult};
 use wasi_types::ErrNo;
 use std::string::String;
 use serde::{Deserialize, Serialize};
-use pinecone::from_bytes;
+use postcard::from_bytes;
 
-pub(crate) struct PineconeService;
+pub(crate) struct PostcardService;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum E1 {
@@ -53,14 +53,14 @@ pub struct T3 {
     e3: E2,
 }
 
-impl Service for PineconeService {
+impl Service for PostcardService {
     fn name(&self) -> &str {
-        "Pinecone Service"
+        "Postcard Service"
     }
 
     fn serve(&self, fs: &mut FileSystem, inputs: &[u8]) -> FileSystemResult<()> {
         let v = from_bytes::<Vec<T3>>(inputs).map_err(|_| ErrNo::Inval)?;
-        fs.write_file_by_absolute_path("/services/pinecone_result.dat", serde_json::to_string(&v).map_err(|_| ErrNo::Inval)?.as_bytes().to_vec(), false)?;
+        fs.write_file_by_absolute_path("/services/postcard_result.dat", serde_json::to_string(&v).map_err(|_| ErrNo::Inval)?.as_bytes().to_vec(), false)?;
         Ok(())
     }
 
@@ -69,7 +69,7 @@ impl Service for PineconeService {
     }
 }
 
-impl PineconeService {
+impl PostcardService {
     pub(crate) fn new() -> Self {
         Self{}
     }

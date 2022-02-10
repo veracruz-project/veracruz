@@ -44,7 +44,7 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
-use crate::native_modules::pinecone::PineconeService;
+use crate::native_modules::postcard::PostcardService;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -732,7 +732,6 @@ pub struct FileSystem {
 
 impl Debug for FileSystem {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "FileSystem:\n")?;
         write!(f, "\tFD table:\n")?;
         for (fd, fd_entry) in self.fd_table.iter() {
             write!(f, "\t\t{:?} -> {:?}\n", fd, fd_entry)?;
@@ -776,9 +775,9 @@ impl FileSystem {
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
         //TODO include the correct parameter
-        let service: Box<dyn Service> = Box::new(PineconeService::new());
+        let service: Box<dyn Service> = Box::new(PostcardService::new());
         let mut services = Vec::new();
-        services.push( ("/services/pinecone_string.dat", rst.clone(), Arc::new(Mutex::new(service))) );
+        services.push( ("/services/postcard_string.dat", rst.clone(), Arc::new(Mutex::new(service))) );
         rst.install_services(services)?;
         Ok(rst)
     }
@@ -797,7 +796,11 @@ impl FileSystem {
         // Must clone as install_prestat need to lock the inode_table too
         let rights_table = self.lock_inode_table()?.get_rights(principal)?.clone();
         rst.install_prestat::<PathBuf>(&rights_table)?;
-        println!("spawn fd_table: {:?}", rst.fd_table);
+        println!("new filesystem\n{:?}",rst);
+        {
+            let inode_table = rst.inode_table.lock().unwrap();
+            println!("{:?}",inode_table);
+        }
         Ok(rst)
     }
 
@@ -1145,6 +1148,7 @@ impl FileSystem {
         bufs: &mut [B],
         offset: FileSize,
     ) -> FileSystemResult<usize> {
+        println!("fd_pread fd {:?}", fd);
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
@@ -1229,6 +1233,7 @@ impl FileSystem {
         fd: Fd,
         bufs: &mut [B],
     ) -> FileSystemResult<usize> {
+        println!("fd_read fd {:?}", fd);
         self.check_right(&fd, Rights::FD_READ)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
@@ -1456,6 +1461,7 @@ impl FileSystem {
         if !self.lock_inode_table()?.is_dir(&parent_inode) {
             return Err(ErrNo::NotDir);
         }
+        println!("lock is dir succ");
         // Intersect with the inheriting right from `fd`
         let fd_inheriting = self
             .fd_table
@@ -1491,6 +1497,7 @@ impl FileSystem {
                 new_inode
             }
         };
+        println!("path open inode succ");
         // Truncate the file if `trunc` flag is set.
         if oflags.contains(OpenFlags::TRUNC) {
             // Check the right of the program on truncate
@@ -1519,6 +1526,7 @@ impl FileSystem {
                 advice: vec![(0, file_size, Advice::Normal)],
             },
         );
+        println!("path open return");
         Ok(new_fd)
     }
 

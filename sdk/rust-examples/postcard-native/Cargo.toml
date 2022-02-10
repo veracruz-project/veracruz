@@ -1,5 +1,5 @@
 [package]
-name = "pinecone_native"
+name = "postcard-native"
 version = "0.1.0"
 authors = ["Shale Xiong <shale.xiong@arm.com>"]
 edition = "2018"
