@@ -29,22 +29,6 @@ jobs:
             make -C /work/veracruz/workspaces linux PROFILE=dev
             make -C /work/veracruz/workspaces/linux-host test-client test-server veracruz-test PROFILE=dev
 
-  icecap:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-icecap:ci-v2
-      volumes:
-        - ${{ github.workspace }}:/work/veracruz
-    steps:
-      - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - name: Build and test Veracruz on IceCap
-        run: |
-            make -C /work/veracruz/workspaces icecap
-            make -C /work/veracruz/workspaces/icecap-host run-tests
-
   nitro:
     runs-on: ubuntu-latest
     container:
