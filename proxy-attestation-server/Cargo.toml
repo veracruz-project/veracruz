@@ -50,7 +50,7 @@ http = "=0.2.4"
 lazy_static = "1.3"
 log = "0.4.13"
 nb-connect = "1.0.3"
-nitro-enclave-attestation-document = { git = "https://github.com/mathias-arm/nitro-enclave-attestation-document.git", branch = "main", optional = true }
+nitro-enclave-attestation-document = { path = "../third-party/nitro-enclave-attestation-document", optional = true }
 openssl = "0.10.24"
 percent-encoding = "2.1"
 psa-attestation = { path = "../psa-attestation" }

@@ -34,4 +34,4 @@ webpki = "=0.21.2"
 x509-parser = { version = "0.7.0", optional = true }
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed", optional = true }
+rustls = { path = "../third-party/rustls" }

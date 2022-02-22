@@ -13,6 +13,10 @@
 cargo-features = ["resolver"]
 
 [workspace]
+exclude = [
+  "crates/third-party/libc",
+  "crates/third-party/wasmi",
+]
 members = [
   # Data generators
   "crates/sdk/data-generators/csv-encoder",
@@ -38,5 +42,5 @@ lto = true
 opt-level = 3
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }
-webpki = { git = "https://github.com/mathias-arm/webpki.git", branch = "unrecognized_extensions" }
+rustls = { path = "crates/third-party/rustls" }
+webpki = { path = "crates/third-party/webpki" }
