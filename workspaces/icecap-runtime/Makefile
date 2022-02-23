@@ -11,6 +11,7 @@ include ../common.mk
 
 ICECAP_PLAT ?= virt
 HOST_CC ?= gcc
+LD = $(abspath $(shell cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
 CC = aarch64-linux-gnu-gcc
 
 icecap_plat := $(ICECAP_PLAT)
@@ -102,11 +103,11 @@ sel4-build: sel4-configure
 
 $(sel4_build_dir)/build/libsel4/libsel4.a: sel4-build
 
-$(sel4_build_dir)/install/lib/%: $(sel4_build_dir)/build/libsel4/%
+$(sel4_build_dir)/install/libsel4/lib/%: $(sel4_build_dir)/build/libsel4/%
 		install -D -T $< $@
 
 .PHONY: sel4-install
-sel4-install: sel4-build $(sel4_build_dir)/install/lib/libsel4.a
+sel4-install: sel4-build $(sel4_build_dir)/install/libsel4/lib/libsel4.a
 		ninja -C $(abspath $(sel4_build_dir)/build) install
 
 .PHONY: sel4
@@ -117,6 +118,9 @@ sel4: sel4-install
 
 icecap_rustflags := \
 	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
+	-l static=c-supplement \
+	-l static=icecap-runtime \
+	-l static=icecap-some-libc \
 	-l static=icecap-utils \
 	$(icecap_c_lib_flags) \
 	--sysroot=$(abspath $(sysroot_dir))
@@ -147,11 +151,13 @@ runtime-manager: $(now) sysroot-install userspace_c sel4
 userspace_c: sel4
 	$(MAKE) -f $(c_src)/Makefile CROSS_COMPILE=aarch64-linux-gnu- \
 		BUILD=$(c_build_dir)/for-userspace/build OUT=$(c_build_dir)/for-userspace/install \
-		CFLAGS="-I$(sel4_include_dir)" \
+		CFLAGS="-I$(sel4_include_dir) -I$(compiler_some_libc_include)" \
 		ICECAP_RUNTIME_CONFIG_IN=/dev/null \
 		ROOTS=$(c_src)/icecap-runtime/icecap.mk \
 		ROOTS=" \
+			$(c_src)/../../../src/c/libc-supplement/icecap.mk \
 			$(c_src)/icecap-runtime/icecap.mk \
+			$(c_src)/icecap-some-libc/icecap.mk \
 			$(c_src)/icecap-utils/icecap.mk \
 		" \
 		install
