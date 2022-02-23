@@ -28,6 +28,7 @@ RUN apt-get update && \
         gnupg \
         haskell-stack \
         less \
+        libc6-dev-arm64-cross \
         libxml2-utils \
         netbase \
         ninja-build \
