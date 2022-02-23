@@ -49,3 +49,14 @@
 [submodule "third-party/rust-psa-crypto"]
 	path = third-party/rust-psa-crypto
 	url = https://github.com/veracruz-project/rust-psa-crypto.git
+[submodule "workspaces/icecap-runtime/deps/seL4"]
+	path = workspaces/icecap-runtime/deps/seL4
+	url = https://gitlab.com/arm-research/security/icecap/seL4.git
+	branch = dev
+[submodule "workspaces/icecap-runtime/deps/seL4_tools"]
+	path = workspaces/icecap-runtime/deps/seL4_tools
+	url = https://gitlab.com/arm-research/security/icecap/seL4_tools.git
+	branch = dev
+[submodule "workspaces/icecap-runtime/deps/capdl"]
+	path = workspaces/icecap-runtime/deps/capdl
+	url = https://gitlab.com/arm-research/security/icecap/capdl.git
