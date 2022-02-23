@@ -14,18 +14,19 @@ extern crate alloc;
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 
+use finite_set::Finite;
+use hypervisor_event_server_types::{
+    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
+};
 use icecap_core::{
     config::RingBufferConfig,
     config::RingBufferKicksConfig,
-    finite_set::Finite,
     logger::{DisplayMode, Level, Logger},
     prelude::*,
-    rpc_sel4::RPCClient,
     runtime as icecap_runtime,
 };
-use icecap_event_server_types::{
-    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
-};
+use icecap_rpc::Client;
+use icecap_ring_buffer::*;
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
 
@@ -47,7 +48,7 @@ fn main(config: Config) -> Fallible<()> {
     icecap_runtime_init();
 
     let channel = {
-        let event_server = RPCClient::<EventServerRequest>::new(config.event_server_endpoint);
+        let event_server = Client::<EventServerRequest>::new(config.event_server_endpoint);
         let index = {
             use events::*;
             RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
@@ -57,7 +58,7 @@ fn main(config: Config) -> Fallible<()> {
                 index: index.to_nat(),
             })
         });
-        RingBuffer::realize_resume(
+        RingBuffer::resume_from_config(
             &config.channel,
             RingBufferKicksConfig {
                 read: kick.clone(),
@@ -209,7 +210,7 @@ const LOG_LEVEL: Level = Level::Error;
 // HACK
 // System time is provided at build time. The same time is provided to the test Linux userland.
 // These must align with eachother and with the time the test policies were generated.
-const NOW: u64 = include!("../../icecap/build/NOW");
+const NOW: u64 = include!("../NOW");
 
 fn icecap_runtime_init() {
     icecap_std_external::set_panic();

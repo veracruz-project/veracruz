@@ -31,7 +31,7 @@ rustc-std-workspace-std = { path = "../rust/library/rustc-std-workspace-std" }
 dlmalloc = { git = "https://gitlab.com/arm-research/security/icecap/rust-dlmalloc", rev = "f6759cfed44dc4135eaa43c8c26599357749af39" }
 libc = { git = "https://gitlab.com/arm-research/security/icecap/rust-libc", rev = "642614a0e357d33620d922114fe902c4af17ae54" }
 
-icecap-std-impl = { path = "../../icecap/src/rust/crates/std-support/icecap-std-impl" }
+icecap-std-impl = { path = "../../icecap/src/rust/crates/framework/std-support/icecap-std-impl" }
 
 [workspace]
 resolver = "2"
