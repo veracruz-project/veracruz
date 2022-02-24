@@ -67,7 +67,13 @@ pub fn parse_renamable_paths(
 /// mistakes.
 #[cfg(feature = "std")]
 pub fn enforce_leading_backslash(path: &str) -> Cow<str> {
-    if !path.starts_with('/') {
+    let is_special_file = match path {
+        "stdin" => true,
+        "stderr" => true,
+        "stdout" => true,
+        _otherwise => false,
+    };
+    if !path.starts_with('/') && !is_special_file {
         Cow::Owned(format!("/{}", path))
     } else {
         Cow::Borrowed(path)
