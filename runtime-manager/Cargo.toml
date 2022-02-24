@@ -52,7 +52,7 @@ nitro = [
   "io-utils/nitro",
   "libc",
   "policy-utils/std",
-  "nsm_io",
+  "nsm_api",
   "nsm_lib",
   "nix",
   "ring/nitro",
@@ -80,7 +80,7 @@ libc = { git = "https://github.com/veracruz-project/libc.git", branch = "veracru
 libm = { version = "0.2", optional = true }
 log = { version = "=0.4.13", optional = true }
 nix = { version = "0.15", optional = true }
-nsm_io = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-io", optional = true }
+nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "aws-nitro-enclaves-nsm-api", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
 policy-utils = { path = "../policy-utils" }
 protobuf = { git = "https://github.com/veracruz-project/rust-protobuf.git", branch = "veracruz" }

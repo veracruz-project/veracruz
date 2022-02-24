@@ -14,7 +14,7 @@
 
 use super::result;
 use nix::{errno::Errno, sys::time::TimeValLike, time};
-use nsm_io;
+use nsm_api;
 use nsm_lib;
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
@@ -28,7 +28,7 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
 
     let status = unsafe { nsm_lib::nsm_get_random(nsm_fd, buffer.as_mut_ptr(), &mut buffer_len) };
     return match status {
-        nsm_io::ErrorCode::Success => result::Result::Success(()),
+        nsm_api::api::ErrorCode::Success => result::Result::Success(()),
         _ => result::Result::UnknownError,
     };
 }

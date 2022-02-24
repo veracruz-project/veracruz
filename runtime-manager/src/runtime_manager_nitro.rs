@@ -16,7 +16,7 @@ use io_utils::{
 use nix::sys::socket::listen as listen_vsock;
 use nix::sys::socket::{accept, bind, SockAddr};
 use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
-use nsm_io;
+use nsm_api;
 use nsm_lib;
 use std::os::unix::io::AsRawFd;
 use veracruz_utils::platform::{
@@ -176,7 +176,7 @@ fn attestation(
             )
         };
         match status {
-            nsm_io::ErrorCode::Success => (),
+            nsm_api::api::ErrorCode::Success => (),
             _ => return Err(RuntimeManagerError::NsmErrorCode(status)),
         }
         unsafe {
