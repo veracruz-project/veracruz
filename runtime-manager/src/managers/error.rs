@@ -73,7 +73,7 @@ pub enum RuntimeManagerError {
     NsmLibError(i32),
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: NSM Error code: {:?}", _0)]
-    NsmErrorCode(nsm_io::ErrorCode),
+    NsmErrorCode(nsm_api::api::ErrorCode),
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: wrong message type received: {:?}", _0)]
     WrongMessageTypeError(NitroRootEnclaveMessage),
