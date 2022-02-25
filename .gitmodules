@@ -23,3 +23,31 @@
 [submodule "icecap/sysroot/rust"]
 	path = icecap/sysroot/rust
 	url = https://gitlab.com/arm-research/security/icecap/rust.git
+[submodule "third-party/ring"]
+	path = third-party/ring
+	url = https://github.com/veracruz-project/ring.git
+	branch = veracruz-v2
+[submodule "third-party/webpki"]
+	path = third-party/webpki
+	url = https://github.com/veracruz-project/webpki.git
+	branch = veracruz-v2
+[submodule "third-party/nitro-enclave-attestation-document"]
+	path = third-party/nitro-enclave-attestation-document
+	url = https://github.com/veracruz-project/nitro-enclave-attestation-document.git
+	branch = veracruz-v2
+[submodule "third-party/rustls"]
+	path = third-party/rustls
+	url = https://github.com/veracruz-project/rustls.git
+	branch = self_signed
+[submodule "third-party/libc"]
+	path = third-party/libc
+	url = https://github.com/veracruz-project/libc.git
+	branch = veracruz
+[submodule "third-party/wasi-types"]
+	path = third-party/wasi-types
+	url = https://github.com/veracruz-project/wasi-types.git
+	branch = veracruz
+[submodule "third-party/wasmi"]
+	path = third-party/wasmi
+	url = https://github.com/veracruz-project/wasmi.git
+	branch = veracruz

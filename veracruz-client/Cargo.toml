@@ -11,39 +11,37 @@ path = "src/cli.rs"
 required-features = ["cli"]
 
 [features]
+# a feature to enable CLI-only dependencies
+# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
+cli = ["structopt", "env_logger"]
 icecap = []
 linux = []
 mock = ["mockall", "mockito"]
 nitro = []
-# a feature to enable CLI-only dependencies
-# https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "env_logger"]
 
 [dependencies]
 backtrace = "=0.3.61"
 base64 = "0.10.1"
-bitflags = "=1.2.1"
 curl = "=0.4.35"
 env_logger = { version = "0.7", optional = true }
 err-derive = "0.2"
 hex = "0.4.2"
-http = "=0.2.4"
-log = "=0.4.13"
+log = "0.4.13"
 # Used in unit tests. Mock all the network traffic
 mockall = { version = "0.5.0", optional = true }
 mockito = { version = "0.23.1", optional = true }
-openssl-sys = "=0.9.70"
 policy-utils = { path = "../policy-utils", features = ["std"] }
 rand = "0.7.0"
 reqwest = { version = "0.9", default-features = false }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+ring = "0.16.11"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-serde_json = { git = "https://github.com/veracruz-project/json.git", branch = "veracruz" }
+rustls = "0.16"
+serde_json = "1.0"
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+webpki = "0.21.2"
+webpki-roots = "0.19.0"
 x509-parser = "0.12.0"
 
 [dev-dependencies]
@@ -52,6 +50,3 @@ actix-rt = "1.1.1"
 actix-session = "0.4.1"
 actix-web = "3.3.2"
 futures = "0.3"
-
-[patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "self_signed" }

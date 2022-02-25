@@ -6,25 +6,23 @@ name = "session-manager"
 version = "0.3.0"
 
 [features]
-# NOTE: turn on the `std` on ring for Error trait
 icecap = [
+  "policy-utils/icecap",
   "ring/std",
-  "ring/non_sgx",
-  "policy-utils/icecap"
 ]
 nitro = [
+  "policy-utils/std",
   "ring/std",
-  "ring/non_sgx",
-  "policy-utils/std"
 ]
 std = [
+  "policy-utils/std",
   "ring/std",
-  "policy-utils/std"
 ]
 
 [dependencies]
 err-derive = "0.2"
 policy-utils = { path = "../policy-utils" }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+ring = "0.16.11"
+rustls = "0.16"
+webpki = "=0.21.2"
+webpki-roots = "0.19.0"

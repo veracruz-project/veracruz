@@ -14,14 +14,14 @@ icecap = [
   "transport-protocol/icecap",
 ]
 linux = [
+  "proxy-attestation-server/linux",
   "veracruz-client/linux",
   "veracruz-server/linux",
-  "proxy-attestation-server/linux"
 ]
 nitro = [
+  "proxy-attestation-server/nitro",
   "veracruz-client/nitro",
   "veracruz-server/nitro",
-  "proxy-attestation-server/nitro"
 ]
 
 [dependencies]
@@ -31,12 +31,15 @@ async-std = "1"
 env_logger = "0.7"
 err-derive = "0.2"
 futures = "0.3"
-http = "=0.2.4"
 lazy_static = "1.4"
-log = "=0.4.13"
+log = "0.4.13"
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", features = ["std"] }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
+ring = "0.16.11"
+rustls = "0.16"
+serde = { version = "1.0.115", features = ["derive"] }
+serde_json = "1.0"
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }

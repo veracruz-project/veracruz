@@ -13,12 +13,16 @@
 cargo-features = ["resolver"]
 
 [workspace]
+exclude = [
+  "crates/third-party/libc",
+  "crates/third-party/wasmi",
+]
 members = [
-    "crates/proxy-attestation-server",
-    "crates/veracruz-client",
-    "crates/veracruz-server",
-    "crates/veracruz-server-test",
-    "crates/veracruz-test",
+  "crates/proxy-attestation-server",
+  "crates/veracruz-client",
+  "crates/veracruz-server",
+  "crates/veracruz-server-test",
+  "crates/veracruz-test",
 ]
 resolver = "2"
 
@@ -28,6 +32,5 @@ lto = true
 opt-level = 3
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
-serde_derive = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
+rustls = { path = "crates/third-party/rustls" }
+webpki = { path = "crates/third-party/webpki" }

@@ -7,41 +7,46 @@ version = "0.3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-icecap = [
-  "veracruz-server/icecap",
-  "proxy-attestation-server/icecap",
-  "policy-utils/icecap",
-  "veracruz-utils/icecap",
-]
-linux = [
-  "veracruz-server/linux",
-  "policy-utils/std",
-  "veracruz-utils/linux",
-  "proxy-attestation-server/linux",
-]
-nitro = ["veracruz-server/nitro", "proxy-attestation-server/nitro", "policy-utils/std", "veracruz-utils/nitro"]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
 # cannot connect)
 debug = ["veracruz-server/debug"]
+icecap = [
+  "policy-utils/icecap",
+  "proxy-attestation-server/icecap",
+  "veracruz-server/icecap",
+  "veracruz-utils/icecap",
+]
+linux = [
+  "policy-utils/std",
+  "proxy-attestation-server/linux",
+  "veracruz-server/linux",
+  "veracruz-utils/linux",
+]
+nitro = [
+  "policy-utils/std",
+  "proxy-attestation-server/nitro",
+  "veracruz-server/nitro",
+  "veracruz-utils/nitro",
+]
 
 [dependencies]
 actix-rt = "1.1.1"
-curl = "=0.4.35"
+curl = "0.4.35"
 env_logger = "0.7"
 hex = "0.4.2"
-http = "=0.2.4"
 lazy_static = "1.4"
-log = "=0.4.13"
+log = "0.4.13"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+ring = "0.16.11"
+rustls = "0.16"
 transport-protocol = { path = "../transport-protocol" }
 veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
-webpki = { git = "https://github.com/veracruz-project/webpki.git", branch = "veracruz" }
+webpki = "=0.21.2"
+webpki-roots = "0.19.0"
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
+rustls = { path = "../third-party/rustls" }

@@ -28,6 +28,5 @@ lto = true
 opt-level = 3
 
 [patch.crates-io]
-rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
-serde = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
-serde_derive = { git = "https://github.com/veracruz-project/serde.git", branch = "veracruz" }
+rustls = { path = "crates/third-party/rustls" }
+webpki = { path = "crates/third-party/webpki" }
