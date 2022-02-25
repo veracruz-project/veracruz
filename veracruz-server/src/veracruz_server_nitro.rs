@@ -18,6 +18,7 @@ pub mod veracruz_server_nitro {
         nitro::NitroEnclave,
     };
     use policy_utils::policy::Policy;
+    use std::env;
     use std::io::Read;
     use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
 
@@ -51,16 +52,18 @@ pub mod veracruz_server_nitro {
             })?;
 
             println!("VeracruzServerNitro::new instantiating Runtime Manager");
+            let runtime_manager_eif_path = env::var("RUNTIME_MANAGER_EIF_PATH")
+                .unwrap_or(RUNTIME_MANAGER_EIF_PATH.to_string());
             #[cfg(feature = "debug")]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in debug mode");
-                NitroEnclave::new(false, RUNTIME_MANAGER_EIF_PATH, true)
+                NitroEnclave::new(false, &runtime_manager_eif_path, true)
                     .map_err(|err| VeracruzServerError::NitroError(err))?
             };
             #[cfg(not(feature = "debug"))]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in release mode");
-                NitroEnclave::new(false, RUNTIME_MANAGER_EIF_PATH, false)
+                NitroEnclave::new(false, &runtime_manager_eif_path, false)
                     .map_err(|err| VeracruzServerError::NitroError(err))?
             };
             println!("VeracruzServerNitro::new NitroEnclave::new returned");
