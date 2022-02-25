@@ -12,97 +12,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-repo-and-compile-sdk:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
-      volumes:
-        - ${{ github.workspace }}:/work/veracruz
-
-    steps:
-
-      # Remove pre-installed .Net, Android, and Glasgow Haskell Compiler
-      - name: Free-up disk space
-        id: disk-space
-        run: sudo rm -rf /usr/local/share/boost && sudo rm -rf /usr/share/dotnet && sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/ghc
-
-      # Check out the repo, using the action from github
-      - name: Check out the repo
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-
-      # Check source file formatting, then compile all examples and data sources in the SDK
-      - name: Check source file formatting
-        id: rustfmt-check
-        run: |
-          cd /work/veracruz
-          make fmt-check
-
-      - name: Compile SDK
-        id: sdk
-        run: |
-          cd /work/veracruz
-          make sdk
-
-      # Pack cache
-      - name: Pack cache
-        id: pack-cache
-        run: |
-          cd /
-          tar -cvf veracruz.tar -C /work/veracruz --exclude=./veracruz.tar --exclude-vcs --exclude-backups .
-
-     # Update the repo and sdk artifact, using the action from github
-      - name: Upload veracruz cache artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: veracruz.tar
-          path: /veracruz.tar
-          if-no-files-found: error
-
   linux:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz:ci
-      volumes:
-        - ${{ github.workspace }}:/work/veracruz
-    needs: [check-repo-and-compile-sdk]
-    steps:
-      # Remove pre-installed .Net, Android, and Glasgow Haskell Compiler
-      - name: Free-up disk space
-        id: disk-space
-        run: sudo rm -rf /usr/local/share/boost && sudo rm -rf /usr/share/dotnet && sudo rm -rf /usr/local/lib/android && sudo rm -rf /opt/ghc
-
-      # Download the artifact containing repo and sdk artifact, using the action from github
-      - name: Download veracruz cache artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: veracruz.tar
-          path: /
-      # Unpack
-      - name: Unpack veracruz cache artifact
-        id: linux-unpack
-        run: |
-            cd /
-            mkdir -p /work/veracruz
-            mv veracruz.tar /work/veracruz
-            cd /work/veracruz
-            tar -xvf veracruz.tar
-            rm veracruz.tar
-      - name: Running linux test script
-        id: linux-build-and-test
-        run: |
-            cd /work/veracruz
-            make linux
-            make linux-cli
-            make linux-veracruz-server-test
-            make linux-veracruz-test
-            make linux-veracruz-client-test
-
-  icecap:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-icecap:ci-57aa33370d
+      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-linux:ci-v2
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -110,37 +23,24 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: Build and test Veracruz on IceCap
-        run: bash /work/veracruz/icecap/ci/run.sh
+      - name: Running linux test script
+        id: linux-build-and-test
+        run: |
+            make -C /work/veracruz/workspaces linux PROFILE=dev
+            make -C /work/veracruz/workspaces/linux-host test-client test-server veracruz-test PROFILE=dev
 
   nitro:
-     runs-on: ubuntu-latest
-     container:
-       image: ghcr.io/veracruz-project/veracruz/veracruz-nitro:latest
-       volumes: 
-         - ${{ github.workspace }}:/work/veracruz 
-     needs: [check-repo-and-compile-sdk]
-
-     steps:
-
-       # Download the artifact containing repo and sdk artifact, using the action from github
-       - name: Download veracruz cache artifact
-         uses: actions/download-artifact@v2
-         with:
-           name: veracruz.tar
-           path: /
-       # Unpack
-       - name: Unpack veracruz cache artifact
-         id: nitro-unpack
-         run: |
-             cd /
-             mkdir -p /work/veracruz
-             tar -C /work/veracruz -xvf veracruz.tar
-             rm veracruz.tar
-       
-       - name: Running Nitro test script
-         id: nitro-build
-         run: |
-             cd /work/veracruz
-             make nitro
-             make nitro-cli
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-nitro:ci-v2
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
+    steps:
+      - name: Check out the Veracruz repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Running Nitro test script
+        id: nitro-build
+        run: |
+            make -C /work/veracruz/workspaces nitro PROFILE=dev
