@@ -34,10 +34,6 @@
 	path = third-party/rustls
 	url = https://github.com/veracruz-project/rustls.git
 	branch = self_signed
-[submodule "third-party/libc"]
-	path = third-party/libc
-	url = https://github.com/veracruz-project/libc.git
-	branch = veracruz
 [submodule "third-party/wasi-types"]
 	path = third-party/wasi-types
 	url = https://github.com/veracruz-project/wasi-types.git
@@ -60,3 +56,7 @@
 [submodule "workspaces/icecap-runtime/deps/capdl"]
 	path = workspaces/icecap-runtime/deps/capdl
 	url = https://gitlab.com/arm-research/security/icecap/capdl.git
+[submodule "icecap/sysroot/libc"]
+	path = icecap/sysroot/libc
+	url = https://gitlab.com/arm-research/security/icecap/rust-libc.git
+	branch = icecap
