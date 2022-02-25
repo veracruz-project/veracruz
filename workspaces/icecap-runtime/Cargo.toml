@@ -14,7 +14,7 @@ cargo-features = ["resolver"]
 
 [workspace]
 exclude = [
-  "crates/third-party/libc",
+  "crates/icecap/sysroot/libc",
   "crates/third-party/wasmi",
 ]
 members = [
@@ -28,7 +28,7 @@ lto = true
 opt-level = 3
 
 [patch.crates-io]
-libc = { path = "crates/third-party/libc" }
+libc = { path = "crates/icecap/sysroot/libc" }
 ring = { path = "crates/third-party/ring" }
 rustls = { path = "crates/third-party/rustls" }
 webpki = { path = "crates/third-party/webpki" }
