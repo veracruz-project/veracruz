@@ -60,3 +60,7 @@
 	path = icecap/sysroot/libc
 	url = https://gitlab.com/arm-research/security/icecap/rust-libc.git
 	branch = icecap
+[submodule "icecap/sysroot/dlmalloc"]
+	path = icecap/sysroot/dlmalloc
+	url = https://gitlab.com/arm-research/security/icecap/rust-dlmalloc.git
+	branch = icecap
