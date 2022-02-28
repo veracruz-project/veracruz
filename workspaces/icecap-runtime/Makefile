@@ -55,6 +55,7 @@ sel4_build_dir := $(disposable_dir)/cmake/sel4
 sel4_include_dir := $(sel4_build_dir)/install/libsel4/include
 sel4_lib_dir := $(sel4_build_dir)/install/libsel4/lib
 
+platform_info_h := $(misc_build_dir)/platform_info.h
 object_sizes_yaml := $(misc_build_dir)/object_sizes.yaml
 
 icedl_component_dir := $(icedl_build_dir)/components
@@ -64,7 +65,10 @@ capdl_src := $(deps)/capdl
 capdl_tool := $(capdl_src)/capDL-tool/parse-capDL
 capdl_loader := $(c_build_dir)/capdl-loader/install/bin/capdl-loader.elf
 app_elf := $(misc_build_dir)/app.elf
+
+elfloader_build_dir := $(disposable_dir)/cmake/elfloader
 elfloader := $(elfloader_build_dir)/build/elfloader
+elfloader_src := $(sel4_tools_src)/elfloader-tool
 
 # FIXME
 buildInputs = $(sel4_build_dir)/install/libsel4 \
@@ -246,7 +250,6 @@ rust-project: $(now) sysroot-install userspace_c sel4
 			--target-dir $(target_dir) \
 			--out-dir $(bin_dir)
 
-
 ###########################################################################
 # IceCap CDL
 ###########################################################################
@@ -285,3 +288,121 @@ $(icedl_firmware_cdl): \
 						-c $(icedl_component_dir) \
 						-s $(object_sizes_yaml) \
 						-o $(abspath $(dir $@))
+
+###########################################################################
+# CapDL Loader
+###########################################################################
+
+$(capdl_tool):
+	$(MAKE) -C $(capdl_src)/capDL-tool
+
+$(icedl_firmware_dir)/src/capdl_spec.c: $(icedl_firmware_cdl) $(object_sizes_yaml) $(capdl_tool)
+	mkdir -p $(dir $@)
+	$(capdl_tool) --code-dynamic-alloc --object-sizes=$(object_sizes_yaml) --code=$@ $<
+
+$(icedl_firmware_dir)/capdl.cpio: $(icedl_firmware_cdl)
+	rm -rf $@.links
+	cp -rL $(icedl_firmware_dir)/cdl/links $@.links
+	(cd $@.links && find . -not -type d | cpio -o --reproducible -H newc > $(abspath $@))
+
+$(icedl_firmware_dir)/capdl.o: $(icedl_firmware_dir)/capdl.cpio
+	aarch64-linux-gnu-gcc -c $(c_src)/support/embedded-file.S -o $@ \
+		-DSYMBOL=_capdl_archive -DFILE=$< -DSECTION=_archive_cpio
+
+$(platform_info_h): sel4 | $(misc_build_dir)
+	python3 $(sel4_tools_src)/cmake-tool/helpers/platform_sift.py --emit-c-syntax \
+		$(sel4_build_dir)/build/gen_headers/plat/machine/platform_gen.yaml > $@
+
+$(capdl_loader): $(icedl_firmware_dir)/src/capdl_spec.c $(icedl_firmware_dir)/capdl.o $(platform_info_h)
+	$(MAKE) -f $(c_src)/Makefile CROSS_COMPILE=aarch64-linux-gnu- \
+		BUILD=$(c_build_dir)/capdl-loader/build OUT=$(c_build_dir)/capdl-loader/install \
+		CFLAGS="-I$(sel4_include_dir) -I$(c_build_dir)/capdl-loader/build/include -I$(compiler_some_libc_include)" \
+		LDFLAGS="-T $(abspath $(c_src)/support/root-task-tls.lds") \
+		ICECAP_RUNTIME_CONFIG_IN=$(src)/icecap-runtime-root-config.h \
+		CAPDL_LOADER_EXTERNAL_SOURCE=$(capdl_src)/capdl-loader-app \
+		CAPDL_LOADER_CONFIG_IN_H=/dev/null \
+		CAPDL_LOADER_PLATFORM_INFO_H=$(platform_info_h) \
+		CAPDL_LOADER_SPEC_SRC=$(icedl_firmware_dir)/src \
+		CAPDL_LOADER_CPIO_O=$(icedl_firmware_dir)/capdl.o \
+		ROOTS=" \
+			$(c_src)/icecap-runtime/icecap.mk \
+			$(c_src)/icecap-utils/icecap.mk \
+			$(c_src)/icecap-some-libc/icecap.mk \
+			$(c_src)/boot/cpio/icecap.mk \
+			$(c_src)/boot/capdl-loader-shim/icecap.mk \
+			$(c_src)/boot/capdl-loader-core/icecap.mk \
+			$(c_src)/boot/capdl-loader/icecap.mk \
+			" \
+		install
+
+###########################################################################
+# ELF Loader
+###########################################################################
+
+$(app_elf): $(capdl_loader)
+	install -D -T $< $@
+
+sel4_cmake_config_prefixes := Kernel LibSel4 HardwareDebugAPI
+
+$(misc_build_dir)/kernel-config.txt: sel4 | $(misc_build_dir)
+	sed -n 's,^\([A-Za-z0-9][^:]*\):\([^=]*\)=\(.*\)$$,\1:\2=\3,p' $(sel4_build_dir)/build/CMakeCache.txt \
+		| grep -e '$$.^' $(addprefix -e ^,$(sel4_cmake_config_prefixes)) \
+		| sort \
+		> $@
+
+$(misc_build_dir)/kernel-config.cmake: $(misc_build_dir)/kernel-config.txt
+	sed 's/^\([^:]*\):\([^=]*\)=\(.*\)$$/set(\1 "\3" CACHE \2 "")/' $< \
+		> $@
+
+$(misc_build_dir)/boot.cpio: sel4 $(app_elf)
+	mkdir -p $@.links
+	cp -rL $(sel4_build_dir)/install/bin/kernel.elf $(sel4_build_dir)/build/kernel.dtb $(app_elf) $@.links
+	printf "kernel.elf\nkernel.dtb\napp.elf\n" | cpio -o -D $@.links --reproducible -H newc > $(abspath $@)
+
+$(misc_build_dir)/boot.o: $(misc_build_dir)/boot.cpio
+	aarch64-linux-gnu-gcc -c -x assembler-with-cpp $(c_src)/support/embedded-file.S -o $@ \
+		-DSYMBOL=_archive_start -DFILE=$< -DSECTION=_archive_cpio
+
+elfloader_c:
+	$(MAKE) -f $(c_src)/Makefile CROSS_COMPILE=aarch64-linux-gnu- \
+		BUILD=$(c_build_dir)/for-elfloader/build OUT=$(c_build_dir)/for-elfloader/install \
+		ROOTS=$(c_src)/boot/cpio/icecap.mk \
+		install
+
+elfloader_extra_cpp_flags := \
+	-I$(abspath $(sel4_include_dir)) \
+	-I$(abspath $(c_build_dir)/for-elfloader/install/include)
+
+elfloader_extra_c_flags_link := \
+	-L$(abspath $(sel4_lib_dir)) \
+	-L$(abspath $(c_build_dir)/for-elfloader/install/lib)
+
+.PHONY: elfloader-configure
+elfloader-configure: $(misc_build_dir)/boot.o $(misc_build_dir)/kernel-config.cmake elfloader_c | $(elfloader_build_dir)
+	cmake -G Ninja \
+		-DCMAKE_TOOLCHAIN_FILE=$(abspath $(sel4_src)/gcc.cmake) \
+		-DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
+		-DHACK_SEL4_SRC=$(abspath $(sel4_src)) \
+		-DHACK_KERNEL_CONFIG=$(abspath $(misc_build_dir)/kernel-config.cmake) \
+		-C $(abspath $(src)/cmake-config/elfloader.cmake) \
+		-S $(abspath $(elfloader_src)) \
+		-B $(abspath $(elfloader_build_dir)/build) \
+		-DPYTHON3=python3 \
+		-DICECAP_HACK_EXTRA_CPP_FLAGS="$(elfloader_extra_cpp_flags)" \
+		-DICECAP_HACK_EXTRA_C_FLAGS_LINK="$(elfloader_extra_c_flags_link)" \
+		-DICECAP_HACK_CMAKE_HELPERS=$(abspath $(sel4_src)/tools/helpers.cmake) \
+		-DICECAP_HACK_CMAKE_INTERNAL=$(abspath $(sel4_src)/tools/internal.cmake) \
+		-DICECAP_HACK_CMAKE_TOOL_HELPERS_DIR=$(abspath $(sel4_tools_src)/cmake-tool/helpers) \
+		-DICECAP_HACK_KERNEL_TOOLS=$(abspath $(sel4_src)/tools) \
+		-DICECAP_HACK_KERNEL_DTB=$(abspath $(sel4_build_dir)/build/kernel.dtb) \
+		-DICECAP_HACK_ARCHIVE_O=$(abspath $(misc_build_dir)/boot.o) \
+		-Dplatform_yaml=$(abspath $(sel4_build_dir)/build/gen_headers/plat/machine/platform_gen.yaml)
+
+.PHONY: elfloader-build
+elfloader-build: elfloader-configure
+	ninja -C $(abspath $(elfloader_build_dir)/build) elfloader
+
+$(elfloader_build_dir)/build/elfloader: elfloader-build
+
+.PHONY: elfloader
+elfloader: $(elfloader_build_dir)/build/elfloader
