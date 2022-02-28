@@ -14,11 +14,14 @@ clean-plat:
 QEMU_BIN = qemu-system-aarch64
 QEMU_BASE_FLAGS = -machine virt,virtualization=on,gic-version=2 \
 		-cpu cortex-a57 -smp 4 -m 3072 \
-		-nographic -semihosting-config enable=on,target=native \
-		-device virtio-serial-device
-QEMU_RUN_FLAGS = -chardev socket,server,host=localhost,port=1234,id=charconsole0 \
+		-semihosting-config enable=on,target=native \
+		-device virtio-serial-device \
 		-device virtconsole,chardev=charconsole0,id=console0 \
-		-serial mon:stdio
+		-device virtio-net-device,netdev=netdev0 \
+		-netdev user,id=netdev0
+QEMU_RUN_FLAGS = \
+		-chardev socket,server=on,host=localhost,port=1234,id=charconsole0 \
+		-serial mon:stdio -nographic
 
 .PHONY: run
 run:
@@ -39,6 +42,7 @@ $(sel4_dts_path): $(misc_build_dir)/virt.dtb
 
 $(misc_build_dir)/virt.dtb: | $(misc_build_dir)
 	$(QEMU_BIN) $(QEMU_BASE_FLAGS) \
+		-chardev socket,server=on,host=localhost,port=1234,id=charconsole0,wait=off \
 		-machine dumpdtb=$@
 
 system_files := \
