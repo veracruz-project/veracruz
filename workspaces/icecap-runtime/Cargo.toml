@@ -19,6 +19,7 @@ exclude = [
 ]
 members = [
   "crates/runtime-manager",
+  "src/virtio-console-server",
 ]
 resolver = "2"
 
