@@ -10,7 +10,6 @@ std = { path = "../rust/library/std" }
 
 # Hacks to get std to depend on our patches.
 libc = "=0.2.108"
-dlmalloc = "=0.1.3"
 
 [lib]
 crate-type = ["rlib"]
@@ -28,7 +27,6 @@ rustc-std-workspace-core = { path = "../rust/library/rustc-std-workspace-core" }
 rustc-std-workspace-alloc = { path = "../rust/library/rustc-std-workspace-alloc" }
 rustc-std-workspace-std = { path = "../rust/library/rustc-std-workspace-std" }
 
-dlmalloc = { path = "../dlmalloc" }
 libc = { path = "../libc" }
 
 icecap-std-impl = { path = "../../icecap/src/rust/crates/framework/std-support/icecap-std-impl" }

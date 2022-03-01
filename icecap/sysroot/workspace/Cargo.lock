@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "compiler_builtins"
-version = "0.1.66"
+version = "0.1.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "191424db7756bbed2c4996959a0fbda94388abcf4f5a2728a8af17481ad9c4f7"
+checksum = "a68c69e9451f1df4b215c9588c621670c12286b53e60fb5ec4b59aaa1138d18e"
 dependencies = [
  "rustc-std-workspace-core",
 ]
@@ -141,15 +141,6 @@ dependencies = [
 [[package]]
 name = "core"
 version = "0.0.0"
-
-[[package]]
-name = "dlmalloc"
-version = "0.1.3"
-dependencies = [
- "compiler_builtins",
- "libc",
- "rustc-std-workspace-core",
-]
 
 [[package]]
 name = "dlmalloc"
@@ -230,7 +221,7 @@ name = "icecap-dlmalloc"
 version = "0.1.0"
 dependencies = [
  "compiler_builtins",
- "dlmalloc 0.2.3",
+ "dlmalloc",
  "icecap-sync",
  "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",
@@ -319,9 +310,9 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afe203d669ec979b7128619bae5a63b7b42e9203c1b29146079ee05e2f604b52"
+checksum = "efbc0f03f9a775e9f6aed295c6a1ba2253c5757a9e03d55c6caa46a681abcddd"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi",
@@ -378,18 +369,18 @@ checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.33"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb37d2df5df740e582f28f8560cf425f52bb267d872fe58358eadb554909f07a"
+checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.10"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
+checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
 dependencies = [
  "proc-macro2",
 ]
@@ -455,8 +446,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "compiler_builtins",
  "core",
- "dlmalloc 0.1.3",
- "dlmalloc 0.2.3",
+ "dlmalloc",
  "fortanix-sgx-abi",
  "hashbrown",
  "hermit-abi",
@@ -487,9 +477,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "syn"
-version = "1.0.82"
+version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8daf5dd0bb60cbd4137b1b587d2fc0ae729bc07cf01cd70b36a1ed5ade3b9d59"
+checksum = "8a65b3f4ffa0092e9887669db0eae07941f023991ab58ea44da8fe8e2d511c6b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -500,7 +490,6 @@ dependencies = [
 name = "sysroot"
 version = "0.3.0"
 dependencies = [
- "dlmalloc 0.1.3",
  "libc",
  "std",
 ]
@@ -554,9 +543,9 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "version_check"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
+checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "wasi"
@@ -571,9 +560,9 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "4.2.2"
+version = "4.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea187a8ef279bc014ec368c27a920da2024d2a711109bfbe3440585d5cf27ad9"
+checksum = "2a5a7e487e921cf220206864a94a89b6c6905bfc19f1057fa26a4cb360e5c1d2"
 dependencies = [
  "either",
  "lazy_static",

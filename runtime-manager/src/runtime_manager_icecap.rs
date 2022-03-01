@@ -19,14 +19,12 @@ use hypervisor_event_server_types::{
     calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
 };
 use icecap_core::{
-    config::RingBufferConfig,
-    config::RingBufferKicksConfig,
+    config::{RingBufferConfig, RingBufferKicksConfig},
     logger::{DisplayMode, Level, Logger},
     prelude::*,
-    runtime as icecap_runtime,
+    ring_buffer::*,
+    rpc, runtime as icecap_runtime,
 };
-use icecap_rpc::Client;
-use icecap_ring_buffer::*;
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
 
@@ -48,7 +46,7 @@ fn main(config: Config) -> Fallible<()> {
     icecap_runtime_init();
 
     let channel = {
-        let event_server = Client::<EventServerRequest>::new(config.event_server_endpoint);
+        let event_server = rpc::Client::<EventServerRequest>::new(config.event_server_endpoint);
         let index = {
             use events::*;
             RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
@@ -213,7 +211,7 @@ const LOG_LEVEL: Level = Level::Error;
 const NOW: u64 = include!("../NOW");
 
 fn icecap_runtime_init() {
-    icecap_std_external::set_panic();
+    icecap_std_external::early_init();
     icecap_std_external::set_now(std::time::Duration::from_secs(NOW));
     let mut logger = Logger::default();
     logger.level = LOG_LEVEL;
