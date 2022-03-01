@@ -12,8 +12,9 @@ RUN apt-get update && \
         bash-completion \
         bc \
         bison \
-        ccache \
         ca-certificates \
+        ccache \
+        clang \
         cmake \
         coreutils \
         cpio \
