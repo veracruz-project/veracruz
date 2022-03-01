@@ -7,6 +7,8 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
+# FIXME: This file is duplicated at workspaces/icecap-host/targets.nix
+
 let
   topLevel = import ./nix;
   inherit (topLevel) lib veracruz;
