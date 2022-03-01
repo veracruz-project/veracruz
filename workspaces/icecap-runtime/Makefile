@@ -206,12 +206,11 @@ sysroot: userspace_c sel4
 	cargo build \
 		-Z unstable-options \
 		-Z binary-dep-depinfo \
-		--release \
+		--release $(V_FLAG) \
 		--manifest-path sysroot/workspace/Cargo.toml \
 		--target $(rust_target) \
 		-j$$(nproc) \
 		--target-dir $(sysroot_target_dir)
-
 
 ###########################################################################
 # Veracruz part
@@ -245,7 +244,7 @@ rust-project: $(now) sysroot-install userspace_c sel4
 			--target $(rust_target) \
 			$(foreach x,$(icedl_components),-p $(x)) \
 			--features icecap \
-			$(PROFILE_FLAG) \
+			$(PROFILE_FLAG) $(V_FLAG) \
 			-j$$(nproc) \
 			--target-dir $(target_dir) \
 			--out-dir $(bin_dir)
@@ -405,16 +404,7 @@ elfloader-build: elfloader-configure
 $(elfloader_build_dir)/build/elfloader: elfloader-build
 
 .PHONY: elfloader
-elfloader: $(elfloader_build_dir)/build/elfloader
+elfloader: $(elfloader_build_dir)/build/elfloader css-icecap.bin
 
-# get capdl output for debugging
-.PHONY: cdl
-cdl: $(icedl_firmware_cdl)
-		cat $< && echo
-
-cdl2:
-	@echo $(icedl_components_prepared)
-	@echo $(rust_icecap_bins)/runtime_manager_enclave.elf
-	@echo $(icedl_component_dir)/runtime_manager.min.elf
-	@echo $(icedl_component_dir)/runtime_manager.full.elf
-
+css-icecap.bin: $(elfloader_build_dir)/build/elfloader
+	cp $< $@

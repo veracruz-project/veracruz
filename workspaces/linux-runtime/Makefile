@@ -29,7 +29,7 @@ linux: target/$(PROFILE_PATH)/runtime_manager_enclave \
 
 target/$(PROFILE_PATH)/runtime_manager_enclave: \
 	Cargo.toml $(Linux_Src)
-	cargo build $(PROFILE_FLAG) --features linux \
+	cargo build $(PROFILE_FLAG) $(V_FLAG) --features linux \
 		-p runtime_manager_enclave
 	cp target/$(PROFILE_PATH)/runtime_manager_enclave .
 
