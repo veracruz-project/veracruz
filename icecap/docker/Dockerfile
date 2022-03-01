@@ -22,6 +22,7 @@ RUN apt-get update && \
         doxygen \
         file \
         flex \
+        g++ \
         gcc-aarch64-linux-gnu \
         gdb \
         git \
@@ -29,10 +30,13 @@ RUN apt-get update && \
         haskell-stack \
         less \
         libc6-dev-arm64-cross \
+        libsqlite3-dev \
+        libssl-dev \
         libxml2-utils \
         netbase \
         ninja-build \
         openssh-client \
+        pkg-config \
         protobuf-compiler \
         python3-dev \
         python3-pip \
@@ -41,6 +45,7 @@ RUN apt-get update && \
         qemu-system-arm \
         strace \
         sudo \
+        telnet \
         u-boot-tools \
         unzip \
         vim \
