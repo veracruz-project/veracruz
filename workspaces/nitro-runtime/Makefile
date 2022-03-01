@@ -45,8 +45,8 @@ runtime_manager.eif PCR0: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runt
 target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
 	rustup target add $(ARCH)-unknown-linux-musl
 	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
-	cargo build --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) --features nitro \
-	  -p runtime_manager_enclave --verbose
+	cargo build --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
+		--features nitro -p runtime_manager_enclave
 
 doc:
 	cargo doc

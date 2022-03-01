@@ -43,11 +43,11 @@ build:
 		--features proxy-attestation-server/icecap \
 		--features veracruz-client/icecap \
 		--features veracruz-server/icecap \
-		--features cli -v
+		--features cli $(V_FLAG)
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
-	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)
+	$(MAKE) -C ../icecap-runtime elfloader css-icecap.bin ICECAP_PLAT=$(ICECAP_PLAT)
 
 test-dependencies: test-collateral $(LINUX_ROOT_ENCLAVE) $(RUNTIME_MANAGER_ENCLAVE)
 
@@ -66,7 +66,7 @@ veracruz-test: test-dependencies
 	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
 
 $(RUNTIME_MANAGER_ENCLAVE):
-	$(MAKE) -C ../icecap-runtime ICECAP_PLAT=$(ICECAP_PLAT)
+	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)
 
 doc:
 	cargo doc
