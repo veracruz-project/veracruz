@@ -45,18 +45,6 @@ fn main() {
         panic!("QCBOR failed to build");
     }
 
-    // make the mbed crypto library
-    let mbed_crypto_dir = format!("{:}/lib/mbed-crypto", project_dir);
-    let make_status = Command::new("make")
-        .env("CC", &cc)
-        .current_dir(mbed_crypto_dir.clone())
-        .args(&["-j8", "all", outdir_arg.as_str()])
-        .status()
-        .unwrap();
-    if !make_status.success() {
-        panic!("mbedtls failed to build");
-    }
-
     let t_cose_dir = format!("{:}/lib/t_cose", project_dir);
     let make_status = Command::new("make")
         .env("CC", &cc)
@@ -83,8 +71,10 @@ fn main() {
     println!("cargo:rustc-link-lib=static=psa_attestation");
     println!("cargo:rustc-link-search={:}", target_dir);
     println!("cargo:rustc-link-lib=static=qcbor");
-    println!("cargo:rustc-link-lib=static=mbedcrypto");
     println!("cargo:rustc-link-lib=static=t_cose");
+    // These two C libraries come from psa-crypto / psa-crypto-sys:
+    println!("cargo:rustc-link-lib=static=mbedcrypto");
+    println!("cargo:rustc-link-lib=static=shim");
 
     // Tell cargo to invalidate the build crate whenever the wrapper changes
     //println!("cargo:rerun-if-changed=wrapper.h");

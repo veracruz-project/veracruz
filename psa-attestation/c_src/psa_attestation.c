@@ -16,7 +16,7 @@ void attest_core_set_key_handle(psa_key_handle_t new_key_handle);
 psa_status_t
 psa_initial_attest_load_key(uint8_t const *private_key,
                             size_t private_key_size,
-                            uint16_t *p_key_handle) {
+                            uint32_t *p_key_handle) {
     psa_status_t status;
     status = psa_crypto_init();
     if (status != PSA_SUCCESS) {
@@ -26,7 +26,7 @@ psa_initial_attest_load_key(uint8_t const *private_key,
     psa_key_attributes_t attributes = psa_key_attributes_init();
     psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_HASH );
     psa_set_key_algorithm(&attributes, PSA_ALG_ECDSA(PSA_ALG_SHA_256));
-    psa_set_key_type(&attributes, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_CURVE_SECP256R1));
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
     status = psa_import_key(&attributes,
                             private_key,
                             private_key_size,
@@ -40,7 +40,7 @@ psa_initial_attest_load_key(uint8_t const *private_key,
 }
 
 psa_status_t
-psa_initial_attest_remove_key(uint16_t key_handle) {
+psa_initial_attest_remove_key(uint32_t key_handle) {
     psa_status_t status;
     status = psa_crypto_init();
     if (status != PSA_SUCCESS) {

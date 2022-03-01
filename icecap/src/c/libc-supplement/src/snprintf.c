@@ -11,6 +11,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 int snprintf(char *str, size_t size, const char *format, ...) {
     // HACK instead of implementing sprintf, just:

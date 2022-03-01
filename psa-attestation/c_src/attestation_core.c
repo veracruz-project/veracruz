@@ -642,7 +642,7 @@ attest_add_instance_id_claim(struct attest_token_ctx *token_ctx)
     mbedtls_sha256_context hash_context;
     mbedtls_sha256_init( &hash_context );
 
-    crypto_res = mbedtls_sha256_update_ret( &hash_context,
+    crypto_res = mbedtls_sha256_update( &hash_context,
                                public_key,
                               key_len );
     if (crypto_res != 0) {
@@ -650,7 +650,7 @@ attest_add_instance_id_claim(struct attest_token_ctx *token_ctx)
     }
 
     /* The hash starts from the second byte, leaving the first free. */
-    crypto_res = mbedtls_sha256_finish_ret(&hash_context, instance_id + 1);
+    crypto_res = mbedtls_sha256_finish(&hash_context, instance_id + 1);
     if (crypto_res != 0) {
         return PSA_ATTEST_ERR_CLAIM_UNAVAILABLE;
     }

@@ -256,7 +256,7 @@ mod attestation_hack {
         let enclave_hash = &RUNTIME_MANAGER_HASH;
         let csr_hash = digest::digest(&digest::SHA256, csr);
 
-        let mut root_key_handle: u16 = 0;
+        let mut root_key_handle: u32 = 0;
         assert_eq!(0, unsafe {
             psa_attestation::psa_initial_attest_load_key(
                 root_private_key.as_ptr(),
@@ -317,9 +317,11 @@ mod c_hack {
 
     #[no_mangle]
     extern "C" fn free(ptr: *mut core::ffi::c_void) {
-        unsafe {
-            // TODO is this sound?
-            Box::<u8>::from_raw(ptr as *mut u8);
+        if !ptr.is_null() {
+            unsafe {
+                // TODO is this sound?
+                Box::<u8>::from_raw(ptr as *mut u8);
+            }
         }
     }
 }

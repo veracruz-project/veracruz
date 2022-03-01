@@ -51,9 +51,9 @@ typedef int32_t psa_status_t;
 
 psa_status_t psa_initial_attest_load_key(uint8_t const *private_key,
                                          size_t private_key_size,
-                                         uint16_t *p_key_handle);
+                                         uint32_t *p_key_handle);
 
-psa_status_t psa_initial_attest_remove_key(uint16_t key_handle);
+psa_status_t psa_initial_attest_remove_key(uint32_t key_handle);
 
 /**
  * The list of fixed claims in the initial attestation token is still evolving,
