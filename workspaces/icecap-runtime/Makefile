@@ -77,7 +77,7 @@ buildInputs = $(sel4_build_dir)/install/libsel4 \
 icecap_c_include_flags := $(foreach x,$(buildInputs),-I$(abspath $(x)/include))
 icecap_c_lib_flags := $(foreach x,$(buildInputs),-L$(abspath $(x)/lib))
 
-compiler_some_libc_include := /usr/lib/gcc-cross/aarch64-linux-gnu/11/include/
+compiler_some_libc_include := $(wildcard /usr/lib/gcc-cross/aarch64-linux-gnu/*/include/)
 
 .PHONY: none
 none:
@@ -406,3 +406,15 @@ $(elfloader_build_dir)/build/elfloader: elfloader-build
 
 .PHONY: elfloader
 elfloader: $(elfloader_build_dir)/build/elfloader
+
+# get capdl output for debugging
+.PHONY: cdl
+cdl: $(icedl_firmware_cdl)
+		cat $< && echo
+
+cdl2:
+	@echo $(icedl_components_prepared)
+	@echo $(rust_icecap_bins)/runtime_manager_enclave.elf
+	@echo $(icedl_component_dir)/runtime_manager.min.elf
+	@echo $(icedl_component_dir)/runtime_manager.full.elf
+

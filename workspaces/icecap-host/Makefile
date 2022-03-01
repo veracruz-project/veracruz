@@ -36,7 +36,6 @@ TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 all: build test-collateral
 
 build:
-	BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/$(shell uname -m)-linux-gnu/11/include" \
 	$(COMPILERS) RUST_BACKTRACE=full \
 		cargo build $(PROFILE_FLAG) \
 		-p proxy-attestation-server \
