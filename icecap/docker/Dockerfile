@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND noninteractive
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install --no-install-recommends -y \
         bash-completion \
         bc \
@@ -24,6 +25,7 @@ RUN apt-get update && \
         file \
         flex \
         g++ \
+        gcc \
         gcc-aarch64-linux-gnu \
         gdb \
         git \
@@ -39,6 +41,7 @@ RUN apt-get update && \
         openssh-client \
         pkg-config \
         protobuf-compiler \
+        procps \
         python3-dev \
         python3-pip \
         python3-protobuf \
@@ -49,10 +52,12 @@ RUN apt-get update && \
         telnet \
         u-boot-tools \
         unzip \
+        uuid-dev \
         vim \
         wget \
+        xxd \
+        zlib1g-dev \
         && \
-    apt-get upgrade -y && \
     apt-get autoremove -y && apt-get clean && \
     rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
@@ -108,7 +113,9 @@ RUN set -eux; \
     echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
+    cargo install diesel_cli --no-default-features --features sqlite ; \
     rm rustup-init; \
+    rm -rf /usr/local/cargo/registry/*/github.com-* ; \
     mkdir -p /local; \
     if [ "$USER" != "root" ] ; then \
         groupadd -f -g $GID $USER ; \
