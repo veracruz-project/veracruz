@@ -23,6 +23,6 @@ libc = "0.2.69"
 psa-crypto = { path = "../third-party/rust-psa-crypto/psa-crypto" }
 
 [build-dependencies]
-bindgen = "0.57.0"
+bindgen = "0.59.2"
 cfg-if = "1.0"
 cmake = "0.1"
