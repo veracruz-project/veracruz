@@ -1,4 +1,0 @@
-[toolchain]
-channel = "nightly-2021-08-25"
-components = [ "rustfmt", "rust-src" ]
-targets = [ "aarch64-unknown-linux-gnu" ]

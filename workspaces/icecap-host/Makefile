@@ -1,128 +1,83 @@
+# Makefile
+#
 # AUTHORS
 #
 # The Veracruz Development Team.
 #
-# COPYRIGHT
+# COPYRIGHT AND LICENSING
 #
-# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
-# and copyright information.
+# See the `LICENSING.markdown` file in the Veracruz root directory for
+# licensing and copyright information.
 
-include ../../icecap/mk/common.mk
-include ../common.mk
+.PHONY: all build clean clean-cargo-lock default doc fmt \
+	test-dependencies test-collateral test-server test-client veracruz-test
 
-test_system := $(build_dir)/test-system
-now := $(build_dir)/NOW
+default: build
 
-nix_build := nix-build
-nix_shell := nix-shell --pure
-nix_expression := targets.nix
-nix_attribute_path := $(ICECAP_PLAT)
+ICECAP_PLAT ?= virt
+WORKSPACE_DIR = $(abspath ..)
+OUT_DIR ?= $(abspath test-collateral)
+MEASUREMENT_FILE = $(abspath ../icecap-runtime/css-icecap.bin)
+MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 
-inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) PROFILE=$(PROFILE) $@
+include $(WORKSPACE_DIR)/common.mk
+include $(WORKSPACE_DIR)/shared.mk
 
-# HACK
-# Certificate expiry matters require the time in the host and realm to align
-# roughly with the time that test cases are generated. The content of this file
-# is embedded into both the host initramfs and the Runtime Manager to be used
-# for setting the time at startup.
-$(now): | $(build_dir)
-	date +%s | tr -d '\n' > $@
+COMPILERS = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 
-# Explicitly update the time in the host and the realm at the cost of some rebuilding
-.PHONY: update-time
-update-time:
-	rm -f $(now)
+RUNTIME_MANAGER_ENCLAVE = $(WORKSPACE_DIR)/icecap-runtime/build/virt/disposable/cmake/elfloader/build/elfloader
+TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
+	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
+	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
+	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
+	VERACRUZ_DATA_DIR=$(OUT_DIR) \
+	RUNTIME_MANAGER_ENCLAVE_PATH=$(RUNTIME_MANAGER_ENCLAVE)
 
-.PHONY: runtime-manager
-runtime-manager: $(now)
-	$(MAKE) -C ../icecap-runtime runtime-manager
+all: build test-collateral
 
-.PHONY: sysroot
-sysroot:
-	$(MAKE) -C ../icecap-runtime sysroot
+build:
+	BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/$(shell uname -a)-linux-gnu/11/include" \
+	$(COMPILERS) RUST_BACKTRACE=full \
+		cargo build $(PROFILE_FLAG) \
+		-p proxy-attestation-server \
+		-p veracruz-client -p veracruz-server \
+		--features proxy-attestation-server/icecap \
+		--features veracruz-client/icecap \
+		--features veracruz-server/icecap \
+		--features cli -v
 
-.PHONY: veracruz-server-test
-veracruz-server-test:
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.host --run '$(call inner_make_cmd,host)'
+.PHONY: $(MEASUREMENT_FILE)
+$(MEASUREMENT_FILE):
+	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)
 
-.PHONY: veracruz-test
-veracruz-test:
-	$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.host --run '$(call inner_make_cmd,host)'
+test-dependencies: test-collateral $(LINUX_ROOT_ENCLAVE) $(RUNTIME_MANAGER_ENCLAVE)
 
-.PHONY: test-collateral
-test-collateral: set-key-permissions
-	if [ -f /usr/local/cargo/bin/cargo ] ; then \
-		$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral ; \
-	else \
-		$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) PROFILE=$(PROFILE) -f test.mk test-collateral' ; \
-	fi
+CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features icecap
 
-test_system_body = $(nix_build) $(nix_expression) -A $(nix_attribute_path).test-system -o $(test_system)
+test-server: test-dependencies
+	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
+	$(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) -p veracruz-server-test test_debug -- --ignored --test-threads=1
 
-.PHONY: test-system
-test-system: $(now) runtime-manager veracruz-server-test veracruz-test test-collateral
-	$(test_system_body)
+test-client: test-dependencies
+	$(CARGO_TEST) -p veracruz-client --lib --features mock -- --test-threads=1
 
-# Convenient shortcut
-.PHONY: test-system-stale-test-collateral
-test-system-stale-test-collateral: $(now) runtime-manager veracruz-server-test veracruz-test # implicit prerequisite: test-collateral
-	$(test_system_body)
+veracruz-test: test-dependencies
+	$(CARGO_TEST) -p veracruz-test --no-run
+	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
 
-# Convenient shortcut
-.PHONY: test-system-stale
-test-system-stale: $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-collateral
-	$(test_system_body)
+$(RUNTIME_MANAGER_ENCLAVE):
+	$(MAKE) -C ../icecap-runtime ICECAP_PLAT=$(ICECAP_PLAT)
 
-nix/host/token-ssh-key.priv: ../../icecap/nix/host/token-ssh-key.priv
-	cp $< $@
-
-# Permission constraints required by the OpenSSH client cannot be expressed in Git or Nix
-.PHONY: set-key-permissions
-set-key-permissions: nix/host/token-ssh-key.priv
-	chmod 0400 nix/host/token-ssh-key.priv
-
-run_tests_body = script=$$($(nix_build) $(nix_expression) -A $(nix_attribute_path).run-tests --no-out-link) && eval $$script
-
-.PHONY: run-tests
-run-tests: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test test-collateral
-	$(run_tests_body)
-
-# Convenient shortcut
-.PHONY: run-tests-stale-test-collateral
-run-tests-stale-test-collateral: set-key-permissions $(now) runtime-manager veracruz-server-test veracruz-test # implicit prerequisite: test-collateral
-	$(run_tests_body)
-
-# Convenient shortcut
-.PHONY: run-tests-stale
-run-tests-stale: set-key-permissions $(now) # implicit prerequisites: runtime-manager veracruz-server-test veracruz-test test-collateral
-	$(run_tests_body)
-
-
-# Clean everything specific to the IceCap build, all of which is contained in this ./icecap directory
-.PHONY: clean
-clean:
-	rm -rf $(build_dir)
-	if [ -f /usr/local/cargo/bin/cargo ] ; then \
-		$(MAKE) -f test.mk clean ; \
-	else \
-		$(nix_shell) $(nix_expression) -A $(nix_attribute_path).env.sdk-and-test-collateral --run '$(MAKE) -f test.mk clean' ; \
-	fi
-
-.PHONY: clean-cargo-lock
-clean-cargo-lock:
-	rm -f Cargo.lock
-
-.PHONY: doc
 doc:
 	cargo doc
 
-.PHONY: fmt
 fmt:
 	cargo fmt
 
-# This is a bit heavy-handed, but useful for achieving a clean slate for 'sdk' and 'test-collateral'
-.PHONY: deep-clean
-deep-clean: clean
-	cd ../.. && git clean -Xdff \
-		--exclude='!icecap/icecap/nixpkgs/' \
-		--exclude='!icecap/icecap/nixpkgs/**'
+clean:
+	cargo clean
+	rm -rf $(OUT_DIR)
+
+clean-cargo-lock:
+	rm -f Cargo.lock
