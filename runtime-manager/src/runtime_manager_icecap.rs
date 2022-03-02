@@ -11,197 +11,313 @@
 
 extern crate alloc;
 
-use bincode::{deserialize, serialize};
+use core::fmt::Write;
+
 use serde::{Deserialize, Serialize};
 
-use finite_set::Finite;
-use hypervisor_event_server_types::{
-    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
-};
-use icecap_core::{
-    config::{RingBufferConfig, RingBufferKicksConfig},
-    logger::{DisplayMode, Level, Logger},
-    prelude::*,
-    ring_buffer::*,
-    rpc, runtime as icecap_runtime,
-};
 use icecap_start_generic::declare_generic_main;
-use icecap_std_external;
-
-use veracruz_utils::platform::icecap::message::{Error, Request, Response};
-
-use crate::managers::{session_manager, RuntimeManagerError};
+use icecap_core::config::*;
+use icecap_core::prelude::*;
+use icecap_core::ring_buffer::*;
 
 declare_generic_main!(main);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Config {
-    event: Notification,
-    event_server_endpoint: Endpoint,
-    event_server_bitfield: usize,
-    channel: RingBufferConfig,
+    event_nfn: Notification,
+    virtio_console_server_ring_buffer: UnmanagedRingBufferConfig,
+    badges: Badges,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Badges {
+    virtio_console_server_ring_buffer: Badge,
 }
 
 fn main(config: Config) -> Fallible<()> {
-    icecap_runtime_init();
+    debug_println!("hello from application");
 
-    let channel = {
-        let event_server = rpc::Client::<EventServerRequest>::new(config.event_server_endpoint);
-        let index = {
-            use events::*;
-            RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
-        };
-        let kick = Box::new(move || {
-            event_server.call::<()>(&EventServerRequest::Signal {
-                index: index.to_nat(),
-            })
-        });
-        RingBuffer::resume_from_config(
-            &config.channel,
-            RingBufferKicksConfig {
-                read: kick.clone(),
-                write: kick,
-            },
-        )
-    };
+    // enable ring buffer to serial-server
+    let mut virtio_console_client = BufferedRingBuffer::new(RingBuffer::unmanaged_from_config(
+        &config.virtio_console_server_ring_buffer,
+    ));
+    virtio_console_client.ring_buffer().enable_notify_read();
+    virtio_console_client.ring_buffer().enable_notify_write();
 
-    let event_server_bitfield = unsafe { EventServerBitfield::new(config.event_server_bitfield) };
+//    // send hello
+//    out!(&mut virtio_console_client, "\nhello from application over serial-server!\n");
 
-    event_server_bitfield.clear_ignore_all();
+    // now loop responding to input
+    loop {
+        let badge = config.event_nfn.wait();
+        if badge & config.badges.virtio_console_server_ring_buffer != 0 {
+            virtio_console_client.rx_callback();
+            virtio_console_client.tx_callback();
+            if let Some(chars) = virtio_console_client.rx() {
+                for (i, chunk) in chars.chunks(16).enumerate() {
+                    debug_print!("{:08x}: ", i);
+                    for x in chunk {
+                        debug_print!("{:02x} ", x);
+                    }
+                    debug_print!("  ");
+                    for x in chunk {
+                        debug_print!("{}", if x.is_ascii_graphic() { char::from(*x) } else { '.' });
+                    }
+                    debug_println!();
 
-    RuntimeManager::new(channel, config.event, event_server_bitfield).run()
-}
-
-struct RuntimeManager {
-    channel: PacketRingBuffer,
-    event: Notification,
-    event_server_bitfield: EventServerBitfield,
-    active: bool,
-}
-
-impl RuntimeManager {
-    fn new(
-        channel: RingBuffer,
-        event: Notification,
-        event_server_bitfield: EventServerBitfield,
-    ) -> Self {
-        Self {
-            channel: PacketRingBuffer::new(channel),
-            event,
-            event_server_bitfield,
-            active: true,
-        }
-    }
-
-    fn run(&mut self) -> Fallible<()> {
-        loop {
-            let req = self
-                .recv()
-                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
-            let resp = self.handle(req)?;
-            self.send(&resp)
-                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
-            if !self.active {
-                icecap_runtime::exit();
-            }
-        }
-    }
-
-    fn handle(&mut self, req: Request) -> Fallible<Response> {
-        Ok(match req {
-            Request::Attestation {
-                device_id,
-                challenge,
-            } => match session_manager::init_session_manager()
-                .and(self.handle_attestation(device_id, &challenge))
-            {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok((token, csr)) => Response::Attestation { token, csr },
-            },
-            Request::Initialize {
-                policy_json,
-                root_cert,
-                compute_cert,
-            } => match session_manager::load_policy(&policy_json).and(
-                session_manager::load_cert_chain(&vec![compute_cert, root_cert]),
-            ) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::Initialize,
-            },
-            Request::NewTlsSession => match session_manager::new_session() {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(sess) => Response::NewTlsSession(sess),
-            },
-            Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::CloseTlsSession,
-            },
-            Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::SendTlsData,
-            },
-            Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(needed) => Response::GetTlsDataNeeded(needed),
-            },
-            Request::GetTlsData(sess) => match session_manager::get_data(sess) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok((active, data)) => {
-                    self.active = active;
-                    Response::GetTlsData(active, data)
+                    //out!(&mut virtio_console_client, "input: {:?}\n", char::from(*c));
                 }
-            },
-        })
-    }
-
-    fn handle_attestation(
-        &self,
-        _device_id: i32,
-        challenge: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>), RuntimeManagerError> {
-        let csr = session_manager::generate_csr()?;
-        let token = attestation_hack::native_attestation(&challenge, &csr)?;
-        Ok((token, csr))
-    }
-
-    fn wait(&self) {
-        let badge = self.event.wait();
-        self.event_server_bitfield.clear_ignore(badge);
-    }
-
-    fn send(&mut self, resp: &Response) -> Result<(), RuntimeManagerError> {
-        let mut block = false;
-        let resp_bytes = serialize(resp).map_err(RuntimeManagerError::BincodeError)?;
-        while !self.channel.write(&resp_bytes) {
-            if block {
-                self.wait();
-                block = false;
-            } else {
-                block = true;
-                self.channel.enable_notify_write();
             }
-        }
-        self.channel.notify_write();
-        Ok(())
-    }
-
-    fn recv(&mut self) -> Result<Request, RuntimeManagerError> {
-        let mut block = false;
-        loop {
-            if let Some(msg) = self.channel.read() {
-                self.channel.notify_read();
-                let req = deserialize(&msg).map_err(RuntimeManagerError::BincodeError)?;
-                return Ok(req);
-            } else if block {
-                self.wait();
-                block = false;
-            } else {
-                block = true;
-                self.channel.enable_notify_read();
-            }
+            virtio_console_client.ring_buffer().enable_notify_read();
+            virtio_console_client.ring_buffer().enable_notify_write();
         }
     }
 }
+
+    // fn handle(&mut self, req: Request) -> Fallible<Response> {
+    //     Ok(match req {
+    //         Request::Attestation {
+    //             device_id,
+    //             challenge,
+    //         } => match session_manager::init_session_manager()
+    //             .and(self.handle_attestation(device_id, &challenge))
+    //         {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok((token, csr)) => Response::Attestation { token, csr },
+    //         },
+    //         Request::Initialize {
+    //             policy_json,
+    //             root_cert,
+    //             compute_cert,
+    //         } => match session_manager::load_policy(&policy_json).and(
+    //             session_manager::load_cert_chain(&vec![compute_cert, root_cert]),
+    //         ) {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok(()) => Response::Initialize,
+    //         },
+    //         Request::NewTlsSession => match session_manager::new_session() {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok(sess) => Response::NewTlsSession(sess),
+    //         },
+    //         Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok(()) => Response::CloseTlsSession,
+    //         },
+    //         Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok(()) => Response::SendTlsData,
+    //         },
+    //         Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok(needed) => Response::GetTlsDataNeeded(needed),
+    //         },
+    //         Request::GetTlsData(sess) => match session_manager::get_data(sess) {
+    //             Err(_) => Response::Error(Error::Unspecified),
+    //             Ok((active, data)) => {
+    //                 self.active = active;
+    //                 Response::GetTlsData(active, data)
+    //             }
+    //         },
+    //     })
+    // }
+
+
+use icecap_core::logger::{DisplayMode, Level, Logger};
+
+//use bincode::{deserialize, serialize};
+//use serde::{Deserialize, Serialize};
+//
+//use finite_set::Finite;
+//use hypervisor_event_server_types::{
+//    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
+//};
+//use icecap_core::{
+//    config::{RingBufferConfig, RingBufferKicksConfig},
+//    logger::{DisplayMode, Level, Logger},
+//    prelude::*,
+//    ring_buffer::*,
+//    rpc, runtime as icecap_runtime,
+//};
+//use icecap_start_generic::declare_generic_main;
+//use icecap_std_external;
+
+use veracruz_utils::platform::icecap::message::{Error, Request, Response};
+
+use crate::managers::{session_manager, RuntimeManagerError};
+
+//declare_generic_main!(main);
+//
+//#[derive(Debug, Clone, Serialize, Deserialize)]
+//struct Config {
+//    event: Notification,
+//    event_server_endpoint: Endpoint,
+//    event_server_bitfield: usize,
+//    channel: RingBufferConfig,
+//}
+//
+//fn main(config: Config) -> Fallible<()> {
+//    icecap_runtime_init();
+//
+//    let channel = {
+//        let event_server = rpc::Client::<EventServerRequest>::new(config.event_server_endpoint);
+//        let index = {
+//            use events::*;
+//            RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
+//        };
+//        let kick = Box::new(move || {
+//            event_server.call::<()>(&EventServerRequest::Signal {
+//                index: index.to_nat(),
+//            })
+//        });
+//        RingBuffer::resume_from_config(
+//            &config.channel,
+//            RingBufferKicksConfig {
+//                read: kick.clone(),
+//                write: kick,
+//            },
+//        )
+//    };
+//
+//    let event_server_bitfield = unsafe { EventServerBitfield::new(config.event_server_bitfield) };
+//
+//    event_server_bitfield.clear_ignore_all();
+//
+//    RuntimeManager::new(channel, config.event, event_server_bitfield).run()
+//}
+//
+//struct RuntimeManager {
+//    channel: PacketRingBuffer,
+//    event: Notification,
+//    event_server_bitfield: EventServerBitfield,
+//    active: bool,
+//}
+//
+//impl RuntimeManager {
+//    fn new(
+//        channel: RingBuffer,
+//        event: Notification,
+//        event_server_bitfield: EventServerBitfield,
+//    ) -> Self {
+//        Self {
+//            channel: PacketRingBuffer::new(channel),
+//            event,
+//            event_server_bitfield,
+//            active: true,
+//        }
+//    }
+//
+//    fn run(&mut self) -> Fallible<()> {
+//        loop {
+//            let req = self
+//                .recv()
+//                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
+//            let resp = self.handle(req)?;
+//            self.send(&resp)
+//                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
+//            if !self.active {
+//                icecap_runtime::exit();
+//            }
+//        }
+//    }
+//
+//    fn handle(&mut self, req: Request) -> Fallible<Response> {
+//        Ok(match req {
+//            Request::Initialize { policy_json } => {
+//                match session_manager::init_session_manager()
+//                    .and(session_manager::load_policy(&policy_json))
+//                {
+//                    Err(_) => Response::Error(Error::Unspecified),
+//                    Ok(()) => Response::Initialize,
+//                }
+//            }
+//            Request::Attestation {
+//                device_id,
+//                challenge,
+//            } => match self.handle_attestation(device_id, &challenge) {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok((token, csr)) => Response::Attestation { token, csr },
+//            },
+//            Request::CertificateChain {
+//                root_cert,
+//                compute_cert,
+//            } => match session_manager::load_cert_chain(&vec![compute_cert, root_cert]) {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok(()) => Response::CertificateChain,
+//            },
+//            Request::NewTlsSession => match session_manager::new_session() {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok(sess) => Response::NewTlsSession(sess),
+//            },
+//            Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok(()) => Response::CloseTlsSession,
+//            },
+//            Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok(()) => Response::SendTlsData,
+//            },
+//            Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok(needed) => Response::GetTlsDataNeeded(needed),
+//            },
+//            Request::GetTlsData(sess) => match session_manager::get_data(sess) {
+//                Err(_) => Response::Error(Error::Unspecified),
+//                Ok((active, data)) => {
+//                    self.active = active;
+//                    Response::GetTlsData(active, data)
+//                }
+//            },
+//        })
+//    }
+//
+//    fn handle_attestation(
+//        &self,
+//        _device_id: i32,
+//        challenge: &[u8],
+//    ) -> Result<(Vec<u8>, Vec<u8>), RuntimeManagerError> {
+//        let csr = session_manager::generate_csr()?;
+//        let token = attestation_hack::native_attestation(&challenge, &csr)?;
+//        Ok((token, csr))
+//    }
+//
+//    fn wait(&self) {
+//        let badge = self.event.wait();
+//        self.event_server_bitfield.clear_ignore(badge);
+//    }
+//
+//    fn send(&mut self, resp: &Response) -> Result<(), RuntimeManagerError> {
+//        let mut block = false;
+//        let resp_bytes = serialize(resp).map_err(RuntimeManagerError::BincodeError)?;
+//        while !self.channel.write(&resp_bytes) {
+//            if block {
+//                self.wait();
+//                block = false;
+//            } else {
+//                block = true;
+//                self.channel.enable_notify_write();
+//            }
+//        }
+//        self.channel.notify_write();
+//        Ok(())
+//    }
+//
+//    fn recv(&mut self) -> Result<Request, RuntimeManagerError> {
+//        let mut block = false;
+//        loop {
+//            if let Some(msg) = self.channel.read() {
+//                self.channel.notify_read();
+//                let req = deserialize(&msg).map_err(RuntimeManagerError::BincodeError)?;
+//                return Ok(req);
+//            } else if block {
+//                self.wait();
+//                block = false;
+//            } else {
+//                block = true;
+//                self.channel.enable_notify_read();
+//            }
+//        }
+//    }
+//}
 
 const LOG_LEVEL: Level = Level::Error;
 
