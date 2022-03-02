@@ -16,7 +16,10 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use policy_utils::principal::{FileRights, Principal, RightsTable};
+use policy_utils::{
+    principal::{FileRights, Principal, RightsTable},
+    CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
+};
 #[cfg(not(feature = "icecap"))]
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
@@ -356,13 +359,28 @@ impl InodeTable {
     /// Install standard streams (`stdin`, `stdout`, `stderr`).
     fn install_standard_streams_inode(&mut self) -> FileSystemResult<()> {
         self.stdin = self.new_inode()?;
-        self.add_file(self.stdin, "stdin", self.stdin, Vec::new())?;
+        self.add_file(
+            self.stdin,
+            CANONICAL_STDIN_FILE_PATH,
+            self.stdin,
+            Vec::new(),
+        )?;
 
         self.stdout = self.new_inode()?;
-        self.add_file(self.stdout, "stdout", self.stdout, Vec::new())?;
+        self.add_file(
+            self.stdout,
+            CANONICAL_STDOUT_FILE_PATH,
+            self.stdout,
+            Vec::new(),
+        )?;
 
         self.stderr = self.new_inode()?;
-        self.add_file(self.stderr, "stderr", self.stderr, Vec::new())?;
+        self.add_file(
+            self.stderr,
+            CANONICAL_STDERR_FILE_PATH,
+            self.stderr,
+            Vec::new(),
+        )?;
         Ok(())
     }
 
@@ -642,9 +660,9 @@ impl FileSystem {
         };
         let mut all_rights = HashMap::new();
         all_rights.insert(PathBuf::from("/"), Rights::all());
-        all_rights.insert(PathBuf::from("stdin"), Rights::all());
-        all_rights.insert(PathBuf::from("stdout"), Rights::all());
-        all_rights.insert(PathBuf::from("stderr"), Rights::all());
+        all_rights.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), Rights::all());
+        all_rights.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), Rights::all());
+        all_rights.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), Rights::all());
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
         Ok(rst)
@@ -700,9 +718,9 @@ impl FileSystem {
             // Base rights are ignored and replaced with the default rights
 
             let (fd_number, inode_number) = match std_stream.file_name() {
-                "stdin" => (Fd(0), self.lock_inode_table()?.stdin()),
-                "stdout" => (Fd(1), self.lock_inode_table()?.stdout()),
-                "stderr" => (Fd(2), self.lock_inode_table()?.stderr()),
+                CANONICAL_STDIN_FILE_PATH => (Fd(0), self.lock_inode_table()?.stdin()),
+                CANONICAL_STDOUT_FILE_PATH => (Fd(1), self.lock_inode_table()?.stdout()),
+                CANONICAL_STDERR_FILE_PATH => (Fd(2), self.lock_inode_table()?.stderr()),
                 _otherwise => continue,
             };
             let rights = Rights::from_bits(<_>::try_from_or_errno(*std_stream.rights())?)
@@ -732,7 +750,11 @@ impl FileSystem {
                 let rights = *v;
                 match file {
                     // Extract right associated to stdin stdout stderr
-                    Some(path) if path == "stdin" || path == "stdout" || path == "stderr" => {
+                    Some(path)
+                        if path == CANONICAL_STDIN_FILE_PATH
+                            || path == CANONICAL_STDOUT_FILE_PATH
+                            || path == CANONICAL_STDERR_FILE_PATH =>
+                    {
                         let rights_u32 = match u32::try_from_or_errno(u64::from(rights)) {
                             Ok(o) => o,
                             Err(_) => return None,
@@ -752,7 +774,9 @@ impl FileSystem {
         // Load all pre-opened directories. Create directories if necessary.
         let rights_table_without_std = rights_table.iter().filter(|(k, _)| {
             let k = k.as_ref();
-            k != Path::new("stdin") && k != Path::new("stdout") && k != Path::new("stderr")
+            k != Path::new(CANONICAL_STDIN_FILE_PATH)
+                && k != Path::new(CANONICAL_STDOUT_FILE_PATH)
+                && k != Path::new(CANONICAL_STDERR_FILE_PATH)
         });
         for (index, (path, rights)) in rights_table_without_std.enumerate() {
             let new_fd = Fd(u32::try_from_or_errno(index)? + first_fd);

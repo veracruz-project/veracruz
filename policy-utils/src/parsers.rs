@@ -13,6 +13,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
 #[cfg(feature = "std")]
 use std::{borrow::Cow, ffi, path};
 
@@ -63,16 +64,14 @@ pub fn parse_renamable_paths(
 /// Insert a backslash (/) if the path does not already have one
 ///
 /// Veracruz currently doesn't have a concept of "current directory", so
-/// the "current directory" is always the root. This avoid easy typing
+/// the "current directory" is always the root. This avoids easy typing
 /// mistakes.
 #[cfg(feature = "std")]
 pub fn enforce_leading_backslash(path: &str) -> Cow<str> {
-    let is_special_file = match path {
-        "stdin" => true,
-        "stderr" => true,
-        "stdout" => true,
-        _otherwise => false,
-    };
+    let is_special_file = path == CANONICAL_STDIN_FILE_PATH
+        || path == CANONICAL_STDOUT_FILE_PATH
+        || path == CANONICAL_STDERR_FILE_PATH;
+
     if !path.starts_with('/') && !is_special_file {
         Cow::Owned(format!("/{}", path))
     } else {

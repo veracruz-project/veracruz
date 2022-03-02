@@ -9,8 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use policy_utils::{policy::Policy, principal::Principal};
-use std::sync::Mutex;
+use policy_utils::{policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH};
 
 use execution_engine::{execute, fs::FileSystem};
 use lazy_static::lazy_static;
@@ -18,7 +17,10 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     string::{String, ToString},
-    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicU32, Ordering},
+        Mutex,
+    },
     vec::Vec,
 };
 use wasi_types::ErrNo;
@@ -130,13 +132,15 @@ impl ProtocolState {
                 }
             }
         }
-        let mut vfs = self.vfs.spawn(client_id)?;
-        match file_name {
-            "stdin" => {
-                vfs.write_stdin(&data)?;
-            }
-            _otherwise => vfs.write_file_by_absolute_path(file_name, data, false)?,
-        };
+
+        if file_name == CANONICAL_STDIN_FILE_PATH {
+            self.vfs.spawn(client_id)?.write_stdin(&data)?;
+        } else {
+            self.vfs
+                .spawn(client_id)?
+                .write_file_by_absolute_path(file_name, data, false)?;
+        }
+
         Ok(())
     }
 
