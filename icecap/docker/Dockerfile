@@ -47,6 +47,7 @@ RUN apt-get update && \
         python3-protobuf \
         python3-setuptools \
         qemu-system-arm \
+        sqlite3 \
         strace \
         sudo \
         telnet \
