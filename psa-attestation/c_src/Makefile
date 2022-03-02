@@ -8,17 +8,21 @@
 #
 # See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
- 
+
 OUT_DIR?=.
-INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../lib/mbed-crypto/include -I ../lib/QCBOR/inc -I ../lib/t_cose/inc -I ../lib/t_cose/inc/t_cose -I ../lib/psa_crypto/include/
+CFLAGS=-g -fPIC
+INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../../third-party/rust-psa-crypto/psa-crypto-sys/vendor/include -I ../lib/QCBOR/inc -I ../lib/t_cose/inc -I ../lib/t_cose/inc/t_cose -I ../lib/psa_crypto/include/
 
 .PHONY: clean all
 
 all: $(OUT_DIR)/libpsa_attestation.a
 
-CFLAGS=-g -fPIC
-$(OUT_DIR)/libpsa_attestation.a: $(OUT_DIR)/psa_attestation.o $(OUT_DIR)/attestation_core.o $(OUT_DIR)/attest_token.o
-	ar cr $@ $(OUT_DIR)/psa_attestation.o $(OUT_DIR)/attestation_core.o $(OUT_DIR)/attest_token.o
+clean:
+	rm -f $(OUT_DIR)/*.o $(OUT_DIR)/*.a
+
+# psa-attestation
+
+PSA_ATT_OBJ=$(OUT_DIR)/psa_attestation.o $(OUT_DIR)/attestation_core.o $(OUT_DIR)/attest_token.o
 
 $(OUT_DIR)/psa_attestation.o: psa_attestation.c ../include/internal/attestation.h ../include/psa/initial_attestation.h
 	$(CC) $(CFLAGS) -c -o $@ psa_attestation.c $(INCLUDE_PATHS)
@@ -28,5 +32,49 @@ $(OUT_DIR)/attestation_core.o: attestation_core.c ../include/internal/attestatio
 $(OUT_DIR)/attest_token.o: attest_token.c
 	$(CC) $(CFLAGS) -c -o $@ attest_token.c $(INCLUDE_PATHS)
 
-clean:
-	rm -f $(OUT_DIR)/*.o $(OUT_DIR)/*.a
+# QCBOR
+
+QCBOR_OBJ=$(OUT_DIR)/UsefulBuf.o $(OUT_DIR)/qcbor_encode.o $(OUT_DIR)/qcbor_decode.o $(OUT_DIR)/ieee754.o $(OUT_DIR)/qcbor_err_to_str.o
+QCBOR_SRC_DIR=../lib/QCBOR/src
+QCBOR_INCLUDE_PATHS=-I../lib/QCBOR/inc
+
+$(OUT_DIR)/UsefulBuf.o: $(QCBOR_SRC_DIR)/UsefulBuf.c
+	$(CC) -c $(CFLAGS) -o $@ $^ $(QCBOR_INCLUDE_PATHS)
+
+$(OUT_DIR)/qcbor_encode.o: $(QCBOR_SRC_DIR)/qcbor_encode.c
+	$(CC) -c $(CFLAGS) -o $@ $^ $(QCBOR_INCLUDE_PATHS)
+
+$(OUT_DIR)/qcbor_decode.o: $(QCBOR_SRC_DIR)/qcbor_decode.c
+	$(CC) -c $(CFLAGS) -o $@ $^ $(QCBOR_INCLUDE_PATHS)
+
+$(OUT_DIR)/ieee754.o: $(QCBOR_SRC_DIR)/ieee754.c
+	$(CC) -c $(CFLAGS) -o $@ $^ $(QCBOR_INCLUDE_PATHS)
+
+$(OUT_DIR)/qcbor_err_to_str.o: $(QCBOR_SRC_DIR)/qcbor_err_to_str.c
+	$(CC) -c $(CFLAGS) -o $@ $^ $(QCBOR_INCLUDE_PATHS)
+
+# t_cose
+
+T_COSE_OBJ=$(OUT_DIR)/t_cose_sign1_verify.o $(OUT_DIR)/t_cose_sign1_sign.o $(OUT_DIR)/t_cose_util.o $(OUT_DIR)/t_cose_parameters.o $(OUT_DIR)/t_cose_psa_crypto.o
+T_COSE_SRC_DIR=../lib/t_cose
+T_COSE_INCLUDE_PATHS=-I../lib/QCBOR/inc -I../lib/t_cose/inc -I../lib/t_cose/src -I../../third-party/rust-psa-crypto/psa-crypto-sys/vendor/include -DT_COSE_USE_PSA_CRYPTO
+
+$(OUT_DIR)/t_cose_sign1_verify.o: $(T_COSE_SRC_DIR)/src/t_cose_sign1_verify.c
+	$(CC) -c $(CFLAGS) -o $@ $< $(T_COSE_INCLUDE_PATHS)
+
+$(OUT_DIR)/t_cose_sign1_sign.o: $(T_COSE_SRC_DIR)/src/t_cose_sign1_sign.c
+	$(CC) -c $(CFLAGS) -o $@ $< $(T_COSE_INCLUDE_PATHS)
+
+$(OUT_DIR)/t_cose_util.o: $(T_COSE_SRC_DIR)/src/t_cose_util.c
+	$(CC) -c $(CFLAGS) -o $@ $< $(T_COSE_INCLUDE_PATHS)
+
+$(OUT_DIR)/t_cose_parameters.o: $(T_COSE_SRC_DIR)/src/t_cose_parameters.c
+	$(CC) -c $(CFLAGS) -o $@ $< $(T_COSE_INCLUDE_PATHS)
+
+$(OUT_DIR)/t_cose_psa_crypto.o: $(T_COSE_SRC_DIR)/crypto_adapters/t_cose_psa_crypto.c
+	$(CC) -c $(CFLAGS) -o $@ $< $(T_COSE_INCLUDE_PATHS)
+
+# combined library
+
+$(OUT_DIR)/libpsa_attestation.a: $(PSA_ATT_OBJ) $(QCBOR_OBJ) $(T_COSE_OBJ)
+	ar cr $@ $(PSA_ATT_OBJ) $(QCBOR_OBJ) $(T_COSE_OBJ)

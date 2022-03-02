@@ -5,11 +5,6 @@
 [submodule "psa_attestation/lib/t_cose"]
 	path = psa-attestation/lib/t_cose
 	url = https://github.com/veracruz-project/t_cose.git
-    branch = master
-[submodule "psa_attestation/lib/mbed-crypto"]
-	path = psa-attestation/lib/mbed-crypto
-	url = https://github.com/veracruz-project/mbed-crypto.git
-    branch = veracruz
 [submodule "docker"]
 	path = docker
 	url = https://github.com/veracruz-project/veracruz-docker-image.git
@@ -51,3 +46,6 @@
 	path = third-party/wasmi
 	url = https://github.com/veracruz-project/wasmi.git
 	branch = veracruz
+[submodule "third-party/rust-psa-crypto"]
+	path = third-party/rust-psa-crypto
+	url = https://github.com/veracruz-project/rust-psa-crypto.git

@@ -66,7 +66,7 @@ attest_get_initial_attestation_private_key_handle(psa_key_handle_t *key_handle);
 enum psa_attest_err_t
 attest_get_initial_attestation_public_key(uint8_t **public_key,
                                           size_t *public_key_len,
-                                          psa_ecc_curve_t *public_key_curve);
+                                          psa_ecc_family_t *public_key_curve);
 
 /**
  * \brief Get the attestation key ID. It is the hash (SHA256) of the COSE_Key

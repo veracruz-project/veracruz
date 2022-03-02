@@ -96,7 +96,7 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
     let mut t_cose_ctx: t_cose_sign1_verify_ctx = unsafe { ::std::mem::zeroed() };
     unsafe { t_cose_sign1_verify_init(&mut t_cose_ctx, 0) };
 
-    let mut key_handle: u16 = 0;
+    let mut key_handle: u32 = 0;
     let lpk_ret = unsafe {
         t_cose_sign1_verify_load_public_key(
             pubkey.as_ptr() as *const u8,
