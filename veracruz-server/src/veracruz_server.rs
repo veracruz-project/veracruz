@@ -218,7 +218,10 @@ pub trait VeracruzServer {
     where
         Self: Sized;
 
-    fn plaintext_data(&mut self, data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError>;
+    fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        // this function is not strictly needed, should we remove at some point?
+        unimplemented!();
+    }
 
     fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError>;
 

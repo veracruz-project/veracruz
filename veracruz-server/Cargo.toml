@@ -25,6 +25,7 @@ icecap = [
   "psa-attestation",
   "io-utils/icecap",
   "veracruz-utils/icecap",
+  "tempfile",
 ]
 linux = [
   "data-encoding",
