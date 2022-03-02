@@ -58,6 +58,7 @@ nitro = [
   "ring/nitro",
   "ring/std",
   "session-manager/nitro",
+  "veracruz-utils/nitro_enclave",
   "veracruz-utils/nitro",
 ]
 

@@ -56,9 +56,9 @@ nix = { version = "0.15", optional = true }
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", optional = true }
 psa-attestation = { path = "../psa-attestation", optional = true }
-ring = "0.16.11"
-rouille = "3.2.1"
-rustls = "0.16"
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+rouille = "=3.2.1"
+rustls = { git = "https://github.com/veracruz-project/rustls.git", branch = "veracruz" }
 serde = { version = "1.0.115", default-features = false, features = ["derive"] }
 serde_json = "1.0"
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }

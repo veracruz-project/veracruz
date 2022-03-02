@@ -17,6 +17,11 @@ nitro = [
   "serde/derive",
   "serde_json/std",
 ]
+
+nitro_enclave = [
+  "ring/nitro"
+]
+
 std = [
   "serde/std",
   "serde_json/std",
@@ -25,7 +30,7 @@ std = [
 [dependencies]
 bincode = { version = "1.2.1", default-features = false, optional = true }
 err-derive = "0.2"
-ring = "0.16.11"
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz", default-features = false }
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 rustls = { version = "0.16", optional = true }
 serde = { version = "1.0.115", default-features = false, optional = true }
