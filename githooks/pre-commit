@@ -15,13 +15,17 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz repository root
 # directory for copyright and licensing information.
 
+HAS_RUSTFMT_ERROR=0
 HAS_RUSTFMT_ISSUES=0
 HAS_SPACE_ISSUES=0
 
 echo "Checking code formatting of files staged for commit."
 
 for file in $(git diff --name-only --staged \*.rs); do
-    RUSTFMT="$(rustfmt --edition=2018 --check --skip-children --unstable-features $file)"
+    RUSTFMT="$(rustfmt --edition=2018 --check $file)"
+    if [ "$?" != 0 ] ; then
+        HAS_RUSTFMT_ERROR=1
+    fi
     SPACES="$(perl -ne 'print if /[ \t]$/;' $file)"
     if [ "$RUSTFMT" != "" -o "$SPACES" != "" ]; then
         printf "[ERROR]: $file\n"
@@ -52,6 +56,10 @@ elif [ $HAS_SPACE_ISSUES -eq 1 ]; then
     echo "before committing."
     exit 1
 else
-    echo "Code formatting style is OK."
+    if [ $HAS_RUSTFMT_ERROR -eq 1 ]; then
+        echo "WARNING: rustfmt did not run correctly!"
+    else
+        echo "Code formatting style is OK."
+    fi
     exit 0
 fi
