@@ -1,6 +1,6 @@
 from capdl import ObjectType, Cap, ARMIRQMode
 from icecap_framework import GenericElfComponent
-from icecap_framework.utils import align_up, align_down, PAGE_SIZE, PAGE_SIZE_BITS
+from icecap_framework.utils import align_up, align_down, PAGE_SIZE, PAGE_SIZE_BITS, BLOCK_SIZE_BITS
 import itertools as it
 
 BADGE_IRQ = 1 << 0
@@ -88,8 +88,8 @@ class VirtioConsoleServer(GenericElfComponent):
 
     def register_client(self, client, kick_nfn, kick_nfn_badge):
         server_rb_objs, client_rb_objs = self.composition.alloc_ring_buffer(
-            a_name=self.name, a_size_bits=PAGE_SIZE_BITS,
-            b_name=client.name, b_size_bits=PAGE_SIZE_BITS,
+            a_name=self.name, a_size_bits=BLOCK_SIZE_BITS,
+            b_name=client.name, b_size_bits=BLOCK_SIZE_BITS,
             )
         kick_cap = self.cspace().alloc(kick_nfn, badge=kick_nfn_badge, write=True)
         self._arg['client_ring_buffer'] = {

@@ -135,7 +135,7 @@ impl IceCapRealm {
         // create a temporary socket for communication
         let tempdir = tempfile::tempdir()?;
         let channel_path = tempdir.path().join("console0");
-        println!("using unix socket: {:?}", channel_path);
+        println!("vc-server: using unix socket: {:?}", channel_path);
 
         // startup qemu
         let child = Command::new(&qemu_bin[0])
@@ -160,7 +160,12 @@ impl IceCapRealm {
                     break channel;
                 }
                 Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                    thread::yield_now();
+                    thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+                // NOTE I don't know why this one happens
+                Err(err) if err.kind() == io::ErrorKind::ConnectionRefused => {
+                    thread::sleep(Duration::from_millis(100));
                     continue;
                 }
                 Err(err) => {
@@ -177,6 +182,7 @@ impl IceCapRealm {
     }
 
     fn communicate(&mut self, request: &Request) -> Result<Response, VeracruzServerError> {
+        println!("vc-server: send {:?}", request);
         // send request
         let raw_request = bincode::serialize(request)?;
         let raw_header = bincode::serialize(&Header::try_from(raw_request.len()).unwrap())?;
@@ -191,12 +197,13 @@ impl IceCapRealm {
         self.channel.read_exact(&mut raw_response).map_err(IceCapError::ChannelError)?;
         let response = bincode::deserialize::<Response>(&raw_response)?;
 
+        println!("vc-server: recv {} {:?}", raw_response.len(), response);
         Ok(response)
     }
 
     // NOTE close can report errors, but drop can still happen in weird cases
     fn shutdown(mut self) -> Result<(), VeracruzServerError> {
-        println!("killing");
+        println!("vc-server: shutting down");
         self.child.kill()?;
         Ok(())
     }
