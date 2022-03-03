@@ -864,6 +864,7 @@ mod tests {
         let server_loop_handle = thread::spawn(move || {
             server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(
                 |e| {
+                    eprintln!("AAAAAAAAAAAAAAH {:?}", e);
                     CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
                     e
                 },

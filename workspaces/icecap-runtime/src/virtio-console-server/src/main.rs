@@ -194,12 +194,12 @@ fn main(config: Config) -> Fallible<()> {
         }
     }
 
-    debug_println!("virtio{}@{:012x}: sending...", virtio_i, virtio_mmio);
+    //debug_println!("virtio{}@{:012x}: sending...", virtio_i, virtio_mmio);
     // we need to send over a frame, allocate one from the pool
     let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
-    let formatted = format!("\nhello from virtio-console-server over virtio{}@{:012x}!\n\n", virtio_i, virtio_mmio);
-    send_page[..formatted.as_bytes().len()].copy_from_slice(&formatted.as_bytes());
-    console.send_slice(&send_page[..formatted.as_bytes().len()])?;
+    //let formatted = format!("\nhello from virtio-console-server over virtio{}@{:012x}!\n\n", virtio_i, virtio_mmio);
+    //send_page[..formatted.as_bytes().len()].copy_from_slice(&formatted.as_bytes());
+    //console.send_slice(&send_page[..formatted.as_bytes().len()])?;
 
     // begin processing requests
     let mut rb = BufferedRingBuffer::new(RingBuffer::unmanaged_from_config(
