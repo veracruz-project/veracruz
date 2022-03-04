@@ -126,6 +126,33 @@ RUN set -eux; \
         echo "$USER ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USER && chmod 0440 /etc/sudoers.d/$USER ; \
     fi
 
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+        cabal-install \
+        ghc \
+        && \
+    apt-get autoremove -y && apt-get clean && \
+    rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
+
+RUN \
+    git clone https://gitlab.com/tseenshe/stack2cabal.git &&  \
+    cd stack2cabal && \
+    cabal v2-update && \
+    cabal v2-build -j --disable-optimization --ghc-options "-O0" all && \
+    cp $(cabal v2-exec --disable-optimization -v0 which -- stack2cabal) /usr/local/bin && \
+    cd .. && \
+    rm -rf stack2cabal && \
+    git clone https://gitlab.com/arm-research/security/icecap/capdl.git && \
+    cd capdl/capDL-tool && \
+    /usr/local/bin/stack2cabal && \
+    perl -i -pe 's/with-compiler: ghc-.*/with-compiler: ghc-8.8.4/' cabal.project && \
+    cabal v2-build -j --disable-optimization --ghc-options "-O0" all && \
+    cp $(cabal v2-exec --disable-optimization -v0 which -- parse-capDL) /usr/local/bin && \
+    cd ../.. && \
+    rm -rf capdl && \
+    cabal v2-clean && \
+    rm -rf $HOME/.cabal
+
 ENV RUSTUP_HOME="/local/build/cache/rustup"
 ENV CARGO_HOME="/local/build/cache/cargo"
 ENV STACK_ROOT="/local/build/cache/stack"
