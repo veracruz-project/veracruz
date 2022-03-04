@@ -182,7 +182,6 @@ impl IceCapRealm {
     }
 
     fn communicate(&mut self, request: &Request) -> Result<Response, VeracruzServerError> {
-        println!("vc-server: send {:?}", request);
         // send request
         let raw_request = bincode::serialize(request)?;
         let raw_header = bincode::serialize(&Header::try_from(raw_request.len()).unwrap())?;
@@ -197,7 +196,6 @@ impl IceCapRealm {
         self.channel.read_exact(&mut raw_response).map_err(IceCapError::ChannelError)?;
         let response = bincode::deserialize::<Response>(&raw_response)?;
 
-        println!("vc-server: recv {} {:?}", raw_response.len(), response);
         Ok(response)
     }
 
