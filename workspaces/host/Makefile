@@ -20,6 +20,7 @@ all: crates/sdk/wasm-checker/bin/wasm-checker
 DATA_GENERATORS = idash2017-logistic-regression-generator \
                       intersection-set-sum-generator \
                       moving-average-convergence-divergence-generator \
+				      postcard-generator \
                       private-set-intersection-generator \
                       private-set-intersection-sum-generator \
                       string-generator \

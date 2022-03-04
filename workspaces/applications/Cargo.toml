@@ -23,6 +23,8 @@ members = [
   "crates/sdk/rust-examples/moving-average-convergence-divergence",
   "crates/sdk/rust-examples/nop",
   "crates/sdk/rust-examples/number-stream-accumulation",
+  "crates/sdk/rust-examples/postcard-native",
+  "crates/sdk/rust-examples/postcard-wasm",
   "crates/sdk/rust-examples/private-set-intersection",
   "crates/sdk/rust-examples/private-set-intersection-sum",
   "crates/sdk/rust-examples/random-source",
