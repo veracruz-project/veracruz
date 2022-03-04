@@ -1,9 +1,6 @@
 #![no_std]
 #![no_main]
 
-extern crate alloc;
-use alloc::format;
-
 use core::ops::Range;
 
 use serde::{Deserialize, Serialize};
@@ -132,29 +129,6 @@ pub unsafe extern "C" fn virtio_virt_to_phys(vaddr: usize) -> usize {
 
 // entry point
 fn main(config: Config) -> Fallible<()> {
-    debug_println!("hello from virtio-console-server");
-
-    // is the virtio region mapped correctly?
-    for (i, v) in config.virtio_region.clone().step_by(512).enumerate() {
-        debug_println!("virtio{}@{:012x}: {:08x} {:08x} {:08x} {:08x}",
-            i,
-            v,
-            unsafe { core::ptr::read_volatile((v+ 0) as *const u32) },
-            unsafe { core::ptr::read_volatile((v+ 4) as *const u32) },
-            unsafe { core::ptr::read_volatile((v+ 8) as *const u32) },
-            unsafe { core::ptr::read_volatile((v+12) as *const u32) },
-        );
-    }
-
-    // is the virtio pool allocated correctly?
-    for (_, (addr, page)) in
-        config.virtio_pool_region.clone().step_by(4096)
-            .zip(&config.virtio_pool_pages)
-            .enumerate()
-    {
-        debug_println!("virtio_pool@{:012x} = {:012x}", addr, page.paddr().unwrap_or(0));
-    }
-
     // setup the virtio pool
     unsafe {
         VIRTIO_POOL = Some(VirtioPool::new(
@@ -182,7 +156,6 @@ fn main(config: Config) -> Fallible<()> {
     };
 
     debug_println!("found virtio-console at virtio{}@{:012x}", virtio_i, virtio_mmio);
-    debug_println!("virtio{}@{:012x}: initializing...", virtio_i, virtio_mmio);
     let header = unsafe { &mut *(virtio_mmio as *mut VirtIOHeader) };
     let mut console = VirtIOConsole::new(header)?;
 
@@ -194,19 +167,11 @@ fn main(config: Config) -> Fallible<()> {
         }
     }
 
-    //debug_println!("virtio{}@{:012x}: sending...", virtio_i, virtio_mmio);
-    // we need to send over a frame, allocate one from the pool
-    let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
-    //let formatted = format!("\nhello from virtio-console-server over virtio{}@{:012x}!\n\n", virtio_i, virtio_mmio);
-    //send_page[..formatted.as_bytes().len()].copy_from_slice(&formatted.as_bytes());
-    //console.send_slice(&send_page[..formatted.as_bytes().len()])?;
-
     // begin processing requests
     let mut rb = BufferedRingBuffer::new(RingBuffer::unmanaged_from_config(
         &config.client_ring_buffer,
     ));
-
-    debug_println!("virtio{}@{:012x}: processing requests...", virtio_i, virtio_mmio);
+    let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
 
     // we may have already recieved data to send, but lost the notification
     // during initialization, so there may already be data in our ring buffer

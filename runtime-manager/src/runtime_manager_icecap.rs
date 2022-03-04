@@ -11,14 +11,21 @@
 
 extern crate alloc;
 
-use core::fmt::Write;
-
-use serde::{Deserialize, Serialize};
+use core::mem::size_of;
+use core::convert::TryFrom;
 
 use icecap_start_generic::declare_generic_main;
 use icecap_core::config::*;
+use icecap_core::logger::{DisplayMode, Level, Logger};
 use icecap_core::prelude::*;
 use icecap_core::ring_buffer::*;
+
+use veracruz_utils::platform::icecap::message::{Error, Request, Response, Header};
+use crate::managers::{session_manager, RuntimeManagerError};
+
+use bincode;
+use serde::{Deserialize, Serialize};
+
 
 declare_generic_main!(main);
 
@@ -41,7 +48,7 @@ fn main(config: Config) -> Fallible<()> {
     debug_println!("icecap-realmos: initializing...");
 
     // enable ring buffer to serial-server
-    let mut virtio_console_client = RingBuffer::unmanaged_from_config(
+    let virtio_console_client = RingBuffer::unmanaged_from_config(
         &config.virtio_console_server_ring_buffer,
     );
     virtio_console_client.enable_notify_read();
@@ -54,35 +61,6 @@ fn main(config: Config) -> Fallible<()> {
         config.event_nfn,
         config.badges.virtio_console_server_ring_buffer
     ).run()
-//
-////    // send hello
-////    out!(&mut virtio_console_client, "\nhello from application over serial-server!\n");
-//
-//    // now loop responding to input
-//    loop {
-//        let badge = config.event_nfn.wait();
-//        if badge & config.badges.virtio_console_server_ring_buffer != 0 {
-//            virtio_console_client.rx_callback();
-//            virtio_console_client.tx_callback();
-//            if let Some(chars) = virtio_console_client.rx() {
-//                for (i, chunk) in chars.chunks(16).enumerate() {
-//                    debug_print!("{:08x}: ", i);
-//                    for x in chunk {
-//                        debug_print!("{:02x} ", x);
-//                    }
-//                    debug_print!("  ");
-//                    for x in chunk {
-//                        debug_print!("{}", if x.is_ascii_graphic() { char::from(*x) } else { '.' });
-//                    }
-//                    debug_println!();
-//
-//                    //out!(&mut virtio_console_client, "input: {:?}\n", char::from(*c));
-//                }
-//            }
-//            virtio_console_client.ring_buffer().enable_notify_read();
-//            virtio_console_client.ring_buffer().enable_notify_write();
-//        }
-//    }
 }
 
     // fn handle(&mut self, req: Request) -> Fallible<Response> {
@@ -131,75 +109,6 @@ fn main(config: Config) -> Fallible<()> {
     //         },
     //     })
     // }
-
-
-use icecap_core::logger::{DisplayMode, Level, Logger};
-use icecap_core::runtime as icecap_runtime;
-
-use bincode::{deserialize, serialize};
-use core::mem::size_of;
-use core::convert::TryFrom;
-
-//use serde::{Deserialize, Serialize};
-//
-//use finite_set::Finite;
-//use hypervisor_event_server_types::{
-//    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
-//};
-//use icecap_core::{
-//    config::{RingBufferConfig, RingBufferKicksConfig},
-//    logger::{DisplayMode, Level, Logger},
-//    prelude::*,
-//    ring_buffer::*,
-//    rpc, runtime as icecap_runtime,
-//};
-//use icecap_start_generic::declare_generic_main;
-//use icecap_std_external;
-
-use veracruz_utils::platform::icecap::message::{Error, Request, Response, Header};
-
-use crate::managers::{session_manager, RuntimeManagerError};
-
-//declare_generic_main!(main);
-//
-//#[derive(Debug, Clone, Serialize, Deserialize)]
-//struct Config {
-//    event: Notification,
-//    event_server_endpoint: Endpoint,
-//    event_server_bitfield: usize,
-//    channel: RingBufferConfig,
-//}
-//
-//fn main(config: Config) -> Fallible<()> {
-//    icecap_runtime_init();
-//
-//    let channel = {
-//        let event_server = rpc::Client::<EventServerRequest>::new(config.event_server_endpoint);
-//        let index = {
-//            use events::*;
-//            RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
-//        };
-//        let kick = Box::new(move || {
-//            event_server.call::<()>(&EventServerRequest::Signal {
-//                index: index.to_nat(),
-//            })
-//        });
-//        RingBuffer::resume_from_config(
-//            &config.channel,
-//            RingBufferKicksConfig {
-//                read: kick.clone(),
-//                write: kick,
-//            },
-//        )
-//    };
-//
-//    let event_server_bitfield = unsafe { EventServerBitfield::new(config.event_server_bitfield) };
-//
-//    event_server_bitfield.clear_ignore_all();
-//
-//    RuntimeManager::new(channel, config.event, event_server_bitfield).run()
-//}
-
 
 struct RuntimeManager {
     channel: RingBuffer,
