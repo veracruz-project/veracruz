@@ -26,7 +26,10 @@
 use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
-use policy_utils::principal::{ExecutionStrategy, Principal};
+use policy_utils::{
+    principal::{ExecutionStrategy, Principal},
+    CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
+};
 use std::{
     collections::HashMap,
     error::Error,
@@ -318,9 +321,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
-    file_table.insert(PathBuf::from("stdin"), read_right);
-    file_table.insert(PathBuf::from("stdout"), write_right);
-    file_table.insert(PathBuf::from("stderr"), write_right);
+    file_table.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), read_right);
+    file_table.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), write_right);
+    file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
     // Add read permission to input path
     for file_path in cmdline.input_sources.iter() {
         // NOTE: inject the root path.
