@@ -81,7 +81,7 @@ buildInputs = $(sel4_build_dir)/install/libsel4 \
 icecap_c_include_flags := $(foreach x,$(buildInputs),-I$(abspath $(x)/include))
 icecap_c_lib_flags := $(foreach x,$(buildInputs),-L$(abspath $(x)/lib))
 
-compiler_some_libc_include := $(wildcard /usr/lib/gcc-cross/aarch64-linux-gnu/*/include/)
+compiler_some_libc_include := $(wildcard /usr/lib/gcc*/aarch64-linux-gnu/*/include/)
 
 .PHONY: none
 none:
