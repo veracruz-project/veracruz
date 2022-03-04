@@ -62,7 +62,11 @@ icedl_component_dir := $(icedl_build_dir)/components
 icedl_firmware_dir := $(icedl_build_dir)/firmware
 icedl_firmware_cdl := $(icedl_firmware_dir)/cdl/icecap.cdl
 capdl_src := $(deps)/capdl
+ifeq (,$(wildcard /usr/local/bin/parse-capDL))
 capdl_tool := $(capdl_src)/capDL-tool/parse-capDL
+else
+capdl_tool := /usr/local/bin/parse-capDL
+endif
 capdl_loader := $(c_build_dir)/capdl-loader/install/bin/capdl-loader.elf
 app_elf := $(misc_build_dir)/app.elf
 
