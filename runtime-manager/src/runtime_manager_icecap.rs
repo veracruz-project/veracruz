@@ -35,6 +35,9 @@ struct Badges {
 }
 
 fn main(config: Config) -> Fallible<()> {
+    // TODO why do we need this?
+    icecap_runtime_init();
+
     debug_println!("icecap-realmos: initializing...");
 
     // enable ring buffer to serial-server
