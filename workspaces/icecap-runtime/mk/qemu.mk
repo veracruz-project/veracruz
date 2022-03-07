@@ -1,15 +1,23 @@
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
+# and copyright information.
+
 sel4_kernel_platform := qemu-arm-virt
 
 system := $(disposable_dir)/system
 
-sel4_dts_path := $(sel4_src)/tools/dts/qemu.dts
+sel4_dts_path := $(sel4_src)/tools/dts/virt.dts
 
-host_feature_flags := --features icecap-qemu
 runtime_feature_flags := --features icecap-qemu
 
 .PHONY: clean-plat
 clean-plat:
-	rm -f $(sel4_dts_path) system
+	rm -f $(sel4_dts_path)
 
 QEMU_BIN = qemu-system-aarch64
 QEMU_BASE_FLAGS = -machine virt,virtualization=on,gic-version=2 \
@@ -33,10 +41,10 @@ debug:
 	$(QEMU_BIN) $(QEMU_BASE_FLAGS) $(QEMU_RUN_FLAGS) \
 		-kernel $(elfloader)
 
-$(sel4_dts_path): $(misc_build_dir)/qemu.dtb
+$(sel4_dts_path): $(misc_build_dir)/$(sel4_kernel_platform).dtb
 	dtc -I dtb -O dts -o $@ $<
 
-$(misc_build_dir)/qemu.dtb: | $(misc_build_dir)
+$(misc_build_dir)/$(sel4_kernel_platform).dtb: | $(misc_build_dir)
 	$(QEMU_BIN) $(QEMU_BASE_FLAGS) \
 		-chardev socket,server=on,host=localhost,port=1234,id=charconsole0,wait=off \
 		-machine dumpdtb=$@
