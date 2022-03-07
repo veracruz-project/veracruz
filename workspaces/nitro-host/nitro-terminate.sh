@@ -15,4 +15,5 @@
 INFO=$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')
 echo $INFO
 
-nitro-cli terminate-enclave --enclave-id $INFO
+nitro-cli terminate-enclave --enclave-id $INFO && echo "None found"
+(exit 0)

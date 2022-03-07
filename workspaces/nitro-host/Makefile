@@ -16,12 +16,12 @@ default: build
 
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
+MEASUREMENT_FILE = $(abspath ../nitro-runtime/PCR0)
+MEASUREMENT_PARAMETER = --pcr-file $(MEASUREMENT_FILE)
+EIF_PATH = $(abspath $(WORKSPACE_DIR)/nitro-runtime/runtime_manager.eif)
 
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
-
-MEASUREMENT_FILE = $(abspath PCR0)
-MEASUREMENT_PARAMETER = --pcr-file $(MEASUREMENT_FILE)
 
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 PROXY_ATTESTATION_SERVER_DB = proxy-attestation-server.db
@@ -52,15 +52,15 @@ test-dependencies: test-collateral $(PROXY_ATTESTATION_SERVER_DB)
 CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
 
 test-server: test-dependencies
-	$(CARGO_TEST) -p veracruz-server-test --features debug -- --test-threads=1
-	$(CARGO_TEST) -p veracruz-server-test test_debug --features debug -- --ignored --test-threads=1
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p veracruz-server-test --features debug -- --test-threads=1
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p veracruz-server-test test_debug --features debug -- --ignored --test-threads=1
 	./nitro-terminate.sh
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib --features mock -- --test-threads=1
 
 veracruz-test: test-dependencies
-	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
+	RUNTIME_MANAGER_EIF_PATH=/work/veracruz/workspaces/nitro-runtime/runtime_manager.eif $(CARGO_TEST) -p veracruz-test -- --test-threads=1
 	./nitro-terminate.sh
 
 doc:
