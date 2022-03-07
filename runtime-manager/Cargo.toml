@@ -36,6 +36,7 @@ icecap = [
   "transport-protocol/icecap",
   "veracruz-utils/icecap",
 ]
+icecap-qemu = []
 linux = [
   "bincode",
   "clap",

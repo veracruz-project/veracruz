@@ -27,6 +27,7 @@ icecap = [
   "veracruz-utils/icecap",
   "tempfile",
 ]
+icecap-qemu = []
 linux = [
   "data-encoding",
   "io-utils/linux",

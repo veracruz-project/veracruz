@@ -14,7 +14,8 @@
 
 default: build
 
-ICECAP_PLAT ?= virt
+icecap_plat ?= qemu
+
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
 MEASUREMENT_FILE = $(abspath ../icecap-runtime/css-icecap.bin)
@@ -23,9 +24,14 @@ MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
+# NOTE this file must define:
+#  variables:
+#   - host_feature_flags
+include mk/$(icecap_plat).mk
+
 COMPILERS = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 
-RUNTIME_MANAGER_ENCLAVE = $(WORKSPACE_DIR)/icecap-runtime/build/virt/disposable/cmake/elfloader/build/elfloader
+RUNTIME_MANAGER_ENCLAVE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
 TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
@@ -36,14 +42,16 @@ TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 all: build test-collateral
 
 build:
-	$(COMPILERS) RUST_BACKTRACE=full \
+	$(COMPILERS) \
 		cargo build $(PROFILE_FLAG) \
 		-p proxy-attestation-server \
 		-p veracruz-client -p veracruz-server \
 		--features proxy-attestation-server/icecap \
 		--features veracruz-client/icecap \
 		--features veracruz-server/icecap \
-		--features cli $(V_FLAG)
+		--features cli \
+		$(host_feature_flags) \
+		$(V_FLAG)
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
@@ -51,7 +59,8 @@ $(MEASUREMENT_FILE):
 
 test-dependencies: test-collateral $(LINUX_ROOT_ENCLAVE) $(RUNTIME_MANAGER_ENCLAVE)
 
-CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features icecap
+CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
+	--features icecap $(host_feature_flags)
 
 test-server: test-dependencies
 	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture

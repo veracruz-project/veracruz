@@ -4,18 +4,18 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE.markdown` file in the Veracruz root directory for licensing
 # and copyright information.
 
 include ../common.mk
 
+icecap_plat ?= qemu
+
+WORKSPACE_DIR = $(abspath ..)
 PROJECT = .
-ICECAP_PLAT ?= virt
 HOST_CC ?= gcc
 LD = $(abspath $(shell cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
 CC = aarch64-linux-gnu-gcc
-
-icecap_plat := $(ICECAP_PLAT)
 
 deps := deps
 src := src
@@ -90,6 +90,7 @@ none:
 #  variables:
 #   - sel4_kernel_platform
 #   - sel4_dts_path
+#   - runtime_feature_flags
 #  rules:
 #   - clean-plat
 include mk/$(icecap_plat).mk
@@ -120,7 +121,7 @@ $(now):
 ###########################################################################
 
 .PHONY: sel4-configure
-sel4-configure: $(sel4_build_dir)
+sel4-configure: $(sel4_build_dir) $(sel4_dts_path)
 		cmake -G Ninja \
 				-DCMAKE_TOOLCHAIN_FILE=$(abspath $(sel4_src)/gcc.cmake) \
 				-DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
@@ -193,7 +194,7 @@ sysroot-install: sysroot
 	tidy_dest $$src $$dst
 
 sysroot_rustflags := \
-	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
+	--cfg=icecap_plat=\"$(icecap_plat)\" \
 	$(icecap_c_lib_flags) \
 	-C force-unwind-tables=yes -C embed-bitcode=yes \
 	-Z force-unstable-if-unmarked \
@@ -221,7 +222,7 @@ sysroot: userspace_c sel4
 ###########################################################################
 
 icecap_rustflags := \
-	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
+	--cfg=icecap_plat=\"$(icecap_plat)\" \
 	-l static=c-supplement \
 	-l static=icecap-runtime \
 	-l static=icecap-some-libc \
@@ -247,7 +248,7 @@ rust-project: $(now) sysroot-install userspace_c sel4
 			--manifest-path Cargo.toml \
 			--target $(rust_target) \
 			$(foreach x,$(icedl_components),-p $(x)) \
-			--features icecap \
+			--features icecap $(runtime_feature_flags) \
 			$(PROFILE_FLAG) $(V_FLAG) \
 			-j$$(nproc) \
 			--target-dir $(target_dir) \
@@ -412,3 +413,6 @@ elfloader: $(elfloader_build_dir)/build/elfloader css-icecap.bin
 
 css-icecap.bin: $(elfloader_build_dir)/build/elfloader
 	cp $< $@
+
+.PHONY: build
+build: elfloader
