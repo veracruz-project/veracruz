@@ -115,8 +115,7 @@ nitro-veracruz-server-test: nitro nitro-test-collateral veracruz-server-test/pro
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test --features nitro,debug -- --test-threads=1\
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_debug --features nitro,debug -- --ignored --test-threads=1
-	cd veracruz-server-test \
-		&& ./nitro-terminate.sh
+	./workspaces/nitro-host/nitro-terminate.sh
 
 linux-veracruz-server-test-dry-run: linux linux-test-collateral
 	cd veracruz-server-test \
@@ -134,10 +133,7 @@ nitro-veracruz-server-test-dry-run: nitro nitro-test-collateral
 nitro-veracruz-server-performance: nitro nitro-test-collateral veracruz-server-test/proxy-attestation-server.db
 	cd veracruz-server-test \
 		&& RUSTFLAGS=$(NITRO_RUST_FLAG) cargo test test_performance_ --features nitro -- --ignored
-	cd veracruz-server-test \
-		&& ./nitro-terminate.sh
-	cd ./veracruz-server-test \
-		&& ./nitro-ec2-terminate-root.sh
+	./workspaces/nitro-host/nitro-terminate.sh
 
 nitro-veracruz-test-dry-run: nitro nitro-test-collateral
 	cd veracruz-test \
@@ -146,10 +142,7 @@ nitro-veracruz-test-dry-run: nitro nitro-test-collateral
 nitro-veracruz-test: nitro nitro-test-collateral veracruz-test/proxy-attestation-server.db
 	cd veracruz-test \
 		&& RUSTFLAGS=$(SGX_RUST_FLAG) cargo test --features nitro -- --test-threads=1
-	cd veracruz-server-test \
-		&& ./nitro-terminate.sh
-	cd ./veracruz-server-test \
-		&& ./nitro-ec2-terminate_root.sh
+	./workspaces/nitro-host/nitro-terminate.sh
 
 nitro-psa-attestation:
 	cd psa-attestation && cargo build --features nitro

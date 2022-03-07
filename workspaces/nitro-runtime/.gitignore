@@ -1,2 +1,4 @@
 Dockerfile
 measurements.json
+PCR0
+runtime_manager.eif
