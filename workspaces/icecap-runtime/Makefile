@@ -25,7 +25,6 @@ python_src := $(icecap_src)/python
 c_src := $(icecap_src)/c
 rust_src := $(icecap_src)/rust
 
-build := build
 build_dir := build
 target_dir := $(build_dir)/target
 bin_dir := $(build_dir)/bin
@@ -36,8 +35,8 @@ kebab_to_caml = $(subst -,_,$(1))
 capitalize = $(shell echo $(1) | tr '[:lower:]' '[:upper:]')
 cargo_target_config_prefix = CARGO_TARGET_$(call capitalize,$(call kebab_to_caml,$(1)))_
 
-sticky_dir := $(build)/$(icecap_plat)/sticky
-disposable_dir := $(build)/$(icecap_plat)/disposable
+sticky_dir := $(build_dir)/$(icecap_plat)/sticky
+disposable_dir := $(build_dir)/$(icecap_plat)/disposable
 rust_build_dir := $(sticky_dir)/target
 c_build_dir := $(disposable_dir)/c
 icedl_build_dir := $(disposable_dir)/icedl
@@ -416,3 +415,6 @@ css-icecap.bin: $(elfloader_build_dir)/build/elfloader
 
 .PHONY: build
 build: elfloader
+
+.PHONY: clean
+	rm -rf css-icecap.bin $(build_dir)

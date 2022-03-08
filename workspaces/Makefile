@@ -29,8 +29,8 @@ nitro: shared
 	$(MAKE) -C nitro-runtime
 
 icecap: shared
-	$(MAKE) -C icecap-runtime runtime-manager
-	$(MAKE) -C icecap-host test-system
+	$(MAKE) -C icecap-runtime build
+	$(MAKE) -C icecap-host
 
 shared:
 	$(MAKE) -C applications
