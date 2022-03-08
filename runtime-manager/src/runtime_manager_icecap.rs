@@ -14,17 +14,16 @@ extern crate alloc;
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 
+use finite_set::Finite;
+use hypervisor_event_server_types::{
+    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
+};
 use icecap_core::{
-    config::RingBufferConfig,
-    config::RingBufferKicksConfig,
-    finite_set::Finite,
+    config::{RingBufferConfig, RingBufferKicksConfig},
     logger::{DisplayMode, Level, Logger},
     prelude::*,
-    rpc_sel4::RPCClient,
-    runtime as icecap_runtime,
-};
-use icecap_event_server_types::{
-    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
+    ring_buffer::*,
+    rpc, runtime as icecap_runtime,
 };
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
@@ -47,7 +46,7 @@ fn main(config: Config) -> Fallible<()> {
     icecap_runtime_init();
 
     let channel = {
-        let event_server = RPCClient::<EventServerRequest>::new(config.event_server_endpoint);
+        let event_server = rpc::Client::<EventServerRequest>::new(config.event_server_endpoint);
         let index = {
             use events::*;
             RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
@@ -57,7 +56,7 @@ fn main(config: Config) -> Fallible<()> {
                 index: index.to_nat(),
             })
         });
-        RingBuffer::realize_resume(
+        RingBuffer::resume_from_config(
             &config.channel,
             RingBufferKicksConfig {
                 read: kick.clone(),
@@ -215,7 +214,7 @@ const LOG_LEVEL: Level = Level::Error;
 const NOW: u64 = include!("../../icecap/build/NOW");
 
 fn icecap_runtime_init() {
-    icecap_std_external::set_panic();
+    icecap_std_external::early_init();
     icecap_std_external::set_now(std::time::Duration::from_secs(NOW));
     let mut logger = Logger::default();
     logger.level = LOG_LEVEL;

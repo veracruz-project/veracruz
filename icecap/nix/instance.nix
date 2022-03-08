@@ -44,9 +44,9 @@ in lib.fix (self: with self; {
   run = { automate }:
     assert automate -> icecapPlat == "virt";
     platUtils.${icecapPlat}.bundle {
-      firmware = icecapFirmware.image;
+      image = icecapFirmware.image;
       payload = icecapFirmware.mkDefaultPayload {
-        linuxImage = linuxKernel.host.${icecapPlat}.kernel;
+        kernel = linuxKernel.host.${icecapPlat}.kernel;
         initramfs = hostUser.config.build.initramfs;
         bootargs = [
           "earlycon=icecap_vmm"
@@ -102,11 +102,12 @@ in lib.fix (self: with self; {
     sdk-and-test-collateral = pkgs.dev.icecap.callPackage ./env/sdk-and-test-collateral.nix {};
   };
 
-  libc-supplement = configured.libs.mk {
+  libc-supplement = configured.userC.mk {
     name = "c-supplement";
     root = icecapSrc.absoluteSplit ../src/c/libc-supplement;
-    propagatedBuildInputs = with configured.libs; [
-      icecap-pure
+    propagatedBuildInputs = with configured.userC.nonRootLibs; [
+      compiler-some-libc
+      icecap-some-libc
       icecap-utils
     ];
   };
