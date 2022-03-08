@@ -14,7 +14,7 @@ now := $(build_dir)/NOW
 
 nix_build := nix-build
 nix_shell := nix-shell --pure
-nix_expression := ../../icecap/targets.nix
+nix_expression := ../icecap-host/targets.nix
 nix_attribute_path := $(ICECAP_PLAT)
 
 inner_make_cmd = $(MAKE) -f mk/$(1).mk ICECAP_PLAT=$(ICECAP_PLAT) PROFILE=$(PROFILE) $@

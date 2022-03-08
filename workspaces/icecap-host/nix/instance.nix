@@ -104,7 +104,7 @@ in lib.fix (self: with self; {
 
   libc-supplement = configured.userC.mk {
     name = "c-supplement";
-    root = icecapSrc.absoluteSplit ../src/c/libc-supplement;
+    root = icecapSrc.absoluteSplit ../../../icecap/src/c/libc-supplement;
     propagatedBuildInputs = with configured.userC.nonRootLibs; [
       compiler-some-libc
       icecap-some-libc
