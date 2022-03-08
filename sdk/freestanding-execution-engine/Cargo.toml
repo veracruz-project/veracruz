@@ -18,8 +18,3 @@ wasi-types = { path = "../../third-party/wasi-types" }
 [[bin]]
 name = "freestanding-execution-engine"
 path = "src/main.rs"
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3

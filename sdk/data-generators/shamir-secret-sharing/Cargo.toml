@@ -5,11 +5,6 @@ edition = "2018"
 name = "shamir-secret-sharing"
 version = "0.3.0"
 
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-
 [dependencies]
 hex = "0.4"
 rand = "0.8.3"

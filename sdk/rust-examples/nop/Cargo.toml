@@ -5,8 +5,3 @@ edition = "2018"
 name = "nop"
 version = "0.3.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
