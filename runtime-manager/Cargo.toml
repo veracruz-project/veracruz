@@ -101,7 +101,3 @@ transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi", optional = true }
-
-
-[profile.release]
-lto = true

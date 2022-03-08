@@ -47,6 +47,3 @@ veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
 webpki = "=0.21.2"
 webpki-roots = "0.19.0"
-
-[patch.crates-io]
-rustls = { path = "../third-party/rustls" }
