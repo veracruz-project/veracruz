@@ -26,6 +26,7 @@ members = [
   "crates/sdk/data-generators/linear-regression-generator",
   "crates/sdk/data-generators/moving-average-convergence-divergence-generator",
   "crates/sdk/data-generators/number-stream-generator",
+  "crates/sdk/data-generators/postcard-generator",
   "crates/sdk/data-generators/private-set-intersection-generator",
   "crates/sdk/data-generators/private-set-intersection-sum-generator",
   "crates/sdk/data-generators/shamir-secret-sharing",
