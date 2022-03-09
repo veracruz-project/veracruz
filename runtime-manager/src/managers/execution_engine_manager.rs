@@ -175,6 +175,10 @@ fn parse_incoming_buffer(
     // If not, this means we are receiving the first chunk of the protocol
     // buffer.
     if incoming_buffer_hash.get(&tls_session_id).is_none() {
+        if input.len() < 8 {
+            return Ok(None);
+        }
+
         // Extract the protocol buffer's total length as u64
         let remaining_data = input.split_off(8);
         let mut expected_length_bytes: [u8; 8] = [0; 8];
