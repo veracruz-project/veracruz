@@ -17,10 +17,8 @@
 *.s
 *.swp
 *.swo
-*.lock
 *.bin
 *.png
-Cargo.lock
 **/target/**
 test-collateral/*.dat
 test-collateral/*.json
