@@ -25,4 +25,3 @@ psa-crypto-sys = { path = "../third-party/rust-psa-crypto/psa-crypto-sys" }
 [build-dependencies]
 bindgen = "0.57"
 cfg-if = "1.0"
-cmake = "0.1"

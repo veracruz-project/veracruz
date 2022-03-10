@@ -27,7 +27,6 @@ std = [
 anyhow = { version = "1.0", default-features = false }
 byteorder = "1.4.3"
 cfg-if = "1"
-ctor = "=0.1.16"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 num = { version = "0.4", default-features = false }
@@ -41,7 +40,6 @@ typetag = "=0.1.6"
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi" }
 wasmtime = { version = "0.27", optional = true }
-wast = "35.0.0"
 
 [lib]
 name = "execution_engine"

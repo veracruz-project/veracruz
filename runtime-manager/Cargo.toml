@@ -69,7 +69,6 @@ env_logger = { version = "0.8.3", optional = true }
 err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
 finite-set = { path = "../icecap/crates/framework/helpers/finite-set", optional = true }
-half = "=1.7.1"
 hex = { version = "0.4.2" }
 hypervisor-event-server-types = { path = "../icecap/crates/hypervisor/components/event-server/types", optional = true }
 icecap-core = { path = "../icecap/crates/framework/base/icecap-core", optional = true }
