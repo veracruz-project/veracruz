@@ -9,20 +9,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use io_utils::{
-    raw_fd::{receive_buffer, send_buffer},
-    vsocket,
-};
+use io_utils::raw_fd::{receive_buffer, send_buffer};
 use nix::sys::socket::listen as listen_vsock;
 use nix::sys::socket::{accept, bind, SockAddr};
 use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 use nsm_api;
 use nsm_lib;
-use std::os::unix::io::AsRawFd;
-use veracruz_utils::platform::{
-    nitro::nitro::NitroRootEnclaveMessage,
-    vm::{RuntimeManagerMessage, VMStatus},
-};
+use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
 
 use crate::managers;
 use crate::managers::RuntimeManagerError;

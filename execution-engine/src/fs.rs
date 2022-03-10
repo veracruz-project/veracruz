@@ -21,13 +21,15 @@ use policy_utils::{
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 #[cfg(not(feature = "icecap"))]
-use std::os::unix::ffi::{OsStrExt, OsStringExt};
+use std::{
+    ffi::OsString,
+    os::unix::ffi::{OsStrExt, OsStringExt},
+};
 
 use std::{
     cmp::min,
     collections::HashMap,
     convert::{AsRef, TryFrom},
-    ffi::OsString,
     // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
     // potential utf-8 encoding check
     path::{Component, Path, PathBuf},

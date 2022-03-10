@@ -22,10 +22,6 @@ use std::{
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 use webpki;
 
-// Use Mockall for testing
-#[cfg(feature = "mock")]
-use crate::attestation::MockAttestation as AttestationHandler;
-
 #[derive(Debug)]
 pub struct VeracruzClient {
     tls_session: rustls::ClientSession,

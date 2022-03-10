@@ -13,6 +13,7 @@
 //! See the `LICENSE.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#[cfg(feature = "std")]
 use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
 #[cfg(feature = "std")]
 use std::{borrow::Cow, ffi, path};
