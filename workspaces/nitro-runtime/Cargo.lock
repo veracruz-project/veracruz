@@ -699,7 +699,6 @@ dependencies = [
  "wasi-types",
  "wasmi",
  "wasmtime",
- "wast 35.0.2",
 ]
 
 [[package]]
@@ -812,9 +811,9 @@ checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
 name = "half"
-version = "1.7.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
+checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "hashbrown"
@@ -1189,18 +1188,18 @@ dependencies = [
 
 [[package]]
 name = "lexical-core"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a3926d8f156019890be4abe5fd3785e0cff1001e06f59c597641fd513a5a284"
+checksum = "92912c4af2e7d9075be3e5e3122c4d7263855fa6cce34fbece4dd08e5884624d"
 dependencies = [
  "lexical-util",
 ]
 
 [[package]]
 name = "lexical-util"
-version = "0.8.1"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff669ccaae16ee33af90dc51125755efed17f1309626ba5c12052512b11e291"
+checksum = "c72a9d52c5c4e62fa2cdc2cb6c694a39ae1382d9c2a17a466f18e272a0930eb1"
 dependencies = [
  "static_assertions",
 ]
@@ -1578,7 +1577,6 @@ dependencies = [
  "aws-nitro-enclaves-nsm-api",
  "cfg-if 1.0.0",
  "getrandom 0.1.16",
- "half",
  "nix 0.22.3",
  "nsm-lib",
 ]
@@ -1589,7 +1587,7 @@ version = "0.3.0"
 dependencies = [
  "err-derive",
  "hex",
- "lexical-core 0.8.2",
+ "lexical-core 0.8.3",
  "ring",
  "rustls",
  "serde",
@@ -1695,7 +1693,6 @@ version = "0.3.0"
 dependencies = [
  "bindgen 0.57.0",
  "cfg-if 1.0.0",
- "cmake",
  "libc 0.2.119",
  "psa-crypto-sys",
 ]
@@ -1878,7 +1875,6 @@ dependencies = [
  "err-derive",
  "execution-engine",
  "finite-set",
- "half",
  "hex",
  "hypervisor-event-server-types",
  "icecap-core",
@@ -2698,15 +2694,6 @@ dependencies = [
 
 [[package]]
 name = "wast"
-version = "35.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ef140f1b49946586078353a453a1d28ba90adfc54dde75710bc1931de204d68"
-dependencies = [
- "leb128",
-]
-
-[[package]]
-name = "wast"
 version = "39.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9bbbd53432b267421186feee3e52436531fa69a7cfee9403f5204352df3dd05"
@@ -2722,7 +2709,7 @@ version = "1.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab98ed25494f97c69f28758617f27c3e92e5336040b5c3a14634f2dd3fe61830"
 dependencies = [
- "wast 39.0.0",
+ "wast",
 ]
 
 [[package]]
