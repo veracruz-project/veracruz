@@ -160,11 +160,17 @@ impl InodeEntry {
         self.data.is_service()
     }
 
-    /// Return a service
+    /// Try to parse the input, 
+    #[inline]
+    pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
+        self.data.service_valid_input()
+    }
+
+    /// Try to parse the input, 
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(FileSystem, Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
         self.data.service_handler()
     }
 }
@@ -173,11 +179,16 @@ impl InodeEntry {
 #[derive(Clone, Debug)]
 enum InodeImpl {
     /// A special file that is bound to a native service.
-    /// When reading the file, it will trigger the execution of the service.
+    /// Writing to the file triggers the execution of the service.
     /// It treat the `Inode` as the input parameter and the result will be stored in Vec.
-    /// TODO We do not support reentry now, hence once the Vec exists,
-    /// we will directly return the Vec.
-    NativeModule(FileSystem, Arc<Mutex<Box<dyn Service>>>, Vec<u8>),
+    /// The services will use the FileSystem (handle) to access the VFS.
+    /// NOTE: Current design is only safe for SINGLE thread.
+    ///     - The program is allowed to read the (input) content to the service; and the input
+    ///     information, might be sensitive, is cleaned on the invocation `fd_closed`.
+    ///     In single thread situation, it is fine.
+    ///     - The output of the service is determinded by the service itself. It can try to open
+    ///     any file and write to it, as long as the service has enough capabilities in FileSystem.
+    NativeModule(Arc<Mutex<Box<dyn Service>>>, Vec<u8>),
     /// A file
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
@@ -331,14 +342,30 @@ impl InodeImpl {
         }
     }
 
-    /// Return a service
+    /// Try to parse the input of a service. Return true if it is a valid input.
+    #[inline]
+    pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
+        match self {
+            Self::NativeModule(service, input) => {
+                let service = service.lock().map_err(|_| ErrNo::Busy)?;
+                service.try_parse(input)
+            }
+            _ => Err(ErrNo::Inval),
+        }
+    }
+
+    /// Return the service.
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(FileSystem, Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
         match self {
-            Self::NativeModule(fs, service, input) => {
-                Ok((fs.clone(), service.clone(), input.clone()))
+            Self::NativeModule(service, input) => {
+                // NOTE: We copy out, particularly `input`, on purpose, as they are protected by a
+                // lock on the inote table. We have to release the lock allowing the service to
+                // access the FileSystem, unless we introduce lock ownership transition mechanism.
+                // TODO: Introduce fine-grained lock on the inote table?
+                Ok((service.clone(), input.clone()))
             }
             _ => Err(ErrNo::Inval),
         }
@@ -395,7 +422,7 @@ impl Debug for InodeTable {
         for (k, v) in self.table.iter() {
             match &v.data {
                 InodeImpl::File(_) => write!(f, "\t{:?} -> file\n", k)?,
-                InodeImpl::NativeModule(_, service, _) => write!(
+                InodeImpl::NativeModule(service, _) => write!(
                     f,
                     "\t{:?} -> service {}\n",
                     k,
@@ -441,9 +468,9 @@ impl InodeTable {
     /// created, since each service is assocaited a child filesystem (handler).
     fn install_services<T: AsRef<Path>>(
         &mut self,
-        services: Vec<(T, FileSystem, Arc<Mutex<Box<dyn Service>>>)>,
+        services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
     ) -> FileSystemResult<()> {
-        for (path, service_fs, service) in services {
+        for (path, service) in services {
             let path = path.as_ref();
             let new_inode = self.new_inode()?;
 
@@ -453,9 +480,8 @@ impl InodeTable {
             // Call the existing function to create general files.
             self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
             // Manually uplift the general file to special file bound with the service.
-            // TODO change the input inode.
             self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
-                InodeImpl::NativeModule(service_fs, service.clone(), Vec::new());
+                InodeImpl::NativeModule(service.clone(), Vec::new());
         }
         println!("install services return");
         Ok(())
@@ -800,7 +826,6 @@ impl FileSystem {
         let mut services = Vec::new();
         services.push((
             "/services/postcard_string.dat",
-            rst.clone(),
             Arc::new(Mutex::new(service)),
         ));
         rst.install_services(services)?;
@@ -827,6 +852,10 @@ impl FileSystem {
             println!("{:?}", inode_table);
         }
         Ok(rst)
+    }
+
+    fn service_fs(&self) -> FileSystemResult<Self> {
+        Ok(self.clone())
     }
 
     /// Create a dummy filesystem
@@ -954,7 +983,7 @@ impl FileSystem {
 
     fn install_services<T: AsRef<Path>>(
         &mut self,
-        services: Vec<(T, FileSystem, Arc<Mutex<Box<dyn Service>>>)>,
+        services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
     ) -> FileSystemResult<()> {
         self.lock_inode_table()?.install_services(services)
     }
@@ -1067,6 +1096,16 @@ impl FileSystem {
     /// file descriptor.  Returns `ErrNo::BadF`, if `fd` is not a current file-descriptor.
     #[inline]
     pub(crate) fn fd_close(&mut self, fd: Fd) -> FileSystemResult<()> {
+        let inode = self.get_inode_by_fd(&fd)?;
+        // Limit the scope of the lock
+        {
+            let mut inode_table = self.lock_inode_table()?;
+            let f = inode_table.get_mut(&inode)?;
+            if f.is_service() {
+                println!("truncate file on service");
+                f.truncate_file()?;
+            }
+        }
         self.fd_table.remove(&fd).ok_or(ErrNo::BadF)?;
         Ok(())
     }
@@ -1245,16 +1284,16 @@ impl FileSystem {
             (len, f.is_service())
         };
 
-        // If it is a service, it calls the service
-        if is_service {
-            let (mut fs, service, input) = self
+        // If it is a service, call it when there is a valid input
+        if is_service && { self.lock_inode_table()?
+                .get_mut(&inode)?
+                .service_valid_input()? } {
+            let (service, input) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
             let service = service.lock().map_err(|_| ErrNo::Busy)?;
-            if service.try_parse(&input)? {
-                service.serve(&mut fs, &input)?;
-            }
+            service.serve(&mut self.service_fs()?, &input)?;
         }
         Ok(len)
     }
