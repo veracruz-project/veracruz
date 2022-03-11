@@ -159,13 +159,13 @@ impl InodeEntry {
         self.data.is_service()
     }
 
-    /// Try to parse the input, 
+    /// Try to parse the input,
     #[inline]
     pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
         self.data.service_valid_input()
     }
 
-    /// Try to parse the input, 
+    /// Try to parse the input,
     #[inline]
     pub(crate) fn service_handler(
         &self,
@@ -462,7 +462,7 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (output_path, service_instance) tuples. 
+    /// Install all the (output_path, service_instance) tuples.
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
@@ -1277,9 +1277,11 @@ impl FileSystem {
         };
 
         // If it is a service, call it when there is a valid input
-        if is_service && { self.lock_inode_table()?
+        if is_service && {
+            self.lock_inode_table()?
                 .get_mut(&inode)?
-                .service_valid_input()? } {
+                .service_valid_input()?
+        } {
             let (service, input) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
