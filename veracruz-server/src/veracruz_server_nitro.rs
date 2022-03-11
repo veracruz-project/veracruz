@@ -12,14 +12,12 @@
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
     use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
-    use curl::easy::{Easy, List};
     use io_utils::{
-        http::{post_buffer, send_proxy_attestation_server_start, HttpError},
+        http::{post_buffer, send_proxy_attestation_server_start},
         nitro::NitroEnclave,
     };
     use policy_utils::policy::Policy;
     use std::env;
-    use std::io::Read;
     use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
 
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";

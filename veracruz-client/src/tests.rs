@@ -33,7 +33,6 @@ const RESULT_CLIENT_CERT_FILENAME: &'static str = "result_client_cert.pem";
 const MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME: &'static str = "server_rsa_cert.pem";
 const MOCK_ATTESTATION_ENCLAVE_NAME: &'static str = "localhost";
 
-use crate::attestation::*;
 use crate::error::*;
 use crate::veracruz_client::*;
 use std::{
@@ -48,7 +47,6 @@ use actix_session::Session;
 use actix_web::http::StatusCode;
 use actix_web::{post, App, HttpRequest, HttpResponse, HttpServer};
 use futures;
-use policy_utils::{policy::Policy, Platform};
 
 pub fn policy_path(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
