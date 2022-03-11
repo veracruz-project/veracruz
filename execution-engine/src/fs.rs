@@ -153,8 +153,7 @@ impl InodeEntry {
         self.data.len()
     }
 
-    /// Return the number of bytes, if it is a file,
-    /// or the number of inodes, if it is a directory.
+    /// Return if the current path corresponds is a service.
     #[inline]
     pub(self) fn is_service(&self) -> bool {
         self.data.is_service()
@@ -364,7 +363,7 @@ impl InodeImpl {
                 // NOTE: We copy out, particularly `input`, on purpose, as they are protected by a
                 // lock on the inote table. We have to release the lock allowing the service to
                 // access the FileSystem, unless we introduce lock ownership transition mechanism.
-                // TODO: Introduce fine-grained lock on the inote table?
+                // A better way to organising the inode is using fine-grained locper entry
                 Ok((service.clone(), input.clone()))
             }
             _ => Err(ErrNo::Inval),
@@ -463,9 +462,10 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (file_system_handler, input_paths, output_path, service_instance) tuples. Assume `path` is an absolute path to a (special) file.
+    /// Install all the (output_path, service_instance) tuples. 
+    /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
-    /// created, since each service is assocaited a child filesystem (handler).
+    /// created.
     fn install_services<T: AsRef<Path>>(
         &mut self,
         services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
@@ -726,14 +726,6 @@ impl InodeTable {
         }
         Ok(())
     }
-
-    //fn read_file(&mut self, inode: Inode, max: usize, offset: FileSize) -> FileSystemResult<Vec<u8>> {
-    //let inode_impl = self.get_mut(&inode)?;
-    //match inode_impl.read_file(max, offset) {
-    //Ok(o) => Ok(o),
-    //Err(e) => Err(e),
-    //}
-    //}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
