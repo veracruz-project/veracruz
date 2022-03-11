@@ -12,7 +12,6 @@
 //! information on licensing and copyright.
 
 #![cfg_attr(any(feature = "icecap"), no_main)]
-#![crate_name = "runtime_manager_enclave"]
 #![cfg_attr(any(feature = "icecap"), feature(rustc_private))]
 #![cfg_attr(any(feature = "icecap"), feature(format_args_nl))]
 

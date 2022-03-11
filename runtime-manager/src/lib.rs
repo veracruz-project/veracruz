@@ -9,6 +9,4 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![crate_name = "runtime_manager_enclave"]
-
 pub mod managers;
