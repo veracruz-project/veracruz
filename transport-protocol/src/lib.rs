@@ -9,7 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![crate_name = "transport_protocol"]
 #![crate_type = "staticlib"]
 
 // The protocol buffer generator generates some deprecated code.
