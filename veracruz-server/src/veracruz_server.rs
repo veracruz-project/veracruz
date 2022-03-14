@@ -19,8 +19,6 @@ use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use io_utils::{error::SocketError, http::HttpError};
-#[cfg(feature = "linux")]
-use veracruz_utils::platform::linux::LinuxRootEnclaveResponse;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -165,12 +163,6 @@ pub enum VeracruzServerError {
     DirectMessageError(String, StatusCode),
     #[error(display = "VeracruzServer: Error message {}.", _0)]
     DirectStrError(&'static str),
-    #[cfg(feature = "linux")]
-    #[error(
-        display = "VeracruzServer: Unexpected reply from Linux Root enclave {:?}.",
-        _0
-    )]
-    LinuxRootEnclaveUnexpectedResponse(LinuxRootEnclaveResponse),
     #[error(display = "VeracruzServer: Unimplemented")]
     UnimplementedError,
     #[error(display = "VeracruzServer: Invalid runtime manager hash")]

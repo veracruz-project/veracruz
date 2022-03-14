@@ -25,12 +25,13 @@ Linux_Src = $(COMMON_Src) $(SRC_DIR)/src/runtime_manager_linux.rs $(SRC_DIR)/src
 all: linux
 
 linux: target/$(PROFILE_PATH)/runtime_manager_enclave \
-	target/$(PROFILE_PATH)/linux-root-enclave css-linux.bin
+	css-linux.bin
 
-target/$(PROFILE_PATH)/runtime_manager_enclave target/$(PROFILE_PATH)/linux-root-enclave: \
-	Cargo.toml $(Linux_Src) crates/linux-root-enclave/src/main.rs
+target/$(PROFILE_PATH)/runtime_manager_enclave: \
+	Cargo.toml $(Linux_Src)
 	cargo build $(PROFILE_FLAG) --features linux \
-		-p runtime_manager_enclave -p linux-root-enclave
+		-p runtime_manager_enclave
+	cp target/$(PROFILE_PATH)/runtime_manager_enclave .
 
 css-linux.bin: target/$(PROFILE_PATH)/runtime_manager_enclave
 	cp $< $@

@@ -37,7 +37,7 @@ lazy_static! {
 #[inline]
 fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
     transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
-        .unwrap_or_else(|err| panic!(err))
+        .unwrap_or_else(|err| panic!("{}", err))
 }
 
 /// Encodes an error code indicating that somebody sent an invalid or malformed

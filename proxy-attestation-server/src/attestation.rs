@@ -126,7 +126,6 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
 /// sign it
 fn convert_csr_to_certificate(
     csr_der: &[u8],
-    is_ca: bool,
     enclave_hash: &[u8],
 ) -> Result<openssl::x509::X509, ProxyAttestationServerError> {
     let csr = openssl::x509::X509Req::from_der(csr_der)
@@ -254,9 +253,7 @@ fn convert_csr_to_certificate(
     let mut constraints_extension = openssl::x509::extension::BasicConstraints::new();
     constraints_extension.critical();
     constraints_extension.pathlen(1);
-    if is_ca {
-        constraints_extension.ca();
-    }
+
     let built_constraints_extension = constraints_extension.build()
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::convert_csr_to_certificate BasicConstraints::new failed:{:?}", err);
