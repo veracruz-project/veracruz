@@ -9,7 +9,7 @@ version = "0.3.0"
 [dependencies]
 clap       = "2.33.0"
 csv        = "1.0"
-env_logger = "0.7.1"
+env_logger = "0.9.0"
 log = "0.4.8"
 postcard = { version = "0.7.2", features = [ "alloc" ] }
 toml = "0.5.6"

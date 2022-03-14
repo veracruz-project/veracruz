@@ -23,5 +23,5 @@ libc = "=0.2.108"
 psa-crypto-sys = { path = "../third-party/rust-psa-crypto/psa-crypto-sys" }
 
 [build-dependencies]
-bindgen = "0.57"
+bindgen = "0.59.2"
 cfg-if = "1.0"
