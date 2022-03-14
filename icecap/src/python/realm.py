@@ -10,9 +10,9 @@
 # and copyright information.
 
 from capdl import ObjectType
-from icecap_framework import GenericElfComponent
-from icecap_framework.utils import PAGE_SIZE_BITS, BLOCK_SIZE
-from icecap_hypervisor.realm import BaseRealmComposition
+from icedl.common import GenericElfComponent
+from icedl.realm import BaseRealmComposition
+from icedl.utils import PAGE_SIZE_BITS, BLOCK_SIZE
 
 class RuntimeManager(GenericElfComponent):
 

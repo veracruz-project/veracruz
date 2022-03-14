@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "compiler_builtins"
-version = "0.1.67"
+version = "0.1.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a68c69e9451f1df4b215c9588c621670c12286b53e60fb5ec4b59aaa1138d18e"
+checksum = "191424db7756bbed2c4996959a0fbda94388abcf4f5a2728a8af17481ad9c4f7"
 dependencies = [
  "rustc-std-workspace-core",
 ]
@@ -141,6 +141,16 @@ dependencies = [
 [[package]]
 name = "core"
 version = "0.0.0"
+
+[[package]]
+name = "dlmalloc"
+version = "0.1.3"
+source = "git+https://gitlab.com/arm-research/security/icecap/rust-dlmalloc?rev=f6759cfed44dc4135eaa43c8c26599357749af39#f6759cfed44dc4135eaa43c8c26599357749af39"
+dependencies = [
+ "compiler_builtins",
+ "libc",
+ "rustc-std-workspace-core",
+]
 
 [[package]]
 name = "dlmalloc"
@@ -217,17 +227,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
-name = "icecap-dlmalloc"
-version = "0.1.0"
-dependencies = [
- "compiler_builtins",
- "dlmalloc",
- "icecap-sync",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
 name = "icecap-runtime"
 version = "0.1.0"
 dependencies = [
@@ -271,7 +270,6 @@ name = "icecap-std-impl"
 version = "0.1.0"
 dependencies = [
  "compiler_builtins",
- "icecap-dlmalloc",
  "icecap-runtime",
  "icecap-sel4",
  "icecap-sync",
@@ -311,9 +309,9 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.7.3"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efbc0f03f9a775e9f6aed295c6a1ba2253c5757a9e03d55c6caa46a681abcddd"
+checksum = "afe203d669ec979b7128619bae5a63b7b42e9203c1b29146079ee05e2f604b52"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi",
@@ -370,18 +368,18 @@ checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.36"
+version = "1.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
+checksum = "fb37d2df5df740e582f28f8560cf425f52bb267d872fe58358eadb554909f07a"
 dependencies = [
  "unicode-xid",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.15"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
+checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
 dependencies = [
  "proc-macro2",
 ]
@@ -447,7 +445,8 @@ dependencies = [
  "cfg-if 0.1.10",
  "compiler_builtins",
  "core",
- "dlmalloc",
+ "dlmalloc 0.1.3",
+ "dlmalloc 0.2.3",
  "fortanix-sgx-abi",
  "hashbrown",
  "hermit-abi",
@@ -478,9 +477,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "syn"
-version = "1.0.86"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a65b3f4ffa0092e9887669db0eae07941f023991ab58ea44da8fe8e2d511c6b"
+checksum = "8daf5dd0bb60cbd4137b1b587d2fc0ae729bc07cf01cd70b36a1ed5ade3b9d59"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -491,6 +490,7 @@ dependencies = [
 name = "sysroot"
 version = "0.3.0"
 dependencies = [
+ "dlmalloc 0.1.3",
  "libc",
  "std",
 ]
@@ -544,9 +544,9 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "version_check"
-version = "0.9.4"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
 
 [[package]]
 name = "wasi"
@@ -561,9 +561,9 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "4.2.4"
+version = "4.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a5a7e487e921cf220206864a94a89b6c6905bfc19f1057fa26a4cb360e5c1d2"
+checksum = "ea187a8ef279bc014ec368c27a920da2024d2a711109bfbe3440585d5cf27ad9"
 dependencies = [
  "either",
  "lazy_static",

@@ -3,7 +3,7 @@ let
   salt = builtins.getEnv "SALT";
 
   icecapRemote = builtins.fetchGit rec {
-    url = "https://github.com/veracruz-project/icecap.git";
+    url = "https://gitlab.com/arm-research/security/icecap/icecap-refs.git";
     ref = "refs/tags/icecap/keep/${builtins.substring 0 32 rev}";
     rev = icecapRev;
     submodules = true;
@@ -18,7 +18,7 @@ let
 
   icecap = import icecapSource;
 
-in with icecap.hypervisor.framework;
+in with icecap;
 let
 
   configured = pkgs.none.icecap.configured.virt;
@@ -29,9 +29,9 @@ let
   inherit (pkgs.linux.icecap) linuxKernel nixosLite;
 
   run = platUtils.${icecapPlat}.bundle {
-    image = icecapFirmware.image;
+    firmware = icecapFirmware.image;
     payload = icecapFirmware.mkDefaultPayload {
-      kernel = linuxKernel.host.${icecapPlat}.kernel;
+      linuxImage = linuxKernel.host.${icecapPlat}.kernel;
       initramfs = hostUser.config.build.initramfs;
       bootargs = [];
     };
@@ -63,7 +63,7 @@ let
     pkgs.dev.icecap.cargo
     pkgs.musl.icecap.icecap-host
     pkgs.linux.dropbear
-    configured.userC.nonRootLibs.icecap-some-libc
+    configured.libs.icecap-pure
   ];
 
 in
