@@ -744,10 +744,7 @@ impl WasmtimeRuntimeState {
         let mut vfs = match VFS_INSTANCE.lock() {
             Ok(v) => v,
             // NOTE: We have no choice but panic here, since this function cannot return error!
-            Err(e) => panic!(format!(
-                "Failed to lock return code variable, with error {}",
-                e
-            )),
+            Err(e) => panic!("Failed to lock return code variable, with error {}", e),
         };
         vfs.proc_exit(&mut caller, exit_code);
     }

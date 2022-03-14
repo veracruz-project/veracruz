@@ -15,8 +15,6 @@
 pub mod error;
 #[cfg(feature = "icecap")]
 pub mod icecap;
-#[cfg(feature = "linux")]
-pub mod linux;
 #[cfg(feature = "nitro")]
 pub mod nitro;
 #[cfg(any(feature = "nitro", feature = "linux"))]

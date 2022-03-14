@@ -17,7 +17,6 @@ use diesel::{prelude::SqliteConnection, Connection, ExpressionMethods, QueryDsl,
 use dotenv::dotenv;
 use hex;
 use schema::devices;
-use schema::firmware_versions;
 use std::env;
 
 pub fn establish_connection() -> Result<SqliteConnection, ProxyAttestationServerError> {
@@ -37,28 +36,4 @@ pub fn query_device<'a>(
         .load(conn)?;
     let pubkey_hash_vec = hex::decode(hashes[0].to_owned())?;
     Ok(pubkey_hash_vec)
-}
-
-pub fn get_firmware_version_hash<'a>(
-    conn: &SqliteConnection,
-    protocol: &String,
-    version: &String,
-) -> Result<Option<Vec<u8>>, ProxyAttestationServerError> {
-    let hashes: Vec<String> = firmware_versions::table
-        .filter(firmware_versions::protocol.eq(protocol))
-        .filter(firmware_versions::version_num.eq(version))
-        .select(firmware_versions::hash)
-        .load(conn)
-            .map_err(|err| {
-                println!("proxy-attestation-server::orm::get_firmware_version_hash failed to query table:{:?}", err);
-                err
-            })?;
-
-    let hash_vec = hex::decode(hashes[0].to_owned())
-        .map_err(|err| {
-            println!("proxy-attestation-server::orm::get_firmware_version_hash failed to decode contents:{:?}", err);
-            err
-        })?;
-
-    Ok(Some(hash_vec))
 }

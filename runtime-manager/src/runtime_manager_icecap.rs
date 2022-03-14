@@ -1,6 +1,6 @@
 //! IceCap-specific material for the Runtime Manager enclave
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

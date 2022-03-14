@@ -190,7 +190,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     };
 
     // convert the CSR into a certificate
-    let re_cert = crate::attestation::convert_csr_to_certificate(&csr, false, &received_enclave_hash[0..32])
+    let re_cert = crate::attestation::convert_csr_to_certificate(&csr, &received_enclave_hash[0..32])
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::nitro::attestation_token convert_csr_to_certificate failed:{:?}", err);
             err

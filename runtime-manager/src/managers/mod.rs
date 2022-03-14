@@ -97,12 +97,6 @@ impl ProtocolState {
         })
     }
 
-    /// Returns the global policy associated with the protocol state.
-    #[inline]
-    pub(crate) fn get_policy(&self) -> &Policy {
-        &self.global_policy
-    }
-
     /// Returns the global policy's hash, a hex-encoded string.
     #[inline]
     pub(crate) fn get_policy_hash(&self) -> &str {
@@ -228,7 +222,7 @@ impl ProtocolState {
             transport_protocol::ResponseStatus::SUCCESS as i32,
             Some(error_code.to_le_bytes().to_vec()),
         )
-        .unwrap_or_else(|err| panic!(err))
+        .unwrap_or_else(|err| panic!("{}", err))
     }
 }
 

@@ -49,41 +49,14 @@ pub enum RuntimeManagerMessage {
     /// order are:
     /// - The status.
     Status(VMStatus),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "nitro", feature = "linux"))]
     /// A request to initialize the Runtime Manager enclave with the provided
     /// policy and certificate (for Nitro).
     /// parameters:
     /// String  - The policy, in JSON format
     /// Vec<Vec<u8>> - The certificate chain for the enclave
     Initialize(String, Vec<Vec<u8>>),
-    #[cfg(feature = "linux")]
-    /// A request to initialize the Runtime Manager enclave with the provided
-    /// policy (for Linux).  Parameters (in order):
-    ///
-    /// - The JSON policy in String format,
-    /// - The bytes of the challenge,
-    /// - The challenge ID.
-    Initialize(String, Vec<u8>, i32),
-    #[cfg(feature = "linux")]
-    /// A request to set the server certificate chain.  Note that this is done
-    /// slightly differently for Linux when compared to Nitro, as most of the
-    /// dummy Linux attestation is actually done in the Linux Root Enclave
-    /// where e.g. the Linux runtime manager can be measured, without the use of
-    /// a hacky message needed to set the hash.  As a result, the certificate
-    /// chain is computed in the Linux Root Enclave, before being forwarded to
-    /// the Runtime Manager enclave later, via this message.  Parameters (in
-    /// order) are:
-    /// - The certificate chain.
-    SetCertificateChain(Vec<Vec<u8>>),
-    #[cfg(feature = "linux")]
-    /// A request to forward a certificate signing request (CSR).
-    GetCSR,
-    #[cfg(feature = "linux")]
-    /// The response to the `GetCSR` message, returning the byte encoding of a
-    /// generated certificate signing request.  Parameters in order are:
-    /// - The byte encoding of the certificate signing request.
-    GeneratedCSR(Vec<u8>),
-    #[cfg(feature = "nitro")]
+    #[cfg(any(feature = "nitro", feature = "linux"))]
     /// A request to start the attestation process
     /// parameters:
     /// Vec<u8> - the challenge value
@@ -94,6 +67,11 @@ pub enum RuntimeManagerMessage {
     /// parameters:
     /// Vec<u8> - The nitro attestation document from the enclave
     AttestationData(Vec<u8>),
+    #[cfg(feature = "linux")]
+    /// The response to the `Attestation` request.  Parameters (in order) are:
+    /// - A byte encoding of the PSA attestation token,
+    /// - A byte encoding of the Certificate Signing Request.
+    AttestationData(Vec<u8>, Vec<u8>),
     /// A request to establish a new TLS session with the enclave.
     NewTLSSession,
     /// The response to the `NewTLSSession` message.  Parameters in order are:

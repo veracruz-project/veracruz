@@ -118,6 +118,7 @@ mod tests {
 
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
+
             let _main_loop_handle = std::thread::spawn(|| {
                 let mut sys = System::new("Veracruz Proxy Attestation Server");
                 println!(

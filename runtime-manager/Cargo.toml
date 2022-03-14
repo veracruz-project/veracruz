@@ -43,6 +43,7 @@ linux = [
   "log",
   "nix",
   "policy-utils/std",
+  "psa-attestation/linux",
   "session-manager/std",
   "veracruz-utils/linux",
 ]

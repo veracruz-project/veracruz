@@ -59,10 +59,6 @@ pub fn trust_path(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_TRUST_DIR").unwrap_or("../test-collateral".to_string()))
         .join(filename)
 }
-pub fn program_path(filename: &str) -> PathBuf {
-    PathBuf::from(env::var("VERACRUZ_PROGRAM_DIR").unwrap_or("../test-collateral".to_string()))
-        .join(filename)
-}
 pub fn data_dir(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()))
         .join(filename)
@@ -73,7 +69,7 @@ fn test_internal_read_all_bytes_in_file_succ() {
     let filename = "test.temp";
     let content = b"Hello, world!";
     if let Err(_) = File::create(filename).and_then(|mut file| file.write_all(content)) {
-        panic!(format!("cannot create test file: {}", filename));
+        panic!("cannot create test file: {}", filename);
     }
     let rst = VeracruzClient::pub_read_all_bytes_in_file(filename);
     assert!(rst.is_ok());
@@ -243,7 +239,8 @@ fn test_veracruz_client_new_fail() {
                     &policy
                 )
                 .is_err(),
-                format!("{:?}", policy)
+                "{:?}",
+                policy
             );
         }
     });
