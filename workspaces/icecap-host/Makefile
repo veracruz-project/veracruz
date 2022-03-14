@@ -60,7 +60,7 @@ $(MEASUREMENT_FILE):
 test-dependencies: test-collateral $(LINUX_ROOT_ENCLAVE) $(RUNTIME_MANAGER_ENCLAVE)
 
 CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
-	--features icecap $(host_feature_flags)
+	--features icecap
 
 test-server: test-dependencies
 	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
