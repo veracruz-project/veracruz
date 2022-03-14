@@ -17,7 +17,7 @@ linux = []
 nitro = []
 
 [dependencies]
-libc = "=0.2.108"
+libc = "0.2.108"
 # We are not really using psa-crypto-sys but we are using the C
 # libraries libmbedcrypto.a and libshim.a that psa-crypto-sys uses.
 psa-crypto-sys = { path = "../third-party/rust-psa-crypto/psa-crypto-sys" }
