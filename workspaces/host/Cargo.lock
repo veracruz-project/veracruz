@@ -715,8 +715,10 @@ dependencies = [
  "num-traits",
  "platform-services",
  "policy-utils",
+ "postcard",
  "ring",
  "serde",
+ "serde_json",
  "typetag",
  "wasi-types",
  "wasmi",
@@ -1536,6 +1538,16 @@ name = "postcard-cobs"
 version = "0.1.5-pre"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c68cb38ed13fd7bc9dd5db8f165b7c8d9c1a315104083a2b10f11354c2af97f"
+
+[[package]]
+name = "postcard-generator"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "postcard",
+ "rand 0.8.5",
+ "serde",
+]
 
 [[package]]
 name = "ppv-lite86"

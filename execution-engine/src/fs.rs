@@ -16,17 +16,11 @@
 
 #![allow(clippy::too_many_arguments)]
 
+use crate::native_modules::postcard::PostcardService;
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
-#[cfg(not(feature = "icecap"))]
-use std::{
-    ffi::OsString,
-    os::unix::ffi::{OsStrExt, OsStringExt},
-};
-
-use crate::native_modules::postcard::PostcardService;
 use std::{
     boxed::Box,
     cmp::min,
@@ -39,6 +33,11 @@ use std::{
     string::String,
     sync::{Arc, Mutex, MutexGuard},
     vec::Vec,
+};
+#[cfg(not(feature = "icecap"))]
+use std::{
+    ffi::OsString,
+    os::unix::ffi::{OsStrExt, OsStringExt},
 };
 use wasi_types::{
     Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
@@ -207,13 +206,13 @@ impl InodeImpl {
 
     /// Resize a file to `size`, and fill with `fill_byte` if it grows.
     /// Otherwise, return ErrNo::IsDir if it is not a file.
+    #[inline]
     pub(self) fn resize_file(&mut self, size: FileSize, fill_byte: u8) -> FileSystemResult<()> {
         match self {
-            Self::File(file) => {
+            Self::NativeModule(.., file) | Self::File(file) => {
                 file.resize(<_>::try_from_or_errno(size)?, fill_byte);
                 Ok(())
             }
-            Self::NativeModule(..) => Err(ErrNo::Perm),
             Self::Directory(_) => Err(ErrNo::IsDir),
         }
     }
@@ -280,6 +279,7 @@ impl InodeImpl {
 
     /// Truncate the file.
     /// Return ErrNo::IsDir if it is a dir.
+    #[inline]
     pub(self) fn truncate_file(&mut self) -> FileSystemResult<()> {
         match self {
             Self::File(b) | Self::NativeModule(.., b) => {
@@ -292,6 +292,7 @@ impl InodeImpl {
 
     /// Insert a file to the directory at `self`.
     /// Return ErrNo:: NotDir if `self` is not a directory.
+    #[inline]
     pub(self) fn insert<T: AsRef<Path>>(&mut self, path: T, inode: Inode) -> FileSystemResult<()> {
         match self {
             InodeImpl::Directory(path_table) => {
@@ -304,6 +305,7 @@ impl InodeImpl {
 
     /// Insert a file to the directory at `self`.
     /// Return ErrNo:: NotDir if `self` is not a directory.
+    #[inline]
     pub(self) fn get_inode_by_path<T: AsRef<Path>>(&self, path: T) -> FileSystemResult<Inode> {
         match self {
             InodeImpl::Directory(path_table) => {
@@ -315,6 +317,7 @@ impl InodeImpl {
 
     /// Return the number of the bytes, if it is a file,
     /// or the number of inodes, if it it is a directory.
+    #[inline]
     pub(self) fn len(&self) -> FileSystemResult<FileSize> {
         let rst = match self {
             Self::NativeModule(.., f) | Self::File(f) => f.len(),
@@ -473,9 +476,6 @@ impl InodeTable {
         for (path, service) in services {
             let path = path.as_ref();
             let new_inode = self.new_inode()?;
-
-            println!("service path: {:?}", path);
-
             let path = strip_root_slash(path);
             // Call the existing function to create general files.
             self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
@@ -483,7 +483,6 @@ impl InodeTable {
             self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
                 InodeImpl::NativeModule(service.clone(), Vec::new());
         }
-        println!("install services return");
         Ok(())
     }
 
@@ -828,7 +827,6 @@ impl FileSystem {
     /// It return a FileSystem where directories are pre-opened with appropriate
     /// capabilities in related to `principal`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
-        println!("spawn on: {:?}", principal);
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
@@ -838,14 +836,10 @@ impl FileSystem {
         // Must clone as install_prestat need to lock the inode_table too
         let rights_table = self.lock_inode_table()?.get_rights(principal)?.clone();
         rst.install_prestat::<PathBuf>(&rights_table)?;
-        println!("new filesystem\n{:?}", rst);
-        {
-            let inode_table = rst.inode_table.lock().unwrap();
-            println!("{:?}", inode_table);
-        }
         Ok(rst)
     }
 
+    #[inline]
     fn service_fs(&self) -> FileSystemResult<Self> {
         Ok(self.clone())
     }
@@ -1029,10 +1023,6 @@ impl FileSystem {
         {
             Ok(())
         } else {
-            println!(
-                "right check fail: {:?} {:?} {:?}",
-                fd, rights, self.fd_table
-            );
             Err(ErrNo::Access)
         }
     }
@@ -1094,7 +1084,6 @@ impl FileSystem {
             let mut inode_table = self.lock_inode_table()?;
             let f = inode_table.get_mut(&inode)?;
             if f.is_service() {
-                println!("truncate file on service");
                 f.truncate_file()?;
             }
         }
@@ -1209,7 +1198,6 @@ impl FileSystem {
         bufs: &mut [B],
         offset: FileSize,
     ) -> FileSystemResult<usize> {
-        println!("fd_pread fd {:?}", fd);
         self.check_right(&fd, Rights::FD_READ)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
@@ -1256,7 +1244,6 @@ impl FileSystem {
         bufs: &[B],
         offset: FileSize,
     ) -> FileSystemResult<usize> {
-        println!("fd_write on FD {:?} is call", fd);
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
@@ -1299,7 +1286,6 @@ impl FileSystem {
         fd: Fd,
         bufs: &mut [B],
     ) -> FileSystemResult<usize> {
-        println!("fd_read fd {:?}", fd);
         self.check_right(&fd, Rights::FD_READ)?;
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
@@ -1351,7 +1337,6 @@ impl FileSystem {
         delta: FileDelta,
         whence: Whence,
     ) -> FileSystemResult<FileSize> {
-        println!("call fd_seek {:?} with {:?} and {:?}", fd, whence, delta);
         self.check_right(&fd, Rights::FD_SEEK)?;
         let FdEntry { inode, offset, .. } = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?;
         let file_size = self.lock_inode_table()?.get(inode)?.file_stat.file_size;
@@ -1516,21 +1501,14 @@ impl FileSystem {
         flags: FdFlags,
     ) -> FileSystemResult<Fd> {
         let path = path.as_ref();
-        println!(
-            "path_open fd: {:?}, path: {:?}, oflags: {:?}",
-            fd, path, oflags
-        );
         // Check the right of the program on path_open
         self.check_right(&fd, Rights::PATH_OPEN)?;
-        println!("path_open right check passes");
         // Read the parent inode.
         let parent_inode = self.get_inode_by_fd(&fd)?;
-        println!("path_open parent_inode: {:?}", parent_inode);
 
         if !self.lock_inode_table()?.is_dir(&parent_inode) {
             return Err(ErrNo::NotDir);
         }
-        println!("lock is dir succ");
         // Intersect with the inheriting right from `fd`
         let fd_inheriting = self
             .fd_table
@@ -1566,7 +1544,6 @@ impl FileSystem {
                 new_inode
             }
         };
-        println!("path open inode succ");
         // Truncate the file if `trunc` flag is set.
         if oflags.contains(OpenFlags::TRUNC) {
             // Check the right of the program on truncate
@@ -1574,7 +1551,6 @@ impl FileSystem {
             self.lock_inode_table()?.get_mut(&inode)?.truncate_file()?;
         }
         let new_fd = self.new_fd()?;
-        println!("path_open return new fd: {:?}", new_fd);
         let FileStat {
             file_type,
             file_size,
@@ -1595,7 +1571,6 @@ impl FileSystem {
                 advice: vec![(0, file_size, Advice::Normal)],
             },
         );
-        println!("path open return");
         Ok(new_fd)
     }
 
@@ -1840,7 +1815,6 @@ impl FileSystem {
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
         let file_name = file_name.as_ref();
-        println!("read_file_by_absolute_path file_name: {:?}", file_name);
         let (fd, file_name) = self.find_prestat(file_name)?;
         let fd = self.path_open(
             fd,
