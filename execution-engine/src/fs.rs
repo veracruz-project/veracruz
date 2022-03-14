@@ -1498,6 +1498,51 @@ impl FileSystem {
         Err(ErrNo::NoSys)
     }
 
+    /// This function, added for Veracruz, creates a new anonymous file.
+    /// It will return an Err if getrandom fails, but perhaps in no other
+    /// circumstances.
+    pub(crate) fn fd_create(&mut self) -> FileSystemResult<Fd> {
+        let inode = self.lock_inode_table()?.new_inode()?;
+        let file_stat = FileStat {
+            device: 0u64.into(),
+            inode: inode.clone(),
+            file_type: FileType::RegularFile,
+            num_links: 0,
+            file_size: 0,
+            atime: Timestamp::from_nanos(0),
+            mtime: Timestamp::from_nanos(0),
+            ctime: Timestamp::from_nanos(0),
+        };
+        let node = InodeEntry {
+            current: inode,
+            parent: inode,
+            file_stat,
+            path: PathBuf::from(""),
+            data: InodeImpl::File(Vec::new()),
+        };
+        self.lock_inode_table()?.insert(inode, node)?;
+
+        let new_fd = self.new_fd()?;
+        let file_type = FileType::RegularFile;
+        let flags = FdFlags::empty();
+        let rights_base = Rights::all();
+        let rights_inheriting = Rights::all();
+        let fd_stat = FdStat {
+            file_type,
+            flags,
+            rights_base,
+            rights_inheriting,
+        };
+        let fd_entry = FdEntry {
+            inode,
+            fd_stat,
+            offset: 0,
+            advice: vec![(0, 0, Advice::Normal)],
+        };
+        self.fd_table.insert(new_fd, fd_entry);
+        Ok(new_fd)
+    }
+
     ////////////////////////////////////////////////////////////////////////
     // Public interface for the filesystem.
     // It will be used by the veracruz runtime.
