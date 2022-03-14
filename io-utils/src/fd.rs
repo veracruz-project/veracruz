@@ -6,7 +6,7 @@
 //!
 //! # Copyright and licensing
 //!
-//! See the `LICENSE.markdown` file in the Veracruz root directory for copyright
+//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
 use byteorder::{ByteOrder, LittleEndian};
