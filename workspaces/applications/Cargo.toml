@@ -29,6 +29,7 @@ members = [
   "crates/sdk/rust-examples/read-file",
   "crates/sdk/rust-examples/shamir-secret-sharing",
   "crates/sdk/rust-examples/string-edit-distance",
+  "crates/sdk/rust-examples/fd_create",
 ]
 resolver = "2"
 

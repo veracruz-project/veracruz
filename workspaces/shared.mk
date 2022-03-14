@@ -31,8 +31,8 @@ WASM_PROG_LIST = random-source.wasm \
 				private-set-intersection-sum.wasm \
 				number-stream-accumulation.wasm \
 				read-file.wasm \
-				shamir-secret-sharing.wasm
-
+				shamir-secret-sharing.wasm \
+				fd_create.wasm
 
 WASM_PROG_FILES = $(patsubst %.wasm, $(OUT_DIR)/%.wasm, $(WASM_PROG_LIST))
 

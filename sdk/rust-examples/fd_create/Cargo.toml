@@ -1,0 +1,10 @@
+[package]
+name = "fd_create"
+version = "0.3.0"
+description = "Test of fd_create function"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.14"
+libveracruz = { path = "../../rust/libveracruz" }

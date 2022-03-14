@@ -1,0 +1,8 @@
+[package]
+name = "libveracruz"
+version = "0.3.0"
+description = "Utility library for Veracruz applications"
+authors = ["The Veracruz Development Team"]
+edition = "2021"
+
+[dependencies]
