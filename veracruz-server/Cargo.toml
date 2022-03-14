@@ -24,8 +24,8 @@ icecap = [
   "policy-utils/icecap",
   "psa-attestation",
   "io-utils/icecap",
-  "veracruz-utils/icecap",
   "tempfile",
+  "veracruz-utils/icecap",
 ]
 icecap-qemu = []
 linux = [
