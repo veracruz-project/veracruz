@@ -19,7 +19,7 @@ icecap_c_lib_flags := $(foreach x,$(buildInputs),-L$(abspath $(x)/lib))
 icecap_rustflags := \
 	--cfg=icecap_plat=\"$(ICECAP_PLAT)\" \
 	-l static=icecap-utils \
-	-l static=icecap-some-libc \
+	-l static=icecap-pure \
 	-l static=c-supplement \
 	$(icecap_c_lib_flags) \
 	--sysroot=$(abspath $(sysroot_dir))

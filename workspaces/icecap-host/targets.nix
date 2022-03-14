@@ -9,8 +9,7 @@
 
 let
   topLevel = import ./nix;
-  inherit (topLevel.framework) lib;
-  inherit (topLevel) veracruz;
+  inherit (topLevel) lib veracruz;
 
 in lib.flip lib.mapAttrs veracruz (_plat: attrs: {
   test-system = attrs.runManual;

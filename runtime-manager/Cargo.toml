@@ -19,9 +19,8 @@ default = []
 icecap = [
   "bincode",
   "execution-engine/icecap",
-  "finite-set",
-  "hypervisor-event-server-types",
   "icecap-core",
+  "icecap-event-server-types",
   "icecap-start-generic",
   "icecap-std-external",
   "libc",
@@ -70,11 +69,12 @@ env_logger = { version = "0.8.3", optional = true }
 err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
 finite-set = { path = "../icecap/crates/framework/helpers/finite-set", optional = true }
+half = "=1.7.1"
 hex = { version = "0.4.2" }
-hypervisor-event-server-types = { path = "../icecap/crates/hypervisor/components/event-server/types", optional = true }
-icecap-core = { path = "../icecap/crates/framework/base/icecap-core", optional = true }
-icecap-start-generic = { path = "../icecap/crates/framework/base/icecap-start/generic", optional = true }
-icecap-std-external = { path = "../icecap/crates/framework/std-support/icecap-std-external", optional = true }
+icecap-core = { path = "../icecap/crates/icecap/icecap-core", optional = true }
+icecap-event-server-types = { path = "../icecap/crates/components/event-server/types", optional = true }
+icecap-start-generic = { path = "../icecap/crates/icecap/icecap-start/generic", optional = true }
+icecap-std-external = { path = "../icecap/crates/std-support/icecap-std-external", optional = true }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { path = "../third-party/libc", optional = true }

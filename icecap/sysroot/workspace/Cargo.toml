@@ -10,6 +10,7 @@ std = { path = "../rust/library/std" }
 
 # Hacks to get std to depend on our patches.
 libc = "=0.2.108"
+dlmalloc = "=0.1.3"
 
 [lib]
 crate-type = ["rlib"]
@@ -27,9 +28,10 @@ rustc-std-workspace-core = { path = "../rust/library/rustc-std-workspace-core" }
 rustc-std-workspace-alloc = { path = "../rust/library/rustc-std-workspace-alloc" }
 rustc-std-workspace-std = { path = "../rust/library/rustc-std-workspace-std" }
 
+dlmalloc = { git = "https://gitlab.com/arm-research/security/icecap/rust-dlmalloc", rev = "f6759cfed44dc4135eaa43c8c26599357749af39" }
 libc = { git = "https://gitlab.com/arm-research/security/icecap/rust-libc", rev = "642614a0e357d33620d922114fe902c4af17ae54" }
 
-icecap-std-impl = { path = "../../icecap/src/rust/crates/framework/std-support/icecap-std-impl" }
+icecap-std-impl = { path = "../../icecap/src/rust/crates/std-support/icecap-std-impl" }
 
 [workspace]
 resolver = "2"

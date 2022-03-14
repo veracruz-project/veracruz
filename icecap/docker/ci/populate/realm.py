@@ -1,4 +1,4 @@
-from icecap_hypervisor.realm import BaseRealmComposition
+from icedl.realm import BaseRealmComposition
 
 class Composition(BaseRealmComposition):
     def compose(self):

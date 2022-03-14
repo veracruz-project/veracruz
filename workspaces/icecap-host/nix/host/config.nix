@@ -70,7 +70,7 @@ in {
         # dependency of veracruz-{server-,}test that isn't picked up by copy_bin_and_libs
         cp -pdv ${pkgs.sqlite.out}/lib/libsqlite3.so* $out/lib
 
-        copy_bin_and_libs ${pkgs.icecapFramework.pkgs.musl.icecap.icecap-host}/bin/icecap-host
+        copy_bin_and_libs ${pkgs.muslPkgs.icecap.icecap-host}/bin/icecap-host
         copy_bin_and_libs ${pkgs.dropbear}/bin/dropbear
 
         copy_bin_and_libs ${pkgs.strace}/bin/strace
