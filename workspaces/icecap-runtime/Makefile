@@ -43,8 +43,8 @@ icedl_build_dir := $(disposable_dir)/icedl
 misc_build_dir := $(disposable_dir)/misc
 now := crates/runtime-manager/NOW
 
-rust_icecap_bins := $(target_dir)/aarch64-icecap/release
-rust_dev_bins := $(rust_build_dir)/release
+rust_icecap_bins := $(target_dir)/aarch64-icecap/$(PROFILE_PATH)
+rust_dev_bins := $(rust_build_dir)/$(PROFILE_PATH)
 rust_target := aarch64-icecap
 rust_target_build = $(shell uname -m)-unknown-linux-gnu
 
@@ -262,7 +262,7 @@ $(object_sizes_yaml): sel4 | $(misc_build_dir)
 
 ${rust_dev_bins}/icecap-serialize-runtime-config:
 		cargo build --manifest-path icecap/src/rust/crates/framework/base/icecap-runtime/config/cli/icecap-serialize-runtime-config/Cargo.toml \
-			--release --target-dir ${rust_build_dir}
+			$(PROFILE_FLAG) --target-dir ${rust_build_dir}
 
 icedl_components_prepared := \
         $(foreach x, \
