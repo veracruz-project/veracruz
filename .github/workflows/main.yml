@@ -15,7 +15,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-linux:ci-v2
+      image: ghcr.io/veracruz-project/veracruz/ci:v22.05
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -32,7 +32,7 @@ jobs:
   nitro:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-nitro:ci-v2
+      image: ghcr.io/veracruz-project/veracruz/ci:v22.05
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -45,11 +45,27 @@ jobs:
         run: |
             make -C /work/veracruz/workspaces nitro PROFILE=dev
 
+  icecap:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/ci:v22.05
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
+    steps:
+      - name: Check out the Veracruz repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Running IceCap test script
+        id: icecap-build
+        run: |
+            make -C /work/veracruz/workspaces/icecap-host test-client veracruz-test veracruz-test PROFILE=dev
+
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-linux:ci-v2
+      image: ghcr.io/veracruz-project/veracruz/ci:v22.05
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
