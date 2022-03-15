@@ -49,7 +49,7 @@ const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
     "-device", "virtconsole,chardev=charconsole0,id=console0",
 ];
 const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-kernel", "/local/workspaces/icecap-runtime/build/virt/disposable/cmake/elfloader/build/elfloader"
+    "-kernel", "/local/workspaces/icecap-runtime/build/qemu/disposable/cmake/elfloader/build/elfloader"
 ];
 
 
