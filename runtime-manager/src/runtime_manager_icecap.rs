@@ -140,7 +140,6 @@ impl RuntimeManager {
                 self.channel.enable_notify_write();
 
                 if !self.active {
-                    debug_println!("vcr: done");
                     return Ok(());
                 }
             }
@@ -150,7 +149,6 @@ impl RuntimeManager {
     fn process(&mut self) -> Fallible<()> {
         // recv request if we have a full request in our ring buffer
         if self.channel.poll_read() < size_of::<Header>() {
-            debug_println!("vcr: have {} need {}", self.channel.poll_read(), size_of::<Header>());
             return Ok(());
         }
         let mut raw_header = [0; size_of::<Header>()];
@@ -161,7 +159,6 @@ impl RuntimeManager {
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
 
         if self.channel.poll_read() < size_of::<Header>() + size {
-            debug_println!("vcr: have {} need {}", self.channel.poll_read(), size_of::<Header>() + size);
             return Ok(());
         }
         let mut raw_request = vec![0; usize::try_from(header).unwrap()];
@@ -169,11 +166,9 @@ impl RuntimeManager {
         self.channel.read(&mut raw_request);
         let request = bincode::deserialize::<Request>(&raw_request)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-        debug_println!("vcr: recv {}", size_of::<Header>() + size);
 
         // process requests
         let response = self.handle(request)?;
-        debug_println!("vcr: processed");
 
         // send response
         let raw_response = bincode::serialize(&response)
@@ -183,7 +178,6 @@ impl RuntimeManager {
 
         self.channel.write(&raw_header);
         self.channel.write(&raw_response);
-        debug_println!("vcr: sent {}", size_of::<Header>() + raw_response.len());
 
         self.channel.notify_read();
         self.channel.notify_write();
