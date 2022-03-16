@@ -18,6 +18,7 @@ use std::{
     convert::TryFrom,
     env,
     error::Error,
+    fs,
     io::{self, Read, Write},
     mem::size_of,
     os::unix::net::UnixStream,
@@ -49,8 +50,13 @@ const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
     "-device", "virtconsole,chardev=charconsole0,id=console0",
 ];
 const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-kernel", "/local/workspaces/icecap-runtime/build/qemu/disposable/cmake/elfloader/build/elfloader"
+    "-kernel", "{image_path}"
 ];
+
+// Include image at compile time
+const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] = include_bytes!(
+    env!("VERACRUZ_ICECAP_QEMU_IMAGE")
+);
 
 
 // TODO is this needed?
@@ -132,8 +138,16 @@ impl IceCapRealm {
             VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT
         )?;
 
-        // create a temporary socket for communication
+        // temporary directory for things
         let tempdir = tempfile::tempdir()?;
+
+        // write the image to a temporary file, this makes sure our server is
+        // idempotent
+        let image_path = tempdir.path().join("image");
+        fs::write(&image_path, VERACRUZ_ICECAP_QEMU_IMAGE)?;
+        println!("vc-server: using image: {:?}", image_path);
+
+        // create a temporary socket for communication
         let channel_path = tempdir.path().join("console0");
         println!("vc-server: using unix socket: {:?}", channel_path);
 
@@ -148,7 +162,13 @@ impl IceCapRealm {
                         channel_path.to_str().unwrap()
                     ))
             )
-            .args(&qemu_image_flags)
+            .args(
+                qemu_image_flags.iter()
+                    .map(|s| s.replace(
+                        "{image_path}",
+                        image_path.to_str().unwrap()
+                    ))
+            )
             .stdin(Stdio::null())
             .spawn()
             .map_err(IceCapError::QemuSpawnError)?;
