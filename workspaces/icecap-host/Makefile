@@ -31,18 +31,20 @@ include mk/$(icecap_plat).mk
 
 COMPILERS = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 
-RUNTIME_MANAGER_ENCLAVE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
-TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
+VERACRUZ_ICECAP_QEMU_IMAGE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
+
+BUILD_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE)
+TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
+	DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
-	VERACRUZ_DATA_DIR=$(OUT_DIR) \
-	RUNTIME_MANAGER_ENCLAVE_PATH=$(RUNTIME_MANAGER_ENCLAVE)
+	VERACRUZ_DATA_DIR=$(OUT_DIR)
 
 all: build test-collateral
 
-build:
-	$(COMPILERS) \
+build: $(VERACRUZ_ICECAP_QEMU_IMAGE)
+	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) \
 		-p proxy-attestation-server \
 		-p veracruz-client -p veracruz-server \
@@ -57,7 +59,7 @@ build:
 $(MEASUREMENT_FILE):
 	$(MAKE) -C ../icecap-runtime elfloader css-icecap.bin ICECAP_PLAT=$(ICECAP_PLAT)
 
-test-dependencies: test-collateral $(LINUX_ROOT_ENCLAVE) $(RUNTIME_MANAGER_ENCLAVE)
+test-dependencies: test-collateral $(VERACRUZ_ICECAP_QEMU_IMAGE)
 
 CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
 	--features icecap
@@ -74,7 +76,7 @@ veracruz-test: test-dependencies
 	$(CARGO_TEST) -p veracruz-test --no-run
 	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
 
-$(RUNTIME_MANAGER_ENCLAVE):
+$(VERACRUZ_ICECAP_QEMU_IMAGE):
 	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)
 
 doc:
