@@ -20,6 +20,10 @@ pub mod veracruz_server_nitro {
     use std::env;
     use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
 
+    /// Delay to apply between launching the server and trying to contact the runtime manager
+    /// enclave (in milliseconds).
+    const SERVER_DELAY_IN_MILLIS: u64 = 2000;
+    /// Path of the Runtime Manager enclave EIF file.
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
     /// The protocol to use when interacting with the proxy attestation server.
     const PROXY_ATTESTATION_PROTOCOL: &str = "nitro";
@@ -69,7 +73,8 @@ pub mod veracruz_server_nitro {
                 enclave: runtime_manager_enclave,
             };
             println!("VeracruzServerNitro::new Runtime Manager instantiated. Calling initialize");
-            std::thread::sleep(std::time::Duration::from_millis(10000));
+
+            std::thread::sleep(std::time::Duration::from_millis(SERVER_DELAY_IN_MILLIS));
 
             let attesstation_doc = {
                 let attestation = RuntimeManagerMessage::Attestation(challenge, challenge_id);
