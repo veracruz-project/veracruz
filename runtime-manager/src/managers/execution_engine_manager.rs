@@ -175,20 +175,17 @@ fn parse_incoming_buffer(
     // If not, this means we are receiving the first chunk of the protocol
     // buffer.
     if incoming_buffer_hash.get(&tls_session_id).is_none() {
-        if input.len() < 8 {
+        if input.len() < transport_protocol::LENGTH_PREFIX_SIZE {
             return Ok(None);
         }
 
         // Extract the protocol buffer's total length as u64
-        let remaining_data = input.split_off(8);
-        let mut expected_length_bytes: [u8; 8] = [0; 8];
-        expected_length_bytes.copy_from_slice(input.as_slice());
-        let expected_length = u64::from_be_bytes(expected_length_bytes);
+        let (expected_length, input_unprefixed) = transport_protocol::get_length_prefix(&mut input);
 
         // Insert the expected length in the hash table
         incoming_buffer_hash.insert(tls_session_id, (expected_length, Vec::new()));
 
-        input = remaining_data;
+        input = input_unprefixed.to_vec();
     }
 
     // This should not panic, given the above.  If it does, something is wrong.

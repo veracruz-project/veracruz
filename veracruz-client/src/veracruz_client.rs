@@ -447,9 +447,7 @@ impl VeracruzClient {
             None => (),
         }
 
-        // Write the data to the TLS session, prefixed by the data length.
-        let data_len = u64::to_be_bytes(data.len() as u64);
-        self.tls_session.write_all(&[&data_len, &data[..]].concat())?;
+        self.tls_session.write_all(&data[..])?;
 
         let mut outgoing_data_vec = Vec::new();
         let outgoing_data = Vec::new();
@@ -502,6 +500,7 @@ impl VeracruzClient {
             match plaintext_data_option {
                 Some(plaintext_data) => {
                     self.remote_session_id = Some(enclave_session_id);
+
                     return Ok(plaintext_data);
                 }
                 None => (),
