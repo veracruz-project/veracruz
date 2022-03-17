@@ -77,7 +77,7 @@ fuzz_target!(|buffer: &[u8]| {
             &request,
         )
         .unwrap();
-        let rst = protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerResponse>(&rst);
+        let rst = transport_protocol::parse_runtime_manager_response(&rst);
         assert!(rst.is_ok());
 
         flag_main.store(false, Ordering::SeqCst);
