@@ -17,14 +17,12 @@ pub type SessionId = u32;
 /// Type of requests from the host to the realm
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Request {
-    Initialize {
-        policy_json: String,
-    },
     Attestation {
         device_id: i32,
         challenge: Vec<u8>,
     },
-    CertificateChain {
+    Initialize {
+        policy_json: String,
         root_cert: Vec<u8>,
         compute_cert: Vec<u8>,
     },
@@ -40,7 +38,6 @@ pub enum Request {
 pub enum Response {
     Initialize,
     Attestation { token: Vec<u8>, csr: Vec<u8> },
-    CertificateChain,
     NewTlsSession(SessionId),
     CloseTlsSession,
     SendTlsData,

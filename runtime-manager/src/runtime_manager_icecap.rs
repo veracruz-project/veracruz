@@ -109,27 +109,25 @@ impl RuntimeManager {
 
     fn handle(&mut self, req: Request) -> Fallible<Response> {
         Ok(match req {
-            Request::Initialize { policy_json } => {
-                match session_manager::init_session_manager()
-                    .and(session_manager::load_policy(&policy_json))
-                {
-                    Err(_) => Response::Error(Error::Unspecified),
-                    Ok(()) => Response::Initialize,
-                }
-            }
             Request::Attestation {
                 device_id,
                 challenge,
-            } => match self.handle_attestation(device_id, &challenge) {
+            } => match session::manager::init_session_manager()
+                .and(self.handle_attestation(device_id, &challenge))
+            {
                 Err(_) => Response::Error(Error::Unspecified),
                 Ok((token, csr)) => Response::Attestation { token, csr },
             },
-            Request::CertificateChain {
+            Request::Initialize {
+                policy,
+                _json,
                 root_cert,
                 compute_cert,
-            } => match session_manager::load_cert_chain(&vec![compute_cert, root_cert]) {
+            } => match session_manager::load_policy(&policy_json).and(
+                session_manager::load_cert_chain(&vec![compute_cert, root_cert]),
+            ) {
                 Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::CertificateChain,
+                Ok(()) => Response::Initialize,
             },
             Request::NewTlsSession => match session_manager::new_session() {
                 Err(_) => Response::Error(Error::Unspecified),
