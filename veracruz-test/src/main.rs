@@ -58,16 +58,19 @@ mod tests {
 
     use actix_rt::System;
     use async_std::task;
+    use either::{Left, Right};
     use env_logger;
     use err_derive::Error;
     use log::info;
     use policy_utils::policy::Policy;
     use proxy_attestation_server;
     use std::{
-        env,
+        env::{self, VarError},
+        future::Future,
         io::Read,
         path::{Path, PathBuf},
         sync::Once,
+        time::Duration,
     };
     use veracruz_client;
     use veracruz_server;
@@ -107,6 +110,27 @@ mod tests {
         ClientIndexError(usize),
     }
 
+    /// A wrapper to force tests to panic after a timeout.
+    ///
+    /// Note this is overrideable with the VERACRUZ_TEST_TIMEOUT environment
+    /// variable, which provides a timeout in seconds
+    pub async fn timeout<F: Future>(timeout: Duration, f: F) -> <F as Future>::Output {
+        let timeout = match
+            env::var("VERACRUZ_TEST_TIMEOUT")
+                .map_err(Left)
+                .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
+        {
+            Ok(val) => Duration::from_secs(val),
+            Err(Left(VarError::NotPresent)) => timeout,
+            Err(err) => panic!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err),
+        };
+
+        match actix_web::rt::time::timeout(timeout, f).await {
+            Ok(r) => r,
+            Err(_) => panic!("timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override", timeout),
+        }
+    }
+
     static SETUP: Once = Once::new();
 
     pub fn setup(proxy_attestation_server_url: String) {
@@ -140,6 +164,7 @@ mod tests {
     /// A test of veracruz using network communication using a single session
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(SINGLE_CLIENT_POLICY),
             &vec![(trust_path(CLIENT_CERT), trust_path(CLIENT_KEY))],
@@ -157,11 +182,13 @@ mod tests {
             "veracruz_phase1_get_random_one_client failed with error: {:?}",
             result
         );
+      }).await
     }
 
     /// A test of veracruz using network communication using two sessions (one for program and one for data)
     #[actix_rt::test]
     async fn veracruz_phase1_linear_regression_two_clients() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(LINEAR_REGRESSION_DUAL_POLICY),
             &vec![
@@ -189,11 +216,13 @@ mod tests {
             "veracruz_phase1_linear_regression_one_client failed with error: {:?}",
             result
         );
+      }).await
     }
 
     /// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
     #[actix_rt::test]
     async fn veracruz_phase2_linear_regression_three_clients() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(LINEAR_REGRESSION_TRIPLE_POLICY),
             &vec![
@@ -228,12 +257,14 @@ mod tests {
             "veracruz_phase2_linear_regression_three_clients failed with error: {:?}",
             result
         );
+      }).await
     }
 
     /// A test of veracruz using network communication using four sessions
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_intersection_set_sum_three_clients() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
@@ -272,12 +303,14 @@ mod tests {
             "veracruz_phase2_intersection_set_sum_two_clients failed with error: {:?}",
             result
         );
+      }).await
     }
 
     /// A test of veracruz using network communication using four sessions
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
@@ -312,12 +345,14 @@ mod tests {
         )
         .await;
         assert!(result.is_ok(), "veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision failed with error: {:?}",result);
+      }).await
     }
 
     /// A test of veracruz using network communication using three sessions
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_string_edit_distance_three_clients() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY),
             &vec![
@@ -348,12 +383,14 @@ mod tests {
             "veracruz_phase2_string_edit_distance_three_clients failed with error: {:?}",
             result
         );
+      }).await
     }
 
     /// A test of veracruz using network communication using four sessions
     /// (one for program, one for the first data, one for the second data, and one for retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase3_string_edit_distance_four_clients() {
+      timeout(Duration::from_secs(120), async {
         let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY),
             &vec![
@@ -388,12 +425,14 @@ mod tests {
             "veracruz_phase3_string_edit_distance_four_clients failed with error: {:?}",
             result
         );
+      }).await
     }
 
     /// a test of veracruz using network communication using two parallel sessions
     /// (one for program, one for data sending and retrieving)
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
+      timeout(Duration::from_secs(120), async {
         let policy_json =
             read_policy(policy_path(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
         let policy = Policy::from_json(&policy_json).unwrap();
@@ -448,6 +487,7 @@ mod tests {
         )
         .await;
         assert!(result.is_ok(), "error: {:?}", result);
+      }).await
     }
 
     async fn test_template<P: AsRef<Path>>(
