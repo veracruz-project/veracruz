@@ -29,7 +29,8 @@ pub enum TransportProtocolError {
 type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
 // Strip length prefix from protocol buffer.
-// Return length and stripped protocol buffer
+// Return length and stripped protocol buffer.
+// This function must be called before deserializing a message
 pub fn get_length_prefix(buffer: &[u8]) -> (u64, &[u8]) {
     let mut length_bytes: [u8; LENGTH_PREFIX_SIZE] = [0; LENGTH_PREFIX_SIZE];
     length_bytes.copy_from_slice(&buffer[..LENGTH_PREFIX_SIZE]);
@@ -37,7 +38,8 @@ pub fn get_length_prefix(buffer: &[u8]) -> (u64, &[u8]) {
     (u64::from_be_bytes(length_bytes), remaining_buffer)
 }
 
-// Return protocol buffer prefixed with its length
+// Return protocol buffer prefixed with its length.
+// This function must be called after serializing a message
 pub fn set_length_prefix(buffer: &mut Vec<u8>) -> TransportProtocolResult {
     let length = u64::to_be_bytes(buffer.len() as u64);
     let mut length_bytes = length.to_vec();
