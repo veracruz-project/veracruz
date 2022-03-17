@@ -158,13 +158,13 @@ impl InodeEntry {
         self.data.is_service()
     }
 
-    /// Try to parse the input,
+    /// Try to parse the input.
     #[inline]
     pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
         self.data.service_valid_input()
     }
 
-    /// Try to parse the input,
+    /// Return the service handler, and the current content of in the special file.
     #[inline]
     pub(crate) fn service_handler(
         &self,

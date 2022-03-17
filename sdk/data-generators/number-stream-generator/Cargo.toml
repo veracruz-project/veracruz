@@ -3,7 +3,7 @@ authors = ["The Veracruz Development Team"]
 description = "A utility for generating synthetic 3 data files: *-init.dat containing a single 64-bit floating point number, and *-1.dat and *-2.dat which are two Vecs of 64-bit floating point numbers respectively."
 edition = "2018"
 name = "number-stream-generator"
-version = "0.1.0"
+version = "0.3.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

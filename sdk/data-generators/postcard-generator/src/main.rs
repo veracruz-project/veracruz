@@ -17,18 +17,20 @@
 use clap::{App, Arg};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fs, string::String, vec::Vec};
+use std::{error::Error, fs, vec::Vec};
 
+/// A made-up enum type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-enum E1 {
-    ENUM1(u32),
-    ENUM2(i64),
-    ENUM3(char),
-    ENUM4(String),
+pub enum Enum1 {
+    ENUM1_1(u32),
+    ENUM1_2(i64),
+    ENUM1_3(char),
+    ENUM1_4([char; 11]),
 }
 
+/// A made-up struct type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct T1 {
+pub struct Struct1 {
     f1: f64,
     f2: f64,
     f3: f64,
@@ -38,32 +40,35 @@ struct T1 {
     c1: char,
     c2: char,
     c3: char,
-    e1: E1,
+    e1: Enum1,
 }
 
+/// A made-up struct type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct T2 {
+pub struct Struct2 {
     u1: u64,
     u2: u64,
     u3: u64,
-    t1: T1,
+    t1: Struct1,
     array1: [u16; 7],
     array2: [i32; 13],
-    e1: E1,
+    e1: Enum1,
 }
 
+/// A made-up enum type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-enum E2 {
-    ENUM1(T2),
-    ENUM2([u16; 5]),
-    ENUM3(u16),
+pub enum Enum2 {
+    ENUM2_1(Struct2),
+    ENUM2_2([u16; 5]),
+    ENUM2_3(u16),
 }
 
+/// A made-up struct type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct T3 {
-    e1: E2,
-    e2: E2,
-    e3: E2,
+pub struct Struct3 {
+    e1: Enum2,
+    e2: Enum2,
+    e3: Enum2,
 }
 
 /// Generate a vector of T3 instances
@@ -118,18 +123,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|_| "Cannot parse seed")?;
 
     let mut rng = StdRng::seed_from_u64(seed);
-    let mut t3_array = Vec::new();
+    let mut array = Vec::new();
     for _ in 0..size {
-        t3_array.push(gen_t3(&mut rng));
+        array.push(gen_struct3(&mut rng));
     }
 
-    fs::write(file, postcard::to_allocvec(&t3_array)?)?;
+    fs::write(file, postcard::to_allocvec(&array)?)?;
     Ok(())
 }
 
-/// Generate an instance of T3
-fn gen_t3<T: Rng>(rng: &mut T) -> T3 {
-    let t1 = T1 {
+/// Generate an instance of Struct3
+fn gen_struct3<T: Rng>(rng: &mut T) -> Struct3 {
+    let t1 = Struct1 {
         f1: rng.gen(),
         f2: rng.gen(),
         f3: rng.gen(),
@@ -139,23 +144,35 @@ fn gen_t3<T: Rng>(rng: &mut T) -> T3 {
         c1: rng.gen(),
         c2: rng.gen(),
         c3: rng.gen(),
-        e1: E1::ENUM4(String::from("hello rust")),
+        e1: gen_enum1(rng),
     };
 
-    let t2 = T2 {
+    let t2 = Struct2 {
         u1: rng.gen(),
         u2: rng.gen(),
         u3: rng.gen(),
         t1: t1,
         array1: rng.gen(),
         array2: rng.gen(),
-        e1: E1::ENUM2(rng.gen()),
+        e1: gen_enum1(rng),
     };
 
-    T3 {
-        e1: E2::ENUM1(t2),
-        e2: E2::ENUM2(rng.gen()),
-        e3: E2::ENUM3(rng.gen()),
+    Struct3 {
+        e1: Enum2::ENUM2_1(t2),
+        e2: Enum2::ENUM2_2(rng.gen()),
+        e3: Enum2::ENUM2_3(rng.gen()),
+    }
+}
+
+/// Generate an instance of Enum1
+fn gen_enum1<T: Rng>(rng: &mut T) -> Enum1 {
+    let type_idx = rng.gen_range(0..4);
+    match type_idx {
+        0 => Enum1::ENUM1_1(rng.gen()),
+        1 => Enum1::ENUM1_2(rng.gen()),
+        2 => Enum1::ENUM1_3(rng.gen()),
+        3 => Enum1::ENUM1_4(rng.gen()),
+        _other => panic!("Should not reach here"),
     }
 }
 

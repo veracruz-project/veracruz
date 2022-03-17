@@ -1,19 +1,31 @@
+//! An example to deserialize postcard encoding of a made-up type and serialize to JSON string.
+//! This is for comparison to direct use of native module in Veracruz runtime.
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Copyright
+//!
+//! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
+//! and copyright information.
+
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::string::String;
-use std::vec::Vec;
+use std::{fs, vec::Vec};
 
+/// A made-up enum type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-enum E1 {
-    ENUM1(u32),
-    ENUM2(i64),
-    ENUM3(char),
-    ENUM4(String),
+pub enum Enum1 {
+    ENUM1_1(u32),
+    ENUM1_2(i64),
+    ENUM1_3(char),
+    ENUM1_4([char; 11]),
 }
 
+/// A made-up struct type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct T1 {
+pub struct Struct1 {
     f1: f64,
     f2: f64,
     f3: f64,
@@ -23,37 +35,40 @@ struct T1 {
     c1: char,
     c2: char,
     c3: char,
-    e1: E1,
+    e1: Enum1,
 }
 
+/// A made-up struct type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct T2 {
+pub struct Struct2 {
     u1: u64,
     u2: u64,
     u3: u64,
-    t1: T1,
+    t1: Struct1,
     array1: [u16; 7],
     array2: [i32; 13],
-    e1: E1,
+    e1: Enum1,
 }
 
+/// A made-up enum type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-enum E2 {
-    ENUM1(T2),
-    ENUM2([u16; 5]),
-    ENUM3(u16),
+pub enum Enum2 {
+    ENUM2_1(Struct2),
+    ENUM2_2([u16; 5]),
+    ENUM2_3(u16),
 }
 
+/// A made-up struct type.
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct T3 {
-    e1: E2,
-    e2: E2,
-    e3: E2,
+pub struct Struct3 {
+    e1: Enum2,
+    e2: Enum2,
+    e3: Enum2,
 }
 
 fn main() -> anyhow::Result<()> {
     let input = fs::read("/input/postcard.dat")?;
-    let rst: Vec<T3> = from_bytes(&input)?;
+    let rst: Vec<Struct3> = from_bytes(&input)?;
     let rst = serde_json::to_string(&rst)?;
     fs::write("/output/postcard_wasm.txt", rst)?;
     Ok(())
