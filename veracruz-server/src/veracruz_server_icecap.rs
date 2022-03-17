@@ -24,8 +24,13 @@ use std::{
     os::unix::net::UnixStream,
     process::{Child, Command, Stdio},
     string::ToString,
+    sync::{Arc, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
+};
+use signal_hook::{
+    consts::SIGINT,
+    iterator::{Handle, Signals},
 };
 use tempfile;
 use tempfile::{TempDir};
@@ -94,10 +99,12 @@ impl From<bincode::Error> for VeracruzServerError {
 /// IceCap implementation of 'VeracruzServer'
 struct IceCapRealm {
     // NOTE the order of these fields matter due to drop ordering
-    child: Child,
+    child: Arc<Mutex<Child>>,
     channel: UnixStream,
-    #[allow(dead_code)] stdout: JoinHandle<()>,
-    #[allow(dead_code)] stderr: JoinHandle<()>,
+    #[allow(dead_code)] stdout_handler: JoinHandle<()>,
+    #[allow(dead_code)] stderr_handler: JoinHandle<()>,
+    signal_handle: Handle,
+    #[allow(dead_code)] signal_handler: JoinHandle<()>,
     #[allow(dead_code)] tempdir: TempDir,
 }
 
@@ -153,44 +160,60 @@ impl IceCapRealm {
         println!("vc-server: using unix socket: {:?}", channel_path);
 
         // startup qemu
-        let mut child = Command::new(&qemu_bin[0])
-            .args(&qemu_bin[1..])
-            .args(&qemu_flags)
-            .args(
-                qemu_console_flags.iter()
-                    .map(|s| s.replace(
-                        "{console0_path}",
-                        channel_path.to_str().unwrap()
-                    ))
-            )
-            .args(
-                qemu_image_flags.iter()
-                    .map(|s| s.replace(
-                        "{image_path}",
-                        image_path.to_str().unwrap()
-                    ))
-            )
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(IceCapError::QemuSpawnError)?;
+        let child = Arc::new(Mutex::new(
+            Command::new(&qemu_bin[0])
+                .args(&qemu_bin[1..])
+                .args(&qemu_flags)
+                .args(
+                    qemu_console_flags.iter()
+                        .map(|s| s.replace(
+                            "{console0_path}",
+                            channel_path.to_str().unwrap()
+                        ))
+                )
+                .args(
+                    qemu_image_flags.iter()
+                        .map(|s| s.replace(
+                            "{image_path}",
+                            image_path.to_str().unwrap()
+                        ))
+                )
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(IceCapError::QemuSpawnError)?
+        ));
 
         // forward stderr/stdin via threads, this is necessary to avoid stdio
         // issues under Cargo test
-        let stdout = thread::spawn({
-            let mut child_stdout = child.stdout.take().unwrap();
+        let stdout_handler = thread::spawn({
+            let mut child_stdout = child.lock().unwrap().stdout.take().unwrap();
             move || {
                 let err = io::copy(&mut child_stdout, &mut io::stdout());
-                eprintln!("qemu: stdout closed: {:?}", err);
+                eprintln!("vc-server: qemu: stdout closed: {:?}", err);
             }
         });
 
-        let stderr = thread::spawn({
-            let mut child_stderr = child.stderr.take().unwrap();
+        let stderr_handler = thread::spawn({
+            let mut child_stderr = child.lock().unwrap().stderr.take().unwrap();
             move || {
                 let err = io::copy(&mut child_stderr, &mut io::stderr());
-                eprintln!("qemu: stderr closed: {:?}", err);
+                eprintln!("vc-server: qemu: stderr closed: {:?}", err);
+            }
+        });
+
+        // hookup signal handler so SIGINT will teardown the child process
+        let mut signals = Signals::new(&[SIGINT])?;
+        let signal_handle = signals.handle();
+        let signal_handler = thread::spawn({
+            let child = child.clone();
+            move || {
+                for sig in signals.forever() {
+                    eprintln!("vc-server: qemu: Killed by signal: {:?}", sig);
+                    child.lock().unwrap().kill().unwrap();
+                    signal_hook::low_level::emulate_default_handler(SIGINT).unwrap();
+                }
             }
         });
 
@@ -217,8 +240,10 @@ impl IceCapRealm {
 
         Ok(IceCapRealm {
             child: child,
-            stdout: stdout,
-            stderr: stderr,
+            stdout_handler: stdout_handler,
+            stderr_handler: stderr_handler,
+            signal_handle: signal_handle,
+            signal_handler: signal_handler,
             channel: channel,
             tempdir: tempdir,
         })
@@ -243,9 +268,10 @@ impl IceCapRealm {
     }
 
     // NOTE close can report errors, but drop can still happen in weird cases
-    fn shutdown(mut self) -> Result<(), VeracruzServerError> {
+    fn shutdown(self) -> Result<(), VeracruzServerError> {
         println!("vc-server: shutting down");
-        self.child.kill()?;
+        self.signal_handle.close();
+        self.child.lock().unwrap().kill()?;
         Ok(())
     }
 }

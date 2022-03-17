@@ -25,6 +25,7 @@ icecap = [
   "psa-attestation",
   "io-utils/icecap",
   "tempfile",
+  "signal-hook",
   "veracruz-utils/icecap",
 ]
 icecap-qemu = []
@@ -65,6 +66,7 @@ ring = "0.16.11"
 rustls = "0.16"
 serde = { version = "1.0.115", default-features = false, features = ["derive"] }
 serde_json = "1.0"
+signal-hook = { version = "0.3.13", optional = true }
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
