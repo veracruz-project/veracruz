@@ -24,7 +24,7 @@ use std::{
     os::unix::net::UnixStream,
     process::{Child, Command, Stdio},
     string::ToString,
-    thread,
+    thread::{self, JoinHandle},
     time::Duration,
 };
 use tempfile;
@@ -96,8 +96,9 @@ struct IceCapRealm {
     // NOTE the order of these fields matter due to drop ordering
     child: Child,
     channel: UnixStream,
-    #[allow(dead_code)]
-    tempdir: TempDir,
+    #[allow(dead_code)] stdout: JoinHandle<()>,
+    #[allow(dead_code)] stderr: JoinHandle<()>,
+    #[allow(dead_code)] tempdir: TempDir,
 }
 
 impl IceCapRealm {
@@ -152,7 +153,7 @@ impl IceCapRealm {
         println!("vc-server: using unix socket: {:?}", channel_path);
 
         // startup qemu
-        let child = Command::new(&qemu_bin[0])
+        let mut child = Command::new(&qemu_bin[0])
             .args(&qemu_bin[1..])
             .args(&qemu_flags)
             .args(
@@ -170,8 +171,28 @@ impl IceCapRealm {
                     ))
             )
             .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(IceCapError::QemuSpawnError)?;
+
+        // forward stderr/stdin via threads, this is necessary to avoid stdio
+        // issues under Cargo test
+        let stdout = thread::spawn({
+            let mut child_stdout = child.stdout.take().unwrap();
+            move || {
+                let err = io::copy(&mut child_stdout, &mut io::stdout());
+                eprintln!("qemu: stdout closed: {:?}", err);
+            }
+        });
+
+        let stderr = thread::spawn({
+            let mut child_stderr = child.stderr.take().unwrap();
+            move || {
+                let err = io::copy(&mut child_stderr, &mut io::stderr());
+                eprintln!("qemu: stderr closed: {:?}", err);
+            }
+        });
 
         // connect via socket
         let channel = loop {
@@ -196,6 +217,8 @@ impl IceCapRealm {
 
         Ok(IceCapRealm {
             child: child,
+            stdout: stdout,
+            stderr: stderr,
             channel: channel,
             tempdir: tempdir,
         })
