@@ -28,6 +28,7 @@ nitro = [
 actix-rt = "1.1.1"
 actix-web = "3.3.2"
 async-std = "1"
+either = "1.6.1"
 env_logger = "0.9.0"
 err-derive = "0.2"
 futures = "0.3"
