@@ -108,7 +108,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
             err
         })?;
 
-    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(None, &received_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::nitro::attestation_token failed to parse proxy attestation server request:{:?}", err);
             let _ignore = std::io::stdout().flush();

@@ -286,7 +286,7 @@ pub mod veracruz_server_nitro {
 
         let body_vec =
             base64::decode(&received_body).map_err(|err| VeracruzServerError::Base64Decode(err))?;
-        let response = transport_protocol::parse_proxy_attestation_server_response(&body_vec)
+        let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)
             .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
 
         let (re_cert, ca_cert) = if response.has_cert_chain() {

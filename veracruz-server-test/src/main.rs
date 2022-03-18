@@ -899,7 +899,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received acknowledgement after sending program: {:?}",
-                    transport_protocol::parse_runtime_manager_response(&response)
+                    transport_protocol::parse_runtime_manager_response(None, &response)
                 );
                 info!(
                     "             Provisioning program time (μs): {}.",
@@ -940,7 +940,7 @@ mod tests {
                 )?;
                 info!(
                     "             Client received acknowledgement after sending data: {:?},",
-                    transport_protocol::parse_runtime_manager_response(&response)
+                    transport_protocol::parse_runtime_manager_response(None, &response)
                 );
                 info!(
                     "             Provisioning data time (μs): {}.",
@@ -990,7 +990,7 @@ mod tests {
                     )?;
                     info!(
                         "             Client received acknowledgement after sending data: {:?},",
-                        transport_protocol::parse_runtime_manager_response(&response)
+                        transport_protocol::parse_runtime_manager_response(None, &response)
                     );
                     info!(
                         "             Provisioning data time (μs): {}.",
@@ -1044,7 +1044,8 @@ mod tests {
                         &client_tls_rx,
                         &remote_file_name,
                     )?;
-                    let response = transport_protocol::parse_runtime_manager_response(&response)?;
+                    let response =
+                        transport_protocol::parse_runtime_manager_response(None, &response)?;
                     let response = transport_protocol::parse_result(&response)?;
                     let result = response.ok_or(VeracruzServerError::MissingFieldError(
                         "Result retrievers response",
@@ -1068,7 +1069,7 @@ mod tests {
             )?;
             info!(
                 "             Client received acknowledgment after shutdown request: {:?}",
-                transport_protocol::parse_runtime_manager_response(&response)
+                transport_protocol::parse_runtime_manager_response(None, &response)
             );
             info!(
                 "             Shutdown time (μs): {}.",
@@ -1277,7 +1278,7 @@ mod tests {
 
         info!("Reponse received: {:?}", response);
 
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(None, &response)?;
         let status = parsed_response.get_status();
 
         if status != transport_protocol::ResponseStatus::SUCCESS {

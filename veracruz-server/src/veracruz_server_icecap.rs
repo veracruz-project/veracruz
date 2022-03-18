@@ -232,7 +232,7 @@ impl VeracruzServer for VeracruzServerIceCap {
             );
             let resp = post_buffer(&url, &req).map_err(VeracruzServerError::HttpError)?;
             let resp = base64::decode(&resp)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(&resp)
+            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)
                 .map_err(VeracruzServerError::TransportProtocolError)?;
             let cert_chain = pasr.get_cert_chain();
             let root_cert = cert_chain.get_root_cert();
