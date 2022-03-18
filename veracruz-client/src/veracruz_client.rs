@@ -238,7 +238,8 @@ impl VeracruzClient {
         );
         let serialized_program = transport_protocol::serialize_program(&program, &path)?;
         let response = self.send(&serialized_program)?;
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let parsed_response =
+            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
@@ -265,7 +266,8 @@ impl VeracruzClient {
         let serialized_data = transport_protocol::serialize_program_data(&data, &path)?;
         let response = self.send(&serialized_data)?;
 
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let parsed_response =
+            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
@@ -292,7 +294,8 @@ impl VeracruzClient {
         let serialized_read_result = transport_protocol::serialize_request_result(&path)?;
         let response = self.send(&serialized_read_result)?;
 
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let parsed_response =
+            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(VeracruzClientError::ResponseError(
@@ -320,7 +323,8 @@ impl VeracruzClient {
         let serialized_read_result = transport_protocol::serialize_read_file(&path)?;
         let response = self.send(&serialized_read_result)?;
 
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let parsed_response =
+            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(VeracruzClientError::ResponseError("get_result", status));
@@ -343,7 +347,8 @@ impl VeracruzClient {
     fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph)?;
-        let parsed_response = transport_protocol::parse_runtime_manager_response(&response)?;
+        let parsed_response =
+            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         match parsed_response.status {
             transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;

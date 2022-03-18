@@ -267,7 +267,7 @@ where
         HttpError::Base64Error(e)
     })?;
 
-    let response = parse_proxy_attestation_server_response(&response_body).map_err(|e| {
+    let response = parse_proxy_attestation_server_response(None, &response_body).map_err(|e| {
         error!("Failed to parse response to Start message from Proxy Attestation Service.  Error produced: {:?}.", e);
 
         HttpError::TransportProtocolError(e)

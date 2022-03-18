@@ -11,10 +11,20 @@
 
 use crate::transport_protocol;
 use err_derive::Error;
+use lazy_static::lazy_static;
 use protobuf::{error::ProtobufError, Message, ProtobufEnum};
-use std::{result::Result, string::ToString};
+use std::{collections::HashMap, result::Result, string::ToString, sync::Mutex, vec::Vec};
 
 pub const LENGTH_PREFIX_SIZE: usize = 8;
+
+////////////////////////////////////////////////////////////////////////////////
+// The buffer of incoming data, indexed by a session id.
+////////////////////////////////////////////////////////////////////////////////
+
+lazy_static! {
+    // TODO: wrap into a runtime manager management object.
+    static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, (u64, Vec<u8>)>> = Mutex::new(HashMap::new());
+}
 
 #[derive(Debug, Error)]
 pub enum TransportProtocolError {
@@ -25,72 +35,157 @@ pub enum TransportProtocolError {
     ResponseStatusError(i32),
     #[error(display = "TransportProtocol: TryIntoError: {}.", _0)]
     TryIntoError(#[error(source)] std::num::TryFromIntError),
+    #[error(
+        display = "TransportProtocol: Session {:?}: Buffer is partial, still waiting for chunks",
+        _0
+    )]
+    PartialBuffer(u32),
+    #[error(display = "TransportProtocol: Session {:?}: Length prefix missing", _0)]
+    MissingLengthPrefix(u32),
+    #[error(
+        display = "TransportProtocol: Session {:?}: Incoming buffer not found",
+        _0
+    )]
+    BufferNotFound(u32),
+    #[error(
+        display = "TransportProtocol: Session {:?}: Can't get mutex for incoming buffer",
+        _0
+    )]
+    MutexError(u32),
 }
 type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
-// Strip length prefix from protocol buffer.
-// Return length and stripped protocol buffer.
-// This function must be called before deserializing a message
-pub fn get_length_prefix(buffer: &[u8]) -> (u64, &[u8]) {
+/// General documentation on the network stack (TODO: move it somewhere else)
+/// Each message is serialized by the sender, prefixed by its length, then gets
+/// encrypted at the TLS layer, then split into 16KB TLS records, sent one by
+/// one to the receiver.
+/// The first chunk therefore contains the protocol buffer's total length.
+/// If the incoming buffer reaches its expected length, the protocol buffer is
+/// considered complete and parsed into a message before flushing the incoming
+/// buffer and returning `Ok(message)`.
+/// Otherwise, the receiver knows it still needs to receive more chunks in order
+/// to parse the buffer, and returns `Ok(None)`.
+/// This technique significantly decreases message parsing time hence latency
+/// when dealing with large messages, e.g. files.
+
+/// Strip the length prefix from the input buffer.
+/// Return the length and the stripped buffer.
+/// This function must be called before deserializing a `protobuf` message
+fn get_length_prefix(buffer: &[u8]) -> (u64, &[u8]) {
     let mut length_bytes: [u8; LENGTH_PREFIX_SIZE] = [0; LENGTH_PREFIX_SIZE];
     length_bytes.copy_from_slice(&buffer[..LENGTH_PREFIX_SIZE]);
     let remaining_buffer = &buffer[LENGTH_PREFIX_SIZE..];
     (u64::from_be_bytes(length_bytes), remaining_buffer)
 }
 
-// Return protocol buffer prefixed with its length.
-// This function must be called after serializing a message
-pub fn set_length_prefix(buffer: &mut Vec<u8>) -> TransportProtocolResult {
+/// Return the input buffer prefixed with its length.
+/// This function must be called after serializing a `protobuf` message
+fn set_length_prefix(buffer: &mut Vec<u8>) -> TransportProtocolResult {
     let length = u64::to_be_bytes(buffer.len() as u64);
     let mut length_bytes = length.to_vec();
     length_bytes.append(buffer);
     Ok(length_bytes)
 }
 
+/// Strip the length prefix from the first chunk received and append subsequent
+/// chunks to the session's incoming buffer until the protocol buffer is
+/// complete and can be deserialized into a message.
+/// This function must be called everytime a new chunk is received.
+/// Take a session id and chunk as input.
+/// Return the complete buffer, or an error indicating that the buffer is
+/// partial, or any other error
+///
+/// TODO: harden this against potential malfeasance.  See the note, below.
+fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> TransportProtocolResult {
+    // Default session id to 0
+    let session_id = session_id.unwrap_or(0);
+
+    let mut incoming_buffer_hash = INCOMING_BUFFER_HASH
+        .lock()
+        .map_err(|_| TransportProtocolError::MutexError(session_id))?;
+
+    // First, check if there is an entry in the hash for the specified session.
+    // If not, we assume this is the first chunk of the protocol buffer.
+    if incoming_buffer_hash.get(&session_id).is_none() {
+        if input.len() < LENGTH_PREFIX_SIZE {
+            return Err(TransportProtocolError::MissingLengthPrefix(session_id));
+        }
+
+        // Extract the protocol buffer's total length
+        let (expected_length, input_unprefixed) = get_length_prefix(&mut input);
+
+        // Insert the expected length in the hash table
+        incoming_buffer_hash.insert(session_id, (expected_length, Vec::new()));
+
+        input = input_unprefixed;
+    }
+
+    let (expected_length, incoming_buffer) = match incoming_buffer_hash.get_mut(&session_id) {
+        Some(v) => v,
+        None => return Err(TransportProtocolError::BufferNotFound(session_id)),
+    };
+
+    // Append chunk to incoming buffer
+    incoming_buffer.append(&mut input.to_vec());
+
+    // We return `Ok(None)` as long as the full protocol buffer has not yet been
+    // received. Once received, we return `Ok(buffer)`.
+    // In a well-behaving system, this is reasonable.  In a poorly-behaved
+    // system (under attack, clients just getting confused) it is not
+    // reasonable, and can eventually result in "Out of Memory" or Garbage out.
+    //
+    // TODO: It would be nice to check the error, and then determine if this
+    // might be the case or if it is hopeless and we could just error out.
+
+    if incoming_buffer.len() < *expected_length as usize {
+        return Err(TransportProtocolError::PartialBuffer(session_id));
+    } else {
+        let incoming_buffer = incoming_buffer.to_vec();
+        incoming_buffer_hash.remove(&session_id);
+        Ok(incoming_buffer)
+    }
+}
+
 /// Parse a request to the Runtime Manager.
 pub fn parse_runtime_manager_request(
+    session_id: Option<u32>,
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerRequest, TransportProtocolError> {
-    // Strip length prefix
-    let (_length, buffer_unprefixed) = get_length_prefix(&buffer);
-
+    let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::RuntimeManagerRequest,
-    >(buffer_unprefixed)?)
+    >(&full_unprefixed_buffer)?)
 }
 
 /// Parse a response from the Runtime Manager.
 pub fn parse_runtime_manager_response(
+    session_id: Option<u32>,
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerResponse, TransportProtocolError> {
-    // Strip length prefix
-    let (_length, buffer_unprefixed) = get_length_prefix(&buffer);
-
+    let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::RuntimeManagerResponse,
-    >(buffer_unprefixed)?)
+    >(&full_unprefixed_buffer)?)
 }
 
 pub fn parse_proxy_attestation_server_request(
+    session_id: Option<u32>,
     buffer: &[u8],
 ) -> Result<transport_protocol::ProxyAttestationServerRequest, TransportProtocolError> {
-    // Strip length prefix
-    let (_length, buffer_unprefixed) = get_length_prefix(&buffer);
-
+    let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::ProxyAttestationServerRequest,
-    >(buffer_unprefixed)?)
+    >(&full_unprefixed_buffer)?)
 }
 
 pub fn parse_proxy_attestation_server_response(
+    session_id: Option<u32>,
     buffer: &[u8],
 ) -> Result<transport_protocol::ProxyAttestationServerResponse, TransportProtocolError> {
-    // Strip length prefix
-    let (_length, buffer_unprefixed) = get_length_prefix(&buffer);
-
+    let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::ProxyAttestationServerResponse,
-    >(buffer_unprefixed)?)
+    >(&full_unprefixed_buffer)?)
 }
 
 /// Serialize a program binary.

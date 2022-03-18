@@ -49,7 +49,7 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
         err
     })?;
 
-    let proto = transport_protocol::parse_proxy_attestation_server_request(&proto_bytes)
+    let proto = transport_protocol::parse_proxy_attestation_server_request(None, &proto_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::verify_iat parse_proxy_attestation_server_request failed:{:?}", err);
             err

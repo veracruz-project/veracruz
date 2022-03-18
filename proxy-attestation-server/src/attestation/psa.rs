@@ -67,7 +67,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
 pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)?;
 
-    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)?;
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(None, &received_bytes)?;
     if !parsed.has_native_psa_attestation_token() {
         println!("proxy-attestation-server::attestation::psa::attestation_token received data is incorrect.");
         return Err(ProxyAttestationServerError::MissingFieldError(
