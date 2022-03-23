@@ -71,11 +71,18 @@ type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>
 /// Strip the length prefix from the input buffer.
 /// Return the length and the stripped buffer.
 /// This function must be called before deserializing a `protobuf` message
-fn get_length_prefix(buffer: &[u8]) -> (u64, &[u8]) {
+fn get_length_prefix(
+    session_id: u32,
+    buffer: &[u8],
+) -> Result<(u64, &[u8]), TransportProtocolError> {
+    if buffer.len() < LENGTH_PREFIX_SIZE {
+        return Err(TransportProtocolError::MissingLengthPrefix(session_id));
+    }
+
     let mut length_bytes: [u8; LENGTH_PREFIX_SIZE] = [0; LENGTH_PREFIX_SIZE];
     length_bytes.copy_from_slice(&buffer[..LENGTH_PREFIX_SIZE]);
     let remaining_buffer = &buffer[LENGTH_PREFIX_SIZE..];
-    (u64::from_be_bytes(length_bytes), remaining_buffer)
+    Ok((u64::from_be_bytes(length_bytes), remaining_buffer))
 }
 
 /// Return the input buffer prefixed with its length.
@@ -107,12 +114,8 @@ fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> Transpor
     // First, check if there is an entry in the hash for the specified session.
     // If not, we assume this is the first chunk of the protocol buffer.
     if incoming_buffer_hash.get(&session_id).is_none() {
-        if input.len() < LENGTH_PREFIX_SIZE {
-            return Err(TransportProtocolError::MissingLengthPrefix(session_id));
-        }
-
         // Extract the protocol buffer's total length
-        let (expected_length, input_unprefixed) = get_length_prefix(&mut input);
+        let (expected_length, input_unprefixed) = get_length_prefix(session_id, &mut input)?;
 
         // Insert the expected length in the hash table
         incoming_buffer_hash.insert(session_id, (expected_length, Vec::new()));
