@@ -112,15 +112,14 @@ impl RuntimeManager {
             Request::Attestation {
                 device_id,
                 challenge,
-            } => match session::manager::init_session_manager()
+            } => match session_manager::init_session_manager()
                 .and(self.handle_attestation(device_id, &challenge))
             {
                 Err(_) => Response::Error(Error::Unspecified),
                 Ok((token, csr)) => Response::Attestation { token, csr },
             },
             Request::Initialize {
-                policy,
-                _json,
+                policy_json,
                 root_cert,
                 compute_cert,
             } => match session_manager::load_policy(&policy_json).and(
