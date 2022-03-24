@@ -337,6 +337,10 @@ pub mod veracruz_server_linux {
                 VeracruzServerError::IOError(e)
             })?;
 
+            // Configure TCP to flush outgoing buffers immediately. This reduces
+            // latency when dealing with small packets
+            let _ = runtime_manager_socket.set_nodelay(true);
+
             info!(
                 "Connected to Runtime Manager enclave at address {}.",
                 runtime_manager_address
@@ -412,7 +416,7 @@ pub mod veracruz_server_linux {
 
                     VeracruzServerError::Base64Error(e)
                 })?;
-                let pasr = parse_proxy_attestation_server_response(&resp).map_err(|e| {
+                let pasr = parse_proxy_attestation_server_response(None, &resp).map_err(|e| {
                     error!("Failed to parse reponse from proxy attestation server.  Error received: {:?}.", e);
 
                     VeracruzServerError::TransportProtocolError(e)

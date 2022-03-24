@@ -11,22 +11,14 @@
 //! information on licensing and copyright.
 
 use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
-use lazy_static::lazy_static;
 use policy_utils::principal::Principal;
-use std::sync::Mutex;
-use std::{collections::HashMap, result::Result, vec::Vec};
-use transport_protocol::transport_protocol::{
-    RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
+use std::{result::Result, vec::Vec};
+use transport_protocol::{
+    transport_protocol::{
+        RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
+    },
+    TransportProtocolError,
 };
-
-////////////////////////////////////////////////////////////////////////////////
-// The buffer of incoming data.
-////////////////////////////////////////////////////////////////////////////////
-
-lazy_static! {
-    // TODO: wrap into a runtime manager management object.
-    static ref INCOMING_BUFFER_HASH: Mutex<HashMap<u32, Vec<u8>>> = Mutex::new(HashMap::new());
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Protocol response messages.
@@ -149,47 +141,19 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
     }
 }
 
-/// Tries to parse the incoming data into a `RuntimeManagerRequest`.  If this is not
-/// possible, returns `Err(reason)`.  If we still need to receive more data in
-/// order to parse a full request, returns `Ok(None)`.  Otherwise, returns
-/// `Ok(request)` for the parsed request.
-///
-/// TODO: harden this against potential malfeasance.  See the note, below.
+/// Try to parse the incoming buffer into a `RuntimeManagerRequest` message.
+/// Return `Ok(request)` if it's a success or `Ok(None)` if the message is
+/// partial. Propagate the error otherwise
 fn parse_incoming_buffer(
     tls_session_id: u32,
-    mut input: Vec<u8>,
+    input: Vec<u8>,
 ) -> Result<Option<transport_protocol::RuntimeManagerRequest>, RuntimeManagerError> {
-    let mut incoming_buffer_hash = INCOMING_BUFFER_HASH.lock()?;
-
-    // First, make sure there is an entry in the hash for the TLS session.
-    if incoming_buffer_hash.get(&tls_session_id).is_none() {
-        incoming_buffer_hash.insert(tls_session_id, Vec::new());
-    }
-
-    // This should not panic, given the above.  If it does, something is wrong.
-    let incoming_buffer = incoming_buffer_hash.get_mut(&tls_session_id).ok_or(
-        RuntimeManagerError::UnavailableIncomeBufferError(tls_session_id as u64),
-    )?;
-
-    incoming_buffer.append(&mut input);
-
-    // NB: `parse_from_bytes()` returning failure is interpreted as meaning the
-    // full protocol buffer has not yet been received. So we return `Ok(None)`
-    // with the hope that eventually we will receive all of it, and then
-    // `parse_from_bytes()` will return `Ok(parsed)`. In a well-behaving system,
-    // this is reasonable.  In a poorly-behaved system (under attack, clients
-    // just getting confused) it is not reasonable, and can eventually result in
-    // "Out of Memory" or Garbage out.
-    //
-    // TODO: It would be nice to check the error, and then determine if this might
-    // be the case or if it is hopeless and we could just error out.
-    match protobuf::parse_from_bytes::<transport_protocol::RuntimeManagerRequest>(&incoming_buffer)
-    {
-        Err(_) => Ok(None),
-        Ok(parsed) => {
-            incoming_buffer_hash.remove(&tls_session_id);
-            Ok(Some(parsed))
-        }
+    match transport_protocol::parse_runtime_manager_request(Some(tls_session_id), &input) {
+        Ok(v) => Ok(Some(v)),
+        Err(e) => match e {
+            TransportProtocolError::PartialBuffer(_) => Ok(None),
+            e2 => Err(RuntimeManagerError::TransportProtocolError(e2)),
+        },
     }
 }
 

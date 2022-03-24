@@ -99,7 +99,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
             err
         })?;
 
-    let parsed = transport_protocol::parse_proxy_attestation_server_request(&received_bytes)
+    let parsed = transport_protocol::parse_proxy_attestation_server_request(None, &received_bytes)
         .map_err(|err| {
             println!("proxy-attestation-server::attestation::start failed to parse_proxy_attestation_server_request:{:?}", err);
             err
