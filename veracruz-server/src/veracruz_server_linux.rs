@@ -22,6 +22,7 @@ pub mod veracruz_server_linux {
     use policy_utils::policy::Policy;
     use ring::digest::{digest, SHA256};
     use std::{
+        env,
         fs::File,
         io::Read,
         net::{Shutdown, TcpStream},
@@ -262,19 +263,22 @@ pub mod veracruz_server_linux {
                 VeracruzServerError::VeracruzUtilError(e)
             })?;
 
+            let runtime_enclave_binary_path = env::var("RUNTIME_ENCLAVE_BINARY_PATH")
+                .unwrap_or(RUNTIME_ENCLAVE_BINARY_PATH.to_string());
+
             info!(
                 "Computing measurement of runtime manager enclave (using binary {})",
-                RUNTIME_ENCLAVE_BINARY_PATH
+                runtime_enclave_binary_path
             );
 
-            let measurement = match File::open(RUNTIME_ENCLAVE_BINARY_PATH) {
+            let measurement = match File::open(&runtime_enclave_binary_path) {
                 Ok(mut file) => {
                     let mut buffer = Vec::new();
 
                     if let Err(err) = file.read_to_end(&mut buffer) {
                         error!(
                             "Failed to read file: {:?}.  Error produced: {}.",
-                            RUNTIME_ENCLAVE_BINARY_PATH, err
+                            runtime_enclave_binary_path, err
                         );
 
                         return Err(VeracruzServerError::IOError(err));
@@ -284,7 +288,7 @@ pub mod veracruz_server_linux {
                     HEXLOWER.encode(digest.as_ref())
                 }
                 Err(err) => {
-                    error!("Failed to open file: {:?}.", RUNTIME_ENCLAVE_BINARY_PATH);
+                    error!("Failed to open file: {:?}.", &runtime_enclave_binary_path);
                     return Err(VeracruzServerError::IOError(err));
                 }
             };
@@ -296,10 +300,10 @@ pub mod veracruz_server_linux {
 
             info!(
                 "Starting runtime manager enclave (using binary {} and port {})",
-                RUNTIME_ENCLAVE_BINARY_PATH, RUNTIME_MANAGER_ENCLAVE_PORT
+                runtime_enclave_binary_path, RUNTIME_MANAGER_ENCLAVE_PORT
             );
 
-            let runtime_manager_process = Command::new(RUNTIME_ENCLAVE_BINARY_PATH)
+            let runtime_manager_process = Command::new(runtime_enclave_binary_path)
                 .arg("--port")
                 .arg(RUNTIME_MANAGER_ENCLAVE_PORT)
                 .arg("--measurement")
