@@ -18,7 +18,6 @@ WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
 MEASUREMENT_FILE = $(abspath ../linux-runtime/css-linux.bin)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
-ENCLAVE_BINARY_PATH = $(abspath $(WORKSPACE_DIR)/linux-runtime/runtime_manager_enclave)
 
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
@@ -30,7 +29,7 @@ TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR) \
-	RUNTIME_MANAGER_ENCLAVE_PATH=$(RUNTIME_MANAGER_ENCLAVE)
+	RUNTIME_ENCLAVE_BINARY_PATH=$(WORKSPACE_DIR)/linux-runtime/runtime_manager_enclave
 
 all: build test-collateral
 
@@ -53,9 +52,9 @@ test-dependencies: test-collateral $(RUNTIME_MANAGER_ENCLAVE)
 CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features linux
 
 test-server: test-dependencies
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CARGO_TEST) -p veracruz-server-test test_debug -- --ignored --test-threads=1
+	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
+	$(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) -p veracruz-server-test test_debug -- --ignored --test-threads=1
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib --features mock -- --test-threads=1
