@@ -23,6 +23,7 @@ linux: runtime-manager-enclave css-linux.bin
 
 runtime-manager-enclave:
 	cargo build $(PROFILE_FLAG) $(V_FLAG) --features linux -p runtime_manager_enclave
+	cp target/$(PROFILE_PATH)/runtime_manager_enclave .
 
 css-linux.bin: runtime-manager-enclave
 	cp target/$(PROFILE_PATH)/runtime_manager_enclave $@
