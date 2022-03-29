@@ -13,18 +13,19 @@ use crate::error::VeracruzClientError;
 use log::{error, info};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use ring::signature::KeyPair;
-use rustls::Session;
+use rustls_pemfile;
 use std::{
     io::{Read, Write},
     path::Path,
     str::from_utf8,
+    convert::TryFrom,
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 use webpki;
 
 #[derive(Debug)]
 pub struct VeracruzClient {
-    tls_session: rustls::ClientSession,
+    tls_session: rustls::ClientConnection,
     remote_session_id: Option<u32>,
     policy: Policy,
     policy_hash: String,
@@ -52,12 +53,12 @@ impl VeracruzClient {
     fn read_cert<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate, VeracruzClientError> {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
-        let cert_vec = rustls::internal::pemfile::certs(&mut cursor)
+        let cert_vec = rustls_pemfile::certs(&mut cursor)
             .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
         if cert_vec.len() == 1 {
-            Ok(cert_vec[0].clone())
+            return Ok(rustls::Certificate(cert_vec[0].clone()));
         } else {
-            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
+            return Err(VeracruzClientError::InvalidLengthError("cert_vec", 1));
         }
     }
 
@@ -70,43 +71,15 @@ impl VeracruzClient {
     ) -> Result<rustls::PrivateKey, VeracruzClientError> {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
-        let pkey_vec = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
+        let pkey_vec = rustls_pemfile::rsa_private_keys(&mut cursor)
             .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
         if pkey_vec.len() == 1 {
-            Ok(pkey_vec[0].clone())
+            return Ok(rustls::PrivateKey(pkey_vec[0].clone()));
         } else {
-            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
+            return Err(VeracruzClientError::InvalidLengthError("cert_vec", 1));
         }
     }
-
-    /// If ``ciphersuite_string`` is a supported cipher suite,
-    /// add it into ``client_config``.
-    /// Otherwise return error message.
-    fn set_up_client_ciphersuite(
-        client_config: &mut rustls::ClientConfig,
-        ciphersuite_string: &str,
-    ) -> Result<(), VeracruzClientError> {
-        client_config.ciphersuites.clear();
-
-        let policy_ciphersuite =
-            rustls::CipherSuite::lookup_value(ciphersuite_string).map_err(|_| {
-                VeracruzClientError::TLSInvalidCyphersuiteError(ciphersuite_string.to_string())
-            })?;
-        let supported_ciphersuite = rustls::ALL_CIPHERSUITES
-            .iter()
-            .fold(None, |last_rst, avalabie| {
-                last_rst.or(if avalabie.suite == policy_ciphersuite {
-                    Some(avalabie)
-                } else {
-                    None
-                })
-            })
-            .ok_or(VeracruzClientError::TLSUnsupportedCyphersuiteError(
-                policy_ciphersuite,
-            ))?;
-        client_config.ciphersuites.push(supported_ciphersuite);
-        return Ok(());
-    }
+    
 
     /// Check the validity of client_cert:
     /// parse the certificate and match it with the public key generated from the private key;
@@ -182,25 +155,34 @@ impl VeracruzClient {
 
         let policy_ciphersuite_string = policy.ciphersuite().as_str();
 
-        let mut client_config = rustls::ClientConfig::new();
-        let mut client_cert_vec = std::vec::Vec::new();
-        client_cert_vec.push(client_cert);
-        client_config.set_single_client_cert(client_cert_vec, client_priv_key);
         let proxy_service_cert = {
             let certs_pem = policy.proxy_service_cert();
             let certs =
-                rustls::internal::pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
+                rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
                     VeracruzClientError::X509ParserError(format!(
-                        "pemfile::certs found not certificates"
+                        "rustls_pemfile::certs found not certificates"
                     ))
                 })?;
             certs[0].clone()
         };
-        client_config.root_store.add(&proxy_service_cert)?;
-        Self::set_up_client_ciphersuite(&mut client_config, &policy_ciphersuite_string)?;
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.add(&rustls::Certificate(proxy_service_cert))
+            .map_err(|err| VeracruzClientError::WebpkiError(err))?;
 
-        let dns_name = webpki::DNSNameRef::try_from_ascii_str(&enclave_name)?;
-        let session = rustls::ClientSession::new(&std::sync::Arc::new(client_config), dns_name);
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(&policy_ciphersuite_string)
+            .ok_or_else(|| VeracruzClientError::TLSInvalidCiphersuiteError(policy_ciphersuite_string.to_string()))?;
+
+        let client_config = rustls::ClientConfig::builder()
+            .with_cipher_suites(&[policy_ciphersuite])
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(&[&rustls::version::TLS12])?
+            .with_root_certificates(root_store)
+            .with_single_cert([client_cert].to_vec(), client_priv_key)
+            ?;
+
+        let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
+            .map_err(|err| VeracruzClientError::InvalidDnsNameError(err))?;
+        let session = rustls::ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
@@ -385,12 +367,12 @@ impl VeracruzClient {
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
-        match self.tls_session.get_peer_certificates() {
+        match self.tls_session.peer_certificates() {
             None => {
                 return Err(VeracruzClientError::NoPeerCertificatesError);
             }
             Some(certs) => {
-                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref())?;
+                let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
                 // check for OUR extension
                 // The Extension is encoded using DER, which puts the first two
@@ -447,7 +429,7 @@ impl VeracruzClient {
             None => (),
         }
 
-        self.tls_session.write_all(&data[..])?;
+        self.tls_session.writer().write_all(&data[..])?;
 
         let mut outgoing_data_vec = Vec::new();
         let outgoing_data = Vec::new();
@@ -528,7 +510,7 @@ impl VeracruzClient {
         let mut ret_val = None;
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
         self.tls_session.process_new_packets()?;
-        let read_received = self.tls_session.read_to_end(&mut received_buffer);
+        let read_received = self.tls_session.reader().read_to_end(&mut received_buffer);
         if read_received.is_ok() && received_buffer.len() > 0 {
             ret_val = Some(received_buffer)
         }

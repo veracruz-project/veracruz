@@ -13,7 +13,10 @@
 use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
 use lazy_static::lazy_static;
 use policy_utils::principal::Principal;
-use std::sync::Mutex;
+use std::{
+    panic::panic_any,
+    sync::Mutex
+};
 use std::{collections::HashMap, result::Result, vec::Vec};
 use transport_protocol::transport_protocol::{
     RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
@@ -37,7 +40,7 @@ lazy_static! {
 #[inline]
 fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
     transport_protocol::serialize_result(transport_protocol::ResponseStatus::SUCCESS as i32, result)
-        .unwrap_or_else(|err| panic!(err))
+        .unwrap_or_else(|err| panic_any(err))
 }
 
 /// Encodes an error code indicating that somebody sent an invalid or malformed

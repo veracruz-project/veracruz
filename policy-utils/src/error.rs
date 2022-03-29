@@ -11,7 +11,7 @@
 
 use err_derive::Error;
 #[cfg(feature = "std")]
-use rustls::{CipherSuite, TLSError};
+use rustls;
 use std::{string::String, time::SystemTimeError};
 #[cfg(feature = "std")]
 use x509_parser::error::PEMError;
@@ -43,9 +43,9 @@ pub enum PolicyError {
     X509ParserError(String),
     #[cfg(feature = "std")]
     #[error(display = "PolicyError: TLSError: {:?}.", _0)]
-    TLSError(#[error(source)] TLSError),
+    TLSError(#[error(source)] rustls::Error),
     #[error(display = "PolicyError: TLSError: invalid cyphersuite: {:?}.", _0)]
-    TLSInvalidCyphersuiteError(String),
+    TLSInvalidCiphersuiteError(String),
     #[error(display = "PolicyError: SystemTimeError: {:?}.", _0)]
     SystemTimeError(#[error(source)] SystemTimeError),
     #[error(display = "PolicyError: unauthorized client certificate: {}.", _0)]
@@ -58,7 +58,7 @@ pub enum PolicyError {
     CertificateExpireError(String),
     #[cfg(feature = "std")]
     #[error(display = "PolicyError: TLSError: Unsupported cyphersuite {:?}.", _0)]
-    TLSUnsupportedCyphersuiteError(CipherSuite),
+    TLSUnsupportedCyphersuiteError(rustls::CipherSuite),
     #[error(display = "PolicyError: Certificate format error: {:?}.", _0)]
     CertificateFormatError(String),
     #[error(display = "PolicyError: Duplicated client ID {}.", _0)]

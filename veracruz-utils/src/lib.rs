@@ -18,6 +18,8 @@ pub mod platform;
 #[cfg(feature = "nitro")]
 pub use crate::platform::nitro::*;
 
+use rustls;
+
 /// Material related to cerficate signing requests (CSR).
 pub mod csr;
 
@@ -26,3 +28,16 @@ pub mod csr;
 /// ID as long as it doesn't collide with the ID of an extension in our
 /// certificates.
 pub static VERACRUZ_RUNTIME_HASH_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];
+
+pub fn lookup_ciphersuite(suite_string: &str) -> Option<rustls::SupportedCipherSuite> {
+    let ciphersuite_enum = match rustls::CipherSuite::lookup_value(suite_string) {
+        Ok(suite) => suite,
+        Err(_) => return None,
+    };
+    for this_supported_ciphersuite in rustls::ALL_CIPHER_SUITES {
+        if this_supported_ciphersuite.suite() == ciphersuite_enum {
+            return Some(this_supported_ciphersuite.clone());
+        }
+    }
+    return None;
+}

@@ -281,7 +281,7 @@ impl Policy {
         {
             let policy_ciphersuite = rustls::CipherSuite::lookup_value(self.ciphersuite())
                 .map_err(|_| {
-                    PolicyError::TLSInvalidCyphersuiteError(self.get_ciphersuite().to_string())
+                    PolicyError::TLSInvalidCiphersuiteError(self.get_ciphersuite().to_string())
                 })?;
             if !rustls::ALL_CIPHERSUITES
                 .iter()

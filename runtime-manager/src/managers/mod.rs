@@ -15,6 +15,7 @@ use execution_engine::{execute, fs::FileSystem};
 use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
+    panic::panic_any,
     path::PathBuf,
     string::{String, ToString},
     sync::{
@@ -228,7 +229,7 @@ impl ProtocolState {
             transport_protocol::ResponseStatus::SUCCESS as i32,
             Some(error_code.to_le_bytes().to_vec()),
         )
-        .unwrap_or_else(|err| panic!(err))
+        .unwrap_or_else(|err| panic_any(err))
     }
 }
 

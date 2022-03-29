@@ -27,7 +27,7 @@ pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 #[derive(Debug, Error)]
 pub enum VeracruzServerError {
     #[error(display = "VeracruzServer: TLSError: {:?}.", _0)]
-    TLSError(#[error(source)] rustls::TLSError),
+    TLSError(#[error(source)] rustls::Error),
     #[error(display = "VeracruzServer: HexError: {:?}.", _0)]
     HexError(#[error(source)] hex::FromHexError),
     #[error(display = "VeracruzServer: Utf8Error: {:?}.", _0)]
@@ -48,10 +48,12 @@ pub enum VeracruzServerError {
     Base64Error(#[error(source)] base64::DecodeError),
     #[error(display = "VeracruzServer: TLSError: unspecified.")]
     TLSUnspecifiedError,
+    #[error(display = "VeracruzServer: Invalid cipher suite: {:?}", _0)]
+    InvalidCiphersuiteError(String),
     #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),
     #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
-    WebpkiDNSNameError(#[error(source)] webpki::InvalidDNSNameError),
+    WebpkiDNSNameError(#[error(source)] rustls::client::InvalidDnsNameError),
     #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
     #[error(display = "VeracruzServer: TryIntoError: {}.", _0)]
@@ -90,13 +92,6 @@ pub enum VeracruzServerError {
         _0
     )]
     InvalidRuntimeManagerMessage(veracruz_utils::platform::vm::RuntimeManagerMessage),
-    #[cfg(feature = "nitro")]
-    #[error(
-        display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
-        _0
-    )]
-    #[cfg(feature = "nitro")]
-    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,

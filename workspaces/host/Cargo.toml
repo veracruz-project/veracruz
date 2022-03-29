@@ -42,5 +42,5 @@ lto = true
 opt-level = 3
 
 [patch.crates-io]
-rustls = { path = "crates/third-party/rustls" }
+rustls = { path = "crates/third-party/rustls/rustls" }
 webpki = { path = "crates/third-party/webpki" }

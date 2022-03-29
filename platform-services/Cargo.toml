@@ -21,8 +21,3 @@ getrandom = { version = "0.1.14", optional = true }
 nix = { version = "0.22", optional = true }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "aws-nitro-enclaves-nsm-api", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3

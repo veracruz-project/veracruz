@@ -14,8 +14,8 @@ use std::{
     fs::{read_to_string, File},
     io::{Read, Write},
     net::SocketAddr,
-    path::{Path, PathBuf},
-    process::{exit, Command},
+    path::PathBuf,
+    process::exit,
     str::FromStr,
 };
 
@@ -82,13 +82,6 @@ const VERSION: &'static str = "0.1.0";
 
 /// The single supported ciphersuite embedded in the policy file.
 const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256";
-
-/// The name of the 'dd' executable to call when computing the hash of the
-/// Runtime Manager enclave for SGX.
-const DD_EXECUTABLE_NAME: &'static str = "dd";
-/// The name of the 'xxd' executable to call when computing the hash of the
-/// Runtime Manager enclave for SGX.
-const XXD_EXECUTABLE_NAME: &'static str = "xxd";
 
 /// The default filename of the output JSON policy file, if no alternative is
 /// provided on the command line.
@@ -561,71 +554,6 @@ fn compute_linux_enclave_hash(arguments: &Arguments) -> Option<String> {
     Some(hash)
 }
 
-/// Computes the SGX hash of the Runtime Manager enclave making use of the external
-/// 'dd' and 'xxd' utilities, which are called as external processes.  Returns
-/// `None` iff no `css.bin` file was provided as a command-line argument.
-fn compute_sgx_enclave_hash(arguments: &Arguments) -> Option<String> {
-    info!("Computing Intel SGX Enclave hash.");
-
-    let css_file = match &arguments.css_file {
-        None => return None,
-        Some(css_file) => css_file,
-    };
-
-    if Path::new(css_file).exists() {
-        let mut dd_command = Command::new(DD_EXECUTABLE_NAME);
-
-        dd_command
-            .arg("skip=960")
-            .arg("count=32")
-            .arg(format!("if={}", pretty_pathbuf(css_file.clone())))
-            .arg(format!("of={}", "hash.bin"))
-            .arg("bs=1");
-
-        info!("Invoking 'dd' executable: {:?}.", dd_command);
-
-        if let Ok(output) = dd_command.output() {
-            if !output.status.success() {
-                abort_with("Invocation of 'dd' command failed.");
-            }
-
-            let mut xxd_command = Command::new(XXD_EXECUTABLE_NAME);
-
-            xxd_command
-                .arg("-ps")
-                .arg("-cols")
-                .arg("32")
-                .arg("hash.bin");
-
-            info!("Invoking 'xxd' executable: {:?}.", xxd_command);
-
-            if let Ok(hash_hex) = xxd_command.output() {
-                if !hash_hex.status.success() {
-                    abort_with("Invocation of 'xxd' command failed.");
-                }
-
-                if let Ok(mut hash_hex) = String::from_utf8(hash_hex.stdout) {
-                    hash_hex = hash_hex.replace("\n", "");
-
-                    info!("Hash successfully computed, {}.", hash_hex);
-
-                    return Some(hash_hex);
-                } else {
-                    abort_with("Failed to parse output of 'xxd'.");
-                }
-            } else {
-                abort_with("Invocation of 'xxd' command failed.");
-            }
-        } else {
-            abort_with("Invocation of 'dd' command failed.");
-        }
-    } else {
-        warn!("Runtime Manager CSS.bin file cannot be opened.");
-        warn!("Continuing on without computing an SGX hash.");
-        None
-    }
-}
-
 /// Reads the Runtime Manager PCR0 file content, munging it a little, for the Nitro
 /// Enclave hash.  Returns `None` iff no `pcr0` file was provided as a command
 /// line argument.
@@ -847,7 +775,6 @@ fn serialize_file_hash(arguments: &Arguments) -> Vec<FileHash> {
 fn serialize_json(arguments: &Arguments) -> Value {
     info!("Serializing JSON policy file.");
 
-    let sgx_hash = compute_sgx_enclave_hash(arguments);
     let linux_hash = compute_linux_enclave_hash(arguments);
 
     let policy = Policy::new(
