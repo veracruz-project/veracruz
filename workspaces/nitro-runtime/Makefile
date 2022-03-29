@@ -27,7 +27,7 @@ nitro: runtime_manager.eif PCR0 css-nitro.bin
 css-nitro.bin: PCR0
 	cp $< $@
 
-runtime_manager.eif PCR0: runtime-manager-enclave crates/runtime-manager/dockerdir/Dockerfile
+runtime_manager.eif PCR0: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave crates/runtime-manager/dockerdir/Dockerfile
 	rm -rf docker
 	mkdir -p docker
 	cp target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave docker
@@ -36,6 +36,8 @@ runtime_manager.eif PCR0: runtime-manager-enclave crates/runtime-manager/dockerd
 	nitro-cli build-enclave --docker-dir docker --docker-uri runtime_manager --output-file runtime_manager.eif > measurements.json
 	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
 	rm -rf docker
+
+target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: runtime-manager-enclave
 
 runtime-manager-enclave:
 	rustup target add $(ARCH)-unknown-linux-musl
