@@ -191,17 +191,6 @@ impl VeracruzServer for VeracruzServerIceCap {
             realm_process,
         };
 
-        match server.send(&Request::Initialize {
-            policy_json: policy_json.to_string(),
-        })? {
-            Response::Initialize => (),
-            resp => {
-                return Err(VeracruzServerError::IceCapError(
-                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
-                ))
-            }
-        }
-
         let (device_id, challenge) = send_proxy_attestation_server_start(
             policy.proxy_attestation_server_url(),
             "psa",
@@ -240,11 +229,12 @@ impl VeracruzServer for VeracruzServerIceCap {
             (root_cert.to_vec(), compute_cert.to_vec())
         };
 
-        match server.send(&Request::CertificateChain {
+        match server.send(&Request::Initialize {
+            policy_json: policy_json.to_string(),
             root_cert,
             compute_cert,
         })? {
-            Response::CertificateChain => (),
+            Response::Initialize => (),
             resp => {
                 return Err(VeracruzServerError::IceCapError(
                     IceCapError::UnexpectedRuntimeManagerResponse(resp),
