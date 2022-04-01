@@ -1,6 +1,6 @@
 # Release notes for Veracruz 22.04
 
-Notable changes in this release:
+Notable changes in this release (see the Git tag `veracruz-2204`):
 
 - Changes to Linux and IceCap attestation, bringing them in line with attestation for the Nitro platform.
 Policies are now provisioned into the running isolate much later in the attestation process, as opposed to being provisioned in the opening message of the attestation protocol.
