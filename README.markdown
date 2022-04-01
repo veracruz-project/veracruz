@@ -4,7 +4,7 @@
 
 <img src = "https://confidentialcomputing.io/wp-content/uploads/sites/85/2019/08/cc_consortium-color.svg" width=192>
 
-**NEWS**: the latest Veracruz release is Veracruz 22.04.  See `documents/release-notes/VERACRUZ-2204.markdown` for notable changes in this release.
+**NEWS**: the latest Veracruz release is Veracruz 22.04 (see the `veracruz-2204` Git tag).  See `documents/release-notes/VERACRUZ-2204.markdown` for notable changes in this release.
 
 Veracruz is now an adopted project of the [Confidential Compute Consortium (CCC)](https://confidentialcomputing.io).
 
