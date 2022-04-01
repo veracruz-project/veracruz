@@ -4,6 +4,8 @@
 
 <img src = "https://confidentialcomputing.io/wp-content/uploads/sites/85/2019/08/cc_consortium-color.svg" width=192>
 
+**NEWS**: the latest Veracruz release is Veracruz 22.04 (see the `veracruz-2204` Git tag).  See `documents/release-notes/VERACRUZ-2204.markdown` for notable changes in this release.
+
 Veracruz is now an adopted project of the [Confidential Compute Consortium (CCC)](https://confidentialcomputing.io).
 
 Veracruz is a framework for defining and deploying collaborative, privacy-preserving computations amongst a group of mutually mistrusting individuals.
@@ -45,5 +47,6 @@ Come along and meet the team, find out what everybody is working on, and discuss
 
 This project's codebase is licensed under the [MIT license](LICENSE_MIT.markdown).
 
-The image [`Veracruz Puerto - Vista desde el Hotel Emporio`](sdk/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](https://creativecommons.org/licenses/by-sa/2.0/). [Link to the material](https://www.flickr.com/photos/tomateverde/6169756721/in/photostream)
+The image [`Veracruz Puerto - Vista desde el Hotel Emporio`](sdk/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](https://creativecommons.org/licenses/by-sa/2.0/).
+[Link to the material](https://www.flickr.com/photos/tomateverde/6169756721/in/photostream)
 
