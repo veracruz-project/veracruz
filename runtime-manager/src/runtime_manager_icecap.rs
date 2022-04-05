@@ -63,53 +63,6 @@ fn main(config: Config) -> Fallible<()> {
     ).run()
 }
 
-    // fn handle(&mut self, req: Request) -> Fallible<Response> {
-    //     Ok(match req {
-    //         Request::Attestation {
-    //             device_id,
-    //             challenge,
-    //         } => match session_manager::init_session_manager()
-    //             .and(self.handle_attestation(device_id, &challenge))
-    //         {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok((token, csr)) => Response::Attestation { token, csr },
-    //         },
-    //         Request::Initialize {
-    //             policy_json,
-    //             root_cert,
-    //             compute_cert,
-    //         } => match session_manager::load_policy(&policy_json).and(
-    //             session_manager::load_cert_chain(&vec![compute_cert, root_cert]),
-    //         ) {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok(()) => Response::Initialize,
-    //         },
-    //         Request::NewTlsSession => match session_manager::new_session() {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok(sess) => Response::NewTlsSession(sess),
-    //         },
-    //         Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok(()) => Response::CloseTlsSession,
-    //         },
-    //         Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok(()) => Response::SendTlsData,
-    //         },
-    //         Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok(needed) => Response::GetTlsDataNeeded(needed),
-    //         },
-    //         Request::GetTlsData(sess) => match session_manager::get_data(sess) {
-    //             Err(_) => Response::Error(Error::Unspecified),
-    //             Ok((active, data)) => {
-    //                 self.active = active;
-    //                 Response::GetTlsData(active, data)
-    //             }
-    //         },
-    //     })
-    // }
-
 struct RuntimeManager {
     channel: RingBuffer,
     event: Notification,
@@ -187,27 +140,23 @@ impl RuntimeManager {
 
     fn handle(&mut self, req: Request) -> Fallible<Response> {
         Ok(match req {
-            Request::Initialize { policy_json } => {
-                match session_manager::init_session_manager()
-                    .and(session_manager::load_policy(&policy_json))
-                {
-                    Err(_) => Response::Error(Error::Unspecified),
-                    Ok(()) => Response::Initialize,
-                }
-            }
             Request::Attestation {
                 device_id,
                 challenge,
-            } => match self.handle_attestation(device_id, &challenge) {
+            } => match session_manager::init_session_manager()
+                .and(self.handle_attestation(device_id, &challenge)) {
                 Err(_) => Response::Error(Error::Unspecified),
                 Ok((token, csr)) => Response::Attestation { token, csr },
             },
-            Request::CertificateChain {
+            Request::Initialize {
+                policy_json,
                 root_cert,
                 compute_cert,
-            } => match session_manager::load_cert_chain(&vec![compute_cert, root_cert]) {
+            } => match session_manager::load_policy(&policy_json).and(
+                session_manager::load_cert_chain(&vec![compute_cert, root_cert]),
+            ) {
                 Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::CertificateChain,
+                Ok(()) => Response::Initialize,
             },
             Request::NewTlsSession => match session_manager::new_session() {
                 Err(_) => Response::Error(Error::Unspecified),
