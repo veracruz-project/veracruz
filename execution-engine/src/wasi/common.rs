@@ -2034,6 +2034,8 @@ pub enum FatalEngineError {
     /// Wasmtime trap.
     #[error(display = "FatalEngineError: Wasmtime Trap Error {:?}.", _0)]
     WasmtimeTrapError(String),
+    #[error(display = "FatalEngineError: Native Module Error.")]
+    NativeModuleError,
 }
 
 /// Either the index or the name of a host call

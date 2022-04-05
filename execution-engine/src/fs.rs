@@ -16,7 +16,10 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::postcard::PostcardService;
+use crate::native_modules::{
+   postcard::PostcardService,
+   aead::AeadService,
+};
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -812,11 +815,15 @@ impl FileSystem {
         all_rights.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), Rights::all());
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
-        //TODO include the correct parameter
-        let service: Box<dyn Service> = Box::new(PostcardService::new());
         let mut services = Vec::new();
+        let service: Box<dyn Service> = Box::new(PostcardService::new());
         services.push((
             "/services/postcard_string.dat",
+            Arc::new(Mutex::new(service)),
+        ));
+        let service: Box<dyn Service> = Box::new(AeadService::new());
+        services.push((
+            "/services/aead.dat",
             Arc::new(Mutex::new(service)),
         ));
         rst.install_services(services)?;

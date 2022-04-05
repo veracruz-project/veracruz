@@ -13,24 +13,17 @@ use crate::fs::{FileSystem, FileSystemResult, Service};
 use psa_crypto::operations::{aead, key_management};
 use psa_crypto::types::algorithm::{Aead, AeadWithDefaultLengthTag};
 use psa_crypto::types::key::{Attributes, Lifetime, Policy, Type, UsageFlags};
-use psa_crypto::types::status::Error;
-use std::convert::TryInto;
+use std::path::PathBuf;
+#[cfg(not(feature = "icecap"))]
+use std::{
+    ffi::OsString,
+    os::unix::ffi::OsStringExt,
+};
+use wasi_types::ErrNo;
 
 pub(crate) struct AeadService;
 
-const DECRYPTED_DATA: [u8; 24] = [
-    0x45, 0x35, 0xd1, 0x2b, 0x43, 0x77, 0x92, 0x8a, 0x7c, 0x0a, 0x61, 0xc9, 0xf8, 0x25, 0xa4, 0x86,
-    0x71, 0xea, 0x05, 0x91, 0x07, 0x48, 0xc8, 0xef,
-];
-
-const ADDITIONAL_DATA: [u8; 32] = [
-    0x40, 0xa2, 0x7c, 0x1d, 0x1e, 0x23, 0xea, 0x3d, 0xbe, 0x80, 0x56, 0xb2, 0x77, 0x48, 0x61, 0xa4,
-    0xa2, 0x01, 0xcc, 0xe4, 0x9f, 0x19, 0x99, 0x7d, 0x19, 0x20, 0x6d, 0x8c, 0x8a, 0x34, 0x39, 0x51,
-];
-
-const NONCE: [u8; 13] = [
-    0x48, 0xc0, 0x90, 0x69, 0x30, 0x56, 0x1e, 0x0a, 0xb0, 0xef, 0x4c, 0xd9, 0x72,
-];
+const ADDITIONAL_DATA: [u8; 0] = [ ];
 
 impl Service for AeadService {
     fn name(&self) -> &str {
@@ -38,6 +31,18 @@ impl Service for AeadService {
     }
 
     fn serve(&self, fs: &mut FileSystem, key_data: &[u8]) -> FileSystemResult<()> {
+        println!("Aead is called");
+        let key = &key_data[0..16];
+        let nonce = &key_data[16..13+16];
+        #[cfg(feature = "icecap")]
+        let input_path = 
+            PathBuf::from(String::from_utf8(key_data[13+16..key_data.len()-1].to_vec()).map_err(|_| ErrNo::Canceled));
+        #[cfg(not(feature = "icecap"))]
+        let input_path = 
+            PathBuf::from(OsString::from_vec(key_data[13+16..key_data.len()-1].to_vec()));
+        println!("Aead input path: {:?}", input_path);
+        let input = fs.read_file_by_absolute_path(&input_path)?;
+
         let alg = Aead::AeadWithDefaultLengthTag(AeadWithDefaultLengthTag::Ccm);
         let mut usage_flags: UsageFlags = Default::default();
         usage_flags.set_encrypt();
@@ -50,27 +55,34 @@ impl Service for AeadService {
                 permitted_algorithms: alg.into(),
             },
         };
-        psa_crypto::init().unwrap();
-        let my_key = key_management::import(attributes, None, key_data).unwrap();
-        let output_buffer_size = attributes.aead_encrypt_output_size(alg.into(), DECRYPTED_DATA.len()).unwrap();
+        psa_crypto::init().map_err(|_| ErrNo::Canceled)?;
+        let my_key = key_management::import(attributes, None, key).map_err(|_| ErrNo::Canceled)?;
+        let output_buffer_size = attributes.aead_encrypt_output_size(alg.into(), input.len()).map_err(|_| ErrNo::Canceled)?;
         let mut output_buffer = vec![0; output_buffer_size];
         let length = aead::encrypt(
             my_key,
             alg,
-            &NONCE,
+            nonce,
             &ADDITIONAL_DATA,
-            &DECRYPTED_DATA,
+            &input,
             &mut output_buffer,
         )
-        .unwrap();
+        .map_err(|_| ErrNo::Canceled)?;
         output_buffer.resize(length, 0);
-        Ok(())
+        fs.write_file_by_absolute_path(&input_path, output_buffer, true)
     }
 
     /// For the purpose of demonstration, we always return true. In reality,
     /// this function may check validity of the `input`, and even buffer the result 
     /// for further uses.
-    fn try_parse(&self, _input: &[u8]) -> FileSystemResult<bool> {
-        Ok(true)
+    fn try_parse(&self, input: &[u8]) -> FileSystemResult<bool> {
+        //             key + nonce       `ZERO`-end string
+        Ok(input.len() > (16 + 13) && input[input.len()-1] == 0)
+    }
+}
+
+impl AeadService {
+    pub fn new() -> Self {
+        Self{}
     }
 }
