@@ -1,7 +1,7 @@
 [package]
 authors = ["The Veracruz Development Team"]
-description = "The test program for calling the aead native module."
-name = "aead-native"
+description = "The test program for calling the AES counter mode native module."
+name = "aesctr-native"
 version = "0.3.0"
 edition = "2018"
 
@@ -9,6 +9,8 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.14"
+postcard = { version = "0.7.2", features = [ "alloc", "use-std" ] }
+serde = { version = "1.0.3", features = ["derive"] }
 
 [profile.release]
 codegen-units = 1

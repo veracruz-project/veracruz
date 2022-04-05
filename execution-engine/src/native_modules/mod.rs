@@ -10,4 +10,4 @@
 //! information on licensing and copyright.
 
 pub(crate) mod postcard;
-pub(crate) mod aead;
+pub(crate) mod aesctr;
