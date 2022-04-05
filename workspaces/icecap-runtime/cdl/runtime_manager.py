@@ -38,5 +38,8 @@ class RuntimeManager(GenericElfComponent):
                 },
         }
 
+    def static_heap_size(self):
+        return 128 * BLOCK_SIZE # 256 MiB
+
     def arg_json(self):
         return self._arg
