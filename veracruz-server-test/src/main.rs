@@ -68,6 +68,8 @@ mod tests {
     const INTERSECTION_SET_SUM_WASM: &'static str = "private-set-intersection-sum.wasm";
     const FD_CREATE_RUST_WASM: &'static str = "fd_create.wasm";
     const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
+    const POSTCARD_NATIVE_WASM: &'static str = "postcard-native.wasm";
+    const POSTCARD_WASM: &'static str = "postcard-wasm.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str = "intersection-customer.dat";
@@ -78,6 +80,7 @@ mod tests {
     const PERSON_SET_1_DATA: &'static str = "private-set-1.dat";
     const PERSON_SET_2_DATA: &'static str = "private-set-2.dat";
     const SINGLE_F64_DATA: &'static str = "number-stream-init.dat";
+    const POSTCARD_DATA: &'static str = "postcard.dat";
     const F64_STREAM_PATH: &'static str = "number-stream/";
     const LOGISTICS_REGRESSION_DATA_PATH: &'static str = "idash2017/";
     const MACD_DATA_PATH: &'static str = "macd/";
@@ -651,6 +654,39 @@ mod tests {
             &["/output/accumulation.dat"],
         );
         assert!(result.is_err(), "An error should occur");
+    }
+
+    #[test]
+    /// Attempt to provision stream data in the state of loading static data.
+    fn test_phase4_native_postcard_module() {
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[(
+                "/program/postcard-native.wasm",
+                program_path(POSTCARD_NATIVE_WASM),
+            )],
+            &[("/input/postcard.dat", data_dir(POSTCARD_DATA))],
+            &[],
+            &["/output/postcard_native.txt"],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    /// Attempt to provision stream data in the state of loading static data.
+    fn test_phase4_wasm_postcard_module() {
+        test_template(
+            policy_path(POLICY),
+            trust_path(CLIENT_CERT),
+            trust_path(CLIENT_KEY),
+            &[("/program/postcard-wasm.wasm", program_path(POSTCARD_WASM))],
+            &[("/input/postcard.dat", data_dir(POSTCARD_DATA))],
+            &[],
+            &["/output/postcard_wasm.txt"],
+        )
+        .unwrap();
     }
 
     #[test]

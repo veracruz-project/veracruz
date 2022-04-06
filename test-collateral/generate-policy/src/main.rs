@@ -86,14 +86,9 @@ const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
 /// The default filename of the output JSON policy file, if no alternative is
 /// provided on the command line.
 const DEFAULT_OUTPUT_FILENAME: &'static str = "output.json";
-/// The default debug status of the Veracruz enclave, if no alternative is
-/// provided on the command line.
-const DEFAULT_DEBUG_STATUS: bool = false;
 /// The default execution strategy for the WASM binary, if no alternative is
 /// provided on the command line.
-const DEFAULT_EXECUTION_STRATEGY: &'static str = "Interpretation";
-/// The default clock flag, if no alternative is provided on the command line.
-const DEFAULT_ENABLE_CLOCK: bool = false;
+const DEFAULT_EXECUTION_STRATEGY: &'static str = "JIT";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parsing.
@@ -311,7 +306,6 @@ list of files may be provided.")
                     "Specifies whether the Veracruz trusted runtime should allow debugging \
 information to be produced by the executing WASM binary.",
                 )
-                .value_name("BOOLEAN")
         )
         .arg(
             Arg::with_name("execution-strategy")
@@ -331,7 +325,6 @@ binary.",
                     "Specifies whether the Veracruz trusted runtime should allow the WASM \
 binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                 )
-                .value_name("BOOLEAN")
         )
         .arg(
             Arg::with_name("hash")
@@ -460,16 +453,7 @@ list of files may be provided.")
         abort_with("No certificate lifetime passed as an argument.");
     }
 
-    if let Some(debug) = matches.value_of("debug") {
-        if let Ok(debug) = bool::from_str(debug) {
-            arguments.enclave_debug_mode = debug;
-        } else {
-            abort_with("The debug flag could not be parsed.");
-        }
-    } else {
-        info!("No debug flag passed as an argument.  Using a default.");
-        arguments.enclave_debug_mode = DEFAULT_DEBUG_STATUS;
-    }
+    arguments.enclave_debug_mode = matches.is_present("debug");
 
     if let Some(strategy) = matches.value_of("execution-strategy") {
         check_execution_strategy(strategy);
@@ -486,16 +470,7 @@ command-line parameter.",
         );
     }
 
-    if let Some(enable_clock) = matches.value_of("enable-clock") {
-        if let Ok(enable_clock) = bool::from_str(enable_clock) {
-            arguments.enable_clock = enable_clock;
-        } else {
-            abort_with("The clock flag could not be parsed.");
-        }
-    } else {
-        info!("No clock flag passed as an argument.  Using a default.");
-        arguments.enable_clock = DEFAULT_ENABLE_CLOCK;
-    }
+    arguments.enable_clock = matches.is_present("enable-clock");
 
     info!("Successfully extracted command line arguments.");
 
