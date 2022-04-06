@@ -36,6 +36,7 @@ TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 all: build test-collateral
 
 build:
+	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
 	$(CC) \
 		cargo build $(PROFILE_FLAG) \
 		-p proxy-attestation-server \
