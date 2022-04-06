@@ -9,13 +9,14 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock default doc fmt \
+.PHONY: all build install clean clean-cargo-lock default doc fmt \
 	test-dependencies test-collateral test-server test-client veracruz-test
 
 default: build
 
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
+BIN_DIR ?= /usr/local/cargo/bin
 MEASUREMENT_FILE = $(abspath ../linux-runtime/css-linux.bin)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 ENCLAVE_BINARY_PATH = $(abspath $(WORKSPACE_DIR)/linux-runtime/runtime_manager_enclave)
@@ -43,6 +44,16 @@ build:
 		--features veracruz-client/linux \
 		--features veracruz-server/linux \
 		--features cli
+
+install: build
+	# create full names
+	cp -f target/$(PROFILE_PATH)/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
+	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)/veracruz-client
+	cp -f target/$(PROFILE_PATH)/veracruz-server $(BIN_DIR)/veracruz-server
+	# create short names
+	ln -sf $(BIN_DIR)/proxy-attestation-server $(BIN_DIR)/vc-pas
+	ln -sf $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
+	ln -sf $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):

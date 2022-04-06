@@ -13,8 +13,8 @@ default:
 
 include common.mk
 
-.PHONY: all clean icecap icecap-clean linux linux-clean nitro nitro-clean \
-	shared shared-clean
+.PHONY: all clean icecap icecap-clean linux linux-install linux-clean nitro \
+	nitro-clean shared shared-install shared-clean
 
 all: shared linux nitro icecap
 
@@ -35,6 +35,12 @@ icecap: shared
 shared:
 	$(MAKE) -C applications
 	$(MAKE) -C host
+
+linux-install: shared-install
+	$(MAKE) -C linux-host install
+
+shared-install:
+	$(MAKE) -C host install
 
 linux-clean:
 	$(MAKE) -C linux-host clean
