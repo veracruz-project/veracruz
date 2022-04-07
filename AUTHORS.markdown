@@ -13,3 +13,5 @@ and is designed and written by the *Veracruz Development Team*:
 - Nick Spinale (nick.spinale@arm.com)
 - Shale Xiong (shale.xiong@arm.com)
 - Sabreen Kaur (sabreenderjitkaur.gurjitsingh@arm.com)
+- Mohamed Abdelfatah (mohamedabdelfatah2027@gmail.com)
+
