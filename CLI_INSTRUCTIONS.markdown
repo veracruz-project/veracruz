@@ -13,8 +13,8 @@ Veracruz.
 
 First lets make sure we've built and installed the Veracruz binaries. For
 this part you need to specify which Trusted Execution Environment (TEE) you are
-using. So for example, if you are running Veracruz on Nitro, you would
-run `make nitro-cli-install`.
+using. So for example, if you are running Veracruz on Linux, you would
+run `make -C workspaces linux-install`.
 
 We're also going to need a WebAssembly toolchain to build our example binary.
 This can be built using `make sdk`. Fortunately, you can combine these two
@@ -22,7 +22,7 @@ rules, allowing you to maximize the time you have to get coffee while the code
 is compiling:
 
 ``` bash
-$ make sdk nitro-cli-install
+$ make -C workspaces linux-install
 ...
 ```
 
@@ -156,7 +156,7 @@ $ vc-pgen \
     --proxy-attestation-server-cert example/example-ca-cert.pem \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
-    --css-file runtime-manager/css-sgx.bin \
+    --css-file workspaces/linux-runtime/css-linux.bin \
     --certificate example/example-program-cert.pem \
     --capability "/program/:w" \
     --certificate example/example-data0-cert.pem \
@@ -209,7 +209,7 @@ $ vc-pas :3010 \
     --ca-cert=example/example-ca-cert.pem \
     --ca-key=example/example-ca-key.pem &
 Proxy Attestation Server running on 127.0.0.1:3010
-$ sleep 10
+$ sleep 5
 ```
 
 ## Running the Veracruz Server
