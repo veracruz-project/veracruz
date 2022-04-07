@@ -206,6 +206,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fd_create"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "libveracruz",
+]
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -333,6 +341,10 @@ name = "libc"
 version = "0.2.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
+
+[[package]]
+name = "libveracruz"
+version = "0.3.0"
 
 [[package]]
 name = "linear-regression"
@@ -533,14 +545,14 @@ checksum = "7c68cb38ed13fd7bc9dd5db8f165b7c8d9c1a315104083a2b10f11354c2af97f"
 
 [[package]]
 name = "postcard-native"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
 ]
 
 [[package]]
 name = "postcard-wasm"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "postcard",
