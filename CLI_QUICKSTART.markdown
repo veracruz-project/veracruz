@@ -62,11 +62,16 @@ For this walkthrough we're going to use the Shamir secret sharing example,
 which can be found in the `sdk/rust-examples/shamir-secret-sharing`
 directory.
 
-We need to use Xargo to cross-compile this example into WebAssembly, fortunately
-this is all captured in the example's Makefile:
+The rust-examples are a part of the `applications` workspace in the workspaces
+directory, so we need to use the `workspaces/applications` Cargo.toml. Note we
+are compiling to WebAssembly here, which Rust makes very easy for us:
 
 ``` bash
-$ make -C sdk/rust-examples/shamir-secret-sharing
+$ cargo build \
+    --manifest-path=workspaces/applications/Cargo.toml \
+    --target wasm32-wasi \
+    --release \
+    --package shamir-secret-sharing
 ```
 
 You should now find the example compiled to WebAssembly in the `target/wasm32-wasi/release`
