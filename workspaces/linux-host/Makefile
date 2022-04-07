@@ -62,12 +62,15 @@ $(MEASUREMENT_FILE):
 
 test-dependencies: test-collateral $(RUNTIME_MANAGER_ENCLAVE)
 
-CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features linux
+CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
+	$(CC) \
+	$(TEST_PARAMETERS) \
+	cargo test $(PROFILE_FLAG) --features linux
 
 test-server: test-dependencies
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CARGO_TEST) -p veracruz-server-test test_debug -- --ignored --test-threads=1
+	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
+	$(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) -p veracruz-server-test test_debug -- --ignored --test-threads=1
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib --features mock -- --test-threads=1
