@@ -21,9 +21,9 @@ all: crates/sdk/wasm-checker/bin/wasm-checker
 
 install: all
 	# create full names
-	cp -f target/$(PROFILE_PATH)/freestanding-execution-engine $(BIN_DIR)/freestanding-execution-engine
-	cp -f target/$(PROFILE_PATH)/generate-policy $(BIN_DIR)/generate-policy
-	cp -f crates/sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)/wasm-checker
+	cp -f target/$(PROFILE_PATH)/freestanding-execution-engine $(BIN_DIR)
+	cp -f target/$(PROFILE_PATH)/generate-policy $(BIN_DIR)
+	cp -f crates/sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)
 	# create short names
 	ln -sf $(BIN_DIR)/freestanding-execution-engine $(BIN_DIR)/vc-fee
 	ln -sf $(BIN_DIR)/generate-policy $(BIN_DIR)/vc-pgen

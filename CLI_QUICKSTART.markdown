@@ -11,7 +11,7 @@ Veracruz.
 
 ## Building the Veracruz binaries
 
-First lets make sure we've built and installed the Veracruz binaries. For
+First let's make sure we've built and installed the Veracruz binaries. For
 this part you need to specify which Trusted Execution Environment (TEE) you are
 using. So for example, if you are running Veracruz on Linux, you would
 run `make -C workspaces linux-install`.
@@ -261,7 +261,7 @@ your application, sending data programatically via the Rust API, but for this
 example we'll use the Veracruz Client CLI interface. This provides the same
 functionality, but in a CLI form.
 
-First lets send over the program to our Veracruz server, this requires an
+First let's send over the program to our Veracruz server. This requires an
 identity with the "ProgramProvider" role:
 
 ``` bash
@@ -274,7 +274,7 @@ Connecting to 127.0.0.1:3017
 Submitting <enclave>/example-binary.wasm from example/example-binary.wasm
 ```
 
-Then lets send over our data with identities with the "DataProvider" role.
+Then let's send over our data with identities with the "DataProvider" role.
 These are shares I've created that the example will use to reconstruct a
 secret message. Keep in mind most likely this data will be coming from
 different devices:

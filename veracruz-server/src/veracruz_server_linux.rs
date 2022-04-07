@@ -279,7 +279,7 @@ pub mod veracruz_server_linux {
 
             // make sure our image is executable
             let mut runtime_enclave_binary_permissions = fs::metadata(&runtime_enclave_binary_path)?.permissions();
-            runtime_enclave_binary_permissions.set_mode(0o544);
+            runtime_enclave_binary_permissions.set_mode(0o500); // readable and executable by user is all we need
             fs::set_permissions(&runtime_enclave_binary_path, runtime_enclave_binary_permissions)?;
 
             info!(

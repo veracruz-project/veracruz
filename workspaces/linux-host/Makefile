@@ -48,9 +48,9 @@ build:
 
 install: build
 	# create full names
-	cp -f target/$(PROFILE_PATH)/proxy-attestation-server $(BIN_DIR)/proxy-attestation-server
-	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)/veracruz-client
-	cp -f target/$(PROFILE_PATH)/veracruz-server $(BIN_DIR)/veracruz-server
+	cp -f target/$(PROFILE_PATH)/proxy-attestation-server $(BIN_DIR)
+	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)
+	cp -f target/$(PROFILE_PATH)/veracruz-server $(BIN_DIR)
 	# create short names
 	ln -sf $(BIN_DIR)/proxy-attestation-server $(BIN_DIR)/vc-pas
 	ln -sf $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
