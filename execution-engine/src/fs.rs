@@ -845,6 +845,7 @@ impl FileSystem {
     }
 
     /// Create a dummy filesystem
+    #[allow(dead_code)]
     pub(crate) fn new_dummy() -> Self {
         let mut rights_table = HashMap::new();
         rights_table.insert(Principal::NoCap, HashMap::new());

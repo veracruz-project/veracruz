@@ -23,14 +23,10 @@ use crate::managers::RuntimeManagerError;
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
 const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
-/// The CID to send ocalls to that the non-secure host is listening on
-const HOST_CID: u32 = 3;
 /// The incoming port to listen on
 const PORT: u32 = 5005;
 /// max number of outstanding connectiosn in the socket listen queue
 const BACKLOG: usize = 128;
-/// The port to use when performing ocalls to the non-secure host
-const OCALL_PORT: u32 = 5006;
 
 /// The maximum attestation document size
 /// the value was copied from https://github.com/aws/aws-nitro-enclaves-sdk-c/blob/main/source/attestation.c
@@ -141,7 +137,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
 
 fn attestation(
     challenge: &[u8],
-    challenge_id: i32,
+    _challenge_id: i32,
 ) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
     println!("runtime_manager_nitro::attestation started");
     managers::session_manager::init_session_manager()?;
