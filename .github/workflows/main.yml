@@ -44,3 +44,27 @@ jobs:
         id: nitro-build
         run: |
             make -C /work/veracruz/workspaces nitro PROFILE=dev
+
+  # tests that the CLI_QUICKSTART.markdown is still up to date
+  quickstart:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/veracruz-ci-linux:ci-v2
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
+    steps:
+      - name: Check out the Veracruz repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Running CLI_QUICKSTART.markdown
+        id: quickstart-test
+        run: |
+          # grab every bash code block, remove line continuation, and only keep lines
+          # that start with '$' (of course removing that '$' in the process)
+          sed -n '/``` bash/,/```/{/```/d; p}' CLI_QUICKSTART.markdown \
+            | sed ':a; /\\$/{N; s/\\\n//; ta}' \
+            | sed -n '/^\$/{s/^\$ \?//; p}' \
+            >> CLI_QUICKSTART.markdown.sh
+          # run the quickstart
+          bash -euxo pipefail CLI_QUICKSTART.markdown.sh
