@@ -78,8 +78,29 @@ You should now find the example compiled to WebAssembly in the `target/wasm32-wa
 directory. This will be our program to execute inside a Veracruz enclave:
 
 ``` bash
-$ ls sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm
-sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm
+$ sdk/wasm-checker/wabt/bin/wasm-objdump \
+    -d sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm \
+    | head -n20 || [ $? -eq 141 ]
+
+shamir-secret-sharing.wasm:     file format wasm 0x1
+
+Code Disassembly:
+
+000417 func[10] <__wasm_call_ctors>:
+ 000418: 10 cf 01                   | call 207 <__wasilibc_populate_preopens>
+ 00041b: 0b                         | end
+00041d func[11] <undefined_weak:__wasilibc_find_relpath_alloc>:
+ 00041e: 00                         | unreachable
+ 00041f: 0b                         | end
+000421 func[12] <_start>:
+ 000422: 01 7f                      | local[0] type=i32
+ 000424: 02 40                      | block
+ 000426: 10 ad 80 80 80 00          |   call 45 <__original_main>
+ 00042c: 22 00                      |   local.tee 0
+ 00042e: 45                         |   i32.eqz
+ 00042f: 0d 00                      |   br_if 0
+ 000431: 20 00                      |   local.get 0
+ 000433: 10 d5 81 80 80 00          |   call 213 <exit>
 ```
 
 Lets go ahead and copy this to an example directory to make the paths a bit
