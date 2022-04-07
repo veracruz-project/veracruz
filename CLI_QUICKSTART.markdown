@@ -79,7 +79,7 @@ directory. This will be our program to execute inside a Veracruz enclave:
 
 ``` bash
 $ sdk/wasm-checker/wabt/bin/wasm-objdump \
-    -d sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm \
+    -d workspaces/applications/target/wasm32-wasi/release/shamir-secret-sharing.wasm \
     | head -n20 || [ $? -eq 141 ]
 
 shamir-secret-sharing.wasm:     file format wasm 0x1
@@ -108,7 +108,7 @@ easier to use:
 
 ``` bash
 $ mkdir -p example
-$ cp sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm example/example-binary.wasm
+$ cp workspaces/applications/target/wasm32-wasi/release/shamir-secret-sharing.wasm example/example-binary.wasm
 ```
 
 ## Generating certificates
