@@ -2,7 +2,6 @@
 
 
 This is a simple program that lets you move the cursor inside a text file for a number of bytes that specify, read the remaining file after the cursor and write the output into anothe text file.
-We provided a text file, `rust-std.txt`, which is the introduction of the Rust Standard Library Documentation.
 
 # Steps
 
