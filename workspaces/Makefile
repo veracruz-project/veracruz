@@ -21,8 +21,8 @@ all: shared linux nitro icecap
 clean: shared-clean linux-clean nitro-clean icecap-clean
 
 linux: shared
-	$(MAKE) -C linux-host
 	$(MAKE) -C linux-runtime
+	$(MAKE) -C linux-host
 
 nitro: shared
 	$(MAKE) -C nitro-host
@@ -37,6 +37,7 @@ shared:
 	$(MAKE) -C host
 
 linux-install: shared-install
+	$(MAKE) -C linux-runtime
 	$(MAKE) -C linux-host install
 
 shared-install:
