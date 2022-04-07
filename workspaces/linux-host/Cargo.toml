@@ -13,6 +13,9 @@
 cargo-features = ["resolver"]
 
 [workspace]
+exclude = [
+  "crates/third-party/rust-psa-crypto",
+]
 members = [
   "crates/proxy-attestation-server",
   "crates/veracruz-client",
