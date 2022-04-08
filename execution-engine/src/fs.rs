@@ -16,10 +16,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::{
-   postcard::PostcardService,
-   aesctr::AesCtrService,
-};
+use crate::native_modules::{aesctr::AesCtrService, postcard::PostcardService};
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -822,10 +819,7 @@ impl FileSystem {
             Arc::new(Mutex::new(service)),
         ));
         let service: Box<dyn Service> = Box::new(AesCtrService::new());
-        services.push((
-            "/services/aesctr.dat",
-            Arc::new(Mutex::new(service)),
-        ));
+        services.push(("/services/aesctr.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;
         Ok(rst)
     }

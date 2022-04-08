@@ -11,7 +11,7 @@
 
 use crate::fs::{FileSystem, FileSystemResult, Service};
 use psa_crypto::{
-    operations::cipher::{encrypt, decrypt},
+    operations::cipher::{decrypt, encrypt},
     operations::key_management,
     types::algorithm::Cipher::Ctr,
     types::key::{Attributes, Lifetime, Policy, Type, UsageFlags},
@@ -37,7 +37,13 @@ impl Service for AesCtrService {
     fn serve(&mut self, fs: &mut FileSystem, _input: &[u8]) -> FileSystemResult<()> {
         // when reaching here, the `input` bytes are already parsed.
         println!("AesCtr is called");
-        let AesCtrService{key, iv, input_path, output_path, is_encryption} = self;
+        let AesCtrService {
+            key,
+            iv,
+            input_path,
+            output_path,
+            is_encryption,
+        } = self;
         println!("AesCtr input path: {:?}", input_path);
         println!("AesCtr output path: {:?}", input_path);
         let input = fs.read_file_by_absolute_path(&input_path)?;
@@ -55,14 +61,11 @@ impl Service for AesCtrService {
             },
         };
         psa_crypto::init().map_err(|_| ErrNo::Canceled)?;
-        let imported_key = key_management::import(attributes, None, &key[..]).map_err(|_| ErrNo::Canceled)?;
+        let imported_key =
+            key_management::import(attributes, None, &key[..]).map_err(|_| ErrNo::Canceled)?;
         let mut output = vec![0; input.len()];
         // can the enc or dec based on the `is_encryption` bool
-        let length = if *is_encryption {
-            encrypt
-        } else {
-            decrypt
-        }(
+        let length = if *is_encryption { encrypt } else { decrypt }(
             imported_key,
             Ctr,
             &input,
@@ -75,13 +78,14 @@ impl Service for AesCtrService {
     }
 
     /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result 
+    /// this function may check validity of the `input`, and even buffer the result
     /// for further uses.
     fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
-        let deserialized_input: AesCtrService = match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
-            Ok(o) => o,
-            Err(_) => return Ok(false),
-        };
+        let deserialized_input: AesCtrService =
+            match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
+                Ok(o) => o,
+                Err(_) => return Ok(false),
+            };
         *self = deserialized_input;
         Ok(true)
     }
@@ -89,7 +93,7 @@ impl Service for AesCtrService {
 
 impl AesCtrService {
     pub fn new() -> Self {
-        Self{
+        Self {
             key: [0; 16],
             iv: [0; 16],
             input_path: PathBuf::new(),

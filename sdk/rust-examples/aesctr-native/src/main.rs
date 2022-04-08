@@ -17,7 +17,7 @@
 
 use serde::Serialize;
 use std::{
-    fs::{File, read, write},
+    fs::{read, write, File},
     io::Read,
     path::{Path, PathBuf},
 };
@@ -33,9 +33,9 @@ pub struct AesCtrInput {
 
 fn main() -> anyhow::Result<()> {
     // Assume the key and iv are 128 bits.
-    let mut key = [0u8;16];
+    let mut key = [0u8; 16];
     read_exact_bytes("/input/key.dat", &mut key)?;
-    let mut iv = [0u8;16];
+    let mut iv = [0u8; 16];
     read_exact_bytes("/input/iv.dat", &mut iv)?;
     let aes_ctr_input = AesCtrInput {
         key,
@@ -55,7 +55,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_exact_bytes<T: AsRef<Path>>(path: T, buf: &mut[u8]) -> anyhow::Result<()> {
+fn read_exact_bytes<T: AsRef<Path>>(path: T, buf: &mut [u8]) -> anyhow::Result<()> {
     let mut f = File::open(path)?;
     f.read_exact(buf)?;
     Ok(())
