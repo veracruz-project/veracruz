@@ -9,13 +9,25 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all clean clean-cargo-lock clean-datasets datasets doc fmt
+.PHONY: all install clean clean-cargo-lock clean-datasets datasets doc fmt
 
 WORKSPACE_DIR = $(abspath ..)
+BIN_DIR ?= /usr/local/cargo/bin
 include $(WORKSPACE_DIR)/common.mk
+
 
 all: crates/sdk/wasm-checker/bin/wasm-checker
 	cargo build $(PROFILE_FLAG)
+
+install: all
+	# create full names
+	cp -f target/$(PROFILE_PATH)/freestanding-execution-engine $(BIN_DIR)
+	cp -f target/$(PROFILE_PATH)/generate-policy $(BIN_DIR)
+	cp -f crates/sdk/wasm-checker/bin/wasm-checker $(BIN_DIR)
+	# create short names
+	ln -sf $(BIN_DIR)/freestanding-execution-engine $(BIN_DIR)/vc-fee
+	ln -sf $(BIN_DIR)/generate-policy $(BIN_DIR)/vc-pgen
+	ln -sf $(BIN_DIR)/wasm-checker $(BIN_DIR)/vc-wc
 
 DATA_GENERATORS = idash2017-logistic-regression-generator \
                       intersection-set-sum-generator \
