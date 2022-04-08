@@ -729,20 +729,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "err-derive"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c34a887c8df3ed90498c1c437ce21f211c8e27672921a8ffa293cb8d6d4caa9e"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn",
- "synstructure",
-]
-
-[[package]]
 name = "errno"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -771,7 +757,7 @@ dependencies = [
  "byteorder",
  "cfg-if 1.0.0",
  "ctor",
- "err-derive 0.2.4",
+ "err-derive",
  "lazy_static",
  "num",
  "num-derive",
@@ -1219,7 +1205,7 @@ dependencies = [
  "bincode",
  "byteorder",
  "curl",
- "err-derive 0.2.4",
+ "err-derive",
  "log",
  "nix 0.15.0",
  "serde",
@@ -1352,28 +1338,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linux-root-enclave"
-version = "0.3.0"
-dependencies = [
- "base64 0.13.0",
- "bincode",
- "clap",
- "env_logger 0.8.4",
- "err-derive 0.3.1",
- "hex",
- "io-utils",
- "lazy_static",
- "log",
- "net2",
- "nix 0.20.2",
- "psa-attestation",
- "ring",
- "serde",
- "transport-protocol",
- "veracruz-utils",
-]
-
-[[package]]
 name = "lock_api"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1457,17 +1421,6 @@ name = "nb"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
-
-[[package]]
-name = "net2"
-version = "0.2.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "391630d12b68002ae1e25e8f974306474966550ad82dac6886fb8910c19568ae"
-dependencies = [
- "cfg-if 0.1.10",
- "libc 0.2.119",
- "winapi",
-]
 
 [[package]]
 name = "nix"
@@ -1752,7 +1705,7 @@ dependencies = [
 name = "policy-utils"
 version = "0.3.0"
 dependencies = [
- "err-derive 0.2.4",
+ "err-derive",
  "hex",
  "lexical-core 0.8.3",
  "ring",
@@ -1867,9 +1820,9 @@ dependencies = [
 
 [[package]]
 name = "psa-crypto-sys"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
- "bindgen 0.57.0",
+ "bindgen 0.59.2",
  "cc",
  "cmake",
  "walkdir",
@@ -2061,7 +2014,7 @@ dependencies = [
  "bincode",
  "clap",
  "env_logger 0.8.4",
- "err-derive 0.2.4",
+ "err-derive",
  "execution-engine",
  "finite-set",
  "hex",
@@ -2288,7 +2241,7 @@ dependencies = [
 name = "session-manager"
 version = "0.3.0"
 dependencies = [
- "err-derive 0.2.4",
+ "err-derive",
  "policy-utils",
  "ring",
  "rustls",
@@ -2486,7 +2439,8 @@ dependencies = [
 name = "transport-protocol"
 version = "0.3.0"
 dependencies = [
- "err-derive 0.2.4",
+ "err-derive",
+ "lazy_static",
  "protobuf",
  "protoc-rust",
 ]
@@ -2577,7 +2531,7 @@ name = "veracruz-utils"
 version = "0.3.0"
 dependencies = [
  "bincode",
- "err-derive 0.2.4",
+ "err-derive",
  "ring",
  "rustls",
  "serde",
@@ -2635,7 +2589,7 @@ name = "wasi-types"
 version = "0.1.6"
 dependencies = [
  "bitflags",
- "err-derive 0.2.4",
+ "err-derive",
  "num",
  "num-derive",
  "num-traits",
