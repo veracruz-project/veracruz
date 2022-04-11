@@ -22,6 +22,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// The interface between Counter mode AES service
 #[derive(Serialize, Debug)]
 pub struct AesCtrInput {
     key: [u8; 16],
@@ -31,26 +32,41 @@ pub struct AesCtrInput {
     is_encryption: bool,
 }
 
+/// Example to invoke the Counter mode AES service. Encrypt `data.dat` and then 
+/// decrypt it using the `key.dat` and iv.dat`.
 fn main() -> anyhow::Result<()> {
     // Assume the key and iv are 128 bits.
     let mut key = [0u8; 16];
     read_exact_bytes("/input/key.dat", &mut key)?;
     let mut iv = [0u8; 16];
     read_exact_bytes("/input/iv.dat", &mut iv)?;
-    let aes_ctr_input = AesCtrInput {
+    let aes_ctr_enc_input = AesCtrInput {
         key,
         iv,
         input_path: PathBuf::from("/input/data.dat"),
-        output_path: PathBuf::from("/output/data.dat"),
+        output_path: PathBuf::from("/output/enc.dat"),
         is_encryption: true,
     };
-    println!("service input {:x?}", aes_ctr_input);
-    let aes_ctr_input_bytes = postcard::to_allocvec(&aes_ctr_input)?;
-    println!("prepare the bytes {:x?}", aes_ctr_input_bytes);
-    write("/services/aesctr.dat", aes_ctr_input_bytes)?;
-    println!("service returns");
-    let result = read(aes_ctr_input.output_path)?;
-    println!("result {:x?}", result);
+    let result = read(&aes_ctr_enc_input.input_path)?;
+    println!("data input {:x?}", result);
+    println!("service enc input {:x?}", aes_ctr_enc_input);
+    let aes_ctr_enc_input_bytes = postcard::to_allocvec(&aes_ctr_enc_input)?;
+    println!("prepare the enc bytes {:x?}", aes_ctr_enc_input_bytes);
+    write("/services/aesctr.dat", aes_ctr_enc_input_bytes)?;
+    let result = read(aes_ctr_enc_input.output_path)?;
+    println!("enc result {:x?}", result);
+    let aes_ctr_dec_input = AesCtrInput {
+        key,
+        iv,
+        input_path: PathBuf::from("/output/enc.dat"),
+        output_path: PathBuf::from("/output/dec.dat"),
+        is_encryption: false,
+    };
+    let aes_ctr_dec_input_bytes = postcard::to_allocvec(&aes_ctr_dec_input)?;
+    println!("prepare the enc bytes {:x?}", aes_ctr_dec_input_bytes);
+    write("/services/aesctr.dat", aes_ctr_dec_input_bytes)?;
+    let result = read(aes_ctr_dec_input.output_path)?;
+    println!("dec result {:x?}", result);
     println!("service return");
     Ok(())
 }

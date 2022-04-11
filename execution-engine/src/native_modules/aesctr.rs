@@ -20,6 +20,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use wasi_types::ErrNo;
 
+/// The interface between of the Counter mode AES module.
 #[derive(Deserialize, Debug)]
 pub(crate) struct AesCtrService {
     key: [u8; 16],
@@ -30,12 +31,50 @@ pub(crate) struct AesCtrService {
 }
 
 impl Service for AesCtrService {
+    /// Return the name of this service
     fn name(&self) -> &str {
-        "AesCtr Service"
+        "Couter mode AES Service"
     }
 
+    /// Triggers the service. The details of the service can be found in function `enc_dec`.
+    /// Here is the enter point. It also erase the state unconditionally afterwards.
     fn serve(&mut self, fs: &mut FileSystem, _input: &[u8]) -> FileSystemResult<()> {
         // when reaching here, the `input` bytes are already parsed.
+        let result = self.enc_dec(fs);
+        // NOTE: erase all the states.
+        self.reset();
+        result
+    }
+
+    /// For the purpose of demonstration, we always return true. In reality,
+    /// this function may check validity of the `input`, and even buffer the result
+    /// for further uses.
+    fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
+        let deserialized_input: AesCtrService =
+            match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
+                Ok(o) => o,
+                Err(_) => return Ok(false),
+            };
+        *self = deserialized_input;
+        Ok(true)
+    }
+}
+
+impl AesCtrService {
+    /// Create a new service, with empty internal state.
+    pub fn new() -> Self {
+        Self {
+            key: [0; 16],
+            iv: [0; 16],
+            input_path: PathBuf::new(),
+            output_path: PathBuf::new(),
+            is_encryption: false,
+        }
+    }
+
+    /// The core service. It encrypts or decrypts, depending on the flag `is_encryption`, the input read
+    /// from the path `input_path` using the `key` and `iv`, and writes the result to the file at `output_path`.
+    fn enc_dec(&mut self, fs: &mut FileSystem) -> FileSystemResult<()> {
         println!("AesCtr is called");
         let AesCtrService {
             key,
@@ -77,28 +116,12 @@ impl Service for AesCtrService {
         fs.write_file_by_absolute_path(&output_path, output, true)
     }
 
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result
-    /// for further uses.
-    fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
-        let deserialized_input: AesCtrService =
-            match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
-                Ok(o) => o,
-                Err(_) => return Ok(false),
-            };
-        *self = deserialized_input;
-        Ok(true)
-    }
-}
-
-impl AesCtrService {
-    pub fn new() -> Self {
-        Self {
-            key: [0; 16],
-            iv: [0; 16],
-            input_path: PathBuf::new(),
-            output_path: PathBuf::new(),
-            is_encryption: false,
-        }
+    /// Reset the state, and erase the sensitive information.
+    fn reset(&mut self) {
+        self.key = [0; 16];
+        self.iv = [0; 16];
+        self.input_path = PathBuf::new();
+        self.output_path = PathBuf::new();
+        self.is_encryption = false;
     }
 }
