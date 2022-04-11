@@ -2,9 +2,17 @@
 //!
 //! ## Context
 //!
-//! It calls the module mounted at path `/services/postcard_string.dat`. It is expected to
-//! deserialize the postcard encoding of a made-up type and serialize to JSON string.
-//! The result is written to `/services/postcard_result.dat`.
+//! It calls the module mounted at path `/services/aesctr.dat`, via the postcard encoding of
+//! the interface,
+//! ```
+//! pub struct AesCtrInput {
+//!     key: [u8; 16],
+//!     iv: [u8; 16],
+//!     input_path: PathBuf,
+//!     output_path: PathBuf,
+//!     is_encryption: bool,
+//! }
+//! ```
 //!
 //! ## Authors
 //!

@@ -1,4 +1,4 @@
-//! A native module for decryption and encryption in aead.
+//! A native module for decryption and encryption of AES counter mode.
 //!
 //! ## Authors
 //!
