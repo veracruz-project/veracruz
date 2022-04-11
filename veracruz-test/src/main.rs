@@ -164,7 +164,7 @@ mod tests {
     /// A test of veracruz using network communication using a single session
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(SINGLE_CLIENT_POLICY),
             &vec![(trust_path(CLIENT_CERT), trust_path(CLIENT_KEY))],
@@ -188,7 +188,7 @@ mod tests {
     /// A test of veracruz using network communication using two sessions (one for program and one for data)
     #[actix_rt::test]
     async fn veracruz_phase1_linear_regression_two_clients() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(LINEAR_REGRESSION_DUAL_POLICY),
             &vec![
@@ -222,7 +222,7 @@ mod tests {
     /// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
     #[actix_rt::test]
     async fn veracruz_phase2_linear_regression_three_clients() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(LINEAR_REGRESSION_TRIPLE_POLICY),
             &vec![
@@ -265,7 +265,7 @@ mod tests {
     #[actix_rt::test]
     #[ignore] // FIXME: test currently disabled because it fails on IceCap
     async fn veracruz_phase2_intersection_set_sum_three_clients() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
@@ -312,7 +312,7 @@ mod tests {
     #[actix_rt::test]
     #[ignore] // FIXME: test currently disabled because it fails on IceCap
     async fn veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
@@ -354,7 +354,7 @@ mod tests {
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_string_edit_distance_three_clients() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY),
             &vec![
@@ -392,7 +392,7 @@ mod tests {
     /// (one for program, one for the first data, one for the second data, and one for retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase3_string_edit_distance_four_clients() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY),
             &vec![
@@ -434,7 +434,7 @@ mod tests {
     /// (one for program, one for data sending and retrieving)
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
-      timeout(Duration::from_secs(120), async {
+      timeout(Duration::from_secs(600), async {
         let policy_json =
             read_policy(policy_path(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
         let policy = Policy::from_json(&policy_json).unwrap();

@@ -208,7 +208,7 @@ mod tests {
     /// test-collateral/invalid_policy,
     /// initialise an enclave.
     fn test_phase1_init_destroy_enclave() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         // all the json in test-collateral should be valid policy
         let policy_dir = PathBuf::from(
             env::var("VERACRUZ_POLICY_DIR")
@@ -246,7 +246,7 @@ mod tests {
     #[test]
     /// Load policy file and check if a new session tls can be opened
     fn test_phase1_new_session() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let policy_dir = PathBuf::from(
             env::var("VERACRUZ_POLICY_DIR")
                 .unwrap_or("../test-collateral".to_string())
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     /// Load the Veracruz server and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         // start the proxy attestation server
         let policy_dir = PathBuf::from(
             env::var("VERACRUZ_POLICY_DIR")
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
         setup(policy.proxy_attestation_server_url().clone());
 
@@ -298,7 +298,7 @@ mod tests {
     #[ignore]
     /// Test if the detect for calling `debug!` in enclave works.
     fn test_debug1_fire_test_on_debug() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         debug_setup();
         DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
         debug!("Enclave debug message stud");
@@ -310,7 +310,7 @@ mod tests {
     #[ignore]
     /// Test if the detect for calling `debug!` in enclave works.
     fn test_debug2_linear_regression_without_debug() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         debug_setup();
         DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
         test_template(
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
         // start the proxy attestation server
         setup(policy.proxy_attestation_server_url().clone());
@@ -357,7 +357,7 @@ mod tests {
     /// computation: echoing
     /// data sources: a single input under filename `input.txt`.
     fn test_phase2_basic_file_read_write_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -377,7 +377,7 @@ mod tests {
     /// computation: random-source, returning a vec of random u8
     /// data sources: none
     fn test_phase2_random_source_no_data_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -397,7 +397,7 @@ mod tests {
     #[test]
     /// Attempt to fetch the result without program nor data
     fn test_phase2_random_source_no_program_no_data() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -415,7 +415,7 @@ mod tests {
     #[test]
     /// Attempt to provision a wrong program
     fn test_phase2_incorrect_program_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     /// Attempt to use an unauthorized key
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -457,7 +457,7 @@ mod tests {
     #[test]
     /// Attempt to use an unauthorized certificate
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(UNAUTHORIZED_CERT),
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     /// A unauthorized client attempted to connect the service
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(UNAUTHORIZED_CERT),
@@ -504,7 +504,7 @@ mod tests {
     /// two-dimensional space.  Data sources: linear-regression, a vec of points
     /// in two-dimensional space, represented by Vec<(f64, f64)>.
     fn test_phase2_linear_regression_single_data_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -527,7 +527,7 @@ mod tests {
     #[test]
     /// Attempt to fetch result without data
     fn test_phase2_linear_regression_no_data_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -560,7 +560,7 @@ mod tests {
     /// A standard two data source scenario, where the data provisioned in the
     /// reversed order (data 1, then data 0)
     fn test_phase2_intersection_sum_reversed_data_provisioning_two_data_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -593,7 +593,7 @@ mod tests {
     /// computation: string-edit-distance, computing the string edit distance.
     /// data sources: two strings
     fn test_phase2_string_edit_distance_two_data_no_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -622,7 +622,7 @@ mod tests {
     /// in two-dimensional space, represented by Vec<(f64, f64)>
     /// A standard one data source scenario with attestation.
     fn test_phase3_linear_regression_one_data_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -649,7 +649,7 @@ mod tests {
     /// data sources: two vecs of persons, representing by Vec<Person>
     /// A standard two data sources scenario with attestation.
     fn test_phase3_private_set_intersection_two_data_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -676,7 +676,7 @@ mod tests {
     /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
     /// A standard one data source and two stream sources scenario with attestation.
     fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let stream_list =
             stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
         test_template(
@@ -698,7 +698,7 @@ mod tests {
     #[test]
     /// Attempt to fetch result without enough stream data.
     fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let result = test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
@@ -718,7 +718,7 @@ mod tests {
     #[test]
     /// Attempt to provision stream data in the state of loading static data.
     fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let stream_list =
             stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
         let result = test_template(
@@ -776,7 +776,7 @@ mod tests {
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn test_performance_idash2017_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let input_vec = input_list(
             data_dir(LOGISTICS_REGRESSION_DATA_PATH),
             "/input/idash2017/",
@@ -811,7 +811,7 @@ mod tests {
     /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
     fn test_performance_macd_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let input_vec =
             input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
         let input_vec: Vec<(&str, PathBuf)> =
@@ -839,7 +839,7 @@ mod tests {
     /// computation: intersection-sum, matching the setting in .
     /// data sources: private-set-inter-sum/*.dat
     fn test_performance_set_intersection_sum_with_attestation() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         let input_vec = input_list(
             data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
             "/input/private-set-inter-sum/",
@@ -866,7 +866,7 @@ mod tests {
 
     #[test]
     fn test_fd_create() {
-      timeout(Duration::from_secs(120), || {
+      timeout(Duration::from_secs(600), || {
         test_template(
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
