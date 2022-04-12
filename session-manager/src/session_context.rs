@@ -14,7 +14,7 @@
 
 use std::{
     io::Cursor,
-    string::{String, ToString},
+    string::String,
     vec::Vec,
 };
 
@@ -26,8 +26,9 @@ use policy_utils::policy::Policy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use rustls::{
-    AllowAnyAuthenticatedClient, Certificate, CipherSuite, PrivateKey, RootCertStore, ServerConfig,
+    Certificate, PrivateKey, RootCertStore, ServerConfig,
 };
+use rustls_pemfile;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -43,13 +44,13 @@ where
     U: Into<&'a String>,
 {
     let mut cursor = Cursor::new(cert_string.into());
-    rustls::internal::pemfile::certs(&mut cursor)
+    rustls_pemfile::certs(&mut cursor)
         .map_err(|_| SessionManagerError::TLSUnspecifiedError)
         .and_then(|certs| {
             if certs.is_empty() {
                 Err(SessionManagerError::NoCertificateError)
             } else {
-                Ok(certs[0].clone())
+                Ok(Certificate(certs[0].clone()))
             }
         })
 }
@@ -61,6 +62,9 @@ where
 /// A session context contains various bits of meta-data, such as certificates
 /// and server configuration options, for managing a server session.
 pub struct SessionContext {
+    /// An intermediate ConfigBuilder that will be present after the policy is 
+    /// provided but before the certificate chain is provided
+    server_config_builder: Option<rustls::ConfigBuilder<rustls::ServerConfig, rustls::server::WantsServerCert>>,
     /// The configuration options for the server.
     server_config: Option<ServerConfig>,
     /// The global policy associated with the Veracruz computation, detailing
@@ -92,6 +96,7 @@ impl SessionContext {
         };
 
         Ok(Self {
+            server_config_builder: None,
             server_config: None,
             principals: None,
             policy: None,
@@ -120,33 +125,16 @@ impl SessionContext {
             principals.push(principal);
         }
         // create the configuration
-        let mut server_config =
-            ServerConfig::new(AllowAnyAuthenticatedClient::new(root_cert_store));
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(&policy.ciphersuite())
+              .ok_or_else(|| SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().clone()))?;
 
-        // Set the supported ciphersuites in the server to the one specified in
-        // the policy.  This is a dumb way to do this, but I leave it up to the
-        // student to find a better way (the ALL_CIPHERSUITES array is not very
-        // long, anyway).
+        let server_config_builder = rustls::ServerConfig::builder()
+            .with_cipher_suites(&[policy_ciphersuite])
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(&[&rustls::version::TLS12])?
+            .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(root_cert_store));
 
-        let policy_ciphersuite = CipherSuite::lookup_value(policy.ciphersuite()).map_err(|_| {
-            SessionManagerError::TLSInvalidCyphersuiteError(policy.ciphersuite().to_string())
-        })?;
-        let mut supported_ciphersuite = None;
-
-        for this_supported_cs in rustls::ALL_CIPHERSUITES.iter() {
-            if this_supported_cs.suite == policy_ciphersuite {
-                supported_ciphersuite = Some(this_supported_cs);
-            }
-        }
-
-        let supported_ciphersuite = supported_ciphersuite.ok_or(
-            SessionManagerError::TLSUnsupportedCyphersuiteError(policy_ciphersuite),
-        )?;
-
-        server_config.ciphersuites = vec![supported_ciphersuite];
-        server_config.versions = vec![rustls::ProtocolVersion::TLSv1_2];
-
-        self.server_config = Some(server_config);
+        self.server_config_builder = Some(server_config_builder);
         self.principals = Some(principals);
         self.policy = Some(policy);
 
@@ -159,9 +147,14 @@ impl SessionContext {
             let cert: rustls::Certificate = rustls::Certificate(this_chain_data.clone());
             cert_chain.push(cert);
         }
-        match &mut self.server_config {
-            Some(config) => config.set_single_cert(cert_chain, self.server_private_key.clone())?,
+        let config_builder_option = self.server_config_builder.take(); // After this, server_config_builder will be None
+        match config_builder_option {
+            Some(config_builder) => {
+                let config = config_builder.with_single_cert(cert_chain, self.server_private_key.clone())?;
+                self.server_config = Some(config);
+            }
             None => return Err(SessionManagerError::InvalidStateError),
+            
         }
         return Ok(());
     }
@@ -204,6 +197,6 @@ impl SessionContext {
     /// of the new session fails.
     #[inline]
     pub fn create_session(&self) -> Result<Session, SessionManagerError> {
-        Ok(Session::new(self.server_config()?, self.principals()?))
+        Ok(Session::new(self.server_config()?, self.principals()?)?)
     }
 }

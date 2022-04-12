@@ -29,5 +29,5 @@ opt-level = 3
 
 [patch.crates-io]
 ring = { path = "crates/third-party/ring" }
-rustls = { path = "crates/third-party/rustls" }
+rustls = { path = "crates/third-party/rustls/rustls" }
 webpki = { path = "crates/third-party/webpki" }

@@ -19,7 +19,7 @@ use std::{
     vec::Vec,
 };
 
-use rustls::{Certificate, ServerSession, Session as TLSSession};
+use rustls::{Certificate, ServerConnection};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Sessions.
@@ -34,7 +34,7 @@ pub type Principal = Identity<Certificate>;
 /// their identifying information.
 pub struct Session {
     /// The TLS server session.
-    tls_session: ServerSession,
+    tls_connection: ServerConnection,
     /// The list of principals, their identities, and roles in the Veracruz
     /// computation.
     principals: Vec<Principal>,
@@ -43,27 +43,30 @@ pub struct Session {
 impl Session {
     /// Creates a new session from a server configuration and a list of
     /// principals.
-    pub fn new(config: rustls::ServerConfig, principals: &Vec<Principal>) -> Self {
-        let tls_session = ServerSession::new(&std::sync::Arc::new(config));
+    pub fn new(config: rustls::ServerConfig, principals: &Vec<Principal>) -> Result<Self, SessionManagerError> {
+        let mut tls_connection = ServerConnection::new(std::sync::Arc::new(config))?;
+        tls_connection.set_buffer_limit(Some(512 * 1024));
 
-        Session {
-            tls_session: tls_session,
+        Ok(Session {
+            tls_connection: tls_connection,
             principals: principals.to_vec(),
-        }
+        })
     }
 
     /// Writes the contents of `input` over the session's TLS server session.
     pub fn send_tls_data(&mut self, input: &mut Vec<u8>) -> Result<(), SessionManagerError> {
         let mut slice = input.as_slice();
-        self.tls_session.read_tls(&mut slice)?;
-        self.tls_session.process_new_packets()?;
+        while slice.len() > 0 {
+            self.tls_connection.read_tls(&mut slice)?;
+            self.tls_connection.process_new_packets()?;
+        }
         Ok(())
     }
 
     /// Writes the entirety of the `input` buffer over the TLS connection.
     #[inline]
     pub fn return_data(&mut self, input: &[u8]) -> Result<(), SessionManagerError> {
-        self.tls_session.write_all(input)?;
+        self.tls_connection.writer().write_all(input)?;
         Ok(())
     }
 
@@ -72,9 +75,9 @@ impl Session {
     /// for reading, returns `Ok(Some(buffer))` for some byte buffer, `buffer`.
     /// If reading fails, then an error is returned.
     pub fn read_tls_data(&mut self) -> Result<Option<Vec<u8>>, SessionManagerError> {
-        if self.tls_session.wants_write() {
+        if self.tls_connection.wants_write() {
             let mut output = Vec::new();
-            self.tls_session.write_tls(&mut output)?;
+            self.tls_connection.write_tls(&mut output)?;
             Ok(Some(output))
         } else {
             Ok(None)
@@ -86,12 +89,19 @@ impl Session {
     /// data.
     pub fn read_plaintext_data(&mut self) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
-        let num_bytes = self.tls_session.read_to_end(&mut received_buffer)?;
+        match self.tls_connection.reader().read_to_end(&mut received_buffer) {
+            Ok(_num) => (),
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                ()
+            },
+            Err(err) => return Err(SessionManagerError::IOError(err)),
+        }
+        self.tls_connection.process_new_packets()?;
 
-        if num_bytes > 0 {
+        if received_buffer.len() > 0 {
             let peer_certs = self
-                .tls_session
-                .get_peer_certificates()
+                .tls_connection
+                .peer_certificates()
                 .ok_or(SessionManagerError::PeerCertificateError)?;
 
             if peer_certs.len() != 1 {
@@ -115,13 +125,13 @@ impl Session {
     /// Returns `true` iff the session's TLS server session has data to be read.
     #[inline]
     pub fn read_tls_needed(&self) -> bool {
-        self.tls_session.wants_write()
+        self.tls_connection.wants_write()
     }
 
     /// Returns `true` iff the session's TLS server session has finished
     /// handshaking and therefore authentication has been completed.
     #[inline]
     pub fn is_authenticated(&self) -> bool {
-        !self.tls_session.is_handshaking()
+        !self.tls_connection.is_handshaking()
     }
 }

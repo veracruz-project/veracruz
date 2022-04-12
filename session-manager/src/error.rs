@@ -23,7 +23,7 @@ pub enum SessionManagerError {
     /// A TLS error originating in the `RusTLS` library occurred, with an
     /// accompanying error code.
     #[error(display = "Session manager: a TLS error occurred: {:?}.", _0)]
-    TLSError(#[error(source)] rustls::TLSError),
+    TLSError(#[error(source)] rustls::Error),
     /// A generic, unspecified TLS error occurred.
     #[error(display = "Session manager: an unspecified or unknown TLS error occurred.")]
     TLSUnspecifiedError,
@@ -32,7 +32,7 @@ pub enum SessionManagerError {
         display = "Session manager: an invalid cyphersuite was requested in the TLS handshake: {:?}.",
         _0
     )]
-    TLSInvalidCyphersuiteError(std::string::String),
+    TLSInvalidCiphersuiteError(std::string::String),
     /// An unsupported ciphersuite was requested.
     #[error(
         display = "Session manager: an unsupported cyphersuite was requested in the TLS handshake: {:?}.",
