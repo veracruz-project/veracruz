@@ -25,8 +25,10 @@ mod tests {
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
     use ring;
+    use rustls_pemfile;
     use std::{
         collections::HashMap,
+        convert::TryFrom,
         env::{self, VarError},
         io::{Read, Write},
         path::{Path, PathBuf},
@@ -335,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
+    /// Attempt to establish a client connection with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
         timeout(Duration::from_secs(1200), || {
             let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
@@ -346,11 +348,11 @@ mod tests {
             let client_cert_filename = trust_path("never_used_cert.pem");
             let client_key_filename = trust_path("client_rsa_key.pem");
 
-            let mut _client_session = create_client_test_session(
-                client_cert_filename.as_path(),
-                client_key_filename.as_path(),
-            );
-        })
+        let mut _client_connection = create_client_test_connection(
+            client_cert_filename.as_path(),
+            client_key_filename.as_path(),
+            &policy.ciphersuite(),
+        );
     }
 
     #[test]
@@ -942,7 +944,8 @@ mod tests {
 
         info!("             Enclave generated a self-signed certificate:");
 
-        let mut client_session = create_client_test_session(client_cert_path, client_key_path)?;
+        let mut client_connection = create_client_test_connection(client_cert_path, client_key_path, &policy.ciphersuite())?;
+        client_connection.set_buffer_limit(Some(512 * 1024));
         info!(
             "             Initialization time (μs): {}.",
             time_init.elapsed().as_micros()
@@ -1008,7 +1011,7 @@ mod tests {
                     &policy_hash,
                     &test_target_platform,
                     client_session_id,
-                    &mut client_session,
+                    &mut client_connection,
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1017,7 +1020,7 @@ mod tests {
                 let response = provision_data(
                     Path::new(data_path),
                     client_session_id,
-                    &mut client_session,
+                    &mut client_connection,
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1045,7 +1048,7 @@ mod tests {
                     &policy_hash,
                     &test_target_platform,
                     client_session_id,
-                    &mut client_session,
+                    &mut client_connection,
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1058,7 +1061,7 @@ mod tests {
                 let response = provision_data(
                     Path::new(data_path),
                     client_session_id,
-                    &mut client_session,
+                    &mut client_connection,
                     ticket,
                     &client_tls_tx,
                     &client_tls_rx,
@@ -1095,7 +1098,7 @@ mod tests {
                         &policy_hash,
                         &test_target_platform,
                         client_session_id,
-                        &mut client_session,
+                        &mut client_connection,
                         ticket,
                         &client_tls_tx,
                         &client_tls_rx,
@@ -1108,7 +1111,7 @@ mod tests {
                     let response = provision_stream(
                         Path::new(data_path),
                         client_session_id,
-                        &mut client_session,
+                        &mut client_connection,
                         ticket,
                         &client_tls_tx,
                         &client_tls_rx,
@@ -1134,7 +1137,7 @@ mod tests {
                         &policy_hash,
                         &test_target_platform,
                         client_session_id,
-                        &mut client_session,
+                        &mut client_connection,
                         ticket,
                         &client_tls_tx,
                         &client_tls_rx,
@@ -1149,7 +1152,7 @@ mod tests {
                         &client_tls_tx,
                         &client_tls_rx,
                         client_session_id,
-                        &mut client_session,
+                        &mut client_connection,
                         ticket,
                         &transport_protocol::serialize_request_result(remote_file_name)?.as_slice(),
                     )?;
@@ -1164,7 +1167,7 @@ mod tests {
                     info!("             Read {}.", remote_file_name);
                     let response = read_file(
                         client_session_id,
-                        &mut client_session,
+                        &mut client_connection,
                         ticket,
                         &client_tls_tx,
                         &client_tls_rx,
@@ -1189,7 +1192,7 @@ mod tests {
                 &client_tls_tx,
                 &client_tls_rx,
                 client_session_id,
-                &mut client_session,
+                &mut client_connection,
                 ticket,
                 &transport_protocol::serialize_request_shutdown()?.as_slice(),
             )?;
@@ -1350,7 +1353,7 @@ mod tests {
         policy_hash: &str,
         test_target_platform: &Platform,
         client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
+        client_connection: &mut rustls::ClientConnection,
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
@@ -1358,20 +1361,20 @@ mod tests {
         check_policy_hash(
             policy_hash,
             client_session_id,
-            client_session,
+            client_connection,
             ticket,
             client_tls_tx,
             client_tls_rx,
         )?;
         info!("Policy hash OK...");
-        check_runtime_manager_hash(policy, client_session, test_target_platform)?;
+        check_runtime_manager_hash(policy, client_connection, test_target_platform)?;
         Ok(())
     }
 
     fn check_policy_hash(
         expected_policy_hash: &str,
         client_session_id: u32,
-        client_session: &mut dyn rustls::Session,
+        client_connection: &mut rustls::ClientConnection,
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
@@ -1392,7 +1395,7 @@ mod tests {
             client_tls_tx,
             client_tls_rx,
             client_session_id,
-            client_session,
+            client_connection,
             ticket,
             &serialized_request_policy_hash[..],
         )
@@ -1465,10 +1468,10 @@ mod tests {
 
     fn check_runtime_manager_hash(
         policy: &Policy,
-        client_session: &dyn rustls::Session,
+        client_connection: &rustls::ClientConnection,
         test_target_platform: &Platform,
     ) -> Result<(), VeracruzServerError> {
-        return match client_session.get_peer_certificates() {
+        return match client_connection.peer_certificates() {
             None => {
                 error!("No peer certificate found.");
 
@@ -1477,7 +1480,7 @@ mod tests {
                 ))
             }
             Some(certs) => {
-                let ee_cert = webpki::EndEntityCert::from(certs[0].as_ref()).unwrap();
+                let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref()).unwrap();
                 let ues = ee_cert.unrecognized_extensions();
 
                 // check for OUR extension
@@ -1524,7 +1527,7 @@ mod tests {
     fn provision_data(
         filename: &Path,
         client_session_id: u32,
-        client_session: &mut rustls::ClientSession,
+        client_connection: &mut rustls::ClientConnection,
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
@@ -1543,7 +1546,7 @@ mod tests {
             client_tls_tx,
             client_tls_rx,
             client_session_id,
-            client_session,
+            client_connection,
             ticket,
             &serialized_data[..],
         )
@@ -1552,7 +1555,7 @@ mod tests {
     fn provision_stream(
         filename: &Path,
         client_session_id: u32,
-        client_session: &mut rustls::ClientSession,
+        client_connection: &mut rustls::ClientConnection,
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
@@ -1571,7 +1574,7 @@ mod tests {
             client_tls_tx,
             client_tls_rx,
             client_session_id,
-            client_session,
+            client_connection,
             ticket,
             &serialized_stream[..],
         )
@@ -1579,7 +1582,7 @@ mod tests {
 
     fn read_file(
         client_session_id: u32,
-        client_session: &mut rustls::ClientSession,
+        client_connection: &mut rustls::ClientConnection,
         ticket: u32,
         client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
@@ -1591,7 +1594,7 @@ mod tests {
             client_tls_tx,
             client_tls_rx,
             client_session_id,
-            client_session,
+            client_connection,
             ticket,
             &serialized_read[..],
         )
@@ -1660,18 +1663,18 @@ mod tests {
         tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
         rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
         session_id: u32,
-        session: &mut dyn rustls::Session,
+        connection: &mut rustls::ClientConnection,
         ticket: u32,
         send_data: &[u8],
     ) -> Result<Vec<u8>, VeracruzServerError> {
-        session.write_all(&send_data).map_err(|e| {
+        connection.writer().write_all(&send_data).map_err(|e| {
             error!("Failed to send all data.  Error produced: {:?}.", e);
             e
         })?;
 
         let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
 
-        session.write_tls(&mut output).map_err(|e| {
+        connection.write_tls(&mut output).map_err(|e| {
             error!("Failed to write TLS.  Error produced: {:?}.", e);
             e
         })?;
@@ -1700,7 +1703,7 @@ mod tests {
         {
             let received = rx.try_recv();
 
-            if received.is_ok() && (!session.is_handshaking() || session.wants_read()) {
+            if received.is_ok() && (!connection.is_handshaking() || connection.wants_read()) {
                 info!("Received is OK, and we're not handshaking...");
 
                 let received = received.map_err(|e| {
@@ -1709,30 +1712,36 @@ mod tests {
                 })?;
 
                 let mut slice = &received[..];
-                session.read_tls(&mut slice).map_err(|e| {
+                connection.read_tls(&mut slice).map_err(|e| {
                     error!("Failed to read TLS.  Error produced: {:?}.", e);
                     e
                 })?;
-                session.process_new_packets().map_err(|e| {
+                connection.process_new_packets().map_err(|e| {
                     error!("Failed to process new packets.  Error produced: {:?}.", e);
                     e
                 })?;
 
                 let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
 
-                let num_bytes = session.read_to_end(&mut received_buffer).map_err(|e| {
-                    error!("Failed to read data to end.  Error produced: {:?}.", e);
-                    e
-                })?;
+                match connection.reader().read_to_end(&mut received_buffer) {
+                    Ok(_num) => (),
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                        ()
+                    },
+                    Err(err) => {
+                        error!("Failed to read data to end.  Error produced: {:?}.", err);
+                        return Err(VeracruzServerError::IOError(err));
+                    },
+                };
 
-                if num_bytes > 0 {
+                if received_buffer.len() > 0 {
                     info!("Finished sending via TLS.");
                     return Ok(received_buffer);
                 }
-            } else if session.wants_write() {
+            } else if connection.wants_write() {
                 info!("Session wants write...");
                 let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-                session.write_tls(&mut output).map_err(|e| {
+                connection.write_tls(&mut output).map_err(|e| {
                     error!("Failed to write TLS.  Error produced: {:?}.", e);
                     e
                 })?;
@@ -1750,43 +1759,54 @@ mod tests {
         ))
     }
 
-    fn create_client_test_session(
+    fn create_client_test_connection(
         client_cert_filename: &Path,
         client_key_filename: &Path,
-    ) -> Result<rustls::ClientSession, VeracruzServerError> {
+        ciphersuite_str: &str,
+    ) -> Result<rustls::ClientConnection, VeracruzServerError> {
         let client_cert = read_cert_file(client_cert_filename)?;
 
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
             let data = std::fs::read(trust_path(CA_CERT)).unwrap();
-            let certs = rustls::internal::pemfile::certs(&mut data.as_slice()).unwrap();
+            let certs = rustls_pemfile::certs(&mut data.as_slice()).unwrap();
             certs[0].clone()
         };
-        let mut client_config = rustls::ClientConfig::new();
-        let mut client_cert_vec = std::vec::Vec::new();
-        client_cert_vec.push(client_cert);
-        client_config.set_single_client_cert(client_cert_vec, client_priv_key);
-        client_config.root_store.add(&proxy_service_cert).unwrap();
 
-        let dns_name = webpki::DNSNameRef::try_from_ascii_str("ComputeEnclave.dev")?;
-        Ok(rustls::ClientSession::new(
-            &std::sync::Arc::new(client_config),
-            dns_name,
-        ))
+        let cipher_suite = veracruz_utils::lookup_ciphersuite(ciphersuite_str)
+            .ok_or_else(|| VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string()))?;
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.add(&rustls::Certificate(proxy_service_cert))
+            .map_err(|err| VeracruzServerError::WebpkiError(err))?;
+
+        let client_config = rustls::ClientConfig::builder()
+            .with_cipher_suites(&[cipher_suite])
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(&[&rustls::version::TLS12])?
+            .with_root_certificates(root_store)
+            .with_single_cert([client_cert].to_vec(), client_priv_key)?;
+
+        let enclave_name_as_server = rustls::ServerName::try_from("ComputeEnclave.dev")
+        .map_err(|err| VeracruzServerError::WebpkiDNSNameError(err))?;
+        Ok(rustls::ClientConnection::new(
+            std::sync::Arc::new(client_config),
+            enclave_name_as_server,
+        )?)
     }
+
 
     fn read_cert_file(filename: &Path) -> Result<rustls::Certificate, VeracruzServerError> {
         let mut cert_file = std::fs::File::open(filename)?;
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer)?;
         let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls::internal::pemfile::certs(&mut cursor)
+        let certs = rustls_pemfile::certs(&mut cursor)
             .map_err(|_| VeracruzServerError::TLSUnspecifiedError)?;
         if certs.len() == 0 {
             Err(VeracruzServerError::InvalidLengthError("certs.len()", 1))
         } else {
-            Ok(certs[0].clone())
+            Ok(rustls::Certificate(certs[0].clone()))
         }
     }
 
@@ -1795,8 +1815,8 @@ mod tests {
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer)?;
         let mut cursor = std::io::Cursor::new(key_buffer);
-        let rsa_keys = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
+        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)
             .map_err(|_| VeracruzServerError::TLSUnspecifiedError)?;
-        Ok(rsa_keys[0].clone())
+        Ok(rustls::PrivateKey(rsa_keys[0].clone()))
     }
 }
