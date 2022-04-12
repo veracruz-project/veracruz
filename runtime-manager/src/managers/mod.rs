@@ -188,9 +188,9 @@ impl ProtocolState {
     /// TODO: Do something better (https://github.com/veracruz-project/veracruz/issues/393)
     pub(crate) fn request_and_check_shutdown(
         &mut self,
-        _client_id: u64,
+        client_id: u64,
     ) -> Result<bool, RuntimeManagerError> {
-        Ok(!self.expected_shutdown_sources.is_empty())
+        Ok(self.expected_shutdown_sources.contains(client_id))
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
