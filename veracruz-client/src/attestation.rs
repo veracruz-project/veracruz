@@ -11,10 +11,6 @@
 
 use policy_utils::{policy::Policy, Platform};
 
-#[cfg(feature = "mock")]
-use mockall::{automock, predicate::*};
-
-#[cfg_attr(feature = "mock", automock)]
 pub trait Attestation {
     fn attestation(
         policy: &Policy,
