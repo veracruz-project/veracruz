@@ -37,7 +37,6 @@ shared:
 	$(MAKE) -C host
 
 linux-install: shared-install
-	$(MAKE) -C linux-runtime
 	$(MAKE) -C linux-host install
 
 shared-install:

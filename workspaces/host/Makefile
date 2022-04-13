@@ -18,7 +18,7 @@ include $(WORKSPACE_DIR)/common.mk
 all: crates/sdk/wasm-checker/bin/wasm-checker
 	cargo build $(PROFILE_FLAG) $(V_FLAG)
 
-install: all
+install:
 	# create full names
 	cp -f target/$(PROFILE_PATH)/freestanding-execution-engine $(BIN_DIR)
 	cp -f target/$(PROFILE_PATH)/generate-policy $(BIN_DIR)

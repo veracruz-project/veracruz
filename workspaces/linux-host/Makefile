@@ -45,7 +45,7 @@ build:
 		--features veracruz-server/linux \
 		--features cli
 
-install: build
+install:
 	# create full names
 	cp -f target/$(PROFILE_PATH)/proxy-attestation-server $(BIN_DIR)
 	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)
