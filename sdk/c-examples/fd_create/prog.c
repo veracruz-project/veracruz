@@ -57,7 +57,7 @@ void assert_fail(const char *file, unsigned long long line,
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// A simple test.F
+// A simple test.
 
 int main()
 {
