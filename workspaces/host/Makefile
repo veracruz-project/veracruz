@@ -12,7 +12,6 @@
 .PHONY: all install clean clean-cargo-lock clean-datasets datasets doc fmt
 
 WORKSPACE_DIR = $(abspath ..)
-BIN_DIR ?= /usr/local/cargo/bin
 include $(WORKSPACE_DIR)/common.mk
 
 

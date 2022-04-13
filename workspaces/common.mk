@@ -13,8 +13,9 @@ PROFILE ?= release
 PROFILE_PATH = release
 PROFILE_FLAG = --release
 V ?= 0
+BIN_DIR ?= /usr/local/bin
 
-export PROFILE V
+export PROFILE V BIN_DIR
 
 ifeq ($(PROFILE),dev)
     PROFILE_PATH = debug

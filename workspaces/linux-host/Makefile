@@ -16,7 +16,6 @@ default: build
 
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
-BIN_DIR ?= /usr/local/cargo/bin
 MEASUREMENT_FILE = $(abspath ../linux-runtime/css-linux.bin)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 ENCLAVE_BINARY_PATH = $(abspath $(WORKSPACE_DIR)/linux-runtime/runtime_manager_enclave)
