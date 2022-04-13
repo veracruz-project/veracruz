@@ -17,9 +17,8 @@ using. So for example, if you are running Veracruz on Linux, you would
 run `make -C workspaces linux-install`.
 
 ``` bash
-$ mkdir -p bin
-$ export PATH=$PATH:$PWD/bin
-$ make -C workspaces linux-install BIN_DIR=$PWD/bin
+$ make -C workspaces linux
+$ sudo make -C workspaces linux-install
 ...
 ```
 
@@ -64,7 +63,6 @@ directory, so we need to use the `workspaces/applications` Cargo.toml. Note we
 are compiling to WebAssembly here, which Rust makes very easy for us:
 
 ``` bash
-$ rustup target add wasm32-wasi
 $ cargo build \
     --manifest-path=workspaces/applications/Cargo.toml \
     --target wasm32-wasi \
