@@ -68,7 +68,7 @@ struct CommandLineOptions {
     input_sources: Vec<String>,
     /// The list of file names passed as ouput.
     output_sources: Vec<String>,
-    /// The pathes passed as the WASM programs to be executed (in order).
+    /// The paths passed as the WASM programs to be executed (in order).
     program_sources: Vec<String>,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
@@ -123,7 +123,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("p")
                 .long("program")
                 .value_name("FILE")
-                .help("Pathes to the WASM binary to be executed. It executes in order.")
+                .help("Paths to the WASM binary to be executed. It executes in order.")
                 .multiple(true)
                 .required(true),
         )
@@ -309,10 +309,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
-    // Convert the program pathes to absolute if needed.
+    // Convert the program paths to absolute if needed.
     cmdline.program_sources.iter_mut().for_each(|e| {
         if !e.starts_with("/") {
-            e.insert(0,'/');
+            e.insert(0, '/');
         }
     });
 
@@ -344,9 +344,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Insert the file right for all programs
     for prog_path in &cmdline.program_sources {
-        let program_id = Principal::Program(
-            prog_path.to_string(),
-        );
+        let program_id = Principal::Program(prog_path.to_string());
         right_table.insert(program_id.clone(), file_table.clone());
     }
     info!("The final right tables: {:?}", right_table);
@@ -356,7 +354,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
     info!("Data sources loaded.");
 
-    info!("Invoking programs on in order {:?}.", cmdline.program_sources);
+    info!("Invoking programs in order {:?}.", cmdline.program_sources);
 
     for prog_path in &cmdline.program_sources {
         let main_time = Instant::now();
@@ -375,7 +373,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             options,
         )?;
         info!("return code of {}: {:?}", prog_path, return_code);
-        info!("time on {}: {} micro seconds", prog_path, main_time.elapsed().as_micros());
+        info!(
+            "time on {}: {} micro seconds",
+            prog_path,
+            main_time.elapsed().as_micros()
+        );
 
         // Dump contents of stdout
         if cmdline.dump_stdout {
