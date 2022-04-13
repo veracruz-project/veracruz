@@ -190,7 +190,7 @@ impl ProtocolState {
         &mut self,
         client_id: u64,
     ) -> Result<bool, RuntimeManagerError> {
-        Ok(self.expected_shutdown_sources.contains(client_id))
+        Ok(self.expected_shutdown_sources.contains(&client_id))
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
