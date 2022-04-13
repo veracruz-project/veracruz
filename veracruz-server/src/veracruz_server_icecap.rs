@@ -14,6 +14,10 @@ use bincode;
 use err_derive::Error;
 use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
+use signal_hook::{
+    consts::SIGINT,
+    iterator::{Handle, Signals},
+};
 use std::{
     convert::TryFrom,
     env,
@@ -28,45 +32,46 @@ use std::{
     thread::{self, JoinHandle},
     time::Duration,
 };
-use signal_hook::{
-    consts::SIGINT,
-    iterator::{Handle, Signals},
-};
 use tempfile;
-use tempfile::{TempDir};
+use tempfile::TempDir;
 use veracruz_utils::platform::icecap::message::{Header, Request, Response};
 
-const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &'static [&'static str] = &[
-    "qemu-system-aarch64",
-];
+const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &'static [&'static str] = &["qemu-system-aarch64"];
 const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-machine", "virt,virtualization=on,gic-version=2",
-    "-cpu", "cortex-a57",
-    "-smp", "4",
-    "-m", "3072",
-    "-semihosting-config", "enable=on,target=native",
-    "-netdev", "user,id=netdev0",
-    "-serial", "mon:stdio", "-nographic",
+    "-machine",
+    "virt,virtualization=on,gic-version=2",
+    "-cpu",
+    "cortex-a57",
+    "-smp",
+    "4",
+    "-m",
+    "3072",
+    "-semihosting-config",
+    "enable=on,target=native",
+    "-netdev",
+    "user,id=netdev0",
+    "-serial",
+    "mon:stdio",
+    "-nographic",
 ];
 const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-chardev", "socket,path={console0_path},server=on,wait=off,id=charconsole0",
+    "-chardev",
+    "socket,path={console0_path},server=on,wait=off,id=charconsole0",
     //"-chardev", "socket,server=on,host=localhost,port=1234,id=charconsole0",
-    "-device", "virtio-serial-device",
-    "-device", "virtconsole,chardev=charconsole0,id=console0",
+    "-device",
+    "virtio-serial-device",
+    "-device",
+    "virtconsole,chardev=charconsole0,id=console0",
 ];
-const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-kernel", "{image_path}"
-];
+const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] =
+    &["-kernel", "{image_path}"];
 
 // Include image at compile time
-const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] = include_bytes!(
-    env!("VERACRUZ_ICECAP_QEMU_IMAGE")
-);
-
+const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] =
+    include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
 
 // TODO is this needed?
 const FIRMWARE_VERSION: &str = "0.3.0";
-
 
 /// Class of IceCap-specific errors.
 #[derive(Debug, Error)]
@@ -95,55 +100,49 @@ impl From<bincode::Error> for VeracruzServerError {
     }
 }
 
-
 /// IceCap implementation of 'VeracruzServer'
 struct IceCapRealm {
     // NOTE the order of these fields matter due to drop ordering
     child: Arc<Mutex<Child>>,
     channel: UnixStream,
-    #[allow(dead_code)] stdout_handler: JoinHandle<()>,
-    #[allow(dead_code)] stderr_handler: JoinHandle<()>,
+    #[allow(dead_code)]
+    stdout_handler: JoinHandle<()>,
+    #[allow(dead_code)]
+    stderr_handler: JoinHandle<()>,
     signal_handle: Handle,
-    #[allow(dead_code)] signal_handler: JoinHandle<()>,
-    #[allow(dead_code)] tempdir: TempDir,
+    #[allow(dead_code)]
+    signal_handler: JoinHandle<()>,
+    #[allow(dead_code)]
+    tempdir: TempDir,
 }
 
 impl IceCapRealm {
     fn spawn() -> Result<IceCapRealm, VeracruzServerError> {
         fn env_flags(var: &str, default: &[&str]) -> Result<Vec<String>, VeracruzServerError> {
             match env::var(var) {
-                Ok(var) => Ok(
-                    var.split_whitespace()
-                        .map(|s| s.to_owned())
-                        .collect()
-                ),
-                Err(env::VarError::NotPresent) => Ok(
-                    default.iter()
-                        .map(|s| (*s).to_owned())
-                        .collect()
-                ),
+                Ok(var) => Ok(var.split_whitespace().map(|s| s.to_owned()).collect()),
+                Err(env::VarError::NotPresent) => {
+                    Ok(default.iter().map(|s| (*s).to_owned()).collect())
+                }
                 Err(_) => Err(IceCapError::InvalidEnvironemntVariableValue {
-                    variable: var.to_owned()
+                    variable: var.to_owned(),
                 })?,
             }
         }
 
         // Allow overriding these from environment variables
-        let qemu_bin = env_flags(
-            "VERACRUZ_ICECAP_QEMU_BIN",
-            VERACRUZ_ICECAP_QEMU_BIN_DEFAULT
-        )?;
+        let qemu_bin = env_flags("VERACRUZ_ICECAP_QEMU_BIN", VERACRUZ_ICECAP_QEMU_BIN_DEFAULT)?;
         let qemu_flags = env_flags(
             "VERACRUZ_ICECAP_QEMU_FLAGS",
-            VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT
+            VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT,
         )?;
         let qemu_console_flags = env_flags(
             "VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS",
-            VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT
+            VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT,
         )?;
         let qemu_image_flags = env_flags(
             "VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS",
-            VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT
+            VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT,
         )?;
 
         // temporary directory for things
@@ -165,24 +164,20 @@ impl IceCapRealm {
                 .args(&qemu_bin[1..])
                 .args(&qemu_flags)
                 .args(
-                    qemu_console_flags.iter()
-                        .map(|s| s.replace(
-                            "{console0_path}",
-                            channel_path.to_str().unwrap()
-                        ))
+                    qemu_console_flags
+                        .iter()
+                        .map(|s| s.replace("{console0_path}", channel_path.to_str().unwrap())),
                 )
                 .args(
-                    qemu_image_flags.iter()
-                        .map(|s| s.replace(
-                            "{image_path}",
-                            image_path.to_str().unwrap()
-                        ))
+                    qemu_image_flags
+                        .iter()
+                        .map(|s| s.replace("{image_path}", image_path.to_str().unwrap())),
                 )
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .map_err(IceCapError::QemuSpawnError)?
+                .map_err(IceCapError::QemuSpawnError)?,
         ));
 
         // forward stderr/stdin via threads, this is necessary to avoid stdio
@@ -253,15 +248,23 @@ impl IceCapRealm {
         // send request
         let raw_request = bincode::serialize(request)?;
         let raw_header = bincode::serialize(&Header::try_from(raw_request.len()).unwrap())?;
-        self.channel.write_all(&raw_header).map_err(IceCapError::ChannelError)?;
-        self.channel.write_all(&raw_request).map_err(IceCapError::ChannelError)?;
+        self.channel
+            .write_all(&raw_header)
+            .map_err(IceCapError::ChannelError)?;
+        self.channel
+            .write_all(&raw_request)
+            .map_err(IceCapError::ChannelError)?;
 
         // recv response
         let mut raw_header = [0; size_of::<Header>()];
-        self.channel.read_exact(&mut raw_header).map_err(IceCapError::ChannelError)?;
+        self.channel
+            .read_exact(&mut raw_header)
+            .map_err(IceCapError::ChannelError)?;
         let header = bincode::deserialize::<Header>(&raw_header)?;
         let mut raw_response = vec![0; usize::try_from(header).unwrap()];
-        self.channel.read_exact(&mut raw_response).map_err(IceCapError::ChannelError)?;
+        self.channel
+            .read_exact(&mut raw_response)
+            .map_err(IceCapError::ChannelError)?;
         let response = bincode::deserialize::<Response>(&raw_response)?;
 
         Ok(response)
@@ -275,7 +278,6 @@ impl IceCapRealm {
         Ok(())
     }
 }
-
 
 pub struct VeracruzServerIceCap(Option<IceCapRealm>);
 
@@ -300,16 +302,14 @@ impl VeracruzServer for VeracruzServerIceCap {
         let policy: Policy = Policy::from_json(policy_json)?;
 
         // create the realm
-        let mut self_ = Self(Some(
-            IceCapRealm::spawn()?
-        ));
+        let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
         let (device_id, challenge) = send_proxy_attestation_server_start(
             policy.proxy_attestation_server_url(),
             "psa",
             FIRMWARE_VERSION,
         )
-            .map_err(VeracruzServerError::HttpError)?;
+        .map_err(VeracruzServerError::HttpError)?;
 
         let (token, csr) = match self_.communicate(&Request::Attestation {
             challenge,
@@ -320,10 +320,9 @@ impl VeracruzServer for VeracruzServerIceCap {
         };
 
         let (root_cert, compute_cert) = {
-            let req = transport_protocol::serialize_native_psa_attestation_token(
-                &token, &csr, device_id
-            )
-                .map_err(VeracruzServerError::TransportProtocolError)?;
+            let req =
+                transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id)
+                    .map_err(VeracruzServerError::TransportProtocolError)?;
             let req = base64::encode(&req);
             let url = format!(
                 "{:}/PSA/AttestationToken",
@@ -406,9 +405,7 @@ impl VeracruzServer for VeracruzServerIceCap {
                 realm.shutdown()?;
                 Ok(())
             }
-            None => {
-                Ok(())
-            }
+            None => Ok(()),
         }
     }
 }
@@ -420,4 +417,3 @@ impl Drop for VeracruzServerIceCap {
         }
     }
 }
-
