@@ -68,8 +68,8 @@ struct CommandLineOptions {
     input_sources: Vec<String>,
     /// The list of file names passed as ouput.
     output_sources: Vec<String>,
-    /// The filename passed as the WASM program to be executed.
-    binary: String,
+    /// The pathes passed as the WASM programs to be executed (in order).
+    program_sources: Vec<String>,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
     /// Whether the contents of `stdout` should be dumped before exiting.
@@ -102,7 +102,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .value_name("DIRECTORIES")
                 .help(
                     "Space-separated paths to the input directories on disk. The directories are \
-                     copied into the root directory in Veracruz space. The program is granted \
+                     copied into the root directory in Veracruz space. All programs are granted \
                      with read capabilities.",
                 )
                 .multiple(true),
@@ -114,7 +114,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .value_name("DIRECTORIES")
                 .help(
                     "Space-separated paths to the output directories. The directories are copied \
-                     into disk on the host. The program is granted with write capabilities.",
+                     into disk on the host. All program are granted with write capabilities.",
                 )
                 .multiple(true),
         )
@@ -123,8 +123,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("p")
                 .long("program")
                 .value_name("FILE")
-                .help("Path to the WASM binary to be executed.")
-                .multiple(false)
+                .help("Pathes to the WASM binary to be executed. It executes in order.")
+                .multiple(true)
                 .required(true),
         )
         .arg(
@@ -202,9 +202,10 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         }
     };
 
-    let binary = if let Some(binary) = matches.value_of("program") {
-        info!("Using '{}' as our WASM executable.", binary);
-        binary.to_string()
+    let program_sources = if let Some(data) = matches.values_of("program") {
+        let program_sources: Vec<String> = data.map(|e| e.to_string()).collect();
+        info!("Using '{:?}' as our WASM executable.", program_sources);
+        program_sources
     } else {
         return Err("No binary file provided.".into());
     };
@@ -252,7 +253,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     Ok(CommandLineOptions {
         input_sources,
         output_sources,
-        binary,
+        program_sources,
         execution_strategy,
         dump_stdout,
         dump_stderr,
@@ -305,13 +306,19 @@ fn load_input_source<T: AsRef<Path>>(
 /// invoking the entry point.
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let cmdline = parse_command_line()?;
+    let mut cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
-    let program_path = &cmdline.binary;
-    let prog_file_abs_path = Path::new("/").join(program_path.clone());
+    // Convert the program pathes to absolute if needed.
+    cmdline.program_sources.iter_mut().for_each(|e| {
+        if !e.starts_with("/") {
+            e.insert(0,'/');
+        }
+    });
 
+    // Contruct the right table
     let mut right_table = HashMap::new();
+    // Contruct file table for all programs
     let mut file_table = HashMap::new();
     let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
     let write_right = read_right
@@ -334,13 +341,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), write_right);
     }
-    let program_id = Principal::Program(
-        prog_file_abs_path
-            .to_str()
-            .ok_or("Failed to convert program path to a string.")?
-            .to_string(),
-    );
-    right_table.insert(program_id.clone(), file_table);
+
+    // Insert the file right for all programs
+    for prog_path in &cmdline.program_sources {
+        let program_id = Principal::Program(
+            prog_path.to_string(),
+        );
+        right_table.insert(program_id.clone(), file_table.clone());
+    }
     info!("The final right tables: {:?}", right_table);
 
     let mut vfs = FileSystem::new(right_table)?;
@@ -348,47 +356,51 @@ fn main() -> Result<(), Box<dyn Error>> {
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
     info!("Data sources loaded.");
 
-    info!("Invoking main on {:?}.", prog_file_abs_path);
-    let main_time = Instant::now();
-    let options = Options {
-        environment_variables: cmdline.environment_variables,
-        program_arguments: cmdline.program_arguments,
-        enable_clock: cmdline.enable_clock,
-        enable_strace: cmdline.enable_strace,
-        ..Default::default()
-    };
-    let program = vfs.read_file_by_absolute_path(prog_file_abs_path)?;
-    let return_code = execute(
-        &cmdline.execution_strategy,
-        vfs.spawn(&program_id)?,
-        program,
-        options,
-    )?;
-    info!("return code: {:?}", return_code);
-    info!("time: {} micro seconds", main_time.elapsed().as_micros());
+    info!("Invoking programs on in order {:?}.", cmdline.program_sources);
 
-    // Dump contents of stdout
-    if cmdline.dump_stdout {
-        let buf = vfs.read_stdout()?;
-        let stdout_dump = std::str::from_utf8(&buf)?;
-        print!(
-            "---- stdout dump ----\n{}---- stdout dump end ----\n",
-            stdout_dump
-        );
-        std::io::stdout().flush()?;
+    for prog_path in &cmdline.program_sources {
+        let main_time = Instant::now();
+        let options = Options {
+            environment_variables: cmdline.environment_variables.clone(),
+            program_arguments: cmdline.program_arguments.clone(),
+            enable_clock: cmdline.enable_clock,
+            enable_strace: cmdline.enable_strace,
+            ..Default::default()
+        };
+        let program = vfs.read_file_by_absolute_path(prog_path)?;
+        let return_code = execute(
+            &cmdline.execution_strategy,
+            vfs.spawn(&Principal::Program(prog_path.to_string()))?,
+            program,
+            options,
+        )?;
+        info!("return code of {}: {:?}", prog_path, return_code);
+        info!("time on {}: {} micro seconds", prog_path, main_time.elapsed().as_micros());
+
+        // Dump contents of stdout
+        if cmdline.dump_stdout {
+            let buf = vfs.read_stdout()?;
+            let stdout_dump = std::str::from_utf8(&buf)?;
+            print!(
+                "---- stdout dump ----\n{}---- stdout dump end ----\n",
+                stdout_dump
+            );
+            std::io::stdout().flush()?;
+        }
+
+        // Dump contents of stderr
+        if cmdline.dump_stderr {
+            let buf = vfs.read_stderr()?;
+            let stderr_dump = std::str::from_utf8(&buf)?;
+            eprint!(
+                "---- stderr dump ----\n{}---- stderr dump end ----\n",
+                stderr_dump
+            );
+            std::io::stderr().flush()?;
+        }
     }
 
-    // Dump contents of stderr
-    if cmdline.dump_stderr {
-        let buf = vfs.read_stderr()?;
-        let stderr_dump = std::str::from_utf8(&buf)?;
-        eprint!(
-            "---- stderr dump ----\n{}---- stderr dump end ----\n",
-            stderr_dump
-        );
-        std::io::stderr().flush()?;
-    }
-
+    // Map all output directories
     for file_path in cmdline.output_sources.iter() {
         for (output_path, buf) in vfs
             .read_all_files_by_absolute_path(Path::new("/").join(file_path))?
