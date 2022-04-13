@@ -590,7 +590,6 @@ pub mod veracruz_server_linux {
             self.runtime_manager_socket.shutdown(Shutdown::Both)?;
 
             info!("Killing and Runtime Manager process...");
-            //self.runtime_manager_process.kill().map_err(|err| VeracruzServerError::EnclaveShutdownError(err))?;
             self.runtime_manager_process.kill()?;
 
             info!("TCP connection and process killed.");
