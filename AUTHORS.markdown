@@ -14,4 +14,4 @@ and is designed and written by the *Veracruz Development Team*:
 - Shale Xiong (shale.xiong@arm.com)
 - Sabreen Kaur (sabreenderjitkaur.gurjitsingh@arm.com)
 - Mohamed Abdelfatah (mohamedabdelfatah2027@gmail.com)
-
+- Aryan Godara (aryangodara03@gmail.com)
