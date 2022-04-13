@@ -1,4 +1,4 @@
-//! Test of fd_create function.
+//! Test of fd-create function.
 //!
 //! ## Context
 //!
