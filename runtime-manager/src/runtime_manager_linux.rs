@@ -354,13 +354,6 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                         RuntimeManagerMessage::Status(VMStatus::Fail)
                     })
             }
-            RuntimeManagerMessage::ResetEnclave => {
-                info!("Shutting down enclave.");
-
-                abort = true;
-
-                RuntimeManagerMessage::Status(VMStatus::Success)
-            }
             otherwise => {
                 error!("Received unknown or unimplemented opcode: {:?}.", otherwise);
                 RuntimeManagerMessage::Status(VMStatus::Unimplemented)

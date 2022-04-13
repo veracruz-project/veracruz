@@ -79,45 +79,6 @@ pub mod veracruz_server_linux {
         fn teardown(&mut self) -> Result<bool, VeracruzServerError> {
             info!("Tearing down Linux runtime manager enclave.");
 
-            info!("Sending shutdown message.");
-
-            send_message(
-                &mut self.runtime_manager_socket,
-                &RuntimeManagerMessage::ResetEnclave,
-            )
-            .map_err(VeracruzServerError::SocketError)?;
-
-            info!("Shutdown message successfully sent, awaiting response...");
-
-            let response: RuntimeManagerMessage = receive_message(&mut self.runtime_manager_socket)
-                .map_err(VeracruzServerError::SocketError)?;
-
-            info!("Response received.");
-
-            let response = match response {
-                RuntimeManagerMessage::Status(VMStatus::Success) => {
-                    info!("Enclave successfully shutdown.");
-
-                    Ok(true)
-                }
-                RuntimeManagerMessage::Status(otherwise) => {
-                    info!(
-                        "Enclave failed to shutdown (status {:?} received.",
-                        otherwise
-                    );
-
-                    Ok(false)
-                }
-                otherwise => {
-                    error!(
-                        "Unexpected response received from runtime enclave: {:?}.",
-                        otherwise
-                    );
-
-                    Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise))
-                }
-            };
-
             info!("Killing TCP connections and Runtime Manager process.");
 
             let _result = self.runtime_manager_socket.shutdown(Shutdown::Both);

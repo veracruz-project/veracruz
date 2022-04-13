@@ -117,11 +117,6 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                 };
                 return_message
             }
-            RuntimeManagerMessage::ResetEnclave => {
-                println!("runtime_manager_nitro::main ResetEnclave");
-                abort = true;
-                RuntimeManagerMessage::Status(VMStatus::Success)
-            }
             _ => {
                 println!("runtime_manager_nitro::main Unknown Opcode");
                 RuntimeManagerMessage::Status(VMStatus::Unimplemented)

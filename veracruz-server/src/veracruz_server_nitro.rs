@@ -219,11 +219,8 @@ pub mod veracruz_server_nitro {
         }
 
         fn close(&mut self) -> Result<bool, VeracruzServerError> {
-            let re_message: RuntimeManagerMessage = RuntimeManagerMessage::ResetEnclave;
-            let re_buffer: Vec<u8> = bincode::serialize(&re_message)?;
-
-            self.enclave.send_buffer(&re_buffer)?;
-
+            // Don't do anything. The enclave gets shutdown when the
+            // `NitroEnclave` object is dropped
             return Ok(true);
         }
     }
