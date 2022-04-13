@@ -58,9 +58,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
     let fd = accept(socket_fd).map_err(|err| RuntimeManagerError::SocketError(err))?;
     println!("runtime_manager_nitro::nitro_main accept succeeded. looping");
 
-    let mut abort = false;
-
-    while !abort {
+    loop {
         let received_buffer =
             receive_buffer(fd).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
         let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)
@@ -130,9 +128,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
         );
         send_buffer(fd, &return_buffer)
             .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-    };
-
-    Ok(())
+    }
 }
 
 fn attestation(
