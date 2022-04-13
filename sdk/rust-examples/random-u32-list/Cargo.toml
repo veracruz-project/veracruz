@@ -1,7 +1,7 @@
 [package]
+name = "random-u32-list"
 authors = ["The Veracruz Development Team"]
-description = "Reading a file contains and unsorted numbers, sort them and write the output into a text file"
-name = "sort-numbers"
+description = "Samples 32 random u32 numbers and output as a comma-seperated string."
 version = "0.3.0"
 edition = "2018"
 
@@ -9,6 +9,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.14"
+rand = "0.8.0"
 
 [profile.release]
 codegen-units = 1
