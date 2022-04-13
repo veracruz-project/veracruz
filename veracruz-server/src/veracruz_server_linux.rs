@@ -23,6 +23,7 @@ pub mod veracruz_server_linux {
     use ring::digest::{digest, SHA256};
     use std::{
         env,
+        error::Error,
         fs::{self, File},
         io::Read,
         net::{Shutdown, TcpStream},
@@ -73,22 +74,6 @@ pub mod veracruz_server_linux {
     }
 
     impl VeracruzServerLinux {
-        /// Tears down the Runtime Manager enclave, then closes TCP connections.  Tries
-        /// to be as liberal in ignoring erroneous conditions as possible in order to kill as
-        /// many things as we can.
-        fn teardown(&mut self) -> Result<bool, VeracruzServerError> {
-            info!("Tearing down Linux runtime manager enclave.");
-
-            info!("Killing TCP connections and Runtime Manager process.");
-
-            let _result = self.runtime_manager_socket.shutdown(Shutdown::Both);
-            let _result = self.runtime_manager_process.kill();
-
-            info!("TCP connection and process killed.");
-
-            response
-        }
-
         /// Returns `Ok(true)` iff further TLS data can be read from the socket
         /// connecting the Veracruz server and the Linux root enclave.
         /// Returns `Ok(false)` iff no further TLS data can be read.
@@ -204,10 +189,10 @@ pub mod veracruz_server_linux {
     /// a `VeracruzServerLinux` struct is about to go out of scope.
     impl Drop for VeracruzServerLinux {
         fn drop(&mut self) {
-            info!("Dropping VeracruzServerLinux object, shutting down enclaves...");
-            if let Err(error) = self.teardown() {
+            info!("Dropping VeracruzServerLinux object, shutting down enclave...");
+            if let Err(error) = self.shutdown_isolate() {
                 error!(
-                    "Failed to forcibly kill Runtime Manager and Linux Root enclave process.  Error produced: {:?}.",
+                    "Failed to forcibly shutdown Runtime Manager enclave.  Error produced: {:?}.",
                     error
                 );
             }
@@ -596,12 +581,20 @@ pub mod veracruz_server_linux {
             }
         }
 
-        /// Kills the Linux Root enclave, all spawned Runtime Manager enclaves, and all open
-        /// TCP connections and processes that we have a handle to.
+        /// Kills the Runtime Manager enclave, then closes TCP connection.
         #[inline]
-        fn close(&mut self) -> Result<bool, VeracruzServerError> {
-            info!("Closing...");
-            self.teardown()
+        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+            info!("Shutting down Linux runtime manager enclave.");
+
+            info!("Closing TCP connection...");
+            self.runtime_manager_socket.shutdown(Shutdown::Both)?;
+
+            info!("Killing and Runtime Manager process...");
+            //self.runtime_manager_process.kill().map_err(|err| VeracruzServerError::EnclaveShutdownError(err))?;
+            self.runtime_manager_process.kill()?;
+
+            info!("TCP connection and process killed.");
+            Ok(())
         }
     }
 }

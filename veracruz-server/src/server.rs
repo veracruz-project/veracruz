@@ -94,7 +94,7 @@ async fn runtime_manager_request(
     // Shutdown the enclave
     if !active_flag {
         let mut enclave_handler_locked = enclave_handler.lock()?;
-        enclave_handler_locked.as_mut().map(|e| e.close());
+        enclave_handler_locked.as_mut().map(|e| e.shutdown_isolate());
         *enclave_handler_locked = None;
         stopper.send(())?;
     }

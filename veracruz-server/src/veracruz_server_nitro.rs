@@ -17,7 +17,7 @@ pub mod veracruz_server_nitro {
         nitro::NitroEnclave,
     };
     use policy_utils::policy::Policy;
-    use std::env;
+    use std::{env, error::Error};
     use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
 
     /// Delay to apply between launching the server and trying to contact the runtime manager
@@ -218,17 +218,20 @@ pub mod veracruz_server_nitro {
             ))
         }
 
-        fn close(&mut self) -> Result<bool, VeracruzServerError> {
+        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
             // Don't do anything. The enclave gets shutdown when the
-            // `NitroEnclave` object is dropped
-            return Ok(true);
+            // `NitroEnclave` object inside `VeracruzServerNitro` is dropped
+            Ok(())
         }
     }
 
     impl Drop for VeracruzServerNitro {
         fn drop(&mut self) {
-            match self.close() {
-                Err(err) => println!("VeracruzServerNitro::drop failed in call to self.close:{:?}, we will persevere, though.", err),
+            match self.shutdown_isolate() {
+                Err(err) => println!(
+                    "VeracruzServerNitro::drop failed in call to self.shutdown_isolate:{:?}",
+                    err
+                ),
                 _ => (),
             }
         }
