@@ -66,7 +66,7 @@ mod tests {
     const LOGISTICS_REGRESSION_WASM: &'static str = "idash2017-logistic-regression.wasm";
     const MACD_WASM: &'static str = "moving-average-convergence-divergence.wasm";
     const INTERSECTION_SET_SUM_WASM: &'static str = "private-set-intersection-sum.wasm";
-    const FD_CREATE_RUST_WASM: &'static str = "fd_create.wasm";
+    const FD_CREATE_RUST_WASM: &'static str = "fd-create.wasm";
     const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
     const POSTCARD_NATIVE_WASM: &'static str = "postcard-native.wasm";
     const POSTCARD_WASM: &'static str = "postcard-wasm.wasm";
@@ -783,7 +783,7 @@ mod tests {
             policy_path(POLICY),
             trust_path(CLIENT_CERT),
             trust_path(CLIENT_KEY),
-            &[("/program/fd_create.wasm", program_path(FD_CREATE_RUST_WASM))],
+            &[("/program/fd-create.wasm", program_path(FD_CREATE_RUST_WASM))],
             &[],
             &[],
             &["/output/pass"],
