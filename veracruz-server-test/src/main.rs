@@ -32,8 +32,7 @@ mod tests {
         path::{Path, PathBuf},
         sync::{
             atomic::{AtomicBool, AtomicU32, Ordering},
-            mpsc,
-            Mutex, Once,
+            mpsc, Mutex, Once,
         },
         thread,
         time::{Duration, Instant},
@@ -122,14 +121,13 @@ mod tests {
     ///
     /// Note this is overrideable with the VERACRUZ_TEST_TIMEOUT environment
     /// variable, which provides a timeout in seconds
-    pub fn timeout<
-        R: Send + 'static,
-        F: (FnOnce() -> R) + Send + 'static
-    >(timeout: Duration, f: F) -> R {
-        let timeout = match
-            env::var("VERACRUZ_TEST_TIMEOUT")
-                .map_err(Left)
-                .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
+    pub fn timeout<R: Send + 'static, F: (FnOnce() -> R) + Send + 'static>(
+        timeout: Duration,
+        f: F,
+    ) -> R {
+        let timeout = match env::var("VERACRUZ_TEST_TIMEOUT")
+            .map_err(Left)
+            .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
         {
             Ok(val) => Duration::from_secs(val),
             Err(Left(VarError::NotPresent)) => timeout,
@@ -146,7 +144,10 @@ mod tests {
 
         match done_rx.recv_timeout(timeout) {
             Ok(_) => thread.join().expect("thread panicked"),
-            Err(_) => panic!("timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override", timeout),
+            Err(_) => panic!(
+                "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
+                timeout
+            ),
         }
     }
 
@@ -208,148 +209,148 @@ mod tests {
     /// test-collateral/invalid_policy,
     /// initialise an enclave.
     fn test_phase1_init_destroy_enclave() {
-      timeout(Duration::from_secs(600), || {
-        // all the json in test-collateral should be valid policy
-        let policy_dir = PathBuf::from(
-            env::var("VERACRUZ_POLICY_DIR")
-                .unwrap_or("../test-collateral".to_string())
-                .clone(),
-        );
-        iterate_over_policy(policy_dir.as_path(), |policy_json| {
-            let policy = Policy::from_json(&policy_json);
-            assert!(policy.is_ok());
-            if let Ok(policy) = policy {
-                setup(policy.proxy_attestation_server_url().clone());
-                let result = VeracruzServerEnclave::new(&policy_json);
-                assert!(result.is_ok(), "error:{:?}", result.err());
-            }
-        });
+        timeout(Duration::from_secs(600), || {
+            // all the json in test-collateral should be valid policy
+            let policy_dir = PathBuf::from(
+                env::var("VERACRUZ_POLICY_DIR")
+                    .unwrap_or("../test-collateral".to_string())
+                    .clone(),
+            );
+            iterate_over_policy(policy_dir.as_path(), |policy_json| {
+                let policy = Policy::from_json(&policy_json);
+                assert!(policy.is_ok());
+                if let Ok(policy) = policy {
+                    setup(policy.proxy_attestation_server_url().clone());
+                    let result = VeracruzServerEnclave::new(&policy_json);
+                    assert!(result.is_ok(), "error:{:?}", result.err());
+                }
+            });
 
-        // If any json in test-collateral/invalid_policy is valid in Policy::new(),
-        // it must also valid in term of VeracruzServerEnclave::new()
-        iterate_over_policy(policy_path("invalid_policy").as_path(), |policy_json| {
-            let policy = Policy::from_json(&policy_json);
-            if let Ok(policy) = policy {
-                setup(policy.proxy_attestation_server_url().clone());
-                let result = VeracruzServerEnclave::new(&policy_json);
-                assert!(
-                    result.is_ok(),
-                    "error:{:?}, json:{:?}",
-                    result.err(),
-                    policy_json
-                );
-            }
-        });
-      })
+            // If any json in test-collateral/invalid_policy is valid in Policy::new(),
+            // it must also valid in term of VeracruzServerEnclave::new()
+            iterate_over_policy(policy_path("invalid_policy").as_path(), |policy_json| {
+                let policy = Policy::from_json(&policy_json);
+                if let Ok(policy) = policy {
+                    setup(policy.proxy_attestation_server_url().clone());
+                    let result = VeracruzServerEnclave::new(&policy_json);
+                    assert!(
+                        result.is_ok(),
+                        "error:{:?}, json:{:?}",
+                        result.err(),
+                        policy_json
+                    );
+                }
+            });
+        })
     }
 
     #[test]
     /// Load policy file and check if a new session tls can be opened
     fn test_phase1_new_session() {
-      timeout(Duration::from_secs(600), || {
-        let policy_dir = PathBuf::from(
-            env::var("VERACRUZ_POLICY_DIR")
-                .unwrap_or("../test-collateral".to_string())
-                .clone(),
-        );
-        iterate_over_policy(policy_dir.as_path(), |policy_json| {
-            let policy = Policy::from_json(&policy_json).unwrap();
-            // start the proxy attestation server
-            setup(policy.proxy_attestation_server_url().clone());
-            let result = init_veracruz_server_and_tls_session(policy_json);
-            assert!(result.is_ok(), "error:{:?}", result.err());
-        });
-      })
+        timeout(Duration::from_secs(600), || {
+            let policy_dir = PathBuf::from(
+                env::var("VERACRUZ_POLICY_DIR")
+                    .unwrap_or("../test-collateral".to_string())
+                    .clone(),
+            );
+            iterate_over_policy(policy_dir.as_path(), |policy_json| {
+                let policy = Policy::from_json(&policy_json).unwrap();
+                // start the proxy attestation server
+                setup(policy.proxy_attestation_server_url().clone());
+                let result = init_veracruz_server_and_tls_session(policy_json);
+                assert!(result.is_ok(), "error:{:?}", result.err());
+            });
+        })
     }
 
     #[test]
     /// Load the Veracruz server and generate the self-signed certificate
     fn test_phase1_enclave_self_signed_cert() {
-      timeout(Duration::from_secs(600), || {
-        // start the proxy attestation server
-        let policy_dir = PathBuf::from(
-            env::var("VERACRUZ_POLICY_DIR")
-                .unwrap_or("../test-collateral".to_string())
-                .clone(),
-        );
-        iterate_over_policy(policy_dir.as_path(), |policy_json| {
-            let policy = Policy::from_json(&policy_json).unwrap();
-            setup(policy.proxy_attestation_server_url().clone());
-            let result = VeracruzServerEnclave::new(&policy_json);
-            assert!(result.is_ok());
-        });
-      })
+        timeout(Duration::from_secs(600), || {
+            // start the proxy attestation server
+            let policy_dir = PathBuf::from(
+                env::var("VERACRUZ_POLICY_DIR")
+                    .unwrap_or("../test-collateral".to_string())
+                    .clone(),
+            );
+            iterate_over_policy(policy_dir.as_path(), |policy_json| {
+                let policy = Policy::from_json(&policy_json).unwrap();
+                setup(policy.proxy_attestation_server_url().clone());
+                let result = VeracruzServerEnclave::new(&policy_json);
+                assert!(result.is_ok());
+            });
+        })
     }
 
     #[test]
     /// Test the attestation flow without sending any program or data into the Veracruz server
     fn test_phase1_attestation_only() {
-      timeout(Duration::from_secs(600), || {
-        let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
-        setup(policy.proxy_attestation_server_url().clone());
+        timeout(Duration::from_secs(600), || {
+            let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
+            setup(policy.proxy_attestation_server_url().clone());
 
-        let ret = VeracruzServerEnclave::new(&policy_json);
+            let ret = VeracruzServerEnclave::new(&policy_json);
 
-        let _veracruz_server = ret.unwrap();
-      })
+            let _veracruz_server = ret.unwrap();
+        })
     }
 
     #[test]
     #[ignore]
     /// Test if the detect for calling `debug!` in enclave works.
     fn test_debug1_fire_test_on_debug() {
-      timeout(Duration::from_secs(600), || {
-        debug_setup();
-        DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
-        debug!("Enclave debug message stud");
-        assert!(DEBUG_IS_CALLED.load(Ordering::SeqCst));
-      })
+        timeout(Duration::from_secs(600), || {
+            debug_setup();
+            DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
+            debug!("Enclave debug message stud");
+            assert!(DEBUG_IS_CALLED.load(Ordering::SeqCst));
+        })
     }
 
     #[test]
     #[ignore]
     /// Test if the detect for calling `debug!` in enclave works.
     fn test_debug2_linear_regression_without_debug() {
-      timeout(Duration::from_secs(600), || {
-        debug_setup();
-        DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
-        test_template(
-            policy_path(NO_DEBUG_POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/linear-regression.wasm",
-                program_path(LINEAR_REGRESSION_WASM),
-            )],
-            &[(
-                "/input/linear-regression.dat",
-                data_dir(LINEAR_REGRESSION_DATA),
-            )],
-            &[],
-            &["/output/linear-regression.dat"],
-        )
-        .unwrap();
-        assert!(!DEBUG_IS_CALLED.load(Ordering::SeqCst));
-      })
+        timeout(Duration::from_secs(600), || {
+            debug_setup();
+            DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
+            test_template(
+                policy_path(NO_DEBUG_POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/linear-regression.wasm",
+                    program_path(LINEAR_REGRESSION_WASM),
+                )],
+                &[(
+                    "/input/linear-regression.dat",
+                    data_dir(LINEAR_REGRESSION_DATA),
+                )],
+                &[],
+                &["/output/linear-regression.dat"],
+            )
+            .unwrap();
+            assert!(!DEBUG_IS_CALLED.load(Ordering::SeqCst));
+        })
     }
 
     #[test]
     /// Attempt to establish a client session with the Veracruz server with an invalid client certificate
     fn test_phase2_single_session_with_invalid_client_certificate() {
-      timeout(Duration::from_secs(600), || {
-        let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
-        // start the proxy attestation server
-        setup(policy.proxy_attestation_server_url().clone());
-        init_veracruz_server_and_tls_session(&policy_json).unwrap();
+        timeout(Duration::from_secs(600), || {
+            let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
+            // start the proxy attestation server
+            setup(policy.proxy_attestation_server_url().clone());
+            init_veracruz_server_and_tls_session(&policy_json).unwrap();
 
-        let client_cert_filename = trust_path("never_used_cert.pem");
-        let client_key_filename = trust_path("client_rsa_key.pem");
+            let client_cert_filename = trust_path("never_used_cert.pem");
+            let client_key_filename = trust_path("client_rsa_key.pem");
 
-        let mut _client_session = create_client_test_session(
-            client_cert_filename.as_path(),
-            client_key_filename.as_path(),
-        );
-      })
+            let mut _client_session = create_client_test_session(
+                client_cert_filename.as_path(),
+                client_key_filename.as_path(),
+            );
+        })
     }
 
     #[test]
@@ -357,18 +358,18 @@ mod tests {
     /// computation: echoing
     /// data sources: a single input under filename `input.txt`.
     fn test_phase2_basic_file_read_write_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[("/program/read-file.wasm", program_path(READ_FILE_WASM))],
-            &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA))],
-            &[],
-            &["/output/test/test.txt", "/output/hello-world-1.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[("/program/read-file.wasm", program_path(READ_FILE_WASM))],
+                &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA))],
+                &[],
+                &["/output/test/test.txt", "/output/hello-world-1.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
@@ -377,123 +378,123 @@ mod tests {
     /// computation: random-source, returning a vec of random u8
     /// data sources: none
     fn test_phase2_random_source_no_data_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/random-source.wasm",
-                program_path(RANDOM_SOURCE_WASM),
-            )],
-            &[],
-            &[],
-            &["/output/random.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/random-source.wasm",
+                    program_path(RANDOM_SOURCE_WASM),
+                )],
+                &[],
+                &[],
+                &["/output/random.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
     /// Attempt to fetch the result without program nor data
     fn test_phase2_random_source_no_program_no_data() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[],
-            &[],
-            &[],
-            &["/output/random.dat"],
-        );
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[],
+                &[],
+                &[],
+                &["/output/random.dat"],
+            );
 
-        assert!(result.is_err(), "An error should occur");
-      })
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
     /// Attempt to provision a wrong program
     fn test_phase2_incorrect_program_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/string-edit-distance.wasm",
-                program_path(STRING_EDIT_DISTANCE_WASM),
-            )],
-            &[],
-            &[],
-            &["/output/random.dat"],
-        );
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/string-edit-distance.wasm",
+                    program_path(STRING_EDIT_DISTANCE_WASM),
+                )],
+                &[],
+                &[],
+                &["/output/random.dat"],
+            );
 
-        assert!(result.is_err(), "An error should occur");
-      })
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
     /// Attempt to use an unauthorized key
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(UNAUTHORIZED_KEY),
-            &[(
-                "/program/random-source.wasm",
-                program_path(RANDOM_SOURCE_WASM),
-            )],
-            &[],
-            &[],
-            &["/output/random.dat"],
-        );
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(UNAUTHORIZED_KEY),
+                &[(
+                    "/program/random-source.wasm",
+                    program_path(RANDOM_SOURCE_WASM),
+                )],
+                &[],
+                &[],
+                &["/output/random.dat"],
+            );
 
-        assert!(result.is_err(), "An error should occur");
-      })
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
     /// Attempt to use an unauthorized certificate
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(UNAUTHORIZED_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/random-source.wasm",
-                program_path(RANDOM_SOURCE_WASM),
-            )],
-            &[],
-            &[],
-            &["/output/random.dat"],
-        );
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(UNAUTHORIZED_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/random-source.wasm",
+                    program_path(RANDOM_SOURCE_WASM),
+                )],
+                &[],
+                &[],
+                &["/output/random.dat"],
+            );
 
-        assert!(result.is_err(), "An error should occur");
-      })
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
     /// A unauthorized client attempted to connect the service
     fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(UNAUTHORIZED_CERT),
-            trust_path(UNAUTHORIZED_KEY),
-            &[(
-                "/program/random-source.wasm",
-                program_path(RANDOM_SOURCE_WASM),
-            )],
-            &[],
-            &[],
-            &["/output/random.dat"],
-        );
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(UNAUTHORIZED_CERT),
+                trust_path(UNAUTHORIZED_KEY),
+                &[(
+                    "/program/random-source.wasm",
+                    program_path(RANDOM_SOURCE_WASM),
+                )],
+                &[],
+                &[],
+                &["/output/random.dat"],
+            );
 
-        assert!(result.is_err(), "An error should occur");
-      })
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
@@ -504,45 +505,45 @@ mod tests {
     /// two-dimensional space.  Data sources: linear-regression, a vec of points
     /// in two-dimensional space, represented by Vec<(f64, f64)>.
     fn test_phase2_linear_regression_single_data_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/linear-regression.wasm",
-                program_path(LINEAR_REGRESSION_WASM),
-            )],
-            &[(
-                "/input/linear-regression.dat",
-                data_dir(LINEAR_REGRESSION_DATA),
-            )],
-            &[],
-            &["/output/linear-regression.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/linear-regression.wasm",
+                    program_path(LINEAR_REGRESSION_WASM),
+                )],
+                &[(
+                    "/input/linear-regression.dat",
+                    data_dir(LINEAR_REGRESSION_DATA),
+                )],
+                &[],
+                &["/output/linear-regression.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
     /// Attempt to fetch result without data
     fn test_phase2_linear_regression_no_data_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/linear-regression.wasm",
-                program_path(LINEAR_REGRESSION_WASM),
-            )],
-            &[],
-            &[],
-            &["/output/linear-regression.dat"],
-        );
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/linear-regression.wasm",
+                    program_path(LINEAR_REGRESSION_WASM),
+                )],
+                &[],
+                &[],
+                &["/output/linear-regression.dat"],
+            );
 
-        assert!(result.is_err(), "An error should occur");
-      })
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
@@ -560,31 +561,31 @@ mod tests {
     /// A standard two data source scenario, where the data provisioned in the
     /// reversed order (data 1, then data 0)
     fn test_phase2_intersection_sum_reversed_data_provisioning_two_data_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/intersection-set-sum.wasm",
-                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
-            )],
-            &[
-                // message sends out in the reversed order
-                (
-                    "/input/intersection-customer.dat",
-                    data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA),
-                ),
-                (
-                    "/input/intersection-advertisement-viewer.dat",
-                    data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
-                ),
-            ],
-            &[],
-            &["/output/intersection-set-sum.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/intersection-set-sum.wasm",
+                    program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+                )],
+                &[
+                    // message sends out in the reversed order
+                    (
+                        "/input/intersection-customer.dat",
+                        data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                    ),
+                    (
+                        "/input/intersection-advertisement-viewer.dat",
+                        data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                    ),
+                ],
+                &[],
+                &["/output/intersection-set-sum.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
@@ -593,24 +594,24 @@ mod tests {
     /// computation: string-edit-distance, computing the string edit distance.
     /// data sources: two strings
     fn test_phase2_string_edit_distance_two_data_no_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/string-edit-distance.wasm",
-                program_path(STRING_EDIT_DISTANCE_WASM),
-            )],
-            &[
-                ("/input/hello-world-1.dat", data_dir(STRING_1_DATA)),
-                ("/input/hello-world-2.dat", data_dir(STRING_2_DATA)),
-            ],
-            &[],
-            &["/output/string-edit-distance.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/string-edit-distance.wasm",
+                    program_path(STRING_EDIT_DISTANCE_WASM),
+                )],
+                &[
+                    ("/input/hello-world-1.dat", data_dir(STRING_1_DATA)),
+                    ("/input/hello-world-2.dat", data_dir(STRING_2_DATA)),
+                ],
+                &[],
+                &["/output/string-edit-distance.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
@@ -622,24 +623,24 @@ mod tests {
     /// in two-dimensional space, represented by Vec<(f64, f64)>
     /// A standard one data source scenario with attestation.
     fn test_phase3_linear_regression_one_data_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/linear-regression.wasm",
-                program_path(LINEAR_REGRESSION_WASM),
-            )],
-            &[(
-                "/input/linear-regression.dat",
-                data_dir(LINEAR_REGRESSION_DATA),
-            )],
-            &[],
-            &["/output/linear-regression.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/linear-regression.wasm",
+                    program_path(LINEAR_REGRESSION_WASM),
+                )],
+                &[(
+                    "/input/linear-regression.dat",
+                    data_dir(LINEAR_REGRESSION_DATA),
+                )],
+                &[],
+                &["/output/linear-regression.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
@@ -649,24 +650,24 @@ mod tests {
     /// data sources: two vecs of persons, representing by Vec<Person>
     /// A standard two data sources scenario with attestation.
     fn test_phase3_private_set_intersection_two_data_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/private-set-intersection.wasm",
-                program_path(PERSON_SET_INTERSECTION_WASM),
-            )],
-            &[
-                ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA)),
-                ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA)),
-            ],
-            &[],
-            &["/output/private-set.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/private-set-intersection.wasm",
+                    program_path(PERSON_SET_INTERSECTION_WASM),
+                )],
+                &[
+                    ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA)),
+                    ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA)),
+                ],
+                &[],
+                &["/output/private-set.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
@@ -676,65 +677,65 @@ mod tests {
     /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
     /// A standard one data source and two stream sources scenario with attestation.
     fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let stream_list =
-            stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/number-stream-accumulation.wasm",
-                program_path(NUMBER_STREM_WASM),
-            )],
-            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
-            &stream_list,
-            &["/output/accumulation.dat"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            let stream_list =
+                stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/number-stream-accumulation.wasm",
+                    program_path(NUMBER_STREM_WASM),
+                )],
+                &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
+                &stream_list,
+                &["/output/accumulation.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
     /// Attempt to fetch result without enough stream data.
     fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/number-stream-accumulation.wasm",
-                program_path(NUMBER_STREM_WASM),
-            )],
-            &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
-            &[],
-            &["/output/accumulation.dat"],
-        );
-        assert!(result.is_err(), "An error should occur");
-      })
+        timeout(Duration::from_secs(600), || {
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/number-stream-accumulation.wasm",
+                    program_path(NUMBER_STREM_WASM),
+                )],
+                &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
+                &[],
+                &["/output/accumulation.dat"],
+            );
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
     /// Attempt to provision stream data in the state of loading static data.
     fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let stream_list =
-            stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/number-stream-accumulation.wasm",
-                program_path(NUMBER_STREM_WASM),
-            )],
-            &[],
-            &stream_list,
-            &["/output/accumulation.dat"],
-        );
-        assert!(result.is_err(), "An error should occur");
-      })
+        timeout(Duration::from_secs(600), || {
+            let stream_list =
+                stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/number-stream-accumulation.wasm",
+                    program_path(NUMBER_STREM_WASM),
+                )],
+                &[],
+                &stream_list,
+                &["/output/accumulation.dat"],
+            );
+            assert!(result.is_err(), "An error should occur");
+        })
     }
 
     #[test]
@@ -776,33 +777,33 @@ mod tests {
     /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn test_performance_idash2017_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let input_vec = input_list(
-            data_dir(LOGISTICS_REGRESSION_DATA_PATH),
-            "/input/idash2017/",
-        )
-        .expect("Failed to parse input");
-        let input_vec: Vec<(&str, PathBuf)> =
-            input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
+        timeout(Duration::from_secs(600), || {
+            let input_vec = input_list(
+                data_dir(LOGISTICS_REGRESSION_DATA_PATH),
+                "/input/idash2017/",
+            )
+            .expect("Failed to parse input");
+            let input_vec: Vec<(&str, PathBuf)> =
+                input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
 
-        let result = test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/idash2017-logistic-regression.wasm",
-                program_path(LOGISTICS_REGRESSION_WASM),
-            )],
-            &input_vec,
-            &[],
-            // only read two outputs
-            &[
-                "/output/idash2017/generate-data-0.dat",
-                "/output/idash2017/generate-data-1.dat",
-            ],
-        );
-        assert!(result.is_ok(), "error:{:?}", result);
-      })
+            let result = test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/idash2017-logistic-regression.wasm",
+                    program_path(LOGISTICS_REGRESSION_WASM),
+                )],
+                &input_vec,
+                &[],
+                // only read two outputs
+                &[
+                    "/output/idash2017/generate-data-0.dat",
+                    "/output/idash2017/generate-data-1.dat",
+                ],
+            );
+            assert!(result.is_ok(), "error:{:?}", result);
+        })
     }
 
     #[test]
@@ -811,26 +812,26 @@ mod tests {
     /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
     fn test_performance_macd_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let input_vec =
-            input_list(data_dir(MACD_DATA_PATH), "/input/macd/").expect("Failed to parse input");
-        let input_vec: Vec<(&str, PathBuf)> =
-            input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
+        timeout(Duration::from_secs(600), || {
+            let input_vec = input_list(data_dir(MACD_DATA_PATH), "/input/macd/")
+                .expect("Failed to parse input");
+            let input_vec: Vec<(&str, PathBuf)> =
+                input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
 
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/moving-average-convergence-divergence.wasm",
-                program_path(MACD_WASM),
-            )],
-            &input_vec,
-            &[],
-            &["/output/macd/generate-1000.dat"],
-        )
-        .unwrap();
-      })
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/moving-average-convergence-divergence.wasm",
+                    program_path(MACD_WASM),
+                )],
+                &input_vec,
+                &[],
+                &["/output/macd/generate-1000.dat"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
@@ -839,45 +840,45 @@ mod tests {
     /// computation: intersection-sum, matching the setting in .
     /// data sources: private-set-inter-sum/*.dat
     fn test_performance_set_intersection_sum_with_attestation() {
-      timeout(Duration::from_secs(600), || {
-        let input_vec = input_list(
-            data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
-            "/input/private-set-inter-sum/",
-        )
-        .expect("Failed to parse input");
-        let input_vec: Vec<(&str, PathBuf)> =
-            input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
+        timeout(Duration::from_secs(600), || {
+            let input_vec = input_list(
+                data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
+                "/input/private-set-inter-sum/",
+            )
+            .expect("Failed to parse input");
+            let input_vec: Vec<(&str, PathBuf)> =
+                input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
 
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/private-set-intersection-sum.wasm",
-                program_path(INTERSECTION_SET_SUM_WASM),
-            )],
-            &input_vec,
-            &[],
-            &["/output/private-set-inter-sum/data-2000-0"],
-        )
-        .unwrap();
-      })
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[(
+                    "/program/private-set-intersection-sum.wasm",
+                    program_path(INTERSECTION_SET_SUM_WASM),
+                )],
+                &input_vec,
+                &[],
+                &["/output/private-set-inter-sum/data-2000-0"],
+            )
+            .unwrap();
+        })
     }
 
     #[test]
     fn test_fd_create() {
-      timeout(Duration::from_secs(600), || {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[("/program/fd-create.wasm", program_path(FD_CREATE_RUST_WASM))],
-            &[],
-            &[],
-            &["/output/pass"],
-        )
-        .unwrap();
-      })
+        timeout(Duration::from_secs(600), || {
+            test_template(
+                policy_path(POLICY),
+                trust_path(CLIENT_CERT),
+                trust_path(CLIENT_KEY),
+                &[("/program/fd-create.wasm", program_path(FD_CREATE_RUST_WASM))],
+                &[],
+                &[],
+                &["/output/pass"],
+            )
+            .unwrap();
+        })
     }
 
     /// This is the template of test cases for veracruz-server,

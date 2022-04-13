@@ -11,21 +11,20 @@
 
 extern crate alloc;
 
-use core::mem::size_of;
 use core::convert::TryFrom;
+use core::mem::size_of;
 
-use icecap_start_generic::declare_generic_main;
 use icecap_core::config::*;
 use icecap_core::logger::{DisplayMode, Level, Logger};
 use icecap_core::prelude::*;
 use icecap_core::ring_buffer::*;
+use icecap_start_generic::declare_generic_main;
 
-use veracruz_utils::platform::icecap::message::{Error, Request, Response, Header};
 use crate::managers::{session_manager, RuntimeManagerError};
+use veracruz_utils::platform::icecap::message::{Error, Header, Request, Response};
 
 use bincode;
 use serde::{Deserialize, Serialize};
-
 
 declare_generic_main!(main);
 
@@ -48,9 +47,8 @@ fn main(config: Config) -> Fallible<()> {
     debug_println!("icecap-realmos: initializing...");
 
     // enable ring buffer to serial-server
-    let virtio_console_client = RingBuffer::unmanaged_from_config(
-        &config.virtio_console_server_ring_buffer,
-    );
+    let virtio_console_client =
+        RingBuffer::unmanaged_from_config(&config.virtio_console_server_ring_buffer);
     virtio_console_client.enable_notify_read();
     virtio_console_client.enable_notify_write();
     debug_println!("icecap-realmos: enabled ring buffer");
@@ -59,8 +57,9 @@ fn main(config: Config) -> Fallible<()> {
     RuntimeManager::new(
         virtio_console_client,
         config.event_nfn,
-        config.badges.virtio_console_server_ring_buffer
-    ).run()
+        config.badges.virtio_console_server_ring_buffer,
+    )
+    .run()
 }
 
 struct RuntimeManager {
@@ -144,7 +143,8 @@ impl RuntimeManager {
                 device_id,
                 challenge,
             } => match session_manager::init_session_manager()
-                .and(self.handle_attestation(device_id, &challenge)) {
+                .and(self.handle_attestation(device_id, &challenge))
+            {
                 Err(_) => Response::Error(Error::Unspecified),
                 Ok((token, csr)) => Response::Attestation { token, csr },
             },
@@ -167,7 +167,10 @@ impl RuntimeManager {
                 Ok(()) => Response::CloseTlsSession,
             },
             Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
-                Err(e) => { debug_println!("oh no {:?}", e); Response::Error(Error::Unspecified) },
+                Err(e) => {
+                    debug_println!("oh no {:?}", e);
+                    Response::Error(Error::Unspecified)
+                }
                 Ok(()) => Response::SendTlsData,
             },
             Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {

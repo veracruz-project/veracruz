@@ -88,7 +88,7 @@ impl Service for PostcardService {
     }
 
     /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result 
+    /// this function may check validity of the `input`, and even buffer the result
     /// for further uses.
     fn try_parse(&self, _input: &[u8]) -> FileSystemResult<bool> {
         Ok(true)

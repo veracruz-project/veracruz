@@ -115,10 +115,9 @@ mod tests {
     /// Note this is overrideable with the VERACRUZ_TEST_TIMEOUT environment
     /// variable, which provides a timeout in seconds
     pub async fn timeout<F: Future>(timeout: Duration, f: F) -> <F as Future>::Output {
-        let timeout = match
-            env::var("VERACRUZ_TEST_TIMEOUT")
-                .map_err(Left)
-                .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
+        let timeout = match env::var("VERACRUZ_TEST_TIMEOUT")
+            .map_err(Left)
+            .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
         {
             Ok(val) => Duration::from_secs(val),
             Err(Left(VarError::NotPresent)) => timeout,
@@ -127,7 +126,10 @@ mod tests {
 
         match actix_web::rt::time::timeout(timeout, f).await {
             Ok(r) => r,
-            Err(_) => panic!("timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override", timeout),
+            Err(_) => panic!(
+                "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
+                timeout
+            ),
         }
     }
 
@@ -164,100 +166,103 @@ mod tests {
     /// A test of veracruz using network communication using a single session
     #[actix_rt::test]
     async fn veracruz_phase1_get_random_one_client() {
-      timeout(Duration::from_secs(600), async {
-        let result = test_template(
-            policy_path(SINGLE_CLIENT_POLICY),
-            &vec![(trust_path(CLIENT_CERT), trust_path(CLIENT_KEY))],
-            &[(
-                0,
-                "/program/random-source.wasm",
-                program_path(RANDOM_SOURCE_WASM),
-            )],
-            &vec![],
-            &vec![(0, "/output/random.dat")],
-        )
-        .await;
-        assert!(
-            result.is_ok(),
-            "veracruz_phase1_get_random_one_client failed with error: {:?}",
-            result
-        );
-      }).await
+        timeout(Duration::from_secs(600), async {
+            let result = test_template(
+                policy_path(SINGLE_CLIENT_POLICY),
+                &vec![(trust_path(CLIENT_CERT), trust_path(CLIENT_KEY))],
+                &[(
+                    0,
+                    "/program/random-source.wasm",
+                    program_path(RANDOM_SOURCE_WASM),
+                )],
+                &vec![],
+                &vec![(0, "/output/random.dat")],
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "veracruz_phase1_get_random_one_client failed with error: {:?}",
+                result
+            );
+        })
+        .await
     }
 
     /// A test of veracruz using network communication using two sessions (one for program and one for data)
     #[actix_rt::test]
     async fn veracruz_phase1_linear_regression_two_clients() {
-      timeout(Duration::from_secs(600), async {
-        let result = test_template(
-            policy_path(LINEAR_REGRESSION_DUAL_POLICY),
-            &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT),
-                    trust_path(PROGRAM_CLIENT_KEY),
-                ),
-                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-            ],
-            &[(
-                0,
-                "/program/linear-regression.wasm",
-                program_path(LINEAR_REGRESSION_WASM),
-            )],
-            &vec![(
-                1,
-                "/input/linear-regression.dat",
-                data_path(LINEAR_REGRESSION_DATA),
-            )],
-            &vec![(1, "/output/linear-regression.dat")],
-        )
-        .await;
-        assert!(
-            result.is_ok(),
-            "veracruz_phase1_linear_regression_one_client failed with error: {:?}",
-            result
-        );
-      }).await
+        timeout(Duration::from_secs(600), async {
+            let result = test_template(
+                policy_path(LINEAR_REGRESSION_DUAL_POLICY),
+                &vec![
+                    (
+                        trust_path(PROGRAM_CLIENT_CERT),
+                        trust_path(PROGRAM_CLIENT_KEY),
+                    ),
+                    (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                ],
+                &[(
+                    0,
+                    "/program/linear-regression.wasm",
+                    program_path(LINEAR_REGRESSION_WASM),
+                )],
+                &vec![(
+                    1,
+                    "/input/linear-regression.dat",
+                    data_path(LINEAR_REGRESSION_DATA),
+                )],
+                &vec![(1, "/output/linear-regression.dat")],
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "veracruz_phase1_linear_regression_one_client failed with error: {:?}",
+                result
+            );
+        })
+        .await
     }
 
     /// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
     #[actix_rt::test]
     async fn veracruz_phase2_linear_regression_three_clients() {
-      timeout(Duration::from_secs(600), async {
-        let result = test_template(
-            policy_path(LINEAR_REGRESSION_TRIPLE_POLICY),
-            &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT),
-                    trust_path(PROGRAM_CLIENT_KEY),
-                ),
-                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (
-                    trust_path(RESULT_CLIENT_CERT),
-                    trust_path(RESULT_CLIENT_KEY),
-                ),
-            ],
-            &[(
-                0,
-                "/program/linear-regression.wasm",
-                program_path(LINEAR_REGRESSION_WASM),
-            )],
-            &vec![(
-                1,
-                "/input/linear-regression.dat",
-                data_path(LINEAR_REGRESSION_DATA),
-            )],
-            &vec![
-                (1, "/output/linear-regression.dat"),
-                (2, "/output/linear-regression.dat"),
-            ],
-        )
-        .await;
-        assert!(
-            result.is_ok(),
-            "veracruz_phase2_linear_regression_three_clients failed with error: {:?}",
-            result
-        );
-      }).await
+        timeout(Duration::from_secs(600), async {
+            let result = test_template(
+                policy_path(LINEAR_REGRESSION_TRIPLE_POLICY),
+                &vec![
+                    (
+                        trust_path(PROGRAM_CLIENT_CERT),
+                        trust_path(PROGRAM_CLIENT_KEY),
+                    ),
+                    (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                    (
+                        trust_path(RESULT_CLIENT_CERT),
+                        trust_path(RESULT_CLIENT_KEY),
+                    ),
+                ],
+                &[(
+                    0,
+                    "/program/linear-regression.wasm",
+                    program_path(LINEAR_REGRESSION_WASM),
+                )],
+                &vec![(
+                    1,
+                    "/input/linear-regression.dat",
+                    data_path(LINEAR_REGRESSION_DATA),
+                )],
+                &vec![
+                    (1, "/output/linear-regression.dat"),
+                    (2, "/output/linear-regression.dat"),
+                ],
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "veracruz_phase2_linear_regression_three_clients failed with error: {:?}",
+                result
+            );
+        })
+        .await
     }
 
     /// A test of veracruz using network communication using four sessions
@@ -265,46 +270,47 @@ mod tests {
     #[actix_rt::test]
     #[ignore] // FIXME: test currently disabled because it fails on IceCap
     async fn veracruz_phase2_intersection_set_sum_three_clients() {
-      timeout(Duration::from_secs(600), async {
-        let result = test_template(
-            policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY),
-            &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT),
-                    trust_path(PROGRAM_CLIENT_KEY),
-                ),
-                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (
-                    trust_path(RESULT_CLIENT_CERT),
-                    trust_path(RESULT_CLIENT_KEY),
-                ),
-            ],
-            &[(
-                0,
-                "/program/intersection-set-sum.wasm",
-                program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
-            )],
-            &vec![
-                (
-                    1,
-                    "/input/intersection-advertisement-viewer.dat",
-                    data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
-                ),
-                (
-                    2,
-                    "/input/intersection-customer.dat",
-                    data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA),
-                ),
-            ],
-            &vec![(2, "/output/intersection-set-sum.dat")],
-        )
-        .await;
-        assert!(
-            result.is_ok(),
-            "veracruz_phase2_intersection_set_sum_two_clients failed with error: {:?}",
-            result
-        );
-      }).await
+        timeout(Duration::from_secs(600), async {
+            let result = test_template(
+                policy_path(INTERSECTION_SET_SUM_TRIPLE_POLICY),
+                &vec![
+                    (
+                        trust_path(PROGRAM_CLIENT_CERT),
+                        trust_path(PROGRAM_CLIENT_KEY),
+                    ),
+                    (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                    (
+                        trust_path(RESULT_CLIENT_CERT),
+                        trust_path(RESULT_CLIENT_KEY),
+                    ),
+                ],
+                &[(
+                    0,
+                    "/program/intersection-set-sum.wasm",
+                    program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+                )],
+                &vec![
+                    (
+                        1,
+                        "/input/intersection-advertisement-viewer.dat",
+                        data_path(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+                    ),
+                    (
+                        2,
+                        "/input/intersection-customer.dat",
+                        data_path(INTERSECTION_SET_SUM_CUSTOMER_DATA),
+                    ),
+                ],
+                &vec![(2, "/output/intersection-set-sum.dat")],
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "veracruz_phase2_intersection_set_sum_two_clients failed with error: {:?}",
+                result
+            );
+        })
+        .await
     }
 
     /// A test of veracruz using network communication using four sessions
@@ -312,7 +318,7 @@ mod tests {
     #[actix_rt::test]
     #[ignore] // FIXME: test currently disabled because it fails on IceCap
     async fn veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision() {
-      timeout(Duration::from_secs(600), async {
+        timeout(Duration::from_secs(600), async {
         let result = test_template(
             policy_path(PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY),
             &vec![
@@ -354,142 +360,145 @@ mod tests {
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase2_string_edit_distance_three_clients() {
-      timeout(Duration::from_secs(600), async {
-        let result = test_template(
-            policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY),
-            &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT),
-                    trust_path(PROGRAM_CLIENT_KEY),
-                ),
-                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (
-                    trust_path(RESULT_CLIENT_CERT),
-                    trust_path(RESULT_CLIENT_KEY),
-                ),
-            ],
-            &[(
-                0,
-                "/program/string-edit-distance.wasm",
-                program_path(STRING_EDIT_DISTANCE_WASM),
-            )],
-            &vec![
-                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
-                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
-            ],
-            &vec![(2, "/output/string-edit-distance.dat")],
-        )
-        .await;
-        assert!(
-            result.is_ok(),
-            "veracruz_phase2_string_edit_distance_three_clients failed with error: {:?}",
-            result
-        );
-      }).await
+        timeout(Duration::from_secs(600), async {
+            let result = test_template(
+                policy_path(STRING_EDIT_DISTANCE_TRIPLE_POLICY),
+                &vec![
+                    (
+                        trust_path(PROGRAM_CLIENT_CERT),
+                        trust_path(PROGRAM_CLIENT_KEY),
+                    ),
+                    (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                    (
+                        trust_path(RESULT_CLIENT_CERT),
+                        trust_path(RESULT_CLIENT_KEY),
+                    ),
+                ],
+                &[(
+                    0,
+                    "/program/string-edit-distance.wasm",
+                    program_path(STRING_EDIT_DISTANCE_WASM),
+                )],
+                &vec![
+                    (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
+                    (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
+                ],
+                &vec![(2, "/output/string-edit-distance.dat")],
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "veracruz_phase2_string_edit_distance_three_clients failed with error: {:?}",
+                result
+            );
+        })
+        .await
     }
 
     /// A test of veracruz using network communication using four sessions
     /// (one for program, one for the first data, one for the second data, and one for retrieval.)
     #[actix_rt::test]
     async fn veracruz_phase3_string_edit_distance_four_clients() {
-      timeout(Duration::from_secs(600), async {
-        let result = test_template(
-            policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY),
-            &vec![
-                (
-                    trust_path(PROGRAM_CLIENT_CERT),
-                    trust_path(PROGRAM_CLIENT_KEY),
-                ),
-                (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
-                (
-                    trust_path(DATA_CLIENT_SECOND_CERT),
-                    trust_path(DATA_CLIENT_SECOND_KEY),
-                ),
-                (
-                    trust_path(RESULT_CLIENT_CERT),
-                    trust_path(RESULT_CLIENT_KEY),
-                ),
-            ],
-            &[(
-                0,
-                "/program/string-edit-distance.wasm",
-                program_path(STRING_EDIT_DISTANCE_WASM),
-            )],
-            &vec![
-                (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
-                (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
-            ],
-            &vec![(3, "/output/string-edit-distance.dat")],
-        )
-        .await;
-        assert!(
-            result.is_ok(),
-            "veracruz_phase3_string_edit_distance_four_clients failed with error: {:?}",
-            result
-        );
-      }).await
+        timeout(Duration::from_secs(600), async {
+            let result = test_template(
+                policy_path(STRING_EDIT_DISTANCE_QUADRUPLE_POLICY),
+                &vec![
+                    (
+                        trust_path(PROGRAM_CLIENT_CERT),
+                        trust_path(PROGRAM_CLIENT_KEY),
+                    ),
+                    (trust_path(DATA_CLIENT_CERT), trust_path(DATA_CLIENT_KEY)),
+                    (
+                        trust_path(DATA_CLIENT_SECOND_CERT),
+                        trust_path(DATA_CLIENT_SECOND_KEY),
+                    ),
+                    (
+                        trust_path(RESULT_CLIENT_CERT),
+                        trust_path(RESULT_CLIENT_KEY),
+                    ),
+                ],
+                &[(
+                    0,
+                    "/program/string-edit-distance.wasm",
+                    program_path(STRING_EDIT_DISTANCE_WASM),
+                )],
+                &vec![
+                    (1, "/input/hello-world-1.dat", data_path(STRING_1_DATA)),
+                    (2, "/input/hello-world-2.dat", data_path(STRING_2_DATA)),
+                ],
+                &vec![(3, "/output/string-edit-distance.dat")],
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "veracruz_phase3_string_edit_distance_four_clients failed with error: {:?}",
+                result
+            );
+        })
+        .await
     }
 
     /// a test of veracruz using network communication using two parallel sessions
     /// (one for program, one for data sending and retrieving)
     #[actix_rt::test]
     async fn veracruz_phase4_linear_regression_two_clients_parallel() {
-      timeout(Duration::from_secs(600), async {
-        let policy_json =
-            read_policy(policy_path(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
-        let policy = Policy::from_json(&policy_json).unwrap();
+        timeout(Duration::from_secs(600), async {
+            let policy_json =
+                read_policy(policy_path(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
+            let policy = Policy::from_json(&policy_json).unwrap();
 
-        setup(policy.proxy_attestation_server_url().clone());
+            setup(policy.proxy_attestation_server_url().clone());
 
-        task::sleep(std::time::Duration::from_millis(5000)).await;
-        let policy_file = policy_path(LINEAR_REGRESSION_PARALLEL_POLICY);
-        let server_handle = server_tls_loop(policy_file.as_path());
+            task::sleep(std::time::Duration::from_millis(5000)).await;
+            let policy_file = policy_path(LINEAR_REGRESSION_PARALLEL_POLICY);
+            let server_handle = server_tls_loop(policy_file.as_path());
 
-        let program_provider_handle = async {
-            task::sleep(std::time::Duration::from_millis(10000)).await;
-            info!("### program provider start.");
-            let mut client = veracruz_client::VeracruzClient::new(
-                trust_path(PROGRAM_CLIENT_CERT).as_path(),
-                trust_path(PROGRAM_CLIENT_KEY).as_path(),
-                &policy_json,
-            )?;
-            let prog_path = program_path(LINEAR_REGRESSION_WASM);
-            info!("### program provider read binary.");
-            let program_data = read_binary_file(prog_path.as_path())?;
-            info!("### program provider send binary.");
-            client.send_program("/program/linear-regression.wasm", &program_data)?;
-            Ok::<(), VeracruzTestError>(())
-        };
-        let data_provider_handle = async {
-            task::sleep(std::time::Duration::from_millis(15000)).await;
-            info!("### data provider start.");
-            let mut client = veracruz_client::VeracruzClient::new(
-                trust_path(DATA_CLIENT_CERT).as_path(),
-                trust_path(DATA_CLIENT_KEY).as_path(),
-                &policy_json,
-            )?;
+            let program_provider_handle = async {
+                task::sleep(std::time::Duration::from_millis(10000)).await;
+                info!("### program provider start.");
+                let mut client = veracruz_client::VeracruzClient::new(
+                    trust_path(PROGRAM_CLIENT_CERT).as_path(),
+                    trust_path(PROGRAM_CLIENT_KEY).as_path(),
+                    &policy_json,
+                )?;
+                let prog_path = program_path(LINEAR_REGRESSION_WASM);
+                info!("### program provider read binary.");
+                let program_data = read_binary_file(prog_path.as_path())?;
+                info!("### program provider send binary.");
+                client.send_program("/program/linear-regression.wasm", &program_data)?;
+                Ok::<(), VeracruzTestError>(())
+            };
+            let data_provider_handle = async {
+                task::sleep(std::time::Duration::from_millis(15000)).await;
+                info!("### data provider start.");
+                let mut client = veracruz_client::VeracruzClient::new(
+                    trust_path(DATA_CLIENT_CERT).as_path(),
+                    trust_path(DATA_CLIENT_KEY).as_path(),
+                    &policy_json,
+                )?;
 
-            let data_filename = data_path(LINEAR_REGRESSION_DATA);
-            info!("### data provider read input.");
-            let data = read_binary_file(&data_filename.as_path())?;
-            info!("### data provider send input.");
-            client.send_data("/input/linear-regression.dat", &data)?;
-            info!("### data provider read result.");
-            client.request_compute("/program/linear-regression.wasm")?;
-            client.get_results("/output/linear-regression.dat")?;
-            info!("### data provider request shutdown.");
-            client.request_shutdown()?;
-            Ok::<(), VeracruzTestError>(())
-        };
+                let data_filename = data_path(LINEAR_REGRESSION_DATA);
+                info!("### data provider read input.");
+                let data = read_binary_file(&data_filename.as_path())?;
+                info!("### data provider send input.");
+                client.send_data("/input/linear-regression.dat", &data)?;
+                info!("### data provider read result.");
+                client.request_compute("/program/linear-regression.wasm")?;
+                client.get_results("/output/linear-regression.dat")?;
+                info!("### data provider request shutdown.");
+                client.request_shutdown()?;
+                Ok::<(), VeracruzTestError>(())
+            };
 
-        let result = futures::future::try_join3(
-            server_handle,
-            program_provider_handle,
-            data_provider_handle,
-        )
-        .await;
-        assert!(result.is_ok(), "error: {:?}", result);
-      }).await
+            let result = futures::future::try_join3(
+                server_handle,
+                program_provider_handle,
+                data_provider_handle,
+            )
+            .await;
+            assert!(result.is_ok(), "error: {:?}", result);
+        })
+        .await
     }
 
     async fn test_template<P: AsRef<Path>>(

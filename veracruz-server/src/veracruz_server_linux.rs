@@ -32,10 +32,7 @@ pub mod veracruz_server_linux {
         thread::sleep,
         time::Duration,
     };
-    use tempfile::{
-        self,
-        TempDir
-    };
+    use tempfile::{self, TempDir};
     use transport_protocol::{
         parse_proxy_attestation_server_response, serialize_native_psa_attestation_token,
     };
@@ -46,9 +43,8 @@ pub mod veracruz_server_linux {
     ////////////////////////////////////////////////////////////////////////////
 
     /// The Runtime Manager binary (the enclave), included at compile time
-    const RUNTIME_ENCLAVE_BINARY_IMAGE: &'static [u8] = include_bytes!(
-        env!("RUNTIME_ENCLAVE_BINARY_PATH")
-    );
+    const RUNTIME_ENCLAVE_BINARY_IMAGE: &'static [u8] =
+        include_bytes!(env!("RUNTIME_ENCLAVE_BINARY_PATH"));
     /// Spawn delay to apply (in seconds) between spawning the Runtime Manager enclave and trying
     /// to contact it.
     const RUNTIME_ENCLAVE_SPAWN_DELAY: u64 = 2;
@@ -70,7 +66,8 @@ pub mod veracruz_server_linux {
         /// The socket used to communicate with the Runtime Manager enclave.
         runtime_manager_socket: TcpStream,
         /// Temporary dir where we store our image, this gets cleaned up when VeracruzServerLinux is dropped
-        #[allow(dead_code)] runtime_enclave_binary_dir: TempDir,
+        #[allow(dead_code)]
+        runtime_enclave_binary_dir: TempDir,
     }
 
     impl VeracruzServerLinux {
@@ -220,13 +217,19 @@ pub mod veracruz_server_linux {
             // temporary directory to store image
             let runtime_enclave_binary_dir = tempfile::tempdir()?;
 
-            let runtime_enclave_binary_path = runtime_enclave_binary_dir.path().join("runtime_enclave_binary");
+            let runtime_enclave_binary_path = runtime_enclave_binary_dir
+                .path()
+                .join("runtime_enclave_binary");
             fs::write(&runtime_enclave_binary_path, RUNTIME_ENCLAVE_BINARY_IMAGE)?;
 
             // make sure our image is executable
-            let mut runtime_enclave_binary_permissions = fs::metadata(&runtime_enclave_binary_path)?.permissions();
+            let mut runtime_enclave_binary_permissions =
+                fs::metadata(&runtime_enclave_binary_path)?.permissions();
             runtime_enclave_binary_permissions.set_mode(0o500); // readable and executable by user is all we need
-            fs::set_permissions(&runtime_enclave_binary_path, runtime_enclave_binary_permissions)?;
+            fs::set_permissions(
+                &runtime_enclave_binary_path,
+                runtime_enclave_binary_permissions,
+            )?;
 
             info!(
                 "Computing measurement of runtime manager enclave (using binary {:?})",
