@@ -99,6 +99,4 @@ pub enum RuntimeManagerMessage {
     /// - The TLS data, which may be empty.
     /// - A flag indicating if the TLS session is still alive.
     TLSData(Vec<u8>, bool),
-    /// A request to reset the enclave.
-    ResetEnclave,
 }
