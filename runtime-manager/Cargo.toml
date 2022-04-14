@@ -57,8 +57,7 @@ nitro = [
   "io-utils/nitro",
   "libc",
   "policy-utils/std",
-  "nsm_api",
-  "nsm_lib",
+  "aws-nitro-enclaves-nsm-api",
   "nix",
   "ring/nitro",
   "ring/std",
@@ -67,6 +66,7 @@ nitro = [
 ]
 
 [dependencies]
+aws-nitro-enclaves-nsm-api = { version = "0.2.0", optional = true }
 bincode = { version = "1.2.1", default-features = false, optional = true }
 clap = { version = "2.33", optional = true }
 env_logger = { version = "0.9.0", optional = true }
@@ -87,12 +87,11 @@ libc = { version = "0.2.108", optional = true }
 libm = { version = "0.2", optional = true }
 log = { version = "0.4.13", optional = true }
 nix = { version = "0.15", optional = true }
-nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "aws-nitro-enclaves-nsm-api", optional = true }
-nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
+
 policy-utils = { path = "../policy-utils" }
 protobuf = "=2.8.1"
 psa-attestation = { path = "../psa-attestation", optional = true }
-ring = "0.16.11"
+ring = "0.16.20"
 rustls = "0.20.4"
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
 serde_json = "1.0"

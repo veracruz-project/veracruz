@@ -92,7 +92,8 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "aws-nitro-enclaves-nsm-api"
 version = "0.2.0"
-source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api.git/?branch=main#915d87fb67d9956cb973d7e3edce7810c4ba70f1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9138ac237191fcb830a6c5fb45b93573ee670956bef2b2dd1ee8609daa59a4a"
 dependencies = [
  "libc",
  "log",
@@ -209,24 +210,6 @@ name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
-
-[[package]]
-name = "cbindgen"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1df6a11bba1d7cab86c166cecf4cf8acd7d02b7b65924d81b33d27197f22ee35"
-dependencies = [
- "heck",
- "indexmap",
- "log",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn",
- "tempfile",
- "toml",
-]
 
 [[package]]
 name = "cc"
@@ -697,15 +680,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
-name = "fastrand"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3fcf0cee53519c866c09b5de1f6c56ff9d647101f81c1964fa632e148896cdf"
-dependencies = [
- "instant",
-]
-
-[[package]]
 name = "file-per-thread-logger"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -926,15 +900,6 @@ dependencies = [
  "autocfg",
  "hashbrown",
  "serde",
-]
-
-[[package]]
-name = "instant"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
-dependencies = [
- "cfg-if",
 ]
 
 [[package]]
@@ -1237,16 +1202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nsm-lib"
-version = "0.2.0"
-source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api.git/?branch=main#915d87fb67d9956cb973d7e3edce7810c4ba70f1"
-dependencies = [
- "aws-nitro-enclaves-nsm-api",
- "cbindgen",
- "serde_bytes",
-]
-
-[[package]]
 name = "num"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1448,7 +1403,6 @@ dependencies = [
  "cfg-if",
  "getrandom 0.1.16",
  "nix 0.22.3",
- "nsm-lib",
 ]
 
 [[package]]
@@ -1751,15 +1705,6 @@ dependencies = [
  "bitflags",
  "libc",
  "mach",
- "winapi",
-]
-
-[[package]]
-name = "remove_dir_all"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
-dependencies = [
  "winapi",
 ]
 
@@ -2088,20 +2033,6 @@ name = "target-lexicon"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7fa7e55043acb85fca6b3c01485a2eeb6b69c5d21002e273c79e465f43b7ac1"
-
-[[package]]
-name = "tempfile"
-version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cdb1ef4eaeeaddc8fbd371e5017057064af0911902ef36b39801f67cc6d79e4"
-dependencies = [
- "cfg-if",
- "fastrand",
- "libc",
- "redox_syscall",
- "remove_dir_all",
- "winapi",
-]
 
 [[package]]
 name = "term_size"

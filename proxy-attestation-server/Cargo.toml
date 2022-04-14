@@ -54,7 +54,7 @@ openssl = "0.10.24"
 percent-encoding = "2.1"
 psa-attestation = { path = "../psa-attestation" }
 rand = "0.7"
-ring = "0.16.11"
+ring = "0.16.20"
 rustls = "0.20.4"
 serde_json = "1.0"
 stringreader = "0.1"
