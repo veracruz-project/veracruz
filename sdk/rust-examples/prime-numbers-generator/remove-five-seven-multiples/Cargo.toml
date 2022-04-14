@@ -1,7 +1,7 @@
 [package]
 authors = ["The Veracruz Development Team"]
-name = "remove-two-three-multiples"
-description = "Remove all number that are multiples of 2 or 3"
+name = "remove-five-seven-multiples"
+description = "Remove all number that are multiples of 5 or 7"
 version = "0.3.0"
 edition = "2018"
 

@@ -1,8 +1,8 @@
-//! Generate Prime Numbers : Remove multiples of 2 or 3
+//! Prime Numbers Generator : Remove Multiples of 5 or 7
 //!
 //! ## Context
 //!
-//! Remove all number that are multiples of 2 or 3
+//! Remove all number that are multiples of 5 or 7
 //!
 //! ## Authors
 //!
@@ -16,7 +16,6 @@
 use std::fs;
 use anyhow;
 
-
 const FILENAME: &'static str = "/output/number-set.txt"; 
 
 fn main() -> anyhow::Result<()>{
@@ -28,11 +27,11 @@ fn main() -> anyhow::Result<()>{
         .split(",")
         .map(|x| x.parse::<u32>().unwrap())
         .collect();
-
-    // remove any multiple of 2 or 3
+    
+    // remove all multiples of 5 or 7 
     let filtered_vec: Vec<u32> = num_vec
         .into_iter()
-        .filter(|&x| (x % 2 != 0 && x % 3 != 0) || (x == 2 || x == 3))
+        .filter(|&x| (x % 5 != 0 && x % 7 != 0) || (x == 5 || x == 7))
         .collect::<Vec<_>>();
 
     let mut content: String = filtered_vec

@@ -1,4 +1,4 @@
-//! Pipeline Example : Generate the number set
+//! Prime Numbers Generator: Generate the number set
 //!
 //! ## Context
 //!
@@ -25,10 +25,13 @@ fn main() -> anyhow::Result<()> {
         set.push(i);
     }
 
-    let set_str: String = set
+    let mut set_str: String = set
         .iter()
         .map(|num| num.to_string() + ",")
         .collect();
+
+    set_str.pop();
+    set_str.push('\n');
 
     fs::write(OUTPUT_FILENAME, set_str)?;
 
