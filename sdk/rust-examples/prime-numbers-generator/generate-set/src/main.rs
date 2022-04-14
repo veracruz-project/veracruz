@@ -2,8 +2,8 @@
 //!
 //! ## Context
 //!
-//! Generate all numbers from 2 to 120 and write them to a text file
-//!
+//! Generate all numbers from 2 to the specified upper limit
+//! 
 //! ## Authors
 //!
 //! The Veracruz Development Team.
@@ -21,7 +21,13 @@ const OUTPUT_FILENAME: &'static str = "/output/number-set.txt";
 fn main() -> anyhow::Result<()> {
     let mut set: Vec<u32> = Vec::new();
 
-    for i in 2..=120 {
+    let args: Vec<String> = std::env::args().collect();
+    let upper_limit = args.get(0)
+        .unwrap()
+        .to_owned()
+        .parse::<u32>()?;
+
+    for i in 2..=upper_limit {
         set.push(i);
     }
 
