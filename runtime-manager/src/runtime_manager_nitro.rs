@@ -57,6 +57,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
 
     let fd = accept(socket_fd).map_err(|err| RuntimeManagerError::SocketError(err))?;
     println!("runtime_manager_nitro::nitro_main accept succeeded. looping");
+
     loop {
         let received_buffer =
             receive_buffer(fd).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
@@ -113,11 +114,6 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                     Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
                 };
                 return_message
-            }
-            RuntimeManagerMessage::ResetEnclave => {
-                // Do nothing here for now
-                println!("runtime_manager_nitro::main ResetEnclave");
-                RuntimeManagerMessage::Status(VMStatus::Success)
             }
             _ => {
                 println!("runtime_manager_nitro::main Unknown Opcode");

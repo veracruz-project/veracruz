@@ -19,6 +19,7 @@ use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use io_utils::{error::SocketError, http::HttpError};
+use std::error::Error;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -230,5 +231,5 @@ pub trait VeracruzServer {
         input: Vec<u8>,
     ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError>;
 
-    fn close(&mut self) -> Result<bool, VeracruzServerError>;
+    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>>;
 }

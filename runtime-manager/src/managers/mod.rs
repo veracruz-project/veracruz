@@ -184,14 +184,13 @@ impl ProtocolState {
     }
 
     /// Requests shutdown on behalf of a client, as identified by their client
-    /// ID, and then checks if this request was sufficient to reach a threshold
-    /// of requests wherein the platform can finally shutdown.
+    /// ID.
+    /// TODO: Do something better (https://github.com/veracruz-project/veracruz/issues/393)
     pub(crate) fn request_and_check_shutdown(
         &mut self,
         client_id: u64,
     ) -> Result<bool, RuntimeManagerError> {
-        self.expected_shutdown_sources.retain(|v| v != &client_id);
-        Ok(self.expected_shutdown_sources.is_empty())
+        Ok(self.expected_shutdown_sources.contains(&client_id))
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
