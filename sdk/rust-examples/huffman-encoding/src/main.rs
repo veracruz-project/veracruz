@@ -38,7 +38,8 @@ struct Node {
     right: Link
 }
     
-fn new_node(freq: i32, ch: Option<char>) -> Node {
+fn new_node(freq: i32, ch: Option<char>) -> Node 
+{
     Node {
         freq: freq,
         ch: ch,
@@ -48,47 +49,58 @@ fn new_node(freq: i32, ch: Option<char>) -> Node {
     }
 }
 
-fn new_box(n: Node) -> Box<Node> {
+fn new_box(n: Node) -> Box<Node> 
+{
     Box::new(n)
 }
 
-fn frequency(s: &str) -> HashMap<char, i32> {
-    let mut h = HashMap::new();
+fn frequency(s: &str) -> HashMap<char, i32> 
+{
+    let mut hm = HashMap::new();
     for ch in s.chars() {
-        let counter = h.entry(ch).or_insert(0);
-        *counter += 1;  
+        let count = h.entry(ch).or_insert(0);
+        *count += 1;  
     }
-    h
+
+    hm
 }
  
 fn assign_codes(p: &Box<Node>, 
-                h: &mut HashMap<char, String>,
+                hm: &mut HashMap<char, String>,
                 s: String ) {
 
-    if let Some(ch) = p.ch {
-        h.insert(ch, s);
-    } else {
-        if let Some(ref l) = p.left {
-            assign_codes(l, h, s.clone() + "0") ;
+    if let Some(ch) = p.ch 
+    {
+        hm.insert(ch, s);
+    }
+    else 
+    {
+        if let Some(ref l) = p.left 
+        {
+            assign_codes(l, hm, s.clone() + "0") ;
         }
-        if let Some(ref r) = p.right {
-            assign_codes(r, h, s.clone() + "1") ;
+        if let Some(ref r) = p.right 
+        {
+            assign_codes(r, hm, s.clone() + "1") ;
         }
     }
 }
  
-fn encode_string(s: &str, h: &HashMap<char, String>) -> String {
-    let mut r = "".to_string();
+fn encode_string(s: &str, hm: &HashMap<char, String>) -> String 
+{
+    let mut r = String::new() ;
     let mut t:Option<&String>;
 
     for ch in s.chars() {
-        t = h.get(&ch);
+        t = hm.get(&ch);
         r.push_str(t.unwrap());
     }
+
     r
 }
  
-fn decode_string(s: &str, root: &Box<Node>) -> String {
+fn decode_string(s: &str, root: &Box<Node>) -> String 
+{
 
     let mut retval = "".to_string();
     let mut nodeptr = root;
@@ -109,14 +121,15 @@ fn decode_string(s: &str, root: &Box<Node>) -> String {
         }
     }
     
-    retval.pop();   // To remove \r\n from the end of the 'retval' String
-    retval.pop();
+    // retval.pop();   // To remove \r\n from the end of the 'retval' String
+    // retval.pop();
 
-    println!("{:?}", retval.as_str()) ;
+    // println!("{:?}", retval.as_str()) ;
     retval
 }
             
-fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> 
+{
 
     // Taking input of the file
     let file_vec = fs::read(INPUT_FILENAME)? ;
@@ -124,10 +137,10 @@ fn main() -> anyhow::Result<()> {
     let msg = String::from_utf8_lossy(&file_vec).to_string() ;
     let msg = msg.as_str() ;
 
-    let h = frequency(msg);
+    let hm = frequency(msg);
 
     let mut p:Vec<Box<Node>> = 
-                      h.iter()
+                      hm.iter()
                       .map(|x| new_box(new_node(*(x.1), Some(*(x.0)))))
                       .collect();
 
@@ -142,12 +155,12 @@ fn main() -> anyhow::Result<()> {
     }
 
     let root = p.pop().unwrap();
-    let mut h:HashMap<char, String> = HashMap::new();
+    let mut hm:HashMap<char, String> = HashMap::new();
 
-    assign_codes(&root, &mut h, "".to_string()); 
+    assign_codes(&root, &mut hm, "".to_string()); 
 
     // Storing the encoded and decoded strings, respectively
-    let enc = encode_string(msg, &h);
+    let enc = encode_string(msg, &hm);
     let dec = decode_string(&enc, &root) ;
 
     let mut ret = String::new() ;
