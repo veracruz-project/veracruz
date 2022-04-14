@@ -229,9 +229,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
 
     info!("TCP listener connected on {:?}.", client_addr);
 
-    let mut abort = false;
-
-    while !abort {
+    loop {
         info!("Listening for incoming message...");
 
         let received_buffer: Vec<u8> = receive_buffer(&mut fd).map_err(|err| {
@@ -354,13 +352,6 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                         RuntimeManagerMessage::Status(VMStatus::Fail)
                     })
             }
-            RuntimeManagerMessage::ResetEnclave => {
-                info!("Shutting down enclave.");
-
-                abort = true;
-
-                RuntimeManagerMessage::Status(VMStatus::Success)
-            }
             otherwise => {
                 error!("Received unknown or unimplemented opcode: {:?}.", otherwise);
                 RuntimeManagerMessage::Status(VMStatus::Unimplemented)
@@ -382,6 +373,4 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
             RuntimeManagerError::IOError(e)
         })?;
     }
-
-    Ok(())
 }

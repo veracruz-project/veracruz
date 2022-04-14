@@ -310,19 +310,19 @@ impl VeracruzServer for VeracruzServerIceCap {
         ))
     }
 
-    fn close(&mut self) -> Result<bool> {
+    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
         self.realm_process
             .kill()
             .map_err(IceCapError::hoist(IceCapError::ShadowVMMStopError))?;
         self.configuration.destroy_realm()?;
-        Ok(true)
+        Ok(())
     }
 }
 
 impl Drop for VeracruzServerIceCap {
     fn drop(&mut self) {
-        if let Err(err) = self.close() {
-            panic!("Veracruz server failed to close: {}", err)
+        if let Err(err) = self.shutdown_isolate() {
+            panic!("Realm failed to shutdown: {}", err)
         }
     }
 }

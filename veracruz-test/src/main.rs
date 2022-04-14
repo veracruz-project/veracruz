@@ -417,8 +417,6 @@ mod tests {
             let program_data = read_binary_file(prog_path.as_path())?;
             info!("### program provider send binary.");
             client.send_program("/program/linear-regression.wasm", &program_data)?;
-            info!("### program provider request shutdown.");
-            client.request_shutdown()?;
             Ok::<(), VeracruzTestError>(())
         };
         let data_provider_handle = async {
@@ -546,13 +544,11 @@ mod tests {
                 info!("            Result of len: {:?}", result.len());
             }
 
-            for client_index in 0..client_configs.len() {
-                clients
-                    .get_mut(client_index)
-                    .ok_or(VeracruzTestError::ClientIndexError(client_index))?
-                    .request_shutdown()?;
-                info!("            Client {} disconnects", client_index);
-            }
+            clients
+                .get_mut(0)
+                .ok_or(VeracruzTestError::ClientIndexError(0))?
+                .request_shutdown()?;
+            info!("            Client 0 successfully issued shutdown command");
             Ok::<(), VeracruzTestError>(())
         };
         info!("            Server and clients threads execute.");
