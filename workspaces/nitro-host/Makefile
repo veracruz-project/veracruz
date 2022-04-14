@@ -57,7 +57,7 @@ test-server: test-dependencies
 	./nitro-terminate.sh
 
 test-client: test-dependencies
-	$(CARGO_TEST) -p veracruz-client --lib --features mock -- --test-threads=1
+	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
 	RUNTIME_MANAGER_EIF_PATH=/work/veracruz/workspaces/nitro-runtime/runtime_manager.eif $(CARGO_TEST) -p veracruz-test -- --test-threads=1

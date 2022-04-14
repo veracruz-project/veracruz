@@ -15,3 +15,4 @@ and is designed and written by the *Veracruz Development Team*:
 - Sabreen Kaur (sabreenderjitkaur.gurjitsingh@arm.com)
 - Mohamed Abdelfatah (mohamedabdelfatah2027@gmail.com)
 - Aryan Godara (aryangodara03@gmail.com)
+- Sagar Arya (aryasagar125@gmail.com)

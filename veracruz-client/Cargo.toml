@@ -16,7 +16,6 @@ required-features = ["cli"]
 cli = ["structopt", "env_logger"]
 icecap = []
 linux = []
-mock = ["mockall"]
 nitro = []
 
 [dependencies]
@@ -26,8 +25,6 @@ env_logger = { version = "0.7", optional = true }
 err-derive = "0.2"
 hex = "0.4.2"
 log = "0.4.13"
-# Used in unit tests. Mock all the network traffic
-mockall = { version = "0.5.0", optional = true }
 policy-utils = { path = "../policy-utils", features = ["std"] }
 rand = "0.7.0"
 reqwest = { version = "0.9", default-features = false }
