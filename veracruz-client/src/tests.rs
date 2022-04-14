@@ -141,13 +141,6 @@ fn iterate_over_policy(
     }
 }
 
-#[actix_rt::test]
-#[should_panic]
-/// Test client's policy enforcement by setting up new client instances, and
-/// then calling them using invalid client credentials for the policy
-/// TODO update this test case in the following possible options:
-/// - checking if the client send data/program but vialoate the capabilities in the policy ?
-
 #[test]
 #[ignore]
 fn veracruz_client_session() {
