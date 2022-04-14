@@ -268,7 +268,6 @@ mod tests {
     /// A test of veracruz using network communication using four sessions
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
-    #[ignore] // FIXME: test currently disabled because it fails on IceCap
     async fn veracruz_phase2_intersection_set_sum_three_clients() {
         timeout(Duration::from_secs(1200), async {
             let result = test_template(
@@ -316,7 +315,6 @@ mod tests {
     /// A test of veracruz using network communication using four sessions
     /// (one for program, one for the first data, and one for the second data and retrieval.)
     #[actix_rt::test]
-    #[ignore] // FIXME: test currently disabled because it fails on IceCap
     async fn veracruz_phase2_intersection_set_sum_two_clients_reversed_data_provision() {
         timeout(Duration::from_secs(1200), async {
         let result = test_template(

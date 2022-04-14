@@ -547,7 +547,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // FIXME: test currently disabled because it fails on IceCap
     /// Integration test:
     /// policy: PiProvider, DataProvider and ResultReader is the same party
     /// computation: intersection sum, intersection of two data sources
