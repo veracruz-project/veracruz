@@ -22,7 +22,7 @@ std = [
 [dependencies]
 err-derive = "0.2"
 policy-utils = { path = "../policy-utils" }
-ring = "0.16.11"
+ring = "0.16.20"
 rustls = "0.20.4"
 rustls-pemfile = "0.3.0"
 veracruz-utils = { path = "../veracruz-utils" }
