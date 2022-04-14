@@ -13,7 +13,7 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::{fs, usize};
+use std::fs;
 use anyhow;
 
 const FILENAME: &'static str = "/output/number-set.txt"; 
