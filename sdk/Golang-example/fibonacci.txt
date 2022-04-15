@@ -31,11 +31,39 @@ Go to https://wasmtime.dev/
    cd Golang-to-WASI
 
 
-3. Compile to WASM using the following commandn:
+3. Create a file named main.go :
+   touch main.go
+
+
+4. Add the program of febonacci there :
+   // Simple Program to calculate fibonacci of input
+
+	package main
+
+	import "fmt"
+	func FibonacciRecursion(n int) int 
+        {
+	    if n <= 1 {
+        		return n
+       		      }
+	    return FibonacciRecursion(n-1) + FibonacciRecursion(n-2)
+	}
+
+	func main()
+        {
+       fmt.Print("Enter number : ")
+       var n int
+       fmt.Scanln(&n)
+       fmt.Println("Fibonacci of", n , "is", FibonacciRecursion(n));
+        }
+
+
+
+5. Compile to WASM using the following commandn:
    tinygo build -wasm-abi=generic -target=wasi -o main.wasm main.go
 
 
-4. The wasm file created in the folder:
+6. The wasm file created in the folder:
    wasmtime main.wasm
 
 
