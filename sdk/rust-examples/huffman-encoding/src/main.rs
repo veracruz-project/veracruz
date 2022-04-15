@@ -50,7 +50,6 @@ fn new_node(freq: u32, ch: Option<char>) -> Node {
 }
 
 /// Count the frequency of occurence of each unique ASCII character in the input string
-#[inline]
 fn frequency(s: &str) -> HashMap<char, u32> {
     let mut hm = HashMap::new();
     for ch in s.chars() {
@@ -76,7 +75,6 @@ fn assign_codes(p: &Node, hm: &mut HashMap<char, String>, s: String) {
 }
 
 /// Takes the huffman tree and input string, to return the encoded string
-#[inline]
 fn encode_string<A>(s: A, hm: &HashMap<char, String>) -> String
 where
     A: AsRef<str>,
@@ -93,7 +91,6 @@ where
 }
 
 /// Takes the Huffman Tree and encoded string, to return the decoded string
-#[inline]
 fn decode_string<A>(s: A, root: &Node) -> String
 where
     A: AsRef<str>,
