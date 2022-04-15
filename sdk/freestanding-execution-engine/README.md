@@ -15,7 +15,7 @@ IMPORTANT: This exercise assume some familiarity with reading **Rust syntax** an
   ```
 The first command adds WebAssembly (WASM) as the compilation target, so the rust program can be compiled to WASM. The second command complies the code that is inside src, which is usually a file named `main.rs`, into WASM. Once the second command has been run you should expect to see a WASM file inside the directory `read-file/target/wasm32-wasi/debug/read-file.wasm`.
   
-5. Copy `read-file.wasm` into the directory `veracruz/sdk/freestanding-execution-environment`
+5. Copy `read-file.wasm` into the directory `veracruz/sdk/freestanding-execution-engine`
 6. If you read what was inside main.rs in `read-file/src` you will have noticed that the program has an input file called `input.txt` and two outputs; a file called `output` and a directory called `a/b/c/d/e.txt`. We need to create `input.txt` to feed into the program; so create `input.txt` inside the freestanding-execution-engine directory and write in anything to the contents of the file. We also need to create the directory `a/b/c/d` inside the freestanding-execution-engine directory.
 7. Now you are setup to run the main command that executes the WASM program inside the Veracruz engine! Below is the command, it is a long one, but we will break down.
 ```
