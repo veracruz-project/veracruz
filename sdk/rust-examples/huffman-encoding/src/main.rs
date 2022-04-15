@@ -29,7 +29,7 @@ type Link = Option<Box<Node>>;
 /// A Binary Tree Node is represented here
 struct Node {
     /// Each Node, must represent a character, and its frequency in the input string
-    freq: i32,
+    freq: u32,
     ch: Option<char>,
 
     /// The nodes for left and right children of the node
@@ -39,7 +39,7 @@ struct Node {
 
 /// Function to create a new node, (ike a Constructor function)
 #[inline]
-fn new_node(freq: i32, ch: Option<char>) -> Node {
+fn new_node(freq: u32, ch: Option<char>) -> Node {
     Node {
         freq: freq,
         ch: ch,
@@ -51,7 +51,7 @@ fn new_node(freq: i32, ch: Option<char>) -> Node {
 
 /// Count the frequency of occurence of each unique ASCII character in the input string
 #[inline]
-fn frequency(s: &str) -> HashMap<char, i32> {
+fn frequency(s: &str) -> HashMap<char, u32> {
     let mut hm = HashMap::new();
     for ch in s.chars() {
         let count = hm.entry(ch).or_insert(0);
