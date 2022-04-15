@@ -37,7 +37,7 @@ struct Node {
     right: Link,
 }
 
-/// Function to create a new node, (Like a Constructor function)
+/// Function to create a new node, (ike a Constructor function)
 #[inline]
 fn new_node(freq: i32, ch: Option<char>) -> Node {
     Node {
