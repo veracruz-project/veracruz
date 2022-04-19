@@ -23,11 +23,11 @@ fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 1 {
-        println!("Not enough arguments provided");
         process::exit(1);
     }
 
-    let query: String = args.get(0)
+    let query: String = args
+        .get(0)
         .expect("Couldn't read the argument.")
         .to_string(); // Argument: To be searched for
 
@@ -35,7 +35,6 @@ fn main() -> anyhow::Result<()> {
 
     let filename: String = String::from_utf8_lossy(&file_vec).to_string(); // Input file: To be searched in
 
-    // let res_vec: Vec<&str> = search(query.as_str(), &filename.as_str());
     let res_vec: Vec<&str> = search(&query, &filename);
 
     let mut ret: String = String::new();
