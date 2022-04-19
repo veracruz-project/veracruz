@@ -16,26 +16,26 @@ Go to https://wasmtime.dev/
 
 ### Part 1 (compile source code in high level languages)
 
-1. For that first step lets build simple Golang program that creates fibonacci sequence of an integer input.
+(1) For that first step lets build simple Golang program that creates fibonacci sequence of an integer input.
 
-2. Create a folder "Golang-to-WASI" :
+(2) Create a folder "Golang-to-WASI" :
    mkdir Golang-to-WASI
    cd Golang-to-WASI
 
-3. Create a file named main.go :
+(3) Create a file named main.go :
    touch main.go
 
-4. Add the program there 
+(4) Add the program there 
 
-5. Compile to Wasm using the following lines:
+(5) Compile to Wasm using the following lines:
    tinygo build -wasm-abi=generic -target=wasi -o main.wasm main.go
 
-6. The Wasmfile created in the folder:
+(6) The Wasmfile created in the folder:
    file main.wasm
 
 ### Part 2 (execute the Wasm via some engines)
 
-1. Executing using Wasmtime :
+(1) Executing using Wasmtime :
    wasmtime main.wasm
 
 
