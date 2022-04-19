@@ -14,20 +14,29 @@
 //! copyright information.
 
 use anyhow::{self, Ok};
-use std::{env, fs};
+use std::{env, fs, process};
 
 const INPUT_FILENAME: &'static str = "/input/random_search_text.txt";
 const OUTPUT_FILENAME: &'static str = "/output/search_results.txt";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
-    let query: String = args.get(0).unwrap().to_string(); // Argument: To be searched for
+
+    if args.len() < 1 {
+        println!("Not enough arguments provided");
+        process::exit(1);
+    }
+
+    let query: String = args.get(0)
+        .expect("Couldn't read the argument.")
+        .to_string(); // Argument: To be searched for
 
     let file_vec: Vec<u8> = fs::read(INPUT_FILENAME)?;
 
     let filename: String = String::from_utf8_lossy(&file_vec).to_string(); // Input file: To be searched in
 
-    let res_vec: Vec<&str> = search(query.as_str(), &filename.as_str());
+    // let res_vec: Vec<&str> = search(query.as_str(), &filename.as_str());
+    let res_vec: Vec<&str> = search(&query, &filename);
 
     let mut ret: String = String::new();
 
