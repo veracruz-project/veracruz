@@ -16,11 +16,6 @@ this part you need to specify which Trusted Execution Environment (TEE) you are
 using. So for example, if you are running Veracruz on Linux, you would
 run `make -C workspaces linux-install`.
 
-We're also going to need a WebAssembly toolchain to build our example binary.
-This can be built using `make sdk`. Fortunately, you can combine these two
-rules, allowing you to maximize the time you have to get coffee while the code
-is compiling:
-
 ``` bash
 $ make -C workspaces linux-install
 ...
