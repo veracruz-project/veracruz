@@ -22,10 +22,8 @@ fn main() -> anyhow::Result<()> {
     let mut set: Vec<u32> = Vec::new();
 
     let args: Vec<String> = std::env::args().collect();
-    let upper_limit = args.get(0)
-        .unwrap()
-        .to_owned()
-        .parse::<u32>()?;
+
+    let upper_limit = args.get(0).unwrap_or(&String::from("100")).to_owned().parse::<u32>()?;
 
     for i in 2..=upper_limit {
         set.push(i);
@@ -33,10 +31,10 @@ fn main() -> anyhow::Result<()> {
 
     let mut set_str: String = set
         .iter()
-        .map(|num| num.to_string() + ",")
-        .collect();
+        .map(|num| num.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
 
-    set_str.pop();
     set_str.push('\n');
 
     fs::write(OUTPUT_FILENAME, set_str)?;

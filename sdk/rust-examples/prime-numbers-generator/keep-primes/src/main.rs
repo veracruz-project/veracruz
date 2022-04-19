@@ -25,18 +25,18 @@ fn main() -> anyhow::Result<()>{
     let mut num_vec: Vec<u32> = content
         .trim()
         .split(",")
-        .map(|x| x.parse::<u32>().unwrap())
+        .map(|x| x.parse::<u32>().expect("Number couldn't be parsed"))
         .collect();
 
     sieve_of_eratosthenes(&mut num_vec)?;
         
-    let mut content: String = num_vec 
+    let mut content: String = num_vec
         .iter()
-        .map(|x| x.to_string() + ",")
-        .collect();
+        .map(|n| n.to_string())
+        .collect::<Vec<_>>()
+        .join(","); 
    
     // remove last comma, add end of line character
-    content.pop();
     content.push('\n');
 
     fs::write(FILENAME, content)?;
