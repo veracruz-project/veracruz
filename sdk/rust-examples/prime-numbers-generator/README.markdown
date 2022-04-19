@@ -27,4 +27,4 @@ RUST_LOG="info" cargo run -- --arg 1000 --input-source program --program program
 ```
 you can change the number after `--arg` to change the `upper_limit` value.
 
-6. After the long log of information, you should see a file called `number-set.txt` inside the output directory. This file should cantain all prime numbers between 2 and `upper_limit` .
+6. After the long log of information, you should see a file called `number-set.txt` inside the output directory. This file should contain all prime numbers between 2 and `upper_limit` .
