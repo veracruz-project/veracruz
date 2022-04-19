@@ -1,0 +1,11 @@
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Searches for the given argument inside the input file"
+name = "string-search"
+version = "0.3.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.56"
