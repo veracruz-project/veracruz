@@ -193,7 +193,7 @@ impl VeracruzClient {
 
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
             .map_err(|err| VeracruzClientError::InvalidDnsNameError(err))?;
-        let connection = ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
+        let mut connection = ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
@@ -445,14 +445,17 @@ impl VeracruzClient {
             None => (),
         }
 
-        self.tls_connection.writer().write_all(&data[..])?;
-
         let mut outgoing_data_vec = Vec::new();
-        let outgoing_data = Vec::new();
-        let outgoing_data_option = self.process(outgoing_data)?; // intentionally sending no data to process
-        match outgoing_data_option {
-            Some(outgoing_data) => outgoing_data_vec.push(outgoing_data),
-            None => (),
+        let mut start_index: usize = 0;
+        while start_index < data.len() {
+            let bytes_read = self.tls_connection.writer().write(&data[start_index..])?;
+            start_index += bytes_read;
+            let outgoing_data = Vec::new();
+            let outgoing_data_option = self.process(outgoing_data)?; // intentionally sending no data to process
+            match outgoing_data_option {
+                Some(outgoing_data) => outgoing_data_vec.push(outgoing_data),
+                None => (),
+            }
         }
 
         let mut incoming_data_vec: Vec<Vec<u8>> = Vec::new();
@@ -524,21 +527,18 @@ impl VeracruzClient {
     }
 
     fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
-        let mut ret_val = None;
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
         self.tls_connection.process_new_packets()?;
-        let read_received = match self.tls_connection.reader().read_to_end(&mut received_buffer) {
-            Ok(num) => Ok(num),
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                println!("session-manager::Would block");
-                Ok(0)
-            },
-            Err(err) => Err(VeracruzClientError::IOError(err)),
+        match self.tls_connection.reader().read_to_end(&mut received_buffer) {
+            Ok(_num) => (),
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
+            Err(err) => return Err(VeracruzClientError::IOError(err)),
         };
-        if read_received.is_ok() && received_buffer.len() > 0 {
-            ret_val = Some(received_buffer)
+        if received_buffer.len() > 0 {
+            return Ok(Some(received_buffer));
+        } else {
+            return Ok(None);
         }
-        Ok(ret_val)
     }
 
     fn post_runtime_manager(

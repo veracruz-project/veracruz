@@ -945,7 +945,6 @@ mod tests {
         info!("             Enclave generated a self-signed certificate:");
 
         let mut client_connection = create_client_test_connection(client_cert_path, client_key_path, &policy.ciphersuite())?;
-        client_connection.set_buffer_limit(Some(512 * 1024));
         info!(
             "             Initialization time (μs): {}.",
             time_init.elapsed().as_micros()
@@ -1668,25 +1667,30 @@ mod tests {
         ticket: u32,
         send_data: &[u8],
     ) -> Result<Vec<u8>, VeracruzServerError> {
-        connection.writer().write_all(&send_data).map_err(|e| {
-            error!("Failed to send all data.  Error produced: {:?}.", e);
-            e
-        })?;
 
-        let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-
-        connection.write_tls(&mut output).map_err(|e| {
-            error!("Failed to write TLS.  Error produced: {:?}.", e);
-            e
-        })?;
-
-        tx.send((session_id, output)).map_err(|e| {
-            error!(
-                "Failed to send data on TX channel.  Error produced: {:?}.",
+        let mut start_index: usize = 0;
+        while start_index < send_data.len() {
+            let bytes_written = connection.writer().write(&send_data[start_index..]).map_err(|e| {
+                error!("Failed to send all data.  Error produced: {:?}.", e);
                 e
-            );
-            e
-        })?;
+            })?;
+            start_index += bytes_written;
+
+            let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
+
+            connection.write_tls(&mut output).map_err(|e| {
+                error!("Failed to write TLS.  Error produced: {:?}.", e);
+                e
+            })?;
+
+            tx.send((session_id, output)).map_err(|e| {
+                error!(
+                    "Failed to send data on TX channel.  Error produced: {:?}.",
+                    e
+                );
+                e
+            })?;
+        }
 
         while *CONTINUE_FLAG_HASH
             .lock()
