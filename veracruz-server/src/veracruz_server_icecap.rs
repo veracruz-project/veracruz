@@ -15,7 +15,7 @@ use err_derive::Error;
 use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
 use std::{
-    env,
+    env, error,
     fs::{File, OpenOptions},
     io::{self, Read, Write},
     mem::size_of,
@@ -310,7 +310,7 @@ impl VeracruzServer for VeracruzServerIceCap {
         ))
     }
 
-    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+    fn shutdown_isolate(&mut self) -> result::Result<(), Box<dyn error::Error>> {
         self.realm_process
             .kill()
             .map_err(IceCapError::hoist(IceCapError::ShadowVMMStopError))?;
