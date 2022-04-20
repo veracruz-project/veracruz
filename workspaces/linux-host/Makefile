@@ -16,7 +16,6 @@ default: build
 
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
-BIN_DIR ?= /usr/local/cargo/bin
 MEASUREMENT_FILE = $(abspath ../linux-runtime/css-linux.bin)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 ENCLAVE_BINARY_PATH = $(abspath $(WORKSPACE_DIR)/linux-runtime/runtime_manager_enclave)
@@ -38,7 +37,7 @@ all: build test-collateral
 build:
 	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
 	$(CC) \
-		cargo build $(PROFILE_FLAG) \
+		cargo build $(PROFILE_FLAG) $(V_FLAG) \
 		-p proxy-attestation-server \
 		-p veracruz-client -p veracruz-server \
 		--features proxy-attestation-server/linux \
@@ -46,7 +45,7 @@ build:
 		--features veracruz-server/linux \
 		--features cli
 
-install: build
+install:
 	# create full names
 	cp -f target/$(PROFILE_PATH)/proxy-attestation-server $(BIN_DIR)
 	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)

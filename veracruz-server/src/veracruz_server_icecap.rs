@@ -10,186 +10,299 @@
 //! information on licensing and copyright.
 
 use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
-use bincode::{deserialize, serialize};
+use bincode;
 use err_derive::Error;
 use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
+use signal_hook::{
+    consts::SIGINT,
+    iterator::{Handle, Signals},
+};
 use std::{
-    env, error,
-    fs::{File, OpenOptions},
+    convert::TryFrom,
+    env,
+    error::Error,
+    fs,
     io::{self, Read, Write},
     mem::size_of,
-    path::PathBuf,
-    process::{Child, Command, ExitStatus},
-    result,
+    os::unix::net::UnixStream,
+    process::{Child, Command, Stdio},
     string::ToString,
+    sync::{Arc, Mutex},
+    thread::{self, JoinHandle},
+    time::Duration,
 };
+use tempfile;
+use tempfile::TempDir;
 use veracruz_utils::platform::icecap::message::{Header, Request, Response};
 
-// For now, certain IceCap host configuration parameters must be passed as environment variables.
-// See veracruz/icecap/nix/host/config.nix for an illustration of their usage.
-const VERACRUZ_ICECAP_HOST_COMMAND_ENV: &str = "VERACRUZ_ICECAP_HOST_COMMAND";
-const VERACRUZ_ICECAP_REALM_ID_ENV: &str = "VERACRUZ_ICECAP_REALM_ID";
-const VERACRUZ_ICECAP_REALM_SPEC_ENV: &str = "VERACRUZ_ICECAP_REALM_SPEC";
-const VERACRUZ_ICECAP_REALM_ENDPOINT_ENV: &str = "VERACRUZ_ICECAP_REALM_ENDPOINT";
+const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &'static [&'static str] = &["qemu-system-aarch64"];
+const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &'static [&'static str] = &[
+    "-machine",
+    "virt,virtualization=on,gic-version=2",
+    "-cpu",
+    "cortex-a57",
+    "-smp",
+    "4",
+    "-m",
+    "3072",
+    "-semihosting-config",
+    "enable=on,target=native",
+    "-netdev",
+    "user,id=netdev0",
+    "-serial",
+    "mon:stdio",
+    "-nographic",
+];
+const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
+    "-chardev",
+    "socket,path={console0_path},server=on,wait=off,id=charconsole0",
+    //"-chardev", "socket,server=on,host=localhost,port=1234,id=charconsole0",
+    "-device",
+    "virtio-serial-device",
+    "-device",
+    "virtconsole,chardev=charconsole0,id=console0",
+];
+const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] =
+    &["-kernel", "{image_path}"];
 
-const VERACRUZ_ICECAP_HOST_COMMAND_DEFAULT: &str = "icecap-host";
+// Include image at compile time
+const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] =
+    include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
 
+// TODO is this needed?
 const FIRMWARE_VERSION: &str = "0.3.0";
-
-type Result<T> = result::Result<T, VeracruzServerError>;
 
 /// Class of IceCap-specific errors.
 #[derive(Debug, Error)]
 pub enum IceCapError {
-    #[error(display = "IceCap: Realm channel error: {}", _0)]
-    RealmChannelError(io::Error),
-    #[error(display = "IceCap: Serialization error: {}", _0)]
-    SerializationError(bincode::Error),
-    #[error(display = "IceCap: Shadow VMM spawn error: {}", _0)]
-    ShadowVmmSpawnError(io::Error),
-    #[error(display = "IceCap: Shadow VMM exit status error: {}", exit_status)]
-    ShadowVMMExitStatusError { exit_status: ExitStatus },
-    #[error(display = "IceCap: Shadow VMM stop error: {}", _0)]
-    ShadowVMMStopError(io::Error),
-    #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
-    UnexpectedRuntimeManagerResponse(Response),
-    #[error(display = "IceCap: Missing environment variable: {}", variable)]
-    MissingEnvironmentVariable { variable: String },
     #[error(display = "IceCap: Invalid environment variable value: {}", variable)]
     InvalidEnvironemntVariableValue { variable: String },
+    #[error(display = "IceCap: Channel error: {}", _0)]
+    ChannelError(io::Error),
+    #[error(display = "IceCap: Qemu spawn error: {}", _0)]
+    QemuSpawnError(io::Error),
+    #[error(display = "IceCap: Serialization error: {}", _0)]
+    SerializationError(bincode::Error),
+    #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
+    UnexpectedRuntimeManagerResponse(Response),
 }
 
-impl IceCapError {
-    // For point-free error handling
-    fn hoist<T>(f: impl Fn(T) -> IceCapError) -> impl Fn(T) -> VeracruzServerError {
-        move |inner| VeracruzServerError::IceCapError(f(inner))
+impl From<IceCapError> for VeracruzServerError {
+    fn from(err: IceCapError) -> VeracruzServerError {
+        VeracruzServerError::IceCapError(err)
     }
 }
 
-struct Configuration {
-    icecap_host_command: PathBuf,
-    realm_id: usize,
-    realm_spec: PathBuf,
-    realm_endpoint: PathBuf,
-}
-
-impl Configuration {
-    fn env_var(var: &str) -> Result<String> {
-        env::var(var).map_err(|_| {
-            VeracruzServerError::IceCapError(IceCapError::MissingEnvironmentVariable {
-                variable: var.to_string(),
-            })
-        })
-    }
-
-    fn from_env() -> Result<Self> {
-        Ok(Self {
-            icecap_host_command: Self::env_var(VERACRUZ_ICECAP_HOST_COMMAND_ENV)
-                .map(PathBuf::from)
-                .unwrap_or(VERACRUZ_ICECAP_HOST_COMMAND_DEFAULT.into()),
-            realm_id: Self::env_var(VERACRUZ_ICECAP_REALM_ID_ENV)?
-                .parse::<usize>()
-                .map_err(|_| {
-                    VeracruzServerError::IceCapError(IceCapError::InvalidEnvironemntVariableValue {
-                        variable: VERACRUZ_ICECAP_REALM_ID_ENV.to_string(),
-                    })
-                })?,
-            realm_spec: Self::env_var(VERACRUZ_ICECAP_REALM_SPEC_ENV)?.into(),
-            realm_endpoint: Self::env_var(VERACRUZ_ICECAP_REALM_ENDPOINT_ENV)?.into(),
-        })
-    }
-
-    fn icecap_host_command(&self) -> Command {
-        // HACK
-        // For now, at the pinned version of IceCap, realms must run on core 0.
-        let mut command = Command::new("taskset");
-        command.arg("0x1");
-        command.arg(&self.icecap_host_command);
-        command
-    }
-
-    // HACK
-    // Clean up in case of previous failure.
-    // As the IceCap shadow VMM matures, this will become unnecessary.
-    fn hack_ensure_not_realm_running() {
-        Command::new("pkill")
-            .arg("-f")
-            .arg("icecap-host run")
-            .status()
-            .unwrap();
-    }
-
-    fn ensure_successful(exit_status: ExitStatus) -> Result<()> {
-        if exit_status.success() {
-            Ok(())
-        } else {
-            Err(VeracruzServerError::IceCapError(
-                IceCapError::ShadowVMMExitStatusError { exit_status },
-            ))
-        }
-    }
-
-    fn create_realm(&self) -> Result<()> {
-        Self::ensure_successful(
-            self.icecap_host_command()
-                .arg("create")
-                .arg(format!("{}", self.realm_id))
-                .arg(&self.realm_spec)
-                .status()
-                .map_err(IceCapError::hoist(IceCapError::ShadowVmmSpawnError))?,
-        )
-    }
-
-    fn run_realm(&self) -> Result<Child> {
-        let virtual_node_id: usize = 0;
-        let child = self
-            .icecap_host_command()
-            .arg("run")
-            .arg(format!("{}", self.realm_id))
-            .arg(format!("{}", virtual_node_id))
-            .spawn()
-            .map_err(IceCapError::hoist(IceCapError::ShadowVmmSpawnError))?;
-        Ok(child)
-    }
-
-    fn destroy_realm(&self) -> Result<()> {
-        Self::hack_ensure_not_realm_running();
-        Self::ensure_successful(
-            self.icecap_host_command()
-                .arg("destroy")
-                .arg(format!("{}", self.realm_id))
-                .status()
-                .map_err(IceCapError::hoist(IceCapError::ShadowVmmSpawnError))?,
-        )
+impl From<bincode::Error> for VeracruzServerError {
+    fn from(err: bincode::Error) -> VeracruzServerError {
+        VeracruzServerError::from(IceCapError::SerializationError(err))
     }
 }
 
 /// IceCap implementation of 'VeracruzServer'
-pub struct VeracruzServerIceCap {
-    configuration: Configuration,
-    realm_channel: File,
-    realm_process: Child,
+struct IceCapRealm {
+    // NOTE the order of these fields matter due to drop ordering
+    child: Arc<Mutex<Child>>,
+    channel: UnixStream,
+    #[allow(dead_code)]
+    stdout_handler: JoinHandle<()>,
+    #[allow(dead_code)]
+    stderr_handler: JoinHandle<()>,
+    signal_handle: Handle,
+    #[allow(dead_code)]
+    signal_handler: JoinHandle<()>,
+    #[allow(dead_code)]
+    tempdir: TempDir,
+}
+
+impl IceCapRealm {
+    fn spawn() -> Result<IceCapRealm, VeracruzServerError> {
+        fn env_flags(var: &str, default: &[&str]) -> Result<Vec<String>, VeracruzServerError> {
+            match env::var(var) {
+                Ok(var) => Ok(var.split_whitespace().map(|s| s.to_owned()).collect()),
+                Err(env::VarError::NotPresent) => {
+                    Ok(default.iter().map(|s| (*s).to_owned()).collect())
+                }
+                Err(_) => Err(IceCapError::InvalidEnvironemntVariableValue {
+                    variable: var.to_owned(),
+                })?,
+            }
+        }
+
+        // Allow overriding these from environment variables
+        let qemu_bin = env_flags("VERACRUZ_ICECAP_QEMU_BIN", VERACRUZ_ICECAP_QEMU_BIN_DEFAULT)?;
+        let qemu_flags = env_flags(
+            "VERACRUZ_ICECAP_QEMU_FLAGS",
+            VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT,
+        )?;
+        let qemu_console_flags = env_flags(
+            "VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS",
+            VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT,
+        )?;
+        let qemu_image_flags = env_flags(
+            "VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS",
+            VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT,
+        )?;
+
+        // temporary directory for things
+        let tempdir = tempfile::tempdir()?;
+
+        // write the image to a temporary file, this makes sure our server is
+        // idempotent
+        let image_path = tempdir.path().join("image");
+        fs::write(&image_path, VERACRUZ_ICECAP_QEMU_IMAGE)?;
+        println!("vc-server: using image: {:?}", image_path);
+
+        // create a temporary socket for communication
+        let channel_path = tempdir.path().join("console0");
+        println!("vc-server: using unix socket: {:?}", channel_path);
+
+        // startup qemu
+        let child = Arc::new(Mutex::new(
+            Command::new(&qemu_bin[0])
+                .args(&qemu_bin[1..])
+                .args(&qemu_flags)
+                .args(
+                    qemu_console_flags
+                        .iter()
+                        .map(|s| s.replace("{console0_path}", channel_path.to_str().unwrap())),
+                )
+                .args(
+                    qemu_image_flags
+                        .iter()
+                        .map(|s| s.replace("{image_path}", image_path.to_str().unwrap())),
+                )
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(IceCapError::QemuSpawnError)?,
+        ));
+
+        // forward stderr/stdin via threads, this is necessary to avoid stdio
+        // issues under Cargo test
+        let stdout_handler = thread::spawn({
+            let mut child_stdout = child.lock().unwrap().stdout.take().unwrap();
+            move || {
+                let err = io::copy(&mut child_stdout, &mut io::stdout());
+                eprintln!("vc-server: qemu: stdout closed: {:?}", err);
+            }
+        });
+
+        let stderr_handler = thread::spawn({
+            let mut child_stderr = child.lock().unwrap().stderr.take().unwrap();
+            move || {
+                let err = io::copy(&mut child_stderr, &mut io::stderr());
+                eprintln!("vc-server: qemu: stderr closed: {:?}", err);
+            }
+        });
+
+        // hookup signal handler so SIGINT will teardown the child process
+        let mut signals = Signals::new(&[SIGINT])?;
+        let signal_handle = signals.handle();
+        let signal_handler = thread::spawn({
+            let child = child.clone();
+            move || {
+                for sig in signals.forever() {
+                    eprintln!("vc-server: qemu: Killed by signal: {:?}", sig);
+                    child.lock().unwrap().kill().unwrap();
+                    signal_hook::low_level::emulate_default_handler(SIGINT).unwrap();
+                }
+            }
+        });
+
+        // connect via socket
+        let channel = loop {
+            match UnixStream::connect(&channel_path) {
+                Ok(channel) => {
+                    break channel;
+                }
+                Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                    thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+                // NOTE I don't know why this one happens
+                Err(err) if err.kind() == io::ErrorKind::ConnectionRefused => {
+                    thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+                Err(err) => {
+                    Err(IceCapError::ChannelError(err))?;
+                }
+            };
+        };
+
+        Ok(IceCapRealm {
+            child: child,
+            stdout_handler: stdout_handler,
+            stderr_handler: stderr_handler,
+            signal_handle: signal_handle,
+            signal_handler: signal_handler,
+            channel: channel,
+            tempdir: tempdir,
+        })
+    }
+
+    fn communicate(&mut self, request: &Request) -> Result<Response, VeracruzServerError> {
+        // send request
+        let raw_request = bincode::serialize(request)?;
+        let raw_header = bincode::serialize(&Header::try_from(raw_request.len()).unwrap())?;
+        self.channel
+            .write_all(&raw_header)
+            .map_err(IceCapError::ChannelError)?;
+        self.channel
+            .write_all(&raw_request)
+            .map_err(IceCapError::ChannelError)?;
+
+        // recv response
+        let mut raw_header = [0; size_of::<Header>()];
+        self.channel
+            .read_exact(&mut raw_header)
+            .map_err(IceCapError::ChannelError)?;
+        let header = bincode::deserialize::<Header>(&raw_header)?;
+        let mut raw_response = vec![0; usize::try_from(header).unwrap()];
+        self.channel
+            .read_exact(&mut raw_response)
+            .map_err(IceCapError::ChannelError)?;
+        let response = bincode::deserialize::<Response>(&raw_response)?;
+
+        Ok(response)
+    }
+
+    // NOTE close can report errors, but drop can still happen in weird cases
+    fn shutdown(self) -> Result<(), VeracruzServerError> {
+        println!("vc-server: shutting down");
+        self.signal_handle.close();
+        self.child.lock().unwrap().kill()?;
+        Ok(())
+    }
+}
+
+pub struct VeracruzServerIceCap(Option<IceCapRealm>);
+
+impl VeracruzServerIceCap {
+    fn communicate(&mut self, request: &Request) -> Result<Response, VeracruzServerError> {
+        match &mut self.0 {
+            Some(realm) => realm.communicate(request),
+            None => return Err(VeracruzServerError::UninitializedEnclaveError),
+        }
+    }
+
+    fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
+        match self.communicate(&Request::GetTlsDataNeeded(session_id))? {
+            Response::GetTlsDataNeeded(needed) => Ok(needed),
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+        }
+    }
 }
 
 impl VeracruzServer for VeracruzServerIceCap {
-    fn new(policy_json: &str) -> Result<Self> {
+    fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
         let policy: Policy = Policy::from_json(policy_json)?;
 
-        let configuration = Configuration::from_env()?;
-        configuration.destroy_realm()?; // HACK clean up in case of previous failure
-        configuration.create_realm()?;
-        let realm_process = configuration.run_realm()?;
-        let realm_channel = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&configuration.realm_endpoint)
-            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
-        let server = Self {
-            configuration,
-            realm_channel,
-            realm_process,
-        };
+        // create the realm
+        let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
         let (device_id, challenge) = send_proxy_attestation_server_start(
             policy.proxy_attestation_server_url(),
@@ -198,16 +311,12 @@ impl VeracruzServer for VeracruzServerIceCap {
         )
         .map_err(VeracruzServerError::HttpError)?;
 
-        let (token, csr) = match server.send(&Request::Attestation {
+        let (token, csr) = match self_.communicate(&Request::Attestation {
             challenge,
             device_id,
         })? {
             Response::Attestation { token, csr } => (token, csr),
-            resp => {
-                return Err(VeracruzServerError::IceCapError(
-                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
-                ))
-            }
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
         };
 
         let (root_cert, compute_cert) = {
@@ -229,41 +338,29 @@ impl VeracruzServer for VeracruzServerIceCap {
             (root_cert.to_vec(), compute_cert.to_vec())
         };
 
-        match server.send(&Request::Initialize {
+        match self_.communicate(&Request::Initialize {
             policy_json: policy_json.to_string(),
             root_cert,
             compute_cert,
         })? {
             Response::Initialize => (),
-            resp => {
-                return Err(VeracruzServerError::IceCapError(
-                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
-                ))
-            }
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
         }
 
-        Ok(server)
+        Ok(self_)
     }
 
-    fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        unimplemented!()
-    }
-
-    fn new_tls_session(&mut self) -> Result<u32> {
-        match self.send(&Request::NewTlsSession)? {
+    fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
+        match self.communicate(&Request::NewTlsSession)? {
             Response::NewTlsSession(session_id) => Ok(session_id),
-            resp => Err(VeracruzServerError::IceCapError(
-                IceCapError::UnexpectedRuntimeManagerResponse(resp),
-            )),
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
         }
     }
 
-    fn close_tls_session(&mut self, session_id: u32) -> Result<()> {
-        match self.send(&Request::CloseTlsSession(session_id))? {
+    fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
+        match self.communicate(&Request::CloseTlsSession(session_id))? {
             Response::CloseTlsSession => Ok(()),
-            resp => Err(VeracruzServerError::IceCapError(
-                IceCapError::UnexpectedRuntimeManagerResponse(resp),
-            )),
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
         }
     }
 
@@ -271,14 +368,10 @@ impl VeracruzServer for VeracruzServerIceCap {
         &mut self,
         session_id: u32,
         input: Vec<u8>,
-    ) -> Result<(bool, Option<Vec<Vec<u8>>>)> {
-        match self.send(&Request::SendTlsData(session_id, input))? {
+    ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
+        match self.communicate(&Request::SendTlsData(session_id, input))? {
             Response::SendTlsData => (),
-            resp => {
-                return Err(VeracruzServerError::IceCapError(
-                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
-                ))
-            }
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
         }
 
         let mut acc = Vec::new();
@@ -286,18 +379,14 @@ impl VeracruzServer for VeracruzServerIceCap {
             if !self.tls_data_needed(session_id)? {
                 break true;
             }
-            match self.send(&Request::GetTlsData(session_id))? {
+            match self.communicate(&Request::GetTlsData(session_id))? {
                 Response::GetTlsData(active, data) => {
                     acc.push(data);
                     if !active {
                         break false;
                     }
                 }
-                resp => {
-                    return Err(VeracruzServerError::IceCapError(
-                        IceCapError::UnexpectedRuntimeManagerResponse(resp),
-                    ))
-                }
+                resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
             };
         };
 
@@ -310,12 +399,14 @@ impl VeracruzServer for VeracruzServerIceCap {
         ))
     }
 
-    fn shutdown_isolate(&mut self) -> result::Result<(), Box<dyn error::Error>> {
-        self.realm_process
-            .kill()
-            .map_err(IceCapError::hoist(IceCapError::ShadowVMMStopError))?;
-        self.configuration.destroy_realm()?;
-        Ok(())
+    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+        match self.0.take() {
+            Some(realm) => {
+                realm.shutdown()?;
+                Ok(())
+            }
+            None => Ok(()),
+        }
     }
 }
 
@@ -323,45 +414,6 @@ impl Drop for VeracruzServerIceCap {
     fn drop(&mut self) {
         if let Err(err) = self.shutdown_isolate() {
             panic!("Realm failed to shutdown: {}", err)
-        }
-    }
-}
-
-impl VeracruzServerIceCap {
-    fn send(&self, request: &Request) -> Result<Response> {
-        // We have '&self' rather than '&mut self', so we must use 'impl Write for &File'
-        // rather than 'impl Write for File'.
-        let mut realm_channel = &self.realm_channel;
-
-        let msg =
-            serialize(request).map_err(IceCapError::hoist(IceCapError::SerializationError))?;
-        let header = (msg.len() as Header).to_le_bytes();
-        realm_channel
-            .write(&header)
-            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
-        realm_channel
-            .write(&msg)
-            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
-        let mut header_bytes = [0; size_of::<Header>()];
-        realm_channel
-            .read_exact(&mut header_bytes)
-            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
-        let header = u32::from_le_bytes(header_bytes);
-        let mut resp_bytes = vec![0; header as usize];
-        realm_channel
-            .read_exact(&mut resp_bytes)
-            .map_err(IceCapError::hoist(IceCapError::RealmChannelError))?;
-        let resp = deserialize(&resp_bytes)
-            .map_err(IceCapError::hoist(IceCapError::SerializationError))?;
-        Ok(resp)
-    }
-
-    fn tls_data_needed(&self, session_id: u32) -> Result<bool> {
-        match self.send(&Request::GetTlsDataNeeded(session_id))? {
-            Response::GetTlsDataNeeded(needed) => Ok(needed),
-            resp => Err(VeracruzServerError::IceCapError(
-                IceCapError::UnexpectedRuntimeManagerResponse(resp),
-            )),
         }
     }
 }

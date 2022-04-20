@@ -1,0 +1,13 @@
+[package]
+name = "virtio-console-server"
+version = "0.2.0"
+edition = "2018"
+
+[dependencies]
+icecap-core = { path =  "../../crates/icecap/crates/framework/base/icecap-core" }
+icecap-driver-interfaces = { path =  "../../crates/icecap/crates/framework/drivers/icecap-driver-interfaces" }
+icecap-pl011-driver = { path =  "../../crates/icecap/crates/framework/drivers/devices/pl011" }
+icecap-start-generic = { path =  "../../crates/icecap/crates/framework/base/icecap-start/generic" }
+libc = { path = "../../crates/icecap/sysroot/libc", optional = true }
+serde = { version = "*", default-features = false, features = [ "alloc", "derive" ] }
+virtio-drivers = { path = "../../crates/icecap/crates/framework/drivers/devices/virtio-drivers" }

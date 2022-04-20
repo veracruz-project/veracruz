@@ -25,7 +25,7 @@ use bincode::{deserialize, serialize};
 use clap::{App, Arg};
 use hex::decode_to_slice;
 use io_utils::fd::{receive_buffer, send_buffer};
-use log::{error, info};
+use log::{error, info, trace};
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
@@ -246,7 +246,8 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                 RuntimeManagerError::BincodeError(derr)
             })?;
 
-        info!("Received message: {:?}.", received_message);
+        info!("Received message.");
+        trace!("Received message: {:?}.", received_message);
 
         let return_message = match received_message {
             RuntimeManagerMessage::Attestation(challenge, _challenge_id) => {
@@ -366,7 +367,8 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
             RuntimeManagerError::BincodeError(serr)
         })?;
 
-        info!("Sending message: {:?}.", return_message);
+        info!("Sending message");
+        trace!("Sending message: {:?}.", return_message);
 
         send_buffer(&mut fd, &return_buffer).map_err(|e| {
             error!("Failed to send message.  Error produced: {}.", e);

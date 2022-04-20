@@ -11,71 +11,61 @@
 
 extern crate alloc;
 
-use bincode::{deserialize, serialize};
-use serde::{Deserialize, Serialize};
+use core::convert::TryFrom;
+use core::mem::size_of;
 
-use finite_set::Finite;
-use hypervisor_event_server_types::{
-    calls::Client as EventServerRequest, events, Bitfield as EventServerBitfield,
-};
-use icecap_core::{
-    config::{RingBufferConfig, RingBufferKicksConfig},
-    logger::{DisplayMode, Level, Logger},
-    prelude::*,
-    ring_buffer::*,
-    rpc, runtime as icecap_runtime,
-};
+use icecap_core::config::*;
+use icecap_core::logger::{DisplayMode, Level, Logger};
+use icecap_core::prelude::*;
+use icecap_core::ring_buffer::*;
 use icecap_start_generic::declare_generic_main;
-use icecap_std_external;
-
-use veracruz_utils::platform::icecap::message::{Error, Request, Response};
 
 use crate::managers::{session_manager, RuntimeManagerError};
+use veracruz_utils::platform::icecap::message::{Error, Header, Request, Response};
+
+use bincode;
+use serde::{Deserialize, Serialize};
 
 declare_generic_main!(main);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Config {
-    event: Notification,
-    event_server_endpoint: Endpoint,
-    event_server_bitfield: usize,
-    channel: RingBufferConfig,
+    event_nfn: Notification,
+    virtio_console_server_ring_buffer: UnmanagedRingBufferConfig,
+    badges: Badges,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Badges {
+    virtio_console_server_ring_buffer: Badge,
 }
 
 fn main(config: Config) -> Fallible<()> {
+    // TODO why do we need this?
     icecap_runtime_init();
 
-    let channel = {
-        let event_server = rpc::Client::<EventServerRequest>::new(config.event_server_endpoint);
-        let index = {
-            use events::*;
-            RealmOut::RingBuffer(RealmRingBufferOut::Host(RealmRingBufferId::Channel))
-        };
-        let kick = Box::new(move || {
-            event_server.call::<()>(&EventServerRequest::Signal {
-                index: index.to_nat(),
-            })
-        });
-        RingBuffer::resume_from_config(
-            &config.channel,
-            RingBufferKicksConfig {
-                read: kick.clone(),
-                write: kick,
-            },
-        )
-    };
+    debug_println!("icecap-realmos: initializing...");
 
-    let event_server_bitfield = unsafe { EventServerBitfield::new(config.event_server_bitfield) };
+    // enable ring buffer to serial-server
+    let virtio_console_client =
+        RingBuffer::unmanaged_from_config(&config.virtio_console_server_ring_buffer);
+    virtio_console_client.enable_notify_read();
+    virtio_console_client.enable_notify_write();
+    debug_println!("icecap-realmos: enabled ring buffer");
 
-    event_server_bitfield.clear_ignore_all();
-
-    RuntimeManager::new(channel, config.event, event_server_bitfield).run()
+    debug_println!("icecap-realmos: running...");
+    RuntimeManager::new(
+        virtio_console_client,
+        config.event_nfn,
+        config.badges.virtio_console_server_ring_buffer,
+    )
+    .run()
 }
 
 struct RuntimeManager {
-    channel: PacketRingBuffer,
+    channel: RingBuffer,
     event: Notification,
-    event_server_bitfield: EventServerBitfield,
+    virtio_console_server_ring_buffer_badge: Badge,
     active: bool,
 }
 
@@ -83,28 +73,68 @@ impl RuntimeManager {
     fn new(
         channel: RingBuffer,
         event: Notification,
-        event_server_bitfield: EventServerBitfield,
+        virtio_console_server_ring_buffer_badge: Badge,
     ) -> Self {
         Self {
-            channel: PacketRingBuffer::new(channel),
-            event,
-            event_server_bitfield,
+            channel: channel,
+            event: event,
+            virtio_console_server_ring_buffer_badge: virtio_console_server_ring_buffer_badge,
             active: true,
         }
     }
 
     fn run(&mut self) -> Fallible<()> {
         loop {
-            let req = self
-                .recv()
-                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
-            let resp = self.handle(req)?;
-            self.send(&resp)
-                .map_err(|e| format_err!("RuntimeManagerErro: {:?}", e))?;
-            if !self.active {
-                icecap_runtime::exit();
+            let badge = self.event.wait();
+            if badge & self.virtio_console_server_ring_buffer_badge != 0 {
+                self.process()?;
+                self.channel.enable_notify_read();
+                self.channel.enable_notify_write();
+
+                if !self.active {
+                    return Ok(());
+                }
             }
         }
+    }
+
+    fn process(&mut self) -> Fallible<()> {
+        // recv request if we have a full request in our ring buffer
+        if self.channel.poll_read() < size_of::<Header>() {
+            return Ok(());
+        }
+        let mut raw_header = [0; size_of::<Header>()];
+        self.channel.peek(&mut raw_header);
+        let header = bincode::deserialize::<Header>(&raw_header)
+            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+        let size = usize::try_from(header)
+            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+
+        if self.channel.poll_read() < size_of::<Header>() + size {
+            return Ok(());
+        }
+        let mut raw_request = vec![0; usize::try_from(header).unwrap()];
+        self.channel.skip(size_of::<Header>());
+        self.channel.read(&mut raw_request);
+        let request = bincode::deserialize::<Request>(&raw_request)
+            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+
+        // process requests
+        let response = self.handle(request)?;
+
+        // send response
+        let raw_response = bincode::serialize(&response)
+            .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
+        let raw_header = bincode::serialize(&Header::try_from(raw_response.len()).unwrap())
+            .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
+
+        self.channel.write(&raw_header);
+        self.channel.write(&raw_response);
+
+        self.channel.notify_read();
+        self.channel.notify_write();
+
+        Ok(())
     }
 
     fn handle(&mut self, req: Request) -> Fallible<Response> {
@@ -137,7 +167,10 @@ impl RuntimeManager {
                 Ok(()) => Response::CloseTlsSession,
             },
             Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
-                Err(_) => Response::Error(Error::Unspecified),
+                Err(e) => {
+                    debug_println!("oh no {:?}", e);
+                    Response::Error(Error::Unspecified)
+                }
                 Ok(()) => Response::SendTlsData,
             },
             Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
@@ -163,44 +196,6 @@ impl RuntimeManager {
         let token = attestation_hack::native_attestation(&challenge, &csr)?;
         Ok((token, csr))
     }
-
-    fn wait(&self) {
-        let badge = self.event.wait();
-        self.event_server_bitfield.clear_ignore(badge);
-    }
-
-    fn send(&mut self, resp: &Response) -> Result<(), RuntimeManagerError> {
-        let mut block = false;
-        let resp_bytes = serialize(resp).map_err(RuntimeManagerError::BincodeError)?;
-        while !self.channel.write(&resp_bytes) {
-            if block {
-                self.wait();
-                block = false;
-            } else {
-                block = true;
-                self.channel.enable_notify_write();
-            }
-        }
-        self.channel.notify_write();
-        Ok(())
-    }
-
-    fn recv(&mut self) -> Result<Request, RuntimeManagerError> {
-        let mut block = false;
-        loop {
-            if let Some(msg) = self.channel.read() {
-                self.channel.notify_read();
-                let req = deserialize(&msg).map_err(RuntimeManagerError::BincodeError)?;
-                return Ok(req);
-            } else if block {
-                self.wait();
-                block = false;
-            } else {
-                block = true;
-                self.channel.enable_notify_read();
-            }
-        }
-    }
 }
 
 const LOG_LEVEL: Level = Level::Error;
@@ -208,7 +203,7 @@ const LOG_LEVEL: Level = Level::Error;
 // HACK
 // System time is provided at build time. The same time is provided to the test Linux userland.
 // These must align with eachother and with the time the test policies were generated.
-const NOW: u64 = include!("../../icecap/build/NOW");
+const NOW: u64 = include!("../NOW");
 
 fn icecap_runtime_init() {
     icecap_std_external::early_init();

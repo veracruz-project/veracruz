@@ -14,10 +14,11 @@
 	url = https://github.com/nanopb/nanopb
 [submodule "icecap/icecap"]
 	path = icecap/icecap
-	url = https://github.com/veracruz-project/icecap.git
+	url = https://gitlab.com/arm-research/security/icecap/icecap.git
+	branch = realmos
 [submodule "icecap/sysroot/rust"]
 	path = icecap/sysroot/rust
-	url = https://github.com/veracruz-project/icecap-rust.git
+	url = https://gitlab.com/arm-research/security/icecap/rust.git
 [submodule "third-party/ring"]
 	path = third-party/ring
 	url = https://github.com/veracruz-project/ring.git
@@ -34,10 +35,6 @@
 	path = third-party/rustls
 	url = https://github.com/veracruz-project/rustls.git
 	branch = self_signed
-[submodule "third-party/libc"]
-	path = third-party/libc
-	url = https://github.com/veracruz-project/libc.git
-	branch = veracruz
 [submodule "third-party/wasi-types"]
 	path = third-party/wasi-types
 	url = https://github.com/veracruz-project/wasi-types.git
@@ -49,3 +46,18 @@
 [submodule "third-party/rust-psa-crypto"]
 	path = third-party/rust-psa-crypto
 	url = https://github.com/veracruz-project/rust-psa-crypto.git
+[submodule "workspaces/icecap-runtime/deps/seL4"]
+	path = workspaces/icecap-runtime/deps/seL4
+	url = https://gitlab.com/arm-research/security/icecap/seL4.git
+	branch = realmos
+[submodule "workspaces/icecap-runtime/deps/seL4_tools"]
+	path = workspaces/icecap-runtime/deps/seL4_tools
+	url = https://gitlab.com/arm-research/security/icecap/seL4_tools.git
+	branch = realmos
+[submodule "workspaces/icecap-runtime/deps/capdl"]
+	path = workspaces/icecap-runtime/deps/capdl
+	url = https://gitlab.com/arm-research/security/icecap/capdl.git
+[submodule "icecap/sysroot/libc"]
+	path = icecap/sysroot/libc
+	url = https://gitlab.com/arm-research/security/icecap/rust-libc.git
+	branch = icecap

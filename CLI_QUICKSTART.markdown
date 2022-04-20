@@ -17,7 +17,8 @@ using. So for example, if you are running Veracruz on Linux, you would
 run `make -C workspaces linux-install`.
 
 ``` bash
-$ make -C workspaces linux-install
+$ make -C workspaces linux
+$ sudo make -C workspaces linux-install
 ...
 ```
 
@@ -116,31 +117,41 @@ we're going to create a separate identity for the program provider, result
 reader, and three data providers:
 
 ``` bash
-$ openssl genrsa -out example/example-program-key.pem 2048
+$ openssl genrsa 2048 \
+    | openssl pkcs8 -nocrypt -traditional \
+    > example/example-program-key.pem
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-program-key.pem \
     -out example/example-program-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example/example-data0-key.pem 2048
+$ openssl genrsa 2048 \
+    | openssl pkcs8 -nocrypt -traditional \
+    > example/example-data0-key.pem
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-data0-key.pem \
     -out example/example-data0-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example/example-data1-key.pem 2048
+$ openssl genrsa 2048 \
+    | openssl pkcs8 -nocrypt -traditional \
+    > example/example-data1-key.pem
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-data1-key.pem \
     -out example/example-data1-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example/example-data2-key.pem 2048
+$ openssl genrsa 2048 \
+    | openssl pkcs8 -nocrypt -traditional \
+    > example/example-data2-key.pem
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-data2-key.pem \
     -out example/example-data2-cert.pem \
     -config test-collateral/cert.conf
 
-$ openssl genrsa -out example/example-result-key.pem 2048
+$ openssl genrsa 2048 \
+    | openssl pkcs8 -nocrypt -traditional \
+    > example/example-result-key.pem
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-result-key.pem \
     -out example/example-result-cert.pem \

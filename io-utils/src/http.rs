@@ -17,7 +17,7 @@ use curl::{
     Error as CurlError,
 };
 use err_derive::Error;
-use log::{error, info};
+use log::{error, info, trace};
 use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
@@ -146,7 +146,7 @@ where
         transfer
             .write_function(|buf| {
                 received_body.push_str(from_utf8(buf).expect({
-                    info!(
+                    trace!(
                         "Error converting data {:?} from UTF-8.  Continuing with default value.",
                         buf
                     );
@@ -170,7 +170,7 @@ where
         transfer
             .header_function(|buf| {
                 received_header.push_str(from_utf8(buf).expect({
-                    info!(
+                    trace!(
                         "Error converting data {:?} from UTF-8.  Continuing with default value.",
                         buf
                     );

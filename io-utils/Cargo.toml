@@ -10,11 +10,14 @@ icecap = ["serde/derive", "base64/std"]
 linux = ["bincode", "byteorder", "base64/std"]
 nitro = ["serde_json/std", "base64/std", "nix", "byteorder"]
 
+# NOTE: socket2 is pinned to "=0.4.2" to avoid libc ^0.2.114 constraint
+#       in socket2 0.4.3
 [dependencies]
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bincode = { version = "1.2.1", default-features = false, optional = true }
 byteorder = { version = "1.4.3", optional = true }
-curl = "0.4.35"
+curl = "0.4.43"
+socket2 = "=0.4.2"
 err-derive = "0.2"
 log = "0.4.13"
 nix = { version = "0.15", optional = true }

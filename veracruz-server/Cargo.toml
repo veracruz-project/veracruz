@@ -24,8 +24,11 @@ icecap = [
   "policy-utils/icecap",
   "psa-attestation",
   "io-utils/icecap",
+  "tempfile",
+  "signal-hook",
   "veracruz-utils/icecap",
 ]
+icecap-qemu = []
 linux = [
   "data-encoding",
   "io-utils/linux",
@@ -46,9 +49,9 @@ actix-rt = { version = "1.0.0", optional = true }
 actix-web = "3.3.2"
 base64 = "0.10.1"
 bincode = { version = "1.2.1", default-features = false }
-curl = "0.4.35"
+curl = "0.4.43"
 data-encoding = { version = "2.3.2", optional = true }
-env_logger = { version = "0.7", optional = true }
+env_logger = { version = "0.9.0", optional = true }
 err-derive = "0.2"
 futures = "0.3"
 hex = "0.4.2"
@@ -63,6 +66,7 @@ ring = "0.16.11"
 rustls = "0.16"
 serde = { version = "1.0.115", default-features = false, features = ["derive"] }
 serde_json = "1.0"
+signal-hook = { version = "0.3.13", optional = true }
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
