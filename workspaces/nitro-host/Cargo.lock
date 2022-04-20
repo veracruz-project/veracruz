@@ -681,29 +681,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bd2a9a458e8f4304c52c43ebb0cfbd520289f8379a52e329a38afda99bf8eb8"
 dependencies = [
  "bitflags",
- "cexpr 0.4.0",
- "clang-sys",
- "clap",
- "env_logger",
- "lazy_static",
- "lazycell",
- "log",
- "peeking_take_while",
- "proc-macro2 1.0.36",
- "quote 1.0.15",
- "regex 1.5.5",
- "rustc-hash",
- "shlex 0.1.1",
- "which 3.1.1",
-]
-
-[[package]]
-name = "bindgen"
-version = "0.59.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd2a9a458e8f4304c52c43ebb0cfbd520289f8379a52e329a38afda99bf8eb8"
-dependencies = [
- "bitflags",
  "cexpr 0.6.0",
  "clang-sys",
  "clap",
