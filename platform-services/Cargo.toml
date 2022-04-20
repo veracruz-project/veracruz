@@ -8,7 +8,7 @@ version = "0.3.0"
 [features]
 default = []
 icecap = []
-nitro = ["nix", "aws-nitro-enclaves-nsm-api"]
+nitro = ["nix", "nsm_api", "nsm_lib"]
 std = ["getrandom", "nix"]
 
 [lib]
@@ -16,9 +16,8 @@ name = "platform_services"
 path = "./src/lib.rs"
 
 [dependencies]
-aws-nitro-enclaves-nsm-api = { version = "0.2.0", optional = true }
 cfg-if = "1"
 getrandom = { version = "0.1.14", optional = true }
 nix = { version = "0.22", optional = true }
-nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "aws-nitro-enclaves-nsm-api", optional = true }
-nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
+nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "aws-nitro-enclaves-nsm-api", optional = true }
+nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "nsm-lib", optional = true }

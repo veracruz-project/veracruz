@@ -193,7 +193,7 @@ impl VeracruzClient {
 
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
             .map_err(|err| VeracruzClientError::InvalidDnsNameError(err))?;
-        let mut connection = ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
+        let connection = ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
