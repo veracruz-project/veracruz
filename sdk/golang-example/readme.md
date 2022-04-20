@@ -22,20 +22,20 @@ Go to https://wasmtime.dev/
    mkdir Golang-to-WASI
    cd Golang-to-WASI
 
-(3) Create a file named main.go :
-   touch main.go
+(3) Create a file named *.go :  // replace * with program name, example: fibonacci.go 
+   touch *.go
 
 (4) Add the program there 
 
 (5) Compile to Wasm using the following lines:
-   tinygo build -wasm-abi=generic -target=wasi -o main.wasm main.go
+   tinygo build -wasm-abi=generic -target=wasi -o *.wasm *.go
 
 (6) The Wasmfile created in the folder:
-   file main.wasm
+   file *.wasm
 
 ### Part 2 (execute the Wasm via some engines)
 
 (1) Executing using Wasmtime :
-   wasmtime main.wasm
+   wasmtime *.wasm
 
 
