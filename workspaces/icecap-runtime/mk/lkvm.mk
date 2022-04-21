@@ -11,7 +11,7 @@ sel4_kernel_platform := lkvm
 
 sel4_dts_path := $(sel4_src)/tools/dts/lkvm.dts
 
-runtime_feature_flags := --features icecap-qemu
+runtime_feature_flags := --features icecap-lkvm
 
 .PHONY: clean-plat
 clean-plat:
