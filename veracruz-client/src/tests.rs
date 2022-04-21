@@ -46,7 +46,8 @@ use std::{
 use actix_session::Session;
 use actix_web::http::StatusCode;
 use actix_web::{post, App, HttpRequest, HttpResponse, HttpServer};
-use futures;
+
+use rustls_pemfile;
 
 pub fn policy_path(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
@@ -153,7 +154,7 @@ fn veracruz_client_session() {
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
         let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls::internal::pemfile::certs(&mut cursor).unwrap();
+        let certs = rustls_pemfile::certs(&mut cursor).unwrap();
         assert!(certs.len() > 0);
         certs[0].clone()
     };
@@ -164,7 +165,7 @@ fn veracruz_client_session() {
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer).unwrap();
         let mut cursor = std::io::Cursor::new(key_buffer);
-        let rsa_keys = rustls::internal::pemfile::rsa_private_keys(&mut cursor)
+        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)
             .expect("file contains invalid rsa private key");
         rsa_keys[0].clone()
     };
@@ -184,22 +185,20 @@ fn veracruz_client_session() {
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
         let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls::internal::pemfile::certs(&mut cursor).unwrap();
+        let certs = rustls_pemfile::certs(&mut cursor).unwrap();
         assert!(certs.len() > 0);
         certs[0].clone()
     };
 
     let mut server_root_cert_store = rustls::RootCertStore::empty();
-    server_root_cert_store.add(&client_cert).unwrap();
-    let mut server_config = rustls::ServerConfig::new(rustls::AllowAnyAuthenticatedClient::new(
-        server_root_cert_store,
-    ));
-    server_config.key_log = std::sync::Arc::new(rustls::KeyLogFile::new());
-    server_config
-        .set_single_cert(vec![server_cert.clone()], server_priv_key)
-        .expect("bad certificate/private key");
-    server_config.ciphersuites = rustls::ALL_CIPHERSUITES.to_vec(); // TODO: Choose one ciphersuite
-    server_config.versions = vec![rustls::ProtocolVersion::TLSv1_2];
+    server_root_cert_store.add(&rustls::Certificate(client_cert)).unwrap();
+
+    let server_config = rustls::ServerConfig::builder()
+            .with_cipher_suites(&rustls::ALL_CIPHER_SUITES.to_vec())
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(&[&rustls::version::TLS12]).unwrap()
+            .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(server_root_cert_store))
+            .with_single_cert(vec![rustls::Certificate(server_cert.to_vec())], rustls::PrivateKey(server_priv_key));
 }
 
 /// simple index handler
@@ -225,7 +224,7 @@ async fn runtime_manager(
 }
 
 async fn policy_server_loop(
-    _server_sess: &mut dyn rustls::Session,
+    _server_conn: &mut rustls::Connection,
     server_url: &str,
 ) -> Result<(), VeracruzClientError> {
     HttpServer::new(|| App::new().service(runtime_manager))
