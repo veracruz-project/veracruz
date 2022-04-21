@@ -12,6 +12,7 @@
 use super::common::MemoryHandler;
 use crate::fs::FileSystemResult;
 use std::fmt;
+use log::info;
 
 /// How many characters to display from a string or memory buffer.
 const BUFFER_DISPLAY_LEN: usize = 32;
@@ -65,7 +66,7 @@ impl Strace {
     /// Start generating strace output, given function name.
     pub fn func(enabled: bool, name: &str) -> Self {
         if enabled {
-            eprint!("{}(", name)
+            info!("{}(", name)
         };
         Strace {
             enabled,
@@ -78,9 +79,9 @@ impl Strace {
         match self.state {
             TraceState::Func => self.state = TraceState::Args,
             TraceState::Args => {
-                eprint!(", ");
+                info!(", ");
             }
-            TraceState::Done => eprint!("\nUnexpected strace arg: "),
+            TraceState::Done => info!("\nUnexpected strace arg: "),
         }
     }
 
@@ -92,8 +93,8 @@ impl Strace {
         self.arg_print_comma();
         let mut bytes = vec![0u8; len as usize];
         match mem.read_buffer(adr, &mut bytes) {
-            Ok(()) => eprint!("{}", strace_string(&bytes, BUFFER_DISPLAY_LEN)),
-            Err(_) => eprint!("BAD_MEM_REF"),
+            Ok(()) => info!("{}", strace_string(&bytes, BUFFER_DISPLAY_LEN)),
+            Err(_) => info!("BAD_MEM_REF"),
         }
     }
 
@@ -103,7 +104,7 @@ impl Strace {
             return;
         }
         self.arg_print_comma();
-        eprint!("{}", n)
+        info!("{}", n)
     }
 
     /// Print ellipsis ("...") for argument that we do not display.
@@ -112,7 +113,7 @@ impl Strace {
             return;
         }
         self.arg_print_comma();
-        eprint!("...")
+        info!("...")
     }
 
     /// Handle argument that is a directoy entry.
@@ -128,7 +129,7 @@ impl Strace {
         }
         self.arg_print_comma();
         // NOT YET IMPLEMENTED
-        eprint!("DIRENTS")
+        info!("DIRENTS")
     }
 
     /// Handle argument that represents events (for poll_oneoff).
@@ -138,7 +139,7 @@ impl Strace {
         }
         self.arg_print_comma();
         // NOT YET IMPLEMENTED
-        eprint!("EVENTS")
+        info!("EVENTS")
     }
 
     /// Handle argument fdstat (for fd_fdstat_get).
@@ -148,7 +149,7 @@ impl Strace {
         }
         self.arg_print_comma();
         // NOT YET IMPLEMENTED
-        eprint!("FDSTAT")
+        info!("FDSTAT")
     }
 
     /// Handle argument filestat.
@@ -158,7 +159,7 @@ impl Strace {
         }
         self.arg_print_comma();
         // NOT YET IMPLEMENTED
-        eprint!("FILESTAT")
+        info!("FILESTAT")
     }
 
     /// Handle argument as hexadecimal value.
@@ -167,7 +168,7 @@ impl Strace {
             return;
         }
         self.arg_print_comma();
-        eprint!("0x{:x}", n)
+        info!("0x{:x}", n)
     }
 
     /// Handle argument that is an iovec.
@@ -184,7 +185,7 @@ impl Strace {
         }
         self.arg_print_comma();
         if !res.is_ok() {
-            eprint!("_");
+            info!("_");
             return;
         }
         if let Ok(len) = memory_ref.read_u32(address) {
@@ -195,12 +196,12 @@ impl Strace {
                     buf.extend(b.as_ref())
                 }
                 buf.truncate(len as usize);
-                eprint!("{}", strace_string(&buf, BUFFER_DISPLAY_LEN))
+                info!("{}", strace_string(&buf, BUFFER_DISPLAY_LEN))
             } else {
-                eprint!("BAD_IOVEC")
+                info!("BAD_IOVEC")
             }
         } else {
-            eprint!("BAD_IOVEC_LEN") // This will probably never happen.
+            info!("BAD_IOVEC_LEN") // This will probably never happen.
         }
     }
 
@@ -211,8 +212,8 @@ impl Strace {
         }
         self.arg_print_comma();
         match mem.read_u16(adr) {
-            Ok(x) => eprint!("0x{:x}", x),
-            Err(_) => eprint!("BAD_MEM_REF"),
+            Ok(x) => info!("0x{:x}", x),
+            Err(_) => info!("BAD_MEM_REF"),
         }
     }
 
@@ -223,8 +224,8 @@ impl Strace {
         }
         self.arg_print_comma();
         match mem.read_u32(adr) {
-            Ok(x) => eprint!("{}", x),
-            Err(_) => eprint!("BAD_MEM_REF"),
+            Ok(x) => info!("{}", x),
+            Err(_) => info!("BAD_MEM_REF"),
         }
     }
 
@@ -235,8 +236,8 @@ impl Strace {
         }
         self.arg_print_comma();
         match mem.read_u64(adr) {
-            Ok(x) => eprint!("{}", x),
-            Err(_) => eprint!("BAD_MEM_REF"),
+            Ok(x) => info!("{}", x),
+            Err(_) => info!("BAD_MEM_REF"),
         }
     }
 
@@ -248,8 +249,8 @@ impl Strace {
         self.arg_print_comma();
         let mut bytes = vec![0u8; len as usize];
         match mem.read_buffer(adr, &mut bytes) {
-            Ok(()) => eprint!("{}", strace_string(&bytes, 1024)),
-            Err(_) => eprint!("BAD_MEM_REF"),
+            Ok(()) => info!("{}", strace_string(&bytes, 1024)),
+            Err(_) => info!("BAD_MEM_REF"),
         }
     }
 
@@ -268,15 +269,15 @@ impl Strace {
             match mem.read_u64(adr) {
                 Ok(x) => {
                     if x & 0xffffffff == 0 {
-                        eprint!("{{len={}}}", x >> 32)
+                        info!("{{len={}}}", x >> 32)
                     } else {
-                        eprint!("BAD_PRESTAT");
+                        info!("BAD_PRESTAT");
                     }
                 }
-                Err(_) => eprint!("BAD_MEM_REF"),
+                Err(_) => info!("BAD_MEM_REF"),
             }
         } else {
-            eprint!("_")
+            info!("_")
         }
     }
 
@@ -286,7 +287,7 @@ impl Strace {
             return;
         }
         self.arg_print_comma();
-        eprint!("0x{:x}", rights)
+        info!("0x{:x}", rights)
     }
 
     /// Handle argument subscriptions (for poll_oneoff).
@@ -296,7 +297,7 @@ impl Strace {
         }
         self.arg_print_comma();
         // NOT YET IMPLEMENTED
-        eprint!("SUBSCRIPTIONS")
+        info!("SUBSCRIPTIONS")
     }
 
     /// Handle results returned from function; this function is called last.
@@ -305,7 +306,7 @@ impl Strace {
             return result;
         }
         match self.state {
-            TraceState::Done => eprint!("\nUnexpected strace result: "),
+            TraceState::Done => info!("\nUnexpected strace result: "),
             _ => self.state = TraceState::Done,
         }
         match result {
