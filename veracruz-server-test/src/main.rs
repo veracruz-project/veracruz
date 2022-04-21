@@ -348,11 +348,13 @@ mod tests {
             let client_cert_filename = trust_path("never_used_cert.pem");
             let client_key_filename = trust_path("client_rsa_key.pem");
 
-        let mut _client_connection = create_client_test_connection(
-            client_cert_filename.as_path(),
-            client_key_filename.as_path(),
-            &policy.ciphersuite(),
-        );
+
+            let mut _client_connection = create_client_test_connection(
+                client_cert_filename.as_path(),
+                client_key_filename.as_path(),
+                &policy.ciphersuite(),
+            );
+        });
     }
 
     #[test]

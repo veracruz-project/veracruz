@@ -206,7 +206,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fd_create"
+name = "fd-create"
 version = "0.3.0"
 dependencies = [
  "anyhow",
