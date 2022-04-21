@@ -21,12 +21,15 @@ const FILENAME: &'static str = "/output/number-set.txt";
 fn main() -> anyhow::Result<()>{
 
     let content = String::from_utf8(fs::read(FILENAME)?)?;
+    let mut num_vec = vec![];
 
-    let mut num_vec: Vec<u32> = content
-        .trim()
-        .split(",")
-        .map(|x| x.parse::<u32>().expect("Number couldn't be parsed"))
-        .collect();
+    for x in content.trim().split(",") {
+        if let Ok(n) = x.parse::<u32>() {
+            num_vec.push(n);
+        } else {
+            anyhow::bail!("Unable to parse {} as u32.", x);
+        }
+    }
 
     sieve_of_eratosthenes(&mut num_vec)?;
         
