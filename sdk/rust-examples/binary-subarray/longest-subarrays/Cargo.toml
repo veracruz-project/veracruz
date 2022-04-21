@@ -1,0 +1,11 @@
+[package]
+authors = ["The Veracruz Development Team"]
+description = "Reads the input file containing 0s and 1s, and prints out the three longest subarrays: (Alternating, 0s, 1s)"
+name = "longest-subarrays"
+version = "0.3.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.56"
