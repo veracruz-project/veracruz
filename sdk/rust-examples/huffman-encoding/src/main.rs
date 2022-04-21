@@ -50,13 +50,15 @@ fn new_node(freq: u32, ch: Option<char>) -> Node {
 }
 
 /// Count the frequency of occurence of each unique ASCII character in the input string
-fn frequency(s: &str) -> HashMap<char, u32> {
+fn frequency<A>(s: A) -> HashMap<char, u32>
+where
+    A: AsRef<str>,
+{
     let mut hm = HashMap::new();
-    for ch in s.chars() {
-        let count = hm.entry(ch).or_insert(0);
-        *count += 1;
+    for ch in s.as_ref().chars() {
+        let counter = hm.entry(ch).or_insert(0);
+        *counter += 1;
     }
-
     hm
 }
 
@@ -121,9 +123,8 @@ fn main() -> anyhow::Result<()> {
     let file_vec = fs::read(INPUT_FILENAME)?;
 
     let msg = String::from_utf8_lossy(&file_vec).to_string();
-    let msg = msg.as_str();
 
-    let hm = frequency(msg);
+    let hm = frequency(&msg);
 
     let mut p: Vec<Box<Node>> = hm
         .iter()
@@ -147,7 +148,7 @@ fn main() -> anyhow::Result<()> {
 
     assign_codes(&root, &mut hm, String::new());
 
-    let enc = encode_string(msg, &hm);
+    let enc = encode_string(&msg, &hm);
     let dec = decode_string(&enc, &root);
 
     let mut ret = String::new();
