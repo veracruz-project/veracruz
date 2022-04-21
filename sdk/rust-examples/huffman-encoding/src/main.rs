@@ -54,12 +54,12 @@ fn frequency<A>(s: A) -> HashMap<char, u32>
 where
     A: AsRef<str>,
 {
-    let mut h = HashMap::new();
+    let mut hm = HashMap::new();
     for ch in s.as_ref().chars() {
-        let counter = h.entry(ch).or_insert(0);
+        let counter = hm.entry(ch).or_insert(0);
         *counter += 1;
     }
-    h
+    hm
 }
 
 /// Assign the binary codes to each unique ASCII character in the input string
