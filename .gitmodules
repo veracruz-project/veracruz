@@ -5,10 +5,6 @@
 [submodule "psa_attestation/lib/t_cose"]
 	path = psa-attestation/lib/t_cose
 	url = https://github.com/veracruz-project/t_cose.git
-[submodule "docker"]
-	path = docker
-	url = https://github.com/veracruz-project/veracruz-docker-image.git
-    branch = main
 [submodule "veracruz-mcu-client/nanopb"]
 	path = veracruz-mcu-client/nanopb
 	url = https://github.com/nanopb/nanopb
