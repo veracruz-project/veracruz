@@ -3,7 +3,7 @@
 //! ## Context
 //!
 //! Generate all numbers from 2 to the specified upper limit
-//! 
+//!
 //! ## Authors
 //!
 //! The Veracruz Development Team.
@@ -13,8 +13,8 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::fs;
 use anyhow;
+use std::fs;
 
 const OUTPUT_FILENAME: &'static str = "/output/number-set.txt";
 
@@ -23,7 +23,11 @@ fn main() -> anyhow::Result<()> {
 
     let args: Vec<String> = std::env::args().collect();
 
-    let upper_limit = args.get(0).unwrap_or(&String::from("100")).to_owned().parse::<u32>()?;
+    let upper_limit = args
+        .get(0)
+        .unwrap_or(&String::from("100"))
+        .to_owned()
+        .parse::<u32>()?;
 
     for i in 2..=upper_limit {
         set.push(i);

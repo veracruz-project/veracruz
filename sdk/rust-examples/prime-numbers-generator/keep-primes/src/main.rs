@@ -13,13 +13,12 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::fs;
 use anyhow;
+use std::fs;
 
-const FILENAME: &'static str = "/output/number-set.txt"; 
+const FILENAME: &'static str = "/output/number-set.txt";
 
-fn main() -> anyhow::Result<()>{
-
+fn main() -> anyhow::Result<()> {
     let content = String::from_utf8(fs::read(FILENAME)?)?;
     let mut num_vec = vec![];
 
@@ -32,22 +31,22 @@ fn main() -> anyhow::Result<()>{
     }
 
     sieve_of_eratosthenes(&mut num_vec)?;
-        
+
     let mut content: String = num_vec
         .iter()
         .map(|n| n.to_string())
         .collect::<Vec<_>>()
-        .join(","); 
-   
-    // remove last comma, add end of line character
+        .join(",");
+
+    /// remove last comma, add end of line character
     content.push('\n');
 
     fs::write(FILENAME, content)?;
-    
+
     Ok(())
 }
 
-// implements sieve_of_eratosthenes algorithm, and retain only prime numbers from nums
+/// implements sieve_of_eratosthenes algorithm, and retain only prime numbers from nums
 fn sieve_of_eratosthenes(nums: &mut Vec<u32>) -> anyhow::Result<()> {
     let n = (nums[nums.len() - 1] + 1) as usize;
     let mut is_prime = vec![true; n];
@@ -60,12 +59,12 @@ fn sieve_of_eratosthenes(nums: &mut Vec<u32>) -> anyhow::Result<()> {
             while i < n {
                 is_prime[i] = false;
                 i += p;
-            } 
+            }
         }
         p += 1;
     }
 
-    // exclude 0 and 1 
+    /// exclude 0 and 1
     is_prime[0] = false;
     is_prime[1] = false;
 
