@@ -6,24 +6,38 @@ import itertools as it
 BADGE_IRQ = 1 << 0
 BADGE_CLIENT = 1 << 1
 
-VIRTIO_PADDR = 0xa000000
-VIRTIO_IRQ = 0x20 + 0x10
-VIRTIO_COUNT = 32
-VIRTIO_POOL_SIZE = 32*4096
-VIRTIO_REGION = (VIRTIO_PADDR, VIRTIO_PADDR + VIRTIO_COUNT*512)
+MMIO_BLOCK_SIZE = 512
 
+QEMU_VIRTIO_PARAMS = {
+    "paddr": 0xa000000,
+    "irq": 0x20 + 0x10,
+    "count": 32,
+    "poolsize": 32 * 4096,
+}
+
+LKVM_VIRTIO_PARAMS = {
+    "paddr": 0x10000,
+    "irq": 0x20 + 0x10,
+    "count": 32,
+    "poolsize": 32 * 4096,
+}
 
 class VirtioConsoleServer(GenericElfComponent):
+    def virtio_params(self):
+        pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        virtio = self.virtio_params()
+        virtio_region_start = align_down(virtio["paddr"], PAGE_SIZE)
+        virtio_region_end = align_up(virtio["paddr"] + virtio["count"] * MMIO_BLOCK_SIZE, PAGE_SIZE)
 
         # first allocate vaddrs for the virtio region
         self.align(PAGE_SIZE)
         self.skip(PAGE_SIZE)
         virtio_vaddr = self.cur_vaddr
-        virtio_size = (align_up(VIRTIO_REGION[1], PAGE_SIZE)
-            - align_down(VIRTIO_REGION[0], PAGE_SIZE))
+        virtio_size = virtio_region_end - virtio_region_start
         self.skip(virtio_size)
 
         # add some padding to catch out-of-bounds access
@@ -32,7 +46,7 @@ class VirtioConsoleServer(GenericElfComponent):
         # allocate vaddrs for the virtio pool, these pages must be
         # shared with the host
         virtio_pool_vaddr = self.cur_vaddr
-        self.skip(align_up(VIRTIO_POOL_SIZE, PAGE_SIZE))
+        self.skip(align_up(virtio["poolsize"], PAGE_SIZE))
 
         # more padding
         self.skip(PAGE_SIZE)
@@ -41,10 +55,7 @@ class VirtioConsoleServer(GenericElfComponent):
         # TODO do we need to do this a page at a time?
         for (vaddr, paddr) in zip(
                 it.count(virtio_vaddr, PAGE_SIZE),
-                range(
-                    align_down(VIRTIO_REGION[0], PAGE_SIZE),
-                    align_up(VIRTIO_REGION[1], PAGE_SIZE),
-                    PAGE_SIZE)):
+                range(virtio_region_start, virtio_region_end, PAGE_SIZE)):
             self.map_with_size(
                 vaddr=vaddr, paddr=paddr, size=PAGE_SIZE,
                 read=True, write=True)
@@ -53,7 +64,7 @@ class VirtioConsoleServer(GenericElfComponent):
         virtio_pool_pages = []
         for vaddr in range(
                 virtio_pool_vaddr,
-                align_up(virtio_pool_vaddr + VIRTIO_POOL_SIZE, PAGE_SIZE),
+                align_up(virtio_pool_vaddr + virtio["poolsize"], PAGE_SIZE),
                 PAGE_SIZE):
             page = self.alloc(ObjectType.seL4_FrameObject,
                 name='virtio_page_{:#x}'.format(vaddr), size=4096)
@@ -65,7 +76,7 @@ class VirtioConsoleServer(GenericElfComponent):
         # create irq handler objects to catch all virtio IRQs
         self.event_nfn = self.alloc(ObjectType.seL4_NotificationObject, name='event_nfn')
         virtio_irq_handlers = []
-        for irq in range(VIRTIO_IRQ, VIRTIO_IRQ + VIRTIO_COUNT):
+        for irq in range(virtio["irq"], virtio["irq"] + virtio["count"]):
             irq_handler = self.alloc(ObjectType.seL4_IRQHandler,
                 name='irq_{}_handler'.format(irq),
                 number=irq, trigger=ARMIRQMode.seL4_ARM_IRQ_LEVEL,
@@ -77,7 +88,7 @@ class VirtioConsoleServer(GenericElfComponent):
             'virtio_region': (virtio_vaddr, virtio_vaddr + virtio_size),
             'virtio_irq_handlers': virtio_irq_handlers,
             'virtio_pool_region': (virtio_pool_vaddr,
-                align_up(virtio_pool_vaddr + VIRTIO_POOL_SIZE, PAGE_SIZE)),
+                align_up(virtio_pool_vaddr + virtio["poolsize"], PAGE_SIZE)),
             'virtio_pool_pages': virtio_pool_pages,
             'event_nfn': self.cspace().alloc(self.event_nfn, read=True),
             'badges': {
@@ -103,3 +114,11 @@ class VirtioConsoleServer(GenericElfComponent):
 
     def arg_json(self):
         return self._arg
+
+class QemuVirtioConsoleServer(VirtioConsoleServer):
+    def virtio_params(self):
+        return QEMU_VIRTIO_PARAMS
+
+class LkvmVirtioConsoleServer(VirtioConsoleServer):
+    def virtio_params(self):
+        return LKVM_VIRTIO_PARAMS

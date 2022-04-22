@@ -4,11 +4,16 @@ import os
 
 from icecap_framework import BaseComposition
 from runtime_manager import RuntimeManager
-from virtio_console_server import VirtioConsoleServer
+from virtio_console_server import QemuVirtioConsoleServer, LkvmVirtioConsoleServer
 
 class Composition(BaseComposition):
     def compose(self):
-        self.virtio_console_server = self.component(VirtioConsoleServer, 'virtio_console_server')
+        if self.plat == 'qemu':
+            self.virtio_console_server = self.component(QemuVirtioConsoleServer, 'virtio_console_server')
+        elif self.plat == 'lkvm':
+            self.virtio_console_server = self.component(LkvmVirtioConsoleServer, 'virtio_console_server')
+        else:
+            raise Exception("Unsupported platform '%s'" % (self.plat))
         self.component(RuntimeManager, 'runtime_manager')
 
 parser = ArgumentParser()
@@ -39,7 +44,6 @@ config = {
                 "full": os.path.join(components_path, "virtio-console-server.full.elf"),
                 "min": os.path.join(components_path, "virtio-console-server.min.elf"),
             }
-
         },
     }
 }
