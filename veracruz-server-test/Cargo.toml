@@ -47,5 +47,5 @@ rustls-pemfile = "0.3.0"
 transport-protocol = { path = "../transport-protocol" }
 veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
-webpki = "=0.22"
+webpki = "0.22"
 webpki-roots = "0.22"

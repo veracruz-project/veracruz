@@ -30,5 +30,5 @@ ring = "0.16.20"
 rustls = { version = "0.20.4" }
 serde = { version = "1.0.115", default-features = false, optional = true }
 serde_json = { version = "1.0", default-features = false }
-webpki = "=0.22"
+webpki = "0.22"
 x509-parser = { version = "0.7.0", optional = true }

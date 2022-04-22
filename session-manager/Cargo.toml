@@ -26,5 +26,5 @@ ring = "0.16.20"
 rustls = "0.20.4"
 rustls-pemfile = "0.3.0"
 veracruz-utils = { path = "../veracruz-utils" }
-webpki = "=0.22"
+webpki = "0.22"
 webpki-roots = "0.22"

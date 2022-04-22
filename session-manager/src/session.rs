@@ -44,8 +44,7 @@ impl Session {
     /// Creates a new session from a server configuration and a list of
     /// principals.
     pub fn new(config: rustls::ServerConfig, principals: &Vec<Principal>) -> Result<Self, SessionManagerError> {
-        let mut tls_connection = ServerConnection::new(std::sync::Arc::new(config))?;
-        tls_connection.set_buffer_limit(Some(512 * 1024));
+        let tls_connection = ServerConnection::new(std::sync::Arc::new(config))?;
 
         Ok(Session {
             tls_connection: tls_connection,
