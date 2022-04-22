@@ -7,29 +7,32 @@ BADGE_IRQ = 1 << 0
 BADGE_CLIENT = 1 << 1
 
 MMIO_BLOCK_SIZE = 512
-
-QEMU_VIRTIO_PARAMS = {
-    "paddr": 0xa000000,
-    "irq": 0x20 + 0x10,
-    "count": 32,
-    "poolsize": 32 * 4096,
-}
-
-LKVM_VIRTIO_PARAMS = {
-    "paddr": 0x10000,
-    "irq": 0x20 + 0x10,
-    "count": 32,
-    "poolsize": 32 * 4096,
+VIRTIO_PARAMS = {
+    "qemu": {
+        "paddr": 0xa000000,
+        "irq": 0x20 + 0x10,
+        "count": 32,
+        "poolsize": 32 * 4096,
+    },
+    "lkvm": {
+        "paddr": 0x10000,
+        "irq": 0x20 + 0x10,
+        "count": 32,
+        "poolsize": 32 * 4096,
+    }
 }
 
 class VirtioConsoleServer(GenericElfComponent):
-    def virtio_params(self):
-        pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        virtio = self.virtio_params()
+        plat = args[0].plat
+        if plat in VIRTIO_PARAMS:
+            virtio = VIRTIO_PARAMS[plat]
+        else:
+            raise Exception("Unsupported platform '%s'" % (plat))
+
         virtio_region_start = align_down(virtio["paddr"], PAGE_SIZE)
         virtio_region_end = align_up(virtio["paddr"] + virtio["count"] * MMIO_BLOCK_SIZE, PAGE_SIZE)
 
@@ -114,11 +117,3 @@ class VirtioConsoleServer(GenericElfComponent):
 
     def arg_json(self):
         return self._arg
-
-class QemuVirtioConsoleServer(VirtioConsoleServer):
-    def virtio_params(self):
-        return QEMU_VIRTIO_PARAMS
-
-class LkvmVirtioConsoleServer(VirtioConsoleServer):
-    def virtio_params(self):
-        return LKVM_VIRTIO_PARAMS
