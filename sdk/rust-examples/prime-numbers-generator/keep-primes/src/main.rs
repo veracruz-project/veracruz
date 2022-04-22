@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
         .collect::<Vec<_>>()
         .join(",");
 
-    /// remove last comma, add end of line character
+    // remove last comma, add end of line character
     content.push('\n');
 
     fs::write(FILENAME, content)?;
@@ -64,7 +64,7 @@ fn sieve_of_eratosthenes(nums: &mut Vec<u32>) -> anyhow::Result<()> {
         p += 1;
     }
 
-    /// exclude 0 and 1
+    // exclude 0 and 1
     is_prime[0] = false;
     is_prime[1] = false;
 
