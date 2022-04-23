@@ -9,7 +9,7 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock doc fmt \
+.PHONY: all build clean clean-cargo-lock doc fmt clippy \
 	test-client test-collateral test-dependencies test-server veracruz-test
 
 default: build
