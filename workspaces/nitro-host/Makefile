@@ -69,6 +69,20 @@ doc:
 fmt:
 	cargo fmt
 
+clippy: 
+	# source code
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p veracruz-client -- --no-deps
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p proxy-attestation-server -- --no-deps
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p veracruz-server -- --no-deps
+	# veracruz-test 
+	RUNTIME_MANAGER_EIF_PATH=/work/veracruz/workspaces/nitro-runtime/runtime_manager.eif \
+		cargo clippy --tests $(PROFILE_FLAG) --features nitro \
+		-p veracruz-test -- \
+		--no-deps
+	# veracruz-server-test
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) \
+		cargo clippy --tests $(PROFILE_FLAG) --features nitro  -p veracruz-server-test -- --no-deps
+
 clean:
 	cargo clean
 	rm -rf $(OUT_DIR)
