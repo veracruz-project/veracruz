@@ -9,9 +9,9 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build install clean clean-cargo-lock default doc fmt \
-	test-dependencies test-collateral test-server test-client veracruz-test \
-	tests
+.PHONY: all build install clean clean-cargo-lock default doc fmt clippy \
+				test-dependencies test-collateral test-server test-client veracruz-test \
+				tests
 
 default: build
 
@@ -78,6 +78,13 @@ veracruz-test: test-dependencies
 
 $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
+
+clippy: 
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-client -- --no-deps
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p proxy-attestation-server -- --no-deps
+	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-server -- --no-deps
+	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy --tests $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-test -- --no-deps
+	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy --tests $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-server-test -- --no-deps
 
 doc:
 	cargo doc
