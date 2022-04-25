@@ -80,11 +80,15 @@ $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
 
 clippy: 
+	# workspace members
 	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-client -- --no-deps
 	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p proxy-attestation-server -- --no-deps
 	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-server -- --no-deps
 	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy --tests $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-test -- --no-deps
 	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy --tests $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-server-test -- --no-deps
+	# veracruz dependencies
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p io-utils -- --no-deps
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p psa-attestation -- --no-deps
 
 doc:
 	cargo doc

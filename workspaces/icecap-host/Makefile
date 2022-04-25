@@ -108,11 +108,14 @@ fmt:
 	cargo fmt
 
 clippy:
+	# workspace members
 	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p proxy-attestation-server -- --no-deps
 	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p veracruz-client -- --no-deps
 	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p veracruz-server -- --no-deps
 	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests --features icecap -p veracruz-server-test -- --no-deps 
 	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests --features icecap -p veracruz-test -- --no-deps 
+	# veracruz dependencies
+	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p io-utils -- --no-deps
 
 clean:
 	cargo clean
