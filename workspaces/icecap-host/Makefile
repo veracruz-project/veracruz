@@ -30,9 +30,11 @@ include $(WORKSPACE_DIR)/shared.mk
 # NOTE this file must define:
 #  variables:
 #   - host_feature_flags
+#  rules:
+#   - rustup-plat
 include mk/$(icecap_plat).mk
 
-COMPILERS = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
+COMPILERS ?= CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 
 VERACRUZ_ICECAP_QEMU_IMAGE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
 
@@ -46,7 +48,7 @@ TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
 
 all: build test-collateral
 
-build: $(VERACRUZ_ICECAP_QEMU_IMAGE)
+build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) \
 		-p proxy-attestation-server \

@@ -89,7 +89,6 @@ none:
 #  variables:
 #   - sel4_kernel_platform
 #   - sel4_dts_path
-#   - runtime_feature_flags
 #  rules:
 #   - clean-plat
 include mk/$(icecap_plat).mk
@@ -99,6 +98,7 @@ include mk/$(icecap_plat).mk
 #   - manifest_path
 #   - cdl_script_path
 #   - icedl_components
+#   - project_feature_flags
 include $(PROJECT)/icecap.mk
 
 mk_dirs := $(sel4_build_dir) $(elfloader_build_dir) $(misc_build_dir)
@@ -233,10 +233,10 @@ icecap_rustflags := \
 rust-project: $(now) sysroot-install userspace_c sel4
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
 		cargo tree \
-			--manifest-path Cargo.toml --target $(rust_target) \
+			--manifest-path $(manifest_path) --target $(rust_target) \
 			-v --charset ascii -f "{p} {f}" \
 			$(foreach x,$(icedl_components),-p $(x)) \
-			 --features icecap > $(build_dir)/tree.txt ; \
+			$(project_feature_flags) > $(build_dir)/tree.txt ; \
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
 	$(call cargo_target_config_prefix,$(rust_target))RUSTFLAGS="$(icecap_rustflags)" \
 	$(call cargo_target_config_prefix,$(rust_target))LINKER="$(LD)" \
@@ -244,10 +244,10 @@ rust-project: $(now) sysroot-install userspace_c sel4
 	BINDGEN_EXTRA_CLANG_ARGS="$(icecap_c_include_flags) -I$(compiler_some_libc_include) -I/usr/aarch64-linux-gnu/include" \
 		cargo build \
 			-Z unstable-options \
-			--manifest-path Cargo.toml \
+			--manifest-path $(manifest_path) \
 			--target $(rust_target) \
+			$(project_feature_flags) \
 			$(foreach x,$(icedl_components),-p $(x)) \
-			--features icecap $(runtime_feature_flags) \
 			$(PROFILE_FLAG) $(V_FLAG) \
 			-j$$(nproc) \
 			--target-dir $(target_dir) \
