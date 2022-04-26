@@ -26,8 +26,7 @@ jobs:
       - name: Running linux test script
         id: linux-build-and-test
         run: |
-            make -C /work/veracruz/workspaces linux PROFILE=dev
-            make -C /work/veracruz/workspaces/linux-host test-client test-server veracruz-test PROFILE=dev
+            make -C /work/veracruz/workspaces linux-tests PROFILE=dev
 
   nitro:
     runs-on: ubuntu-latest
@@ -59,7 +58,7 @@ jobs:
       - name: Running IceCap test script
         id: icecap-build
         run: |
-            make -C /work/veracruz/workspaces/icecap-host test-client veracruz-test veracruz-test PROFILE=dev
+            make -C /work/veracruz/workspaces icecap-tests PROFILE=dev
 
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
