@@ -33,8 +33,8 @@
 	branch = self_signed
 [submodule "third-party/wasi-types"]
 	path = third-party/wasi-types
-	url = https://github.com/gbryant-arm/wasi-types.git
-	branch = exec-right
+	url = https://github.com/veracruz-project/wasi-types.git
+	branch = veracruz
 [submodule "third-party/wasmi"]
 	path = third-party/wasmi
 	url = https://github.com/veracruz-project/wasmi.git
