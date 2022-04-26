@@ -91,6 +91,8 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "linux")]
     #[error(display = "RuntimeManager: IO error: {:?}", _0)]
     IOError(IOError),
+    #[error(display = "RuntimeManager: Execution denied.")]
+    ExecutionDenied,
 }
 
 impl<T> From<PoisonError<T>> for RuntimeManagerError {

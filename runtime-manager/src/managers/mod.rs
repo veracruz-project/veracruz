@@ -24,7 +24,7 @@ use std::{
     vec::Vec,
 };
 use veracruz_utils::sha256::sha256;
-use wasi_types::ErrNo;
+use wasi_types::{ErrNo, Rights};
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -85,7 +85,17 @@ impl ProtocolState {
     ) -> Result<Self, RuntimeManagerError> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let rights_table = global_policy.get_rights_table();
+        let mut rights_table = global_policy.get_rights_table();
+
+        // Grant the super user read access to any file under the root. This is
+        // used internally to read the program on behalf of the executing party
+        let mut su_read_rights = HashMap::new();
+        su_read_rights.insert(
+            PathBuf::from("/"),
+            Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR,
+        );
+        rights_table.insert(Principal::InternalSuperUser, su_read_rights);
+
         let digest_table = global_policy.get_file_hash_table()?;
         let vfs = FileSystem::new(rights_table)?;
 
@@ -187,15 +197,24 @@ impl ProtocolState {
     }
 
     /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
-    /// The client must have the right to read the program.
+    /// The client must have the right to execute the program.
     pub(crate) fn execute(&mut self, client_id: &Principal, file_name: &str) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
         let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
             ..Default::default()
         };
+
+        if !self
+            .vfs
+            .is_file_executable(client_id, &PathBuf::from(file_name))
+            .map_err(|e| RuntimeManagerError::FileSystemError(e))?
+        {
+            return Err(RuntimeManagerError::ExecutionDenied);
+        }
+
         let program = self
-            .read_file(client_id, file_name)?
+            .read_file(&Principal::InternalSuperUser, file_name)?
             .ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
         let return_code = execute(
             &execution_strategy,
