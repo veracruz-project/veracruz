@@ -1919,6 +1919,20 @@ impl FileSystem {
         debug_assert_eq!(read_len, vec.len());
         Ok(vec)
     }
+
+    /// Return whether the given path can be executed by the given principal.
+    /// Fails if the principal can't access the path with `path_open()`.
+    pub fn is_file_executable<T: AsRef<Path> + Copy>(&mut self, principal: &Principal, path: T) -> FileSystemResult<bool> {
+        let (fd, file_name) = self.find_prestat(path)?;
+        self.path_open(fd, LookupFlags::empty(), file_name, OpenFlags::empty(), FileSystem::DEFAULT_RIGHTS, FileSystem::DEFAULT_RIGHTS, FdFlags::empty())?;
+
+        let inode_table = self.lock_inode_table()?;
+        let rights = inode_table.get_rights(principal)?;
+        let file_rights = rights.get(&path.as_ref().to_path_buf()).ok_or(ErrNo::Access)?;
+        let file_rights_bits = u64::from(*file_rights);
+
+        Ok(file_rights_bits & u64::from(Rights::FD_EXECUTE) != 0)
+    }
 }
 
 pub(crate) trait TryFromOrErrNo<T>: Sized {
