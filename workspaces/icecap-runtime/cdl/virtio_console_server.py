@@ -10,13 +10,13 @@ MMIO_BLOCK_SIZE = 512
 VIRTIO_PARAMS = {
     "qemu": {
         "paddr": 0xa000000,
-        "irq": 0x20 + 0x10,
+        "irq": 0x10 + 0x20,
         "count": 32,
         "poolsize": 32 * 4096,
     },
     "lkvm": {
         "paddr": 0x10000,
-        "irq": 0x20 + 0x10,
+        "irq": 0x10 + 0x4,
         "count": 32,
         "poolsize": 32 * 4096,
     }
