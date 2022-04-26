@@ -30,6 +30,7 @@ use policy_utils::{
     policy::Policy,
     principal::{ExecutionStrategy, FileHash, FileRights, Identity, Program},
 };
+use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::sha256::sha256;
 use wasi_types::Rights;
@@ -679,6 +680,9 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         | Rights::PATH_OPEN
         | Rights::PATH_CREATE_DIRECTORY;
 
+    #[allow(non_snake_case)]
+    let EXECUTE_RIGHTS = Rights::FD_EXECUTE;
+
     let mut split = cap_string.split(':');
     let file_name = enforce_leading_backslash(
         split
@@ -695,14 +699,23 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         ))
         .trim();
 
-    let rights = match string_number {
-        // allow "rw" shorthand
-        "r" => READ_RIGHTS,
-        "w" => WRITE_RIGHTS,
-        "rw" => READ_RIGHTS | WRITE_RIGHTS,
-        "wr" => READ_RIGHTS | WRITE_RIGHTS,
-        // parse raw WASI rights
-        _ => {
+    let re = Regex::new(r"[rwx]+").unwrap();
+    let rights = {
+        if re.is_match(string_number) {
+            let mut rights = Rights::empty();
+            if string_number.contains("r") {
+                rights = rights | READ_RIGHTS;
+            }
+            if string_number.contains("w") {
+                rights = rights | WRITE_RIGHTS;
+            }
+            if string_number.contains("x") {
+                rights = rights | EXECUTE_RIGHTS;
+            }
+            rights
+        }
+        else {
+            // parse raw WASI rights
             let number = string_number
                 .parse::<u32>()
                 .expect(&format!("Failed to parse {}, not a u64", string_number));
