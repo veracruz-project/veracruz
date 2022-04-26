@@ -1922,12 +1922,12 @@ impl FileSystem {
 
     /// Return whether the given path can be executed by the given principal.
     /// Fails if the principal can't access the path with `path_open()`.
-    pub fn is_file_executable<T: AsRef<Path> + Copy>(
+    pub fn is_file_executable<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
         path: T,
     ) -> FileSystemResult<bool> {
-        let (fd, file_name) = self.find_prestat(path)?;
+        let (fd, file_name) = self.find_prestat(&path)?;
         self.path_open(
             fd,
             LookupFlags::empty(),
