@@ -15,8 +15,8 @@ cargo-features = ["resolver"]
 [workspace]
 exclude = [
   "crates/icecap/sysroot/libc",
-  "crates/third-party/wasmi",
   "crates/third-party/rust-psa-crypto",
+  "crates/third-party/wasmi",
 ]
 members = [
   "crates/runtime-manager",
