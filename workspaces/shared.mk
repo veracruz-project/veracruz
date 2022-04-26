@@ -109,10 +109,13 @@ PATH_REMOVE_DIRECTORY   := $(shell echo "2^25" | bc)
 PATH_UNLINK_FILE        := $(shell echo "2^26" | bc)
 POLL_FD_READWRITE       := $(shell echo "2^27" | bc)
 SOCK_SHUTDOWN           := $(shell echo "2^28" | bc)
+FD_EXECUTE              := $(shell echo "2^29"  | bc)
 # Common rights
-READ_RIGHT       := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) | bc)
-WRITE_RIGHT      := $(shell echo $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(FD_SEEK) + $(PATH_OPEN) + $(PATH_CREATE_DIRECTORY) | bc)
-READ_WRITE_RIGHT := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) + $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(PATH_CREATE_DIRECTORY) | bc)
+READ_RIGHT          := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) | bc)
+WRITE_RIGHT         := $(shell echo $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(FD_SEEK) + $(PATH_OPEN) + $(PATH_CREATE_DIRECTORY) | bc)
+READ_WRITE_RIGHT    := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) + $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(PATH_CREATE_DIRECTORY) | bc)
+EXECUTE_RIGHT       := $(shell echo $(FD_EXECUTE) | bc)
+WRITE_EXECUTE_RIGHT := $(shell echo $(FD_WRITE) + $(FD_EXECUTE) | bc)
 
 ifeq ($(PLATFORM), Darwin)
 	CERTIFICATE_EXPIRY := "$(shell date -Rf +100d)"
@@ -163,21 +166,21 @@ $(OUT_DIR)/invalid_policy: $(WORKSPACE_DIR)/../test-collateral/invalid_policy/*.
 
 $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
-	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)") \
             --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
 	    --enclave-debug-mode $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
 $(OUT_DIR)/single_client_no_debug.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
-	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_WRITE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)") \
             --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
 	    $(PGEN_COMMON_PARAMS) --output-policy-file $@
 
 $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
 	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), stdin : $(WRITE_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT)") \
 		--veracruz-server-ip 127.0.0.1:3012 --proxy-attestation-server-ip 127.0.0.1:3010 \
@@ -185,8 +188,8 @@ $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 
 $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
-	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT), stdin : $(WRITE_RIGHT)" \
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(EXECUTE_RIGHT), stdin : $(WRITE_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT)") \
 	    --veracruz-server-ip 127.0.0.1:3013 --proxy-attestation-server-ip 127.0.0.1:3010 \
 	    --enable-clock $(PGEN_COMMON_PARAMS) --output-policy-file $@
@@ -194,9 +197,9 @@ $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 # Generate all the triple policy but on different port.
 $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
-	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT), stdin : $(WRITE_RIGHT)" \
-	    --certificate $(RESULT_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(EXECUTE_RIGHT), stdin : $(WRITE_RIGHT)" \
+	    --certificate $(RESULT_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(EXECUTE_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT)") \
 	    --veracruz-server-ip 127.0.0.1:$(shell echo "3020 + $*" | bc) \
 	    --proxy-attestation-server-ip 127.0.0.1:3010 \
@@ -204,10 +207,10 @@ $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 
 $(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) \
-	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(READ_WRITE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
-	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT), stdin : $(WRITE_RIGHT)" \
-	    --certificate $(NEVER_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT), stdin : $(WRITE_RIGHT)" \
-	    --certificate $(RESULT_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(READ_RIGHT)" \
+	    --certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    --certificate $(DATA_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(EXECUTE_RIGHT), stdin : $(WRITE_RIGHT)" \
+	    --certificate $(NEVER_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(EXECUTE_RIGHT), stdin : $(WRITE_RIGHT)" \
+	    --certificate $(RESULT_CRT) --capability "/input/ : $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(EXECUTE_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT)") \
 	    --veracruz-server-ip 127.0.0.1:3030 --proxy-attestation-server-ip 127.0.0.1:3010 \
 	    --enable-clock $(PGEN_COMMON_PARAMS) --output-policy-file $@
