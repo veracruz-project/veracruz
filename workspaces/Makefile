@@ -24,6 +24,9 @@ linux: shared
 	$(MAKE) -C linux-runtime
 	$(MAKE) -C linux-host
 
+linux-tests:
+	$(MAKE) -C linux-host tests
+
 nitro: shared
 	$(MAKE) -C nitro-host
 	$(MAKE) -C nitro-runtime
@@ -31,6 +34,9 @@ nitro: shared
 icecap: shared
 	$(MAKE) -C icecap-runtime build
 	$(MAKE) -C icecap-host
+
+icecap-tests:
+	$(MAKE) -C icecap-host tests
 
 shared:
 	$(MAKE) -C applications
