@@ -15,7 +15,7 @@
 
 default: build
 
-tests: test-server test-client veracruz-test
+tests: test-server
 
 icecap_plat ?= qemu
 
