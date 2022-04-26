@@ -713,8 +713,7 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
                 rights = rights | EXECUTE_RIGHTS;
             }
             rights
-        }
-        else {
+        } else {
             // parse raw WASI rights
             let number = string_number
                 .parse::<u32>()
