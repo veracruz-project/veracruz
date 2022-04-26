@@ -60,6 +60,23 @@ build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 		$(host_feature_flags) \
 		$(V_FLAG)
 
+build-veracruz-server-test: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
+	$(COMPILERS) $(BUILD_PARAMETERS) \
+		cargo test --no-run $(PROFILE_FLAG) \
+		-p veracruz-server-test \
+		--features icecap \
+		$(host_feature_flags) \
+		$(V_FLAG)
+	cp $$( \
+		$(COMPILERS) $(BUILD_PARAMETERS) \
+			cargo test --no-run $(PROFILE_FLAG) \
+			-p veracruz-server-test \
+			--features icecap \
+			$(host_feature_flags) \
+			$(V_FLAG) \
+			--message-format=json | jq -r '.executable | select(.)' \
+		) target/release/veracruz-server-test
+
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
 	$(MAKE) -C ../icecap-runtime elfloader css-icecap.bin ICECAP_PLAT=$(ICECAP_PLAT)
