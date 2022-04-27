@@ -48,6 +48,17 @@ linux-install: shared-install
 shared-install:
 	$(MAKE) -C host install
 
+linux-clippy:
+	make -C linux-runtime clippy
+	make -C linux-host clippy
+
+nitro-clippy:
+	make -C nitro-runtime clippy
+	make -C nitro-host clippy
+
+icecap-clippy:
+	make -C icecap-host clippy
+
 linux-clean:
 	$(MAKE) -C linux-host clean
 	$(MAKE) -C linux-runtime clean
