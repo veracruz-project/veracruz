@@ -27,6 +27,17 @@ runtime-manager-enclave:
 doc:
 	cargo doc
 
+clippy:
+	cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
+		-p runtime_manager_enclave -p execution-engine \
+		-p session-manager -p policy-utils -p platform-services \
+		--features runtime_manager_enclave/linux \
+		--features execution-engine/std \
+		--features session-manager/std \
+		--features policy-utils/std \
+		--features platform-services/std \
+		-- --no-deps 
+
 fmt:
 	cargo fmt
 

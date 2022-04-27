@@ -45,6 +45,20 @@ runtime-manager-enclave:
 doc:
 	cargo doc
 
+clippy:
+	rustup target add $(ARCH)-unknown-linux-musl
+	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
+	cargo clippy --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
+		-p runtime_manager_enclave -p execution-engine \
+		-p session-manager -p policy-utils -p platform-services \
+		--features runtime_manager_enclave/nitro  \
+		--features execution-engine/nitro  \
+		--features session-manager/nitro \
+		--features policy-utils/std \
+		--features platform-services/nitro \
+		-- --no-deps
+
+
 fmt:
 	cargo fmt
 
