@@ -39,7 +39,6 @@ fn main() -> anyhow::Result<()> {
         .collect::<Vec<_>>()
         .join(",");
 
-    // remove last comma, add end of line character
     content.push('\n');
 
     fs::write(FILENAME, content)?;
