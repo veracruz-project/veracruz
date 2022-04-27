@@ -80,15 +80,27 @@ $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
 
 clippy: 
-	# workspace members
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-client -- --no-deps
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p proxy-attestation-server -- --no-deps
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-server -- --no-deps
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy --tests $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-test -- --no-deps
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) cargo clippy --tests $(PROFILE_FLAG) $(V_FLAG) --features linux -p veracruz-server-test -- --no-deps
-	# veracruz dependencies
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p io-utils -- --no-deps
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features linux -p psa-attestation -- --no-deps
+	# workspace members and relevant dependencies
+	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
+	$(CC) \
+		cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
+		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-server -p io-utils -p transport-protocol \
+		-p psa-attestation -p veracruz-utils  \
+		--features proxy-attestation-server/linux \
+		--features veracruz-client/linux \
+		--features veracruz-server/linux \
+		--features io-utils/linux \
+		--features psa-attestation/linux \
+		--features veracruz-utils/linux \
+		-- --no-deps
+	# workspace testing crates
+	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
+		cargo clippy --tests \
+		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
+		--features veracruz-test/linux \
+		--features veracruz-server-test/linux \
+		-- --no-deps
 
 doc:
 	cargo doc

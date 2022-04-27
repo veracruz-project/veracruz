@@ -108,14 +108,25 @@ fmt:
 	cargo fmt
 
 clippy:
-	# workspace members
-	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p proxy-attestation-server -- --no-deps
-	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p veracruz-client -- --no-deps
-	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p veracruz-server -- --no-deps
-	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests --features icecap -p veracruz-server-test -- --no-deps 
-	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests --features icecap -p veracruz-test -- --no-deps 
-	# veracruz dependencies
-	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) --features icecap -p io-utils -- --no-deps
+	# workspace members and relevant dependencies
+	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) \
+		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-server -p io-utils -p transport-protocol \
+		-p psa-attestation -p veracruz-utils  \
+		--features proxy-attestation-server/icecap \
+		--features veracruz-client/icecap \
+		--features veracruz-server/icecap \
+		--features transport-protocol/icecap \
+		--features io-utils/icecap \
+		--features psa-attestation/icecap \
+		--features veracruz-utils/icecap \
+		-- --no-deps
+	# workspace testing crates
+	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests \
+		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
+		--features veracruz-test/icecap \
+		--features veracruz-server-test/icecap \
+		-- --no-deps
 
 clean:
 	cargo clean

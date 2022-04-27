@@ -70,19 +70,24 @@ fmt:
 	cargo fmt
 
 clippy: 
-	# workspace members
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p veracruz-client -- --no-deps
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p proxy-attestation-server -- --no-deps
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p veracruz-server -- --no-deps
-	RUNTIME_MANAGER_EIF_PATH=/work/veracruz/workspaces/nitro-runtime/runtime_manager.eif \
-		cargo clippy --tests $(PROFILE_FLAG) --features nitro \
-		-p veracruz-test -- \
-		--no-deps
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) \
-		cargo clippy --tests $(PROFILE_FLAG) --features nitro  -p veracruz-server-test -- --no-deps
-	# veracruz dependencies
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p io-utils -- --no-deps
-	cargo clippy $(PROFILE_FLAG) $(V_FLAG) --features nitro -p psa-attestation -- --no-deps
+	# workspace members and relevant dependencies
+	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
+		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-server -p io-utils -p transport-protocol \
+		-p psa-attestation -p veracruz-utils  \
+		--features proxy-attestation-server/nitro\
+		--features veracruz-client/nitro \
+		--features veracruz-server/nitro \
+		--features io-utils/nitro \
+		--features psa-attestation/nitro \
+		--features veracruz-utils/nitro \
+		-- --no-deps
+	# workspace testing crates
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CC) $(TEST_PARAMETERS) cargo clippy --tests \
+		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
+		--features veracruz-test/nitro \
+		--features veracruz-server-test/nitro \
+		-- --no-deps
 
 clean:
 	cargo clean
