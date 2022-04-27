@@ -18,7 +18,7 @@ This simple version of search lets you input query text as argument, and an inpu
   rustup target add wasm32-wasi
   cargo build --target wasm32-wasi
   ```
-The first command adds WebAssembly (WASM) as the compilation target, so the rust program can be compiled to WASM. The second command complies the code into WASM
+The first command adds WebAssembly (WASM) as the compilation target, so the rust program can be compiled to WASM. The second command compiles the code into WASM
 
 6. Inside `string-search` directory, Run `cp target/wasm32-wasi/debug/string-search.wasm .`. 
   This will copy the WASM file to the root of the project to be accessed easily.
@@ -30,4 +30,4 @@ RUST_LOG="info" cargo run -- --arg "in" --input-source input --input-source stri
 The string after `--arg` is the `search query` that you want to search for in the text file. Feel free to change it to whatever you want. Here, `in` is just an example of a common word, which is more likely to occur in different texts.  
 Use `"query text"` double quotes, when using multiple words for searching, to keep the formatting of whitespaces in the search query intact.
 
-8. You should have seen a very long log of information. Go to the `output` directory and you should see the `search_results.txt` file and it will contain all the lines where that word was seen.
+8. You should have seen a very long log of information. Go to the `output` directory, and you should see the `search_results.txt` file, and it will contain all the lines where that word was seen.
