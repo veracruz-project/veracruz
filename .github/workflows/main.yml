@@ -58,7 +58,7 @@ jobs:
       - name: Running IceCap test script
         id: icecap-build
         run: |
-            make -C /work/veracruz/workspaces icecap-tests PROFILE=dev
+            VERACRUZ_TEST_TIMEOUT=7200 make -C /work/veracruz/workspaces icecap-tests PROFILE=dev
 
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
