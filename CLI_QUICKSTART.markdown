@@ -344,4 +344,3 @@ with a pkill command:
 $ pkill vc-server
 $ pkill vc-pas
 ```
-
