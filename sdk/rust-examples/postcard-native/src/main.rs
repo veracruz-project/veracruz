@@ -15,7 +15,6 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-/// Entry point: immediately returns success.
 use std::fs;
 fn main() -> anyhow::Result<()> {
     let input = fs::read("/input/postcard.dat")?;

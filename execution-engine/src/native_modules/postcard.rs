@@ -74,7 +74,7 @@ impl Service for PostcardService {
         "Postcard Service"
     }
 
-    fn serve(&self, fs: &mut FileSystem, inputs: &[u8]) -> FileSystemResult<()> {
+    fn serve(&mut self, fs: &mut FileSystem, inputs: &[u8]) -> FileSystemResult<()> {
         let v = from_bytes::<Vec<Struct3>>(inputs).map_err(|_| ErrNo::Inval)?;
         fs.write_file_by_absolute_path(
             "/services/postcard_result.dat",
@@ -90,7 +90,7 @@ impl Service for PostcardService {
     /// For the purpose of demonstration, we always return true. In reality,
     /// this function may check validity of the `input`, and even buffer the result
     /// for further uses.
-    fn try_parse(&self, _input: &[u8]) -> FileSystemResult<bool> {
+    fn try_parse(&mut self, _input: &[u8]) -> FileSystemResult<bool> {
         Ok(true)
     }
 }

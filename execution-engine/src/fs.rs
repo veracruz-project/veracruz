@@ -16,7 +16,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::postcard::PostcardService;
+use crate::native_modules::{aes::AesCounterModeService, postcard::PostcardService};
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -349,7 +349,7 @@ impl InodeImpl {
     pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
         match self {
             Self::NativeModule(service, input) => {
-                let service = service.lock().map_err(|_| ErrNo::Busy)?;
+                let mut service = service.lock().map_err(|_| ErrNo::Busy)?;
                 service.try_parse(input)
             }
             _ => Err(ErrNo::Inval),
@@ -812,13 +812,14 @@ impl FileSystem {
         all_rights.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), Rights::all());
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
-        //TODO include the correct parameter
-        let service: Box<dyn Service> = Box::new(PostcardService::new());
         let mut services = Vec::new();
+        let service: Box<dyn Service> = Box::new(PostcardService::new());
         services.push((
             "/services/postcard_string.dat",
             Arc::new(Mutex::new(service)),
         ));
+        let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
+        services.push(("/services/aesctr.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;
         Ok(rst)
     }
@@ -1274,7 +1275,7 @@ impl FileSystem {
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let service = service.lock().map_err(|_| ErrNo::Busy)?;
+            let mut service = service.lock().map_err(|_| ErrNo::Busy)?;
             service.serve(&mut self.service_fs()?, &input)?;
         }
         Ok(len)
@@ -1942,8 +1943,9 @@ pub trait Service: Send {
     //fn configure(&mut self, config: Self::Configuration) -> FileSystemResult<()>;
     // The FS will prepare the Input and call the serve function at an appropriate time.
     // Result may depend on the configure.
-    fn serve(&self, fs: &mut FileSystem, input: &[u8]) -> FileSystemResult<()>;
-    fn try_parse(&self, input: &[u8]) -> FileSystemResult<bool>;
+    fn serve(&mut self, fs: &mut FileSystem, input: &[u8]) -> FileSystemResult<()>;
+    // try_parse may buffer any result, hence we pass a mutable self here.
+    fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool>;
 }
 
 impl Debug for dyn Service {
