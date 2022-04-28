@@ -207,7 +207,7 @@ impl ProtocolState {
 
         if !self
             .vfs
-            .is_file_executable(client_id, &PathBuf::from(file_name))
+            .is_executable(client_id, &PathBuf::from(file_name))
             .map_err(|e| RuntimeManagerError::FileSystemError(e))?
         {
             return Err(RuntimeManagerError::ExecutionDenied);

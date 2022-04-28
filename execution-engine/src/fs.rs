@@ -1921,14 +1921,20 @@ impl FileSystem {
     }
 
     /// Return whether the given path can be executed by the given principal.
+    /// Since files inherit their parent's rights, granting execution to a
+    /// parent directory is enough to grant execution to every file under it.
     /// Fails if the principal can't access the path with `path_open()`.
-    pub fn is_file_executable<T: AsRef<Path>>(
+    pub fn is_executable<T: AsRef<Path> + std::fmt::Debug>(
         &mut self,
         principal: &Principal,
         path: T,
     ) -> FileSystemResult<bool> {
-        let (fd, file_name) = self.find_prestat(&path)?;
-        self.path_open(
+        let path = path.as_ref();
+        let mut vfs = self.spawn(principal)?;
+
+        // Open path on behalf of the principal
+        let (fd, file_name) = vfs.find_prestat(path)?;
+        let fd = vfs.path_open(
             fd,
             LookupFlags::empty(),
             file_name,
@@ -1938,14 +1944,9 @@ impl FileSystem {
             FdFlags::empty(),
         )?;
 
-        let inode_table = self.lock_inode_table()?;
-        let rights = inode_table.get_rights(principal)?;
-        let file_rights = rights
-            .get(&path.as_ref().to_path_buf())
-            .ok_or(ErrNo::Access)?;
-        let file_rights_bits = u64::from(*file_rights);
+        vfs.check_right(&fd, Rights::FD_EXECUTE)?;
 
-        Ok(file_rights_bits & u64::from(Rights::FD_EXECUTE) != 0)
+        Ok(true)
     }
 }
 
