@@ -14,7 +14,7 @@ default:
 include common.mk
 
 .PHONY: all clean icecap icecap-clippy icecap-clean linux linux-install linux-clippy \
-	linux-clean nitro-clippy nitro-clean shared shared-install shared-clean
+	linux-clean nitro nitro-clippy nitro-clean shared shared-install shared-clean
 
 all: shared linux nitro icecap
 
