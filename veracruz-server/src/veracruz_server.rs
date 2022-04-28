@@ -11,8 +11,7 @@
 
 #[cfg(feature = "icecap")]
 use crate::veracruz_server_icecap::IceCapError;
-use actix_http::ResponseBuilder;
-use actix_web::{error, http::StatusCode, HttpResponse};
+use actix_web::{error, http::StatusCode, HttpResponse, HttpResponseBuilder};
 #[cfg(feature = "nitro")]
 use base64;
 use err_derive::Error;
@@ -193,7 +192,7 @@ impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
 
 impl error::ResponseError for VeracruzServerError {
     fn error_response(&self) -> HttpResponse {
-        ResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
+        HttpResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
     }
     fn status_code(&self) -> StatusCode {
         match self {

@@ -47,7 +47,7 @@ fn main() {
     info!("Loaded policy {}", policy.policy_hash().unwrap_or("???"));
 
     // create Actix runtime
-    let mut sys = actix_rt::System::new("Veracruz Server");
+    let sys = actix_rt::System::new();
 
     // create Veracruz Server instance
     let veracruz_server = match veracruz_server::server::server(&policy_json) {

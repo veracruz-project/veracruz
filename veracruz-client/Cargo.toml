@@ -41,8 +41,8 @@ webpki-roots = "0.22"
 x509-parser = "0.13.0"
 
 [dev-dependencies]
-actix-http = "2.2.0"
-actix-rt = "1.1.1"
-actix-session = "0.4.1"
-actix-web = "3.3.2"
+actix-http = "3"
+actix-rt = "2"
+actix-session = "0.6"
+actix-web = "4"
 futures = "0.3"
