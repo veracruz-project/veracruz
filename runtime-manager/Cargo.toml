@@ -86,7 +86,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { version = "0.2.108", optional = true }
 libm = { version = "0.2", optional = true }
 log = { version = "0.4.13", optional = true }
-nix = { version = "0.15", optional = true }
+nix = { version = "0.22.2", optional = true }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "aws-nitro-enclaves-nsm-api", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", branch = "main", package = "nsm-lib", optional = true }
 policy-utils = { path = "../policy-utils" }

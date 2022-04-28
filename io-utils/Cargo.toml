@@ -20,7 +20,7 @@ curl = "0.4.43"
 socket2 = "=0.4.2"
 err-derive = "0.2"
 log = "0.4.13"
-nix = { version = "0.15", optional = true }
+nix = { version = "0.22.2", optional = true }
 serde = { version = "1.0.115", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, optional = true }
 stringreader = "0.1"
