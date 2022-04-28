@@ -13,9 +13,5 @@
 //! information on licensing and copyright.
 
 pub mod error;
-#[cfg(feature = "icecap")]
-pub mod icecap;
 #[cfg(feature = "nitro")]
 pub mod nitro;
-#[cfg(any(feature = "nitro", feature = "linux"))]
-pub mod vm;

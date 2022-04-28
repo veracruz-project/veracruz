@@ -32,9 +32,10 @@ use std::{
     thread::{self, JoinHandle},
     time::Duration,
 };
-use tempfile;
-use tempfile::TempDir;
-use veracruz_utils::platform::icecap::message::{Header, Request, Response};
+use tempfile::{self, TempDir};
+use veracruz_utils::runtime_manager_message::{
+    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+};
 
 const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &'static [&'static str] = &["qemu-system-aarch64"];
 const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &'static [&'static str] = &[
@@ -77,7 +78,7 @@ const FIRMWARE_VERSION: &str = "0.3.0";
 #[derive(Debug, Error)]
 pub enum IceCapError {
     #[error(display = "IceCap: Invalid environment variable value: {}", variable)]
-    InvalidEnvironemntVariableValue { variable: String },
+    InvalidEnvironmentVariableValue { variable: String },
     #[error(display = "IceCap: Channel error: {}", _0)]
     ChannelError(io::Error),
     #[error(display = "IceCap: Qemu spawn error: {}", _0)]
@@ -85,7 +86,7 @@ pub enum IceCapError {
     #[error(display = "IceCap: Serialization error: {}", _0)]
     SerializationError(bincode::Error),
     #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
-    UnexpectedRuntimeManagerResponse(Response),
+    UnexpectedRuntimeManagerResponse(RuntimeManagerResponse),
 }
 
 impl From<IceCapError> for VeracruzServerError {
@@ -124,7 +125,7 @@ impl IceCapRealm {
                 Err(env::VarError::NotPresent) => {
                     Ok(default.iter().map(|s| (*s).to_owned()).collect())
                 }
-                Err(_) => Err(IceCapError::InvalidEnvironemntVariableValue {
+                Err(_) => Err(IceCapError::InvalidEnvironmentVariableValue {
                     variable: var.to_owned(),
                 })?,
             }
@@ -244,10 +245,13 @@ impl IceCapRealm {
         })
     }
 
-    fn communicate(&mut self, request: &Request) -> Result<Response, VeracruzServerError> {
+    fn communicate(
+        &mut self,
+        request: &RuntimeManagerRequest,
+    ) -> Result<RuntimeManagerResponse, VeracruzServerError> {
         // send request
         let raw_request = bincode::serialize(request)?;
-        let raw_header = bincode::serialize(&Header::try_from(raw_request.len()).unwrap())?;
+        let raw_header = bincode::serialize(&u32::try_from(raw_request.len()).unwrap())?;
         self.channel
             .write_all(&raw_header)
             .map_err(IceCapError::ChannelError)?;
@@ -256,16 +260,16 @@ impl IceCapRealm {
             .map_err(IceCapError::ChannelError)?;
 
         // recv response
-        let mut raw_header = [0; size_of::<Header>()];
+        let mut raw_header = [0; size_of::<u32>()];
         self.channel
             .read_exact(&mut raw_header)
             .map_err(IceCapError::ChannelError)?;
-        let header = bincode::deserialize::<Header>(&raw_header)?;
+        let header = bincode::deserialize::<u32>(&raw_header)?;
         let mut raw_response = vec![0; usize::try_from(header).unwrap()];
         self.channel
             .read_exact(&mut raw_response)
             .map_err(IceCapError::ChannelError)?;
-        let response = bincode::deserialize::<Response>(&raw_response)?;
+        let response = bincode::deserialize::<RuntimeManagerResponse>(&raw_response)?;
 
         Ok(response)
     }
@@ -282,7 +286,10 @@ impl IceCapRealm {
 pub struct VeracruzServerIceCap(Option<IceCapRealm>);
 
 impl VeracruzServerIceCap {
-    fn communicate(&mut self, request: &Request) -> Result<Response, VeracruzServerError> {
+    fn communicate(
+        &mut self,
+        request: &RuntimeManagerRequest,
+    ) -> Result<RuntimeManagerResponse, VeracruzServerError> {
         match &mut self.0 {
             Some(realm) => realm.communicate(request),
             None => return Err(VeracruzServerError::UninitializedEnclaveError),
@@ -290,8 +297,8 @@ impl VeracruzServerIceCap {
     }
 
     fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
-        match self.communicate(&Request::GetTlsDataNeeded(session_id))? {
-            Response::GetTlsDataNeeded(needed) => Ok(needed),
+        match self.communicate(&RuntimeManagerRequest::GetTlsDataNeeded(session_id))? {
+            RuntimeManagerResponse::TlsDataNeeded(needed) => Ok(needed),
             resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
         }
     }
@@ -311,13 +318,15 @@ impl VeracruzServer for VeracruzServerIceCap {
         )
         .map_err(VeracruzServerError::HttpError)?;
 
-        let (token, csr) = match self_.communicate(&Request::Attestation {
-            challenge,
-            device_id,
-        })? {
-            Response::Attestation { token, csr } => (token, csr),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
-        };
+        let (token, csr) =
+            match self_.communicate(&RuntimeManagerRequest::Attestation(challenge, device_id))? {
+                RuntimeManagerResponse::AttestationData(token, csr) => (token, csr),
+                resp => {
+                    return Err(VeracruzServerError::IceCapError(
+                        IceCapError::UnexpectedRuntimeManagerResponse(resp),
+                    ))
+                }
+            };
 
         let (root_cert, compute_cert) = {
             let req =
@@ -338,29 +347,36 @@ impl VeracruzServer for VeracruzServerIceCap {
             (root_cert.to_vec(), compute_cert.to_vec())
         };
 
-        match self_.communicate(&Request::Initialize {
-            policy_json: policy_json.to_string(),
-            root_cert,
-            compute_cert,
-        })? {
-            Response::Initialize => (),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+        match self_.communicate(&RuntimeManagerRequest::Initialize(
+            policy_json.to_string(),
+            vec![compute_cert, root_cert],
+        ))? {
+            RuntimeManagerResponse::Status(Status::Success) => (),
+            resp => {
+                return Err(VeracruzServerError::IceCapError(
+                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
+                ))
+            }
         }
 
         Ok(self_)
     }
 
     fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
-        match self.communicate(&Request::NewTlsSession)? {
-            Response::NewTlsSession(session_id) => Ok(session_id),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+        match self.communicate(&RuntimeManagerRequest::NewTlsSession)? {
+            RuntimeManagerResponse::TlsSession(session_id) => Ok(session_id),
+            resp => Err(VeracruzServerError::IceCapError(
+                IceCapError::UnexpectedRuntimeManagerResponse(resp),
+            )),
         }
     }
 
     fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
-        match self.communicate(&Request::CloseTlsSession(session_id))? {
-            Response::CloseTlsSession => Ok(()),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+        match self.communicate(&RuntimeManagerRequest::CloseTlsSession(session_id))? {
+            RuntimeManagerResponse::Status(Status::Success) => Ok(()),
+            resp => Err(VeracruzServerError::IceCapError(
+                IceCapError::UnexpectedRuntimeManagerResponse(resp),
+            )),
         }
     }
 
@@ -369,9 +385,13 @@ impl VeracruzServer for VeracruzServerIceCap {
         session_id: u32,
         input: Vec<u8>,
     ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
-        match self.communicate(&Request::SendTlsData(session_id, input))? {
-            Response::SendTlsData => (),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+        match self.communicate(&RuntimeManagerRequest::SendTlsData(session_id, input))? {
+            RuntimeManagerResponse::Status(Status::Success) => (),
+            resp => {
+                return Err(VeracruzServerError::IceCapError(
+                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
+                ))
+            }
         }
 
         let mut acc = Vec::new();
@@ -379,8 +399,8 @@ impl VeracruzServer for VeracruzServerIceCap {
             if !self.tls_data_needed(session_id)? {
                 break true;
             }
-            match self.communicate(&Request::GetTlsData(session_id))? {
-                Response::GetTlsData(active, data) => {
+            match self.communicate(&RuntimeManagerRequest::GetTlsData(session_id))? {
+                RuntimeManagerResponse::TlsData(data, active) => {
                     acc.push(data);
                     if !active {
                         break false;

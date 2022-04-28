@@ -81,18 +81,15 @@ pub enum VeracruzServerError {
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
-    #[cfg(any(feature = "linux", feature = "nitro"))]
-    #[error(display = "VeracruzServer: RuntimeManagerMessage::Status: {:?}", _0)]
-    RuntimeManagerMessageStatus(veracruz_utils::platform::vm::RuntimeManagerMessage),
     #[cfg(any(feature = "nitro", feature = "linux"))]
-    #[error(display = "VeracruzServer: VMStatus: {:?}", _0)]
-    VMStatus(veracruz_utils::platform::vm::VMStatus),
+    #[error(display = "VeracruzServer: Status: {:?}", _0)]
+    Status(veracruz_utils::runtime_manager_message::Status),
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(
-        display = "VeracruzServer: Received Invalid Runtime Manager Message: {:?}",
+        display = "VeracruzServer: Received Invalid Runtime Manager response: {:?}",
         _0
     )]
-    InvalidRuntimeManagerMessage(veracruz_utils::platform::vm::RuntimeManagerMessage),
+    InvalidRuntimeManagerResponse(veracruz_utils::runtime_manager_message::RuntimeManagerResponse),
     #[cfg(feature = "nitro")]
     #[error(
         display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",

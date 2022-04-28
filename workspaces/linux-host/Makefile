@@ -10,9 +10,12 @@
 # licensing and copyright information.
 
 .PHONY: all build install clean clean-cargo-lock default doc fmt \
-	test-dependencies test-collateral test-server test-client veracruz-test
+	test-dependencies test-collateral test-server test-client veracruz-test \
+	tests
 
 default: build
+
+tests: test-server test-client veracruz-test
 
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)

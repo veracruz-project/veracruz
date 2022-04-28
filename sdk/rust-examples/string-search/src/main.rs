@@ -41,6 +41,7 @@ fn main() -> anyhow::Result<()> {
 
     for line in res_vec {
         ret.push_str(line);
+        ret.push_str("\n");
     }
 
     fs::write(OUTPUT_FILENAME, ret)?;

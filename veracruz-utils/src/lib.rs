@@ -23,6 +23,9 @@ pub mod csr;
 
 use rustls;
 
+/// Requests and responses for the Runtime Manager.
+pub mod runtime_manager_message;
+
 /// The ID of the Veracruz Runtime Hash Extension.
 /// This value was made up, all can be changed to pretty much any valid
 /// ID as long as it doesn't collide with the ID of an extension in our

@@ -15,6 +15,7 @@ cargo-features = ["resolver"]
 [workspace]
 members = [
   # "crates/sdk/rust-examples/audio-event-triangulation",
+  "crates/sdk/rust-examples/aesctr-native",
   "crates/sdk/rust-examples/idash2017-logistic-regression",
   "crates/sdk/rust-examples/image-processing",
   "crates/sdk/rust-examples/intersection-set-sum",

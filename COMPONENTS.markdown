@@ -95,3 +95,20 @@ in existing Rust code.
 - WASM Checker: this is an ABI-validator for Veracruz binaries, which takes a
 binary as input and certifies that it only assumes the presence of WASM host
 functions that are exposed by the Veracruz ABI.
+
+##  IP addresses and ports used by various Veracruz components
+
+|    IP        |  Port  |                              Usage                                                         | Location(s) |
+|--------------|--------|--------------------------------------------------------------------------------------------|-------------|
+| `127.0.0.1`  | `6000` | Port used by Veracruz Server and Runtime Manager to communicate over a TCP socket          | `veracruz-server/src/veracruz_server_linux.rs` |
+| `127.0.0.1`  | `3016` | Port used in test for Proxy Attestation Service                                            | `proxy-attestation-server/src/test.rs` |
+| `127.0.0.1`  | `3010` | Port used for Proxy Attestation Server in MCU test, veracruz-server-test and veracruz-test | `veracruz-mcu-client/run_mcu_demo_server.sh`, `veracruz-mcu-client/run_mcu_test_server.sh`, `veracruz-mcu-client/MCU_CLIENT_INSTRUCTIONS.markdown`, `workspaces/shared.mk`, `docker/Makefile`|
+| `127.0.0.1`  | `3011` | Port used for Veracruz Server in `veracruz-server-test` and `veracruz-test`                | `workspaces/shared.mk` |
+| `127.0.0.1`  | `3012` | Port used for Veracruz Server in `veracruz-server-test` and `veracruz-test`                | `workspaces/shared.mk` |
+| `127.0.0.1`  | `3013` | Port used for Veracruz Server in `veracruz-server-test` and `veracruz-test`                | `workspaces/shared.mk` |
+| `127.0.0.1`  | `3030` | Port used for Veracruz Server in `veracruz-server-test` and `veracruz-test`                | `workspaces/shared.mk` |
+| `172.17.0.2` | `3010` | Port used for Proxy Attestation Server in MCU test case                                    | `veracruz-mcu-client/run_mcu_test_server.sh`, `veracruz-mcu-client/run_mcu_demo_server.sh`, `veracruz-mcu-client/MCU_CLIENT_INSTRUCTIONS.markdown` |
+| `172.17.0.2` | `3017` | Port used for Veracruz Server in MCU test case                                             | same as `172.17.0.2:3010` (above entry)        |
+| `127.0.0.1`  | `3017` | Port used for Veracruz Server in client quickstart test                                    | `CLI_QUICKSTART.markdown` |
+
+

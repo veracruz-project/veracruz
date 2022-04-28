@@ -34,7 +34,8 @@ WASM_PROG_LIST = random-source.wasm \
 				number-stream-accumulation.wasm \
 				read-file.wasm \
 				shamir-secret-sharing.wasm \
-				fd-create.wasm
+				fd-create.wasm \
+				aesctr-native.wasm
 
 WASM_PROG_FILES = $(patsubst %.wasm, $(OUT_DIR)/%.wasm, $(WASM_PROG_LIST))
 

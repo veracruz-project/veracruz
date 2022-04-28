@@ -31,7 +31,9 @@ use psa_attestation::{
 };
 use ring::digest::{digest, SHA256};
 use std::net::TcpListener;
-use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
+use veracruz_utils::runtime_manager_message::{
+    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -55,19 +57,19 @@ static TOTALLY_INSECURE_ROOT_PRIVATE_KEY: [u8; 32] = [
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Initializes the runtime manager, bringing up a new session manager instance.
-fn initialize() -> RuntimeManagerMessage {
+fn initialize() -> RuntimeManagerResponse {
     if let Err(e) = init_session_manager() {
         error!(
             "Failed to initialize session manager.  Error produced: {:?}.",
             e
         );
 
-        return RuntimeManagerMessage::Status(VMStatus::Fail);
+        return RuntimeManagerResponse::Status(Status::Fail);
     }
 
     info!("Session manager initialized.");
 
-    RuntimeManagerMessage::Status(VMStatus::Success)
+    RuntimeManagerResponse::Status(Status::Success)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -237,7 +239,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
             RuntimeManagerError::IOError(err)
         })?;
 
-        let received_message: RuntimeManagerMessage =
+        let received_message: RuntimeManagerRequest =
             deserialize(&received_buffer).map_err(|derr| {
                 error!(
                     "Failed to deserialize received message.  Error produced: {}.",
@@ -250,7 +252,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
         trace!("Received message: {:?}.", received_message);
 
         let return_message = match received_message {
-            RuntimeManagerMessage::Attestation(challenge, _challenge_id) => {
+            RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
                 info!("Initializing enclave.");
 
                 initialize();
@@ -279,15 +281,15 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                         e
                     })?;
 
-                RuntimeManagerMessage::AttestationData(token, csr)
+                RuntimeManagerResponse::AttestationData(token, csr)
             }
-            RuntimeManagerMessage::Initialize(policy_json, chain) => {
+            RuntimeManagerRequest::Initialize(policy_json, chain) => {
                 info!("Loading policy: {}.", policy_json);
 
                 if let Err(e) = load_policy(&policy_json) {
                     error!("Failed to load policy.  Error produced: {:?}.", e);
 
-                    RuntimeManagerMessage::Status(VMStatus::Fail)
+                    RuntimeManagerResponse::Status(Status::Fail)
                 } else {
                     info!("Setting certificate chain.");
 
@@ -297,65 +299,65 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                         e
                     })?;
 
-                    RuntimeManagerMessage::Status(VMStatus::Success)
+                    RuntimeManagerResponse::Status(Status::Success)
                 }
             }
-            RuntimeManagerMessage::NewTLSSession => {
+            RuntimeManagerRequest::NewTlsSession => {
                 info!("Initiating new TLS session.");
 
                 new_session()
-                    .map(|session_id| RuntimeManagerMessage::TLSSession(session_id))
+                    .map(|session_id| RuntimeManagerResponse::TlsSession(session_id))
                     .unwrap_or_else(|e| {
                         error!(
                             "Could not initiate new TLS session.  Error produced: {:?}.",
                             e
                         );
-                        RuntimeManagerMessage::Status(VMStatus::Fail)
+                        RuntimeManagerResponse::Status(Status::Fail)
                     })
             }
-            RuntimeManagerMessage::CloseTLSSession(session_id) => {
+            RuntimeManagerRequest::CloseTlsSession(session_id) => {
                 info!("Closing TLS session.");
 
                 close_session(session_id)
-                    .map(|_e| RuntimeManagerMessage::Status(VMStatus::Success))
+                    .map(|_e| RuntimeManagerResponse::Status(Status::Success))
                     .unwrap_or_else(|e| {
                         error!("Failed to close TLS session.  Error produced: {:?}.", e);
-                        RuntimeManagerMessage::Status(VMStatus::Fail)
+                        RuntimeManagerResponse::Status(Status::Fail)
                     })
             }
-            RuntimeManagerMessage::GetTLSDataNeeded(session_id) => {
+            RuntimeManagerRequest::GetTlsDataNeeded(session_id) => {
                 info!("Checking whether TLS data is needed.");
 
                 get_data_needed(session_id)
-                    .map(|needed| RuntimeManagerMessage::TLSDataNeeded(needed))
+                    .map(|needed| RuntimeManagerResponse::TlsDataNeeded(needed))
                     .unwrap_or_else(|e|{
                         error!("Failed to check whether further TLS data needed.  Error produced: {:?}.", e);
-                        RuntimeManagerMessage::Status(VMStatus::Fail)
+                        RuntimeManagerResponse::Status(Status::Fail)
                     })
             }
-            RuntimeManagerMessage::GetTLSData(session_id) => {
+            RuntimeManagerRequest::GetTlsData(session_id) => {
                 info!("Retrieving TLS data.");
 
                 get_data(session_id)
-                    .map(|(active, data)| RuntimeManagerMessage::TLSData(data, active))
+                    .map(|(active, data)| RuntimeManagerResponse::TlsData(data, active))
                     .unwrap_or_else(|e| {
                         error!("Failed to retrieve TLS data.  Error produced: {:?}.", e);
-                        RuntimeManagerMessage::Status(VMStatus::Fail)
+                        RuntimeManagerResponse::Status(Status::Fail)
                     })
             }
-            RuntimeManagerMessage::SendTLSData(session_id, tls_data) => {
+            RuntimeManagerRequest::SendTlsData(session_id, tls_data) => {
                 info!("Sending TLS data.");
 
                 send_data(session_id, &tls_data)
-                    .map(|_| RuntimeManagerMessage::Status(VMStatus::Success))
+                    .map(|_| RuntimeManagerResponse::Status(Status::Success))
                     .unwrap_or_else(|e| {
                         error!("Failed to send TLS data.  Error produced: {:?}.", e);
-                        RuntimeManagerMessage::Status(VMStatus::Fail)
+                        RuntimeManagerResponse::Status(Status::Fail)
                     })
             }
             otherwise => {
                 error!("Received unknown or unimplemented opcode: {:?}.", otherwise);
-                RuntimeManagerMessage::Status(VMStatus::Unimplemented)
+                RuntimeManagerResponse::Status(Status::Unimplemented)
             }
         };
 

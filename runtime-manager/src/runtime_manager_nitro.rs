@@ -15,7 +15,9 @@ use nix::sys::socket::{accept, bind, SockAddr};
 use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 use nsm_api;
 use nsm_lib;
-use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
+use veracruz_utils::runtime_manager_message::{
+    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+};
 
 use crate::managers;
 use crate::managers::RuntimeManagerError;
@@ -61,63 +63,63 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
     loop {
         let received_buffer =
             receive_buffer(fd).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-        let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)
+        let received_message: RuntimeManagerRequest = bincode::deserialize(&received_buffer)
             .map_err(|err| RuntimeManagerError::BincodeError(err))?;
         let return_message = match received_message {
-            RuntimeManagerMessage::Attestation(challenge, challenge_id) => {
+            RuntimeManagerRequest::Attestation(challenge, challenge_id) => {
                 attestation(&challenge, challenge_id)?
             }
-            RuntimeManagerMessage::Initialize(policy_json, certificate_chain) => {
+            RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => {
                 initialize(&policy_json, &certificate_chain)?
             }
-            RuntimeManagerMessage::NewTLSSession => {
-                println!("runtime_manager_nitro::main NewTLSSession");
+            RuntimeManagerRequest::NewTlsSession => {
+                println!("runtime_manager_nitro::main NewTlsSession");
                 let ns_result = managers::session_manager::new_session();
-                let return_message: RuntimeManagerMessage = match ns_result {
-                    Ok(session_id) => RuntimeManagerMessage::TLSSession(session_id),
-                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
+                let return_message: RuntimeManagerResponse = match ns_result {
+                    Ok(session_id) => RuntimeManagerResponse::TlsSession(session_id),
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::CloseTLSSession(session_id) => {
-                println!("runtime_manager_nitro::main CloseTLSSession");
+            RuntimeManagerRequest::CloseTlsSession(session_id) => {
+                println!("runtime_manager_nitro::main CloseTlsSession");
                 let cs_result = managers::session_manager::close_session(session_id);
-                let return_message: RuntimeManagerMessage = match cs_result {
-                    Ok(_) => RuntimeManagerMessage::Status(VMStatus::Success),
-                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
+                let return_message: RuntimeManagerResponse = match cs_result {
+                    Ok(_) => RuntimeManagerResponse::Status(Status::Success),
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::GetTLSDataNeeded(session_id) => {
-                println!("runtime_manager_nitro::main GetTLSDataNeeded");
+            RuntimeManagerRequest::GetTlsDataNeeded(session_id) => {
+                println!("runtime_manager_nitro::main GetTlsDataNeeded");
                 let return_message = match managers::session_manager::get_data_needed(session_id) {
-                    Ok(needed) => RuntimeManagerMessage::TLSDataNeeded(needed),
-                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
+                    Ok(needed) => RuntimeManagerResponse::TlsDataNeeded(needed),
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                 };
                 return_message
             }
-            RuntimeManagerMessage::SendTLSData(session_id, tls_data) => {
-                println!("runtime_manager_nitro::main SendTLSData");
+            RuntimeManagerRequest::SendTlsData(session_id, tls_data) => {
+                println!("runtime_manager_nitro::main SendTlsData");
                 let return_message =
                     match managers::session_manager::send_data(session_id, &tls_data) {
-                        Ok(_) => RuntimeManagerMessage::Status(VMStatus::Success),
-                        Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
+                        Ok(_) => RuntimeManagerResponse::Status(Status::Success),
+                        Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                     };
                 return_message
             }
-            RuntimeManagerMessage::GetTLSData(session_id) => {
-                println!("runtime_manager_nitro::main GetTLSData");
+            RuntimeManagerRequest::GetTlsData(session_id) => {
+                println!("runtime_manager_nitro::main GetTlsData");
                 let return_message = match managers::session_manager::get_data(session_id) {
                     Ok((active, output_data)) => {
-                        RuntimeManagerMessage::TLSData(output_data, active)
+                        RuntimeManagerResponse::TlsData(output_data, active)
                     }
-                    Err(_) => RuntimeManagerMessage::Status(VMStatus::Fail),
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                 };
                 return_message
             }
             _ => {
                 println!("runtime_manager_nitro::main Unknown Opcode");
-                RuntimeManagerMessage::Status(VMStatus::Unimplemented)
+                RuntimeManagerResponse::Status(Status::Unimplemented)
             }
         };
         let return_buffer = bincode::serialize(&return_message)
@@ -134,7 +136,7 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
 fn attestation(
     challenge: &[u8],
     _challenge_id: i32,
-) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+) -> Result<RuntimeManagerResponse, RuntimeManagerError> {
     println!("runtime_manager_nitro::attestation started");
     managers::session_manager::init_session_manager()?;
     // generate the csr
@@ -170,17 +172,17 @@ fn attestation(
         buffer.clone()
     };
 
-    return Ok(RuntimeManagerMessage::AttestationData(att_doc));
+    return Ok(RuntimeManagerResponse::AttestationData(att_doc));
 }
 
-/// Handler for the RuntimeManagerMessage::Initialize message
+/// Handler for the RuntimeManagerRequest::Initialize message
 fn initialize(
     policy_json: &str,
     cert_chain: &Vec<Vec<u8>>,
-) -> Result<RuntimeManagerMessage, RuntimeManagerError> {
+) -> Result<RuntimeManagerResponse, RuntimeManagerError> {
     managers::session_manager::load_policy(policy_json)?;
     println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;
 
-    return Ok(RuntimeManagerMessage::Status(VMStatus::Success));
+    return Ok(RuntimeManagerResponse::Status(Status::Success));
 }

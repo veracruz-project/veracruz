@@ -18,7 +18,9 @@ pub mod veracruz_server_nitro {
     };
     use policy_utils::policy::Policy;
     use std::{env, error::Error};
-    use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
+    use veracruz_utils::runtime_manager_message::{
+        RuntimeManagerRequest, RuntimeManagerResponse, Status,
+    };
 
     /// Delay to apply between launching the server and trying to contact the runtime manager
     /// enclave (in milliseconds).
@@ -77,15 +79,15 @@ pub mod veracruz_server_nitro {
             std::thread::sleep(std::time::Duration::from_millis(SERVER_DELAY_IN_MILLIS));
 
             let attesstation_doc = {
-                let attestation = RuntimeManagerMessage::Attestation(challenge, challenge_id);
+                let attestation = RuntimeManagerRequest::Attestation(challenge, challenge_id);
                 meta.enclave
                     .send_buffer(&bincode::serialize(&attestation)?)?;
                 // read the response
                 let response = meta.enclave.receive_buffer()?;
                 match bincode::deserialize(&response[..])? {
-                    RuntimeManagerMessage::AttestationData(doc) => doc,
+                    RuntimeManagerResponse::AttestationData(doc) => doc,
                     response_message => {
-                        return Err(VeracruzServerError::RuntimeManagerMessageStatus(
+                        return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
                             response_message,
                         ))
                     }
@@ -98,8 +100,8 @@ pub mod veracruz_server_nitro {
                 challenge_id,
             )?;
 
-            let initialize: RuntimeManagerMessage =
-                RuntimeManagerMessage::Initialize(policy_json.to_string(), cert_chain);
+            let initialize: RuntimeManagerRequest =
+                RuntimeManagerRequest::Initialize(policy_json.to_string(), cert_chain);
 
             let encoded_buffer: Vec<u8> = bincode::serialize(&initialize)?;
             meta.enclave.send_buffer(&encoded_buffer)?;
@@ -107,14 +109,14 @@ pub mod veracruz_server_nitro {
             // read the response
             let status_buffer = meta.enclave.receive_buffer()?;
 
-            let message: RuntimeManagerMessage = bincode::deserialize(&status_buffer[..])?;
+            let message: RuntimeManagerResponse = bincode::deserialize(&status_buffer[..])?;
             let status = match message {
-                RuntimeManagerMessage::Status(status) => status,
-                _ => return Err(VeracruzServerError::RuntimeManagerMessageStatus(message)),
+                RuntimeManagerResponse::Status(status) => status,
+                _ => return Err(VeracruzServerError::InvalidRuntimeManagerResponse(message)),
             };
             match status {
-                VMStatus::Success => (),
-                _ => return Err(VeracruzServerError::VMStatus(status)),
+                Status::Success => (),
+                _ => return Err(VeracruzServerError::Status(status)),
             }
             println!("VeracruzServerNitro::new complete. Returning");
             return Ok(meta);
@@ -128,17 +130,17 @@ pub mod veracruz_server_nitro {
         }
 
         fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
-            let nls_message = RuntimeManagerMessage::NewTLSSession;
+            let nls_message = RuntimeManagerRequest::NewTlsSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
             let session_id = match received_message {
-                RuntimeManagerMessage::TLSSession(sid) => sid,
+                RuntimeManagerResponse::TlsSession(sid) => sid,
                 _ => {
-                    return Err(VeracruzServerError::InvalidRuntimeManagerMessage(
+                    return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
                         received_message,
                     ))
                 }
@@ -147,17 +149,18 @@ pub mod veracruz_server_nitro {
         }
 
         fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
-            let cts_message = RuntimeManagerMessage::CloseTLSSession(session_id);
+            let cts_message = RuntimeManagerRequest::CloseTlsSession(session_id);
             let cts_buffer = bincode::serialize(&cts_message)?;
 
             self.enclave.send_buffer(&cts_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
             return match received_message {
-                RuntimeManagerMessage::Status(_status) => Ok(()),
-                _ => Err(VeracruzServerError::VMStatus(VMStatus::Fail)),
+                RuntimeManagerResponse::Status(_status) => Ok(()),
+
+                _ => Err(VeracruzServerError::Status(Status::Fail)),
             };
         }
 
@@ -166,22 +169,22 @@ pub mod veracruz_server_nitro {
             session_id: u32,
             input: Vec<u8>,
         ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
-            let std_message: RuntimeManagerMessage =
-                RuntimeManagerMessage::SendTLSData(session_id, input);
+            let std_message: RuntimeManagerRequest =
+                RuntimeManagerRequest::SendTlsData(session_id, input);
             let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
 
             self.enclave.send_buffer(&std_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
             match received_message {
-                RuntimeManagerMessage::Status(status) => match status {
-                    VMStatus::Success => (),
-                    _ => return Err(VeracruzServerError::VMStatus(status)),
+                RuntimeManagerResponse::Status(status) => match status {
+                    Status::Success => (),
+                    _ => return Err(VeracruzServerError::Status(status)),
                 },
                 _ => {
-                    return Err(VeracruzServerError::InvalidRuntimeManagerMessage(
+                    return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
                         received_message,
                     ))
                 }
@@ -190,21 +193,21 @@ pub mod veracruz_server_nitro {
             let mut active_flag = true;
             let mut ret_array = Vec::new();
             while self.tls_data_needed(session_id)? {
-                let gtd_message = RuntimeManagerMessage::GetTLSData(session_id);
+                let gtd_message = RuntimeManagerRequest::GetTlsData(session_id);
                 let gtd_buffer: Vec<u8> = bincode::serialize(&gtd_message)?;
 
                 self.enclave.send_buffer(&gtd_buffer)?;
 
                 let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-                let received_message: RuntimeManagerMessage =
+                let received_message: RuntimeManagerResponse =
                     bincode::deserialize(&received_buffer)?;
                 match received_message {
-                    RuntimeManagerMessage::TLSData(data, alive) => {
+                    RuntimeManagerResponse::TlsData(data, alive) => {
                         active_flag = alive;
                         ret_array.push(data);
                     }
-                    _ => return Err(VeracruzServerError::VMStatus(VMStatus::Fail)),
+                    _ => return Err(VeracruzServerError::Status(Status::Fail)),
                 }
             }
 
@@ -239,17 +242,17 @@ pub mod veracruz_server_nitro {
 
     impl VeracruzServerNitro {
         fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
-            let gtdn_message = RuntimeManagerMessage::GetTLSDataNeeded(session_id);
+            let gtdn_message = RuntimeManagerRequest::GetTlsDataNeeded(session_id);
             let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
 
             self.enclave.send_buffer(&gtdn_buffer)?;
 
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
-            let received_message: RuntimeManagerMessage = bincode::deserialize(&received_buffer)?;
+            let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
             let tls_data_needed = match received_message {
-                RuntimeManagerMessage::TLSDataNeeded(needed) => needed,
-                _ => return Err(VeracruzServerError::VMStatus(VMStatus::Fail)),
+                RuntimeManagerResponse::TlsDataNeeded(needed) => needed,
+                _ => return Err(VeracruzServerError::Status(Status::Fail)),
             };
             return Ok(tls_data_needed);
         }
