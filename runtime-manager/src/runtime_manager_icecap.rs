@@ -11,17 +11,22 @@
 
 extern crate alloc;
 
-use core::convert::TryFrom;
-use core::mem::size_of;
+use core::{convert::TryFrom, mem::size_of};
 
-use icecap_core::config::*;
-use icecap_core::logger::{DisplayMode, Level, Logger};
-use icecap_core::prelude::*;
-use icecap_core::ring_buffer::*;
+use icecap_core::{
+    config::*,
+    logger::{DisplayMode, Level, Logger},
+    prelude::*,
+    ring_buffer::*,
+};
 use icecap_start_generic::declare_generic_main;
+use icecap_std_external;
+
+use veracruz_utils::runtime_manager_message::{
+    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+};
 
 use crate::managers::{session_manager, RuntimeManagerError};
-use veracruz_utils::platform::icecap::message::{Error, Header, Request, Response};
 
 use bincode;
 use serde::{Deserialize, Serialize};
@@ -100,23 +105,23 @@ impl RuntimeManager {
 
     fn process(&mut self) -> Fallible<()> {
         // recv request if we have a full request in our ring buffer
-        if self.channel.poll_read() < size_of::<Header>() {
+        if self.channel.poll_read() < size_of::<u32>() {
             return Ok(());
         }
-        let mut raw_header = [0; size_of::<Header>()];
+        let mut raw_header = [0; size_of::<u32>()];
         self.channel.peek(&mut raw_header);
-        let header = bincode::deserialize::<Header>(&raw_header)
+        let header = bincode::deserialize::<u32>(&raw_header)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
         let size = usize::try_from(header)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
 
-        if self.channel.poll_read() < size_of::<Header>() + size {
+        if self.channel.poll_read() < size_of::<u32>() + size {
             return Ok(());
         }
         let mut raw_request = vec![0; usize::try_from(header).unwrap()];
-        self.channel.skip(size_of::<Header>());
+        self.channel.skip(size_of::<u32>());
         self.channel.read(&mut raw_request);
-        let request = bincode::deserialize::<Request>(&raw_request)
+        let request = bincode::deserialize::<RuntimeManagerRequest>(&raw_request)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
 
         // process requests
@@ -125,7 +130,7 @@ impl RuntimeManager {
         // send response
         let raw_response = bincode::serialize(&response)
             .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-        let raw_header = bincode::serialize(&Header::try_from(raw_response.len()).unwrap())
+        let raw_header = bincode::serialize(&u32::try_from(raw_response.len()).unwrap())
             .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
 
         self.channel.write(&raw_header);
@@ -137,53 +142,57 @@ impl RuntimeManager {
         Ok(())
     }
 
-    fn handle(&mut self, req: Request) -> Fallible<Response> {
+    fn handle(&mut self, req: RuntimeManagerRequest) -> Fallible<RuntimeManagerResponse> {
         Ok(match req {
-            Request::Attestation {
-                device_id,
-                challenge,
-            } => match session_manager::init_session_manager()
-                .and(self.handle_attestation(device_id, &challenge))
-            {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok((token, csr)) => Response::Attestation { token, csr },
-            },
-            Request::Initialize {
-                policy_json,
-                root_cert,
-                compute_cert,
-            } => match session_manager::load_policy(&policy_json).and(
-                session_manager::load_cert_chain(&vec![compute_cert, root_cert]),
-            ) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::Initialize,
-            },
-            Request::NewTlsSession => match session_manager::new_session() {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(sess) => Response::NewTlsSession(sess),
-            },
-            Request::CloseTlsSession(sess) => match session_manager::close_session(sess) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(()) => Response::CloseTlsSession,
-            },
-            Request::SendTlsData(sess, data) => match session_manager::send_data(sess, &data) {
-                Err(e) => {
-                    debug_println!("oh no {:?}", e);
-                    Response::Error(Error::Unspecified)
+            RuntimeManagerRequest::Attestation(challenge, device_id) => {
+                match session_manager::init_session_manager()
+                    .and(self.handle_attestation(device_id, &challenge))
+                {
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
+                    Ok((token, csr)) => RuntimeManagerResponse::AttestationData(token, csr),
                 }
-                Ok(()) => Response::SendTlsData,
+            }
+            RuntimeManagerRequest::Initialize(policy_json, cert_chain) => {
+                match session_manager::load_policy(&policy_json)
+                    .and(session_manager::load_cert_chain(&cert_chain))
+                {
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
+                    Ok(()) => RuntimeManagerResponse::Status(Status::Success),
+                }
+            }
+            RuntimeManagerRequest::NewTlsSession => match session_manager::new_session() {
+                Err(_) => RuntimeManagerResponse::Status(Status::Fail),
+                Ok(sess) => RuntimeManagerResponse::TlsSession(sess),
             },
-            Request::GetTlsDataNeeded(sess) => match session_manager::get_data_needed(sess) {
-                Err(_) => Response::Error(Error::Unspecified),
-                Ok(needed) => Response::GetTlsDataNeeded(needed),
-            },
-            Request::GetTlsData(sess) => match session_manager::get_data(sess) {
-                Err(_) => Response::Error(Error::Unspecified),
+            RuntimeManagerRequest::CloseTlsSession(sess) => {
+                match session_manager::close_session(sess) {
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
+                    Ok(()) => RuntimeManagerResponse::Status(Status::Success),
+                }
+            }
+            RuntimeManagerRequest::SendTlsData(sess, data) => {
+                match session_manager::send_data(sess, &data) {
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
+                    Ok(()) => RuntimeManagerResponse::Status(Status::Success),
+                }
+            }
+            RuntimeManagerRequest::GetTlsDataNeeded(sess) => {
+                match session_manager::get_data_needed(sess) {
+                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
+                    Ok(needed) => RuntimeManagerResponse::TlsDataNeeded(needed),
+                }
+            }
+            RuntimeManagerRequest::GetTlsData(sess) => match session_manager::get_data(sess) {
+                Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                 Ok((active, data)) => {
                     self.active = active;
-                    Response::GetTlsData(active, data)
+                    RuntimeManagerResponse::TlsData(data, active)
                 }
             },
+            RuntimeManagerRequest::ResetEnclave => {
+                /* NB: don't do anything in response to this... */
+                RuntimeManagerResponse::Status(Status::Success)
+            }
         })
     }
 
