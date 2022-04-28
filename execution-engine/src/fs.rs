@@ -1924,7 +1924,7 @@ impl FileSystem {
     /// Since files inherit their parent's rights, granting execution to a
     /// parent directory is enough to grant execution to every file under it.
     /// Fails if the principal can't access the path with `path_open()`.
-    pub fn is_executable<T: AsRef<Path> + std::fmt::Debug>(
+    pub fn is_executable<T: AsRef<Path>>(
         &mut self,
         principal: &Principal,
         path: T,
