@@ -46,7 +46,7 @@ serde_json = "1.0"
 typetag = "=0.1.6"
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi" }
-wasmtime = { version = "0.27", optional = true }
+wasmtime = { version = "0.34.2", optional = true }
 
 [lib]
 name = "execution_engine"
