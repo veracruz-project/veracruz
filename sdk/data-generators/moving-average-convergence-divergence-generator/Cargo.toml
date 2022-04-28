@@ -10,5 +10,5 @@ version = "0.3.0"
 clap = "2.33"
 csv = "1.0"
 postcard = { version = "0.7.2", features = [ "alloc" ] }
-rand = "0.7"
-rand_distr = "0.3"
+rand = "0.8.3"
+rand_distr = "0.4"
