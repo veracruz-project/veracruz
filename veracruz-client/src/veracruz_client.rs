@@ -554,8 +554,8 @@ impl VeracruzClient {
             "http://{:}/runtime_manager",
             self.policy.veracruz_server_url()
         );
-        let client_build = reqwest::ClientBuilder::new().timeout(None).build()?;
-        let mut ret = client_build
+        let client_build = reqwest::blocking::ClientBuilder::new().build()?;
+        let ret = client_build
             .post(dest_url.as_str())
             .body(combined_string)
             .send()?;
