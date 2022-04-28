@@ -36,7 +36,9 @@ pub mod veracruz_server_linux {
     use transport_protocol::{
         parse_proxy_attestation_server_response, serialize_native_psa_attestation_token,
     };
-    use veracruz_utils::platform::vm::{RuntimeManagerMessage, VMStatus};
+    use veracruz_utils::runtime_manager_message::{
+        RuntimeManagerRequest, RuntimeManagerResponse, Status,
+    };
 
     ////////////////////////////////////////////////////////////////////////////
     // Constants.
@@ -88,7 +90,7 @@ pub mod veracruz_server_linux {
 
             send_message(
                 &mut self.runtime_manager_socket,
-                &RuntimeManagerMessage::GetTLSDataNeeded(session_id),
+                &RuntimeManagerRequest::GetTlsDataNeeded(session_id),
             )
             .map_err(VeracruzServerError::SocketError)?;
 
@@ -96,13 +98,14 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let received: RuntimeManagerMessage = receive_message(&mut self.runtime_manager_socket)
-                .map_err(VeracruzServerError::SocketError)?;
+            let received: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)
+                    .map_err(VeracruzServerError::SocketError)?;
 
             info!("Response received.");
 
             match received {
-                RuntimeManagerMessage::TLSDataNeeded(response) => {
+                RuntimeManagerResponse::TlsDataNeeded(response) => {
                     info!(
                         "Runtime Manager enclave can have further TLS data read: {}.",
                         response
@@ -116,7 +119,9 @@ pub mod veracruz_server_linux {
                         otherwise
                     );
 
-                    Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise))
+                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ))
                 }
             }
         }
@@ -149,7 +154,7 @@ pub mod veracruz_server_linux {
 
             send_message(
                 &mut self.runtime_manager_socket,
-                &RuntimeManagerMessage::GetTLSData(session_id),
+                &RuntimeManagerRequest::GetTlsData(session_id),
             )
             .map_err(VeracruzServerError::SocketError)?;
 
@@ -157,21 +162,24 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let received: RuntimeManagerMessage = receive_message(&mut self.runtime_manager_socket)
-                .map_err(VeracruzServerError::SocketError)?;
+            let received: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)
+                    .map_err(VeracruzServerError::SocketError)?;
 
             info!("Response received.");
 
             match received {
-                RuntimeManagerMessage::TLSData(buffer, alive) => {
+                RuntimeManagerResponse::TlsData(buffer, alive) => {
                     info!("{} bytes of TLS data received from Runtime Manager enclave (alive status: {}).", buffer.len(), alive);
 
                     Ok((alive, buffer))
                 }
                 otherwise => {
-                    error!("Unexpected reply received back from Runtime Manager enclave.  Recevied: {:?}.", otherwise);
+                    error!("Unexpected reply received back from Runtime Manager enclave.  Received: {:?}.", otherwise);
 
-                    Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise))
+                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ))
                 }
             }
         }
@@ -333,7 +341,7 @@ pub mod veracruz_server_linux {
                 VeracruzServerError::HttpError(e)
             })?;
 
-            send_message(&mut runtime_manager_socket, &RuntimeManagerMessage::Attestation(challenge, challenge_id)).map_err(|e| {
+            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Attestation(challenge, challenge_id)).map_err(|e| {
                 error!("Failed to send attestation message to runtime manager enclave.  Error returned: {:?}.", e);
 
                 VeracruzServerError::SocketError(e)
@@ -341,7 +349,7 @@ pub mod veracruz_server_linux {
 
             info!("Attestation message successfully sent to runtime manager enclave.");
 
-            let received: RuntimeManagerMessage = receive_message(&mut runtime_manager_socket).map_err(|e| {
+            let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
                 error!("Failed to receive response to runtime manager enclave attestation message.  Error received: {:?}.", e);
 
                 VeracruzServerError::SocketError(e)
@@ -350,7 +358,7 @@ pub mod veracruz_server_linux {
             info!("Response to attestation message received from runtime manager enclave.");
 
             let (token, csr) = match received {
-                RuntimeManagerMessage::AttestationData(token, csr) => {
+                RuntimeManagerResponse::AttestationData(token, csr) => {
                     info!("Response to attestation message successfully received.",);
 
                     (token, csr)
@@ -361,7 +369,9 @@ pub mod veracruz_server_linux {
                         otherwise
                     );
 
-                    return Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise));
+                    return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ));
                 }
             };
 
@@ -399,7 +409,7 @@ pub mod veracruz_server_linux {
 
             info!("Certificate chain received from proxy attestation server.  Forwarding to runtime manager enclave.");
 
-            send_message(&mut runtime_manager_socket, &RuntimeManagerMessage::Initialize(String::from(policy), vec![compute_cert, root_cert])).map_err(|e| {
+            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy), vec![compute_cert, root_cert])).map_err(|e| {
                 error!("Failed to send certificate chain message to runtime manager enclave.  Error returned: {:?}.", e);
 
                 VeracruzServerError::SocketError(e)
@@ -407,7 +417,7 @@ pub mod veracruz_server_linux {
 
             info!("Certificate chain message sent, awaiting response.");
 
-            let received: RuntimeManagerMessage = receive_message(&mut runtime_manager_socket).map_err(|e| {
+            let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
                 error!("Failed to receive response to certificate chain message message from runtime manager enclave.  Error returned: {:?}.", e);
 
                 VeracruzServerError::SocketError(e)
@@ -416,7 +426,7 @@ pub mod veracruz_server_linux {
             info!("Response received.");
 
             return match received {
-                RuntimeManagerMessage::Status(VMStatus::Success) => {
+                RuntimeManagerResponse::Status(Status::Success) => {
                     info!("Received success message from runtime manager enclave.");
 
                     Ok(Self {
@@ -425,13 +435,13 @@ pub mod veracruz_server_linux {
                         runtime_enclave_binary_dir,
                     })
                 }
-                RuntimeManagerMessage::Status(otherwise) => {
+                RuntimeManagerResponse::Status(otherwise) => {
                     error!(
                         "Received non-success error code from runtiem manager: {:?}.",
                         otherwise
                     );
 
-                    Err(VeracruzServerError::VMStatus(otherwise))
+                    Err(VeracruzServerError::Status(otherwise))
                 }
                 otherwise => {
                     error!(
@@ -439,7 +449,9 @@ pub mod veracruz_server_linux {
                         otherwise
                     );
 
-                    Err(VeracruzServerError::RuntimeManagerMessageStatus(otherwise))
+                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ))
                 }
             };
         }
@@ -457,7 +469,7 @@ pub mod veracruz_server_linux {
 
             send_message(
                 &mut self.runtime_manager_socket,
-                &RuntimeManagerMessage::NewTLSSession,
+                &RuntimeManagerRequest::NewTlsSession,
             )
             .map_err(VeracruzServerError::SocketError)?;
 
@@ -465,11 +477,11 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerMessage = receive_message(&mut self.runtime_manager_socket)
+            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)
                 .map_err(VeracruzServerError::SocketError)?;
 
             match message {
-                RuntimeManagerMessage::TLSSession(session_id) => {
+                RuntimeManagerResponse::TlsSession(session_id) => {
                     info!("Enclave started new TLS session with ID: {}.", session_id);
                     Ok(session_id)
                 }
@@ -478,7 +490,9 @@ pub mod veracruz_server_linux {
                         "Unexpected response returned from enclave.  Received: {:?}.",
                         otherwise
                     );
-                    Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise))
+                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ))
                 }
             }
         }
@@ -488,7 +502,7 @@ pub mod veracruz_server_linux {
 
             send_message(
                 &mut self.runtime_manager_socket,
-                &RuntimeManagerMessage::CloseTLSSession(session_id),
+                &RuntimeManagerRequest::CloseTlsSession(session_id),
             )
             .map_err(VeracruzServerError::SocketError)?;
 
@@ -496,26 +510,28 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerMessage = receive_message(&mut self.runtime_manager_socket)
+            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)
                 .map_err(VeracruzServerError::SocketError)?;
 
             info!("Response received.");
 
             match message {
-                RuntimeManagerMessage::Status(VMStatus::Success) => {
+                RuntimeManagerResponse::Status(Status::Success) => {
                     info!("TLS session successfully closed.");
                     Ok(())
                 }
-                RuntimeManagerMessage::Status(status) => {
+                RuntimeManagerResponse::Status(status) => {
                     error!("TLS session close request resulted in unexpected status message.  Received: {:?}.", status);
-                    Err(VeracruzServerError::VMStatus(status))
+                    Err(VeracruzServerError::Status(status))
                 }
                 otherwise => {
                     error!(
                         "Unexpected response returned from enclave.  Received: {:?}.",
                         otherwise
                     );
-                    Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise))
+                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ))
                 }
             }
         }
@@ -532,7 +548,7 @@ pub mod veracruz_server_linux {
 
             send_message(
                 &mut self.runtime_manager_socket,
-                &RuntimeManagerMessage::SendTLSData(session_id, input),
+                &RuntimeManagerRequest::SendTlsData(session_id, input),
             )
             .map_err(VeracruzServerError::SocketError)?;
 
@@ -540,22 +556,24 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerMessage = receive_message(&mut self.runtime_manager_socket)
+            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)
                 .map_err(VeracruzServerError::SocketError)?;
 
             info!("Response received.");
 
             match message {
-                RuntimeManagerMessage::Status(VMStatus::Success) => {
+                RuntimeManagerResponse::Status(Status::Success) => {
                     info!("Runtime Manager enclave successfully received TLS data.")
                 }
-                RuntimeManagerMessage::Status(otherwise) => {
+                RuntimeManagerResponse::Status(otherwise) => {
                     error!("Runtime Manager enclave failed to receive TLS data.  Response received: {:?}.", otherwise);
-                    return Err(VeracruzServerError::VMStatus(otherwise));
+                    return Err(VeracruzServerError::Status(otherwise));
                 }
                 otherwise => {
                     error!("Runtime Manager enclave produced an unexpected response to TLS data.  Response received: {:?}.", otherwise);
-                    return Err(VeracruzServerError::InvalidRuntimeManagerMessage(otherwise));
+                    return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                        otherwise,
+                    ));
                 }
             }
 
