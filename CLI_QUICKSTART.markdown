@@ -198,7 +198,7 @@ $ vc-pgen \
     --certificate example/example-data2-cert.pem \
     --capability "/input/:w" \
     --certificate example/example-result-cert.pem \
-    --capability "/program/:rx,/output/:r" \
+    --capability "/program/:x,/output/:r" \
     --binary /program/example-binary.wasm=example/example-binary.wasm \
     --capability "/input/:r,/output/:w" \
     --output-policy-file example/example-policy.json
