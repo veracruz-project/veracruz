@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean clean-cargo-lock doc fmt linux runtime-manager-enclave
+.PHONY: all clean clean-cargo-lock doc fmt clippy linux runtime-manager-enclave
 
 default: all
 
