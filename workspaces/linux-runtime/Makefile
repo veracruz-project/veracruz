@@ -19,14 +19,10 @@ include $(WORKSPACE_DIR)/common.mk
 
 all: linux
 
-linux: runtime-manager-enclave css-linux.bin
+linux: runtime-manager-enclave
 
 runtime-manager-enclave:
 	cargo build $(PROFILE_FLAG) $(V_FLAG) --features linux -p runtime_manager_enclave
-	cp target/$(PROFILE_PATH)/runtime_manager_enclave .
-
-css-linux.bin: runtime-manager-enclave
-	cp target/$(PROFILE_PATH)/runtime_manager_enclave $@
 
 doc:
 	cargo doc
@@ -36,7 +32,6 @@ fmt:
 
 clean:
 	@cargo clean
-	@rm -f css-linux.bin
 
 clean-cargo-lock:
 	rm -f Cargo.lock

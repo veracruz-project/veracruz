@@ -17,27 +17,27 @@ default: build
 
 tests: test-server test-client veracruz-test
 
-WORKSPACE_DIR = $(abspath ..)
-OUT_DIR ?= $(abspath test-collateral)
-MEASUREMENT_FILE = $(abspath ../linux-runtime/css-linux.bin)
-MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
-
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
+WORKSPACE_DIR = $(abspath ..)
+OUT_DIR ?= $(abspath test-collateral)
+MEASUREMENT_FILE = $(abspath ../linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave)
+MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
+
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
-RUNTIME_MANAGER_ENCLAVE = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave
+RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave
 TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR) \
-	RUNTIME_ENCLAVE_BINARY_PATH=$(WORKSPACE_DIR)/linux-runtime/runtime_manager_enclave
+	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH)
 
 all: build test-collateral
 
 build:
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
+	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(CC) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG) \
 		-p proxy-attestation-server \
@@ -61,9 +61,9 @@ install:
 $(MEASUREMENT_FILE):
 	$(MAKE) -C ../linux-runtime linux
 
-test-dependencies: test-collateral $(RUNTIME_MANAGER_ENCLAVE)
+test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 
-CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
+CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(CC) \
 	$(TEST_PARAMETERS) \
 	cargo test $(PROFILE_FLAG) --features linux
@@ -80,7 +80,7 @@ veracruz-test: test-dependencies
 	$(CARGO_TEST) -p veracruz-test --no-run
 	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
 
-$(RUNTIME_MANAGER_ENCLAVE):
+$(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
 
 doc:
