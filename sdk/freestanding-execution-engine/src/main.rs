@@ -355,6 +355,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         PathBuf::from("/"),
         Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR,
     );
+    right_table.insert(Principal::InternalSuperUser, su_read_rights);
 
     info!("The final right tables: {:?}", right_table);
 
