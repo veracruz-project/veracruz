@@ -22,10 +22,7 @@ include $(WORKSPACE_DIR)/shared.mk
 
 all: nitro
 
-nitro: runtime_manager.eif PCR0 css-nitro.bin
-
-css-nitro.bin: PCR0
-	cp $< $@
+nitro: runtime_manager.eif PCR0
 
 runtime_manager.eif PCR0: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave crates/runtime-manager/dockerdir/Dockerfile
 	rm -rf docker
@@ -53,7 +50,7 @@ fmt:
 
 clean:
 	@cargo clean
-	@rm -f css-nitro.bin PCR0
+	@rm -f PCR0
 
 clean-cargo-lock:
 	rm -f Cargo.lock
