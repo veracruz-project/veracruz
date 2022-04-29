@@ -227,8 +227,7 @@ pub fn generate_csr(
     template: &CsrTemplate,
     private_key: &EcdsaKeyPair,
 ) -> Result<Vec<u8>, CertError> {
-    #[allow(clippy::clone_double_ref)]
-    let public_key =  private_key.public_key().as_ref().clone();
+    let public_key = private_key.public_key().as_ref();
     let mut constructed_csr = template.template.to_vec();
     if public_key.len() != (template.public_key_location.1 - template.public_key_location.0) {
         return Err(CertError::InvalidLength {
