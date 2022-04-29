@@ -19,14 +19,14 @@ tests: test-server test-client veracruz-test
 
 WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
-include $(WORKSPACE_DIR)/shared.mk
 
 OUT_DIR ?= $(abspath test-collateral)
-MEASUREMENT_FILE = $(abspath ../linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave)
+RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave
+MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
+include $(WORKSPACE_DIR)/shared.mk
 
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
-RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave
 TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
 	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
@@ -56,10 +56,6 @@ install:
 	ln -sf $(BIN_DIR)/proxy-attestation-server $(BIN_DIR)/vc-pas
 	ln -sf $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
 	ln -sf $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
-
-.PHONY: $(MEASUREMENT_FILE)
-$(MEASUREMENT_FILE):
-	$(MAKE) -C ../linux-runtime linux
 
 test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 
