@@ -10,8 +10,8 @@
 # licensing and copyright information.
 
 .PHONY: all build clean clean-cargo-lock default doc clippy fmt clippy \
-				test-dependencies test-collateral test-server test-client veracruz-test \
-				tests
+	test-dependencies test-collateral test-server test-client veracruz-test \
+	tests
 
 default: build
 
