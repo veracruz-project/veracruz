@@ -17,10 +17,10 @@ default: build
 
 tests: test-server test-client veracruz-test
 
+WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
-WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
 MEASUREMENT_FILE = $(abspath ../linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
