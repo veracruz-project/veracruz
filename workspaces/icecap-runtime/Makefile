@@ -14,7 +14,7 @@ icecap_plat ?= qemu
 WORKSPACE_DIR = $(abspath ..)
 PROJECT = .
 HOST_CC ?= gcc
-LD = $(abspath $(shell cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
+LD = $(abspath $(shell RUSTC_BOOTSTRAP=1 cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
 CC = aarch64-linux-gnu-gcc
 
 deps := deps
@@ -242,6 +242,7 @@ rust-project: $(now) sysroot-install userspace_c sel4
 	$(call cargo_target_config_prefix,$(rust_target))LINKER="$(LD)" \
 	CC_$(call kebab_to_caml,$(rust_target))="$(CC)" \
 	BINDGEN_EXTRA_CLANG_ARGS="$(icecap_c_include_flags) -I$(compiler_some_libc_include) -I/usr/aarch64-linux-gnu/include" \
+	RUSTC_BOOTSTRAP=1 \
 		cargo build \
 			-Z unstable-options \
 			--manifest-path $(manifest_path) \

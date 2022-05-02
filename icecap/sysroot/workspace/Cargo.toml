@@ -9,7 +9,8 @@ description = "Crate that depends on Rust libraries for Icecap"
 std = { path = "../rust/library/std" }
 
 # Hacks to get std to depend on our patches.
-libc = "=0.2.108"
+libc = "=0.2.124"
+# compiler_builtins = "=0.1.69"
 
 [lib]
 crate-type = ["rlib"]
@@ -25,7 +26,7 @@ debug-assertions = true
 
 rustc-std-workspace-core = { path = "../rust/library/rustc-std-workspace-core" }
 rustc-std-workspace-alloc = { path = "../rust/library/rustc-std-workspace-alloc" }
-rustc-std-workspace-std = { path = "../rust/library/rustc-std-workspace-std" }
+# rustc-std-workspace-std = { path = "../rust/library/rustc-std-workspace-std" }
 
 libc = { path = "../libc" }
 

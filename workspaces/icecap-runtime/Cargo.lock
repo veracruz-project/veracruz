@@ -1258,7 +1258,7 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.108"
+version = "0.2.124"
 
 [[package]]
 name = "libloading"
