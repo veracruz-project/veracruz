@@ -25,10 +25,10 @@ std = [
 [dependencies]
 bincode = { version = "1.2.1", default-features = false, optional = true }
 err-derive = "0.2"
-ring = "0.16.11"
+ring = "0.16.20"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
-rustls = { version = "0.16", optional = true }
+rustls = { version = "0.20.4" }
 serde = { version = "1.0.115", default-features = false, optional = true }
 serde_json = { version = "1.0", default-features = false }
-webpki = "=0.21.2"
+webpki = "0.22"
 x509-parser = { version = "0.7.0", optional = true }

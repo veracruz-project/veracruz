@@ -11,7 +11,7 @@
 
 use err_derive::Error;
 #[cfg(feature = "std")]
-use rustls::{CipherSuite, TLSError};
+use rustls::{CipherSuite, Error as TLSError};
 use std::{string::String, time::SystemTimeError};
 #[cfg(feature = "std")]
 use x509_parser::error::PEMError;
@@ -45,7 +45,7 @@ pub enum PolicyError {
     #[error(display = "PolicyError: TLSError: {:?}.", _0)]
     TLSError(#[error(source)] TLSError),
     #[error(display = "PolicyError: TLSError: invalid cyphersuite: {:?}.", _0)]
-    TLSInvalidCyphersuiteError(String),
+    TLSInvalidCiphersuiteError(String),
     #[error(display = "PolicyError: SystemTimeError: {:?}.", _0)]
     SystemTimeError(#[error(source)] SystemTimeError),
     #[error(display = "PolicyError: unauthorized client certificate: {}.", _0)]

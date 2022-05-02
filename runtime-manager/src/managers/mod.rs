@@ -246,7 +246,7 @@ pub fn error_message(message: String, error_code: u32) {
 }
 
 /// Base function for printing messages outside of the enclave.  Note that this
-/// should only print something to *stdoout* on the host's machine if the debug
+/// should only print something to *stdout* on the host's machine if the debug
 /// configuration flag is set in the Veracruz global policy.
 fn print_message(#[allow(unused)] message: String, #[allow(unused)] code: u32) {
     #[cfg(feature = "linux")]
