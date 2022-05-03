@@ -63,7 +63,13 @@ const VERACRUZ_PORT: u32 = 5005;
 
 impl NitroEnclave {
     /// create a new Nitro enclave, started with the file in eif_path
-    pub fn new(nitro_sbin: bool, eif_path: &str, debug: bool) -> Result<Self, NitroError> {
+    pub fn new(
+        nitro_sbin: bool,
+        eif_path: &str,
+        debug: bool,
+        max_memory: u32,
+    ) -> Result<Self, NitroError> {
+        let max_memory_str = max_memory.to_string();
         let mut args = vec![
             "run-enclave",
             "--eif-path",
@@ -71,7 +77,7 @@ impl NitroEnclave {
             "--cpu-count",
             "2",
             "--memory",
-            "256",
+            &max_memory_str,
         ];
         if debug {
             args.push("--debug-mode=true");

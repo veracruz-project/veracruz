@@ -95,7 +95,9 @@ pub struct Policy {
     /// The clock flag.  This dictates whether the WASM program will be able to
     /// call clock functions to e.g. get a clock's time or resolution.
     enable_clock: bool,
-
+    /// The maximum amount of memory in MiB available to the isolate. Only
+    /// enforced in Nitro for now.
+    max_memory: u32,
     /// Hash of the JSON representation if the Policy was parsed from a file.
     #[serde(skip)]
     policy_hash: Option<String>,
@@ -120,6 +122,7 @@ impl Policy {
         execution_strategy: ExecutionStrategy,
         file_hashes: Vec<FileHash>,
         enable_clock: bool,
+        max_memory: u32,
     ) -> Result<Self, PolicyError> {
         let policy = Self {
             identities,
@@ -135,6 +138,7 @@ impl Policy {
             debug,
             execution_strategy,
             enable_clock,
+            max_memory,
             policy_hash: None,
             file_hashes,
         };
@@ -253,6 +257,13 @@ impl Policy {
     #[inline]
     pub fn enable_clock(&self) -> &bool {
         &self.enable_clock
+    }
+
+    /// Returns the maximum amount of memory available to the isolate associated
+    /// with this policy.
+    #[inline]
+    pub fn max_memory(&self) -> &u32 {
+        &self.max_memory
     }
 
     /// Returns the hash of the source JSON representation, if available
