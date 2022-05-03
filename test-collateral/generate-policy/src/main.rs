@@ -331,6 +331,15 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                 )
         )
         .arg(
+            Arg::with_name("max-memory-mib")
+                .short("m")
+                .long("max-memory-mib")
+                .help(
+                    "Specifies the maximum amount of memory in MiB available to the isolate. \
+Only enforced in Nitro for now.",
+                )
+        )
+        .arg(
             Arg::with_name("hash")
                 .short("h")
                 .long("hashes")
@@ -476,7 +485,7 @@ command-line parameter.",
 
     arguments.enable_clock = matches.is_present("enable-clock");
 
-    if let Some(max_memory_mib) = matches.value_of("max-memory") {
+    if let Some(max_memory_mib) = matches.value_of("max-memory-mib") {
         arguments.max_memory_mib = max_memory_mib.parse().unwrap_or_else(|e| {
             abort_with(format!(
                 "Failed to parse max memory.  Error produced: {}.",
