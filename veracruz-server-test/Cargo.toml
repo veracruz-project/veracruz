@@ -41,7 +41,6 @@ lazy_static = "1.4"
 log = "0.4.13"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
-ring = "0.16.20"
 rustls = "0.20.4"
 rustls-pemfile = "0.3.0"
 transport-protocol = { path = "../transport-protocol" }

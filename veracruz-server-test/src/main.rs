@@ -24,7 +24,6 @@ mod tests {
     use log::{debug, error, info, Level};
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
-    use ring;
     use rustls_pemfile;
     use std::{
         collections::HashMap,
@@ -48,6 +47,7 @@ mod tests {
     use veracruz_server::VeracruzServerLinux as VeracruzServerEnclave;
     #[cfg(feature = "nitro")]
     use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
+    use veracruz_utils::sha256::sha256;
     use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
     // Policy files
@@ -347,7 +347,6 @@ mod tests {
 
             let client_cert_filename = trust_path("never_used_cert.pem");
             let client_key_filename = trust_path("client_rsa_key.pem");
-
 
             let mut _client_connection = create_client_test_connection(
                 client_cert_filename.as_path(),
@@ -946,7 +945,11 @@ mod tests {
 
         info!("             Enclave generated a self-signed certificate:");
 
-        let mut client_connection = create_client_test_connection(client_cert_path, client_key_path, &policy.ciphersuite())?;
+        let mut client_connection = create_client_test_connection(
+            client_cert_path,
+            client_key_path,
+            &policy.ciphersuite(),
+        )?;
         info!(
             "             Initialization time (μs): {}.",
             time_init.elapsed().as_micros()
@@ -1325,8 +1328,8 @@ mod tests {
         let policy_json = std::fs::read_to_string(fname)
             .expect(&format!("Cannot open file {}", fname.to_string_lossy()));
 
-        let policy_hash = ring::digest::digest(&ring::digest::SHA256, policy_json.as_bytes());
-        let policy_hash_str = hex::encode(&policy_hash.as_ref().to_vec());
+        let policy_hash = sha256(policy_json.as_bytes());
+        let policy_hash_str = hex::encode(&policy_hash);
         let policy = Policy::from_json(policy_json.as_ref())?;
         Ok((policy, policy_json.to_string(), policy_hash_str))
     }
@@ -1668,13 +1671,15 @@ mod tests {
         ticket: u32,
         send_data: &[u8],
     ) -> Result<Vec<u8>, VeracruzServerError> {
-
         let mut start_index: usize = 0;
         while start_index < send_data.len() {
-            let bytes_written = connection.writer().write(&send_data[start_index..]).map_err(|e| {
-                error!("Failed to send all data.  Error produced: {:?}.", e);
-                e
-            })?;
+            let bytes_written = connection
+                .writer()
+                .write(&send_data[start_index..])
+                .map_err(|e| {
+                    error!("Failed to send all data.  Error produced: {:?}.", e);
+                    e
+                })?;
             start_index += bytes_written;
 
             let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
@@ -1731,13 +1736,11 @@ mod tests {
 
                 match connection.reader().read_to_end(&mut received_buffer) {
                     Ok(_num) => (),
-                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                        ()
-                    },
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
                     Err(err) => {
                         error!("Failed to read data to end.  Error produced: {:?}.", err);
                         return Err(VeracruzServerError::IOError(err));
-                    },
+                    }
                 };
 
                 if received_buffer.len() > 0 {
@@ -1780,10 +1783,13 @@ mod tests {
             certs[0].clone()
         };
 
-        let cipher_suite = veracruz_utils::lookup_ciphersuite(ciphersuite_str)
-            .ok_or_else(|| VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string()))?;
+        let cipher_suite =
+            veracruz_utils::lookup_ciphersuite(ciphersuite_str).ok_or_else(|| {
+                VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string())
+            })?;
         let mut root_store = rustls::RootCertStore::empty();
-        root_store.add(&rustls::Certificate(proxy_service_cert))
+        root_store
+            .add(&rustls::Certificate(proxy_service_cert))
             .map_err(|err| VeracruzServerError::WebpkiError(err))?;
 
         let client_config = rustls::ClientConfig::builder()
@@ -1794,13 +1800,12 @@ mod tests {
             .with_single_cert([client_cert].to_vec(), client_priv_key)?;
 
         let enclave_name_as_server = rustls::ServerName::try_from("ComputeEnclave.dev")
-        .map_err(|err| VeracruzServerError::WebpkiDNSNameError(err))?;
+            .map_err(|err| VeracruzServerError::WebpkiDNSNameError(err))?;
         Ok(rustls::ClientConnection::new(
             std::sync::Arc::new(client_config),
             enclave_name_as_server,
         )?)
     }
-
 
     fn read_cert_file(filename: &Path) -> Result<rustls::Certificate, VeracruzServerError> {
         let mut cert_file = std::fs::File::open(filename)?;

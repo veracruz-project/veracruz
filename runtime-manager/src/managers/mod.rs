@@ -23,6 +23,7 @@ use std::{
     },
     vec::Vec,
 };
+use veracruz_utils::sha256::sha256;
 use wasi_types::ErrNo;
 
 pub mod error;
@@ -116,7 +117,7 @@ impl ProtocolState {
     ) -> Result<(), RuntimeManagerError> {
         // Check the digest, if necessary
         if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
-            let incoming_digest = Self::sha_256_digest(&data);
+            let incoming_digest = sha256(&data);
             if incoming_digest.len() != digest.len() {
                 return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
             }
@@ -136,14 +137,6 @@ impl ProtocolState {
         }
 
         Ok(())
-    }
-
-    /// Compute the digest of a `buffer`
-    #[inline]
-    fn sha_256_digest(buffer: &[u8]) -> Vec<u8> {
-        ring::digest::digest(&ring::digest::SHA256, buffer)
-            .as_ref()
-            .to_vec()
     }
 
     /// Check if a client has capability to write to a file, and then overwrite it with new `data`.

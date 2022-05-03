@@ -18,6 +18,7 @@ use std::sync::{
     Arc,
 };
 use transport_protocol;
+use veracruz_utils::sha256::sha256;
 
 use policy_utils::policy::Policy;
 
@@ -39,7 +40,7 @@ fuzz_target!(|buffer: &[u8]| {
 
         let client_cert_filename = "../test-collateral/client_rsa_cert.pem";
         let client_key_filename = "../test-collateral/client_rsa_key.pem";
-        let cert_hash = ring::digest::digest(&ring::digest::SHA256, enclave_cert.as_ref());
+        let cert_hash = sha256(enclave_cert);
 
         let mut client_session = create_client_test_session(
             &veracruz_server,

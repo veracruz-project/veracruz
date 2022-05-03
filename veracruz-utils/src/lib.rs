@@ -24,6 +24,9 @@ pub mod csr;
 /// Requests and responses for the Runtime Manager.
 pub mod runtime_manager_message;
 
+/// SHA256 function.
+pub mod sha256;
+
 use rustls;
 
 /// The ID of the Veracruz Runtime Hash Extension.

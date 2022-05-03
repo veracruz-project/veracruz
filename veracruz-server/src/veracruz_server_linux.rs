@@ -20,7 +20,6 @@ pub mod veracruz_server_linux {
     };
     use log::{error, info};
     use policy_utils::policy::Policy;
-    use ring::digest::{digest, SHA256};
     use std::{
         env,
         error::Error,
@@ -39,6 +38,7 @@ pub mod veracruz_server_linux {
     use veracruz_utils::runtime_manager_message::{
         RuntimeManagerRequest, RuntimeManagerResponse, Status,
     };
+    use veracruz_utils::sha256::sha256;
 
     ////////////////////////////////////////////////////////////////////////////
     // Constants.
@@ -257,7 +257,7 @@ pub mod veracruz_server_linux {
                         return Err(VeracruzServerError::IOError(err));
                     }
 
-                    let digest = digest(&SHA256, &mut buffer);
+                    let digest = sha256(&buffer);
                     HEXLOWER.encode(digest.as_ref())
                 }
                 Err(err) => {

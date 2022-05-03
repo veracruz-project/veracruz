@@ -19,6 +19,7 @@ use psa_attestation::{
 };
 use rand::Rng;
 use std::{collections::HashMap, ffi::c_void, sync::Mutex};
+use veracruz_utils::sha256::sha256;
 
 // Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
 // will have the same public key. Yes, I'm embedding that key in the source
@@ -156,12 +157,12 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     }
 
     let received_csr_hash = &payload_vec[86..118];
-    let calculated_csr_hash = ring::digest::digest(&ring::digest::SHA256, &csr);
-    if received_csr_hash != calculated_csr_hash.as_ref() {
+    let calculated_csr_hash = sha256(&csr);
+    if received_csr_hash != calculated_csr_hash {
         println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "received_csr_hash",
-            expected: calculated_csr_hash.as_ref().to_vec(),
+            expected: calculated_csr_hash,
             received: received_csr_hash.to_vec(),
         });
     }
