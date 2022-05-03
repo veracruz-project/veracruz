@@ -1658,10 +1658,10 @@ dependencies = [
  "err-derive",
  "hex",
  "lexical-core 0.8.3",
- "ring",
  "rustls",
  "serde",
  "serde_json",
+ "veracruz-utils",
  "wasi-types",
  "x509-parser 0.12.0",
 ]
@@ -2499,6 +2499,7 @@ version = "0.3.0"
 dependencies = [
  "bincode",
  "err-derive",
+ "psa-crypto",
  "ring",
  "rustls",
  "serde",
