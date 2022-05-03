@@ -57,3 +57,6 @@
 	path = icecap/sysroot/libc
 	url = https://gitlab.com/arm-research/security/icecap/rust-libc.git
 	branch = icecap
+[submodule "third-party/rust-mbedtls"]
+	path = third-party/rust-mbedtls
+	url = https://github.com/veracruz-project/rust-mbedtls.git
