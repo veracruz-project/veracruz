@@ -53,7 +53,6 @@ CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitr
 
 test-server: test-dependencies
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p veracruz-server-test --features debug -- --test-threads=1
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p veracruz-server-test test_debug --features debug -- --ignored --test-threads=1
 	./nitro-terminate.sh
 
 test-client: test-dependencies
