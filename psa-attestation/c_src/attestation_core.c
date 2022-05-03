@@ -8,9 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stddef.h>
-#include "psa/initial_attestation.h" // for psa_status_t
-#include "mbedtls/sha256.h"
-#include "psa/error.h" // for PSA_SUCCESS
+#include "psa/crypto.h"
 #include "attestation.h"
 
 //#include "attestation_key.h"
@@ -77,7 +75,7 @@ error_mapping_to_psa_status_t(enum psa_attest_err_t attest_err)
         return PSA_SUCCESS;
         break;
     case PSA_ATTEST_ERR_INIT_FAILED:
-        return PSA_ERROR_SERVICE_FAILURE;
+        return PSA_ERROR_GENERIC_ERROR;
         break;
     case PSA_ATTEST_ERR_BUFFER_OVERFLOW:
         return PSA_ERROR_BUFFER_TOO_SMALL;
@@ -627,8 +625,6 @@ attest_add_instance_id_claim(struct attest_token_ctx *token_ctx)
     struct q_useful_buf_c claim_value;
     uint8_t *public_key;
     size_t key_len;
-    //psa_ecc_curve_t psa_curve;
-    //psa_hash_operation_t hash = psa_hash_operation_init();
 
 #if 0
     attest_res = attest_get_initial_attestation_public_key(&public_key,
@@ -639,23 +635,18 @@ attest_add_instance_id_claim(struct attest_token_ctx *token_ctx)
     }
 #endif
 
-    mbedtls_sha256_context hash_context;
-    mbedtls_sha256_init( &hash_context );
-
-    crypto_res = mbedtls_sha256_update( &hash_context,
-                               public_key,
-                              key_len );
-    if (crypto_res != 0) {
-        return PSA_ATTEST_ERR_CLAIM_UNAVAILABLE;
-    }
-
     /* The hash starts from the second byte, leaving the first free. */
-    crypto_res = mbedtls_sha256_finish(&hash_context, instance_id + 1);
-    if (crypto_res != 0) {
-        return PSA_ATTEST_ERR_CLAIM_UNAVAILABLE;
-    }
-    instance_id_len = 32;
+    uint8_t *hash = instance_id + 1;
+    size_t hash_size = INSTANCE_ID_MAX_SIZE - 1;
 
+    size_t hash_length = 0;
+    crypto_res = psa_hash_compute(PSA_ALG_SHA_256,
+                                  public_key, key_len,
+                                  hash, hash_size, &hash_length);
+    if (crypto_res != PSA_SUCCESS || hash_length != 32)
+        return PSA_ATTEST_ERR_CLAIM_UNAVAILABLE;
+
+    instance_id_len = 32;
     /* First byte indicates the type: 0x01 indicates GUID */
     instance_id[0] = 0x01;
     instance_id_len += 1;
