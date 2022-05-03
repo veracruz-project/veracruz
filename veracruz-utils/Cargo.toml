@@ -25,6 +25,7 @@ std = [
 [dependencies]
 bincode = { version = "1.2.1", default-features = false, optional = true }
 err-derive = "0.2"
+mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 psa-crypto = { path = "../third-party/rust-psa-crypto/psa-crypto" }
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 rustls = { version = "0.20.4" }

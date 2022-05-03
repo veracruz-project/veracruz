@@ -14,6 +14,7 @@ cargo-features = ["resolver"]
 
 [workspace]
 exclude = [
+  "crates/third-party/rust-mbedtls",
   "crates/third-party/rust-psa-crypto",
 ]
 members = [

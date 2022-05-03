@@ -170,11 +170,7 @@ fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
 pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
     let key = get_enclave_private_key()?.0;
     let (public_key, private_key) = der::extract_keys_from_enclave_key(&key);
-    let csr = csr::generate_csr(
-        &csr::COMPUTE_ENCLAVE_CSR_TEMPLATE,
-        &public_key,
-        &private_key,
-    )
-    .map_err(|err| RuntimeManagerError::CertError(err))?;
+    let csr = csr::generate_csr(&public_key, &private_key)
+        .map_err(|err| RuntimeManagerError::CertError(err))?;
     return Ok(csr);
 }
