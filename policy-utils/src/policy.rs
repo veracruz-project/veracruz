@@ -47,6 +47,7 @@ use std::{
     string::{String, ToString},
     vec::Vec,
 };
+use veracruz_utils::sha256::sha256;
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,7 +154,7 @@ impl Policy {
         policy.assert_valid()?;
 
         // include hash?
-        let hash = hex::encode(ring::digest::digest(&ring::digest::SHA256, json.as_bytes()));
+        let hash = hex::encode(sha256(json.as_bytes()));
         policy.policy_hash = Some(hash);
 
         Ok(policy)

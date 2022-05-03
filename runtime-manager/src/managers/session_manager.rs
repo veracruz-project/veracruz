@@ -15,6 +15,7 @@ use rustls::PrivateKey;
 use session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::csr;
+use veracruz_utils::sha256::sha256;
 
 pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
     let new_session_manager = SessionContext::new()?;
@@ -28,7 +29,7 @@ pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
 }
 
 pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
-    let policy_hash = ring::digest::digest(&ring::digest::SHA256, &policy_json.as_bytes());
+    let policy_hash = sha256(&policy_json.as_bytes());
     let policy = Policy::from_json(policy_json)?;
 
     if *policy.debug() {
@@ -36,7 +37,7 @@ pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
     }
 
     {
-        let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash.as_ref()))?;
+        let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash))?;
         let mut protocol_state = super::PROTOCOL_STATE.lock()?;
         *protocol_state = Some(state);
     }

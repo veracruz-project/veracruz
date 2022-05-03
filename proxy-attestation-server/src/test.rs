@@ -201,7 +201,7 @@ fn test_psa_attestation() {
     assert!(ret == 0);
     unsafe { public_key.set_len(public_key_size as usize) };
 
-    let pubkey_hash = ring::digest::digest(&ring::digest::SHA256, public_key.as_ref());
+    let pubkey_hash = sha256(public_key);
     // create a fake device with a public key, fake URL
     let connection = crate::orm::establish_connection();
     crate::orm::update_or_create_device(

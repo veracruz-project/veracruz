@@ -18,6 +18,7 @@ use crate::attestation::psa;
 use lazy_static::lazy_static;
 use std::net::ToSocketAddrs;
 use std::sync::atomic::{AtomicBool, Ordering};
+use veracruz_utils::sha256::sha256;
 
 lazy_static! {
     pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
@@ -83,12 +84,12 @@ async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
 
     // verify that the pubkey we received matches the hash we received
     // during native attestation
-    let calculated_pubkey_hash = ring::digest::digest(&ring::digest::SHA256, pubkey.as_ref());
-    if calculated_pubkey_hash.as_ref().to_vec() != pubkey_hash {
+    let calculated_pubkey_hash = sha256(&pubkey);
+    if calculated_pubkey_hash != pubkey_hash {
         println!("proxy-attestation-server::verify_iat hashes didn't match");
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "proxy-attestation-server::server public key",
-            received: calculated_pubkey_hash.as_ref().to_vec(),
+            received: calculated_pubkey_hash,
             expected: pubkey_hash,
         });
     }

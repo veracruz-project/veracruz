@@ -229,7 +229,7 @@ fn icecap_runtime_init() {
 mod attestation_hack {
 
     use super::RuntimeManagerError;
-    use ring::digest;
+    use veracruz_utils::sha256::sha256;
 
     const EXAMPLE_PRIVATE_KEY: [u8; 32] = [
         0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe, 0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54,
@@ -254,7 +254,7 @@ mod attestation_hack {
     ) -> Result<Vec<u8>, RuntimeManagerError> {
         let root_private_key = &ROOT_PRIVATE_KEY;
         let enclave_hash = &RUNTIME_MANAGER_HASH;
-        let csr_hash = digest::digest(&digest::SHA256, csr);
+        let csr_hash = sha256(csr);
 
         let mut root_key_handle: u32 = 0;
         assert_eq!(0, unsafe {
@@ -271,8 +271,8 @@ mod attestation_hack {
             psa_attestation::psa_initial_attest_get_token(
                 enclave_hash.as_ptr() as *const u8,
                 enclave_hash.len() as u64,
-                csr_hash.as_ref().as_ptr() as *const u8,
-                csr_hash.as_ref().len() as u64,
+                csr_hash.as_ptr() as *const u8,
+                csr_hash.len() as u64,
                 std::ptr::null() as *const u8,
                 0,
                 challenge.as_ptr() as *const u8,

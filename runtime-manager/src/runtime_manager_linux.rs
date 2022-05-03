@@ -34,6 +34,7 @@ use std::net::TcpListener;
 use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
+use veracruz_utils::sha256::sha256;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -84,7 +85,7 @@ fn native_attestation(
     challenge: Vec<u8>,
     runtime_manager_hash: &[u8],
 ) -> Result<Vec<u8>, RuntimeManagerError> {
-    let csr_hash = digest(&SHA256, &csr);
+    let csr_hash = sha256(&csr);
 
     let mut root_key_handle: u32 = 0;
 
@@ -110,8 +111,8 @@ fn native_attestation(
         psa_initial_attest_get_token(
             runtime_manager_hash.as_ptr(),
             runtime_manager_hash.len() as u64,
-            csr_hash.as_ref().as_ptr() as *const u8,
-            csr_hash.as_ref().len() as u64,
+            csr_hash.as_ptr() as *const u8,
+            csr_hash.len() as u64,
             std::ptr::null() as *const i8,
             0,
             challenge.as_ptr() as *const u8,

@@ -30,8 +30,8 @@ use policy_utils::{
     policy::Policy,
     principal::{ExecutionStrategy, FileHash, FileRights, Identity, Program},
 };
-use ring::digest::{digest, SHA256};
 use serde_json::{json, to_string_pretty, Value};
+use veracruz_utils::sha256::sha256;
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -58,10 +58,9 @@ fn pretty_pathbuf(buf: PathBuf) -> String {
 
 /// Pretty-prints the SHA256 digest of the input `buf` into a lowercase
 /// hex-formatted string.
-fn pretty_digest(mut buf: &[u8]) -> String {
-    let digest = digest(&SHA256, &mut buf);
-
-    HEXLOWER.encode(digest.as_ref())
+fn pretty_digest(buf: &[u8]) -> String {
+    let digest = sha256(buf);
+    HEXLOWER.encode(&digest)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
