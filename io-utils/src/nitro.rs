@@ -67,9 +67,9 @@ impl NitroEnclave {
         nitro_sbin: bool,
         eif_path: &str,
         debug: bool,
-        max_memory: u32,
+        max_memory_mib: u32,
     ) -> Result<Self, NitroError> {
-        let max_memory_str = max_memory.to_string();
+        let max_memory_mib_str = max_memory_mib.to_string();
         let mut args = vec![
             "run-enclave",
             "--eif-path",
@@ -77,7 +77,7 @@ impl NitroEnclave {
             "--cpu-count",
             "2",
             "--memory",
-            &max_memory_str,
+            &max_memory_mib_str,
         ];
         if debug {
             args.push("--debug-mode=true");

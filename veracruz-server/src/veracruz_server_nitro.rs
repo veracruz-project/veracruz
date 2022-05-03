@@ -61,8 +61,13 @@ pub mod veracruz_server_nitro {
             #[cfg(feature = "debug")]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in debug mode");
-                NitroEnclave::new(false, &runtime_manager_eif_path, true, *policy.max_memory())
-                    .map_err(|err| VeracruzServerError::NitroError(err))?
+                NitroEnclave::new(
+                    false,
+                    &runtime_manager_eif_path,
+                    true,
+                    *policy.max_memory_mib(),
+                )
+                .map_err(|err| VeracruzServerError::NitroError(err))?
             };
             #[cfg(not(feature = "debug"))]
             let runtime_manager_enclave = {
@@ -71,7 +76,7 @@ pub mod veracruz_server_nitro {
                     false,
                     &runtime_manager_eif_path,
                     false,
-                    *policy.max_memory(),
+                    *policy.max_memory_mib(),
                 )
                 .map_err(|err| VeracruzServerError::NitroError(err))?
             };

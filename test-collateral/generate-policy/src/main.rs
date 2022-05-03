@@ -147,7 +147,7 @@ struct Arguments {
     enable_clock: bool,
     /// The maximum amount of memory in MiB available to the isolate. Only
     /// enforced in Nitro for now.
-    max_memory: u32,
+    max_memory_mib: u32,
 }
 
 impl Arguments {
@@ -172,7 +172,7 @@ impl Arguments {
             enclave_debug_mode: false,
             execution_strategy: String::new(),
             enable_clock: false,
-            max_memory: 0,
+            max_memory_mib: 0,
         }
     }
 }
@@ -476,8 +476,8 @@ command-line parameter.",
 
     arguments.enable_clock = matches.is_present("enable-clock");
 
-    if let Some(max_memory) = matches.value_of("max-memory") {
-        arguments.max_memory = max_memory.parse().unwrap_or_else(|e| {
+    if let Some(max_memory_mib) = matches.value_of("max-memory") {
+        arguments.max_memory_mib = max_memory_mib.parse().unwrap_or_else(|e| {
             abort_with(format!(
                 "Failed to parse max memory.  Error produced: {}.",
                 e
@@ -793,7 +793,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         serialize_execution_strategy(&arguments.execution_strategy),
         serialize_file_hash(arguments),
         arguments.enable_clock,
-        arguments.max_memory,
+        arguments.max_memory_mib,
     )
     .expect("Failed to instantiate a (struct) policy");
 
