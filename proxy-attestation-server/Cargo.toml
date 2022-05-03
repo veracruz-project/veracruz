@@ -38,9 +38,6 @@ nitro = [
 actix-http = "3"
 actix-rt = "2"
 actix-web = "4"
-# Force the version on async-io. This solves a dependency issue on socket2.
-async-io = "1.3.1"
-async-std = "1.5"
 base64 = "0.13.0"
 curl = "0.4.43"
 dotenv = "0.9.0"

@@ -56,8 +56,7 @@ mod tests {
     const STRING_1_DATA: &'static str = "hello-world-1.dat";
     const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
-    use actix_rt::System;
-    use async_std::task;
+    use actix_rt::{ System, time::sleep };
     use either::{Left, Right};
     use env_logger;
     use err_derive::Error;
@@ -449,12 +448,12 @@ mod tests {
 
             setup(policy.proxy_attestation_server_url().clone());
 
-            task::sleep(std::time::Duration::from_millis(5000)).await;
+            sleep(std::time::Duration::from_millis(5000)).await;
             let policy_file = policy_path(LINEAR_REGRESSION_PARALLEL_POLICY);
             let server_handle = server_tls_loop(policy_file.as_path());
 
             let program_provider_handle = async {
-                task::sleep(std::time::Duration::from_millis(10000)).await;
+                sleep(std::time::Duration::from_millis(10000)).await;
                 info!("### program provider start.");
                 let mut client = veracruz_client::VeracruzClient::new(
                     trust_path(PROGRAM_CLIENT_CERT).as_path(),
@@ -469,7 +468,7 @@ mod tests {
                 Ok::<(), VeracruzTestError>(())
             };
             let data_provider_handle = async {
-                task::sleep(std::time::Duration::from_millis(15000)).await;
+                sleep(std::time::Duration::from_millis(15000)).await;
                 info!("### data provider start.");
                 let mut client = veracruz_client::VeracruzClient::new(
                     trust_path(DATA_CLIENT_CERT).as_path(),
@@ -526,13 +525,13 @@ mod tests {
         );
 
         // Wait the setup
-        task::sleep(std::time::Duration::from_millis(5000)).await;
+        sleep(std::time::Duration::from_millis(5000)).await;
 
         let server_handle = server_tls_loop(policy_path);
 
         let clients_handle = async {
             // Wait for the enclave initialasation
-            task::sleep(std::time::Duration::from_millis(10000)).await;
+            sleep(std::time::Duration::from_millis(10000)).await;
 
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
