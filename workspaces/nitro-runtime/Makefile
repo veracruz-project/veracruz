@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean clean-cargo-lock default doc fmt nitro test-collateral
+.PHONY: all clean clean-cargo-lock default doc fmt nitro test-collateral runtime-manager-enclave
 
 default: all
 
@@ -20,17 +20,9 @@ ARCH = $(shell uname -m)
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
-############# Source code #################
-SRC_DIR = $(abspath crates/runtime-manager)
-COMMON_Src = $(SRC_DIR)/src/managers/*.rs
-Nitro_Src = $(COMMON_Src) $(SRC_DIR)/src/runtime_manager_nitro.rs $(SRC_DIR)/src/main.rs
-
 all: nitro
 
-nitro: runtime_manager.eif PCR0 css-nitro.bin
-
-css-nitro.bin: PCR0
-	cp $< $@
+nitro: runtime_manager.eif PCR0
 
 runtime_manager.eif PCR0: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave crates/runtime-manager/dockerdir/Dockerfile
 	rm -rf docker
@@ -42,7 +34,9 @@ runtime_manager.eif PCR0: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runt
 	cat measurements.json | jq -r '.Measurements.PCR0' > PCR0
 	rm -rf docker
 
-target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: Cargo.toml $(Nitro_Src)
+target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: runtime-manager-enclave
+
+runtime-manager-enclave:
 	rustup target add $(ARCH)-unknown-linux-musl
 	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
 	cargo build --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
@@ -56,7 +50,7 @@ fmt:
 
 clean:
 	@cargo clean
-	@rm -f css-nitro.bin PCR0
+	@rm -f PCR0
 
 clean-cargo-lock:
 	rm -f Cargo.lock
