@@ -713,7 +713,6 @@ dependencies = [
  "policy-utils",
  "postcard",
  "psa-crypto",
- "ring",
  "serde",
  "serde_json",
  "typetag",
