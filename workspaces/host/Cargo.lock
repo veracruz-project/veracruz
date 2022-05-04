@@ -2330,7 +2330,6 @@ dependencies = [
  "bincode",
  "err-derive",
  "psa-crypto",
- "ring",
  "rustls",
  "serde",
  "serde_json",

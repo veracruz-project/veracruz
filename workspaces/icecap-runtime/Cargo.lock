@@ -1929,10 +1929,8 @@ dependencies = [
 name = "ring"
 version = "0.16.20"
 dependencies = [
- "aws-nitro-enclaves-nsm-api",
  "cc",
  "libc",
- "nsm-lib",
  "once_cell",
  "spin 0.5.2",
  "untrusted",
@@ -1990,7 +1988,6 @@ dependencies = [
  "policy-utils",
  "protobuf",
  "psa-attestation",
- "ring",
  "rustls",
  "serde",
  "serde_json",
@@ -2209,7 +2206,6 @@ version = "0.3.0"
 dependencies = [
  "err-derive",
  "policy-utils",
- "ring",
  "rustls",
  "rustls-pemfile",
  "veracruz-utils",
@@ -2495,7 +2491,6 @@ dependencies = [
  "bincode",
  "err-derive",
  "psa-crypto",
- "ring",
  "rustls",
  "serde",
  "serde_json",
