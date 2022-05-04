@@ -27,7 +27,7 @@ use std::{
 //use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 //use webpki;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct VeracruzClient {
     tls_connection: mbedtls::ssl::Context<std::net::TcpStream>,
     remote_session_id: Option<u32>,
@@ -138,7 +138,7 @@ impl VeracruzClient {
         policy_hash: String,
     ) -> Result<VeracruzClient, VeracruzClientError> {
         let client_cert = Self::read_cert(&client_cert_filename)?;
-        let client_priv_key = Self::read_private_key(&client_key_filename)?;
+        let mut client_priv_key = Self::read_private_key(&client_key_filename)?;
 
         // check if the certificate is valid
         let public_key = client_priv_key.write_public_der_vec().unwrap();
@@ -363,6 +363,8 @@ impl VeracruzClient {
     /// send the data to the runtime_manager path on the Veracruz server.
     // TODO: This function has return points scattered all over, making it very hard to follow
     fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
+        Ok(vec![]) //xx
+        /*
         let mut enclave_session_id: u32 = 0;
         match self.remote_session_id {
             Some(session_id) => enclave_session_id = session_id,
@@ -431,9 +433,12 @@ impl VeracruzClient {
                 None => (),
             }
         }
+         */
     }
 
     fn process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
+        Ok(Some(vec![]))
+        /*
         let mut ret_option = None;
         let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
         if input.len() > 0
@@ -449,9 +454,12 @@ impl VeracruzClient {
             ret_option = Some(output);
         }
         Ok(ret_option)
+         */
     }
 
     fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
+        Ok(Some(vec![]))
+        /*
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
         self.tls_connection.process_new_packets()?;
         match self
@@ -468,6 +476,7 @@ impl VeracruzClient {
         } else {
             return Ok(None);
         }
+         */
     }
 
     fn post_runtime_manager(
