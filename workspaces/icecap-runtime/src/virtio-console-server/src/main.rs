@@ -129,6 +129,12 @@ pub unsafe extern "C" fn virtio_virt_to_phys(vaddr: usize) -> usize {
 
 // entry point
 fn main(config: Config) -> Fallible<()> {
+    // FIXME: Yield 10 times to let the runtime start before the console server
+    for i in 1..10 {
+        // debug_println!("Yield {}", i);
+        icecap_core::sel4::yield_();
+    }
+
     // setup the virtio pool
     unsafe {
         VIRTIO_POOL = Some(VirtioPool::new(
