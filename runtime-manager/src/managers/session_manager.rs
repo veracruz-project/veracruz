@@ -14,8 +14,8 @@ use policy_utils::policy::Policy;
 use rustls::PrivateKey;
 use session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
-use veracruz_utils::csr;
 use veracruz_utils::sha256::sha256;
+use veracruz_utils::{csr, der};
 
 pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
     let new_session_manager = SessionContext::new()?;
@@ -168,13 +168,13 @@ fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
 }
 
 pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
-    let private_key_vec = get_enclave_private_key()?.0;
-    let private_key = ring::signature::EcdsaKeyPair::from_pkcs8(
-        &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
-        &private_key_vec,
+    let key = get_enclave_private_key()?.0;
+    let (public_key, private_key) = der::extract_keys_from_enclave_key(&key);
+    let csr = csr::generate_csr(
+        &csr::COMPUTE_ENCLAVE_CSR_TEMPLATE,
+        &public_key,
+        &private_key,
     )
-    .map_err(|err| RuntimeManagerError::RingKeyRejected(err))?;
-    let csr = csr::generate_csr(&csr::COMPUTE_ENCLAVE_CSR_TEMPLATE, &private_key)
-        .map_err(|err| RuntimeManagerError::CertError(err))?;
+    .map_err(|err| RuntimeManagerError::CertError(err))?;
     return Ok(csr);
 }

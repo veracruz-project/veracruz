@@ -24,6 +24,12 @@ pub mod csr;
 /// Requests and responses for the Runtime Manager.
 pub mod runtime_manager_message;
 
+/// Distinguished Encoding Rules (DER) functions.
+pub mod der;
+
+/// ECDSA functions.
+pub mod ecdsa;
+
 /// SHA256 function.
 pub mod sha256;
 

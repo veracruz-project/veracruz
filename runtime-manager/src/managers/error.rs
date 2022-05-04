@@ -84,8 +84,6 @@ pub enum RuntimeManagerError {
         _2
     )]
     DataWrongSizeForField(std::string::String, usize, usize),
-    #[error(display = "RuntimeManager: RingKeyRejected error:{:?}", _0)]
-    RingKeyRejected(ring::error::KeyRejected),
     #[error(display = "RuntimeManager: Certificate error:{:?}", _0)]
     CertError(CertError),
     #[cfg(feature = "linux")]

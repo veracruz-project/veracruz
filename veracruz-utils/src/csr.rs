@@ -11,11 +11,8 @@
 
 use std::vec::Vec;
 
+use crate::ecdsa;
 use err_derive::Error;
-use ring::{
-    rand::SystemRandom,
-    signature::{EcdsaKeyPair, KeyPair},
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Error type.
@@ -215,19 +212,11 @@ pub const COMPUTE_ENCLAVE_CERT_TEMPLATE: CertTemplate = CertTemplate {
     enclave_hash_location: (383, 383 + 32),
 };
 
-const CSR_PUBKEY_LOCATION: (usize, usize) = (129 + 26, 220);
-
-// It would probably be better for these times to be generated as offsets
-// from the current time, but all this code is expected to be removed
-// before the end of 2022 in any case, when root enclaves are removed.
-const CERTIFICATE_VALID_FROM: [u32; 6] = [2021, 1, 1, 0, 0, 0]; // 2021-01-01
-const CERTIFICATE_EXPIRY: [u32; 6] = [2031, 2, 1, 0, 0, 0]; // 2031-02-01
-
 pub fn generate_csr(
     template: &CsrTemplate,
-    private_key: &EcdsaKeyPair,
+    public_key: &[u8],
+    private_key: &[u8],
 ) -> Result<Vec<u8>, CertError> {
-    let public_key = private_key.public_key().as_ref().clone();
     let mut constructed_csr = template.template.to_vec();
     if public_key.len() != (template.public_key_location.1 - template.public_key_location.0) {
         return Err(CertError::InvalidLength {
@@ -241,15 +230,11 @@ pub fn generate_csr(
         public_key.iter().cloned(),
     );
 
-    let rng = SystemRandom::new();
-    let signature: Vec<u8> = private_key
-        .sign(
-            &rng,
-            &constructed_csr[template.signature_range.0..template.signature_range.1],
-        )
-        .unwrap()
-        .as_ref()
-        .to_vec();
+    let signature = ecdsa::sign(
+        &public_key,
+        &private_key,
+        &constructed_csr[template.signature_range.0..template.signature_range.1],
+    );
 
     let signature_length = signature.len();
     constructed_csr.splice(
@@ -273,82 +258,6 @@ pub fn generate_csr(
     }
 
     return Ok(constructed_csr.clone());
-}
-
-pub fn convert_csr_to_cert(
-    csr: &[u8],
-    cert_template: &CertTemplate,
-    enclave_hash: &[u8],
-    private_key: &EcdsaKeyPair,
-) -> Result<std::vec::Vec<u8>, CertError> {
-    let mut constructed_cert = cert_template.template.to_vec();
-    let valid_from = generate_utc_time(
-        CERTIFICATE_VALID_FROM[0],
-        CERTIFICATE_VALID_FROM[1],
-        CERTIFICATE_VALID_FROM[2],
-        CERTIFICATE_VALID_FROM[3],
-        CERTIFICATE_VALID_FROM[4],
-        CERTIFICATE_VALID_FROM[5],
-    )?;
-    constructed_cert.splice(
-        cert_template.valid_from_location.0..cert_template.valid_from_location.1,
-        valid_from,
-    );
-    // TODO: Once the root enclave is gone, this can be done properly inside the proxy service
-    let valid_until = generate_utc_time(
-        CERTIFICATE_EXPIRY[0],
-        CERTIFICATE_EXPIRY[1],
-        CERTIFICATE_EXPIRY[2],
-        CERTIFICATE_EXPIRY[3],
-        CERTIFICATE_EXPIRY[4],
-        CERTIFICATE_EXPIRY[5],
-    )?;
-    constructed_cert.splice(
-        cert_template.valid_until_location.0..cert_template.valid_until_location.1,
-        valid_until,
-    );
-
-    // replace the public key in the template with the public key from the CSR
-    let public_key = &csr[CSR_PUBKEY_LOCATION.0..CSR_PUBKEY_LOCATION.1];
-    constructed_cert.splice(
-        cert_template.public_key_location.0..cert_template.public_key_location.1,
-        public_key.to_vec(),
-    );
-
-    // replace the dummy data in the template with the enclave hash
-    constructed_cert.splice(
-        cert_template.enclave_hash_location.0..cert_template.enclave_hash_location.1,
-        enclave_hash.to_vec(),
-    );
-
-    // Sign the body of the constructed cert
-    let signature: Vec<u8> = private_key
-        .sign(
-            &SystemRandom::new(),
-            &constructed_cert[cert_template.signature_range.0..cert_template.signature_range.1],
-        )
-        .unwrap()
-        .as_ref()
-        .to_vec();
-    // place the signature in the constructed_cert
-    let signature_length = signature.len();
-    constructed_cert.splice(
-        cert_template.signature_location.0..cert_template.signature_location.1,
-        signature,
-    );
-
-    let signature_field_length: u8 =
-        (cert_template.signature_length_initial_value + signature_length as u8) as u8;
-    constructed_cert[cert_template.signature_length_field_location.0] = signature_field_length;
-
-    let overall_length: u16 =
-        (cert_template.overall_length_initial_value + signature_length as u16) as u16;
-    constructed_cert[cert_template.overall_length_field_location.0] =
-        ((overall_length & 0xff00) >> 8) as u8;
-    constructed_cert[cert_template.overall_length_field_location.0 + 1] =
-        (overall_length & 0xff) as u8;
-
-    return Ok(constructed_cert.clone());
 }
 
 pub fn generate_utc_time(

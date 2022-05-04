@@ -29,7 +29,6 @@ use log::{error, info, trace};
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
-use ring::digest::{digest, SHA256};
 use std::net::TcpListener;
 use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
@@ -111,7 +110,7 @@ fn native_attestation(
         psa_initial_attest_get_token(
             runtime_manager_hash.as_ptr(),
             runtime_manager_hash.len() as u64,
-            csr_hash.as_ptr() as *const u8,
+            csr_hash.as_ptr(),
             csr_hash.len() as u64,
             std::ptr::null() as *const i8,
             0,
