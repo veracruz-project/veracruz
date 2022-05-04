@@ -89,6 +89,9 @@ const DEFAULT_OUTPUT_FILENAME: &'static str = "output.json";
 /// The default execution strategy for the WASM binary, if no alternative is
 /// provided on the command line.
 const DEFAULT_EXECUTION_STRATEGY: &'static str = "JIT";
+/// The default maximum amount of memory in MiB available to the isolaten if no
+/// alternative is provided on the command line.
+const DEFAULT_MAX_MEMORY_MIB: u32 = 256;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parsing.
@@ -494,7 +497,8 @@ command-line parameter.",
             ));
         });
     } else {
-        warn!("The maximum amount of isolate memory was not passed as a command line parameter.  Expect failures in Nitro.");
+        info!("No maximum amount of memory passed as an argument.  Using a default.");
+        arguments.max_memory_mib = DEFAULT_MAX_MEMORY_MIB;
     }
 
     info!("Successfully extracted command line arguments.");
