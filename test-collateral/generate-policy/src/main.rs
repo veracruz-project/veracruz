@@ -334,6 +334,7 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
             Arg::with_name("max-memory-mib")
                 .short("m")
                 .long("max-memory-mib")
+                .value_name("SIZE")
                 .help(
                     "Specifies the maximum amount of memory in MiB available to the isolate. \
 Only enforced in Nitro for now.",
