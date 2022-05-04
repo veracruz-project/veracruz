@@ -170,7 +170,7 @@ fn generate(rng: &mut impl Rng, size: usize) -> (Data, Sample) {
     }
 
     let mut sample = Vec::with_capacity(size);
-    let intersection = rng.gen_range(0, size);
+    let intersection = rng.gen_range(0..size);
     for (id, _) in data.iter().take(intersection) {
         sample.push(*id)
     }

@@ -26,7 +26,7 @@ err-derive = "0.2"
 hex = "0.4.2"
 log = "0.4.13"
 policy-utils = { path = "../policy-utils", features = ["std"] }
-rand = "0.7.0"
+rand = "0.8.3"
 reqwest = { version = "0.9", default-features = false }
 ring = "0.16.20"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
