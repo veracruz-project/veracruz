@@ -24,7 +24,10 @@ cli = ["structopt"]
 # a feature to enable PSA native attestation.
 # Note: Final attestation is always PSA. This is just to enable platforms
 # that use PSA for their native attestation.
-icecap = ["psa-attestation/icecap"]
+icecap = [
+  "psa-attestation/icecap",
+  "openssl/vendored",
+]
 linux = ["psa-attestation/linux"]
 nitro = [
   "nitro-enclave-attestation-document",
@@ -47,6 +50,7 @@ err-derive = "0.2"
 hex = "0.4.2"
 http = "=0.2.4"
 lazy_static = "1.3"
+libsqlite3-sys = { version = "*", features = ["bundled"] }
 log = "0.4.13"
 nb-connect = "1.0.3"
 nitro-enclave-attestation-document = { path = "../third-party/nitro-enclave-attestation-document", optional = true }

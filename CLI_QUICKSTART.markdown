@@ -342,6 +342,6 @@ If we are done running computations, we can take down the Veracruz servers
 with a pkill command:
 
 ``` bash
-$ pkill vc-server
-$ pkill vc-pas
+$ pkill vc-server || true
+$ pkill vc-pas || true
 ```

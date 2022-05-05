@@ -13,8 +13,6 @@ system := $(disposable_dir)/system
 
 sel4_dts_path := $(sel4_src)/tools/dts/virt.dts
 
-runtime_feature_flags := --features icecap-qemu
-
 .PHONY: clean-plat
 clean-plat:
 	rm -f $(sel4_dts_path)

@@ -8,3 +8,7 @@
 # and copyright information.
 
 host_feature_flags := --features icecap-qemu
+
+.PHONY: rustup-plat
+
+rustup-plat:

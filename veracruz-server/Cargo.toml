@@ -28,6 +28,7 @@ icecap = [
   "signal-hook",
   "veracruz-utils/icecap",
 ]
+icecap-lkvm = []
 icecap-qemu = []
 linux = [
   "data-encoding",
