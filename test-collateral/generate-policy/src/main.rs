@@ -88,6 +88,9 @@ const DEFAULT_OUTPUT_FILENAME: &'static str = "output.json";
 /// The default execution strategy for the WASM binary, if no alternative is
 /// provided on the command line.
 const DEFAULT_EXECUTION_STRATEGY: &'static str = "JIT";
+/// The default maximum amount of memory in MiB available to the isolaten if no
+/// alternative is provided on the command line.
+const DEFAULT_MAX_MEMORY_MIB: u32 = 256;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parsing.
@@ -144,6 +147,9 @@ struct Arguments {
     /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
     /// enabled.
     enable_clock: bool,
+    /// The maximum amount of memory in MiB available to the isolate. Only
+    /// enforced in Nitro for now.
+    max_memory_mib: u32,
 }
 
 impl Arguments {
@@ -168,6 +174,7 @@ impl Arguments {
             enclave_debug_mode: false,
             execution_strategy: String::new(),
             enable_clock: false,
+            max_memory_mib: 0,
         }
     }
 }
@@ -326,6 +333,16 @@ binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                 )
         )
         .arg(
+            Arg::with_name("max-memory-mib")
+                .short("m")
+                .long("max-memory-mib")
+                .value_name("SIZE")
+                .help(
+                    "Specifies the maximum amount of memory in MiB available to the isolate. \
+Only enforced in Nitro for now.",
+                )
+        )
+        .arg(
             Arg::with_name("hash")
                 .short("h")
                 .long("hashes")
@@ -470,6 +487,18 @@ command-line parameter.",
     }
 
     arguments.enable_clock = matches.is_present("enable-clock");
+
+    if let Some(max_memory_mib) = matches.value_of("max-memory-mib") {
+        arguments.max_memory_mib = max_memory_mib.parse().unwrap_or_else(|e| {
+            abort_with(format!(
+                "Failed to parse max memory.  Error produced: {}.",
+                e
+            ));
+        });
+    } else {
+        info!("No maximum amount of memory passed as an argument.  Using a default.");
+        arguments.max_memory_mib = DEFAULT_MAX_MEMORY_MIB;
+    }
 
     info!("Successfully extracted command line arguments.");
 
@@ -777,6 +806,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
         serialize_execution_strategy(&arguments.execution_strategy),
         serialize_file_hash(arguments),
         arguments.enable_clock,
+        arguments.max_memory_mib,
     )
     .expect("Failed to instantiate a (struct) policy");
 

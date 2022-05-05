@@ -202,6 +202,7 @@ $ vc-pgen \
     --binary /program/example-binary.wasm=example/example-binary.wasm \
     --capability "/input/:r,/output/:w" \
     --output-policy-file example/example-policy.json
+    --max-memory-mib 256
 ```
 
 This should create a policy.json file at `example/example-policy.json`:

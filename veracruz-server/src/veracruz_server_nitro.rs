@@ -61,14 +61,24 @@ pub mod veracruz_server_nitro {
             #[cfg(feature = "debug")]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in debug mode");
-                NitroEnclave::new(false, &runtime_manager_eif_path, true)
-                    .map_err(|err| VeracruzServerError::NitroError(err))?
+                NitroEnclave::new(
+                    false,
+                    &runtime_manager_eif_path,
+                    true,
+                    *policy.max_memory_mib(),
+                )
+                .map_err(|err| VeracruzServerError::NitroError(err))?
             };
             #[cfg(not(feature = "debug"))]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in release mode");
-                NitroEnclave::new(false, &runtime_manager_eif_path, false)
-                    .map_err(|err| VeracruzServerError::NitroError(err))?
+                NitroEnclave::new(
+                    false,
+                    &runtime_manager_eif_path,
+                    false,
+                    *policy.max_memory_mib(),
+                )
+                .map_err(|err| VeracruzServerError::NitroError(err))?
             };
             println!("VeracruzServerNitro::new NitroEnclave::new returned");
             let meta = Self {
