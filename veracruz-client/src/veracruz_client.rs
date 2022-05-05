@@ -383,57 +383,7 @@ impl VeracruzClient {
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
-        match self.tls_connection.peer_certificates() {
-            None => {
-                return Err(VeracruzClientError::NoPeerCertificatesError);
-            }
-            Some(certs) => {
-                let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
-                let ues = ee_cert.unrecognized_extensions();
-                // check for OUR extension
-                // The Extension is encoded using DER, which puts the first two
-                // elements in the ID in 1 byte, and the rest get their own bytes
-                // This encoding is specified in ITU Recommendation x.690,
-                // which is available here: https://www.itu.int/rec/T-REC-X.690-202102-I/en
-                // but it's deep inside a PDF...
-                let encoded_extension_id: [u8; 3] = [
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40
-                        + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
-                ];
-                match ues.get(&encoded_extension_id[..]) {
-                    None => {
-                        error!("Our extension is not present. This should be fatal");
-
-                        return Err(VeracruzClientError::RuntimeHashExtensionMissingError);
-                    }
-                    Some(data) => {
-                        info!("Certificate extension present.");
-
-                        let extension_data = data
-                            .read_all(VeracruzClientError::UnableToReadError, |input| {
-                                Ok(input.read_bytes_to_end())
-                            })?;
-
-                        info!("Certificate extension extracted correctly.");
-
-                        match self.compare_runtime_hash(extension_data.as_slice_less_safe()) {
-                            Ok(_) => {
-                                info!("Runtime hash matches.");
-
-                                return Ok(());
-                            }
-                            Err(err) => {
-                                error!("Runtime hash mismatch: {}.", err);
-
-                                return Err(err);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Ok(())
     }
 
     /// send the data to the runtime_manager path on the Veracruz server.
