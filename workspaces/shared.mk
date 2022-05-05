@@ -14,9 +14,9 @@ INFO_COLOR := "\e[1;32m"
 RESET_COLOR := "\e[0m"
 PLATFORM := $(shell uname)
 
-.PHONY: wasm-files datasets proxy-attestation-server-db policy-files test-collateral
+.PHONY: wasm-files datasets policy-files test-collateral
 
-test-collateral: wasm-files datasets proxy-attestation-server-db $(MEASUREMENT_FILE) policy-files
+test-collateral: wasm-files datasets $(MEASUREMENT_FILE) policy-files
 
 ###################################################
 # Wasm programs
