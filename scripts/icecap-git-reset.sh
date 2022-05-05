@@ -1,4 +1,15 @@
 #!/bin/bash
+#
+# Development script to update IceCap/seL4 git submodules.
+#
+## Authors
+#
+# The Veracruz Development Team.
+#
+## Licensing and copyright notice
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
+# information on licensing and copyright.
 
 set -e
 
