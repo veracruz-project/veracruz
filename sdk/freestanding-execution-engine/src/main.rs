@@ -347,6 +347,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         let program_id = Principal::Program(prog_path.to_string());
         right_table.insert(program_id.clone(), file_table.clone());
     }
+
+    // Grant the super user read access to any file under the root. This is
+    // used internally to read the program on behalf of the executing party
+    let mut su_read_rights = HashMap::new();
+    su_read_rights.insert(
+        PathBuf::from("/"),
+        Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR,
+    );
+    right_table.insert(Principal::InternalSuperUser, su_read_rights);
+
     info!("The final right tables: {:?}", right_table);
 
     let mut vfs = FileSystem::new(right_table)?;

@@ -791,6 +791,7 @@ dependencies = [
  "env_logger",
  "log",
  "policy-utils",
+ "regex",
  "serde",
  "serde_json",
  "veracruz-utils",
