@@ -98,7 +98,7 @@ impl RuntimeManager {
             let badge = self.event.wait();
             if badge & self.virtio_console_server_rx_badge != 0 {
                 self.process()?;
-                self.rb.ring_buffer().enable_notify_write();
+                self.rb.rx_callback();
 
                 if !self.active {
                     return Ok(());
@@ -107,7 +107,6 @@ impl RuntimeManager {
 
             // always handle tx operations
             self.rb.tx_callback();
-            self.rb.ring_buffer().enable_notify_read();
         }
     }
 

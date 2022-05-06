@@ -207,11 +207,9 @@ fn main(config: Config) -> Fallible<()> {
                 }
             }
             rb.rx_callback();
-            rb.ring_buffer().enable_notify_write();
         }
 
         // always handle tx operations
         rb.tx_callback();
-        rb.ring_buffer().enable_notify_read();
     }
 }
