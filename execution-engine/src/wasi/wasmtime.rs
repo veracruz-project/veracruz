@@ -14,34 +14,37 @@
 use crate::{
     fs::{FileSystem, FileSystemResult},
     wasi::common::{
-        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError,
-        HostFunctionIndexOrName, MemoryHandler, MemorySlice, MemorySliceMut, VeracruzAPIName,
-        WasiAPIName, WasiWrapper,
+        Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, MemoryHandler,
+        MemorySlice, MemorySliceMut, VeracruzAPIName, WasiAPIName, WasiWrapper,
     },
     Options,
 };
-use lazy_static::lazy_static;
-use std::{convert::TryFrom, sync::Mutex, vec::Vec};
+use log::info;
+use std::{
+    convert::TryFrom,
+    mem,
+    sync::{Arc, Mutex},
+    vec::Vec,
+};
 use wasi_types::ErrNo;
 use wasmtime::{
-    Caller, Config, Engine, Extern, ExternType, Func, Instance, Memory, Module, Store, Val, ValType,
+    AsContext, AsContextMut, Caller, Config, Engine, ExternType, Linker, Memory, Module, Store,
+    StoreContext, StoreContextMut, ValType,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // The Wasmtime runtime state.
 ////////////////////////////////////////////////////////////////////////////////
 
-lazy_static! {
-    // The initial value has NO use. The unwrap should NOT fail.
-    static ref VFS_INSTANCE: Mutex<WasiWrapper> = Mutex::new(WasiWrapper::new(FileSystem::new_dummy(), false).unwrap());
-}
+type SharedMutableWasiWrapper = Arc<Mutex<WasiWrapper>>;
+type CallerWrapper<'a> = Caller<'a, Arc<Mutex<WasiWrapper>>>;
 
-/// A macro for lock the global VFS and store the result in the variable,
-/// which will be captured by `$vfs` in the macro.
+/// A macro for lock and return the VFS.
 /// If the locks fails, it returns Busy error code.
+/// The macro need to pass a stub variable `$var2`.
 macro_rules! lock_vfs {
-    () => {
-        match VFS_INSTANCE.lock() {
+    ($var:ident) => {
+        match $var.lock() {
             Ok(v) => v,
             Err(_) => return ErrNo::Busy as u32,
         }
@@ -70,43 +73,55 @@ macro_rules! convert_wasi_arg {
 /// This currently requires unsafe code for data_unchecked and data_unchecked_mut,
 /// but these already have safe versions in the most recent version of Wasmtime.
 ///
-pub struct WasmtimeSlice {
+pub struct WasmtimeSlice<'a, T> {
+    store: StoreContext<'a, T>,
     memory: Memory,
     address: usize,
     length: usize,
 }
 
-impl AsRef<[u8]> for WasmtimeSlice {
+pub struct WasmtimeSliceMut<'a, T> {
+    store: StoreContextMut<'a, T>,
+    memory: Memory,
+    address: usize,
+    length: usize,
+}
+
+impl<'a, T> AsRef<[u8]> for WasmtimeSlice<'a, T> {
     fn as_ref(&self) -> &[u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
         // versions of wasmtime
-        &(unsafe { self.memory.data_unchecked() })[self.address..self.address + self.length]
+        &(self.memory.data(&self.store))[self.address..self.address + self.length]
     }
 }
 
-impl AsMut<[u8]> for WasmtimeSlice {
+impl<'a, T> AsMut<[u8]> for WasmtimeSliceMut<'a, T> {
     fn as_mut(&mut self) -> &mut [u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
         // versions of wasmtime
-        &mut (unsafe { self.memory.data_unchecked_mut() })[self.address..self.address + self.length]
+        &mut (self.memory.data_mut(&mut self.store))[self.address..self.address + self.length]
     }
 }
 
-impl MemorySlice for WasmtimeSlice {}
-impl MemorySliceMut for WasmtimeSlice {}
+impl<T> MemorySlice for WasmtimeSlice<'_, T> {}
+//TODO: REMOVE??
+//impl<T>  MemorySlice for WasmtimeSliceMut<'_, T> {}
+impl<T> MemorySliceMut for WasmtimeSliceMut<'_, T> {}
 
 /// Impl the MemoryHandler for Caller.
 /// This allows passing the Caller to WasiWrapper on any VFS call.
-impl MemoryHandler for Caller<'_> {
-    type Slice = WasmtimeSlice;
-    type SliceMut = WasmtimeSlice;
+impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
+    type Slice = WasmtimeSlice<'static, T>;
+    type SliceMut = WasmtimeSliceMut<'static, T>;
 
-    fn get_slice<'a>(
-        &'a self,
+    fn get_slice<'b>(
+        &'b self,
         address: u32,
         length: u32,
-    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
-        let memory = match self
+    ) -> FileSystemResult<Bound<'b, Self::Slice>> {
+        // NOTE: manually and temporarily change the mutability.
+        let memory = match unsafe { (self as *const Self as *mut Self).as_mut() }
+            .unwrap()
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
         {
@@ -114,17 +129,20 @@ impl MemoryHandler for Caller<'_> {
             None => return Err(ErrNo::NoMem),
         };
         Ok(Bound::new(WasmtimeSlice {
+            store: unsafe {
+                mem::transmute::<StoreContext<'b, T>, StoreContext<'static, T>>(self.as_context())
+            },
             memory,
             address: address as usize,
             length: length as usize,
         }))
     }
 
-    fn get_slice_mut<'a>(
-        &'a mut self,
+    fn get_slice_mut<'c>(
+        &'c mut self,
         address: u32,
         length: u32,
-    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
+    ) -> FileSystemResult<BoundMut<'c, Self::SliceMut>> {
         let memory = match self
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
@@ -132,7 +150,12 @@ impl MemoryHandler for Caller<'_> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        Ok(BoundMut::new(WasmtimeSlice {
+        Ok(BoundMut::new(WasmtimeSliceMut {
+            store: unsafe {
+                mem::transmute::<StoreContextMut<'c, T>, StoreContextMut<'static, T>>(
+                    self.as_context_mut(),
+                )
+            },
             memory,
             address: address as usize,
             length: length as usize,
@@ -140,14 +163,16 @@ impl MemoryHandler for Caller<'_> {
     }
 
     fn get_size(&self) -> FileSystemResult<u32> {
-        let memory = match self
+        // NOTE: manually and temporarily change the mutability.
+        let memory = match unsafe { (self as *const Self as *mut Self).as_mut() }
+            .unwrap()
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
             .and_then(|export| export.into_memory())
         {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
-        Ok(u32::try_from(memory.data_size()).unwrap())
+        Ok(u32::try_from(memory.data_size(&self)).unwrap())
     }
 }
 
@@ -178,7 +203,12 @@ fn check_main(tau: &ExternType) -> EntrySignature {
 // The Wasmtime host provisioning state.
 ////////////////////////////////////////////////////////////////////////////////
 /// The facade of WASMTIME host provisioning state.
-pub struct WasmtimeRuntimeState {}
+pub struct WasmtimeRuntimeState {
+    /// The WASI file system wrapper. It is a sharable structure protected by lock. 
+    /// The common pattern is to clone it and try to lock it, to obtain the underlining 
+    /// WasiWrapper.
+    filesystem: SharedMutableWasiWrapper,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Operations on the WasmtimeRuntimeState.
@@ -187,9 +217,9 @@ pub struct WasmtimeRuntimeState {}
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     pub fn new(filesystem: FileSystem, enable_clock: bool) -> Result<Self, FatalEngineError> {
-        // Load the VFS ref to the global environment. This is required by Wasmtime.
-        *VFS_INSTANCE.lock()? = WasiWrapper::new(filesystem, enable_clock)?;
-        Ok(Self {})
+        Ok(Self {
+            filesystem: Arc::new(Mutex::new(WasiWrapper::new(filesystem, enable_clock)?)),
+        })
     }
 
     /// Executes the entry point of the WASM program provisioned into the
@@ -208,159 +238,269 @@ impl WasmtimeRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_entry_point(binary: Vec<u8>) -> Result<u32, FatalEngineError> {
+    pub(crate) fn invoke_engine(&self, binary: Vec<u8>) -> Result<u32, FatalEngineError> {
         let mut config = Config::default();
         config.wasm_simd(true);
         let engine = Engine::new(&config)?;
         let module = Module::new(&engine, binary)?;
-        let store = Store::new(&engine);
-        let mut exports: Vec<Extern> = Vec::new();
+        let mut linker = Linker::new(&engine);
 
-        for import in module.imports() {
-            let import_name = import.name().unwrap_or("");
-            match import.module() {
-                WasiWrapper::WASI_SNAPSHOT_MODULE_NAME => {
-                    let host_call_body = match WasiAPIName::try_from(import_name).map_err(|_| {
-                        FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
-                            import_name.to_string(),
-                        ))
-                    })? {
-                        WasiAPIName::ARGS_GET => Func::wrap(&store, Self::wasi_arg_get),
-                        WasiAPIName::ARGS_SIZES_GET => {
-                            Func::wrap(&store, Self::wasi_args_sizes_get)
-                        }
-                        WasiAPIName::ENVIRON_GET => Func::wrap(&store, Self::wasi_environ_get),
-                        WasiAPIName::ENVIRON_SIZES_GET => {
-                            Func::wrap(&store, Self::wasi_environ_size_get)
-                        }
-                        WasiAPIName::CLOCK_RES_GET => Func::wrap(&store, Self::wasi_clock_res_get),
-                        WasiAPIName::CLOCK_TIME_GET => {
-                            Func::wrap(&store, Self::wasi_clock_time_get)
-                        }
-                        WasiAPIName::FD_ADVISE => Func::wrap(&store, Self::wasi_fd_advise),
-                        WasiAPIName::FD_ALLOCATE => Func::wrap(&store, Self::wasi_fd_allocate),
-                        WasiAPIName::FD_CLOSE => Func::wrap(&store, Self::wasi_fd_close),
-                        WasiAPIName::FD_DATASYNC => Func::wrap(&store, Self::wasi_fd_datasync),
-                        WasiAPIName::FD_FDSTAT_GET => Func::wrap(&store, Self::wasi_fd_fdstat_get),
-                        WasiAPIName::FD_FDSTAT_SET_FLAGS => {
-                            Func::wrap(&store, Self::wasi_fd_fdstat_set_flags)
-                        }
-                        WasiAPIName::FD_FDSTAT_SET_RIGHTS => {
-                            Func::wrap(&store, Self::wasi_fd_fdstat_set_rights)
-                        }
-                        WasiAPIName::FD_FILESTAT_GET => {
-                            Func::wrap(&store, Self::wasi_fd_filestat_get)
-                        }
-                        WasiAPIName::FD_FILESTAT_SET_SIZE => {
-                            Func::wrap(&store, Self::wasi_fd_filestat_set_size)
-                        }
-                        WasiAPIName::FD_FILESTAT_SET_TIMES => {
-                            Func::wrap(&store, Self::wasi_fd_filestat_set_times)
-                        }
-                        WasiAPIName::FD_PREAD => Func::wrap(&store, Self::wasi_fd_pread),
-                        WasiAPIName::FD_PRESTAT_GET => {
-                            Func::wrap(&store, Self::wasi_fd_prestat_get)
-                        }
-                        WasiAPIName::FD_PRESTAT_DIR_NAME => {
-                            Func::wrap(&store, Self::wasi_fd_prestat_dir_name)
-                        }
-                        WasiAPIName::FD_PWRITE => Func::wrap(&store, Self::wasi_fd_pwrite),
-                        WasiAPIName::FD_READ => Func::wrap(&store, Self::wasi_fd_read),
-                        WasiAPIName::FD_READDIR => Func::wrap(&store, Self::wasi_fd_readdir),
-                        WasiAPIName::FD_RENUMBER => Func::wrap(&store, Self::wasi_fd_renumber),
-                        WasiAPIName::FD_SEEK => Func::wrap(&store, Self::wasi_fd_seek),
-                        WasiAPIName::FD_SYNC => Func::wrap(&store, Self::wasi_fd_sync),
-                        WasiAPIName::FD_TELL => Func::wrap(&store, Self::wasi_fd_tell),
-                        WasiAPIName::FD_WRITE => Func::wrap(&store, Self::wasi_fd_write),
-                        WasiAPIName::PATH_CREATE_DIRECTORY => {
-                            Func::wrap(&store, Self::wasi_path_create_directory)
-                        }
-                        WasiAPIName::PATH_FILESTAT_GET => {
-                            Func::wrap(&store, Self::wasi_path_filestat_get)
-                        }
-                        WasiAPIName::PATH_FILESTAT_SET_TIMES => {
-                            Func::wrap(&store, Self::wasi_path_filestat_set_times)
-                        }
-                        WasiAPIName::PATH_LINK => Func::wrap(&store, Self::wasi_path_link),
-                        WasiAPIName::PATH_OPEN => Func::wrap(&store, Self::wasi_path_open),
-                        WasiAPIName::PATH_READLINK => Func::wrap(&store, Self::wasi_path_readlink),
-                        WasiAPIName::PATH_REMOVE_DIRECTORY => {
-                            Func::wrap(&store, Self::wasi_path_remove_directory)
-                        }
-                        WasiAPIName::PATH_RENAME => Func::wrap(&store, Self::wasi_path_rename),
-                        WasiAPIName::PATH_SYMLINK => Func::wrap(&store, Self::wasi_path_symlink),
-                        WasiAPIName::PATH_UNLINK_FILE => {
-                            Func::wrap(&store, Self::wasi_path_unlink_file)
-                        }
-                        WasiAPIName::POLL_ONEOFF => Func::wrap(&store, Self::wasi_poll_oneoff),
-                        WasiAPIName::PROC_EXIT => Func::wrap(&store, Self::wasi_proc_exit),
-                        WasiAPIName::PROC_RAISE => Func::wrap(&store, Self::wasi_proc_raise),
-                        WasiAPIName::SCHED_YIELD => Func::wrap(&store, Self::wasi_sched_yield),
-                        WasiAPIName::RANDOM_GET => Func::wrap(&store, Self::wasi_random_get),
-                        WasiAPIName::SOCK_RECV => Func::wrap(&store, Self::wasi_sock_recv),
-                        WasiAPIName::SOCK_SEND => Func::wrap(&store, Self::wasi_sock_send),
-                        WasiAPIName::SOCK_SHUTDOWN => Func::wrap(&store, Self::wasi_sock_shutdown),
-                        WasiAPIName::_LAST => unreachable!(),
-                    };
-                    exports.push(Extern::Func(host_call_body))
-                }
-                WasiWrapper::VERACRUZ_SI_MODULE_NAME => {
-                    let host_call_body =
-                        match VeracruzAPIName::try_from(import_name).map_err(|_| {
-                            FatalEngineError::UnknownHostFunction(HostFunctionIndexOrName::Name(
-                                import_name.to_string(),
-                            ))
-                        })? {
-                            VeracruzAPIName::FD_CREATE => {
-                                Func::wrap(&store, Self::veracruz_si_fd_create)
-                            }
-                        };
-                    exports.push(Extern::Func(host_call_body))
-                }
-                _ => {
-                    return Err(FatalEngineError::InvalidWASMModule);
-                }
-            }
-        }
+        info!("Initialize a wasmtime engine.");
 
-        let instance = Instance::new(&store, &module, &exports)?;
+        // Link all WASI functions
+        let wasi_scope = WasiWrapper::WASI_SNAPSHOT_MODULE_NAME;
+        linker.func_wrap(wasi_scope, WasiAPIName::ARGS_GET.into(), Self::wasi_arg_get)?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::ARGS_SIZES_GET.into(),
+            Self::wasi_args_sizes_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::ENVIRON_GET.into(),
+            Self::wasi_environ_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::ENVIRON_SIZES_GET.into(),
+            Self::wasi_environ_size_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::CLOCK_RES_GET.into(),
+            Self::wasi_clock_res_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::CLOCK_TIME_GET.into(),
+            Self::wasi_clock_time_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_ADVISE.into(),
+            Self::wasi_fd_advise,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_ALLOCATE.into(),
+            Self::wasi_fd_allocate,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_CLOSE.into(),
+            Self::wasi_fd_close,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_DATASYNC.into(),
+            Self::wasi_fd_datasync,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_FDSTAT_GET.into(),
+            Self::wasi_fd_fdstat_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_FDSTAT_SET_FLAGS.into(),
+            Self::wasi_fd_fdstat_set_flags,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_FDSTAT_SET_RIGHTS.into(),
+            Self::wasi_fd_fdstat_set_rights,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_FILESTAT_GET.into(),
+            Self::wasi_fd_filestat_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_FILESTAT_SET_SIZE.into(),
+            Self::wasi_fd_filestat_set_size,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_FILESTAT_SET_TIMES.into(),
+            Self::wasi_fd_filestat_set_times,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_PREAD.into(),
+            Self::wasi_fd_pread,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_PRESTAT_GET.into(),
+            Self::wasi_fd_prestat_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_PRESTAT_DIR_NAME.into(),
+            Self::wasi_fd_prestat_dir_name,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_PWRITE.into(),
+            Self::wasi_fd_pwrite,
+        )?;
+        linker.func_wrap(wasi_scope, WasiAPIName::FD_READ.into(), Self::wasi_fd_read)?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_READDIR.into(),
+            Self::wasi_fd_readdir,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_RENUMBER.into(),
+            Self::wasi_fd_renumber,
+        )?;
+        linker.func_wrap(wasi_scope, WasiAPIName::FD_SEEK.into(), Self::wasi_fd_seek)?;
+        linker.func_wrap(wasi_scope, WasiAPIName::FD_SYNC.into(), Self::wasi_fd_sync)?;
+        linker.func_wrap(wasi_scope, WasiAPIName::FD_TELL.into(), Self::wasi_fd_tell)?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::FD_WRITE.into(),
+            Self::wasi_fd_write,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_CREATE_DIRECTORY.into(),
+            Self::wasi_path_create_directory,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_FILESTAT_GET.into(),
+            Self::wasi_path_filestat_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_FILESTAT_SET_TIMES.into(),
+            Self::wasi_path_filestat_set_times,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_LINK.into(),
+            Self::wasi_path_link,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_OPEN.into(),
+            Self::wasi_path_open,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_READLINK.into(),
+            Self::wasi_path_readlink,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_REMOVE_DIRECTORY.into(),
+            Self::wasi_path_remove_directory,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_RENAME.into(),
+            Self::wasi_path_rename,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_SYMLINK.into(),
+            Self::wasi_path_symlink,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PATH_UNLINK_FILE.into(),
+            Self::wasi_path_unlink_file,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::POLL_ONEOFF.into(),
+            Self::wasi_poll_oneoff,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PROC_EXIT.into(),
+            Self::wasi_proc_exit,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::PROC_RAISE.into(),
+            Self::wasi_proc_raise,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::SCHED_YIELD.into(),
+            Self::wasi_sched_yield,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::RANDOM_GET.into(),
+            Self::wasi_random_get,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::SOCK_RECV.into(),
+            Self::wasi_sock_recv,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::SOCK_SEND.into(),
+            Self::wasi_sock_send,
+        )?;
+        linker.func_wrap(
+            wasi_scope,
+            WasiAPIName::SOCK_SHUTDOWN.into(),
+            Self::wasi_sock_shutdown,
+        )?;
+
+        // link Veracruz custom functions
+        linker.func_wrap(
+            WasiWrapper::VERACRUZ_SI_MODULE_NAME,
+            VeracruzAPIName::FD_CREATE.into(),
+            Self::veracruz_si_fd_create,
+        )?;
+
+        info!("Link external functions.");
+
+        // TODO: change
+        let mut store = Store::new(&engine, self.filesystem.clone());
+        let instance = linker.instantiate(&mut store, &module)?;
+
+        info!("Linker instantiates.");
+
         let export = instance
-            .get_export(WasiWrapper::ENTRY_POINT_NAME)
+            .get_export(&mut store, WasiWrapper::ENTRY_POINT_NAME)
             .ok_or(FatalEngineError::NoProgramEntryPoint)?;
-        let return_from_main = match check_main(&export.ty()) {
-            EntrySignature::ArgvAndArgc => export
-                .into_func()
-                .ok_or(FatalEngineError::NoProgramEntryPoint)?
-                .call(&[Val::I32(0), Val::I32(0)]),
-            EntrySignature::NoParameters => export
-                .into_func()
-                .ok_or(FatalEngineError::NoProgramEntryPoint)?
-                .call(&[]),
+
+        info!("Get the main function.");
+
+        let return_from_main = match check_main(&export.ty(&store)) {
+            EntrySignature::ArgvAndArgc => instance
+                .get_typed_func::<(i32, i32), (), _>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
+                .call(&mut store, (0, 0)),
+            EntrySignature::NoParameters => instance
+                .get_typed_func::<(), (), _>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
+                .call(&mut store, ()),
             EntrySignature::NoEntryFound => return Err(FatalEngineError::NoProgramEntryPoint),
         };
+
+        info!("Excution returns.");
 
         // NOTE: Surpress the trap, if `proc_exit` is called.
         //       In this case, the error code is in .exit_code().
         //
-        let exit_code = VFS_INSTANCE.lock()?.exit_code();
+        let exit_code = store.into_data().lock()?.exit_code();
+        info!("Exit code {:?}", exit_code);
         match exit_code {
             Some(e) => Ok(e),
             // If proc_exit is not call, return possible error and trap,
             // otherwise the actual return code or default success code `0`.
             None => {
-                let result = return_from_main?;
-                // Too many return values.
-                if result.len() > 1 {
-                    return Err(FatalEngineError::ReturnedCodeError);
-                }
-                // Fetch the return I32 value or default ZERO.
-                match result.get(0) {
-                    None => Ok(0),
-                    Some(return_code) => match return_code {
-                        Val::I32(c) => Ok(*c as u32),
-                        _otherwise => Err(FatalEngineError::ReturnedCodeError),
-                    },
-                }
+                info!("The return trace: {:?}, (it should not reach here).", return_from_main);
+                return_from_main?;
+                Ok(0)
             }
         }
     }
@@ -373,27 +513,43 @@ impl WasmtimeRuntimeState {
         errno as u32
     }
 
-    fn wasi_arg_get(mut caller: Caller, string_ptr_address: u32, buf_address: u32) -> u32 {
-        let vfs = lock_vfs!();
+    fn wasi_arg_get(
+        mut caller: CallerWrapper<'_>,
+        string_ptr_address: u32,
+        buf_address: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.args_get(&mut caller, string_ptr_address, buf_address))
     }
 
-    fn wasi_args_sizes_get(mut caller: Caller, count_address: u32, size_address: u32) -> u32 {
-        let vfs = lock_vfs!();
+    fn wasi_args_sizes_get(
+        mut caller: CallerWrapper<'_>,
+        count_address: u32,
+        size_address: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.args_sizes_get(&mut caller, count_address, size_address))
     }
 
-    fn wasi_environ_get(mut caller: Caller, string_ptr_address: u32, buf_address: u32) -> u32 {
-        let vfs = lock_vfs!();
+    fn wasi_environ_get(
+        mut caller: CallerWrapper<'_>,
+        string_ptr_address: u32,
+        buf_address: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.environ_get(&mut caller, string_ptr_address, buf_address))
     }
 
     fn wasi_environ_size_get(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         environc_address: u32,
         environ_buf_size_address: u32,
     ) -> u32 {
-        let vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.environ_sizes_get(
             &mut caller,
             environc_address,
@@ -401,55 +557,75 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_clock_res_get(mut caller: Caller, clock_id: u32, address: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_clock_res_get(mut caller: CallerWrapper<'_>, clock_id: u32, address: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.clock_res_get(&mut caller, clock_id, address))
     }
 
-    fn wasi_clock_time_get(mut caller: Caller, clock_id: u32, precision: u64, address: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_clock_time_get(
+        mut caller: CallerWrapper<'_>,
+        clock_id: u32,
+        precision: u64,
+        address: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.clock_time_get(&mut caller, clock_id, precision, address))
     }
 
-    fn wasi_fd_advise(mut caller: Caller, fd: u32, offset: u64, len: u64, advice: u32) -> u32 {
+    fn wasi_fd_advise(
+        mut caller: CallerWrapper<'_>,
+        fd: u32,
+        offset: u64,
+        len: u64,
+        advice: u32,
+    ) -> u32 {
         let advice = convert_wasi_arg!(advice, u8);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_advise(&mut caller, fd, offset, len, advice))
     }
 
-    fn wasi_fd_allocate(mut caller: Caller, fd: u32, offset: u64, len: u64) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_allocate(mut caller: CallerWrapper<'_>, fd: u32, offset: u64, len: u64) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_allocate(&mut caller, fd, offset, len))
     }
 
-    fn wasi_fd_close(caller: Caller, fd: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_close(caller: CallerWrapper<'_>, fd: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_close(&caller, fd))
     }
 
-    fn wasi_fd_datasync(mut caller: Caller, fd: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_datasync(mut caller: CallerWrapper<'_>, fd: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_datasync(&mut caller, fd))
     }
 
-    fn wasi_fd_fdstat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
-        let vfs = lock_vfs!();
+    fn wasi_fd_fdstat_get(mut caller: CallerWrapper<'_>, fd: u32, address: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_fdstat_get(&mut caller, fd, address))
     }
 
-    fn wasi_fd_fdstat_set_flags(mut caller: Caller, fd: u32, flag: u32) -> u32 {
+    fn wasi_fd_fdstat_set_flags(mut caller: CallerWrapper<'_>, fd: u32, flag: u32) -> u32 {
         let flag = convert_wasi_arg!(flag, u16);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_fdstat_set_flags(&mut caller, fd, flag))
     }
 
     fn wasi_fd_fdstat_set_rights(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         rights_base: u64,
         rights_inheriting: u64,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_fdstat_set_rights(
             &mut caller,
             fd,
@@ -458,37 +634,41 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_fd_filestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
-        let vfs = lock_vfs!();
+    fn wasi_fd_filestat_get(mut caller: CallerWrapper<'_>, fd: u32, address: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_filestat_get(&mut caller, fd, address))
     }
 
-    fn wasi_fd_filestat_set_size(mut caller: Caller, fd: u32, size: u64) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_filestat_set_size(mut caller: CallerWrapper<'_>, fd: u32, size: u64) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_filestat_set_size(&mut caller, fd, size))
     }
 
     fn wasi_fd_filestat_set_times(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         atime: u64,
         mtime: u64,
         fst_flags: u32,
     ) -> u32 {
         let fst_flags = convert_wasi_arg!(fst_flags, u16);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_filestat_set_times(&mut caller, fd, atime, mtime, fst_flags))
     }
 
     fn wasi_fd_pread(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         iovec_base: u32,
         iovec_count: u32,
         offset: u64,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_pread(
             &mut caller,
             fd,
@@ -499,25 +679,35 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_fd_prestat_get(mut caller: Caller, fd: u32, address: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_prestat_get(mut caller: CallerWrapper<'_>, fd: u32, address: u32) -> u32 {
+        info!("prestat_get called");
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
+        info!("succ lock");
         Self::convert_to_errno(vfs.fd_prestat_get(&mut caller, fd, address))
     }
 
-    fn wasi_fd_prestat_dir_name(mut caller: Caller, fd: u32, address: u32, size: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_prestat_dir_name(
+        mut caller: CallerWrapper<'_>,
+        fd: u32,
+        address: u32,
+        size: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_prestat_dir_name(&mut caller, fd, address, size))
     }
 
     fn wasi_fd_pwrite(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         iovec_base: u32,
         iovec_number: u32,
         offset: u64,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_pwrite(
             &mut caller,
             fd,
@@ -529,25 +719,27 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_fd_read(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         iovec_base: u32,
         iovec_count: u32,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_read(&mut caller, fd, iovec_base, iovec_count, address))
     }
 
     fn wasi_fd_readdir(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         dirent_base: u32,
         dirent_length: u32,
         cookie: u64,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_readdir(
             &mut caller,
             fd,
@@ -558,52 +750,70 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_fd_renumber(mut caller: Caller, fd: u32, to_fd: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_renumber(mut caller: CallerWrapper<'_>, fd: u32, to_fd: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_renumber(&mut caller, fd, to_fd))
     }
 
-    fn wasi_fd_seek(mut caller: Caller, fd: u32, offset: i64, whence: u32, address: u32) -> u32 {
+    fn wasi_fd_seek(
+        mut caller: CallerWrapper<'_>,
+        fd: u32,
+        offset: i64,
+        whence: u32,
+        address: u32,
+    ) -> u32 {
         let whence = convert_wasi_arg!(whence, u8);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_seek(&mut caller, fd, offset, whence, address))
     }
 
-    fn wasi_fd_sync(mut caller: Caller, fd: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_fd_sync(mut caller: CallerWrapper<'_>, fd: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_sync(&mut caller, fd))
     }
 
-    fn wasi_fd_tell(mut caller: Caller, fd: u32, address: u32) -> u32 {
-        let vfs = lock_vfs!();
+    fn wasi_fd_tell(mut caller: CallerWrapper<'_>, fd: u32, address: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_tell(&mut caller, fd, address))
     }
 
     fn wasi_fd_write(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         iovec_base: u32,
         iovec_number: u32,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_write(&mut caller, fd, iovec_base, iovec_number, address))
     }
 
-    fn wasi_path_create_directory(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_path_create_directory(
+        mut caller: CallerWrapper<'_>,
+        fd: u32,
+        path: u32,
+        path_len: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_create_directory(&mut caller, fd, path, path_len))
     }
 
     fn wasi_path_filestat_get(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         flag: u32,
         path: u32,
         path_len: u32,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_filestat_get(
             &mut caller,
             fd,
@@ -615,7 +825,7 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_path_filestat_set_times(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         flag: u32,
         path: u32,
@@ -625,7 +835,8 @@ impl WasmtimeRuntimeState {
         fst_flags: u32,
     ) -> u32 {
         let fst_flags = convert_wasi_arg!(fst_flags, u16);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_filestat_set_times(
             &mut caller,
             fd,
@@ -639,7 +850,7 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_path_link(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         old_fd: u32,
         old_flags: u32,
         old_address: u32,
@@ -648,7 +859,8 @@ impl WasmtimeRuntimeState {
         new_address: u32,
         new_path_len: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_link(
             &mut caller,
             old_fd,
@@ -662,7 +874,7 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_path_open(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         dir_flags: u32,
         path_address: u32,
@@ -675,7 +887,8 @@ impl WasmtimeRuntimeState {
     ) -> u32 {
         let oflags = convert_wasi_arg!(oflags, u16);
         let fd_flags = convert_wasi_arg!(fd_flags, u16);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_open(
             &mut caller,
             fd,
@@ -691,7 +904,7 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_path_readlink(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         fd: u32,
         path: u32,
         path_len: u32,
@@ -699,7 +912,8 @@ impl WasmtimeRuntimeState {
         buf_len: u32,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_readlink(
             &mut caller,
             fd,
@@ -711,13 +925,19 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_path_remove_directory(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_path_remove_directory(
+        mut caller: CallerWrapper<'_>,
+        fd: u32,
+        path: u32,
+        path_len: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_remove_directory(&mut caller, fd, path, path_len))
     }
 
     fn wasi_path_rename(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         old_fd: u32,
         old_path: u32,
         old_len: u32,
@@ -725,7 +945,8 @@ impl WasmtimeRuntimeState {
         new_path: u32,
         new_len: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_rename(
             &mut caller,
             old_fd,
@@ -738,14 +959,15 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_path_symlink(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         old_address: u32,
         old_path_len: u32,
         fd: u32,
         new_address: u32,
         new_path_len: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_symlink(
             &mut caller,
             old_address,
@@ -756,49 +978,60 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_path_unlink_file(mut caller: Caller, fd: u32, path: u32, path_len: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_path_unlink_file(
+        mut caller: CallerWrapper<'_>,
+        fd: u32,
+        path: u32,
+        path_len: u32,
+    ) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.path_unlink_file(&mut caller, fd, path, path_len))
     }
 
     fn wasi_poll_oneoff(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         subscriptions: u32,
         events: u32,
         size: u32,
         address: u32,
     ) -> u32 {
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.poll_oneoff(&mut caller, subscriptions, events, size, address))
     }
 
-    fn wasi_proc_exit(mut caller: Caller, exit_code: u32) {
-        let mut vfs = match VFS_INSTANCE.lock() {
+    fn wasi_proc_exit(mut caller: CallerWrapper<'_>, exit_code: u32) {
+        let caller_data = &caller.data().clone();
+        let mut vfs = match caller_data.lock() {
             Ok(v) => v,
-            // NOTE: We have no choice but panic here, since this function cannot return error!
-            Err(e) => panic!("Failed to lock return code variable, with error {}", e),
+            Err(_) => panic!("unexpected failure"),
         };
+
         vfs.proc_exit(&mut caller, exit_code);
     }
 
-    fn wasi_proc_raise(mut caller: Caller, signal: u32) -> u32 {
+    fn wasi_proc_raise(mut caller: CallerWrapper<'_>, signal: u32) -> u32 {
         let signal = convert_wasi_arg!(signal, u8);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.proc_raise(&mut caller, signal))
     }
 
-    fn wasi_sched_yield(mut caller: Caller) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_sched_yield(mut caller: CallerWrapper<'_>) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.sched_yield(&mut caller))
     }
 
-    fn wasi_random_get(mut caller: Caller, address: u32, length: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn wasi_random_get(mut caller: CallerWrapper<'_>, address: u32, length: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.random_get(&mut caller, address, length))
     }
 
     fn wasi_sock_recv(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         socket: u32,
         buf_address: u32,
         buf_len: u32,
@@ -807,7 +1040,8 @@ impl WasmtimeRuntimeState {
         ro_flag: u32,
     ) -> u32 {
         let ri_flag = convert_wasi_arg!(ri_flag, u16);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.sock_recv(
             &mut caller,
             socket,
@@ -820,7 +1054,7 @@ impl WasmtimeRuntimeState {
     }
 
     fn wasi_sock_send(
-        mut caller: Caller,
+        mut caller: CallerWrapper<'_>,
         socket: u32,
         buf_address: u32,
         buf_len: u32,
@@ -828,7 +1062,8 @@ impl WasmtimeRuntimeState {
         ro_data_len: u32,
     ) -> u32 {
         let si_flag = convert_wasi_arg!(si_flag, u16);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.sock_send(
             &mut caller,
             socket,
@@ -839,14 +1074,16 @@ impl WasmtimeRuntimeState {
         ))
     }
 
-    fn wasi_sock_shutdown(mut caller: Caller, socket: u32, sd_flag: u32) -> u32 {
+    fn wasi_sock_shutdown(mut caller: CallerWrapper, socket: u32, sd_flag: u32) -> u32 {
         let sd_flag = convert_wasi_arg!(sd_flag, u8);
-        let mut vfs = lock_vfs!();
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.sock_shutdown(&mut caller, socket, sd_flag))
     }
 
-    fn veracruz_si_fd_create(mut caller: Caller, address: u32) -> u32 {
-        let mut vfs = lock_vfs!();
+    fn veracruz_si_fd_create(mut caller: CallerWrapper, address: u32) -> u32 {
+        let caller_data = caller.data().clone();
+        let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
 }
@@ -862,10 +1099,14 @@ impl ExecutionEngine for WasmtimeRuntimeState {
         program: Vec<u8>,
         options: Options,
     ) -> Result<u32, FatalEngineError> {
-        VFS_INSTANCE.lock()?.environment_variables = options.environment_variables;
-        VFS_INSTANCE.lock()?.program_arguments = options.program_arguments;
-        VFS_INSTANCE.lock()?.enable_clock = options.enable_clock;
-        VFS_INSTANCE.lock()?.enable_strace = options.enable_strace;
-        Self::invoke_entry_point(program)
+        // NOTE: minimize the locking scope.
+        {
+            let mut vfs = self.filesystem.lock()?;
+            vfs.environment_variables = options.environment_variables;
+            vfs.program_arguments = options.program_arguments;
+            vfs.enable_clock = options.enable_clock;
+            vfs.enable_strace = options.enable_strace;
+        }
+        self.invoke_engine(program)
     }
 }

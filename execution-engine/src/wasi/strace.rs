@@ -11,8 +11,8 @@
 
 use super::common::MemoryHandler;
 use crate::fs::FileSystemResult;
-use std::fmt;
 use log::info;
+use std::fmt;
 
 /// How many characters to display from a string or memory buffer.
 const BUFFER_DISPLAY_LEN: usize = 32;
@@ -310,8 +310,8 @@ impl Strace {
             _ => self.state = TraceState::Done,
         }
         match result {
-            Ok(()) => eprintln!(") = Success"),
-            Err(x) => eprintln!(") = {:?}", x),
+            Ok(()) => info!(") = Success"),
+            Err(x) => info!(") = {:?}", x),
         };
         result
     }

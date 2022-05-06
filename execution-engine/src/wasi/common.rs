@@ -32,6 +32,7 @@ use std::{
     mem::size_of, ops::Deref, ops::DerefMut, slice, slice::from_raw_parts,
     slice::from_raw_parts_mut, string::String, vec::Vec,
 };
+use strum_macros::{EnumString, IntoStaticStr};
 use wasi_types::{
     Advice, ClockId, DirEnt, ErrNo, Event, EventFdState, EventRwFlags, EventType, Fd, FdFlags,
     IoVec, LookupFlags, OpenFlags, RiFlags, Rights, RoFlags, SdFlags, SetTimeFlags, SiFlags,
@@ -44,7 +45,21 @@ use wasi_types::{
 ////////////////////////////////////////////////////////////////////////////////
 
 /// List of WASI API.
-#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
+/// It can be converted between primitive numbers and enum values via `primitive` related dereive,
+/// and between lowercase str and enum values via `strum`.
+#[derive(
+    IntoStaticStr,
+    EnumString,
+    Debug,
+    PartialEq,
+    Clone,
+    FromPrimitive,
+    ToPrimitive,
+    Serialize,
+    Deserialize,
+    Copy,
+)]
+#[strum(serialize_all = "lowercase")]
 pub enum WasiAPIName {
     ARGS_GET = 1,
     ARGS_SIZES_GET,
@@ -91,79 +106,26 @@ pub enum WasiAPIName {
     SOCK_RECV,
     SOCK_SEND,
     SOCK_SHUTDOWN,
+    #[strum(disabled)]
     _LAST,
 }
 
-impl TryFrom<&str> for WasiAPIName {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let rst = match s {
-            "args_get" => WasiAPIName::ARGS_GET,
-            "args_sizes_get" => WasiAPIName::ARGS_SIZES_GET,
-            "environ_get" => WasiAPIName::ENVIRON_GET,
-            "environ_sizes_get" => WasiAPIName::ENVIRON_SIZES_GET,
-            "clock_res_get" => WasiAPIName::CLOCK_RES_GET,
-            "clock_time_get" => WasiAPIName::CLOCK_TIME_GET,
-            "fd_advise" => WasiAPIName::FD_ADVISE,
-            "fd_allocate" => WasiAPIName::FD_ALLOCATE,
-            "fd_close" => WasiAPIName::FD_CLOSE,
-            "fd_datasync" => WasiAPIName::FD_DATASYNC,
-            "fd_fdstat_get" => WasiAPIName::FD_FDSTAT_GET,
-            "fd_fdstat_set_flags" => WasiAPIName::FD_FDSTAT_SET_FLAGS,
-            "fd_fdstat_set_rights" => WasiAPIName::FD_FDSTAT_SET_RIGHTS,
-            "fd_filestat_get" => WasiAPIName::FD_FILESTAT_GET,
-            "fd_filestat_set_size" => WasiAPIName::FD_FILESTAT_SET_SIZE,
-            "fd_filestat_set_times" => WasiAPIName::FD_FILESTAT_SET_TIMES,
-            "fd_pread" => WasiAPIName::FD_PREAD,
-            "fd_prestat_get" => WasiAPIName::FD_PRESTAT_GET,
-            "fd_prestat_dir_name" => WasiAPIName::FD_PRESTAT_DIR_NAME,
-            "fd_pwrite" => WasiAPIName::FD_PWRITE,
-            "fd_read" => WasiAPIName::FD_READ,
-            "fd_readdir" => WasiAPIName::FD_READDIR,
-            "fd_renumber" => WasiAPIName::FD_RENUMBER,
-            "fd_seek" => WasiAPIName::FD_SEEK,
-            "fd_sync" => WasiAPIName::FD_SYNC,
-            "fd_tell" => WasiAPIName::FD_TELL,
-            "fd_write" => WasiAPIName::FD_WRITE,
-            "path_create_directory" => WasiAPIName::PATH_CREATE_DIRECTORY,
-            "path_filestat_get" => WasiAPIName::PATH_FILESTAT_GET,
-            "path_filestat_set_times" => WasiAPIName::PATH_FILESTAT_SET_TIMES,
-            "path_link" => WasiAPIName::PATH_LINK,
-            "path_open" => WasiAPIName::PATH_OPEN,
-            "path_readlink" => WasiAPIName::PATH_READLINK,
-            "path_remove_directory" => WasiAPIName::PATH_REMOVE_DIRECTORY,
-            "path_rename" => WasiAPIName::PATH_RENAME,
-            "path_symlink" => WasiAPIName::PATH_SYMLINK,
-            "path_unlink_file" => WasiAPIName::PATH_UNLINK_FILE,
-            "poll_oneoff" => WasiAPIName::POLL_ONEOFF,
-            "proc_exit" => WasiAPIName::PROC_EXIT,
-            "proc_raise" => WasiAPIName::PROC_RAISE,
-            "sched_yield" => WasiAPIName::SCHED_YIELD,
-            "random_get" => WasiAPIName::RANDOM_GET,
-            "sock_recv" => WasiAPIName::SOCK_RECV,
-            "sock_send" => WasiAPIName::SOCK_SEND,
-            "sock_shutdown" => WasiAPIName::SOCK_SHUTDOWN,
-            _otherwise => return Err(()),
-        };
-        Ok(rst)
-    }
-}
-
 /// List of Veracruz API.
-#[derive(Debug, PartialEq, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Copy)]
+#[derive(
+    IntoStaticStr,
+    EnumString,
+    Debug,
+    PartialEq,
+    Clone,
+    FromPrimitive,
+    ToPrimitive,
+    Serialize,
+    Deserialize,
+    Copy,
+)]
+#[strum(serialize_all = "lowercase")]
 pub enum VeracruzAPIName {
     FD_CREATE,
-}
-
-impl TryFrom<&str> for VeracruzAPIName {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let rst = match s {
-            "fd_create" => VeracruzAPIName::FD_CREATE,
-            _otherwise => return Err(()),
-        };
-        Ok(rst)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -457,7 +419,7 @@ pub struct IoVecSlicesMut<'a, R> {
 }
 
 enum IoVecSlicesMutStorage<'a> {
-    Small([Option<&'a mut [u8]>; 2]),
+    Small([Option<&'a mut [u8]>; IOVECSLICES_SOO_COUNT]),
     Large(Vec<&'a mut [u8]>),
 }
 
