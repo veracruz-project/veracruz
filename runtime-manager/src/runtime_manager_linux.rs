@@ -29,12 +29,11 @@ use log::{error, info, trace};
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
-use ring::digest::{digest, SHA256};
 use std::net::TcpListener;
-use veracruz_utils::runtime_manager_message::{
-    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+use veracruz_utils::{
+    runtime_manager_message::{RuntimeManagerRequest, RuntimeManagerResponse, Status},
+    sha256::sha256,
 };
-use veracruz_utils::sha256::sha256;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.

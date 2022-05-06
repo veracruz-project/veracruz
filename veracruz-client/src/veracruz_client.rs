@@ -13,11 +13,7 @@ use crate::error::VeracruzClientError;
 use log::{error, info};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use ring::signature::KeyPair;
-use rustls::{
-    Certificate,
-    ClientConnection,
-    PrivateKey
-};
+use rustls::{Certificate, ClientConnection, PrivateKey};
 use rustls_pemfile;
 use std::{
     convert::TryFrom,
@@ -48,9 +44,7 @@ impl VeracruzClient {
         let mut buffer = std::vec::Vec::new();
         match file.read_to_end(&mut buffer) {
             Ok(_num) => (),
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                ()
-            },
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
             Err(err) => return Err(VeracruzClientError::IOError(err)),
         }
 
@@ -78,9 +72,7 @@ impl VeracruzClient {
     /// Read the private in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_private_key<P: AsRef<Path>>(
-        filename: P,
-    ) -> Result<PrivateKey, VeracruzClientError> {
+    fn read_private_key<P: AsRef<Path>>(filename: P) -> Result<PrivateKey, VeracruzClientError> {
         let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         let mut cursor = std::io::Cursor::new(buffer);
         let pkey_vec = rustls_pemfile::rsa_private_keys(&mut cursor)
@@ -168,32 +160,36 @@ impl VeracruzClient {
 
         let proxy_service_cert = {
             let certs_pem = policy.proxy_service_cert();
-            let certs =
-                rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
-                    VeracruzClientError::X509ParserError(format!(
-                        "rustls_pemfile::certs found not certificates"
-                    ))
-                })?;
+            let certs = rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
+                VeracruzClientError::X509ParserError(format!(
+                    "rustls_pemfile::certs found not certificates"
+                ))
+            })?;
             certs[0].clone()
         };
         let mut root_store = rustls::RootCertStore::empty();
-        root_store.add(&rustls::Certificate(proxy_service_cert))
+        root_store
+            .add(&rustls::Certificate(proxy_service_cert))
             .map_err(|err| VeracruzClientError::WebpkiError(err))?;
 
         let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(&policy_ciphersuite_string)
-            .ok_or_else(|| VeracruzClientError::TLSInvalidCiphersuiteError(policy_ciphersuite_string.to_string()))?;
+            .ok_or_else(|| {
+                VeracruzClientError::TLSInvalidCiphersuiteError(
+                    policy_ciphersuite_string.to_string(),
+                )
+            })?;
 
         let client_config = rustls::ClientConfig::builder()
             .with_cipher_suites(&[policy_ciphersuite])
             .with_safe_default_kx_groups()
             .with_protocol_versions(&[&rustls::version::TLS12])?
             .with_root_certificates(root_store)
-            .with_single_cert([client_cert].to_vec(), client_priv_key)
-            ?;
+            .with_single_cert([client_cert].to_vec(), client_priv_key)?;
 
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
             .map_err(|err| VeracruzClientError::InvalidDnsNameError(err))?;
-        let connection = ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
+        let connection =
+            ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
@@ -512,7 +508,8 @@ impl VeracruzClient {
     fn process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
         let mut ret_option = None;
         let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-        if input.len() > 0 && (!self.tls_connection.is_handshaking() || self.tls_connection.wants_read())
+        if input.len() > 0
+            && (!self.tls_connection.is_handshaking() || self.tls_connection.wants_read())
         {
             let mut slice = &input[..];
             self.tls_connection.read_tls(&mut slice)?;
@@ -529,7 +526,11 @@ impl VeracruzClient {
     fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
         self.tls_connection.process_new_packets()?;
-        match self.tls_connection.reader().read_to_end(&mut received_buffer) {
+        match self
+            .tls_connection
+            .reader()
+            .read_to_end(&mut received_buffer)
+        {
             Ok(_num) => (),
             Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
             Err(err) => return Err(VeracruzClientError::IOError(err)),

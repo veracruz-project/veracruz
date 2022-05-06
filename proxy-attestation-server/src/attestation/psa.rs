@@ -24,7 +24,7 @@ use veracruz_utils::sha256::sha256;
 // Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
 // will have the same public key. Yes, I'm embedding that key in the source
 // code. I could come up with a complicated system for auto generating a key
-// for each instance, and then populate the device database with they key.
+// for each instance, and then use that key.
 // That's what needs to be done if you want to productize this.
 // That's not what I'm going to do for this research project
 static PUBLIC_KEY: [u8; 65] = [

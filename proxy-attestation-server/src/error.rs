@@ -23,10 +23,6 @@ pub enum ProxyAttestationServerError {
     Base64Error(#[error(source)] base64::DecodeError),
     #[error(display = "ProxyAttestationServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "ProxyAttestationServer: DieselError: {:?}.", _0)]
-    DieselError(#[error(source)] diesel::result::Error),
-    #[error(display = "ProxyAttestationServer: DieselError: {:?}.", _0)]
-    DieselConnectionError(#[error(source)] diesel::ConnectionError),
     #[error(display = "ProxyAttestationServer: Utf8Error: {:?}.", _0)]
     Utf8Error(#[error(source)] std::str::Utf8Error),
     #[error(display = "ProxyAttestationServer: SerdeJsonError: {:?}.", _0)]

@@ -191,14 +191,22 @@ fn veracruz_client_session() {
     };
 
     let mut server_root_cert_store = rustls::RootCertStore::empty();
-    server_root_cert_store.add(&rustls::Certificate(client_cert)).unwrap();
+    server_root_cert_store
+        .add(&rustls::Certificate(client_cert))
+        .unwrap();
 
     let server_config = rustls::ServerConfig::builder()
-            .with_cipher_suites(&rustls::ALL_CIPHER_SUITES.to_vec())
-            .with_safe_default_kx_groups()
-            .with_protocol_versions(&[&rustls::version::TLS12]).unwrap()
-            .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(server_root_cert_store))
-            .with_single_cert(vec![rustls::Certificate(server_cert.to_vec())], rustls::PrivateKey(server_priv_key));
+        .with_cipher_suites(&rustls::ALL_CIPHER_SUITES.to_vec())
+        .with_safe_default_kx_groups()
+        .with_protocol_versions(&[&rustls::version::TLS12])
+        .unwrap()
+        .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
+            server_root_cert_store,
+        ))
+        .with_single_cert(
+            vec![rustls::Certificate(server_cert.to_vec())],
+            rustls::PrivateKey(server_priv_key),
+        );
 }
 
 /// simple index handler

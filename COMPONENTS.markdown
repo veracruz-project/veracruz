@@ -55,8 +55,7 @@ It contains the following components:
 Token.  This is the attestation protocol that the Veracruz attestation
 service exposes to client code.
 - Proxy Attestation Server: this is the attestation service proper, which
-  maintains a database of registered keys and identities, and which can be contacted
-  by clients to authenticate an isolate enrolled in the service.
+  can be contacted by clients to authenticate an isolate enrolled in the service.
 
 ## The Software Development Kit
 

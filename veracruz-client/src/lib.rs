@@ -11,7 +11,6 @@
 
 pub mod veracruz_client;
 pub use self::veracruz_client::*;
-pub mod attestation;
 pub mod error;
 pub use self::error::*;
 
