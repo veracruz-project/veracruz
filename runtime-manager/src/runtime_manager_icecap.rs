@@ -42,7 +42,8 @@ struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Badges {
-    virtio_console_server_ring_buffer: Badge,
+    virtio_console_server_tx: Badge,
+    virtio_console_server_rx: Badge,
 }
 
 fn main(config: Config) -> Fallible<()> {
@@ -52,38 +53,44 @@ fn main(config: Config) -> Fallible<()> {
     debug_println!("icecap-realmos: initializing...");
 
     // enable ring buffer to serial-server
-    let virtio_console_client =
-        RingBuffer::unmanaged_from_config(&config.virtio_console_server_ring_buffer);
-    virtio_console_client.enable_notify_read();
-    virtio_console_client.enable_notify_write();
+    let virtio_console_client = RingBuffer::unmanaged_from_config(
+        &config.virtio_console_server_ring_buffer
+    );
     debug_println!("icecap-realmos: enabled ring buffer");
 
     debug_println!("icecap-realmos: running...");
     RuntimeManager::new(
         virtio_console_client,
         config.event_nfn,
-        config.badges.virtio_console_server_ring_buffer,
+        config.badges.virtio_console_server_tx,
+        config.badges.virtio_console_server_rx,
     )
     .run()
 }
 
 struct RuntimeManager {
-    channel: RingBuffer,
+    rb: BufferedRingBuffer,
     event: Notification,
-    virtio_console_server_ring_buffer_badge: Badge,
+    #[allow(dead_code)]
+    virtio_console_server_tx_badge: Badge,
+    virtio_console_server_rx_badge: Badge,
     active: bool,
 }
 
 impl RuntimeManager {
     fn new(
-        channel: RingBuffer,
+        rb: RingBuffer,
         event: Notification,
-        virtio_console_server_ring_buffer_badge: Badge,
+        virtio_console_server_tx_badge: Badge,
+        virtio_console_server_rx_badge: Badge,
     ) -> Self {
+        rb.enable_notify_read();
+        rb.enable_notify_write();
         Self {
-            channel: channel,
+            rb: BufferedRingBuffer::new(rb),
             event: event,
-            virtio_console_server_ring_buffer_badge: virtio_console_server_ring_buffer_badge,
+            virtio_console_server_tx_badge: virtio_console_server_tx_badge,
+            virtio_console_server_rx_badge: virtio_console_server_rx_badge,
             active: true,
         }
     }
@@ -91,36 +98,41 @@ impl RuntimeManager {
     fn run(&mut self) -> Fallible<()> {
         loop {
             let badge = self.event.wait();
-            if badge & self.virtio_console_server_ring_buffer_badge != 0 {
+            if badge & self.virtio_console_server_rx_badge != 0 {
                 self.process()?;
-                self.channel.enable_notify_read();
-                self.channel.enable_notify_write();
+                self.rb.ring_buffer().enable_notify_write();
 
                 if !self.active {
                     return Ok(());
                 }
             }
+
+            // always handle tx operations
+            self.rb.tx_callback();
+            self.rb.ring_buffer().enable_notify_read();
         }
     }
 
     fn process(&mut self) -> Fallible<()> {
         // recv request if we have a full request in our ring buffer
-        if self.channel.poll_read() < size_of::<u32>() {
+        if self.rb.ring_buffer().poll_read() < size_of::<u32>() {
+            self.rb.ring_buffer().enable_notify_write();
             return Ok(());
         }
         let mut raw_header = [0; size_of::<u32>()];
-        self.channel.peek(&mut raw_header);
+        self.rb.ring_buffer().peek(&mut raw_header);
         let header = bincode::deserialize::<u32>(&raw_header)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
         let size = usize::try_from(header)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
 
-        if self.channel.poll_read() < size_of::<u32>() + size {
+        if self.rb.ring_buffer().poll_read() < size_of::<u32>() + size {
+            self.rb.ring_buffer().enable_notify_write();
             return Ok(());
         }
         let mut raw_request = vec![0; usize::try_from(header).unwrap()];
-        self.channel.skip(size_of::<u32>());
-        self.channel.read(&mut raw_request);
+        self.rb.skip(size_of::<u32>());
+        self.rb.rx_into(&mut raw_request);
         let request = bincode::deserialize::<RuntimeManagerRequest>(&raw_request)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
 
@@ -133,11 +145,8 @@ impl RuntimeManager {
         let raw_header = bincode::serialize(&u32::try_from(raw_response.len()).unwrap())
             .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
 
-        self.channel.write(&raw_header);
-        self.channel.write(&raw_response);
-
-        self.channel.notify_read();
-        self.channel.notify_write();
+        self.rb.tx(&raw_header);
+        self.rb.tx(&raw_response);
 
         Ok(())
     }

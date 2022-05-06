@@ -4,7 +4,8 @@ from icecap_framework.utils import align_up, align_down, PAGE_SIZE, PAGE_SIZE_BI
 import itertools as it
 
 BADGE_IRQ = 1 << 0
-BADGE_CLIENT = 1 << 1
+BADGE_TX  = 1 << 1
+BADGE_RX  = 1 << 2
 
 MMIO_BLOCK_SIZE = 512
 VIRTIO_PARAMS = {
@@ -96,24 +97,30 @@ class VirtioConsoleServer(GenericElfComponent):
             'event_nfn': self.cspace().alloc(self.event_nfn, read=True),
             'badges': {
                 'irq': BADGE_IRQ,
-                'client': BADGE_CLIENT,
+                'tx': BADGE_TX,
+                'rx': BADGE_RX,
                 },
             }
 
-    def register_client(self, client, kick_nfn, kick_nfn_badge):
+    def register_client(self, client, kick_nfn, kick_tx_badge, kick_rx_badge):
         server_rb_objs, client_rb_objs = self.composition.alloc_ring_buffer(
             a_name=self.name, a_size_bits=BLOCK_SIZE_BITS,
             b_name=client.name, b_size_bits=BLOCK_SIZE_BITS,
-            )
-        kick_cap = self.cspace().alloc(kick_nfn, badge=kick_nfn_badge, write=True)
+        )
+        kick_tx_cap = self.cspace().alloc(kick_nfn, badge=kick_tx_badge, write=True)
+        kick_rx_cap = self.cspace().alloc(kick_nfn, badge=kick_rx_badge, write=True)
         self._arg['client_ring_buffer'] = {
             'ring_buffer': self.map_ring_buffer(server_rb_objs),
             'kicks': {
-                'read': kick_cap,
-                'write': kick_cap,
-                },
-            }
-        return client_rb_objs, client.cspace().alloc(self.event_nfn, badge=BADGE_CLIENT, write=True)
+                'read': kick_tx_cap,
+                'write': kick_rx_cap,
+            },
+        }
+        return (
+            client_rb_objs,
+            client.cspace().alloc(self.event_nfn, badge=BADGE_TX, write=True),
+            client.cspace().alloc(self.event_nfn, badge=BADGE_RX, write=True),
+        )
 
     def arg_json(self):
         return self._arg

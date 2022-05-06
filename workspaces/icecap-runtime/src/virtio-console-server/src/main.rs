@@ -31,7 +31,8 @@ struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Badges {
     irq: Badge,
-    client: Badge,
+    tx: Badge,
+    rx: Badge,
 }
 
 
@@ -173,24 +174,14 @@ fn main(config: Config) -> Fallible<()> {
     }
 
     // begin processing requests
-    let mut rb = BufferedRingBuffer::new(RingBuffer::unmanaged_from_config(
-        &config.client_ring_buffer,
-    ));
-    let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
-
-    // we may have already recieved data to send, but lost the notification
-    // during initialization, so there may already be data in our ring buffer
-    // we need to write out
-    rb.rx_callback();
-    rb.tx_callback();
-    if let Some(chars) = rb.rx() {
-        for chunk in chars.chunks(virtio_drivers::PAGE_SIZE) {
-            send_page[..chunk.len()].copy_from_slice(chunk);
-            console.send_slice(&send_page[..chunk.len()])?;
-        }
-    }
+    let mut rb = BufferedRingBuffer::new(
+        RingBuffer::unmanaged_from_config(
+            &config.client_ring_buffer,
+        )
+    );
     rb.ring_buffer().enable_notify_read();
     rb.ring_buffer().enable_notify_write();
+    let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
 
     loop {
         let badge = config.event_nfn.wait();
@@ -209,17 +200,20 @@ fn main(config: Config) -> Fallible<()> {
             virtio_irq_handler.ack()?;
         }
 
-        if badge & config.badges.client != 0 {
-            rb.rx_callback();
-            rb.tx_callback();
+        if badge & config.badges.rx != 0 {
+            //debug_println!("virtio-console-server: rx!");
             if let Some(chars) = rb.rx() {
                 for chunk in chars.chunks(virtio_drivers::PAGE_SIZE) {
                     send_page[..chunk.len()].copy_from_slice(chunk);
                     console.send_slice(&send_page[..chunk.len()])?;
                 }
             }
-            rb.ring_buffer().enable_notify_read();
+            rb.rx_callback();
             rb.ring_buffer().enable_notify_write();
         }
+
+        // always handle tx operations
+        rb.tx_callback();
+        rb.ring_buffer().enable_notify_read();
     }
 }
