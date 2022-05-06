@@ -14,161 +14,17 @@ use crate::attestation;
 use crate::attestation::nitro;
 #[cfg(any(feature = "linux", feature = "icecap"))]
 use crate::attestation::psa;
-
+use crate::error::*;
+use actix_web::{dev::Server, middleware, web, App, HttpServer};
 use lazy_static::lazy_static;
-use std::net::ToSocketAddrs;
-use std::sync::atomic::{AtomicBool, Ordering};
-use veracruz_utils::sha256::sha256;
+use std::{
+    net::ToSocketAddrs,
+    path,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 lazy_static! {
     pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
-}
-
-use crate::error::*;
-use actix_web::{dev::Server, middleware, web, App, HttpServer};
-use psa_attestation::{
-    q_useful_buf_c, t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA, t_cose_key,
-    t_cose_key__bindgen_ty_1, t_cose_parameters, t_cose_sign1_set_verification_key,
-    t_cose_sign1_verify, t_cose_sign1_verify_ctx, t_cose_sign1_verify_delete_public_key,
-    t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
-};
-use std::{ffi::c_void, path, ptr::null};
-
-async fn verify_iat(input_data: String) -> ProxyAttestationServerResponder {
-    if input_data.is_empty() {
-        println!("proxy-attestation-server::verify_iat input_data is empty");
-        return Err(ProxyAttestationServerError::MissingFieldError(
-            "proxy-attestation-server::verify_iat data",
-        ));
-    }
-
-    let proto_bytes = base64::decode(&input_data).map_err(|err| {
-        println!(
-            "proxy-attestation-server::verify_iat decode of input data failed:{:?}",
-            err
-        );
-        err
-    })?;
-
-    let proto = transport_protocol::parse_proxy_attestation_server_request(None, &proto_bytes)
-        .map_err(|err| {
-            println!("proxy-attestation-server::verify_iat parse_proxy_attestation_server_request failed:{:?}", err);
-            err
-        })?;
-    if !proto.has_proxy_psa_attestation_token() {
-        println!(
-            "proxy-attestation-server::verify_iat proto does not have proxy psa attestation token"
-        );
-        return Err(ProxyAttestationServerError::NoProxyPSAAttestationTokenError);
-    }
-
-    let (token, pubkey, device_id) = transport_protocol::parse_proxy_psa_attestation_token(
-        proto.get_proxy_psa_attestation_token(),
-    );
-    let pubkey_hash = {
-        let conn = crate::orm::establish_connection().map_err(|err| {
-            println!(
-                "proxy-attestation-server::verify_iat orm::establish_connection failed:{:?}",
-                err
-            );
-            err
-        })?;
-        crate::orm::query_device(&conn, device_id).map_err(|err| {
-            println!(
-                "proxy-attestation-server::verify_iat orm::query_device failed:{:?}",
-                err
-            );
-            err
-        })?
-    };
-
-    // verify that the pubkey we received matches the hash we received
-    // during native attestation
-    let calculated_pubkey_hash = sha256(&pubkey);
-    if calculated_pubkey_hash != pubkey_hash {
-        println!("proxy-attestation-server::verify_iat hashes didn't match");
-        return Err(ProxyAttestationServerError::MismatchError {
-            variable: "proxy-attestation-server::server public key",
-            received: calculated_pubkey_hash,
-            expected: pubkey_hash,
-        });
-    }
-
-    let mut t_cose_ctx: t_cose_sign1_verify_ctx = unsafe { ::std::mem::zeroed() };
-    unsafe { t_cose_sign1_verify_init(&mut t_cose_ctx, 0) };
-
-    let mut key_handle: u32 = 0;
-    let lpk_ret = unsafe {
-        t_cose_sign1_verify_load_public_key(
-            pubkey.as_ptr() as *const u8,
-            pubkey.len() as u64,
-            &mut key_handle,
-        )
-    };
-    if lpk_ret != 0 {
-        println!(
-            "proxy-attestation-server::verify_iat t_cose_sign1_verify_load_public_key failed:{:?}",
-            lpk_ret
-        );
-        return Err(ProxyAttestationServerError::UnsafeCallError(
-            "proxy-attestation-server::server::verify_iat t_cose_sign1_verify_load_public_key",
-            lpk_ret,
-        ));
-    }
-
-    let cose_key = t_cose_key {
-        crypto_lib: t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA,
-        k: t_cose_key__bindgen_ty_1 {
-            key_handle: key_handle as u64,
-        },
-    };
-    unsafe { t_cose_sign1_set_verification_key(&mut t_cose_ctx, cose_key) };
-    let sign1 = q_useful_buf_c {
-        ptr: token.as_ptr() as *mut c_void,
-        len: token.len() as u64,
-    };
-    let mut payload_vec = Vec::with_capacity(token.len());
-    let mut payload = q_useful_buf_c {
-        ptr: payload_vec.as_mut_ptr() as *mut c_void,
-        len: payload_vec.capacity() as u64,
-    };
-
-    let mut decoded_parameters: t_cose_parameters = unsafe { ::std::mem::zeroed() };
-
-    let sv_ret = unsafe {
-        t_cose_sign1_verify(
-            &mut t_cose_ctx,
-            sign1,
-            &mut payload,
-            &mut decoded_parameters,
-        )
-    };
-    if sv_ret != 0 {
-        println!("proxy-attestation-server::verify_iat sv_ret != 0");
-        return Err(ProxyAttestationServerError::UnsafeCallError(
-            "proxy-attestation-server::server::verify_iat t_cose_sign1_verify",
-            sv_ret,
-        ));
-    }
-
-    // remove the key from storage
-    let dpk_ret = unsafe { t_cose_sign1_verify_delete_public_key(&mut key_handle) };
-    if dpk_ret != 0 {
-        println!("proxy-attestation-server::attestation::psa_attestation_token Was unable to delete public key, and received the error code:{:?}.
-                   I can't do anything about it, and it may not cause a problem right now, but this will probably end badly for you.", dpk_ret);
-    }
-
-    if payload.ptr == null() {
-        println!("proxy-attestation-server::verify_iat payload.ptr is null");
-        return Err(ProxyAttestationServerError::MissingFieldError(
-            "payload.ptr",
-        ));
-    }
-
-    let payload_vec =
-        unsafe { std::slice::from_raw_parts(payload.ptr as *const u8, payload.len as usize) };
-
-    Ok(base64::encode(payload_vec))
 }
 
 #[allow(unused)]
@@ -237,7 +93,6 @@ where
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
-            .route("/VerifyPAT", web::post().to(verify_iat))
             .route("/Start", web::post().to(attestation::start))
             .route("/PSA/{psa_request}", web::post().to(psa_router))
             .route("/Nitro/{nitro_request}", web::post().to(nitro_router))

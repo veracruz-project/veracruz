@@ -24,9 +24,7 @@ include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
-PROXY_ATTESTATION_SERVER_DB = proxy-attestation-server.db
-TEST_PARAMETERS = DATABASE_URL=$(PROXY_ATTESTATION_SERVER_DB) \
-	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
+TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR) \
@@ -47,7 +45,7 @@ build:
 $(MEASUREMENT_FILE):
 	$(MAKE) -C ../nitro-runtime nitro
 
-test-dependencies: test-collateral $(PROXY_ATTESTATION_SERVER_DB)
+test-dependencies: test-collateral
 
 CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
 

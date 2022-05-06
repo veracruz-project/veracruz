@@ -217,28 +217,12 @@ change the runtime hashes.
 
 ## Running the Proxy Attestation Server
 
-Veracruz's Proxy Attestation Server provides a frontend for a database of
-attested Veracruz instances populated by the native attestation server.
-This allows a client to verify through the server's certificate chain that
-a Veracruz instance is what it says it is.
-
-Before we can launch the Proxy Attestation Server,  we need to populate the
-Proxy Attestation Server's database with the hashes of the Veracruz runtimes:
-
-``` bash
-$ ./test-collateral/populate-test-database.sh example/example-pas.db
-```
-
-NOTE! This command needs to be rerun after every recompile, since this will
-change the runtime hashes.
-
 Now we can launch the Proxy Attestation Server with the
 `vc-pas`/`proxy-attestation-server` command. Note we are using the bash
 character `&` to launch the Proxy Attestation Server in the background:
 
 ``` bash
 $ vc-pas :3010 \
-    --database-url=example/example-pas.db \
     --ca-cert=example/example-ca-cert.pem \
     --ca-key=example/example-ca-key.pem &
 Proxy Attestation Server running on 127.0.0.1:3010

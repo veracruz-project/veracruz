@@ -56,12 +56,8 @@ vc-pgen \
     --capability "input-0:r,input-1:r,input-2:r,output:w" \
     --output-policy-file veracruz-mcu-client/test-data/test-policy.json
 
-# create the pas database
-./test-collateral/populate-test-database.sh veracruz-mcu-client/test-data/test-pas.db
-
 # launch vc-pas
 RUST_LOG=debug vc-pas veracruz-mcu-client/test-data/test-policy.json \
-    --database-url=veracruz-mcu-client/test-data/test-pas.db \
     --ca-cert=veracruz-mcu-client/test-data/test-ca-cert.pem \
     --ca-key=veracruz-mcu-client/test-data/test-ca-key.pem &
 sleep 10

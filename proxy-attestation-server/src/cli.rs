@@ -13,7 +13,7 @@ use actix_rt;
 use env_logger;
 use log::info;
 use proxy_attestation_server;
-use std::{env, path, process};
+use std::{path, process};
 use structopt::StructOpt;
 
 /// A bit of extra parsing to allow omitting addr/port
@@ -44,11 +44,6 @@ struct Opt {
     #[structopt(long, parse(from_os_str))]
     ca_key: path::PathBuf,
 
-    /// URL or path to database, may also be provided through the
-    /// DATABASE_URL environment variable
-    #[structopt(long)]
-    database_url: Option<String>,
-
     /// Enable/disable debugging
     #[structopt(long)]
     debug: bool,
@@ -61,20 +56,6 @@ fn main() {
 
     // setup logger
     env_logger::init();
-
-    // needs a database URL
-    if let Some(url) = opt.database_url {
-        env::set_var("DATABASE_URL", url);
-    }
-    match env::var("DATABASE_URL") {
-        Ok(url) => {
-            info!("Using database {:?}", url);
-        }
-        Err(_) => {
-            eprintln!("No database URL provided, need --database-url");
-            process::exit(1);
-        }
-    }
 
     // log the CA cert
     info!("Using CA certificate {:?}", opt.ca_cert);

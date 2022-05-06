@@ -82,19 +82,12 @@ $ vc-pgen \
     --output-policy-file veracruz-mcu-client/example/policy.json
 ```
 
-Create the Proxy Attestation Server database:
-
-``` bash server
-$ ./test-collateral/populate-test-database.sh veracruz-mcu-client/example/pas.db
-```
-
 Launch the Proxy Attestation Server:
 
 ``` bash server
 $ pkill vc-pas || true
 $ RUST_LOG=debug \
     vc-pas veracruz-mcu-client/example/policy.json \
-        --database-url=veracruz-mcu-client/example/pas.db \
         --ca-cert=veracruz-mcu-client/example/ca-cert.pem \
         --ca-key=veracruz-mcu-client/example/ca-key.pem &
 $ sleep 10
