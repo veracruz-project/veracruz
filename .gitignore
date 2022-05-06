@@ -29,7 +29,6 @@ test-collateral/macd/
 test-collateral/private-set-inter-sum/
 test-collateral/number-stream/
 test-collateral/pgen
-test-collateral/proxy-attestation-server.db
 *.vscode/
 *.orig
 veracruz-server/fuzz/*
