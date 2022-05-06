@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean clean-cargo-lock default doc fmt nitro test-collateral runtime-manager-enclave
+.PHONY: all clean clean-cargo-lock default doc fmt clippy nitro test-collateral runtime-manager-enclave
 
 default: all
 
@@ -44,6 +44,19 @@ runtime-manager-enclave:
 
 doc:
 	cargo doc
+
+clippy:
+	rustup target add $(ARCH)-unknown-linux-musl
+	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
+	cargo clippy --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
+		-p runtime_manager_enclave -p execution-engine \
+		-p session-manager -p policy-utils -p platform-services \
+		--features runtime_manager_enclave/nitro \
+		--features execution-engine/nitro  \
+		--features session-manager/nitro \
+		--features policy-utils/std \
+		--features platform-services/nitro \
+		-- --no-deps
 
 fmt:
 	cargo fmt

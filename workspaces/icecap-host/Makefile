@@ -9,7 +9,7 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock default doc fmt \
+.PHONY: all build clean clean-cargo-lock default doc fmt clippy \
 	test-dependencies test-collateral test-server test-client veracruz-test \
 	tests
 
@@ -106,6 +106,27 @@ doc:
 
 fmt:
 	cargo fmt
+
+clippy:
+	# workspace members and relevant dependencies
+	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) \
+		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-server -p io-utils -p transport-protocol \
+		-p psa-attestation -p veracruz-utils \
+		--features proxy-attestation-server/icecap \
+		--features veracruz-client/icecap \
+		--features veracruz-server/icecap \
+		--features transport-protocol/icecap \
+		--features io-utils/icecap \
+		--features psa-attestation/icecap \
+		--features veracruz-utils/icecap \
+		-- --no-deps
+	# workspace testing crates
+	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests \
+		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
+		--features veracruz-test/icecap \
+		--features veracruz-server-test/icecap \
+		-- --no-deps
 
 clean:
 	cargo clean

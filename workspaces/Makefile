@@ -13,8 +13,8 @@ default:
 
 include common.mk
 
-.PHONY: all clean icecap icecap-clean linux linux-install linux-clean nitro \
-	nitro-clean shared shared-install shared-clean
+.PHONY: all clean icecap icecap-clippy icecap-clean linux linux-install linux-clippy \
+	linux-clean nitro nitro-clippy nitro-clean shared shared-install shared-clean
 
 all: shared linux nitro icecap
 
@@ -47,6 +47,17 @@ linux-install: shared-install
 
 shared-install:
 	$(MAKE) -C host install
+
+linux-clippy:
+	make -C linux-runtime clippy
+	make -C linux-host clippy
+
+nitro-clippy:
+	make -C nitro-runtime clippy
+	make -C nitro-host clippy
+
+icecap-clippy:
+	make -C icecap-host clippy
 
 linux-clean:
 	$(MAKE) -C linux-host clean

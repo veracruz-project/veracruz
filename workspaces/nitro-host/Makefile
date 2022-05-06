@@ -9,7 +9,7 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock doc fmt \
+.PHONY: all build clean clean-cargo-lock doc fmt clippy \
 	test-client test-collateral test-dependencies test-server veracruz-test
 
 default: build
@@ -68,6 +68,26 @@ doc:
 
 fmt:
 	cargo fmt
+
+clippy: 
+	# workspace members and relevant dependencies
+	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
+		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-server -p io-utils -p transport-protocol \
+		-p psa-attestation -p veracruz-utils  \
+		--features proxy-attestation-server/nitro\
+		--features veracruz-client/nitro \
+		--features veracruz-server/nitro \
+		--features io-utils/nitro \
+		--features psa-attestation/nitro \
+		--features veracruz-utils/nitro \
+		-- --no-deps
+	# workspace testing crates
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CC) $(TEST_PARAMETERS) cargo clippy --tests \
+		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
+		--features veracruz-test/nitro \
+		--features veracruz-server-test/nitro \
+		-- --no-deps
 
 clean:
 	cargo clean
