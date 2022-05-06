@@ -84,8 +84,6 @@ impl RuntimeManager {
         virtio_console_server_tx_badge: Badge,
         virtio_console_server_rx_badge: Badge,
     ) -> Self {
-        rb.enable_notify_read();
-        rb.enable_notify_write();
         Self {
             rb: BufferedRingBuffer::new(rb),
             event: event,

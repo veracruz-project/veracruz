@@ -179,8 +179,6 @@ fn main(config: Config) -> Fallible<()> {
             &config.client_ring_buffer,
         )
     );
-    rb.ring_buffer().enable_notify_read();
-    rb.ring_buffer().enable_notify_write();
     let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
 
     loop {
