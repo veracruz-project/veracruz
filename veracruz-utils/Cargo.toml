@@ -7,17 +7,21 @@ version = "0.3.0"
 
 [features]
 icecap = [
+  "platform-services/icecap",
   "serde/derive",
 ]
 linux = [
+  "platform-services/std",
   "serde/derive",
   "serde_json/std",
 ]
 nitro = [
+  "platform-services/nitro",
   "serde/derive",
   "serde_json/std",
 ]
 std = [
+  "platform-services/std",
   "serde/std",
   "serde_json/std",
 ]
@@ -25,6 +29,8 @@ std = [
 [dependencies]
 bincode = { version = "1.2.1", default-features = false, optional = true }
 err-derive = "0.2"
+mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
+platform-services = { path = "../platform-services" }
 psa-crypto = { path = "../third-party/rust-psa-crypto/psa-crypto" }
 ring = "0.16.20"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
