@@ -106,9 +106,10 @@ doc:
 fmt:
 	cargo fmt
 
-clippy:
+clippy: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	# workspace members and relevant dependencies
-	$(BUILD_PARAMETERS) $(COMPILERS) cargo clippy $(PROFILE_FLAG) \
+	$(BUILD_PARAMETERS) $(COMPILERS) \
+	cargo clippy $(PROFILE_FLAG) \
 		-p proxy-attestation-server -p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils \
