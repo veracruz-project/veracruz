@@ -598,6 +598,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-nitro-enclaves-nsm-api"
+version = "0.2.0"
+source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api.git/?tag=v0.2.0#915d87fb67d9956cb973d7e3edce7810c4ba70f1"
+dependencies = [
+ "libc",
+ "log",
+ "nix 0.20.2",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -655,17 +668,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
-name = "bigdecimal"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1374191e2dd25f9ae02e3aa95041ed5d747fc77b3c102b49fe2dd9a8117a6244"
-dependencies = [
- "num-bigint 0.2.6",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -676,15 +678,15 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.59.2"
+version = "0.58.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd2a9a458e8f4304c52c43ebb0cfbd520289f8379a52e329a38afda99bf8eb8"
+checksum = "0f8523b410d7187a43085e7e064416ea32ded16bd0a4e6fc025e21616d01258f"
 dependencies = [
  "bitflags",
- "cexpr",
+ "cexpr 0.4.0",
  "clang-sys",
  "clap",
- "env_logger",
+ "env_logger 0.8.4",
  "lazy_static",
  "lazycell",
  "log",
@@ -694,8 +696,37 @@ dependencies = [
  "regex 1.5.5",
  "rustc-hash",
  "shlex",
- "which",
+ "which 3.1.1",
 ]
+
+[[package]]
+name = "bindgen"
+version = "0.59.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bd2a9a458e8f4304c52c43ebb0cfbd520289f8379a52e329a38afda99bf8eb8"
+dependencies = [
+ "bitflags",
+ "cexpr 0.6.0",
+ "clang-sys",
+ "clap",
+ "env_logger 0.9.0",
+ "lazy_static",
+ "lazycell",
+ "log",
+ "peeking_take_while",
+ "proc-macro2",
+ "quote",
+ "regex 1.5.5",
+ "rustc-hash",
+ "shlex",
+ "which 4.2.4",
+]
+
+[[package]]
+name = "bit-vec"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f59bbe95d4e52a6398ec21238d31577f2b28a9d86807f06ca59d191d8440d0bb"
 
 [[package]]
 name = "bit_field"
@@ -810,10 +841,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
 
 [[package]]
+name = "cbindgen"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1df6a11bba1d7cab86c166cecf4cf8acd7d02b7b65924d81b33d27197f22ee35"
+dependencies = [
+ "heck 0.3.3",
+ "indexmap",
+ "log",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
+
+[[package]]
+name = "cexpr"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4aedb84272dbe89af497cf81375129abda4fc0a9e7c5d317498c15cc30c0d27"
+dependencies = [
+ "nom 5.1.2",
+]
 
 [[package]]
 name = "cexpr"
@@ -842,8 +900,11 @@ version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
 dependencies = [
+ "libc",
  "num-integer",
  "num-traits",
+ "time 0.1.43",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1227,32 +1288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diesel"
-version = "1.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b28135ecf6b7d446b43e27e225622a038cc4e2930a1022f51cdb97ada19b8e4d"
-dependencies = [
- "bigdecimal",
- "byteorder",
- "diesel_derives",
- "libsqlite3-sys",
- "num-bigint 0.2.6",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "diesel_derives"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45f5098f628d02a7a0f68ddba586fb61e80edec3bdc1be3b921f4ceec60858d3"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1317,6 +1352,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex 1.5.5",
+ "termcolor",
 ]
 
 [[package]]
@@ -1909,7 +1957,7 @@ dependencies = [
  "curl",
  "err-derive",
  "log",
- "nix",
+ "nix 0.20.2",
  "serde",
  "serde_json",
  "socket2 0.4.2",
@@ -2131,6 +2179,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
+name = "mbedtls"
+version = "0.8.2"
+dependencies = [
+ "bitflags",
+ "byteorder",
+ "cc",
+ "cfg-if 1.0.0",
+ "chrono",
+ "mbedtls-sys-auto",
+ "rs-libc",
+ "serde",
+ "serde_derive",
+ "yasna",
+]
+
+[[package]]
+name = "mbedtls-sys-auto"
+version = "2.28.0"
+dependencies = [
+ "bindgen 0.58.1",
+ "cc",
+ "cfg-if 1.0.0",
+ "cmake",
+ "lazy_static",
+ "libc",
+ "psa-crypto-sys",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2292,6 +2371,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.22.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4916f159ed8e5de0082076562152a76b7a1f64a01fd9d1e0fea002c37624faf"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset 0.6.5",
+]
+
+[[package]]
 name = "nom"
 version = "5.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2311,6 +2403,16 @@ dependencies = [
  "memchr",
  "minimal-lexical",
  "version_check",
+]
+
+[[package]]
+name = "nsm-lib"
+version = "0.2.0"
+source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api.git/?tag=v0.2.0#915d87fb67d9956cb973d7e3edce7810c4ba70f1"
+dependencies = [
+ "aws-nitro-enclaves-nsm-api",
+ "cbindgen",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -2634,6 +2736,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58893f751c9b0412871a09abd62ecd2a00298c6c83befa223ef98c52aef40cbe"
 
 [[package]]
+name = "platform-services"
+version = "0.3.0"
+dependencies = [
+ "aws-nitro-enclaves-nsm-api",
+ "cfg-if 1.0.0",
+ "getrandom 0.1.16",
+ "nix 0.22.3",
+ "nsm-lib",
+]
+
+[[package]]
 name = "policy-utils"
 version = "0.3.0"
 dependencies = [
@@ -2781,9 +2894,8 @@ dependencies = [
  "async-std",
  "base64 0.10.1",
  "curl",
- "diesel",
  "dotenv",
- "env_logger",
+ "env_logger 0.9.0",
  "err-derive",
  "hex",
  "http 0.2.4",
@@ -2807,7 +2919,7 @@ dependencies = [
 name = "psa-attestation"
 version = "0.3.0"
 dependencies = [
- "bindgen",
+ "bindgen 0.59.2",
  "cfg-if 1.0.0",
  "libc",
  "psa-crypto-sys",
@@ -2827,7 +2939,7 @@ dependencies = [
 name = "psa-crypto-sys"
 version = "0.9.2"
 dependencies = [
- "bindgen",
+ "bindgen 0.59.2",
  "cc",
  "cmake",
  "walkdir",
@@ -3183,6 +3295,15 @@ checksum = "88aa938cda42a0cf62a20cfe8d139ff1af20c2e681212b5b34adb5a58333f222"
 dependencies = [
  "lazy_static",
  "regex 1.5.5",
+]
+
+[[package]]
+name = "rs-libc"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "914c985b921cf571d950d17ca33221ed54fed3c2001a329ee6fd5b15dd433260"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -4013,6 +4134,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4253,7 +4383,7 @@ dependencies = [
  "actix-web",
  "base64 0.10.1",
  "curl",
- "env_logger",
+ "env_logger 0.9.0",
  "err-derive",
  "futures 0.3.21",
  "hex",
@@ -4284,14 +4414,14 @@ dependencies = [
  "bincode",
  "curl",
  "data-encoding",
- "env_logger",
+ "env_logger 0.9.0",
  "err-derive",
  "futures 0.3.21",
  "hex",
  "io-utils",
  "lazy_static",
  "log",
- "nix",
+ "nix 0.20.2",
  "policy-utils",
  "postcard",
  "psa-attestation",
@@ -4313,7 +4443,7 @@ dependencies = [
  "actix-rt",
  "curl",
  "either",
- "env_logger",
+ "env_logger 0.9.0",
  "hex",
  "lazy_static",
  "log",
@@ -4336,7 +4466,7 @@ dependencies = [
  "actix-web",
  "async-std",
  "either",
- "env_logger",
+ "env_logger 0.9.0",
  "err-derive",
  "futures 0.3.21",
  "lazy_static",
@@ -4357,6 +4487,8 @@ version = "0.3.0"
 dependencies = [
  "bincode",
  "err-derive",
+ "mbedtls",
+ "platform-services",
  "psa-crypto",
  "ring",
  "rustls",
@@ -4543,6 +4675,15 @@ dependencies = [
 
 [[package]]
 name = "which"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "which"
 version = "4.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a5a7e487e921cf220206864a94a89b6c6905bfc19f1057fa26a4cb360e5c1d2"
@@ -4649,6 +4790,16 @@ dependencies = [
  "oid-registry",
  "rusticata-macros 4.1.0",
  "thiserror",
+]
+
+[[package]]
+name = "yasna"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79af3189e6b0484c9fd54208f8eeb8818cadee00ec81438b67a64c8e6f2f3694"
+dependencies = [
+ "bit-vec",
+ "num-bigint 0.2.6",
 ]
 
 [[package]]
