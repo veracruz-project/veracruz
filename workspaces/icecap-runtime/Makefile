@@ -14,7 +14,7 @@ icecap_plat ?= qemu
 WORKSPACE_DIR = $(abspath ..)
 PROJECT = .
 HOST_CC ?= gcc
-LD = $(abspath $(shell cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
+LD = $(abspath $(shell RUSTC_BOOTSTRAP=1 cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
 CC = aarch64-linux-gnu-gcc
 
 deps := deps
@@ -201,11 +201,11 @@ sysroot_rustflags := \
 
 .PHONY: sysroot
 sysroot: userspace_c sel4
+	RUSTC_BOOTSTRAP=1 \
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
 	$(call cargo_target_config_prefix,$(rust_target))RUSTFLAGS="$(sysroot_rustflags)" \
 	$(call cargo_target_config_prefix,$(rust_target))LINKER="$(LD)" \
 	BINDGEN_EXTRA_CLANG_ARGS="$(icecap_c_include_flags)" \
-	RUSTC_BOOTSTRAP=1 \
 	__CARGO_DEFAULT_LIB_METADATA="icecap-sysroot" \
 	cargo build \
 		-Z unstable-options \
@@ -237,6 +237,7 @@ rust-project: $(now) sysroot-install userspace_c sel4
 			-v --charset ascii -f "{p} {f}" \
 			$(foreach x,$(icedl_components),-p $(x)) \
 			$(project_feature_flags) > $(build_dir)/tree.txt ; \
+	RUSTC_BOOTSTRAP=1 \
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
 	$(call cargo_target_config_prefix,$(rust_target))RUSTFLAGS="$(icecap_rustflags)" \
 	$(call cargo_target_config_prefix,$(rust_target))LINKER="$(LD)" \
@@ -261,6 +262,7 @@ $(object_sizes_yaml): sel4 | $(misc_build_dir)
 		aarch64-linux-gnu-gcc -E -P - -I$(sel4_include_dir) < $(capdl_src)/object_sizes/object_sizes.yaml > $@
 
 ${rust_dev_bins}/icecap-serialize-runtime-config:
+	RUSTC_BOOTSTRAP=1 \
 		cargo build --manifest-path icecap/src/rust/crates/framework/base/icecap-runtime/config/cli/icecap-serialize-runtime-config/Cargo.toml \
 			$(PROFILE_FLAG) --target-dir ${rust_build_dir}
 
