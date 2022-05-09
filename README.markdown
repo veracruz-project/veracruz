@@ -54,7 +54,7 @@ If you use Veracruz or otherwise wish to discuss the project, please cite the pr
 
 ```
 @techreport {
-  author = {Brossard, Mathias and Bryant, Guilhem and Gaabouri, Basma El and Fan, Xinxin and Ferreira, Alexandre and Grimley-Evans, Edmund and Haster, Christopher and Johnson, Evan and Miller, Derek and Mo, Fan and Mulligan, Dominic P. and Spinale, Nick and van Hensbergen, Eric and Vincent, Hugo J. M. and Xiong, Shale},
+  author = {Brossard, Mathias and Bryant, Guilhem and El Gaabouri, Basma and Fan, Xinxin and Ferreira, Alexandre and Grimley-Evans, Edmund and Haster, Christopher and Johnson, Evan and Miller, Derek and Mo, Fan and Mulligan, Dominic P. and Spinale, Nick and van Hensbergen, Eric and Vincent, Hugo J. M. and Xiong, Shale},
   title = {Private delegated computations using strong isolation},
   institution = {Systems Research Group, Arm Research},
   doi = {https://doi.org/10.48550/arXiv.2205.03322},
