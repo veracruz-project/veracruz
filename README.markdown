@@ -4,7 +4,7 @@
 
 <img src = "https://confidentialcomputing.io/wp-content/uploads/sites/85/2019/08/cc_consortium-color.svg" width=192>
 
-**NEWS**: the latest Veracruz release is Veracruz 22.04 (see the `veracruz-2204` Git tag).  See `documents/release-notes/VERACRUZ-2204.markdown` for notable changes in this release.
+## About
 
 Veracruz is now an adopted project of the [Confidential Compute Consortium (CCC)](https://confidentialcomputing.io).
 
@@ -28,6 +28,12 @@ To jump straight into the codebase, please read the growing number of guides we 
 - [CLI_QUICKSTART.markdown](CLI_QUICKSTART.markdown) - Quickly run Veracruz with a prepared demo program
 - [CLI_INSTRUCTIONS.markdown](CLI_INSTRUCTIONS.markdown) - A more in-depth guide to running Veracruz, including steps on how to generate certificates and the policy file.
 
+## News
+
+- **May 2022**: we have released Veracruz 22.05 (see the `veracruz-2205` Git tag).  See `documents/release-notes/VERACRUZ-2205.markdown` for notable changes in this release.
+- **May 2022**: we have released a technical report on the Veracruz and IceCap projects, hosted on [Arxiv](https://arxiv.org/abs/2205.03322).
+- **April 2022**: we have released Veracruz 22.04 (see the `veracruz-2204` Git tag).  See `documents/release-notes/VERACRUZ-2204.markdown` for notable changes in this release.
+
 ## Get involved!
 
 The Veracruz team welcome new collaborators and contributions!
@@ -42,11 +48,24 @@ We also have a weekly open Zoom meeting that you are welcome to join which is he
 You can join with [this](https://armltd.zoom.us/j/95458320669?pwd=Uks2OFJ5TjROZURCdjlGKzJOTDI3UT09&from=addon) link.
 Come along and meet the team, find out what everybody is working on, and discuss ideas for improving Veracruz!
 
+## Citing Veracruz
+
+If you use Veracruz or otherwise wish to discuss the project, please cite the project as follows:
+
+```
+@techreport {
+  author = {Brossard, Mathias and Bryant, Guilhem and El Gaabouri, Basma and Fan, Xinxin and Ferreira, Alexandre and Grimley-Evans, Edmund and Haster, Christopher and Johnson, Evan and Miller, Derek and Mo, Fan and Mulligan, Dominic P. and Spinale, Nick and van Hensbergen, Eric and Vincent, Hugo J. M. and Xiong, Shale},
+  title = {Private delegated computations using strong isolation},
+  institution = {Systems Research Group, Arm Research},
+  doi = {https://doi.org/10.48550/arXiv.2205.03322},
+  type = {Technical report},
+  pages = {20},
+  year = {2022}
+}
+```
 
 ## License
 
 This project's codebase is licensed under the [MIT license](LICENSE_MIT.markdown).
 
-The image [`Veracruz Puerto - Vista desde el Hotel Emporio`](sdk/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](https://creativecommons.org/licenses/by-sa/2.0/).
-[Link to the material](https://www.flickr.com/photos/tomateverde/6169756721/in/photostream)
-
+We use the image [Veracruz Puerto - Vista desde el Hotel Emporio](sdk/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon as a test dataset for some of our examples.  This image is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](LICENSE_CC-BY-SA-2.0.markdown).
