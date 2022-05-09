@@ -224,7 +224,7 @@ async fn runtime_manager(
     }
 
     // set counter to session
-    session.set("counter", counter)?;
+    session.insert("counter", counter)?;
 
     Ok(HttpResponse::build(StatusCode::NOT_FOUND)
         .content_type("text/html; charset=utf-8")
