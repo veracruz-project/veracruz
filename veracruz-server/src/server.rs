@@ -132,8 +132,8 @@ pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
         App::new()
             // pass in the shutdown channel and enclave handler VERACRUZ_SERVER to the server
             .wrap(middleware::Logger::default())
-            .app_data(shutdown_channel_tx.clone())
-            .app_data(VERACRUZ_SERVER.clone())
+            .app_data(web::Data::new(shutdown_channel_tx.clone()))
+            .app_data(web::Data::new(VERACRUZ_SERVER.clone()))
             .service(veracruz_server_request)
             .service(runtime_manager_request)
     })
