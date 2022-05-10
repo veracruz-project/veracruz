@@ -43,7 +43,10 @@ pub struct Session {
 impl Session {
     /// Creates a new session from a server configuration and a list of
     /// principals.
-    pub fn new(config: rustls::ServerConfig, principals: &Vec<Principal>) -> Result<Self, SessionManagerError> {
+    pub fn new(
+        config: rustls::ServerConfig,
+        principals: &Vec<Principal>,
+    ) -> Result<Self, SessionManagerError> {
         let tls_connection = ServerConnection::new(std::sync::Arc::new(config))?;
 
         Ok(Session {
@@ -88,11 +91,13 @@ impl Session {
     /// data.
     pub fn read_plaintext_data(&mut self) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
         let mut received_buffer: Vec<u8> = Vec::new();
-        match self.tls_connection.reader().read_to_end(&mut received_buffer) {
+        match self
+            .tls_connection
+            .reader()
+            .read_to_end(&mut received_buffer)
+        {
             Ok(_num) => (),
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                ()
-            },
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
             Err(err) => return Err(SessionManagerError::IOError(err)),
         }
         self.tls_connection.process_new_packets()?;

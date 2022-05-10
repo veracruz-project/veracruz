@@ -27,7 +27,7 @@ pub(crate) struct AesCounterModeService {
     key: [u8; 16],
     /// Initialization vector
     iv: [u8; 16],
-    /// Path to input file that contains either the plaintext or cyphertext, 
+    /// Path to input file that contains either the plaintext or cyphertext,
     /// depending on the flag `is_encryption`.
     input_path: PathBuf,
     /// Path to the result file.
@@ -120,7 +120,7 @@ impl AesCounterModeService {
         )
         .map_err(|_| ErrNo::Canceled)?;
 
-        // Write result. The result is resized to the actual size 
+        // Write result. The result is resized to the actual size
         // returned by AES call, to avoid leaking sensetive information.
         output.resize(length, 0);
         fs.write_file_by_absolute_path(&output_path, output, true)

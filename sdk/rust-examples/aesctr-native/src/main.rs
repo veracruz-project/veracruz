@@ -40,7 +40,7 @@ pub struct AesCtrInput {
     is_encryption: bool,
 }
 
-/// Example to invoke the Counter mode AES service. Encrypt `data.dat` and then 
+/// Example to invoke the Counter mode AES service. Encrypt `data.dat` and then
 /// decrypt it using the `key.dat` and iv.dat`.
 fn main() -> anyhow::Result<()> {
     // Assume the key and iv are 128 bits.

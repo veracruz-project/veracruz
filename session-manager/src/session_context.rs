@@ -12,11 +12,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{
-    io::Cursor,
-    string::String,
-    vec::Vec,
-};
+use std::{io::Cursor, string::String, vec::Vec};
 
 use crate::{
     error::SessionManagerError,
@@ -25,9 +21,7 @@ use crate::{
 use policy_utils::policy::Policy;
 
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
-use rustls::{
-    Certificate, PrivateKey, RootCertStore, ServerConfig,
-};
+use rustls::{Certificate, PrivateKey, RootCertStore, ServerConfig};
 use rustls_pemfile;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,9 +56,10 @@ where
 /// A session context contains various bits of meta-data, such as certificates
 /// and server configuration options, for managing a server session.
 pub struct SessionContext {
-    /// An intermediate ConfigBuilder that will be present after the policy is 
+    /// An intermediate ConfigBuilder that will be present after the policy is
     /// provided but before the certificate chain is provided
-    server_config_builder: Option<rustls::ConfigBuilder<rustls::ServerConfig, rustls::server::WantsServerCert>>,
+    server_config_builder:
+        Option<rustls::ConfigBuilder<rustls::ServerConfig, rustls::server::WantsServerCert>>,
     /// The configuration options for the server.
     server_config: Option<ServerConfig>,
     /// The global policy associated with the Veracruz computation, detailing
@@ -126,13 +121,17 @@ impl SessionContext {
         }
         // create the configuration
         let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(&policy.ciphersuite())
-              .ok_or_else(|| SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().clone()))?;
+            .ok_or_else(|| {
+                SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().clone())
+            })?;
 
         let server_config_builder = rustls::ServerConfig::builder()
             .with_cipher_suites(&[policy_ciphersuite])
             .with_safe_default_kx_groups()
             .with_protocol_versions(&[&rustls::version::TLS12])?
-            .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(root_cert_store));
+            .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
+                root_cert_store,
+            ));
 
         self.server_config_builder = Some(server_config_builder);
         self.principals = Some(principals);
@@ -150,11 +149,11 @@ impl SessionContext {
         let config_builder_option = self.server_config_builder.take(); // After this, server_config_builder will be None
         match config_builder_option {
             Some(config_builder) => {
-                let config = config_builder.with_single_cert(cert_chain, self.server_private_key.clone())?;
+                let config =
+                    config_builder.with_single_cert(cert_chain, self.server_private_key.clone())?;
                 self.server_config = Some(config);
             }
             None => return Err(SessionManagerError::InvalidStateError),
-            
         }
         return Ok(());
     }

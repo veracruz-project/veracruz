@@ -56,7 +56,7 @@ mod tests {
     const STRING_1_DATA: &'static str = "hello-world-1.dat";
     const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
-    use actix_rt::{ System, time::sleep };
+    use actix_rt::{time::sleep, System};
     use either::{Left, Right};
     use env_logger;
     use err_derive::Error;
