@@ -27,7 +27,7 @@ hex = "0.4.2"
 log = "0.4.13"
 policy-utils = { path = "../policy-utils", features = ["std"] }
 rand = "0.8.3"
-reqwest = { version = "0.9", default-features = false }
+reqwest = { version = "0.11", default-features = false, features = ["blocking"] }
 ring = "0.16.20"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 rustls = "0.20.4"
