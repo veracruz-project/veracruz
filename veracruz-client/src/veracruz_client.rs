@@ -105,7 +105,7 @@ impl VeracruzClient {
                 expected: parsed_cert.subject_pki.subject_public_key.data.to_vec(),
                 received: public_key.to_vec(),
             })
-        } else if let None = parsed_cert.validity.time_to_expiration() {
+        } else if parsed_cert.validity.time_to_expiration().is_none() {
             Err(VeracruzClientError::CertificateExpireError(
                 client_cert_filename.as_ref().to_string_lossy().to_string(),
             ))
@@ -122,7 +122,7 @@ impl VeracruzClient {
         client_key_filename: P2,
         policy_json: &str,
     ) -> Result<VeracruzClient, VeracruzClientError> {
-        let policy = Policy::from_json(&policy_json)?;
+        let policy = Policy::from_json(policy_json)?;
         let policy_hash = policy
             .policy_hash()
             .expect("policy did not hash json?")
@@ -161,18 +161,18 @@ impl VeracruzClient {
         let proxy_service_cert = {
             let certs_pem = policy.proxy_service_cert();
             let certs = rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
-                VeracruzClientError::X509ParserError(format!(
-                    "rustls_pemfile::certs found not certificates"
-                ))
+                VeracruzClientError::X509ParserError(
+                    "rustls_pemfile::certs found not certificates".to_string()
+                )
             })?;
             certs[0].clone()
         };
         let mut root_store = rustls::RootCertStore::empty();
         root_store
             .add(&rustls::Certificate(proxy_service_cert))
-            .map_err(|err| VeracruzClientError::WebpkiError(err))?;
+            .map_err(VeracruzClientError::WebpkiError)?;
 
-        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(&policy_ciphersuite_string)
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy_ciphersuite_string)
             .ok_or_else(|| {
                 VeracruzClientError::TLSInvalidCiphersuiteError(
                     policy_ciphersuite_string.to_string(),
@@ -187,7 +187,7 @@ impl VeracruzClient {
             .with_single_cert([client_cert].to_vec(), client_priv_key)?;
 
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
-            .map_err(|err| VeracruzClientError::InvalidDnsNameError(err))?;
+            .map_err(VeracruzClientError::InvalidDnsNameError)?;
         let connection =
             ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
@@ -204,8 +204,8 @@ impl VeracruzClient {
         Ok(VeracruzClient {
             tls_connection: connection,
             remote_session_id: None,
-            policy: policy,
-            policy_hash: policy_hash,
+            policy,
+            policy_hash,
             package_id: 0,
             client_cert: client_cert_string,
         })
@@ -225,15 +225,15 @@ impl VeracruzClient {
                 .to_str()
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
-        let serialized_program = transport_protocol::serialize_program(&program, &path)?;
+        let serialized_program = transport_protocol::serialize_program(program, &path)?;
         let response = self.send(&serialized_program)?;
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
         match status {
-            transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
+            transport_protocol::ResponseStatus::SUCCESS => Ok(()),
             _ => {
-                return Err(VeracruzClientError::ResponseError("send_program", status));
+                Err(VeracruzClientError::ResponseError("send_program", status))
             }
         }
     }
@@ -252,16 +252,16 @@ impl VeracruzClient {
                 .to_str()
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
-        let serialized_data = transport_protocol::serialize_program_data(&data, &path)?;
+        let serialized_data = transport_protocol::serialize_program_data(data, &path)?;
         let response = self.send(&serialized_data)?;
 
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
         match status {
-            transport_protocol::ResponseStatus::SUCCESS => return Ok(()),
+            transport_protocol::ResponseStatus::SUCCESS => Ok(()),
             _ => {
-                return Err(VeracruzClientError::ResponseError("send_data", status));
+                Err(VeracruzClientError::ResponseError("send_data", status))
             }
         }
     }
@@ -296,7 +296,7 @@ impl VeracruzClient {
             return Err(VeracruzClientError::VeracruzServerResponseNoResultError);
         }
         let response_data = &parsed_response.get_result().data;
-        return Ok(response_data.clone());
+        Ok(response_data.clone())
     }
 
     /// Check the policy and runtime hashes, and read the result at the remote `path`.
@@ -322,7 +322,7 @@ impl VeracruzClient {
             return Err(VeracruzClientError::VeracruzServerResponseNoResultError);
         }
         let response_data = &parsed_response.get_result().data;
-        return Ok(response_data.clone());
+        Ok(response_data.clone())
     }
 
     /// Indicate the veracruz to shutdown.
@@ -348,14 +348,14 @@ impl VeracruzClient {
                         received: received_hash.as_bytes().to_vec(),
                     });
                 } else {
-                    return Ok(());
+                    Ok(())
                 }
             }
             _ => {
-                return Err(VeracruzClientError::ResponseError(
+                Err(VeracruzClientError::ResponseError(
                     "check_policy_hash",
                     parsed_response.status,
-                ));
+                ))
             }
         }
     }
@@ -370,18 +370,18 @@ impl VeracruzClient {
             };
             let expected_bytes = hex::decode(expected)?;
 
-            if &received[..] == expected_bytes.as_slice() {
+            if received == expected_bytes.as_slice() {
                 return Ok(());
             }
         }
-        return Err(VeracruzClientError::NoMatchingRuntimeIsolateHash);
+        Err(VeracruzClientError::NoMatchingRuntimeIsolateHash)
     }
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
         match self.tls_connection.peer_certificates() {
             None => {
-                return Err(VeracruzClientError::NoPeerCertificatesError);
+                Err(VeracruzClientError::NoPeerCertificatesError)
             }
             Some(certs) => {
                 let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
@@ -402,7 +402,7 @@ impl VeracruzClient {
                     None => {
                         error!("Our extension is not present. This should be fatal");
 
-                        return Err(VeracruzClientError::RuntimeHashExtensionMissingError);
+                        Err(VeracruzClientError::RuntimeHashExtensionMissingError)
                     }
                     Some(data) => {
                         info!("Certificate extension present.");
@@ -418,12 +418,12 @@ impl VeracruzClient {
                             Ok(_) => {
                                 info!("Runtime hash matches.");
 
-                                return Ok(());
+                                Ok(())
                             }
                             Err(err) => {
                                 error!("Runtime hash mismatch: {}.", err);
 
-                                return Err(err);
+                               Err(err)
                             }
                         }
                     }
@@ -434,11 +434,11 @@ impl VeracruzClient {
 
     /// send the data to the runtime_manager path on the Veracruz server.
     // TODO: This function has return points scattered all over, making it very hard to follow
-    fn send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
+    fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
-        match self.remote_session_id {
-            Some(session_id) => enclave_session_id = session_id,
-            None => (),
+
+        if let Some(session_id) = self.remote_session_id {
+            enclave_session_id = session_id
         }
 
         let mut outgoing_data_vec = Vec::new();
@@ -448,9 +448,8 @@ impl VeracruzClient {
             start_index += bytes_read;
             let outgoing_data = Vec::new();
             let outgoing_data_option = self.process(outgoing_data)?; // intentionally sending no data to process
-            match outgoing_data_option {
-                Some(outgoing_data) => outgoing_data_vec.push(outgoing_data),
-                None => (),
+            if let Some(outgoing_data) = outgoing_data_option {
+                outgoing_data_vec.push(outgoing_data)
             }
         }
 
@@ -459,27 +458,21 @@ impl VeracruzClient {
         loop {
             for outgoing_data in &outgoing_data_vec {
                 let incoming_data_option =
-                    self.post_runtime_manager(enclave_session_id, &outgoing_data)?;
-                match incoming_data_option {
-                    Some((received_session_id, received_data_vec)) => {
-                        enclave_session_id = received_session_id;
-                        for received_data in received_data_vec {
-                            incoming_data_vec.push(received_data);
-                        }
+                    self.post_runtime_manager(enclave_session_id, outgoing_data)?;
+                if let Some((received_session_id, received_data_vec)) = incoming_data_option {
+                    enclave_session_id = received_session_id;
+                    for received_data in received_data_vec {
+                        incoming_data_vec.push(received_data);
                     }
-                    None => (),
                 }
             }
 
             outgoing_data_vec.clear();
-            if incoming_data_vec.len() > 0 {
+            if !incoming_data_vec.is_empty() {
                 for incoming_data in &incoming_data_vec {
                     let outgoing_data_option = self.process(incoming_data.to_vec())?;
-                    match outgoing_data_option {
-                        Some(outgoing_data) => {
-                            outgoing_data_vec.push(outgoing_data);
-                        }
-                        None => (),
+                    if let Some(outgoing_data) = outgoing_data_option {
+                        outgoing_data_vec.push(outgoing_data)
                     }
                 }
                 incoming_data_vec.clear();
@@ -487,20 +480,16 @@ impl VeracruzClient {
                 // try process with no data to see if it wants to send
                 let empty_vec = Vec::new();
                 let outgoing_data_option = self.process(empty_vec)?;
-                match outgoing_data_option {
-                    Some(outgoing_data) => outgoing_data_vec.push(outgoing_data),
-                    None => (),
+                if let Some(outgoing_data) = outgoing_data_option {
+                    outgoing_data_vec.push(outgoing_data)
                 }
             }
 
             let plaintext_data_option = self.get_data()?;
-            match plaintext_data_option {
-                Some(plaintext_data) => {
-                    self.remote_session_id = Some(enclave_session_id);
 
-                    return Ok(plaintext_data);
-                }
-                None => (),
+            if let Some(plaintext_data) = plaintext_data_option {
+                self.remote_session_id = Some(enclave_session_id);
+                return Ok(plaintext_data);
             }
         }
     }
@@ -508,7 +497,7 @@ impl VeracruzClient {
     fn process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
         let mut ret_option = None;
         let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-        if input.len() > 0
+        if !input.is_empty()
             && (!self.tls_connection.is_handshaking() || self.tls_connection.wants_read())
         {
             let mut slice = &input[..];
@@ -535,17 +524,17 @@ impl VeracruzClient {
             Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
             Err(err) => return Err(VeracruzClientError::IOError(err)),
         };
-        if received_buffer.len() > 0 {
-            return Ok(Some(received_buffer));
+        if !received_buffer.is_empty() {
+            Ok(Some(received_buffer))
         } else {
-            return Ok(None);
+            Ok(None)
         }
     }
 
     fn post_runtime_manager(
         &self,
         enclave_session_id: u32,
-        data: &Vec<u8>,
+        data: &[u8],
     ) -> Result<Option<(u32, Vec<Vec<u8>>)>, VeracruzClientError> {
         let string_data = base64::encode(data);
         let combined_string = format!("{:} {:}", enclave_session_id, string_data);
@@ -565,14 +554,14 @@ impl VeracruzClient {
         let body = ret.text()?;
 
         let body_items = body.split_whitespace().collect::<Vec<&str>>();
-        if body_items.len() > 0 {
+        if !body_items.is_empty() {
             let received_session_id = body_items[0].parse::<u32>()?;
             let mut return_vec = Vec::new();
-            for x in 1..body_items.len() {
-                let this_body_data = base64::decode(&body_items[x])?;
+            for item in body_items.iter().skip(1) {
+                let this_body_data = base64::decode(item)?;
                 return_vec.push(this_body_data);
             }
-            if return_vec.len() > 0 {
+            if !return_vec.is_empty() {
                 Ok(Some((received_session_id, return_vec)))
             } else {
                 Ok(None)
@@ -621,7 +610,7 @@ impl VeracruzClient {
 }
 
 #[allow(dead_code)]
-fn print_hex(data: &Vec<u8>) -> String {
+fn print_hex(data: &[u8]) -> String {
     let mut ret_val = String::new();
     for this_byte in data {
         ret_val.push_str(format!("{:02x}", this_byte).as_str());
@@ -630,7 +619,7 @@ fn print_hex(data: &Vec<u8>) -> String {
 }
 
 #[allow(dead_code)]
-fn decode_tls_message(data: &Vec<u8>) {
+fn decode_tls_message(data: &[u8]) {
     match data[0] {
         0x16 => {
             print!("Handshake: ");
