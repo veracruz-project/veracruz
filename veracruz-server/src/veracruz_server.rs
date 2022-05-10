@@ -22,7 +22,6 @@ use io_utils::{error::SocketError, http::HttpError};
 use rustls::Error as TLSError;
 use std::error::Error;
 
-
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
 #[derive(Debug, Error)]

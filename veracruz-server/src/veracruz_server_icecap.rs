@@ -63,12 +63,10 @@ const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &[&str] = &[
     "-device",
     "virtconsole,chardev=charconsole0,id=console0",
 ];
-const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &[&str] =
-    &["-kernel", "{image_path}"];
+const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &[&str] = &["-kernel", "{image_path}"];
 
 // Include image at compile time
-const VERACRUZ_ICECAP_QEMU_IMAGE: &[u8] =
-    include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
+const VERACRUZ_ICECAP_QEMU_IMAGE: &[u8] = include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
 
 // TODO is this needed?
 const FIRMWARE_VERSION: &str = "0.3.0";
@@ -126,7 +124,8 @@ impl IceCapRealm {
                 }
                 Err(_) => Err(IceCapError::InvalidEnvironmentVariableValue {
                     variable: var.to_owned(),
-                }.into()),
+                }
+                .into()),
             }
         }
 

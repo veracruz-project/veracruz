@@ -240,10 +240,12 @@ pub mod veracruz_server_nitro {
 
     impl Drop for VeracruzServerNitro {
         fn drop(&mut self) {
-            if let Err(err) = self.shutdown_isolate() { println!(
-                "VeracruzServerNitro::drop failed in call to self.shutdown_isolate:{:?}",
-                err
-            )}
+            if let Err(err) = self.shutdown_isolate() {
+                println!(
+                    "VeracruzServerNitro::drop failed in call to self.shutdown_isolate:{:?}",
+                    err
+                )
+            }
         }
     }
 
@@ -273,7 +275,7 @@ pub mod veracruz_server_nitro {
     ) -> Result<Vec<Vec<u8>>, VeracruzServerError> {
         let serialized_nitro_attestation_doc_request =
             transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)
-                .map_err( VeracruzServerError::TransportProtocol)?;
+                .map_err(VeracruzServerError::TransportProtocol)?;
         let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
         let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
         println!(
@@ -294,8 +296,7 @@ pub mod veracruz_server_nitro {
             received_body
         );
 
-        let body_vec =
-            base64::decode(&received_body).map_err(VeracruzServerError::Base64Decode)?;
+        let body_vec = base64::decode(&received_body).map_err(VeracruzServerError::Base64Decode)?;
         let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)
             .map_err(VeracruzServerError::TransportProtocol)?;
 
@@ -305,10 +306,7 @@ pub mod veracruz_server_nitro {
         } else {
             return Err(VeracruzServerError::InvalidProtoBufMessage);
         };
-        let cert_chain: Vec<Vec<u8>> = vec![
-            re_cert.to_vec(),
-            ca_cert.to_vec()
-        ];
+        let cert_chain: Vec<Vec<u8>> = vec![re_cert.to_vec(), ca_cert.to_vec()];
         Ok(cert_chain)
     }
 }

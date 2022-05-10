@@ -45,8 +45,7 @@ pub mod veracruz_server_linux {
     ////////////////////////////////////////////////////////////////////////////
 
     /// The Runtime Manager binary (the enclave), included at compile time
-    const RUNTIME_ENCLAVE_BINARY_IMAGE: &[u8] =
-        include_bytes!(env!("RUNTIME_ENCLAVE_BINARY_PATH"));
+    const RUNTIME_ENCLAVE_BINARY_IMAGE: &[u8] = include_bytes!(env!("RUNTIME_ENCLAVE_BINARY_PATH"));
     /// Spawn delay to apply (in seconds) between spawning the Runtime Manager enclave and trying
     /// to contact it.
     const RUNTIME_ENCLAVE_SPAWN_DELAY: u64 = 2;

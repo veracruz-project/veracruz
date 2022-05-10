@@ -162,7 +162,7 @@ impl VeracruzClient {
             let certs_pem = policy.proxy_service_cert();
             let certs = rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
                 VeracruzClientError::X509ParserError(
-                    "rustls_pemfile::certs found not certificates".to_string()
+                    "rustls_pemfile::certs found not certificates".to_string(),
                 )
             })?;
             certs[0].clone()
@@ -232,9 +232,7 @@ impl VeracruzClient {
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(()),
-            _ => {
-                Err(VeracruzClientError::ResponseError("send_program", status))
-            }
+            _ => Err(VeracruzClientError::ResponseError("send_program", status)),
         }
     }
 
@@ -260,9 +258,7 @@ impl VeracruzClient {
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(()),
-            _ => {
-                Err(VeracruzClientError::ResponseError("send_data", status))
-            }
+            _ => Err(VeracruzClientError::ResponseError("send_data", status)),
         }
     }
 
@@ -351,12 +347,10 @@ impl VeracruzClient {
                     Ok(())
                 }
             }
-            _ => {
-                Err(VeracruzClientError::ResponseError(
-                    "check_policy_hash",
-                    parsed_response.status,
-                ))
-            }
+            _ => Err(VeracruzClientError::ResponseError(
+                "check_policy_hash",
+                parsed_response.status,
+            )),
         }
     }
 
@@ -380,9 +374,7 @@ impl VeracruzClient {
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
         match self.tls_connection.peer_certificates() {
-            None => {
-                Err(VeracruzClientError::NoPeerCertificatesError)
-            }
+            None => Err(VeracruzClientError::NoPeerCertificatesError),
             Some(certs) => {
                 let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
                 let ues = ee_cert.unrecognized_extensions();
@@ -423,7 +415,7 @@ impl VeracruzClient {
                             Err(err) => {
                                 error!("Runtime hash mismatch: {}.", err);
 
-                               Err(err)
+                                Err(err)
                             }
                         }
                     }
