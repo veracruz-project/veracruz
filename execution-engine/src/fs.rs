@@ -1696,10 +1696,7 @@ impl FileSystem {
             ctime: Timestamp::from_nanos(0),
         };
         let node = InodeEntry {
-            //current: inode,
-            //parent: inode,
             file_stat,
-            //path: PathBuf::from(""),
             data: InodeImpl::File(Vec::new()),
         };
         self.lock_inode_table()?.insert(inode, node)?;
