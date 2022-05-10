@@ -37,7 +37,7 @@ fn main() {
     let c_src_dir = format!("{:}/c_src/", project_dir);
     let make_status = Command::new("make")
         .env("CC", &cc)
-        .current_dir(c_src_dir.clone())
+        .current_dir(c_src_dir)
         .args(&["all", outdir_arg.as_str()])
         .status()
         .unwrap();
