@@ -212,12 +212,12 @@ impl VeracruzClient {
     }
 
     /// Check the policy and runtime hashes, and then send the `program` to the remote `path`.
-    pub fn send_program<P: AsRef<Path>>(
+    pub async fn send_program<P: AsRef<Path>>(
         &mut self,
         path: P,
         program: &[u8],
     ) -> Result<(), VeracruzClientError> {
-        self.check_policy_hash()?;
+        self.check_policy_hash().await?;
         self.check_runtime_hash()?;
 
         let path = enforce_leading_backslash(
@@ -226,7 +226,7 @@ impl VeracruzClient {
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
         let serialized_program = transport_protocol::serialize_program(program, &path)?;
-        let response = self.send(&serialized_program)?;
+        let response = self.send(&serialized_program).await?;
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         let status = parsed_response.get_status();
@@ -237,12 +237,12 @@ impl VeracruzClient {
     }
 
     /// Check the policy and runtime hashes, and then send the `data` to the remote `path`.
-    pub fn send_data<P: AsRef<Path>>(
+    pub async fn send_data<P: AsRef<Path>>(
         &mut self,
         path: P,
         data: &[u8],
     ) -> Result<(), VeracruzClientError> {
-        self.check_policy_hash()?;
+        self.check_policy_hash().await?;
         self.check_runtime_hash()?;
 
         let path = enforce_leading_backslash(
@@ -251,7 +251,7 @@ impl VeracruzClient {
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
         let serialized_data = transport_protocol::serialize_program_data(data, &path)?;
-        let response = self.send(&serialized_data)?;
+        let response = self.send(&serialized_data).await?;
 
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
@@ -264,11 +264,11 @@ impl VeracruzClient {
 
     /// Check the policy and runtime hashes, and request the veracruz to execute the program at the
     /// remote `path`.
-    pub fn request_compute<P: AsRef<Path>>(
+    pub async fn request_compute<P: AsRef<Path>>(
         &mut self,
         path: P,
     ) -> Result<Vec<u8>, VeracruzClientError> {
-        self.check_policy_hash()?;
+        self.check_policy_hash().await?;
         self.check_runtime_hash()?;
 
         let path = enforce_leading_backslash(
@@ -277,7 +277,7 @@ impl VeracruzClient {
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
         let serialized_read_result = transport_protocol::serialize_request_result(&path)?;
-        let response = self.send(&serialized_read_result)?;
+        let response = self.send(&serialized_read_result).await?;
 
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
@@ -296,8 +296,8 @@ impl VeracruzClient {
     }
 
     /// Check the policy and runtime hashes, and read the result at the remote `path`.
-    pub fn get_results<P: AsRef<Path>>(&mut self, path: P) -> Result<Vec<u8>, VeracruzClientError> {
-        self.check_policy_hash()?;
+    pub async fn get_results<P: AsRef<Path>>(&mut self, path: P) -> Result<Vec<u8>, VeracruzClientError> {
+        self.check_policy_hash().await?;
         self.check_runtime_hash()?;
 
         let path = enforce_leading_backslash(
@@ -306,7 +306,7 @@ impl VeracruzClient {
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
         let serialized_read_result = transport_protocol::serialize_read_file(&path)?;
-        let response = self.send(&serialized_read_result)?;
+        let response = self.send(&serialized_read_result).await?;
 
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
@@ -322,16 +322,16 @@ impl VeracruzClient {
     }
 
     /// Indicate the veracruz to shutdown.
-    pub fn request_shutdown(&mut self) -> Result<(), VeracruzClientError> {
+    pub async fn request_shutdown(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_request = transport_protocol::serialize_request_shutdown()?;
-        let _response = self.send(&serialized_request)?;
+        let _response = self.send(&serialized_request).await?;
         Ok(())
     }
 
     /// Request the hash of the remote policy and check if it matches.
-    fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
+    async fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
-        let response = self.send(&serialized_rph)?;
+        let response = self.send(&serialized_rph).await?;
         let parsed_response =
             transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
         match parsed_response.status {
@@ -426,7 +426,7 @@ impl VeracruzClient {
 
     /// send the data to the runtime_manager path on the Veracruz server.
     // TODO: This function has return points scattered all over, making it very hard to follow
-    fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
+    async fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
 
         if let Some(session_id) = self.remote_session_id {
@@ -450,7 +450,7 @@ impl VeracruzClient {
         loop {
             for outgoing_data in &outgoing_data_vec {
                 let incoming_data_option =
-                    self.post_runtime_manager(enclave_session_id, outgoing_data)?;
+                    self.post_runtime_manager(enclave_session_id, outgoing_data).await?;
                 if let Some((received_session_id, received_data_vec)) = incoming_data_option {
                     enclave_session_id = received_session_id;
                     for received_data in received_data_vec {
@@ -523,7 +523,7 @@ impl VeracruzClient {
         }
     }
 
-    fn post_runtime_manager(
+    async fn post_runtime_manager(
         &self,
         enclave_session_id: u32,
         data: &[u8],
@@ -535,15 +535,16 @@ impl VeracruzClient {
             "http://{:}/runtime_manager",
             self.policy.veracruz_server_url()
         );
-        let client_build = reqwest::blocking::ClientBuilder::new().build()?;
+        let client_build = reqwest::ClientBuilder::new().build()?;
         let ret = client_build
             .post(dest_url.as_str())
             .body(combined_string)
-            .send()?;
+            .send()
+            .await?;
         if ret.status() != reqwest::StatusCode::OK {
             return Err(VeracruzClientError::InvalidReqwestError(ret.status()));
         }
-        let body = ret.text()?;
+        let body = ret.text().await?;
 
         let body_items = body.split_whitespace().collect::<Vec<&str>>();
         if !body_items.is_empty() {

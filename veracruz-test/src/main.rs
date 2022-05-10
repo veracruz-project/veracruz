@@ -464,7 +464,7 @@ mod tests {
                 info!("### program provider read binary.");
                 let program_data = read_binary_file(prog_path.as_path())?;
                 info!("### program provider send binary.");
-                client.send_program("/program/linear-regression.wasm", &program_data)?;
+                client.send_program("/program/linear-regression.wasm", &program_data).await?;
                 Ok::<(), VeracruzTestError>(())
             };
             let data_provider_handle = async {
@@ -480,12 +480,12 @@ mod tests {
                 info!("### data provider read input.");
                 let data = read_binary_file(&data_filename.as_path())?;
                 info!("### data provider send input.");
-                client.send_data("/input/linear-regression.dat", &data)?;
+                client.send_data("/input/linear-regression.dat", &data).await?;
                 info!("### data provider read result.");
-                client.request_compute("/program/linear-regression.wasm")?;
-                client.get_results("/output/linear-regression.dat")?;
+                client.request_compute("/program/linear-regression.wasm").await?;
+                client.get_results("/output/linear-regression.dat").await?;
                 info!("### data provider request shutdown.");
-                client.request_shutdown()?;
+                client.request_shutdown().await?;
                 Ok::<(), VeracruzTestError>(())
             };
 
@@ -554,7 +554,7 @@ mod tests {
                     .get_mut(*program_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*program_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                program_provider_veracruz_client.send_data(remote_filename, &data)?;
+                program_provider_veracruz_client.send_data(remote_filename, &data).await?;
             }
             info!("### Step 4. Provision data.");
             // provosion data
@@ -568,7 +568,7 @@ mod tests {
                     .get_mut(*data_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*data_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                data_provider_veracruz_client.send_data(remote_filename, &data)?;
+                data_provider_veracruz_client.send_data(remote_filename, &data).await?;
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
@@ -580,7 +580,7 @@ mod tests {
                 let program_provider_veracruz_client = clients
                     .get_mut(*program_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*program_provider_index))?;
-                program_provider_veracruz_client.request_compute(remote_filename)?;
+                program_provider_veracruz_client.request_compute(remote_filename).await?;
             }
             for (result_retriever_index, remote_filename) in result_retrievers.iter() {
                 info!(
@@ -590,14 +590,14 @@ mod tests {
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
-                let result = result_retriever_veracruz_client.get_results(remote_filename)?;
+                let result = result_retriever_veracruz_client.get_results(remote_filename).await?;
                 info!("            Result of len: {:?}", result.len());
             }
 
             clients
                 .get_mut(0)
                 .ok_or(VeracruzTestError::ClientIndexError(0))?
-                .request_shutdown()?;
+                .request_shutdown().await?;
             info!("            Client 0 successfully issued shutdown command");
             Ok::<(), VeracruzTestError>(())
         };

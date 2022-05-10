@@ -13,7 +13,7 @@ required-features = ["cli"]
 [features]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "env_logger"]
+cli = ["structopt", "env_logger", "tokio/rt", "tokio/macros"]
 icecap = []
 linux = []
 nitro = []
@@ -34,6 +34,7 @@ rustls = "0.20.4"
 rustls-pemfile = "0.3.0"
 serde_json = "1.0"
 structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
+tokio = { version = "1.0", default-features = false, optional = true}
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
 webpki = "0.22"
