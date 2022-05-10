@@ -54,7 +54,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
 
     let attestation_context = PsaAttestationContext {
         firmware_version: firmware_version.to_string(),
-        challenge: challenge.clone(),
+        challenge,
     };
     {
         let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
@@ -76,7 +76,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         ));
     }
     let (token, csr, device_id) = transport_protocol::parse_native_psa_attestation_token(
-        &parsed.get_native_psa_attestation_token(),
+        parsed.get_native_psa_attestation_token(),
     );
 
     let attestation_context = {
@@ -187,5 +187,5 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         ac_hash.remove(&device_id);
     }
 
-    return Ok(response_b64);
+    Ok(response_b64)
 }

@@ -23,8 +23,6 @@ use std::{
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
-use openssl;
-
 lazy_static! {
     static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
     static ref CA_CERT_DER: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
@@ -39,7 +37,7 @@ where
     P: AsRef<path::Path>,
 {
     let mut f = std::fs::File::open(pem_cert_path)
-        .map_err(|err| ProxyAttestationServerError::IOError(err))?;
+        .map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;
     let cert = openssl::x509::X509::from_pem(&buffer)?;
@@ -51,14 +49,14 @@ where
             *ccd_guard = Some(der);
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
     let ccd_guard = CA_CERT_DER.lock()?;
     match &*ccd_guard {
-        None => return Err(ProxyAttestationServerError::BadStateError),
-        Some(der) => return Ok(der.clone()),
+        None => Err(ProxyAttestationServerError::BadStateError),
+        Some(der) => Ok(der.clone()),
     }
 }
 
@@ -69,7 +67,7 @@ where
     P: AsRef<path::Path>,
 {
     let mut f = std::fs::File::open(pem_key_path)
-        .map_err(|err| ProxyAttestationServerError::IOError(err))?;
+        .map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;
     let key = openssl::pkey::PKey::private_key_from_pem(&buffer)?;
@@ -80,15 +78,15 @@ where
             *guard = Some(key);
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 fn get_ca_key() -> Result<openssl::pkey::PKey<openssl::pkey::Private>, ProxyAttestationServerError>
 {
     let guard = CA_KEY_PKEY.lock()?;
     match &*guard {
-        None => return Err(ProxyAttestationServerError::BadStateError),
-        Some(key) => return Ok(key.clone()),
+        None => Err(ProxyAttestationServerError::BadStateError),
+        Some(key) => Ok(key.clone()),
     }
 }
 

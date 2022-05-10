@@ -145,14 +145,13 @@ where
 
         transfer
             .write_function(|buf| {
-                received_body.push_str(from_utf8(buf).expect({
+                received_body.push_str(from_utf8(buf).unwrap_or_else(|_| panic!("{}", {
                     trace!(
                         "Error converting data {:?} from UTF-8.  Continuing with default value.",
                         buf
                     );
-
                     &format!("Error converting data {:?} from UTF-8.", buf)
-                }));
+                })));
 
                 Ok(buf.len())
             })
@@ -169,14 +168,14 @@ where
 
         transfer
             .header_function(|buf| {
-                received_header.push_str(from_utf8(buf).expect({
+                received_header.push_str(from_utf8(buf).unwrap_or_else(|_| panic!("{}", {
                     trace!(
                         "Error converting data {:?} from UTF-8.  Continuing with default value.",
                         buf
                     );
 
                     &format!("Error converting data {:?} from UTF-8", buf)
-                }));
+                })));
 
                 true
             })
