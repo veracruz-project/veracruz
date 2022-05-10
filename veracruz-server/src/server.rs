@@ -121,7 +121,7 @@ pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
     let policy: Policy = serde_json::from_str(policy_json)?;
     #[allow(non_snake_case)]
     let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(
-        VeracruzServerEnclave::new(&policy_json)?,
+        VeracruzServerEnclave::new(policy_json)?,
     ))));
 
     // create a channel for stop server
@@ -143,18 +143,9 @@ pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
     // clone the Server handle and pass the the thread for shuting down the server
     let server_clone = server.clone();
     thread::spawn(move || {
-        // wait for shutdown signal
-        match shutdown_channel_rx.recv() {
-            // stop server gracefully
-            Ok(_) => {
-                executor::block_on(server_clone.stop(true));
-            }
-            // this CAN fail, in the case that the main thread has died,
-            // most likely from a user's ctrl-C, in either case we want to
-            // shutdown the server
-            Err(_) => {
-                return;
-            }
+        // wait for shutdown signal and stop the server gracefully
+        if shutdown_channel_rx.recv().is_ok() {
+            executor::block_on(server_clone.stop(true));
         }
     });
     Ok(server)

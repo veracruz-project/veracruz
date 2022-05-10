@@ -45,20 +45,19 @@ pub mod veracruz_server_linux {
     ////////////////////////////////////////////////////////////////////////////
 
     /// The Runtime Manager binary (the enclave), included at compile time
-    const RUNTIME_ENCLAVE_BINARY_IMAGE: &'static [u8] =
-        include_bytes!(env!("RUNTIME_ENCLAVE_BINARY_PATH"));
+    const RUNTIME_ENCLAVE_BINARY_IMAGE: &[u8] = include_bytes!(env!("RUNTIME_ENCLAVE_BINARY_PATH"));
     /// Spawn delay to apply (in seconds) between spawning the Runtime Manager enclave and trying
     /// to contact it.
     const RUNTIME_ENCLAVE_SPAWN_DELAY: u64 = 2;
     /// IP address to use when communicating with the Runtime Manager enclave.
-    const RUNTIME_MANAGER_ENCLAVE_ADDRESS: &'static str = "127.0.0.1";
+    const RUNTIME_MANAGER_ENCLAVE_ADDRESS: &str = "127.0.0.1";
     /// Port to communicate with the Runtime Manager enclave on.
-    const RUNTIME_MANAGER_ENCLAVE_PORT: &'static str = "6000";
+    const RUNTIME_MANAGER_ENCLAVE_PORT: &str = "6000";
 
     /// The protocol to use with the proxy attestation server.
-    const PROXY_ATTESTATION_PROTOCOL: &'static str = "psa";
+    const PROXY_ATTESTATION_PROTOCOL: &str = "psa";
     /// The firmware version to use when communicating with the proxy attestation server.
-    const FIRMWARE_VERSION: &'static str = "0.0";
+    const FIRMWARE_VERSION: &str = "0.0";
 
     /// A struct capturing all the metadata needed to start and communicate with
     /// the Linux root enclave.

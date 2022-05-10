@@ -78,9 +78,9 @@ veracruz-test: test-dependencies
 $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
 
-clippy: 
+clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	# workspace members and relevant dependencies
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) \
+	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(CC) \
 		cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
 		-p proxy-attestation-server -p veracruz-client \
@@ -94,7 +94,7 @@ clippy:
 		--features veracruz-utils/linux \
 		-- --no-deps
 	# workspace testing crates
-	RUNTIME_ENCLAVE_BINARY_PATH=$(ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
+	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
 		cargo clippy --tests \
 		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
 		--features veracruz-test/linux \

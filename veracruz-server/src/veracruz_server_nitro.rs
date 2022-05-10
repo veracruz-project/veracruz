@@ -57,7 +57,7 @@ pub mod veracruz_server_nitro {
 
             println!("VeracruzServerNitro::new instantiating Runtime Manager");
             let runtime_manager_eif_path = env::var("RUNTIME_MANAGER_EIF_PATH")
-                .unwrap_or(RUNTIME_MANAGER_EIF_PATH.to_string());
+                .unwrap_or_else(|_| RUNTIME_MANAGER_EIF_PATH.to_string());
             #[cfg(feature = "debug")]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in debug mode");
@@ -78,7 +78,7 @@ pub mod veracruz_server_nitro {
                     false,
                     *policy.max_memory_mib(),
                 )
-                .map_err(|err| VeracruzServerError::NitroError(err))?
+                .map_err(VeracruzServerError::NitroError)?
             };
             println!("VeracruzServerNitro::new NitroEnclave::new returned");
             let meta = Self {
@@ -129,14 +129,14 @@ pub mod veracruz_server_nitro {
                 _ => return Err(VeracruzServerError::Status(status)),
             }
             println!("VeracruzServerNitro::new complete. Returning");
-            return Ok(meta);
+            Ok(meta)
         }
 
         fn plaintext_data(
             &mut self,
             _data: Vec<u8>,
         ) -> Result<Option<Vec<u8>>, VeracruzServerError> {
-            return Err(VeracruzServerError::UnimplementedError);
+            Err(VeracruzServerError::UnimplementedError)
         }
 
         fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
@@ -155,7 +155,7 @@ pub mod veracruz_server_nitro {
                     ))
                 }
             };
-            return Ok(session_id);
+            Ok(session_id)
         }
 
         fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
@@ -167,11 +167,11 @@ pub mod veracruz_server_nitro {
             let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
 
             let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
-            return match received_message {
+            match received_message {
                 RuntimeManagerResponse::Status(_status) => Ok(()),
 
                 _ => Err(VeracruzServerError::Status(Status::Fail)),
-            };
+            }
         }
 
         fn tls_data(
@@ -223,7 +223,7 @@ pub mod veracruz_server_nitro {
 
             Ok((
                 active_flag,
-                if ret_array.len() > 0 {
+                if !ret_array.is_empty() {
                     Some(ret_array)
                 } else {
                     None
@@ -240,12 +240,11 @@ pub mod veracruz_server_nitro {
 
     impl Drop for VeracruzServerNitro {
         fn drop(&mut self) {
-            match self.shutdown_isolate() {
-                Err(err) => println!(
+            if let Err(err) = self.shutdown_isolate() {
+                println!(
                     "VeracruzServerNitro::drop failed in call to self.shutdown_isolate:{:?}",
                     err
-                ),
-                _ => (),
+                )
             }
         }
     }
@@ -264,7 +263,7 @@ pub mod veracruz_server_nitro {
                 RuntimeManagerResponse::TlsDataNeeded(needed) => needed,
                 _ => return Err(VeracruzServerError::Status(Status::Fail)),
             };
-            return Ok(tls_data_needed);
+            Ok(tls_data_needed)
         }
     }
 
@@ -276,7 +275,7 @@ pub mod veracruz_server_nitro {
     ) -> Result<Vec<Vec<u8>>, VeracruzServerError> {
         let serialized_nitro_attestation_doc_request =
             transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)
-                .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
+                .map_err(VeracruzServerError::TransportProtocol)?;
         let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
         let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
         println!(
@@ -297,10 +296,9 @@ pub mod veracruz_server_nitro {
             received_body
         );
 
-        let body_vec =
-            base64::decode(&received_body).map_err(|err| VeracruzServerError::Base64Decode(err))?;
+        let body_vec = base64::decode(&received_body).map_err(VeracruzServerError::Base64Decode)?;
         let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)
-            .map_err(|err| VeracruzServerError::TransportProtocol(err))?;
+            .map_err(VeracruzServerError::TransportProtocol)?;
 
         let (re_cert, ca_cert) = if response.has_cert_chain() {
             let cert_chain = response.get_cert_chain();
@@ -308,9 +306,7 @@ pub mod veracruz_server_nitro {
         } else {
             return Err(VeracruzServerError::InvalidProtoBufMessage);
         };
-        let mut cert_chain: Vec<Vec<u8>> = Vec::new();
-        cert_chain.push(re_cert.to_vec());
-        cert_chain.push(ca_cert.to_vec());
-        return Ok(cert_chain);
+        let cert_chain: Vec<Vec<u8>> = vec![re_cert.to_vec(), ca_cert.to_vec()];
+        Ok(cert_chain)
     }
 }

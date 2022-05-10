@@ -22,7 +22,6 @@ use io_utils::{error::SocketError, http::HttpError};
 use rustls::Error as TLSError;
 use std::error::Error;
 
-
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
 #[derive(Debug, Error)]
@@ -198,7 +197,7 @@ impl error::ResponseError for VeracruzServerError {
     }
     fn status_code(&self) -> StatusCode {
         match self {
-            VeracruzServerError::DirectMessageError(_, e) => e.clone(),
+            VeracruzServerError::DirectMessageError(_, e) => *e,
             VeracruzServerError::UnimplementedRequestError
             | VeracruzServerError::UnknownAttestationTokenError => StatusCode::NOT_IMPLEMENTED,
             VeracruzServerError::UnsupportedRequestError => StatusCode::NOT_FOUND,
