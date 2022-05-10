@@ -10,7 +10,6 @@
 //! information on licensing and copyright.
 
 use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
-use bincode;
 use err_derive::Error;
 use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
@@ -37,8 +36,8 @@ use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
 
-const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &'static [&'static str] = &["qemu-system-aarch64"];
-const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &'static [&'static str] = &[
+const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &[&str] = &["qemu-system-aarch64"];
+const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &[&str] = &[
     "-machine",
     "virt,virtualization=on,gic-version=2",
     "-cpu",
@@ -55,7 +54,7 @@ const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &'static [&'static str] = &[
     "mon:stdio",
     "-nographic",
 ];
-const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
+const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &[&str] = &[
     "-chardev",
     "socket,path={console0_path},server=on,wait=off,id=charconsole0",
     //"-chardev", "socket,server=on,host=localhost,port=1234,id=charconsole0",
@@ -64,11 +63,11 @@ const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
     "-device",
     "virtconsole,chardev=charconsole0,id=console0",
 ];
-const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] =
+const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &[&str] =
     &["-kernel", "{image_path}"];
 
 // Include image at compile time
-const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] =
+const VERACRUZ_ICECAP_QEMU_IMAGE: &[u8] =
     include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
 
 // TODO is this needed?
@@ -127,7 +126,7 @@ impl IceCapRealm {
                 }
                 Err(_) => Err(IceCapError::InvalidEnvironmentVariableValue {
                     variable: var.to_owned(),
-                })?,
+                }.into()),
             }
         }
 
@@ -229,19 +228,19 @@ impl IceCapRealm {
                     continue;
                 }
                 Err(err) => {
-                    Err(IceCapError::ChannelError(err))?;
+                    return Err(IceCapError::ChannelError(err).into());
                 }
             };
         };
 
         Ok(IceCapRealm {
-            child: child,
-            stdout_handler: stdout_handler,
-            stderr_handler: stderr_handler,
-            signal_handle: signal_handle,
-            signal_handler: signal_handler,
-            channel: channel,
-            tempdir: tempdir,
+            child,
+            stdout_handler,
+            stderr_handler,
+            signal_handle,
+            signal_handler,
+            channel,
+            tempdir,
         })
     }
 
@@ -292,14 +291,14 @@ impl VeracruzServerIceCap {
     ) -> Result<RuntimeManagerResponse, VeracruzServerError> {
         match &mut self.0 {
             Some(realm) => realm.communicate(request),
-            None => return Err(VeracruzServerError::UninitializedEnclaveError),
+            None => Err(VeracruzServerError::UninitializedEnclaveError),
         }
     }
 
     fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
         match self.communicate(&RuntimeManagerRequest::GetTlsDataNeeded(session_id))? {
             RuntimeManagerResponse::TlsDataNeeded(needed) => Ok(needed),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp).into()),
         }
     }
 }
@@ -406,7 +405,7 @@ impl VeracruzServer for VeracruzServerIceCap {
                         break false;
                     }
                 }
-                resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp))?,
+                resp => return Err(IceCapError::UnexpectedRuntimeManagerResponse(resp).into()),
             };
         };
 
