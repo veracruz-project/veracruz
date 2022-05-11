@@ -63,16 +63,12 @@ macro_rules! convert_wasi_arg {
     };
 }
 
-/// An implementation of MemorySlice for Wasmtime
+/// An implementation of MemorySlice for Wasmtime.
 ///
-/// We can get direct access through the data and data_mut functions.
+/// We use `data` function in Memory.
 /// Conveniently, Memory is managed by internal reference counting, and already
 /// isn't thread-safe, so we don't have to worry too much about the complex
 /// lifetime requirements of MemorySlice.
-///
-/// This currently requires unsafe code for data_unchecked and data_unchecked_mut,
-/// but these already have safe versions in the most recent version of Wasmtime.
-///
 pub struct WasmtimeSlice<'a, T> {
     store: StoreContext<'a, T>,
     memory: Memory,
@@ -80,6 +76,12 @@ pub struct WasmtimeSlice<'a, T> {
     length: usize,
 }
 
+/// An implementation of MemorySliceMut for Wasmtime.
+///
+/// We use `data_mut` function in Memory.
+/// Conveniently, Memory is managed by internal reference counting, and already
+/// isn't thread-safe, so we don't have to worry too much about the complex
+/// lifetime requirements of MemorySlice.
 pub struct WasmtimeSliceMut<'a, T> {
     store: StoreContextMut<'a, T>,
     memory: Memory,
@@ -87,6 +89,8 @@ pub struct WasmtimeSliceMut<'a, T> {
     length: usize,
 }
 
+/// Implementation of AsRef<u8> for  WasmtimeSlice. Implementation of Wasi is able to use this
+/// function to access the linear memory in Wasmtime.
 impl<'a, T> AsRef<[u8]> for WasmtimeSlice<'a, T> {
     fn as_ref(&self) -> &[u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
@@ -95,6 +99,8 @@ impl<'a, T> AsRef<[u8]> for WasmtimeSlice<'a, T> {
     }
 }
 
+/// Implementation of AsMut<u8> for  WasmtimeSlice. Implementation of Wasi is able to use this
+/// function to access the linear memory in Wasmtime.
 impl<'a, T> AsMut<[u8]> for WasmtimeSliceMut<'a, T> {
     fn as_mut(&mut self) -> &mut [u8] {
         // NOTE this is currently unsafe, but has a safe variant in recent
@@ -104,12 +110,11 @@ impl<'a, T> AsMut<[u8]> for WasmtimeSliceMut<'a, T> {
 }
 
 impl<T> MemorySlice for WasmtimeSlice<'_, T> {}
-//TODO: REMOVE??
-//impl<T>  MemorySlice for WasmtimeSliceMut<'_, T> {}
 impl<T> MemorySliceMut for WasmtimeSliceMut<'_, T> {}
 
 /// Impl the MemoryHandler for Caller.
-/// This allows passing the Caller to WasiWrapper on any VFS call.
+/// This allows passing the Caller to WasiWrapper on any VFS call. Implementation 
+/// here is *NOT* thread-safe, if multiple threads manipulate this Wasmtime instance.
 impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
     type Slice = WasmtimeSlice<'static, T>;
     type SliceMut = WasmtimeSliceMut<'static, T>;
@@ -120,6 +125,7 @@ impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
         length: u32,
     ) -> FileSystemResult<Bound<'b, Self::Slice>> {
         // NOTE: manually and temporarily change the mutability.
+        // The unwrap will fail only if the raw pointer is null, which never happens here.
         let memory = match unsafe { (self as *const Self as *mut Self).as_mut() }
             .unwrap()
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
@@ -128,6 +134,8 @@ impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
+        // Manually bend the lifetime to static. This can be improved when GAT
+        // fully works in Rust standard.
         Ok(Bound::new(WasmtimeSlice {
             store: unsafe {
                 mem::transmute::<StoreContext<'b, T>, StoreContext<'static, T>>(self.as_context())
@@ -150,6 +158,8 @@ impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
             Some(s) => s,
             None => return Err(ErrNo::NoMem),
         };
+        // Manually bend the lifetime to static. This can be improved when GAT
+        // fully works in Rust standard.
         Ok(BoundMut::new(WasmtimeSliceMut {
             store: unsafe {
                 mem::transmute::<StoreContextMut<'c, T>, StoreContextMut<'static, T>>(
@@ -164,6 +174,7 @@ impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
 
     fn get_size(&self) -> FileSystemResult<u32> {
         // NOTE: manually and temporarily change the mutability.
+        // Invocation of `unwrap` only fails if the raw pointer is NULL, but it never happens here.
         let memory = match unsafe { (self as *const Self as *mut Self).as_mut() }
             .unwrap()
             .get_export(WasiWrapper::LINEAR_MEMORY_NAME)
@@ -486,7 +497,7 @@ impl WasmtimeRuntimeState {
             EntrySignature::NoEntryFound => return Err(FatalEngineError::NoProgramEntryPoint),
         };
 
-        info!("Excution returns.");
+        info!("Execution returns.");
 
         // NOTE: Surpress the trap, if `proc_exit` is called.
         //       In this case, the error code is in .exit_code().
