@@ -132,19 +132,19 @@ impl NitroEnclave {
             vsocksocket: crate::vsocket::VsockSocket::connect(cid, VERACRUZ_PORT)?,
             nitro_cli_path: nitro_cli_path.to_string(),
         };
-        return Ok(enclave);
+        Ok(enclave)
     }
 
     /// send a buffer of data to the enclave
-    pub fn send_buffer(&self, buffer: &Vec<u8>) -> Result<(), NitroError> {
+    pub fn send_buffer(&self, buffer: &[u8]) -> Result<(), NitroError> {
         crate::raw_fd::send_buffer(self.vsocksocket.as_raw_fd(), buffer)
-            .map_err(|err| NitroError::VeracruzSocketError(err))
+            .map_err(NitroError::VeracruzSocketError)
     }
 
     /// receive a buffer of data from the enclave
     pub fn receive_buffer(&self) -> Result<Vec<u8>, NitroError> {
         crate::raw_fd::receive_buffer(self.vsocksocket.as_raw_fd())
-            .map_err(|err| NitroError::VeracruzSocketError(err))
+            .map_err(NitroError::VeracruzSocketError)
     }
 }
 

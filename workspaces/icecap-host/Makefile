@@ -45,6 +45,8 @@ TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR)
 
+CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
+
 all: build test-collateral
 
 build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
@@ -120,13 +122,13 @@ clippy: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 		--features io-utils/icecap \
 		--features psa-attestation/icecap \
 		--features veracruz-utils/icecap \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests \
 		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
 		--features veracruz-test/icecap \
 		--features veracruz-server-test/icecap \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 
 clean:
 	cargo clean

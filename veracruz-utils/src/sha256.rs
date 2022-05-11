@@ -17,6 +17,6 @@ use psa_crypto::types::algorithm::Hash;
 pub fn sha256(x: &[u8]) -> Vec<u8> {
     psa_crypto::init().unwrap();
     let mut hash = vec![0; Hash::Sha256.hash_length()];
-    hash::hash_compute(Hash::Sha256, &x, &mut hash).unwrap();
+    hash::hash_compute(Hash::Sha256, x, &mut hash).unwrap();
     hash
 }

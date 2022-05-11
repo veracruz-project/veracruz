@@ -101,7 +101,7 @@ impl error::ResponseError for ProxyAttestationServerError {
     }
     fn status_code(&self) -> StatusCode {
         match self {
-            ProxyAttestationServerError::DirectMessageError(_, e) => e.clone(),
+            ProxyAttestationServerError::DirectMessageError(_, e) => *e,
             ProxyAttestationServerError::UnimplementedRequestError
             | ProxyAttestationServerError::UnknownAttestationTokenError => {
                 StatusCode::NOT_IMPLEMENTED

@@ -115,7 +115,7 @@ fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> Transpor
     // If not, we assume this is the first chunk of the protocol buffer.
     if incoming_buffer_hash.get(&session_id).is_none() {
         // Extract the protocol buffer's total length
-        let (expected_length, input_unprefixed) = get_length_prefix(session_id, &mut input)?;
+        let (expected_length, input_unprefixed) = get_length_prefix(session_id, input)?;
 
         // Insert the expected length in the hash table
         incoming_buffer_hash.insert(session_id, (expected_length, Vec::new()));
@@ -141,7 +141,7 @@ fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> Transpor
     // might be the case or if it is hopeless and we could just error out.
 
     if incoming_buffer.len() < *expected_length as usize {
-        return Err(TransportProtocolError::PartialBuffer(session_id));
+        Err(TransportProtocolError::PartialBuffer(session_id))
     } else {
         let incoming_buffer = incoming_buffer.to_vec();
         incoming_buffer_hash.remove(&session_id);
@@ -518,7 +518,7 @@ pub fn serialize_result(
     if let Some(ref data) = data_opt {
         let mut result = transport_protocol::Result::new();
         result.data.resize(data.len(), 0);
-        result.data.copy_from_slice(&data);
+        result.data.copy_from_slice(data);
         response.set_result(result);
     }
 

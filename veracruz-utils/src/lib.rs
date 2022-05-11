@@ -27,8 +27,6 @@ pub mod runtime_manager_message;
 /// SHA256 function.
 pub mod sha256;
 
-use rustls;
-
 /// The ID of the Veracruz Runtime Hash Extension.
 /// This value was made up, all can be changed to pretty much any valid
 /// ID as long as it doesn't collide with the ID of an extension in our
@@ -42,8 +40,8 @@ pub fn lookup_ciphersuite(suite_string: &str) -> Option<rustls::SupportedCipherS
     };
     for this_supported_ciphersuite in rustls::ALL_CIPHER_SUITES {
         if this_supported_ciphersuite.suite() == ciphersuite_enum {
-            return Some(this_supported_ciphersuite.clone());
+            return Some(*this_supported_ciphersuite);
         }
     }
-    return None;
+    None
 }

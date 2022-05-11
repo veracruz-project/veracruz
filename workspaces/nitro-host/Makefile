@@ -29,6 +29,8 @@ TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR) \
 
+CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
+
 all: build test-collateral
 
 build:
@@ -79,13 +81,13 @@ clippy:
 		--features io-utils/nitro \
 		--features psa-attestation/nitro \
 		--features veracruz-utils/nitro \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CC) $(TEST_PARAMETERS) cargo clippy --tests \
 		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
 		--features veracruz-test/nitro \
 		--features veracruz-server-test/nitro \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 
 clean:
 	cargo clean

@@ -33,6 +33,8 @@ TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR) \
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH)
 
+CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
+
 all: build test-collateral
 
 build:
@@ -92,14 +94,14 @@ clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 		--features io-utils/linux \
 		--features psa-attestation/linux \
 		--features veracruz-utils/linux \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
 		cargo clippy --tests \
 		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
 		--features veracruz-test/linux \
 		--features veracruz-server-test/linux \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 
 doc:
 	cargo doc

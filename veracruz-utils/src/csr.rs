@@ -75,7 +75,7 @@ pub fn generate_csr(private_key_der: &[u8]) -> Result<Vec<u8>, CertError> {
         .signature_hash(mbedtls::hash::Type::Sha256)
         .write_der_vec(&mut rng)
         .unwrap();
-    return Ok(csr);
+    Ok(csr)
 }
 
 pub fn generate_utc_time(
