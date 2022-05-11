@@ -587,8 +587,8 @@ impl VeracruzClient {
     }
 
     #[cfg(test)]
-    pub fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
-        self.send(data)
+    pub async fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
+        self.send(data).await
     }
 
     #[cfg(test)]
