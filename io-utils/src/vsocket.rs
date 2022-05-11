@@ -94,7 +94,7 @@ impl Drop for VsockSocket {
     /// do anything else (it could fail because it's not connected).
     fn drop(&mut self) {
         // Do nothing on failure. It's non fatal and a warning message is just confusing
-        shutdown(self.socket_fd, Shutdown::Both).unwrap_or_else(|_| ());
+        shutdown(self.socket_fd, Shutdown::Both).unwrap_or(());
         close(self.socket_fd).unwrap_or_else(|e| eprintln!("Failed to close io: {:?}", e));
     }
 }

@@ -88,7 +88,7 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
 
     let attestation_context = NitroAttestationContext {
         firmware_version: firmware_version.to_string(),
-        challenge: challenge.clone(),
+        challenge,
     };
     {
         let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
@@ -122,7 +122,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         ));
     }
     let (att_doc_data, device_id) =
-        transport_protocol::parse_nitro_attestation_doc(&parsed.get_nitro_attestation_doc());
+        transport_protocol::parse_nitro_attestation_doc(parsed.get_nitro_attestation_doc());
 
     let attestation_document =
         AttestationDocument::authenticate(&att_doc_data, &AWS_NITRO_ROOT_CERTIFICATE).map_err(
@@ -206,5 +206,5 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
 
     let response_b64 = base64::encode(&response_bytes);
 
-    return Ok(response_b64);
+    Ok(response_b64)
 }

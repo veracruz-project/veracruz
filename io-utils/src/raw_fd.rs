@@ -26,7 +26,7 @@ use std::{os::unix::io::RawFd, vec::Vec};
 
 /// Send a buffer of data (using a length, buffer protocol) to the file
 /// descriptor `fd`
-pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), SocketError> {
+pub fn send_buffer(fd: RawFd, buffer: &[u8]) -> Result<(), SocketError> {
     let len = buffer.len();
     // first, send the length of the buffer
     {
@@ -56,7 +56,7 @@ pub fn send_buffer(fd: RawFd, buffer: &Vec<u8>) -> Result<(), SocketError> {
             sent_bytes += size;
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 /// Read a buffer of data (using a length, buffer protocol) from the file
@@ -94,5 +94,5 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, SocketError> {
             }
         }
     }
-    return Ok(buffer);
+    Ok(buffer)
 }
