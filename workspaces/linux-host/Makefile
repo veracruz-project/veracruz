@@ -78,7 +78,7 @@ veracruz-test: test-dependencies
 $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
 
-CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception
+CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
 
 clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	# workspace members and relevant dependencies

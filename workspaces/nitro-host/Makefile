@@ -67,6 +67,8 @@ doc:
 fmt:
 	cargo fmt
 
+CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
+
 clippy: 
 	# workspace members and relevant dependencies
 	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
@@ -79,13 +81,13 @@ clippy:
 		--features io-utils/nitro \
 		--features psa-attestation/nitro \
 		--features veracruz-utils/nitro \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CC) $(TEST_PARAMETERS) cargo clippy --tests \
 		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
 		--features veracruz-test/nitro \
 		--features veracruz-server-test/nitro \
-		-- --no-deps
+		-- $(CLIPPY_OPTIONS)
 
 clean:
 	cargo clean
