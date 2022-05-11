@@ -9,8 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use actix_http::ResponseBuilder;
-use actix_web::{error, http::StatusCode, HttpResponse};
+use actix_web::{error, http::StatusCode, HttpResponse, HttpResponseBuilder};
 use err_derive::Error;
 
 pub type ProxyAttestationServerResponder = Result<String, ProxyAttestationServerError>;
@@ -97,7 +96,7 @@ impl<T> From<std::sync::PoisonError<T>> for ProxyAttestationServerError {
 
 impl error::ResponseError for ProxyAttestationServerError {
     fn error_response(&self) -> HttpResponse {
-        ResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
+        HttpResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
     }
     fn status_code(&self) -> StatusCode {
         match self {

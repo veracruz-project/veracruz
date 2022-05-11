@@ -142,7 +142,8 @@ macro_rules! qprintln {
 }
 
 /// Entry point
-fn main() {
+#[tokio::main]
+async fn main() {
     // parse args
     let opt = Opt::from_args();
 
@@ -216,7 +217,7 @@ fn main() {
             }
         };
 
-        match veracruz_client.send_program(&program_name, &program_data) {
+        match veracruz_client.send_program(&program_name, &program_data).await {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -257,7 +258,7 @@ fn main() {
             }
         };
 
-        match veracruz_client.send_data(data_name, &data_data) {
+        match veracruz_client.send_data(data_name, &data_data).await {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -271,7 +272,7 @@ fn main() {
         qprintln!(opt, "Requesting compute of <enclave>/{}", compute_name);
         did_something = true;
 
-        match veracruz_client.request_compute(&compute_name) {
+        match veracruz_client.request_compute(&compute_name).await {
             Ok(_) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -293,7 +294,7 @@ fn main() {
         );
         did_something = true;
 
-        let results = match veracruz_client.get_results(output_name) {
+        let results = match veracruz_client.get_results(output_name).await {
             Ok(results) => results,
             Err(err) => {
                 eprintln!("{}", err);
@@ -325,7 +326,7 @@ fn main() {
         qprintln!(opt, "Shutting down enclave");
         did_something = true;
 
-        match veracruz_client.request_shutdown() {
+        match veracruz_client.request_shutdown().await {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);

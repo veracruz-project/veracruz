@@ -56,8 +56,7 @@ mod tests {
     const STRING_1_DATA: &'static str = "hello-world-1.dat";
     const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
-    use actix_rt::System;
-    use async_std::task;
+    use actix_rt::{time::sleep, System};
     use either::{Left, Right};
     use env_logger;
     use err_derive::Error;
@@ -142,7 +141,7 @@ mod tests {
 
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
-                let mut sys = System::new("Veracruz Proxy Attestation Server");
+                let sys = System::new();
                 let server = proxy_attestation_server::server::server(
                     proxy_attestation_server_url,
                     trust_path(CA_CERT),
@@ -449,12 +448,12 @@ mod tests {
 
             setup(policy.proxy_attestation_server_url().clone());
 
-            task::sleep(std::time::Duration::from_millis(5000)).await;
+            sleep(std::time::Duration::from_millis(5000)).await;
             let policy_file = policy_path(LINEAR_REGRESSION_PARALLEL_POLICY);
             let server_handle = server_tls_loop(policy_file.as_path());
 
             let program_provider_handle = async {
-                task::sleep(std::time::Duration::from_millis(10000)).await;
+                sleep(std::time::Duration::from_millis(10000)).await;
                 info!("### program provider start.");
                 let mut client = veracruz_client::VeracruzClient::new(
                     trust_path(PROGRAM_CLIENT_CERT).as_path(),
@@ -465,11 +464,11 @@ mod tests {
                 info!("### program provider read binary.");
                 let program_data = read_binary_file(prog_path.as_path())?;
                 info!("### program provider send binary.");
-                client.send_program("/program/linear-regression.wasm", &program_data)?;
+                client.send_program("/program/linear-regression.wasm", &program_data).await?;
                 Ok::<(), VeracruzTestError>(())
             };
             let data_provider_handle = async {
-                task::sleep(std::time::Duration::from_millis(15000)).await;
+                sleep(std::time::Duration::from_millis(15000)).await;
                 info!("### data provider start.");
                 let mut client = veracruz_client::VeracruzClient::new(
                     trust_path(DATA_CLIENT_CERT).as_path(),
@@ -481,12 +480,12 @@ mod tests {
                 info!("### data provider read input.");
                 let data = read_binary_file(&data_filename.as_path())?;
                 info!("### data provider send input.");
-                client.send_data("/input/linear-regression.dat", &data)?;
+                client.send_data("/input/linear-regression.dat", &data).await?;
                 info!("### data provider read result.");
-                client.request_compute("/program/linear-regression.wasm")?;
-                client.get_results("/output/linear-regression.dat")?;
+                client.request_compute("/program/linear-regression.wasm").await?;
+                client.get_results("/output/linear-regression.dat").await?;
                 info!("### data provider request shutdown.");
-                client.request_shutdown()?;
+                client.request_shutdown().await?;
                 Ok::<(), VeracruzTestError>(())
             };
 
@@ -526,13 +525,13 @@ mod tests {
         );
 
         // Wait the setup
-        task::sleep(std::time::Duration::from_millis(5000)).await;
+        sleep(std::time::Duration::from_millis(5000)).await;
 
         let server_handle = server_tls_loop(policy_path);
 
         let clients_handle = async {
             // Wait for the enclave initialasation
-            task::sleep(std::time::Duration::from_millis(10000)).await;
+            sleep(std::time::Duration::from_millis(10000)).await;
 
             info!("### Step 2. Set up all client sessions.");
             let mut clients = Vec::new();
@@ -555,7 +554,7 @@ mod tests {
                     .get_mut(*program_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*program_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                program_provider_veracruz_client.send_data(remote_filename, &data)?;
+                program_provider_veracruz_client.send_data(remote_filename, &data).await?;
             }
             info!("### Step 4. Provision data.");
             // provosion data
@@ -569,7 +568,7 @@ mod tests {
                     .get_mut(*data_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*data_provider_index))?;
                 let data = read_binary_file(data_filename)?;
-                data_provider_veracruz_client.send_data(remote_filename, &data)?;
+                data_provider_veracruz_client.send_data(remote_filename, &data).await?;
             }
 
             info!("### Step 5. Retrieve result and gracefully shutdown the server.");
@@ -581,7 +580,7 @@ mod tests {
                 let program_provider_veracruz_client = clients
                     .get_mut(*program_provider_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*program_provider_index))?;
-                program_provider_veracruz_client.request_compute(remote_filename)?;
+                program_provider_veracruz_client.request_compute(remote_filename).await?;
             }
             for (result_retriever_index, remote_filename) in result_retrievers.iter() {
                 info!(
@@ -591,14 +590,14 @@ mod tests {
                 let result_retriever_veracruz_client = clients
                     .get_mut(*result_retriever_index)
                     .ok_or(VeracruzTestError::ClientIndexError(*result_retriever_index))?;
-                let result = result_retriever_veracruz_client.get_results(remote_filename)?;
+                let result = result_retriever_veracruz_client.get_results(remote_filename).await?;
                 info!("            Result of len: {:?}", result.len());
             }
 
             clients
                 .get_mut(0)
                 .ok_or(VeracruzTestError::ClientIndexError(0))?
-                .request_shutdown()?;
+                .request_shutdown().await?;
             info!("            Client 0 successfully issued shutdown command");
             Ok::<(), VeracruzTestError>(())
         };

@@ -35,11 +35,11 @@ pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
         Err(errno) => {
             if let nix::Error::Sys(e) = errno {
                 if e == Errno::EINVAL {
-                    return result::Result::Unavailable
+                    return result::Result::Unavailable;
                 }
             }
-            return result::Result::UnknownError
-        },
+            return result::Result::UnknownError;
+        }
     };
     result::Result::Success(timespec.num_nanoseconds() as u64)
 }
@@ -52,11 +52,11 @@ pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
         Err(errno) => {
             if let nix::Error::Sys(e) = errno {
                 if e == Errno::EINVAL {
-                    return result::Result::Unavailable
+                    return result::Result::Unavailable;
                 }
             }
-            return result::Result::UnknownError
-        },
+            return result::Result::UnknownError;
+        }
     };
     result::Result::Success(timespec.num_nanoseconds() as u64)
 }

@@ -34,7 +34,7 @@ nitro = [
 ]
 
 [dependencies]
-actix-rt = "1.1.1"
+actix-rt = "2"
 curl = "0.4.43"
 either = "1.6.1"
 env_logger = "0.9.0"

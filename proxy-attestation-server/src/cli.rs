@@ -61,7 +61,7 @@ fn main() {
     info!("Using CA certificate {:?}", opt.ca_cert);
 
     // create Actix runtime
-    let mut sys = actix_rt::System::new("Proxy Attestation Server");
+    let sys = actix_rt::System::new();
 
     // create Proxy Attestation Server instance
     let proxy_attestation_server = match proxy_attestation_server::server::server(

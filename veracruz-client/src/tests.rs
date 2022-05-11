@@ -224,7 +224,7 @@ async fn runtime_manager(
     }
 
     // set counter to session
-    session.set("counter", counter)?;
+    session.insert("counter", counter)?;
 
     Ok(HttpResponse::build(StatusCode::NOT_FOUND)
         .content_type("text/html; charset=utf-8")
@@ -247,7 +247,7 @@ async fn policy_server_loop(
 }
 
 #[allow(dead_code)]
-fn client_loop(
+async fn client_loop(
     tx: std::sync::mpsc::Sender<Vec<u8>>,
     rx: std::sync::mpsc::Receiver<Vec<u8>>,
     session: &mut crate::veracruz_client::VeracruzClient,
@@ -257,6 +257,7 @@ fn client_loop(
     let message = String::from("Client Hello");
     session
         .pub_send(&message.into_bytes())
+        .await
         .expect("Failed to send data");
     loop {
         let received = rx.try_recv();

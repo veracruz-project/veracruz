@@ -161,7 +161,7 @@ mod tests {
             info!("SETUP.call_once called");
 
             let _main_loop_handle = std::thread::spawn(|| {
-                let mut sys = System::new("Veracruz Proxy Attestation Server");
+                let sys = System::new();
                 println!(
                     "spawned thread calling server with url:{:?}",
                     proxy_attestation_server_url
