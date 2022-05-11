@@ -18,7 +18,7 @@ use crate::{
     Options,
 };
 use num::{FromPrimitive, ToPrimitive};
-use std::{boxed::Box, convert::TryFrom, mem, string::ToString, vec::Vec};
+use std::{boxed::Box, convert::TryFrom, mem, str::FromStr, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
     Error, ExternVal, Externals, FuncInstance, FuncRef, GlobalDescriptor, GlobalRef, HostError,
@@ -464,9 +464,9 @@ impl ModuleImportResolver for WASMIRuntimeState {
     /// "Resolves" a H-call by translating from a H-call name, `field_name` to
     /// the corresponding H-call code, and dispatching appropriately.
     fn resolve_func(&self, field_name: &str, signature: &Signature) -> Result<FuncRef, Error> {
-        let index = if let Ok(x) = WasiAPIName::try_from(field_name) {
+        let index = if let Ok(x) = WasiAPIName::from_str(field_name) {
             APIName::WasiAPIName(x)
-        } else if let Ok(x) = VeracruzAPIName::try_from(field_name) {
+        } else if let Ok(x) = VeracruzAPIName::from_str(field_name) {
             APIName::VeracruzAPIName(x)
         } else {
             return Err(Error::Instantiation(format!(

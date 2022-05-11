@@ -27,13 +27,13 @@ use std::{
     collections::HashMap,
     convert::{AsRef, TryFrom},
     fmt::Debug,
-    // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
-    // potential utf-8 encoding check
     path::{Component, Path, PathBuf},
     string::String,
     sync::{Arc, Mutex, MutexGuard},
     vec::Vec,
 };
+// TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
+// potential utf-8 encoding check
 #[cfg(not(feature = "icecap"))]
 use std::{
     ffi::OsString,
@@ -66,12 +66,6 @@ type SharedInodeTable = Arc<Mutex<InodeTable>>;
 /// data buffer.
 #[derive(Clone, Debug)]
 struct InodeEntry {
-    /// The current inode.
-    current: Inode,
-    /// The parent inode.
-    parent: Inode,
-    /// The path of this inode relative to the parent.
-    path: PathBuf,
     /// The status of this file.
     file_stat: FileStat,
     /// The content of the inode.
@@ -618,10 +612,7 @@ impl InodeTable {
         };
         let path = path.as_ref().to_path_buf();
         let node = InodeEntry {
-            current: new_inode,
-            parent,
             file_stat,
-            path: path.clone(),
             data: InodeImpl::new_directory(new_inode, parent),
         };
         // NOTE: first add the inode to its parent inode, in the case of parent is not a directory,
@@ -707,10 +698,7 @@ impl InodeTable {
             ctime: Timestamp::from_nanos(0),
         };
         let node = InodeEntry {
-            current: new_inode,
-            parent,
             file_stat,
-            path: path.to_path_buf(),
             data: InodeImpl::File(raw_file_data),
         };
         // Add the map from the new inode to inode implementation.
@@ -1708,10 +1696,7 @@ impl FileSystem {
             ctime: Timestamp::from_nanos(0),
         };
         let node = InodeEntry {
-            current: inode,
-            parent: inode,
             file_stat,
-            path: PathBuf::from(""),
             data: InodeImpl::File(Vec::new()),
         };
         self.lock_inode_table()?.insert(inode, node)?;
