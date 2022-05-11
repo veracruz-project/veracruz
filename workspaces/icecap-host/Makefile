@@ -45,6 +45,8 @@ TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR)
 
+CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
+
 all: build test-collateral
 
 build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
@@ -105,8 +107,6 @@ doc:
 
 fmt:
 	cargo fmt
-
-CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
 
 clippy: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	# workspace members and relevant dependencies

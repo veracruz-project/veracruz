@@ -148,9 +148,10 @@ where
                 received_body.push_str(from_utf8(buf).unwrap_or_else(|_| {
                     panic!("{}", {
                         trace!(
-                        "Error converting data {:?} from UTF-8.  Continuing with default value.",
-                        buf
-                    );
+                            "Error converting data {:?} from UTF-8.  Continuing with default value.",
+                            buf
+                        );
+
                         &format!("Error converting data {:?} from UTF-8.", buf)
                     })
                 }));
@@ -173,9 +174,9 @@ where
                 received_header.push_str(from_utf8(buf).unwrap_or_else(|_| {
                     panic!("{}", {
                         trace!(
-                        "Error converting data {:?} from UTF-8.  Continuing with default value.",
-                        buf
-                    );
+                            "Error converting data {:?} from UTF-8.  Continuing with default value.",
+                            buf
+                        );
 
                         &format!("Error converting data {:?} from UTF-8", buf)
                     })
