@@ -36,8 +36,7 @@ pub fn load_ca_certificate<P>(pem_cert_path: P) -> Result<(), ProxyAttestationSe
 where
     P: AsRef<path::Path>,
 {
-    let mut f = std::fs::File::open(pem_cert_path)
-        .map_err(ProxyAttestationServerError::IOError)?;
+    let mut f = std::fs::File::open(pem_cert_path).map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;
     let cert = openssl::x509::X509::from_pem(&buffer)?;
@@ -66,8 +65,7 @@ pub fn load_ca_key<P>(pem_key_path: P) -> Result<(), ProxyAttestationServerError
 where
     P: AsRef<path::Path>,
 {
-    let mut f = std::fs::File::open(pem_key_path)
-        .map_err(ProxyAttestationServerError::IOError)?;
+    let mut f = std::fs::File::open(pem_key_path).map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;
     let key = openssl::pkey::PKey::private_key_from_pem(&buffer)?;
