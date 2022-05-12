@@ -10,4 +10,5 @@
 //! information on licensing and copyright.
 
 pub(crate) mod aes;
+pub(crate) mod ml;
 pub(crate) mod postcard;

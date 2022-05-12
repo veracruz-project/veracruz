@@ -16,7 +16,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::{aes::AesCounterModeService, postcard::PostcardService};
+use crate::native_modules::{aes::AesCounterModeService, ml::MlInferenceService, postcard::PostcardService};
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -818,9 +818,13 @@ impl FileSystem {
             "/services/postcard_string.dat",
             Arc::new(Mutex::new(service)),
         ));
+		println!("registering native modules...");
         let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
         services.push(("/services/aesctr.dat", Arc::new(Mutex::new(service))));
+        let service = Box::new(MlInferenceService::new());
+        services.push(("/services/mlinf.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;
+		println!("registered native modules");
         Ok(rst)
     }
 

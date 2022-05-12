@@ -21,6 +21,7 @@ members = [
   "crates/sdk/rust-examples/intersection-set-sum",
   "crates/sdk/rust-examples/linear-regression",
   "crates/sdk/rust-examples/logistic-regression",
+  "crates/sdk/rust-examples/ml-inference-native",
   "crates/sdk/rust-examples/moving-average-convergence-divergence",
   "crates/sdk/rust-examples/nop",
   "crates/sdk/rust-examples/number-stream-accumulation",

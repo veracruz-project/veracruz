@@ -30,6 +30,7 @@ cfg-if = "1"
 # ctor is not used by this crate, but we must prevent other crates from
 # picking up a newer version of this crate which does not work with IceCap:
 ctor = "=0.1.16"
+darknet = "0.3.4"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 num = { version = "0.4", default-features = false }
