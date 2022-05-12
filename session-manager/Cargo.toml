@@ -8,21 +8,19 @@ version = "0.3.0"
 [features]
 icecap = [
   "policy-utils/icecap",
-  "ring/std",
 ]
 nitro = [
   "policy-utils/std",
-  "ring/std",
 ]
 std = [
   "policy-utils/std",
-  "ring/std",
 ]
 
 [dependencies]
 err-derive = "0.2"
+mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
+platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-ring = "0.16.20"
 rustls = "0.20.4"
 rustls-pemfile = "0.3.0"
 veracruz-utils = { path = "../veracruz-utils" }
