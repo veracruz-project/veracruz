@@ -42,18 +42,6 @@ pub enum SessionManagerError {
     /// An IO error occurred, with an accompanying error code.
     #[error(display = "Session manager: an IO error occurred: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
-    /// A generic error occurred in the Ring library.
-    #[error(
-        display = "Session manager: an unspecified error occurred in the Ring library: {:?}.",
-        _0
-    )]
-    RingUnspecifiedError(#[error(source)] ring::error::Unspecified),
-    /// A cryptographic key was rejected by the Ring library.
-    #[error(
-        display = "Session manager: the Ring library rejected a cryptographic key: {:?}.",
-        _0
-    )]
-    RingKeyRejectedError(#[error(source)] ring::error::KeyRejected),
     /// A WebPKI error occurred with an accompanying error code.
     #[error(display = "Session manager: a WebPKI error occurred: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),

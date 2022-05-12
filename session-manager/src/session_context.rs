@@ -18,9 +18,9 @@ use crate::{
     error::SessionManagerError,
     session::{Principal, Session},
 };
+use mbedtls;
+use platform_services::getrandom;
 use policy_utils::policy::Policy;
-
-use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use rustls::{Certificate, PrivateKey, RootCertStore, ServerConfig};
 use rustls_pemfile;
 
@@ -77,16 +77,17 @@ pub struct SessionContext {
 impl SessionContext {
     /// Creates a new context
     pub fn new() -> Result<Self, SessionManagerError> {
-        let (server_private_key, server_public_key) = {
-            let rng = SystemRandom::new();
-            // ECDSA prime256r1 generation.
-            let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
-                &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-                &rng,
-            )?;
+        let (server_public_key, server_private_key) = {
+            let mut rng = |buffer: *mut u8, size: usize| {
+                let mut slice = unsafe { std::slice::from_raw_parts_mut(buffer, size) };
+                getrandom(&mut slice);
+                0
+            };
+            let mut key =
+                mbedtls::pk::Pk::generate_ec(&mut rng, mbedtls::pk::EcGroupId::SecP256R1).unwrap();
             (
-                rustls::PrivateKey(pkcs8_bytes.as_ref().to_vec()),
-                pkcs8_bytes.as_ref()[70..138].to_vec(),
+                key.write_public_der_vec().unwrap()[23..].to_vec(),
+                rustls::PrivateKey(key.write_private_der_vec().unwrap()),
             )
         };
 
@@ -95,8 +96,8 @@ impl SessionContext {
             server_config: None,
             principals: None,
             policy: None,
-            server_public_key: server_public_key,
-            server_private_key: server_private_key,
+            server_public_key,
+            server_private_key,
         })
     }
 

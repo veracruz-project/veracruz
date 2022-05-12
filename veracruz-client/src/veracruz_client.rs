@@ -12,7 +12,6 @@
 use crate::error::VeracruzClientError;
 use log::{error, info};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
-use ring::signature::KeyPair;
 use rustls::{Certificate, ClientConnection, PrivateKey};
 use rustls_pemfile;
 use std::{
@@ -89,7 +88,7 @@ impl VeracruzClient {
     /// check if the certificate is valid in term of time.
     fn check_certificate_validity<P: AsRef<Path>>(
         client_cert_filename: P,
-        public_key: &[u8],
+        public_key: &mut mbedtls::pk::Pk,
     ) -> Result<(), VeracruzClientError> {
         let cert_file = std::fs::File::open(&client_cert_filename)?;
         let parsed_cert = x509_parser::pem::Pem::read(std::io::BufReader::new(cert_file))?;
@@ -98,12 +97,18 @@ impl VeracruzClient {
             .parse_x509()
             .map_err(|e| VeracruzClientError::X509ParserError(e.to_string()))?
             .tbs_certificate;
+        let cert_public_key_der =
+            mbedtls::pk::Pk::from_public_key(parsed_cert.subject_pki.subject_public_key.data)
+                .unwrap()
+                .write_public_der_vec()
+                .unwrap();
 
-        if parsed_cert.subject_pki.subject_public_key.data != public_key {
+        let public_key_der = public_key.write_public_der_vec().unwrap();
+        if cert_public_key_der != public_key_der {
             Err(VeracruzClientError::MismatchError {
                 variable: "public_key",
-                expected: parsed_cert.subject_pki.subject_public_key.data.to_vec(),
-                received: public_key.to_vec(),
+                expected: cert_public_key_der,
+                received: public_key_der,
             })
         } else if parsed_cert.validity.time_to_expiration().is_none() {
             Err(VeracruzClientError::CertificateExpireError(
@@ -150,9 +155,8 @@ impl VeracruzClient {
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
         // check if the certificate is valid
-        let key_pair = ring::signature::RsaKeyPair::from_der(client_priv_key.0.as_slice())
-            .map_err(|err| VeracruzClientError::RingError(format!("from_der failed:{:?}", err)))?;
-        Self::check_certificate_validity(&client_cert_filename, key_pair.public_key().as_ref())?;
+        let mut key = mbedtls::pk::Pk::from_private_key(&client_priv_key.0, None).unwrap();
+        Self::check_certificate_validity(&client_cert_filename, &mut key)?;
 
         let enclave_name = "ComputeEnclave.dev";
 
@@ -162,7 +166,7 @@ impl VeracruzClient {
             let certs_pem = policy.proxy_service_cert();
             let certs = rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
                 VeracruzClientError::X509ParserError(
-                    "rustls_pemfile::certs found not certificates".to_string(),
+                    "rustls_pemfile::certs found no certificates".to_string(),
                 )
             })?;
             certs[0].clone()
