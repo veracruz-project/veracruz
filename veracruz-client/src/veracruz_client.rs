@@ -47,7 +47,7 @@ struct CbConn {
 impl Read for CbConn {
     fn read(&mut self, data: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
         let n = std::cmp::min(data.len(), self.read_buffer.len());
-        println!("xx returning {} of {}", n, self.read_buffer.len());
+        //println!("xx returning {} of {}", n, self.read_buffer.len());
         data[0..n].clone_from_slice(&self.read_buffer[0..n]);
         self.read_buffer = self.read_buffer[n..].to_vec();
         Ok(n)
@@ -56,7 +56,7 @@ impl Read for CbConn {
 
 impl Write for CbConn {
     fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
-        println!("xx sending {:?}", data);
+        //println!("xx sending {:?}", data);
         let string_data = base64::encode(&data);
         let combined_string = format!("{:} {:}", self.remote_session_id.lock().unwrap().unwrap_or(0), string_data);
 
@@ -70,10 +70,10 @@ impl Write for CbConn {
             .body(combined_string)
             .send().unwrap();
         if ret.status() != reqwest::StatusCode::OK {
-            println!("xx send failed ({}: {})", dest_url.as_str(), ret.text().unwrap());
+            //println!("xx send failed ({}: {})", dest_url.as_str(), ret.text().unwrap());
             return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx"))
         }
-        println!("xx send suceeded:");
+        //println!("xx send suceeded:");
         let body = ret.text().unwrap();
         let body_items = body.split_whitespace().collect::<Vec<&str>>();
         if !body_items.is_empty() {
@@ -82,7 +82,7 @@ impl Write for CbConn {
             let mut return_vec = Vec::new();
             for item in body_items.iter().skip(1) {
                 let this_body_data = base64::decode(item).unwrap();
-                println!("xx received {:?}", this_body_data);
+                //println!("xx received {:?}", this_body_data);
                 return_vec.push(this_body_data);
             }
             if !return_vec.is_empty() {
