@@ -46,48 +46,6 @@ struct CbConn {
 
 impl Read for CbConn {
     fn read(&mut self, data: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
-        if self.write_buffer.len() > 0 {
-            println!("xx sending {:?}", self.write_buffer);
-            let string_data = base64::encode(&self.write_buffer);
-            self.write_buffer = vec![];
-            let combined_string = format!("{:} {:}", self.remote_session_id.lock().unwrap().unwrap_or(0), string_data);
-
-            let dest_url = format!(
-                "http://{:}/runtime_manager",
-                self.veracruz_server_url,
-            );
-            let client_build = reqwest::blocking::ClientBuilder::new().build().unwrap();
-            let ret = client_build
-                .post(dest_url.as_str())
-                //.post("http://127.0.0.1:1743/runtime_manager")
-                .body(combined_string)
-                .send().unwrap();
-            if ret.status() != reqwest::StatusCode::OK {
-                println!("xx send failed ({}: {})", dest_url.as_str(), ret.text().unwrap());
-                return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx"))
-            }
-            println!("xx send suceeded:");
-            let body = ret.text().unwrap();
-
-            let body_items = body.split_whitespace().collect::<Vec<&str>>();
-            if !body_items.is_empty() {
-                let received_session_id = body_items[0].parse::<u32>().unwrap();
-                *self.remote_session_id.lock().unwrap() = Some(received_session_id);
-                let mut return_vec = Vec::new();
-                for item in body_items.iter().skip(1) {
-                    let this_body_data = base64::decode(item).unwrap();
-                    println!("xx received {:?}", this_body_data);
-                    return_vec.push(this_body_data);
-                }
-                if !return_vec.is_empty() {
-                    for x in return_vec {
-                        self.read_buffer.extend_from_slice(&x)
-                    }
-                }
-            }
-            println!("xx send suceeded.");
-        }
-
         let n = std::cmp::min(data.len(), self.read_buffer.len());
         println!("xx returning {} of {}", n, self.read_buffer.len());
         data[0..n].clone_from_slice(&self.read_buffer[0..n]);
@@ -98,8 +56,41 @@ impl Read for CbConn {
 
 impl Write for CbConn {
     fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
-        println!("xx wrote {}", data.len());
-        self.write_buffer.extend_from_slice(&data);
+        println!("xx sending {:?}", data);
+        let string_data = base64::encode(&data);
+        let combined_string = format!("{:} {:}", self.remote_session_id.lock().unwrap().unwrap_or(0), string_data);
+
+        let dest_url = format!(
+            "http://{:}/runtime_manager",
+            self.veracruz_server_url,
+        );
+        let client_build = reqwest::blocking::ClientBuilder::new().build().unwrap();
+        let ret = client_build
+            .post(dest_url.as_str())
+            .body(combined_string)
+            .send().unwrap();
+        if ret.status() != reqwest::StatusCode::OK {
+            println!("xx send failed ({}: {})", dest_url.as_str(), ret.text().unwrap());
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx"))
+        }
+        println!("xx send suceeded:");
+        let body = ret.text().unwrap();
+        let body_items = body.split_whitespace().collect::<Vec<&str>>();
+        if !body_items.is_empty() {
+            let received_session_id = body_items[0].parse::<u32>().unwrap();
+            *self.remote_session_id.lock().unwrap() = Some(received_session_id);
+            let mut return_vec = Vec::new();
+            for item in body_items.iter().skip(1) {
+                let this_body_data = base64::decode(item).unwrap();
+                println!("xx received {:?}", this_body_data);
+                return_vec.push(this_body_data);
+            }
+            if !return_vec.is_empty() {
+                for x in return_vec {
+                    self.read_buffer.extend_from_slice(&x)
+                }
+            }
+        }
         Ok(data.len())
     }
     fn flush(&mut self) -> Result<(), std::io::Error> {
