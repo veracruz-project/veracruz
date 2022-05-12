@@ -246,6 +246,7 @@ async fn policy_server_loop(
     Ok(())
 }
 
+/*
 #[allow(dead_code)]
 async fn client_loop(
     tx: std::sync::mpsc::Sender<Vec<u8>>,
@@ -288,3 +289,4 @@ async fn client_loop(
         std::thread::sleep(one_tenth_sec);
     }
 }
+ */

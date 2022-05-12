@@ -10,27 +10,99 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
-use log::{error, info};
+//use log::{error, info};
+use mbedtls;
+use mbedtls::alloc::List;
+use mbedtls::ssl::CipherSuite::*;
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
-use rustls::{Certificate, ClientConnection, PrivateKey};
-use rustls_pemfile;
+//use rustls::{Certificate, ClientConnection, PrivateKey};
+//use rustls_pemfile;
 use std::{
     convert::TryFrom,
     io::{Read, Write},
     path::Path,
     str::from_utf8,
+    sync::Arc,
 };
-use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
-use webpki;
+//use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
+//use webpki;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct VeracruzClient {
-    tls_connection: ClientConnection,
+    tls_connection: mbedtls::ssl::Context<CbConn>,
     remote_session_id: Option<u32>,
     policy: Policy,
     policy_hash: String,
     package_id: u32,
     client_cert: String,
+}
+
+struct CbConn {
+    read_buffer: Vec<u8>,
+    write_buffer: Vec<u8>,
+    veracruz_server_url: String,
+    enclave_session_id: u32, //xx
+}
+
+impl Read for CbConn {
+    fn read(&mut self, data: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+        if self.write_buffer.len() > 0 {
+            println!("xx sending {:?}", self.write_buffer);
+            let string_data = base64::encode(&self.write_buffer);
+            self.write_buffer = vec![];
+            let combined_string = format!("{:} {:}", self.enclave_session_id, string_data);
+
+            let dest_url = format!(
+                "http://{:}/runtime_manager",
+                self.veracruz_server_url,
+            );
+            let client_build = reqwest::blocking::ClientBuilder::new().build().unwrap();
+            let ret = client_build
+                .post(dest_url.as_str())
+                //.post("http://127.0.0.1:1743/runtime_manager")
+                .body(combined_string)
+                .send().unwrap();
+            if ret.status() != reqwest::StatusCode::OK {
+                println!("xx send failed ({}: {})", dest_url.as_str(), ret.text().unwrap());
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx"))
+            }
+            println!("xx send suceeded:");
+            let body = ret.text().unwrap();
+
+            let body_items = body.split_whitespace().collect::<Vec<&str>>();
+            if !body_items.is_empty() {
+                let received_session_id = body_items[0].parse::<u32>().unwrap();
+                let mut return_vec = Vec::new();
+                for item in body_items.iter().skip(1) {
+                    let this_body_data = base64::decode(item).unwrap();
+                    println!("xx received {:?}", this_body_data);
+                    return_vec.push(this_body_data);
+                }
+                if !return_vec.is_empty() {
+                    for x in return_vec {
+                        self.read_buffer.extend_from_slice(&x)
+                    }
+                }
+            }
+            println!("xx send suceeded.");
+        }
+
+        let n = std::cmp::min(data.len(), self.read_buffer.len());
+        println!("xx returning {} of {}", n, self.read_buffer.len());
+        data[0..n].clone_from_slice(&self.read_buffer[0..n]);
+        self.read_buffer = self.read_buffer[n..].to_vec();
+        Ok(n)
+    }
+}
+
+impl Write for CbConn {
+    fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
+        self.write_buffer.extend_from_slice(&data);
+        Ok(data.len())
+    }
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        Ok(())
+    }
 }
 
 impl VeracruzClient {
@@ -55,32 +127,24 @@ impl VeracruzClient {
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
     // TODO: use generic functions to unify read_cert and read_private_key
-    fn read_cert<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate, VeracruzClientError> {
-        let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
-        let mut cursor = std::io::Cursor::new(buffer);
-        let cert_vec = rustls_pemfile::certs(&mut cursor)
+    fn read_cert<P: AsRef<Path>>(filename: P) -> Result<List<mbedtls::x509::Certificate>, VeracruzClientError> {
+        let mut buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
+        buffer.push(b'\0');
+        let cert_vec = mbedtls::x509::Certificate::from_pem_multiple(&buffer)
             .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
-        if cert_vec.len() == 1 {
-            Ok(Certificate(cert_vec[0].clone()))
-        } else {
-            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
-        }
+        Ok(cert_vec)
     }
 
     /// Provide file path.
     /// Read the private in the file.
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
-    fn read_private_key<P: AsRef<Path>>(filename: P) -> Result<PrivateKey, VeracruzClientError> {
-        let buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
-        let mut cursor = std::io::Cursor::new(buffer);
-        let pkey_vec = rustls_pemfile::rsa_private_keys(&mut cursor)
+    fn read_private_key<P: AsRef<Path>>(filename: P) -> Result<mbedtls::pk::Pk, VeracruzClientError> {
+        let mut buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
+        buffer.push(b'\0');
+        let pkey_vec = mbedtls::pk::Pk::from_private_key(&buffer, None)
             .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
-        if pkey_vec.len() == 1 {
-            Ok(PrivateKey(pkey_vec[0].clone()))
-        } else {
-            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
-        }
+        Ok(pkey_vec)
     }
 
     /// Check the validity of client_cert:
@@ -150,48 +214,50 @@ impl VeracruzClient {
         policy_hash: String,
     ) -> Result<VeracruzClient, VeracruzClientError> {
         let client_cert = Self::read_cert(&client_cert_filename)?;
-        let client_priv_key = Self::read_private_key(&client_key_filename)?;
+        let mut client_priv_key = Self::read_private_key(&client_key_filename)?;
 
         // check if the certificate is valid
-        let mut key = mbedtls::pk::Pk::from_private_key(&client_priv_key.0, None)?;
-        Self::check_certificate_validity(&client_cert_filename, &mut key)?;
+        Self::check_certificate_validity(&client_cert_filename, &mut client_priv_key)?;
 
         let enclave_name = "ComputeEnclave.dev";
 
         let policy_ciphersuite_string = policy.ciphersuite().as_str();
 
         let proxy_service_cert = {
-            let certs_pem = policy.proxy_service_cert();
-            let certs = rustls_pemfile::certs(&mut certs_pem.as_bytes()).map_err(|_| {
+            let mut certs_pem = policy.proxy_service_cert().clone();
+            certs_pem.push('\0'); //xx
+            let certs = mbedtls::x509::Certificate::from_pem_multiple(certs_pem.as_bytes()).map_err(|_| {
                 VeracruzClientError::X509ParserError(
                     "rustls_pemfile::certs found no certificates".to_string(),
                 )
             })?;
-            certs[0].clone()
+            certs
         };
-        let mut root_store = rustls::RootCertStore::empty();
-        root_store
-            .add(&rustls::Certificate(proxy_service_cert))
-            .map_err(VeracruzClientError::WebpkiError)?;
-
-        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy_ciphersuite_string)
-            .ok_or_else(|| {
-                VeracruzClientError::TLSInvalidCiphersuiteError(
-                    policy_ciphersuite_string.to_string(),
-                )
-            })?;
-
-        let client_config = rustls::ClientConfig::builder()
-            .with_cipher_suites(&[policy_ciphersuite])
-            .with_safe_default_kx_groups()
-            .with_protocol_versions(&[&rustls::version::TLS12])?
-            .with_root_certificates(root_store)
-            .with_single_cert([client_cert].to_vec(), client_priv_key)?;
-
+        let mut config = mbedtls::ssl::Config::new(
+            mbedtls::ssl::config::Endpoint::Client,
+            mbedtls::ssl::config::Transport::Stream,
+            mbedtls::ssl::config::Preset::Default);
+        config.set_min_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
+        config.set_max_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
+        let cipher_suites : Vec<i32> = vec![EcdheEcdsaWithChacha20Poly1305Sha256.into(), 0];
+        //let cipher_suites : Vec<i32> = vec![EcdheRsaWithAes256GcmSha384.into(), 0];
+        //let cipher_suites : Vec<i32> = vec![RsaWithAes128GcmSha256.into(), DheRsaWithAes128GcmSha256.into(), PskWithAes128GcmSha256.into(), DhePskWithAes128GcmSha256.into(), RsaPskWithAes128GcmSha256.into(), 0];
+        config.set_ciphersuites(Arc::new(cipher_suites));
+        let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
+        let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None).unwrap());
+        config.set_rng(rng);
+        config.set_ca_list(Arc::new(proxy_service_cert), None);
+        let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
             .map_err(VeracruzClientError::InvalidDnsNameError)?;
-        let connection =
-            ClientConnection::new(std::sync::Arc::new(client_config), enclave_name_as_server)?;
+        let conn = CbConn {
+            read_buffer: vec![],
+            write_buffer: vec![],
+            veracruz_server_url: policy.veracruz_server_url().to_string(),
+            enclave_session_id: 0,
+        };
+        ctx.establish(conn, None).unwrap();
+
         let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
         let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
         // erase some '\n' to match the format in policy file.
@@ -204,8 +270,8 @@ impl VeracruzClient {
             .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
 
         Ok(VeracruzClient {
-            tls_connection: connection,
-            remote_session_id: None,
+            tls_connection: ctx,
+            remote_session_id: Some(0), //xx
             policy,
             policy_hash,
             package_id: 0,
@@ -375,59 +441,11 @@ impl VeracruzClient {
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
-        match self.tls_connection.peer_certificates() {
-            None => Err(VeracruzClientError::NoPeerCertificatesError),
-            Some(certs) => {
-                let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
-                let ues = ee_cert.unrecognized_extensions();
-                // check for OUR extension
-                // The Extension is encoded using DER, which puts the first two
-                // elements in the ID in 1 byte, and the rest get their own bytes
-                // This encoding is specified in ITU Recommendation x.690,
-                // which is available here: https://www.itu.int/rec/T-REC-X.690-202102-I/en
-                // but it's deep inside a PDF...
-                let encoded_extension_id: [u8; 3] = [
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40
-                        + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
-                ];
-                match ues.get(&encoded_extension_id[..]) {
-                    None => {
-                        error!("Our extension is not present. This should be fatal");
-
-                        Err(VeracruzClientError::RuntimeHashExtensionMissingError)
-                    }
-                    Some(data) => {
-                        info!("Certificate extension present.");
-
-                        let extension_data = data
-                            .read_all(VeracruzClientError::UnableToReadError, |input| {
-                                Ok(input.read_bytes_to_end())
-                            })?;
-
-                        info!("Certificate extension extracted correctly.");
-
-                        match self.compare_runtime_hash(extension_data.as_slice_less_safe()) {
-                            Ok(_) => {
-                                info!("Runtime hash matches.");
-
-                                Ok(())
-                            }
-                            Err(err) => {
-                                error!("Runtime hash mismatch: {}.", err);
-
-                                Err(err)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Ok(()) //xx
     }
 
-    /// send the data to the runtime_manager path on the Veracruz server.
-    // TODO: This function has return points scattered all over, making it very hard to follow
+    /// Send the data to the runtime_manager path on the Veracruz server
+    /// and return the response.
     async fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
         let mut enclave_session_id: u32 = 0;
 
@@ -435,132 +453,17 @@ impl VeracruzClient {
             enclave_session_id = session_id
         }
 
-        let mut outgoing_data_vec = Vec::new();
-        let mut start_index: usize = 0;
-        while start_index < data.len() {
-            let bytes_read = self.tls_connection.writer().write(&data[start_index..])?;
-            start_index += bytes_read;
-            let outgoing_data = Vec::new();
-            let outgoing_data_option = self.process(outgoing_data)?; // intentionally sending no data to process
-            if let Some(outgoing_data) = outgoing_data_option {
-                outgoing_data_vec.push(outgoing_data)
-            }
-        }
-
-        let mut incoming_data_vec: Vec<Vec<u8>> = Vec::new();
-
-        loop {
-            for outgoing_data in &outgoing_data_vec {
-                let incoming_data_option =
-                    self.post_runtime_manager(enclave_session_id, outgoing_data).await?;
-                if let Some((received_session_id, received_data_vec)) = incoming_data_option {
-                    enclave_session_id = received_session_id;
-                    for received_data in received_data_vec {
-                        incoming_data_vec.push(received_data);
-                    }
-                }
-            }
-
-            outgoing_data_vec.clear();
-            if !incoming_data_vec.is_empty() {
-                for incoming_data in &incoming_data_vec {
-                    let outgoing_data_option = self.process(incoming_data.to_vec())?;
-                    if let Some(outgoing_data) = outgoing_data_option {
-                        outgoing_data_vec.push(outgoing_data)
-                    }
-                }
-                incoming_data_vec.clear();
-            } else {
-                // try process with no data to see if it wants to send
-                let empty_vec = Vec::new();
-                let outgoing_data_option = self.process(empty_vec)?;
-                if let Some(outgoing_data) = outgoing_data_option {
-                    outgoing_data_vec.push(outgoing_data)
-                }
-            }
-
-            let plaintext_data_option = self.get_data()?;
-
-            if let Some(plaintext_data) = plaintext_data_option {
-                self.remote_session_id = Some(enclave_session_id);
-                return Ok(plaintext_data);
-            }
-        }
-    }
-
-    fn process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
-        let mut ret_option = None;
-        let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-        if !input.is_empty()
-            && (!self.tls_connection.is_handshaking() || self.tls_connection.wants_read())
-        {
-            let mut slice = &input[..];
-            self.tls_connection.read_tls(&mut slice)?;
-
-            self.tls_connection.process_new_packets()?;
-        }
-        if self.tls_connection.wants_write() {
-            self.tls_connection.write_tls(&mut output)?;
-            ret_option = Some(output);
-        }
-        Ok(ret_option)
+        self.tls_connection.write_all(&data)?;
+        let mut response = vec![];
+        self.tls_connection.read_to_end(&mut response);
+        Ok(response)
     }
 
     fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
-        self.tls_connection.process_new_packets()?;
-        match self
-            .tls_connection
-            .reader()
-            .read_to_end(&mut received_buffer)
-        {
-            Ok(_num) => (),
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
-            Err(err) => return Err(VeracruzClientError::IOError(err)),
-        };
+        self.tls_connection.read_to_end(&mut received_buffer);
         if !received_buffer.is_empty() {
             Ok(Some(received_buffer))
-        } else {
-            Ok(None)
-        }
-    }
-
-    async fn post_runtime_manager(
-        &self,
-        enclave_session_id: u32,
-        data: &[u8],
-    ) -> Result<Option<(u32, Vec<Vec<u8>>)>, VeracruzClientError> {
-        let string_data = base64::encode(data);
-        let combined_string = format!("{:} {:}", enclave_session_id, string_data);
-
-        let dest_url = format!(
-            "http://{:}/runtime_manager",
-            self.policy.veracruz_server_url()
-        );
-        let client_build = reqwest::ClientBuilder::new().build()?;
-        let ret = client_build
-            .post(dest_url.as_str())
-            .body(combined_string)
-            .send()
-            .await?;
-        if ret.status() != reqwest::StatusCode::OK {
-            return Err(VeracruzClientError::InvalidReqwestError(ret.status()));
-        }
-        let body = ret.text().await?;
-
-        let body_items = body.split_whitespace().collect::<Vec<&str>>();
-        if !body_items.is_empty() {
-            let received_session_id = body_items[0].parse::<u32>()?;
-            let mut return_vec = Vec::new();
-            for item in body_items.iter().skip(1) {
-                let this_body_data = base64::decode(item)?;
-                return_vec.push(this_body_data);
-            }
-            if !return_vec.is_empty() {
-                Ok(Some((received_session_id, return_vec)))
-            } else {
-                Ok(None)
-            }
         } else {
             Ok(None)
         }
@@ -577,25 +480,20 @@ impl VeracruzClient {
     #[cfg(test)]
     pub fn pub_read_cert<P: AsRef<Path>>(
         filename: P,
-    ) -> Result<rustls::Certificate, VeracruzClientError> {
+    ) -> Result<List<mbedtls::x509::Certificate>, VeracruzClientError> {
         VeracruzClient::read_cert(filename)
     }
 
     #[cfg(test)]
     pub fn pub_read_private_key<P: AsRef<Path>>(
         filename: P,
-    ) -> Result<PrivateKey, VeracruzClientError> {
+    ) -> Result<mbedtls::pk::Pk, VeracruzClientError> {
         VeracruzClient::read_private_key(filename)
     }
 
     #[cfg(test)]
     pub async fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         self.send(data).await
-    }
-
-    #[cfg(test)]
-    pub fn pub_process(&mut self, input: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzClientError> {
-        self.process(input)
     }
 
     #[cfg(test)]
