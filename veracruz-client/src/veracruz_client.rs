@@ -98,6 +98,7 @@ impl Read for CbConn {
 
 impl Write for CbConn {
     fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
+        println!("xx wrote {}", data.len());
         self.write_buffer.extend_from_slice(&data);
         Ok(data.len())
     }
@@ -248,6 +249,7 @@ impl VeracruzClient {
         let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None).unwrap());
         config.set_rng(rng);
         config.set_ca_list(Arc::new(proxy_service_cert), None);
+        config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
         let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
             .map_err(VeracruzClientError::InvalidDnsNameError)?;
