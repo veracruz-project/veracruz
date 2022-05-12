@@ -37,6 +37,8 @@ pub enum VeracruzClientError {
     TLSUnspecifiedError,
     #[error(display = "VeracruzClient: TLSError: invalid cyphersuite {:?}.", _0)]
     TLSInvalidCiphersuiteError(std::string::String),
+    #[error(display = "VeracruzClient: MbedTLS: {:?}", _0)]
+    MbedTLSError(#[error(source)] mbedtls::Error),
     #[error(display = "VeracruzClient: SerdeJsonError: {:?}.", _0)]
     SerdeJsonError(#[error(source)] serde_json::error::Error),
     #[error(display = "VeracruzClient: X509Error: {:?}.", _0)]

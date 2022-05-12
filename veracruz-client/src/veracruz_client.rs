@@ -98,12 +98,10 @@ impl VeracruzClient {
             .map_err(|e| VeracruzClientError::X509ParserError(e.to_string()))?
             .tbs_certificate;
         let cert_public_key_der =
-            mbedtls::pk::Pk::from_public_key(parsed_cert.subject_pki.subject_public_key.data)
-                .unwrap()
-                .write_public_der_vec()
-                .unwrap();
+            mbedtls::pk::Pk::from_public_key(parsed_cert.subject_pki.subject_public_key.data)?
+                .write_public_der_vec()?;
 
-        let public_key_der = public_key.write_public_der_vec().unwrap();
+        let public_key_der = public_key.write_public_der_vec()?;
         if cert_public_key_der != public_key_der {
             Err(VeracruzClientError::MismatchError {
                 variable: "public_key",
@@ -155,7 +153,7 @@ impl VeracruzClient {
         let client_priv_key = Self::read_private_key(&client_key_filename)?;
 
         // check if the certificate is valid
-        let mut key = mbedtls::pk::Pk::from_private_key(&client_priv_key.0, None).unwrap();
+        let mut key = mbedtls::pk::Pk::from_private_key(&client_priv_key.0, None)?;
         Self::check_certificate_validity(&client_cert_filename, &mut key)?;
 
         let enclave_name = "ComputeEnclave.dev";

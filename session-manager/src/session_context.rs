@@ -84,10 +84,10 @@ impl SessionContext {
                 0
             };
             let mut key =
-                mbedtls::pk::Pk::generate_ec(&mut rng, mbedtls::pk::EcGroupId::SecP256R1).unwrap();
+                mbedtls::pk::Pk::generate_ec(&mut rng, mbedtls::pk::EcGroupId::SecP256R1)?;
             (
-                key.write_public_der_vec().unwrap()[23..].to_vec(),
-                rustls::PrivateKey(key.write_private_der_vec().unwrap()),
+                key.write_public_der_vec()?[23..].to_vec(),
+                rustls::PrivateKey(key.write_private_der_vec()?),
             )
         };
 

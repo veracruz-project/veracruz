@@ -42,6 +42,12 @@ pub enum SessionManagerError {
     /// An IO error occurred, with an accompanying error code.
     #[error(display = "Session manager: an IO error occurred: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
+    /// A generic error occurred in the MbedTLS library.
+    #[error(
+        display = "Session manager: an unspecified error occurred in the MbedTLS library: {:?}.",
+        _0
+    )]
+    MbedtlsUnspecifiedError(#[error(source)] mbedtls::Error),
     /// A WebPKI error occurred with an accompanying error code.
     #[error(display = "Session manager: a WebPKI error occurred: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),
