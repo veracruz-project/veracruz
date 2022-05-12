@@ -22,7 +22,7 @@ use std::{
     io::{Read, Write},
     path::Path,
     str::from_utf8,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 //use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 //use webpki;
@@ -30,7 +30,7 @@ use std::{
 //#[derive(Debug)]
 pub struct VeracruzClient {
     tls_connection: mbedtls::ssl::Context<CbConn>,
-    remote_session_id: Option<u32>,
+    remote_session_id: Arc<Mutex<Option<u32>>>,
     policy: Policy,
     policy_hash: String,
     package_id: u32,
@@ -41,7 +41,7 @@ struct CbConn {
     read_buffer: Vec<u8>,
     write_buffer: Vec<u8>,
     veracruz_server_url: String,
-    enclave_session_id: u32, //xx
+    remote_session_id: Arc<Mutex<Option<u32>>>,
 }
 
 impl Read for CbConn {
@@ -50,7 +50,7 @@ impl Read for CbConn {
             println!("xx sending {:?}", self.write_buffer);
             let string_data = base64::encode(&self.write_buffer);
             self.write_buffer = vec![];
-            let combined_string = format!("{:} {:}", self.enclave_session_id, string_data);
+            let combined_string = format!("{:} {:}", self.remote_session_id.lock().unwrap().unwrap_or(0), string_data);
 
             let dest_url = format!(
                 "http://{:}/runtime_manager",
@@ -72,6 +72,7 @@ impl Read for CbConn {
             let body_items = body.split_whitespace().collect::<Vec<&str>>();
             if !body_items.is_empty() {
                 let received_session_id = body_items[0].parse::<u32>().unwrap();
+                *self.remote_session_id.lock().unwrap() = Some(received_session_id);
                 let mut return_vec = Vec::new();
                 for item in body_items.iter().skip(1) {
                     let this_body_data = base64::decode(item).unwrap();
@@ -250,11 +251,12 @@ impl VeracruzClient {
         let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
         let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
             .map_err(VeracruzClientError::InvalidDnsNameError)?;
+        let remote_session_id = Arc::new(Mutex::new(Some(0)));
         let conn = CbConn {
             read_buffer: vec![],
             write_buffer: vec![],
             veracruz_server_url: policy.veracruz_server_url().to_string(),
-            enclave_session_id: 0,
+            remote_session_id: Arc::clone(&remote_session_id),
         };
         ctx.establish(conn, None).unwrap();
 
@@ -271,7 +273,7 @@ impl VeracruzClient {
 
         Ok(VeracruzClient {
             tls_connection: ctx,
-            remote_session_id: Some(0), //xx
+            remote_session_id: Arc::clone(&remote_session_id),
             policy,
             policy_hash,
             package_id: 0,
@@ -296,7 +298,7 @@ impl VeracruzClient {
         let serialized_program = transport_protocol::serialize_program(program, &path)?;
         let response = self.send(&serialized_program).await?;
         let parsed_response =
-            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
+            transport_protocol::parse_runtime_manager_response(*self.remote_session_id.lock().unwrap(), &response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(()),
@@ -322,7 +324,7 @@ impl VeracruzClient {
         let response = self.send(&serialized_data).await?;
 
         let parsed_response =
-            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
+            transport_protocol::parse_runtime_manager_response(*self.remote_session_id.lock().unwrap(), &response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(()),
@@ -348,7 +350,7 @@ impl VeracruzClient {
         let response = self.send(&serialized_read_result).await?;
 
         let parsed_response =
-            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
+            transport_protocol::parse_runtime_manager_response(*self.remote_session_id.lock().unwrap(), &response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(VeracruzClientError::ResponseError(
@@ -377,7 +379,7 @@ impl VeracruzClient {
         let response = self.send(&serialized_read_result).await?;
 
         let parsed_response =
-            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
+            transport_protocol::parse_runtime_manager_response(*self.remote_session_id.lock().unwrap(), &response)?;
         let status = parsed_response.get_status();
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(VeracruzClientError::ResponseError("get_result", status));
@@ -401,7 +403,7 @@ impl VeracruzClient {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph).await?;
         let parsed_response =
-            transport_protocol::parse_runtime_manager_response(self.remote_session_id, &response)?;
+            transport_protocol::parse_runtime_manager_response(*self.remote_session_id.lock().unwrap(), &response)?;
         match parsed_response.status {
             transport_protocol::ResponseStatus::SUCCESS => {
                 let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
@@ -447,10 +449,10 @@ impl VeracruzClient {
     /// Send the data to the runtime_manager path on the Veracruz server
     /// and return the response.
     async fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
-        let mut enclave_session_id: u32 = 0;
+        let mut remote_session_id: u32 = 0;
 
-        if let Some(session_id) = self.remote_session_id {
-            enclave_session_id = session_id
+        if let Some(session_id) = *self.remote_session_id.lock().unwrap() {
+            remote_session_id = session_id
         }
 
         self.tls_connection.write_all(&data)?;
