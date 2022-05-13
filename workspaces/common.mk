@@ -9,17 +9,17 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-PROFILE ?= release
-PROFILE_PATH = release
-PROFILE_FLAG = --release
+PROFILE ?= dev
+PROFILE_PATH = debug
+PROFILE_FLAG =
 V ?= 0
 BIN_DIR ?= /usr/local/bin
 
 export PROFILE V BIN_DIR
 
-ifeq ($(PROFILE),dev)
-    PROFILE_PATH = debug
-    PROFILE_FLAG =
+ifeq ($(PROFILE),release)
+    PROFILE_PATH = release
+    PROFILE_FLAG = --release
 endif
 
 ifeq ($(V), 0)
