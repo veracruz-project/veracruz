@@ -10,54 +10,48 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
-//use log::{error, info};
-use mbedtls;
-use mbedtls::alloc::List;
-use mbedtls::ssl::CipherSuite::*;
+use mbedtls::{alloc::List, ssl::CipherSuite::*};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use std::{
-    convert::TryFrom,
     io::{Read, Write},
     path::Path,
-    str::from_utf8,
     sync::{Arc, Mutex},
 };
-//use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
-//use webpki;
 
-//#[derive(Debug)]
+/// VeracruzClient struct. The remote_session_id is shared between
+/// VeracruzClient and InsecureConnection so that it is available from
+/// VeracruzClient methods and can also be updated by the
+/// InsecureConnection methods invoked by mbedtls.
 pub struct VeracruzClient {
-    tls_connection: mbedtls::ssl::Context<CbConn>,
+    tls_connection: mbedtls::ssl::Context<InsecureConnection>,
     remote_session_id: Arc<Mutex<Option<u32>>>,
     policy: Policy,
     policy_hash: String,
-    package_id: u32,
-    client_cert: String,
 }
 
-struct CbConn {
+/// This is the structure given to mbedtls and used for reading and
+/// writing cyphertext, using the standard Read and Write traits.
+struct InsecureConnection {
     read_buffer: Vec<u8>,
-    write_buffer: Vec<u8>,
     veracruz_server_url: String,
     remote_session_id: Arc<Mutex<Option<u32>>>,
 }
 
-impl Read for CbConn {
+impl Read for InsecureConnection {
     fn read(&mut self, data: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+        // Return as much data from the read_buffer as fits.
         let n = std::cmp::min(data.len(), self.read_buffer.len());
-        //println!("xx returning {} of {}", n, self.read_buffer.len());
         data[0..n].clone_from_slice(&self.read_buffer[0..n]);
         self.read_buffer = self.read_buffer[n..].to_vec();
         Ok(n)
     }
 }
 
-impl Write for CbConn {
+impl Write for InsecureConnection {
     fn write(&mut self, data: &[u8]) -> std::result::Result<usize, std::io::Error> {
-        //println!("xx sending {:?}", data);
+        // Send all the data to the server.
         let string_data = base64::encode(&data);
         let combined_string = format!("{:} {:}", self.remote_session_id.lock().unwrap().unwrap_or(0), string_data);
-
         let dest_url = format!(
             "http://{:}/runtime_manager",
             self.veracruz_server_url,
@@ -73,24 +67,20 @@ impl Write for CbConn {
         if ret.status() != reqwest::StatusCode::OK {
             return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx2"))
         }
-        //println!("xx send suceeded:");
+        // We received a response ...
         let body = ret.text().unwrap();
         let body_items = body.split_whitespace().collect::<Vec<&str>>();
         if !body_items.is_empty() {
+            // If it was not empty, update the remote_session_id ...
             let received_session_id = body_items[0].parse::<u32>().unwrap();
             *self.remote_session_id.lock().unwrap() = Some(received_session_id);
-            let mut return_vec = Vec::new();
+            // And append response data to the read_buffer.
             for item in body_items.iter().skip(1) {
                 let this_body_data = base64::decode(item).unwrap();
-                //println!("xx received {:?}", this_body_data);
-                return_vec.push(this_body_data);
-            }
-            if !return_vec.is_empty() {
-                for x in return_vec {
-                    self.read_buffer.extend_from_slice(&x)
-                }
+                self.read_buffer.extend_from_slice(&this_body_data)
             }
         }
+        // Return value to indicate that we handled all the data.
         Ok(data.len())
     }
     fn flush(&mut self) -> Result<(), std::io::Error> {
@@ -125,7 +115,11 @@ impl VeracruzClient {
         buffer.push(b'\0');
         let cert_vec = mbedtls::x509::Certificate::from_pem_multiple(&buffer)
             .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
-        Ok(cert_vec)
+        if cert_vec.iter().count() == 1 {
+            Ok(cert_vec)
+        } else {
+            Err(VeracruzClientError::InvalidLengthError("cert_vec", 1))
+        }
     }
 
     /// Provide file path.
@@ -212,13 +206,9 @@ impl VeracruzClient {
         // check if the certificate is valid
         Self::check_certificate_validity(&client_cert_filename, &mut client_priv_key)?;
 
-        let enclave_name = "ComputeEnclave.dev";
-
-        let policy_ciphersuite_string = policy.ciphersuite().as_str();
-
         let proxy_service_cert = {
             let mut certs_pem = policy.proxy_service_cert().clone();
-            certs_pem.push('\0'); //xx
+            certs_pem.push('\0');
             let certs = mbedtls::x509::Certificate::from_pem_multiple(certs_pem.as_bytes()).map_err(|_| {
                 VeracruzClientError::X509ParserError(
                     "mbedtls::x509::Certificate::from_pem_multiple".to_string(),
@@ -232,9 +222,7 @@ impl VeracruzClient {
             mbedtls::ssl::config::Preset::Default);
         config.set_min_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
         config.set_max_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
-        let cipher_suites : Vec<i32> = vec![EcdheEcdsaWithChacha20Poly1305Sha256.into(), 0];
-        //let cipher_suites : Vec<i32> = vec![EcdheRsaWithAes256GcmSha384.into(), 0];
-        //let cipher_suites : Vec<i32> = vec![RsaWithAes128GcmSha256.into(), DheRsaWithAes128GcmSha256.into(), PskWithAes128GcmSha256.into(), DhePskWithAes128GcmSha256.into(), RsaPskWithAes128GcmSha256.into(), 0];
+        let cipher_suites : Vec<i32> = vec![EcdheEcdsaWithChacha20Poly1305Sha256.into(), 0]; //xx we should use policy.ciphersuite()
         config.set_ciphersuites(Arc::new(cipher_suites));
         let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
         let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None).unwrap());
@@ -243,32 +231,18 @@ impl VeracruzClient {
         config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
         let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
         let remote_session_id = Arc::new(Mutex::new(Some(0)));
-        let conn = CbConn {
+        let conn = InsecureConnection {
             read_buffer: vec![],
-            write_buffer: vec![],
             veracruz_server_url: policy.veracruz_server_url().to_string(),
             remote_session_id: Arc::clone(&remote_session_id),
         };
         ctx.establish(conn, None).unwrap();
-
-        let client_cert_text = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
-        let mut client_cert_raw = from_utf8(client_cert_text.as_slice())?.to_string();
-        // erase some '\n' to match the format in policy file.
-        client_cert_raw.retain(|c| c != '\n');
-        let client_cert_string = client_cert_raw
-            .replace(
-                "-----BEGIN CERTIFICATE-----",
-                "-----BEGIN CERTIFICATE-----\n",
-            )
-            .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
 
         Ok(VeracruzClient {
             tls_connection: ctx,
             remote_session_id: Arc::clone(&remote_session_id),
             policy,
             policy_hash,
-            package_id: 0,
-            client_cert: client_cert_string,
         })
     }
 
@@ -434,27 +408,25 @@ impl VeracruzClient {
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
-        Ok(()) //xx
+        //xx Presumably we must do something here!
+        if false {
+            let _ = self.compare_runtime_hash(b"");
+        }
+        Ok(())
     }
 
     /// Send the data to the runtime_manager path on the Veracruz server
     /// and return the response.
     async fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
-        let mut remote_session_id: u32 = 0;
-
-        if let Some(session_id) = *self.remote_session_id.lock().unwrap() {
-            remote_session_id = session_id
-        }
-
         self.tls_connection.write_all(&data)?;
         let mut response = vec![];
-        self.tls_connection.read_to_end(&mut response);
+        self.tls_connection.read_to_end(&mut response)?;
         Ok(response)
     }
 
     fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
         let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
-        self.tls_connection.read_to_end(&mut received_buffer);
+        self.tls_connection.read_to_end(&mut received_buffer)?;
         if !received_buffer.is_empty() {
             Ok(Some(received_buffer))
         } else {
