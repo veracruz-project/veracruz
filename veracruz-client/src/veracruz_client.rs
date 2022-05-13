@@ -65,13 +65,15 @@ impl Write for CbConn {
             self.veracruz_server_url,
         );
         let client_build = reqwest::blocking::ClientBuilder::new().build().unwrap();
-        let ret = client_build
+        let ret = match client_build
             .post(dest_url.as_str())
             .body(combined_string)
-            .send().unwrap();
+            .send() {
+                Ok(x) => x,
+                Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx1")),
+            };
         if ret.status() != reqwest::StatusCode::OK {
-            //println!("xx send failed ({}: {})", dest_url.as_str(), ret.text().unwrap());
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx"))
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx2"))
         }
         //println!("xx send suceeded:");
         let body = ret.text().unwrap();
