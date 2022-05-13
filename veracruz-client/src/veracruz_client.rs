@@ -424,16 +424,6 @@ impl VeracruzClient {
         Ok(response)
     }
 
-    fn get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
-        let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
-        self.tls_connection.read_to_end(&mut received_buffer)?;
-        if !received_buffer.is_empty() {
-            Ok(Some(received_buffer))
-        } else {
-            Ok(None)
-        }
-    }
-
     // APIs for testing: expose internal functions
     #[cfg(test)]
     pub fn pub_read_all_bytes_in_file<P: AsRef<Path>>(
@@ -459,11 +449,6 @@ impl VeracruzClient {
     #[cfg(test)]
     pub async fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         self.send(data).await
-    }
-
-    #[cfg(test)]
-    pub fn pub_get_data(&mut self) -> Result<Option<std::vec::Vec<u8>>, VeracruzClientError> {
-        self.get_data()
     }
 }
 
