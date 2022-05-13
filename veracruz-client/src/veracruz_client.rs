@@ -15,8 +15,6 @@ use mbedtls;
 use mbedtls::alloc::List;
 use mbedtls::ssl::CipherSuite::*;
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
-//use rustls::{Certificate, ClientConnection, PrivateKey};
-//use rustls_pemfile;
 use std::{
     convert::TryFrom,
     io::{Read, Write},
@@ -223,7 +221,7 @@ impl VeracruzClient {
             certs_pem.push('\0'); //xx
             let certs = mbedtls::x509::Certificate::from_pem_multiple(certs_pem.as_bytes()).map_err(|_| {
                 VeracruzClientError::X509ParserError(
-                    "rustls_pemfile::certs found no certificates".to_string(),
+                    "mbedtls::x509::Certificate::from_pem_multiple".to_string(),
                 )
             })?;
             certs
@@ -244,8 +242,6 @@ impl VeracruzClient {
         config.set_ca_list(Arc::new(proxy_service_cert), None);
         config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
         let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
-        let enclave_name_as_server = rustls::ServerName::try_from(enclave_name)
-            .map_err(VeracruzClientError::InvalidDnsNameError)?;
         let remote_session_id = Arc::new(Mutex::new(Some(0)));
         let conn = CbConn {
             read_buffer: vec![],

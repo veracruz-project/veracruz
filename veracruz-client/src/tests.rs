@@ -41,13 +41,12 @@ use std::{
     io::prelude::*,
     io::Read,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use actix_session::Session;
 use actix_web::http::StatusCode;
 use actix_web::{post, App, HttpRequest, HttpResponse, HttpServer};
-
-use rustls_pemfile;
 
 pub fn policy_path(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
@@ -153,10 +152,10 @@ fn veracruz_client_session() {
             std::fs::File::open(server_cert_filename).expect("Cannot open cert file for reading");
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
-        let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls_pemfile::certs(&mut cursor).unwrap();
-        assert!(certs.len() > 0);
-        certs[0].clone()
+        cert_buffer.push(b'\0');
+        let certs = mbedtls::x509::Certificate::from_pem_multiple(&cert_buffer).unwrap();
+        assert!(!certs.iter().next().is_none());
+        certs
     };
 
     let server_priv_key = {
@@ -164,10 +163,10 @@ fn veracruz_client_session() {
             std::fs::File::open(server_key_filename).expect("Cannot open key file for reading");
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer).unwrap();
-        let mut cursor = std::io::Cursor::new(key_buffer);
-        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)
+        key_buffer.push(b'\0');
+        let rsa_keys = mbedtls::pk::Pk::from_private_key(&key_buffer, None)
             .expect("file contains invalid rsa private key");
-        rsa_keys[0].clone()
+        rsa_keys
     };
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
@@ -184,29 +183,20 @@ fn veracruz_client_session() {
             .expect("Cannot open cert file for reading");
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
-        let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls_pemfile::certs(&mut cursor).unwrap();
-        assert!(certs.len() > 0);
-        certs[0].clone()
+        cert_buffer.push(b'\0');
+        let certs = mbedtls::x509::Certificate::from_pem_multiple(&cert_buffer).unwrap();
+        assert!(!certs.iter().next().is_none());
+        certs
     };
 
-    let mut server_root_cert_store = rustls::RootCertStore::empty();
-    server_root_cert_store
-        .add(&rustls::Certificate(client_cert))
-        .unwrap();
-
-    let server_config = rustls::ServerConfig::builder()
-        .with_cipher_suites(&rustls::ALL_CIPHER_SUITES.to_vec())
-        .with_safe_default_kx_groups()
-        .with_protocol_versions(&[&rustls::version::TLS12])
-        .unwrap()
-        .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
-            server_root_cert_store,
-        ))
-        .with_single_cert(
-            vec![rustls::Certificate(server_cert.to_vec())],
-            rustls::PrivateKey(server_priv_key),
-        );
+    let mut config = mbedtls::ssl::Config::new(
+        mbedtls::ssl::config::Endpoint::Server,
+        mbedtls::ssl::config::Transport::Stream,
+        mbedtls::ssl::config::Preset::Default);
+    config.set_ca_list(Arc::new(client_cert), None);
+    config.set_min_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
+    config.set_max_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
+    config.push_cert(Arc::new(server_cert), Arc::new(server_priv_key)).unwrap();
 }
 
 /// simple index handler
@@ -232,7 +222,6 @@ async fn runtime_manager(
 }
 
 async fn policy_server_loop(
-    _server_conn: &mut rustls::Connection,
     server_url: &str,
 ) -> Result<(), VeracruzClientError> {
     HttpServer::new(|| App::new().service(runtime_manager))

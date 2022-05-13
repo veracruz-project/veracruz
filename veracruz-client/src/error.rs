@@ -26,13 +26,6 @@ pub enum VeracruzClientError {
     InvalidReqwestError(reqwest::StatusCode),
     #[error(display = "VeracruzClient: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
-    #[error(display = "VeracruzClient: TLSError: {:?}.", _0)]
-    TLSError(#[error(source)] rustls::Error),
-    #[error(
-        display = "VeracruzClient: TLSError: unsupported cyphersuite {:?}.",
-        _0
-    )]
-    TLSUnsupportedCyphersuiteError(rustls::CipherSuite),
     #[error(display = "VeracruzClient: TLSError: unspecified.")]
     TLSUnspecifiedError,
     #[error(display = "VeracruzClient: TLSError: invalid cyphersuite {:?}.", _0)]
@@ -47,8 +40,6 @@ pub enum VeracruzClientError {
     X509ParserError(String),
     #[error(display = "VeracruzClient: WebpkiError: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),
-    #[error(display = "VeracruzClient: Invalid DNS Error: {:?}", _0)]
-    InvalidDnsNameError(#[error(source)] rustls::client::InvalidDnsNameError),
     #[error(display = "VeracruzClient: TryIntoError: {}.", _0)]
     TryIntoError(#[error(source)] std::num::TryFromIntError),
     #[error(display = "VeracruzClient: ParseIntError: {}.", _0)]
