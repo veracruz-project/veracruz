@@ -17,7 +17,7 @@ using. So for example, if you are running Veracruz on Linux, you would
 run `make -C workspaces linux-install`.
 
 ``` bash
-$ make -C workspaces linux
+$ make -C workspaces linux PROFILE=release
 $ sudo make -C workspaces linux-install
 ...
 ```
