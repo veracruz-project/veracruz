@@ -18,7 +18,7 @@ run `make -C workspaces linux-install`.
 
 ``` bash
 $ make -C workspaces linux PROFILE=release
-$ sudo make -C workspaces linux-install
+$ sudo make -C workspaces linux-install PROFILE=release
 ...
 ```
 
@@ -188,7 +188,7 @@ $ vc-pgen \
     --proxy-attestation-server-cert example/example-ca-cert.pem \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
-    --css-file workspaces/linux-runtime/target/debug/runtime_manager_enclave \
+    --css-file workspaces/linux-runtime/target/release/runtime_manager_enclave \
     --certificate example/example-program-cert.pem \
     --capability "/program/:w" \
     --certificate example/example-data0-cert.pem \
