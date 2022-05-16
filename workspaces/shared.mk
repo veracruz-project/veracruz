@@ -128,7 +128,7 @@ $(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.r
 	$(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
-policy-files: $(OUT_DIR) $(MEASUREMENT_FILE) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES)) $(OUT_DIR)/invalid_policy
+policy-files: $(OUT_DIR) $(MEASUREMENT_FILE) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))
 	@echo $(INFO_COLOR)"GEN   =>  $(POLICY_FILES)"$(RESET_COLOR)
 
 PROGRAM_DIR = /program/
@@ -147,10 +147,6 @@ PGEN_COMMON_PARAMS = --proxy-attestation-server-cert $(CA_CRT) $(MEASUREMENT_PAR
 	--certificate-expiry $(CERTIFICATE_EXPIRY) --execution-strategy Interpretation
 
 MAX_MEMORY_MIB = 256
-
-$(OUT_DIR)/invalid_policy: $(WORKSPACE_DIR)/../test-collateral/invalid_policy/*.json
-	mkdir -p $@
-	cp $(WORKSPACE_DIR)/../test-collateral/invalid_policy/*.json $@
 
 $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \

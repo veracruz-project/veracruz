@@ -90,7 +90,6 @@ CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
 test-server: test-dependencies
 	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
 	$(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
-	$(CARGO_TEST) -p veracruz-server-test test_debug -- --ignored --test-threads=1
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1

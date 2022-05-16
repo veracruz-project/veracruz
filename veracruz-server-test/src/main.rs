@@ -20,22 +20,24 @@ mod tests {
     use actix_rt::System;
     use either::{Left, Right};
     use env_logger;
-    use lazy_static::lazy_static;
-    use log::{debug, error, info, Level};
+    use log::{error, info};
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
     use rustls_pemfile;
     use std::{
-        collections::HashMap,
         convert::TryFrom,
         env::{self, VarError},
+        error::Error,
+        fs::File,
         io::{Read, Write},
         path::{Path, PathBuf},
         sync::{
-            atomic::{AtomicBool, AtomicU32, Ordering},
-            mpsc, Mutex, Once,
+            atomic::{AtomicBool, Ordering},
+            mpsc::{channel, Receiver, Sender},
+            Arc, Once,
         },
         thread,
+        thread::JoinHandle,
         time::{Duration, Instant},
         vec::Vec,
     };
@@ -52,7 +54,6 @@ mod tests {
 
     // Policy files
     const POLICY: &'static str = "single_client.json";
-    const NO_DEBUG_POLICY: &'static str = "single_client_no_debug.json";
     const CA_CERT: &'static str = "CACert.pem";
     const CA_KEY: &'static str = "CAKey.pem";
     const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
@@ -73,6 +74,8 @@ mod tests {
     const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
     const POSTCARD_NATIVE_WASM: &'static str = "postcard-native.wasm";
     const POSTCARD_WASM: &'static str = "postcard-wasm.wasm";
+    const SORT_NUBMER_WASM: &'static str = "sort-numbers.wasm";
+    const RANDOM_U32_LIST_WASM: &'static str = "random-u32-list.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str = "intersection-customer.dat";
@@ -88,35 +91,51 @@ mod tests {
     const LOGISTICS_REGRESSION_DATA_PATH: &'static str = "idash2017/";
     const MACD_DATA_PATH: &'static str = "macd/";
     const PRIVATE_SET_INTER_SUM_DATA_PATH: &'static str = "private-set-inter-sum/";
+    // default timeout
+    const TIME_OUT_SECS: u64 = 1200;
 
-    static SETUP: Once = Once::new();
-    static DEBUG_SETUP: Once = Once::new();
-    lazy_static! {
-        // This is a semi-hack to test of if the debug is called.
-        // In each run this flag should be set false.
-        static ref DEBUG_IS_CALLED: AtomicBool = AtomicBool::new(false);
-        // A global flag, between the server thread and the client thread in the test_template.
-        // If one of the two threads hits an Error, it sets the flag to `false` and
-        // thus stops another thread. Without this hack, a failure can cause non-termination.
-        static ref CONTINUE_FLAG_HASH: Mutex<HashMap<u32,bool>> = Mutex::new(HashMap::<u32,bool>::new());
-        static ref NEXT_TICKET: AtomicU32 = AtomicU32::new(0);
-    }
+    static PROXY_ATTESTATION_SETUP: Once = Once::new();
 
-    pub fn policy_path(filename: &str) -> PathBuf {
+    /// Add the policy directory, reading from environment variable `$VERACRUZ_POLICY_DIR` or using the
+    /// default `test-collateral`.
+    pub fn policy_dir<T: AsRef<str>>(filename: T) -> PathBuf {
         PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
-            .join(filename)
+            .join(filename.as_ref())
     }
-    pub fn trust_path(filename: &str) -> PathBuf {
+
+    /// Add the certificate and key directory, reading from environment variable `$VERACRUZ_TRUST_DIR`
+    /// or using the default `test-collateral`.
+    pub fn cert_key_dir<T: AsRef<str>>(filename: T) -> PathBuf {
         PathBuf::from(env::var("VERACRUZ_TRUST_DIR").unwrap_or("../test-collateral".to_string()))
-            .join(filename)
+            .join(filename.as_ref())
     }
-    pub fn program_path(filename: &str) -> PathBuf {
+
+    /// Add the program directory, reading from environment variable `$VERACRUZ_PROGRAM_DIR`
+    /// or using the default `test-collateral`.
+    pub fn program_dir<T: AsRef<str>>(filename: T) -> PathBuf {
         PathBuf::from(env::var("VERACRUZ_PROGRAM_DIR").unwrap_or("../test-collateral".to_string()))
-            .join(filename)
+            .join(filename.as_ref())
     }
-    pub fn data_dir(filename: &str) -> PathBuf {
+
+    /// Add the data directory, reading from environment variable `$VERACRUZ_DATA_DIR`
+    /// or using the default `test-collateral`.
+    pub fn data_dir<T: AsRef<str>>(filename: T) -> PathBuf {
         PathBuf::from(env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()))
-            .join(filename)
+            .join(filename.as_ref())
+    }
+
+    /// Add path prefix, `$REMOTE_PROGRAM_DIR` or the default `/program/`, to the program `filename`.
+    pub fn runtime_program_dir<T: AsRef<str>>(filename: T) -> String {
+        let mut path_prefix = env::var("REMOTE_PROGRAM_DIR").unwrap_or("/program/".to_string());
+        path_prefix.push_str(filename.as_ref());
+        path_prefix
+    }
+
+    /// Add path prefix, `$REMOTE_DATA_DIR` or the default `/input/`, to the program `filename`.
+    pub fn runtime_data_dir<T: AsRef<str>>(filename: T) -> String {
+        let mut path_prefix = env::var("REMOTE_DATA_DIR").unwrap_or("/input/".to_string());
+        path_prefix.push_str(filename.as_ref());
+        path_prefix
     }
 
     /// A wrapper to force tests to panic after a timeout.
@@ -137,7 +156,7 @@ mod tests {
         };
 
         // based on https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
-        let (done_tx, done_rx) = mpsc::channel();
+        let (done_tx, done_rx) = channel();
         let thread = thread::spawn(move || {
             let r = f();
             done_tx.send(()).unwrap();
@@ -153,408 +172,310 @@ mod tests {
         }
     }
 
-    pub fn setup(proxy_attestation_server_url: String) -> u32 {
-        #[allow(unused_assignments)]
-        let rst = NEXT_TICKET.fetch_add(1, Ordering::SeqCst);
+    pub fn proxy_attestation_setup(proxy_attestation_server_url: String) {
+        PROXY_ATTESTATION_SETUP.call_once(|| {
+            info!("Proxy attestation server: initialize.");
 
-        SETUP.call_once(|| {
-            info!("SETUP.call_once called");
+            env_logger::init();
 
             let _main_loop_handle = std::thread::spawn(|| {
                 let sys = System::new();
-                println!(
+                info!(
                     "spawned thread calling server with url:{:?}",
                     proxy_attestation_server_url
                 );
-                #[cfg(feature = "debug")]
+                let debug_flag = if cfg!(feature = "debug") { true } else { false };
                 let server = proxy_attestation_server::server::server(
                     proxy_attestation_server_url,
-                    trust_path(CA_CERT).as_path(),
-                    trust_path(CA_KEY).as_path(),
-                    true,
-                )
-                .unwrap();
-                #[cfg(not(feature = "debug"))]
-                let server = proxy_attestation_server::server::server(
-                    proxy_attestation_server_url,
-                    trust_path(CA_CERT).as_path(),
-                    trust_path(CA_KEY).as_path(),
-                    false,
+                    cert_key_dir(CA_CERT).as_path(),
+                    cert_key_dir(CA_KEY).as_path(),
+                    debug_flag,
                 )
                 .unwrap();
                 sys.block_on(server).unwrap();
             });
         });
-        // sleep to wait for the proxy attestation server to start
+        // Sleep to wait for the proxy attestation server to start
         std::thread::sleep(std::time::Duration::from_millis(100));
-        rst
-    }
-
-    pub fn debug_setup() {
-        DEBUG_SETUP.call_once(|| {
-            std::env::set_var("RUST_LOG", "debug,actix_server=debug,actix_web=debug");
-            env_logger::builder()
-                // Check if the debug is called.
-                .format(|buf, record| {
-                    let message = format!("{}", record.args());
-                    if record.level() == Level::Debug && message.contains("Enclave debug message") {
-                        DEBUG_IS_CALLED.store(true, Ordering::SeqCst);
-                    }
-                    writeln!(buf, "[{} {}]: {}", record.target(), record.level(), message)
-                })
-                .init();
-        });
     }
 
     #[test]
-    /// Load every valid policy file in the test-collateral/ and in
-    /// test-collateral/invalid_policy,
-    /// initialise an enclave.
-    fn test_phase1_init_destroy_enclave() {
-        timeout(Duration::from_secs(1200), || {
-            // all the json in test-collateral should be valid policy
-            let policy_dir = PathBuf::from(
-                env::var("VERACRUZ_POLICY_DIR")
-                    .unwrap_or("../test-collateral".to_string())
-                    .clone(),
-            );
-            iterate_over_policy(policy_dir.as_path(), |policy_json| {
-                let policy = Policy::from_json(&policy_json);
-                assert!(policy.is_ok());
-                if let Ok(policy) = policy {
-                    setup(policy.proxy_attestation_server_url().clone());
-                    let result = VeracruzServerEnclave::new(&policy_json);
-                    assert!(result.is_ok(), "error:{:?}", result.err());
-                }
-            });
-
-            // If any json in test-collateral/invalid_policy is valid in Policy::new(),
-            // it must also valid in term of VeracruzServerEnclave::new()
-            iterate_over_policy(policy_path("invalid_policy").as_path(), |policy_json| {
-                let policy = Policy::from_json(&policy_json);
-                if let Ok(policy) = policy {
-                    setup(policy.proxy_attestation_server_url().clone());
-                    let result = VeracruzServerEnclave::new(&policy_json);
-                    assert!(
-                        result.is_ok(),
-                        "error:{:?}, json:{:?}",
-                        result.err(),
-                        policy_json
-                    );
-                }
-            });
+    /// Load a policy and initialize veracruz server (including runtime), and proxy attestation server.
+    /// Attestation happen during the veracruz runtime initialisation phase.
+    fn basic_init_destroy_enclave() {
+        timeout(Duration::from_secs(TIME_OUT_SECS), || {
+            let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
+            proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+            VeracruzServerEnclave::new(&policy_json).unwrap();
         })
     }
 
     #[test]
     /// Load policy file and check if a new session tls can be opened
-    fn test_phase1_new_session() {
-        timeout(Duration::from_secs(1200), || {
-            let policy_dir = PathBuf::from(
-                env::var("VERACRUZ_POLICY_DIR")
-                    .unwrap_or("../test-collateral".to_string())
-                    .clone(),
-            );
-            iterate_over_policy(policy_dir.as_path(), |policy_json| {
-                let policy = Policy::from_json(&policy_json).unwrap();
-                // start the proxy attestation server
-                setup(policy.proxy_attestation_server_url().clone());
-                let result = init_veracruz_server_and_tls_session(policy_json);
-                assert!(result.is_ok(), "error:{:?}", result.err());
-            });
-        })
-    }
-
-    #[test]
-    /// Load the Veracruz server and generate the self-signed certificate
-    fn test_phase1_enclave_self_signed_cert() {
-        timeout(Duration::from_secs(1200), || {
+    fn basic_new_session() {
+        timeout(Duration::from_secs(TIME_OUT_SECS), || {
+            let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
             // start the proxy attestation server
-            let policy_dir = PathBuf::from(
-                env::var("VERACRUZ_POLICY_DIR")
-                    .unwrap_or("../test-collateral".to_string())
-                    .clone(),
-            );
-            iterate_over_policy(policy_dir.as_path(), |policy_json| {
-                let policy = Policy::from_json(&policy_json).unwrap();
-                setup(policy.proxy_attestation_server_url().clone());
-                let result = VeracruzServerEnclave::new(&policy_json);
-                assert!(result.is_ok());
-            });
+            proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+            init_veracruz_server_and_tls_session(policy_json).unwrap();
         })
     }
 
     #[test]
-    /// Test the attestation flow without sending any program or data into the Veracruz server
-    fn test_phase1_attestation_only() {
-        timeout(Duration::from_secs(1200), || {
-            let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
-            setup(policy.proxy_attestation_server_url().clone());
+    /// Basic read from and write to files, and traverse directories.
+    fn basic_read_write_and_traverse() {
+        let events = vec![
+            TestEvent::CheckHash,
+            TestEvent::write_program(READ_FILE_WASM),
+            TestEvent::write_data(STRING_1_DATA),
+            TestEvent::execute(READ_FILE_WASM),
+            TestEvent::read_result("/output/test/test.txt"),
+            TestEvent::read_result("/output/hello-world-1.dat"),
+            TestEvent::ShutDown,
+        ];
 
-            let ret = VeracruzServerEnclave::new(&policy_json);
-
-            let _veracruz_server = ret.unwrap();
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    #[ignore]
-    /// Test if the detect for calling `debug!` in enclave works.
-    fn test_debug1_fire_test_on_debug() {
-        timeout(Duration::from_secs(1200), || {
-            debug_setup();
-            DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
-            debug!("Enclave debug message stud");
-            assert!(DEBUG_IS_CALLED.load(Ordering::SeqCst));
-        })
+    /// Generate random number.
+    fn basic_random_source() {
+        let events = vec![
+            TestEvent::write_program(RANDOM_SOURCE_WASM),
+            TestEvent::execute(RANDOM_SOURCE_WASM),
+            TestEvent::read_result("/output/random.dat"),
+            TestEvent::ShutDown,
+        ];
+
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    #[ignore]
-    /// Test if the detect for calling `debug!` in enclave works.
-    fn test_debug2_linear_regression_without_debug() {
-        timeout(Duration::from_secs(1200), || {
-            debug_setup();
-            DEBUG_IS_CALLED.store(false, Ordering::SeqCst);
-            test_template(
-                policy_path(NO_DEBUG_POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/linear-regression.wasm",
-                    program_path(LINEAR_REGRESSION_WASM),
-                )],
-                &[(
-                    "/input/linear-regression.dat",
-                    data_dir(LINEAR_REGRESSION_DATA),
-                )],
-                &[],
-                &["/output/linear-regression.dat"],
-            )
-            .unwrap();
-            assert!(!DEBUG_IS_CALLED.load(Ordering::SeqCst));
-        })
+    /// Custom external function `fd_create`
+    fn fd_create() {
+        let events = vec![
+            TestEvent::write_program(FD_CREATE_RUST_WASM),
+            TestEvent::execute(FD_CREATE_RUST_WASM),
+            TestEvent::read_result("/output/pass"),
+            TestEvent::ShutDown,
+        ];
+
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Attempt to establish a client connection with the Veracruz server with an invalid client certificate
-    fn test_phase2_single_session_with_invalid_client_certificate() {
-        timeout(Duration::from_secs(1200), || {
-            let (policy, policy_json, _) = read_policy(policy_path(POLICY)).unwrap();
-            // start the proxy attestation server
-            setup(policy.proxy_attestation_server_url().clone());
-            init_veracruz_server_and_tls_session(&policy_json).unwrap();
+    /// A client attempts to execute a non-existent file
+    fn basic_execute_non_existent() {
+        let events = vec![
+            TestEvent::execute(RANDOM_SOURCE_WASM),
+            TestEvent::read_result("/output/random.dat"),
+            TestEvent::ShutDown,
+        ];
 
-            let client_cert_filename = trust_path("never_used_cert.pem");
-            let client_key_filename = trust_path("client_rsa_key.pem");
-
-            let mut _client_connection = create_client_test_connection(
-                client_cert_filename.as_path(),
-                client_key_filename.as_path(),
-                &policy.ciphersuite(),
-            );
-        });
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Integration test:
-    /// computation: echoing
-    /// data sources: a single input under filename `input.txt`.
-    fn test_phase2_basic_file_read_write_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[("/program/read-file.wasm", program_path(READ_FILE_WASM))],
-                &[("/input/hello-world-1.dat", data_dir(STRING_1_DATA))],
-                &[],
-                &["/output/test/test.txt", "/output/hello-world-1.dat"],
-            )
-            .unwrap();
-        })
+    /// A client attempts to read a non-existent file
+    fn basic_client_read_non_existent() {
+        let events = vec![
+            TestEvent::ReadFile(String::from("/output/random.dat")),
+            TestEvent::ShutDown,
+        ];
+
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Integration test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: random-source, returning a vec of random u8
-    /// data sources: none
-    fn test_phase2_random_source_no_data_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/random-source.wasm",
-                    program_path(RANDOM_SOURCE_WASM),
-                )],
-                &[],
-                &[],
-                &["/output/random.dat"],
-            )
-            .unwrap();
-        })
+    /// A program attempts to read a non-existent file
+    fn basic_program_read_non_existent() {
+        let events = vec![
+            TestEvent::write_program(LINEAR_REGRESSION_WASM),
+            TestEvent::execute(LINEAR_REGRESSION_WASM),
+            TestEvent::ReadFile(String::from("/output/linear-regression.dat")),
+            TestEvent::ShutDown,
+        ];
+
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Attempt to fetch the result without program nor data
-    fn test_phase2_random_source_no_program_no_data() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[],
-                &[],
-                &[],
-                &["/output/random.dat"],
-            );
+    /// A client attempts to use an unauthorized key
+    fn basic_unauthorized_key() {
+        let events = vec![
+            TestEvent::write_program(RANDOM_SOURCE_WASM),
+            TestEvent::execute(RANDOM_SOURCE_WASM),
+            TestEvent::read_result("/output/random.dat"),
+            TestEvent::ShutDown,
+        ];
 
-            assert!(result.is_err(), "An error should occur");
-        })
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            UNAUTHORIZED_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Attempt to provision a wrong program
-    fn test_phase2_incorrect_program_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/string-edit-distance.wasm",
-                    program_path(STRING_EDIT_DISTANCE_WASM),
-                )],
-                &[],
-                &[],
-                &["/output/random.dat"],
-            );
+    /// A client attempts to use an unauthorized certificate
+    fn basic_unauthorized_certificate() {
+        let events = vec![
+            TestEvent::write_program(RANDOM_SOURCE_WASM),
+            TestEvent::execute(RANDOM_SOURCE_WASM),
+            TestEvent::read_result("/output/random.dat"),
+            TestEvent::ShutDown,
+        ];
 
-            assert!(result.is_err(), "An error should occur");
-        })
+        let result = TestExecutor::test_template(
+            POLICY,
+            UNAUTHORIZED_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Attempt to use an unauthorized key
-    fn test_phase2_random_source_no_data_no_attestation_unauthorized_key() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(UNAUTHORIZED_KEY),
-                &[(
-                    "/program/random-source.wasm",
-                    program_path(RANDOM_SOURCE_WASM),
-                )],
-                &[],
-                &[],
-                &["/output/random.dat"],
-            );
+    /// A unauthorized client attempts to connect the service
+    fn basic_unauthorized_certificate_key_pair() {
+        let events = vec![
+            TestEvent::write_program(RANDOM_SOURCE_WASM),
+            TestEvent::execute(RANDOM_SOURCE_WASM),
+            TestEvent::read_result("/output/random.dat"),
+            TestEvent::ShutDown,
+        ];
 
-            assert!(result.is_err(), "An error should occur");
-        })
+        let result = TestExecutor::test_template(
+            POLICY,
+            UNAUTHORIZED_CERT,
+            UNAUTHORIZED_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Attempt to use an unauthorized certificate
-    fn test_phase2_random_source_no_data_no_attestation_unauthorized_certificate() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(UNAUTHORIZED_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/random-source.wasm",
-                    program_path(RANDOM_SOURCE_WASM),
-                )],
-                &[],
-                &[],
-                &["/output/random.dat"],
-            );
+    /// Call an example native module.
+    fn basic_postcard_native_module() {
+        let events = vec![
+            TestEvent::write_program(POSTCARD_NATIVE_WASM),
+            TestEvent::write_data(POSTCARD_DATA),
+            TestEvent::execute(POSTCARD_NATIVE_WASM),
+            TestEvent::read_result("/output/postcard_native.txt"),
+            TestEvent::ShutDown,
+        ];
 
-            assert!(result.is_err(), "An error should occur");
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// A unauthorized client attempted to connect the service
-    fn test_phase2_random_source_no_data_no_attestation_unauthorized_client() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(UNAUTHORIZED_CERT),
-                trust_path(UNAUTHORIZED_KEY),
-                &[(
-                    "/program/random-source.wasm",
-                    program_path(RANDOM_SOURCE_WASM),
-                )],
-                &[],
-                &[],
-                &["/output/random.dat"],
-            );
+    /// Test for several rounds of appending data and executing program.
+    /// It sums up an initial f64 number and two streams of f64 numbers.
+    fn basic_number_accumulation_batch_process() {
+        let mut events = vec![
+            TestEvent::write_program(NUMBER_STREM_WASM),
+            TestEvent::write_data(SINGLE_F64_DATA),
+        ];
+        events.append(&mut TestEvent::batch_process_events(
+            data_dir(F64_STREAM_PATH),
+            NUMBER_STREM_WASM,
+            "/output/accumulation.dat",
+        ));
+        events.push(TestEvent::ShutDown);
 
-            assert!(result.is_err(), "An error should occur");
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Integration test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: linear regression, computing the gradient and intercept,
+    /// Integration test: linear regression.
+    /// Compute the gradient and intercept,
     /// i.e. the LinearRegression struct, given a series of point in the
     /// two-dimensional space.  Data sources: linear-regression, a vec of points
     /// in two-dimensional space, represented by Vec<(f64, f64)>.
-    fn test_phase2_linear_regression_single_data_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/linear-regression.wasm",
-                    program_path(LINEAR_REGRESSION_WASM),
-                )],
-                &[(
-                    "/input/linear-regression.dat",
-                    data_dir(LINEAR_REGRESSION_DATA),
-                )],
-                &[],
-                &["/output/linear-regression.dat"],
-            )
-            .unwrap();
-        })
-    }
+    fn integration_linear_regression() {
+        let events = vec![
+            TestEvent::write_program(LINEAR_REGRESSION_WASM),
+            TestEvent::write_data(LINEAR_REGRESSION_DATA),
+            TestEvent::execute(LINEAR_REGRESSION_WASM),
+            TestEvent::read_result("/output/linear-regression.dat"),
+            TestEvent::ShutDown,
+        ];
 
-    #[test]
-    /// Attempt to fetch result without data
-    fn test_phase2_linear_regression_no_data_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/linear-regression.wasm",
-                    program_path(LINEAR_REGRESSION_WASM),
-                )],
-                &[],
-                &[],
-                &["/output/linear-regression.dat"],
-            );
-
-            assert!(result.is_err(), "An error should occur");
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
     #[ignore] // FIXME: test currently disabled because it fails on IceCap
-    /// Integration test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: intersection sum, intersection of two data sources
-    /// and then the sum of the values in the intersection.
+    /// Integration test: intersection sum.
+    /// Intersection of two data sources and then the sum of the values in the intersection.
     /// data sources: customer and advertisement, vecs of AdvertisementViewer and Customer
     /// respectively.
     /// ```no run
@@ -563,770 +484,818 @@ mod tests {
     /// ```
     /// A standard two data source scenario, where the data provisioned in the
     /// reversed order (data 1, then data 0)
-    fn test_phase2_intersection_sum_reversed_data_provisioning_two_data_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/intersection-set-sum.wasm",
-                    program_path(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
-                )],
-                &[
-                    // message sends out in the reversed order
-                    (
-                        "/input/intersection-customer.dat",
-                        data_dir(INTERSECTION_SET_SUM_CUSTOMER_DATA),
-                    ),
-                    (
-                        "/input/intersection-advertisement-viewer.dat",
-                        data_dir(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
-                    ),
-                ],
-                &[],
-                &["/output/intersection-set-sum.dat"],
-            )
-            .unwrap();
-        })
+    fn integration_intersection_sum() {
+        let events = vec![
+            TestEvent::write_program(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            TestEvent::write_data(INTERSECTION_SET_SUM_CUSTOMER_DATA),
+            TestEvent::write_data(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+            TestEvent::execute(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            TestEvent::read_result("/output/intersection-set-sum.dat"),
+            TestEvent::ShutDown,
+        ];
+
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Integration test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: string-edit-distance, computing the string edit distance.
-    /// data sources: two strings
-    fn test_phase2_string_edit_distance_two_data_no_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/string-edit-distance.wasm",
-                    program_path(STRING_EDIT_DISTANCE_WASM),
-                )],
-                &[
-                    ("/input/hello-world-1.dat", data_dir(STRING_1_DATA)),
-                    ("/input/hello-world-2.dat", data_dir(STRING_2_DATA)),
-                ],
-                &[],
-                &["/output/string-edit-distance.dat"],
-            )
-            .unwrap();
-        })
+    /// Integration test: string-edit-distance.
+    /// Computing the string edit distance.
+    fn integration_string_edit_distance() {
+        let events = vec![
+            TestEvent::write_program(STRING_EDIT_DISTANCE_WASM),
+            TestEvent::write_data(STRING_1_DATA),
+            TestEvent::write_data(STRING_2_DATA),
+            TestEvent::execute(STRING_EDIT_DISTANCE_WASM),
+            TestEvent::read_result("/output/string-edit-distance.dat"),
+            TestEvent::ShutDown,
+        ];
+
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Integration test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: linear regression, computing the gradient and intercept,
-    /// i.e. the LinearRegression struct, given a series of point in the
-    /// two-dimensional space. Data sources: linear-regression, a vec of points
-    /// in two-dimensional space, represented by Vec<(f64, f64)>
-    /// A standard one data source scenario with attestation.
-    fn test_phase3_linear_regression_one_data_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/linear-regression.wasm",
-                    program_path(LINEAR_REGRESSION_WASM),
-                )],
-                &[(
-                    "/input/linear-regression.dat",
-                    data_dir(LINEAR_REGRESSION_DATA),
-                )],
-                &[],
-                &["/output/linear-regression.dat"],
-            )
-            .unwrap();
-        })
-    }
-
-    #[test]
-    /// Integration test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: set intersection, computing the intersection of two sets of persons.
+    /// Integration test: private set intersection.
+    /// Compute the intersection of two sets of persons.
     /// data sources: two vecs of persons, representing by Vec<Person>
     /// A standard two data sources scenario with attestation.
-    fn test_phase3_private_set_intersection_two_data_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/private-set-intersection.wasm",
-                    program_path(PERSON_SET_INTERSECTION_WASM),
-                )],
-                &[
-                    ("/input/private-set-1.dat", data_dir(PERSON_SET_1_DATA)),
-                    ("/input/private-set-2.dat", data_dir(PERSON_SET_2_DATA)),
-                ],
-                &[],
-                &["/output/private-set.dat"],
-            )
-            .unwrap();
-        })
-    }
+    fn integration_private_set_intersection() {
+        let events = vec![
+            TestEvent::write_program(PERSON_SET_INTERSECTION_WASM),
+            TestEvent::write_data(PERSON_SET_1_DATA),
+            TestEvent::write_data(PERSON_SET_2_DATA),
+            TestEvent::execute(PERSON_SET_INTERSECTION_WASM),
+            TestEvent::read_result("/output/private-set.dat"),
+            TestEvent::ShutDown,
+        ];
 
-    #[test]
-    /// Integration test:
-    /// policy: PiProvider, DataProvider, StreamProvider and ResultReader is the same party
-    /// computation: sum of an initial f64 number and two streams of f64 numbers.
-    /// data sources: an initial f64 value, and two vecs of f64, representing two streams.
-    /// A standard one data source and two stream sources scenario with attestation.
-    fn test_phase4_number_stream_accumulation_one_data_two_stream_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let stream_list =
-                stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/number-stream-accumulation.wasm",
-                    program_path(NUMBER_STREM_WASM),
-                )],
-                &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
-                &stream_list,
-                &["/output/accumulation.dat"],
-            )
-            .unwrap();
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
     /// Attempt to fetch result without enough stream data.
     fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/number-stream-accumulation.wasm",
-                    program_path(NUMBER_STREM_WASM),
-                )],
-                &[("/input/number-stream-init.dat", data_dir(SINGLE_F64_DATA))],
-                &[],
-                &["/output/accumulation.dat"],
-            );
-            assert!(result.is_err(), "An error should occur");
-        })
+        let events = vec![
+            TestEvent::write_program(NUMBER_STREM_WASM),
+            TestEvent::write_data(SINGLE_F64_DATA),
+            TestEvent::read_result("/output/accumulation.dat"),
+            TestEvent::ShutDown,
+        ];
+
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
+        assert!(result.is_err(), "An error should occur");
     }
 
     #[test]
-    /// Attempt to provision stream data in the state of loading static data.
-    fn test_phase4_number_stream_accumulation_no_data_two_stream_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let stream_list =
-                stream_list(data_dir(F64_STREAM_PATH), "/input").expect("Failed to parse input");
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/number-stream-accumulation.wasm",
-                    program_path(NUMBER_STREM_WASM),
-                )],
-                &[],
-                &stream_list,
-                &["/output/accumulation.dat"],
-            );
-            assert!(result.is_err(), "An error should occur");
-        })
-    }
+    /// Integration test: deserialize postcard encoding and reserialize to json.
+    fn integration_postcard_json() {
+        let events = vec![
+            TestEvent::write_program(POSTCARD_WASM),
+            TestEvent::write_data(POSTCARD_DATA),
+            TestEvent::execute(POSTCARD_WASM),
+            TestEvent::read_result("/output/postcard_wasm.txt"),
+            TestEvent::ShutDown,
+        ];
 
-    #[test]
-    /// Attempt to provision stream data in the state of loading static data.
-    fn test_phase4_native_postcard_module() {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[(
-                "/program/postcard-native.wasm",
-                program_path(POSTCARD_NATIVE_WASM),
-            )],
-            &[("/input/postcard.dat", data_dir(POSTCARD_DATA))],
-            &[],
-            &["/output/postcard_native.txt"],
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
         )
         .unwrap();
     }
 
     #[test]
-    /// Attempt to provision stream data in the state of loading static data.
-    fn test_phase4_wasm_postcard_module() {
-        test_template(
-            policy_path(POLICY),
-            trust_path(CLIENT_CERT),
-            trust_path(CLIENT_KEY),
-            &[("/program/postcard-wasm.wasm", program_path(POSTCARD_WASM))],
-            &[("/input/postcard.dat", data_dir(POSTCARD_DATA))],
-            &[],
-            &["/output/postcard_wasm.txt"],
-        )
-        .unwrap();
-    }
-
-    #[test]
-    /// Performance test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: logistic regression, https://github.com/kimandrik/IDASH2017.
+    /// Performance test: logistic regression.
+    /// Ref to https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
-    fn test_performance_idash2017_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let input_vec = input_list(
-                data_dir(LOGISTICS_REGRESSION_DATA_PATH),
-                "/input/idash2017/",
-            )
-            .expect("Failed to parse input");
-            let input_vec: Vec<(&str, PathBuf)> =
-                input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
+    fn performance_idash2017() {
+        let mut events = vec![TestEvent::write_program(LOGISTICS_REGRESSION_WASM)];
+        events.append(&mut TestEvent::write_all(
+            data_dir(LOGISTICS_REGRESSION_DATA_PATH),
+            "/input/idash2017/",
+        ));
+        events.append(&mut vec![
+            TestEvent::execute(LOGISTICS_REGRESSION_WASM),
+            // only read two outputs
+            TestEvent::read_result("/output/idash2017/generate-data-0.dat"),
+            TestEvent::read_result("/output/idash2017/generate-data-1.dat"),
+            TestEvent::ShutDown,
+        ]);
 
-            let result = test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/idash2017-logistic-regression.wasm",
-                    program_path(LOGISTICS_REGRESSION_WASM),
-                )],
-                &input_vec,
-                &[],
-                // only read two outputs
-                &[
-                    "/output/idash2017/generate-data-0.dat",
-                    "/output/idash2017/generate-data-1.dat",
-                ],
-            );
-            assert!(result.is_ok(), "error:{:?}", result);
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Performance test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: moving-average-convergence-divergence, https://github.com/woonhulktin/HETSA.
+    /// Performance test: moving-average-convergence-divergence.
+    /// Ref: https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
-    fn test_performance_macd_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let input_vec = input_list(data_dir(MACD_DATA_PATH), "/input/macd/")
-                .expect("Failed to parse input");
-            let input_vec: Vec<(&str, PathBuf)> =
-                input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
+    fn performance_macd() {
+        let mut events = vec![TestEvent::write_program(MACD_WASM)];
+        events.append(&mut TestEvent::write_all(
+            data_dir(MACD_DATA_PATH),
+            "/input/macd/",
+        ));
+        events.append(&mut vec![
+            TestEvent::execute(MACD_WASM),
+            // only read two outputs
+            TestEvent::read_result("/output/macd/generate-1000.dat"),
+            TestEvent::ShutDown,
+        ]);
 
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/moving-average-convergence-divergence.wasm",
-                    program_path(MACD_WASM),
-                )],
-                &input_vec,
-                &[],
-                &["/output/macd/generate-1000.dat"],
-            )
-            .unwrap();
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Performance test:
-    /// policy: PiProvider, DataProvider and ResultReader is the same party
-    /// computation: intersection-sum, matching the setting in .
+    /// Performance test: intersection-sum.
     /// data sources: private-set-inter-sum/*.dat
-    fn test_performance_set_intersection_sum_with_attestation() {
-        timeout(Duration::from_secs(1200), || {
-            let input_vec = input_list(
-                data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
-                "/input/private-set-inter-sum/",
-            )
-            .expect("Failed to parse input");
-            let input_vec: Vec<(&str, PathBuf)> =
-                input_vec.iter().map(|(s, k)| (&s[..], k.clone())).collect();
+    fn performance_set_intersection_sum() {
+        let mut events = vec![TestEvent::write_program(INTERSECTION_SET_SUM_WASM)];
+        events.append(&mut TestEvent::write_all(
+            data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
+            "/input/private-set-inter-sum/",
+        ));
+        events.append(&mut vec![
+            TestEvent::execute(INTERSECTION_SET_SUM_WASM),
+            // only read two outputs
+            TestEvent::read_result("/output/private-set-inter-sum/data-2000-0"),
+            TestEvent::ShutDown,
+        ]);
 
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[(
-                    "/program/private-set-intersection-sum.wasm",
-                    program_path(INTERSECTION_SET_SUM_WASM),
-                )],
-                &input_vec,
-                &[],
-                &["/output/private-set-inter-sum/data-2000-0"],
-            )
-            .unwrap();
-        })
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
-    #[test]
-    fn test_fd_create() {
-        timeout(Duration::from_secs(1200), || {
-            test_template(
-                policy_path(POLICY),
-                trust_path(CLIENT_CERT),
-                trust_path(CLIENT_KEY),
-                &[("/program/fd-create.wasm", program_path(FD_CREATE_RUST_WASM))],
-                &[],
-                &[],
-                &["/output/pass"],
-            )
-            .unwrap();
-        })
+    /// Events that drive the test.
+    #[derive(Debug, Clone)]
+    enum TestEvent {
+        // Check the policy and runtime hash
+        CheckHash,
+        // Write a remote file
+        WriteFile(String, PathBuf),
+        // Append a remote file
+        AppendFile(String, PathBuf),
+        // Execute a remote file
+        Execute(String),
+        // Read a remote file
+        ReadFile(String),
+        // Request to shutdown the runtime
+        ShutDown,
     }
 
-    /// This is the template of test cases for veracruz-server,
-    /// ensuring it is a single client policy,
-    /// and the client_cert and client_key match the policy
-    /// The type T is the return type of the computation
-    fn test_template<P: AsRef<Path>>(
-        policy_path: P,
-        client_cert_path: P,
-        client_key_path: P,
-        program_path: &[(&str, P)],
-        // Assuming there is a single data provider,
-        // yet the client can provision several packages.
-        // The list determines the order of which data is sent out, from head to tail.
-        // Each element contains the package id (u64) and the path to the data
-        data_id_paths: &[(&str, P)],
-        stream_id_paths: &[Vec<(String, P)>],
-        output_files: &[&str],
-    ) -> Result<(), VeracruzServerError> {
-        let policy_path = policy_path.as_ref();
-        let client_cert_path = client_cert_path.as_ref();
-        let client_key_path = client_key_path.as_ref();
-        info!("### Step 0.  Initialise test configuration.");
-        // initialise the pipe
-        let (server_tls_tx, client_tls_rx): (
-            std::sync::mpsc::Sender<std::vec::Vec<u8>>,
-            std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        ) = std::sync::mpsc::channel();
-        let (client_tls_tx, server_tls_rx): (
-            std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-            std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
-        ) = std::sync::mpsc::channel();
+    impl TestEvent {
+        /// Create a test event for provisioning program. The function adds the local and remote
+        /// path prefices on the filename.
+        fn write_program(filename: &str) -> TestEvent {
+            TestEvent::WriteFile(runtime_program_dir(filename), program_dir(filename))
+        }
 
-        info!("### Step 1.  Read policy and set up the proxy attestation server.");
-        // load the policy, initialise enclave and start tls
-        let time_setup = Instant::now();
-        let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
-        //let debug_flag = policy.debug;
-        let ticket = setup(policy.proxy_attestation_server_url().clone());
-        info!(
-            "             Setup time (μs): {}.",
-            time_setup.elapsed().as_micros()
-        );
-        info!("### Step 2.  Initialise enclave.");
-        let time_init = Instant::now();
-        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
-        let client_session_id = veracruz_server.new_tls_session().and_then(|id| {
-            if id == 0 {
-                Err(VeracruzServerError::MissingFieldError("client_session_id"))
-            } else {
-                Ok(id)
-            }
-        })?;
+        /// Create a test event for provisioning data. The function adds the local and remote
+        /// path prefices on the filename.
+        fn write_data(filename: &str) -> TestEvent {
+            TestEvent::WriteFile(runtime_data_dir(filename), data_dir(filename))
+        }
 
-        #[cfg(feature = "linux")]
-        let test_target_platform: Platform = Platform::Linux;
-        #[cfg(feature = "nitro")]
-        let test_target_platform: Platform = Platform::Nitro;
-        #[cfg(feature = "icecap")]
-        let test_target_platform: Platform = Platform::IceCap;
+        /// Create a list of events for provisioning data files in the `local_dir_path`. The
+        /// `local_dir_path` will be replaced by `remote_dir_path`.
+        fn write_all<T: AsRef<Path>, K: AsRef<Path>>(
+            dir_path: T,
+            remote_dir_path: K,
+        ) -> Vec<TestEvent> {
+            TestEvent::input_list(dir_path, remote_dir_path)
+                .into_iter()
+                .map(|(remote, local)| TestEvent::WriteFile(remote, local))
+                .collect()
+        }
 
-        info!("             Enclave generated a self-signed certificate:");
+        /// Create a test event for executing a program. The function adds the remote
+        /// path prefices on the filename.
+        fn execute<T: AsRef<str>>(filename: T) -> TestEvent {
+            TestEvent::Execute(runtime_program_dir(filename))
+        }
 
-        let mut client_connection = create_client_test_connection(
-            client_cert_path,
-            client_key_path,
-            &policy.ciphersuite(),
-        )?;
-        info!(
-            "             Initialization time (μs): {}.",
-            time_init.elapsed().as_micros()
-        );
+        /// Create a test event for reading result.
+        fn read_result<T: AsRef<str>>(filepath: T) -> TestEvent {
+            TestEvent::ReadFile(String::from(filepath.as_ref()))
+        }
 
-        info!("### Step 3.  Spawn Veracruz server thread.");
-        let time_server_boot = Instant::now();
-        CONTINUE_FLAG_HASH.lock()?.insert(ticket, true);
-        let server_loop_handle = thread::spawn(move || {
-            server_tls_loop(&mut veracruz_server, server_tls_tx, server_tls_rx, ticket).map_err(
-                |e| {
-                    CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
-                    e
-                },
-            )
-        });
-        info!(
-            "             Booting Veracruz server time (μs): {}.",
-            time_server_boot.elapsed().as_micros()
-        );
+        /// Function produces a vec of input lists. Each list corresponds to a round
+        /// and is a vec of pairs of remote (des) file and local (src) file path,
+        /// which corresponds to provisioning/appending the content of the local file to the remote file.
+        fn batch_process_events<T: AsRef<Path>, K: AsRef<str>, Q: AsRef<str>>(
+            local_dir_path: T,
+            program_filename: K,
+            result_path: Q,
+        ) -> Vec<TestEvent> {
+            // Load the remote input path, otherwise use default `/input/`
+            let remote_dir_path = env::var("REMOTE_DATA_DIR").unwrap_or("/input/".to_string());
 
-        // Need to clone paths to concrete strings,
-        // so the ownership can be transferred into a client thread.
-        let program_path: Vec<_> = program_path
-            .iter()
-            .map(|(remote_path, path)| (remote_path.to_string(), path.as_ref().to_path_buf()))
-            .collect();
-        // Assuming we are using single data provider,
-        // yet the client can provision several packages.
-        // The list determines the order of which data is sent out, from head to tail.
-        // Each element contains the package id (u64) and the path to the data
-        let data_id_paths: Vec<_> = data_id_paths
-            .iter()
-            .map(|(remote_path, path)| (remote_path.to_string(), path.as_ref().to_path_buf()))
-            .collect();
-        let mut stream_id_paths: Vec<_> = stream_id_paths
-            .iter()
-            .map(|v| {
-                v.iter()
-                    .map(|(remote_path, path)| {
-                        (remote_path.to_string(), path.as_ref().to_path_buf())
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-        let output_files: Vec<_> = output_files.iter().map(|path| path.to_string()).collect();
+            // Construct the TestEvent gradually and append to this vec.
+            let mut rst = Vec::new();
 
-        // This is a closure, containing instructions from clients.
-        // A separate thread is spawn and directly call this closure.
-        // However if an Error pop up, the thread set the CONTINUE_FLAG to false,
-        // hence stopping the server thread.
-        let mut client_body = move || {
-            info!(
-                "### Step 4.  Client provisions program at {:?}.",
-                program_path
-            );
+            // traverse the `local_dir_path`. Assume sub-directories are sorted,
+            // e.g. `1` `2` `3` `4` `5`. Each sub-directory contains files provisioned to
+            // the remote in each batch. Note that the provisioning use `append` request rather then
+            // `write` request anf the remote path is of prefix `remote_dir_path`.
+            // For example, in the previous example, if in the second batch, sub-directory `2`,
+            // there is a file `local_dir_path/2/a.dat`,
+            // then a TestEvent::Append('remote_dir_path/a.dat', `local_dir_path/2/a.dat`) will be
+            // created.
+            let mut dir_entries = local_dir_path
+                .as_ref()
+                .read_dir()
+                .expect(&format!("invalid path: {:?}", local_dir_path.as_ref()))
+                .filter_map(|e| e.map(|x| x.path()).ok())
+                .collect::<Vec<_>>();
+            dir_entries.sort();
+            info!("dir_entries: {:?}", dir_entries);
 
-            for (remote_file_name, data_path) in program_path.iter() {
-                let time_provision_data = Instant::now();
+            // borrow so the loop will not complain on the lifetime.
+            let program_filename = program_filename.as_ref();
+            let result_path = result_path.as_ref();
 
-                check_hash(
-                    &policy,
-                    &policy_hash,
-                    &test_target_platform,
-                    client_session_id,
-                    &mut client_connection,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
-
-                let response = provision_data(
-                    Path::new(data_path),
-                    client_session_id,
-                    &mut client_connection,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    &remote_file_name,
-                )?;
-                info!(
-                    "             Client received acknowledgement after sending program: {:?}",
-                    transport_protocol::parse_runtime_manager_response(None, &response)
+            // Add append, execute and read_result events in each round.
+            for entry in dir_entries.iter() {
+                // Add all the append requests.
+                rst.append(
+                    &mut TestEvent::input_list(entry, &remote_dir_path)
+                        .into_iter()
+                        .map(|(remote, local)| TestEvent::AppendFile(remote, local))
+                        .collect(),
                 );
-                info!(
-                    "             Provisioning program time (μs): {}.",
-                    time_provision_data.elapsed().as_micros()
-                );
+                // Add execute request.
+                rst.push(TestEvent::execute(program_filename));
+                rst.push(TestEvent::read_result(result_path));
             }
 
-            info!("### Step 6.  Data providers provision secret data.");
-            for (remote_file_name, data_path) in data_id_paths.iter() {
-                info!(
-                    "             Data providers provision secret data {}.",
-                    remote_file_name
-                );
-                let time_data_hash = Instant::now();
-                check_hash(
-                    &policy,
-                    &policy_hash,
-                    &test_target_platform,
-                    client_session_id,
-                    &mut client_connection,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                )?;
-                info!(
-                    "             Data provider hash response time (μs): {}.",
-                    time_data_hash.elapsed().as_micros()
-                );
-                let time_data = Instant::now();
-                let response = provision_data(
-                    Path::new(data_path),
-                    client_session_id,
-                    &mut client_connection,
-                    ticket,
-                    &client_tls_tx,
-                    &client_tls_rx,
-                    remote_file_name,
-                )?;
-                info!(
-                    "             Client received acknowledgement after sending data: {:?},",
-                    transport_protocol::parse_runtime_manager_response(None, &response)
-                );
-                info!(
-                    "             Provisioning data time (μs): {}.",
-                    time_data.elapsed().as_micros()
-                );
-            }
-            // If stream_id_paths is empty, we inject an round of stream with empty data
-            if stream_id_paths.is_empty() {
-                stream_id_paths.push(Vec::new());
-            }
+            rst
+        }
 
-            info!("### Step 7.  Stream providers request the program hash.");
-            for (round, paths) in stream_id_paths.iter().enumerate() {
-                info!(
-                    "             ------------ Streaming Round # {} ------------",
-                    round
-                );
-                for (remote_file_name, data_path) in paths.iter() {
-                    info!(
-                        "             Stream providers provision secret data {}.",
-                        remote_file_name
-                    );
-                    let time_data_hash = Instant::now();
-                    check_hash(
-                        &policy,
-                        &policy_hash,
-                        &test_target_platform,
-                        client_session_id,
-                        &mut client_connection,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                    )?;
-                    info!(
-                        "             Stream provider hash response time (μs): {}.",
-                        time_data_hash.elapsed().as_micros()
-                    );
-                    let time_data = Instant::now();
-                    let response = provision_stream(
-                        Path::new(data_path),
-                        client_session_id,
-                        &mut client_connection,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                        remote_file_name,
-                    )?;
-                    info!(
-                        "             Client received acknowledgement after sending data: {:?},",
-                        transport_protocol::parse_runtime_manager_response(None, &response)
-                    );
-                    info!(
-                        "             Provisioning data time (μs): {}.",
-                        time_data.elapsed().as_micros()
-                    );
-                }
-                for (remote_file_name, _) in program_path.iter() {
-                    info!(
-                        "### Step 8.  Result retrievers request program {}.",
-                        remote_file_name
-                    );
-                    let time_result_hash = Instant::now();
-                    check_hash(
-                        &policy,
-                        &policy_hash,
-                        &test_target_platform,
-                        client_session_id,
-                        &mut client_connection,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                    )?;
-                    info!(
-                        "             Result retriever hash response time (μs): {}.",
-                        time_result_hash.elapsed().as_micros()
-                    );
-                    let time_result = Instant::now();
-                    info!("             Result retrievers request result.");
-                    let response = client_tls_send(
-                        &client_tls_tx,
-                        &client_tls_rx,
-                        client_session_id,
-                        &mut client_connection,
-                        ticket,
-                        &transport_protocol::serialize_request_result(remote_file_name)?.as_slice(),
-                    )?;
-                    info!(
-                        "             Computation result time (μs): {} with return code (undecoded) {:?}.",
-                        time_result.elapsed().as_micros(), response
-                    );
-                }
+        /// Function produces a vec of pairs of remote (des) file and local (src) file path,
+        /// which corresponds to provisioning/overwriting the content of the local file to the remote file.
+        /// Read all files and diretory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
+        /// E.g. if call the function with '/local/path/' and '/remote/path/',
+        /// the result could be [(/remote/path/a.txt, /local/path/a.txt), (/remote/path/b/c.txt, /local/path/b/c.txt), ... ].
+        fn input_list<T: AsRef<Path>, K: AsRef<Path>>(
+            dir_path: T,
+            remote_dir_path: K,
+        ) -> Vec<(String, PathBuf)> {
+            let mut rst = Vec::new();
+            let dir_path = dir_path.as_ref();
 
-                info!("### Step 9.  Client read and decodes the result.");
-                for remote_file_name in &output_files {
-                    info!("             Read {}.", remote_file_name);
-                    let response = read_file(
-                        client_session_id,
-                        &mut client_connection,
-                        ticket,
-                        &client_tls_tx,
-                        &client_tls_rx,
-                        &remote_file_name,
-                    )?;
-                    let response =
-                        transport_protocol::parse_runtime_manager_response(None, &response)?;
-                    let response = transport_protocol::parse_result(&response)?;
-                    let result = response.ok_or(VeracruzServerError::MissingFieldError(
-                        "Result retrievers response",
-                    ))?;
-                    info!(
-                        "             Client received result of len: {:?},",
-                        result.len()
-                    );
+            // Traverse all files and directories.
+            for entry in dir_path
+                .read_dir()
+                .expect(&format!("invalid path: {:?}", dir_path))
+            {
+                let entry = entry.expect("invalid entry").path();
+                let remote_entry_path = remote_dir_path.as_ref().join(
+                    entry
+                        .strip_prefix(dir_path)
+                        .expect("Failed to strip entry prefix"),
+                );
+
+                if entry.is_dir() {
+                    // If it a directory traverse recursively.
+                    rst.append(&mut TestEvent::input_list(entry, remote_entry_path))
+                } else if entry.is_file() {
+                    let entry_path = entry.to_str().expect("Failed to parse the entry path");
+                    rst.push((
+                        remote_entry_path
+                            .to_str()
+                            .expect("Failed to parse remote entry path")
+                            .to_string(),
+                        PathBuf::from(entry_path),
+                    ))
                 }
             }
 
-            info!("### Step 10. Client shuts down Veracruz.");
-            let time_shutdown = Instant::now();
-            let response = client_tls_send(
-                &client_tls_tx,
-                &client_tls_rx,
-                client_session_id,
-                &mut client_connection,
-                ticket,
-                &transport_protocol::serialize_request_shutdown()?.as_slice(),
+            rst
+        }
+    }
+
+    /// Test states.
+    struct TestExecutor {
+        // The policy for the runtime.
+        policy: Policy,
+        // The hash of the policy, that is used in attestation
+        policy_hash: String,
+        // The emulated TLS connect from client to server.
+        client_tls_receiver: Receiver<Vec<u8>>,
+        client_tls_sender: Sender<(u32, Vec<u8>)>,
+        // Paths to client certification and private key.
+        // Note that we only have one client in all tests.
+        client_connection: rustls::ClientConnection,
+        client_connection_id: u32,
+        // A alive flag. This is to solve the problem where the server thread still in loop while
+        // client thread is terminated.
+        alive_flag: Arc<AtomicBool>,
+        // Hold the server thread. The test will join the thread in the end to check the server
+        // state.
+        server_thread: JoinHandle<Result<(), String>>,
+    }
+
+    impl TestExecutor {
+        /// This is the template. The template appends the path to the policy, and client
+        /// certificate and key file, initials the test veracruz server and a mock client
+        /// accordingly, and then executes the test-case driven by mock client `events`.
+        fn test_template<P: AsRef<str>, Q: AsRef<str>, K: AsRef<str>>(
+            policy_filename: P,
+            client_cert_filename: Q,
+            client_key_filename: K,
+            events: Vec<TestEvent>,
+            timeout: Duration,
+        ) -> Result<(), Box<dyn Error + 'static>> {
+            Self::new(
+                policy_dir(policy_filename),
+                cert_key_dir(client_cert_filename),
+                cert_key_dir(client_key_filename),
+            )?
+            .execute(events, timeout)?;
+            Ok(())
+        }
+
+        /// Create a new test executor. It initiates a server in a separate thread and creates a
+        /// pair of channels between the main thread, who acts as a client, and the server thread.
+        /// Those two channels simulate the network.
+        fn new<P: AsRef<Path>, Q: AsRef<Path>, K: AsRef<Path>>(
+            policy_path: P,
+            client_cert_path: Q,
+            client_key_path: K,
+        ) -> Result<Self, Box<dyn Error + 'static>> {
+            info!("Initialise test configuration and proxy attestation server.");
+            // Read the the policy
+            let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
+
+            // start the proxy attestation server
+            proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+
+            info!("Create simulated connection channels.");
+            // Create two channel, simulating the connecting channels.
+            let (server_tls_sender, client_tls_receiver) = channel::<Vec<u8>>();
+            let (client_tls_sender, server_tls_receiver) = channel::<(u32, Vec<u8>)>();
+
+            info!("Initialise a client with its certificate and key.");
+            // Create a fake client session which only ends to the simulated connecting channel.
+            let mut client_connection = create_client_test_connection(
+                client_cert_path,
+                client_key_path,
+                &policy.ciphersuite(),
             )?;
-            info!(
-                "             Client received acknowledgment after shutdown request: {:?}",
-                transport_protocol::parse_runtime_manager_response(None, &response)
-            );
-            info!(
-                "             Shutdown time (μs): {}.",
-                time_shutdown.elapsed().as_micros()
-            );
-            Ok::<(), VeracruzServerError>(())
-        };
+            // Set the buffer size to unlimited. The `client_send` function assumes this property.
+            client_connection.set_buffer_limit(None);
 
-        info!("Preparing to spawn client body thread.");
+            info!("Initialise Veracruz runtime.");
+            // Create the server
+            let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
 
-        let _response = thread::spawn(move || {
-            client_body().map_err(|e| {
-                CONTINUE_FLAG_HASH.lock().unwrap().insert(ticket, false);
-                e
+            // Create the client tls session. Note that we need the session id.
+            let client_connection_id = veracruz_server.new_tls_session()?;
+            if client_connection_id == 0 {
+                return Err(String::from("client session id is zero").into());
+            }
+
+            info!("Spawn server thread.");
+            // Create the sever loop, it is the end of the previous created channels.
+            let alive_flag = Arc::new(AtomicBool::new(true));
+            let init_flag = Arc::new(AtomicBool::new(false));
+            // Create a clone which passes to server thread.
+            let alive_flag_clone = alive_flag.clone();
+            let init_flag_clone = init_flag.clone();
+            let server_thread = thread::spawn(move || {
+                if let Err(e) = TestExecutor::simulated_server(
+                    &mut veracruz_server,
+                    server_tls_sender,
+                    server_tls_receiver,
+                    alive_flag_clone.clone(),
+                    init_flag_clone,
+                ) {
+                    alive_flag_clone.store(false, Ordering::SeqCst);
+                    Err(e)
+                } else {
+                    Ok(())
+                }
+            });
+            info!("A new test executor is created.");
+
+            // Block until the init_flag is set by the server thread.
+            while !init_flag.load(Ordering::SeqCst) {}
+
+            Ok(TestExecutor {
+                policy,
+                policy_hash,
+                client_connection,
+                client_connection_id,
+                client_tls_sender,
+                client_tls_receiver,
+                alive_flag,
+                server_thread,
             })
-        })
-        .join()
-        // double `?` one for join and one for client_body
-        .map_err(|e| VeracruzServerError::JoinError(e))??;
+        }
 
-        info!("Client body thread launched.");
+        /// This function simulating a Veracruz server, it should run on a separate thread.
+        fn simulated_server(
+            veracruz_server: &mut dyn veracruz_server::VeracruzServer,
+            sender: Sender<Vec<u8>>,
+            receiver: Receiver<(u32, Vec<u8>)>,
+            test_alive_flag: Arc<AtomicBool>,
+            test_init_flag: Arc<AtomicBool>,
+        ) -> Result<(), String> {
+            info!("Server: simulated server loop starts...");
 
-        // double `?` one for join and one for client_body
-        server_loop_handle
-            .join()
-            .map_err(|e| VeracruzServerError::JoinError(e))??;
+            test_init_flag.store(true, Ordering::SeqCst);
 
-        info!("Server thread launched.");
+            while test_alive_flag.load(Ordering::SeqCst) {
+                let received = receiver.recv();
+                let (session_id, received_buffer) =
+                    received.map_err(|e| format!("Server: {:?}", e))?;
+                info!(
+                    "Server: receive {} byte(s) on session ID {}.",
+                    received_buffer.len(),
+                    session_id
+                );
 
-        Ok(())
-    }
+                let (veracruz_active_flag, output_data_option) = veracruz_server
+                    .tls_data(session_id, received_buffer)
+                    .map_err(|e| {
+                        // This point has a high chance to fail.
+                        error!("Veracruz Server: {:?}", e);
+                        format!("Failed to send TLS data.  Error produced: {:?}.", e)
+                    })?;
 
-    /// Auxiliary function: apply functor to all the policy file (json file) in the path
-    fn iterate_over_policy(dir_path: &Path, f: fn(&str) -> ()) {
-        for entry in dir_path
-            .read_dir()
-            .expect(&format!("invalid dir path:{}", dir_path.to_string_lossy()))
-        {
-            if let Ok(entry) = entry {
-                if let Some(extension_str) = entry
-                    .path()
-                    .extension()
-                    .and_then(|extension_name| extension_name.to_str())
-                {
-                    // iterate over all the json file
-                    if extension_str.eq_ignore_ascii_case("json") {
-                        let policy_path = entry.path();
-                        if let Some(policy_filename) = policy_path.to_str() {
-                            let policy_json = std::fs::read_to_string(policy_filename)
-                                .expect(&format!("Cannot open file {}", policy_filename));
-                            f(&policy_json);
+                // At least send an empty message, this notifies the client.
+                let output_data = output_data_option.unwrap_or_else(|| vec![vec![]]);
+
+                for output in output_data.iter() {
+                    sender.send(output.clone()).map_err(|e| {
+                        format!(
+                            "Failed to send data on TX channel.  Error produced: {:?}.",
+                            e
+                        )
+                    })?;
+                }
+
+                if !veracruz_active_flag {
+                    info!("Veracruz server TLS loop dying due to lack of TLS data.");
+                    return Ok(());
+                }
+            }
+
+            // The server should not reach here.
+            Err(format!(
+                "VeracruzServer TLS loop dieing due to no activity..."
+            ))
+        }
+
+        /// Execute this test. The client sends messages though the channel to the server
+        /// thread driven by `events`. It comsumes the ownership of `self`,
+        /// because it will join server thread at the end.
+        fn execute(
+            mut self,
+            events: Vec<TestEvent>,
+            timeout: Duration,
+        ) -> Result<(), Box<dyn Error + 'static>> {
+            // Spawn a thread that will send the timeout signal by killing alive flag.
+            let alive_flag_clone = self.alive_flag.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(timeout);
+                if alive_flag_clone.load(Ordering::SeqCst) {
+                    error!("--->>> Force timeout. It is very likely to trigger error on the test. <<<---");
+                }
+                alive_flag_clone.store(false, Ordering::SeqCst);
+            });
+
+            // process test events
+            for event in events.iter() {
+                info!("Process event {:?}.", event);
+                let time_init = Instant::now();
+                let response = self.process_event(&event).map_err(|e| {
+                    error!("Client: {:?}", e);
+                    self.alive_flag.store(false, Ordering::SeqCst);
+                    e
+                })?;
+                info!(
+                    "The event {:?} finished with response status {:?} in {:?}.",
+                    event,
+                    response.get_status(),
+                    time_init.elapsed()
+                );
+            }
+
+            // Wait the server to finish.
+            self.server_thread
+                .join()
+                .map_err(|e| format!("server thread failed with error {:?}", e))??;
+            Ok(())
+        }
+
+        fn process_event(
+            &mut self,
+            event: &TestEvent,
+        ) -> Result<transport_protocol::RuntimeManagerResponse, Box<dyn Error + 'static>> {
+            let response = match event {
+                TestEvent::CheckHash => {
+                    let response = self.check_policy_hash()?;
+                    self.check_runtime_manager_hash()?;
+                    response
+                }
+                TestEvent::WriteFile(remote_path, local_path) => {
+                    self.write_file(&remote_path, local_path)?
+                }
+                TestEvent::AppendFile(remote_path, local_path) => {
+                    self.append_file(&remote_path, local_path)?
+                }
+                TestEvent::Execute(remote_path) => self.execute_program(&remote_path)?,
+                TestEvent::ReadFile(remote_path) => self.read_file(&remote_path)?,
+                TestEvent::ShutDown => self.shutdown()?,
+            };
+            Ok(transport_protocol::parse_runtime_manager_response(
+                None, &response,
+            )?)
+        }
+
+        fn check_policy_hash(&mut self) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            let serialized_request_policy_hash =
+                transport_protocol::serialize_request_policy_hash().map_err(|e| {
+                    format!(
+                        "Failed to serialize request for policy hash.  Error produced: {:?}.",
+                        e
+                    )
+                })?;
+
+            let response = self.client_send(&serialized_request_policy_hash[..])?;
+            let parsed_response =
+                transport_protocol::parse_runtime_manager_response(None, &response)?;
+            let status = parsed_response.get_status();
+
+            if status != transport_protocol::ResponseStatus::SUCCESS {
+                return Err(format!("Received non-Success status: {:?}.", status).into());
+            }
+            let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
+            info!("Received {:?} as hash.", received_hash);
+            if received_hash != self.policy_hash {
+                return Err(format!(
+                    "Hash does not match expected hash ({:?}).",
+                    self.policy_hash
+                )
+                .into());
+            }
+            Ok(response)
+        }
+
+        /// Check the runtime manager hash. This function assumes that
+        /// `self.client_connection` handshake completes. Any previous invocation of `self.client_send`
+        /// will achieve this status, e.g. `self.check_policy_hash`
+        fn check_runtime_manager_hash(&mut self) -> Result<(), Box<dyn Error + 'static>> {
+            // Set up the test target platform
+            let target_platform = if cfg!(feature = "linux") {
+                Platform::Linux
+            } else if cfg!(feature = "nitro") {
+                Platform::Nitro
+            } else if cfg!(feature = "icecap") {
+                Platform::IceCap
+            } else {
+                panic!("Unknown platform.");
+            };
+
+            // Get all the certificates. Assume that the handshake completes.
+            let certs = self.client_connection.peer_certificates().ok_or(format!(
+                "No peer certificate found. Potentially wait handshake."
+            ))?;
+
+            let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
+            let ues = ee_cert.unrecognized_extensions();
+
+            // check for OUR extension
+            let encoded_extension_id: [u8; 3] = [
+                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
+            ];
+            let data = ues
+                .get(&encoded_extension_id[..])
+                .ok_or(format!("Our certificate extension is not present."))?;
+            info!("Certificate extension found.");
+
+            let extension_data = data
+                .read_all(format!("Can't read veracruz custom extension."), |input| {
+                    Ok(input.read_bytes_to_end())
+                })?;
+
+            if compare_policy_hash(
+                extension_data.as_slice_less_safe(),
+                &self.policy,
+                &target_platform,
+            ) {
+                Ok(())
+            } else {
+                Err(format!("None of the runtime manager hashes matched.").into())
+            }
+        }
+
+        #[inline]
+        fn write_file<P: AsRef<Path>>(
+            &mut self,
+            remote_path: &str,
+            local_path: P,
+        ) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            // Read the local data and create a protobuf message.
+            let data = {
+                let mut data_file = File::open(local_path)?;
+                let mut data_buffer = Vec::new();
+                data_file.read_to_end(&mut data_buffer)?;
+                data_buffer
+            };
+            let serialized_data = transport_protocol::serialize_write_file(&data, remote_path)?;
+            self.client_send(&serialized_data[..])
+        }
+
+        #[inline]
+        fn append_file<P: AsRef<Path>>(
+            &mut self,
+            remote_path: &str,
+            local_path: P,
+        ) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            // Read the local data and create a protobuf message.
+            let data = {
+                let mut data_file = File::open(local_path)?;
+                let mut data_buffer = Vec::new();
+                data_file.read_to_end(&mut data_buffer)?;
+                data_buffer
+            };
+            let serialized_data = transport_protocol::serialize_stream(&data, remote_path)?;
+            self.client_send(&serialized_data[..])
+        }
+
+        #[inline]
+        fn execute_program(
+            &mut self,
+            remote_path: &str,
+        ) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            self.client_send(&transport_protocol::serialize_request_result(remote_path)?[..])
+        }
+
+        #[inline]
+        fn read_file(&mut self, remote_path: &str) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            self.client_send(&transport_protocol::serialize_read_file(remote_path)?[..])
+        }
+
+        #[inline]
+        fn shutdown(&mut self) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            self.client_send(&transport_protocol::serialize_request_shutdown()?[..])
+        }
+
+        /// The client sends TLS packages via the simulated channel.
+        fn client_send(&mut self, send_data: &[u8]) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+            info!(
+                "Client: client send with length of data {:?}",
+                send_data.len()
+            );
+            let connection: &mut rustls::ClientConnection = &mut self.client_connection;
+            let mut connection_writter = connection.writer();
+            // The buffer size is set unlimited. `write_all` here should not fail.
+            connection_writter
+                .write_all(&send_data[..])
+                .map_err(|e| format!("Failed to send all data.  Error produced: {:?}.", e))?;
+            connection_writter.flush()?;
+
+            let mut output: Vec<u8> = Vec::new();
+
+            connection
+                .write_tls(&mut output)
+                .map_err(|e| format!("Failed to write TLS.  Error produced: {:?}.", e))?;
+
+            self.client_tls_sender
+                .send((self.client_connection_id, output))
+                .map_err(|e| {
+                    format!(
+                        "Failed to send data on TX channel.  Error produced: {:?}.",
+                        e
+                    )
+                })?;
+
+            info!("Client: package is sent");
+
+            // Always check if other threads in the this test instance is still running.
+            while self.alive_flag.load(Ordering::SeqCst) {
+                // Priority write.
+                if connection.wants_write() {
+                    info!("Client: session wants write...");
+                    let mut output: Vec<u8> = Vec::new();
+                    connection
+                        .write_tls(&mut output)
+                        .map_err(|e| format!("Failed to write TLS. Error produced: {:?}.", e))?;
+                    let _res = self
+                        .client_tls_sender
+                        .send((self.client_connection_id, output))
+                        .map_err(|e| {
+                            format!(
+                                "Failed to send data on TX channel. Error produced: {:?}.",
+                                e
+                            )
+                        })?;
+                } else if !connection.is_handshaking() || connection.wants_read() {
+                    let received = self.client_tls_receiver.recv()?;
+                    info!("Client: received is OK, and we're not handshaking...");
+
+                    // It is possible to receive an empty messsage.
+                    if received.len() == 0 {
+                        continue;
+                    }
+
+                    // convert the vec<u8> to read trait
+                    let mut slice = &received[..];
+                    connection
+                        .read_tls(&mut slice)
+                        .map_err(|e| format!("Failed to read TLS. Error produced: {:?}.", e))?;
+                    connection.process_new_packets().map_err(|e| {
+                        format!("Failed to process new packets. Error produced: {:?}.", e)
+                    })?;
+
+                    let mut received_buffer: Vec<u8> = Vec::new();
+
+                    match connection.reader().read_to_end(&mut received_buffer) {
+                        Ok(_num) => (),
+                        // It is allowed to block, but we care more on the received buffer.
+                        Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
+                        Err(err) => {
+                            return Err(format!(
+                                "Failed to read data to end.  Error produced: {:?}.",
+                                err
+                            )
+                            .into());
                         }
+                    };
+
+                    info!("Client: received_buffer.len() {}", received_buffer.len());
+
+                    if received_buffer.len() > 0 {
+                        info!("Client: finished sending via TLS.");
+                        // NOTE: this is the place where function succeeds.
+                        return Ok(received_buffer);
                     }
                 }
             }
-        }
-    }
 
-    /// Function produces a vec of pairs of remote (des) file and local (src) file path,
-    /// which corresponds to provisioning/overwriting the content of the local file to the remote file.
-    /// Read all files and diretory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
-    /// E.g. if call the function with '/local/path/' and '/remote/path/',
-    /// the result could be [(/remote/path/a.txt, /local/path/a.txt), (/remote/path/b/c.txt, /local/path/b/c.txt), ... ].
-    fn input_list<T: AsRef<Path>, K: AsRef<Path>>(
-        dir_path: T,
-        remote_dir_path: K,
-    ) -> Result<Vec<(String, PathBuf)>, VeracruzServerError> {
-        let mut rst = Vec::new();
-        let dir_path = dir_path.as_ref();
-        for entry in dir_path
-            .read_dir()
-            .expect(&format!("invalid path: {:?}", dir_path))
-        {
-            let entry = entry.expect("invalid entry").path();
-            let remote_entry_path = remote_dir_path.as_ref().join(
-                entry
-                    .strip_prefix(dir_path)
-                    .expect("Failed to strip entry prefix"),
-            );
-            if entry.is_dir() {
-                rst.append(&mut input_list(entry, remote_entry_path)?)
-            } else if entry.is_file() {
-                let entry_path = entry.to_str().expect("Failed to parse the entry path");
-                rst.push((
-                    remote_entry_path
-                        .to_str()
-                        .expect("Failed to parse remote entry path")
-                        .to_string(),
-                    PathBuf::from(entry_path),
-                ))
-            }
+            // If reach here, it means the server crashed.
+            Err(format!("Terminate due to server crash").into())
         }
-        Ok(rst)
-    }
-
-    /// Function produces a vec of input lists. Each list corresponds to a round
-    /// and is a vec of pairs of remote (des) file and local (src) file path,
-    /// which corresponds to provisioning/appending the content of the local file to the remote file.
-    fn stream_list<T: AsRef<Path>, K: AsRef<Path>>(
-        dir_path: T,
-        remote_dir_path: K,
-    ) -> Result<Vec<Vec<(String, PathBuf)>>, VeracruzServerError> {
-        let remote_dir_path = remote_dir_path.as_ref();
-        let mut rst = Vec::new();
-        let dir_path = dir_path.as_ref();
-        let mut dir_entries = dir_path
-            .read_dir()
-            .expect(&format!("invalid path: {:?}", dir_path))
-            .filter_map(|e| e.map(|x| x.path()).ok())
-            .collect::<Vec<_>>();
-        dir_entries.sort();
-        for entry in dir_entries.iter() {
-            rst.push(input_list(entry, remote_dir_path)?);
-        }
-        Ok(rst)
     }
 
     /// Auxiliary function: read policy file
     fn read_policy<T: AsRef<Path>>(
         fname: T,
-    ) -> Result<(Policy, String, String), VeracruzServerError> {
+    ) -> Result<(Policy, String, String), Box<dyn Error + 'static>> {
         let fname = fname.as_ref();
-        let policy_json = std::fs::read_to_string(fname)
-            .expect(&format!("Cannot open file {}", fname.to_string_lossy()));
+        let policy_json = std::fs::read_to_string(fname)?;
 
         let policy_hash = sha256(policy_json.as_bytes());
         let policy_hash_str = hex::encode(&policy_hash);
@@ -1335,118 +1304,27 @@ mod tests {
     }
 
     /// Auxiliary function: initialise the Veracruz server from policy and open a tls session
-    fn init_veracruz_server_and_tls_session(
-        policy_json: &str,
-    ) -> Result<(VeracruzServerEnclave, u32), VeracruzServerError> {
-        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json)?;
+    fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
+        policy_json: T,
+    ) -> Result<(VeracruzServerEnclave, u32), Box<dyn Error + 'static>> {
+        let mut veracruz_server = VeracruzServerEnclave::new(policy_json.as_ref())?;
 
-        let one_tenth_sec = std::time::Duration::from_millis(100);
-        std::thread::sleep(one_tenth_sec); // wait for the client to start
+        // wait for the client to start
+        std::thread::sleep(Duration::from_millis(100));
 
-        veracruz_server.new_tls_session().and_then(|session_id| {
-            if session_id != 0 {
-                Ok((veracruz_server, session_id))
-            } else {
-                Err(VeracruzServerError::MissingFieldError("Session id"))
-            }
-        })
-    }
-
-    fn check_hash(
-        policy: &Policy,
-        policy_hash: &str,
-        test_target_platform: &Platform,
-        client_session_id: u32,
-        client_connection: &mut rustls::ClientConnection,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<(), VeracruzServerError> {
-        check_policy_hash(
-            policy_hash,
-            client_session_id,
-            client_connection,
-            ticket,
-            client_tls_tx,
-            client_tls_rx,
-        )?;
-        info!("Policy hash OK...");
-        check_runtime_manager_hash(policy, client_connection, test_target_platform)?;
-        Ok(())
-    }
-
-    fn check_policy_hash(
-        expected_policy_hash: &str,
-        client_session_id: u32,
-        client_connection: &mut rustls::ClientConnection,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-    ) -> Result<(), VeracruzServerError> {
-        info!("Serializing policy hash request.");
-
-        let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()
-            .map_err(|e| {
-                error!(
-                    "Failed to serialize request for policy hash.  Error produced: {:?}.",
-                    e
-                );
-
-                e
-            })?;
-
-        let response = client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_connection,
-            ticket,
-            &serialized_request_policy_hash[..],
-        )
-        .map_err(|e| {
-            error!("Failed to send TLS data.  Error produced: {:?}.", e);
-
-            e
-        })?;
-
-        info!("Reponse received: {:?}", response);
-
-        let parsed_response = transport_protocol::parse_runtime_manager_response(None, &response)?;
-        let status = parsed_response.get_status();
-
-        if status != transport_protocol::ResponseStatus::SUCCESS {
-            error!("Received non-Success status: {:?}.", status);
-            return Err(VeracruzServerError::ResponseError(
-                "check_policy_hash parse_runtime_manager_response",
-                status,
-            ));
-        }
-        let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
-        info!("Received {:?} as hash.", received_hash);
-        return if received_hash == expected_policy_hash {
-            info!("Hash matches expected hash ({:?}).", expected_policy_hash);
-            Ok(())
+        let session_id = veracruz_server.new_tls_session()?;
+        if session_id != 0 {
+            Ok((veracruz_server, session_id))
         } else {
-            error!(
-                "Hash does not match expected hash ({:?}).",
-                expected_policy_hash
-            );
-            Err(VeracruzServerError::MismatchError {
-                variable: "request_policy_hash",
-                received: received_hash.as_bytes().to_vec(),
-                expected: expected_policy_hash.as_bytes().to_vec(),
-            })
-        };
+            Err(format!("Session ID cannot be zero").into())
+        }
     }
 
     fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
-        #[cfg(feature = "debug")]
-        {
+        if cfg!(feature = "debug") {
             // don't check hash because the received hash might be zeros (for nitro, for example)
             return true;
-        }
-        #[cfg(not(feature = "debug"))]
-        {
+        } else {
             let expected = match policy.runtime_manager_hash(platform) {
                 Err(_) => return false,
                 Ok(data) => data,
@@ -1459,7 +1337,7 @@ mod tests {
             info!("Comparing runtime manager hash {:?} (from policy) against {:?} (received) for platform {:?}.", expected_bytes, received, platform);
 
             if &received[..] != expected_bytes.as_slice() {
-                error!("Runtime manager hash does not match.");
+                info!("Runtime manager hash does not match.");
 
                 return false;
             } else {
@@ -1470,316 +1348,18 @@ mod tests {
         }
     }
 
-    fn check_runtime_manager_hash(
-        policy: &Policy,
-        client_connection: &rustls::ClientConnection,
-        test_target_platform: &Platform,
-    ) -> Result<(), VeracruzServerError> {
-        return match client_connection.peer_certificates() {
-            None => {
-                error!("No peer certificate found.");
-
-                Err(VeracruzServerError::MissingFieldError(
-                    "NO PEER CERTIFICATES. WTF?",
-                ))
-            }
-            Some(certs) => {
-                let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref()).unwrap();
-                let ues = ee_cert.unrecognized_extensions();
-
-                // check for OUR extension
-                let encoded_extension_id: [u8; 3] = [
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40
-                        + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                    VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
-                ];
-                match ues.get(&encoded_extension_id[..]) {
-                    None => {
-                        error!("Our certificate extension is not present.");
-
-                        Err(VeracruzServerError::MissingFieldError(
-                            "MY CRAZY CUSTOM EXTENSION AIN'T THERE",
-                        ))
-                    }
-                    Some(data) => {
-                        info!("Certificate extension found.");
-
-                        let extension_data = data.read_all(
-                            VeracruzServerError::MissingFieldError(
-                                "CAN'T READ MY CRAZY CUSTOM EXTENSION",
-                            ),
-                            |input| Ok(input.read_bytes_to_end()),
-                        )?;
-
-                        if !compare_policy_hash(
-                            extension_data.as_slice_less_safe(),
-                            &policy,
-                            test_target_platform,
-                        ) {
-                            error!("None of the runtime manager hashes matched.");
-
-                            return Err(VeracruzServerError::InvalidRuntimeManagerHash);
-                        }
-                        Ok(())
-                    }
-                }
-            }
-        };
-    }
-
-    fn provision_data(
-        filename: &Path,
-        client_session_id: u32,
-        client_connection: &mut rustls::ClientConnection,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        remote_file_name: &str,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        // The client also sends the associated data
-        let data = {
-            let mut data_file = std::fs::File::open(filename)?;
-            let mut data_buffer = std::vec::Vec::new();
-            data_file.read_to_end(&mut data_buffer)?;
-            data_buffer
-        };
-        let serialized_data = transport_protocol::serialize_write_file(&data, remote_file_name)?;
-
-        client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_connection,
-            ticket,
-            &serialized_data[..],
-        )
-    }
-
-    fn provision_stream(
-        filename: &Path,
-        client_session_id: u32,
-        client_connection: &mut rustls::ClientConnection,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        remote_file_name: &str,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        // The client also sends the associated data
-        let data = {
-            let mut data_file = std::fs::File::open(filename)?;
-            let mut data_buffer = std::vec::Vec::new();
-            data_file.read_to_end(&mut data_buffer)?;
-            data_buffer
-        };
-        let serialized_stream = transport_protocol::serialize_stream(&data, remote_file_name)?;
-
-        client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_connection,
-            ticket,
-            &serialized_stream[..],
-        )
-    }
-
-    fn read_file(
-        client_session_id: u32,
-        client_connection: &mut rustls::ClientConnection,
-        ticket: u32,
-        client_tls_tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        client_tls_rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        remote_file_name: &str,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        // The client also sends the associated data
-        let serialized_read = transport_protocol::serialize_read_file(remote_file_name)?;
-        client_tls_send(
-            client_tls_tx,
-            client_tls_rx,
-            client_session_id,
-            client_connection,
-            ticket,
-            &serialized_read[..],
-        )
-    }
-
-    fn server_tls_loop(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
-        tx: std::sync::mpsc::Sender<std::vec::Vec<u8>>,
-        rx: std::sync::mpsc::Receiver<(u32, std::vec::Vec<u8>)>,
-        ticket: u32,
-    ) -> Result<(), VeracruzServerError> {
-        info!("Inside server TLS loop...");
-
-        while *CONTINUE_FLAG_HASH
-            .lock()
-            .map_err(|e| {
-                error!(
-                    "Failed to obtain lock on CONTINUE_FLAG_HASH.  Error produced: {:?}.",
-                    e
-                );
-                e
-            })?
-            .get(&ticket)
-            .ok_or(VeracruzServerError::MissingFieldError(
-                "CONTINUE_FLAG_HASH ticket",
-            ))?
-        {
-            let received = rx.try_recv();
-            let (session_id, received_buffer) = received.unwrap_or_else(|_| (0, Vec::new()));
-
-            if received_buffer.len() > 0 {
-                let (active_flag, output_data_option) = veracruz_server
-                    .tls_data(session_id, received_buffer)
-                    .map_err(|e| {
-                        error!("Failed to send TLS data.  Error produced: {:?}.", e);
-                        e
-                    })?;
-                let output_data = output_data_option.unwrap_or_else(|| Vec::new());
-
-                for output in output_data.iter() {
-                    if output.len() > 0 {
-                        tx.send(output.clone()).map_err(|e| {
-                            error!(
-                                "Failed to send data on TX channel.  Error produced: {:?}.",
-                                e
-                            );
-                            e
-                        })?;
-                    }
-                }
-
-                if !active_flag {
-                    info!("VeracruzServer TLS loop dieing due to lack of TLS data.");
-                    return Ok(());
-                }
-            }
-        }
-        error!("VeracruzServer TLS loop dieing due to no activity...");
-
-        Err(VeracruzServerError::DirectStrError(
-            "No message arrives server",
-        ))
-    }
-
-    fn client_tls_send(
-        tx: &std::sync::mpsc::Sender<(u32, std::vec::Vec<u8>)>,
-        rx: &std::sync::mpsc::Receiver<std::vec::Vec<u8>>,
-        session_id: u32,
-        connection: &mut rustls::ClientConnection,
-        ticket: u32,
-        send_data: &[u8],
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let mut start_index: usize = 0;
-        while start_index < send_data.len() {
-            let bytes_written = connection
-                .writer()
-                .write(&send_data[start_index..])
-                .map_err(|e| {
-                    error!("Failed to send all data.  Error produced: {:?}.", e);
-                    e
-                })?;
-            start_index += bytes_written;
-
-            let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-
-            connection.write_tls(&mut output).map_err(|e| {
-                error!("Failed to write TLS.  Error produced: {:?}.", e);
-                e
-            })?;
-
-            tx.send((session_id, output)).map_err(|e| {
-                error!(
-                    "Failed to send data on TX channel.  Error produced: {:?}.",
-                    e
-                );
-                e
-            })?;
-        }
-
-        while *CONTINUE_FLAG_HASH
-            .lock()
-            .map_err(|e| {
-                error!(
-                    "Failed to obtain lock on CONTINUE_FLAG_HASH.  Error produced: {:?}.",
-                    e
-                );
-                e
-            })?
-            .get(&ticket)
-            .ok_or(VeracruzServerError::MissingFieldError(
-                "CONTINUE_FLAG_HASH ticket",
-            ))?
-        {
-            let received = rx.try_recv();
-
-            if received.is_ok() && (!connection.is_handshaking() || connection.wants_read()) {
-                info!("Received is OK, and we're not handshaking...");
-
-                let received = received.map_err(|e| {
-                    error!("Invariant failed.  Received was not OK.");
-                    e
-                })?;
-
-                let mut slice = &received[..];
-                connection.read_tls(&mut slice).map_err(|e| {
-                    error!("Failed to read TLS.  Error produced: {:?}.", e);
-                    e
-                })?;
-                connection.process_new_packets().map_err(|e| {
-                    error!("Failed to process new packets.  Error produced: {:?}.", e);
-                    e
-                })?;
-
-                let mut received_buffer: std::vec::Vec<u8> = std::vec::Vec::new();
-
-                match connection.reader().read_to_end(&mut received_buffer) {
-                    Ok(_num) => (),
-                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
-                    Err(err) => {
-                        error!("Failed to read data to end.  Error produced: {:?}.", err);
-                        return Err(VeracruzServerError::IOError(err));
-                    }
-                };
-
-                if received_buffer.len() > 0 {
-                    info!("Finished sending via TLS.");
-                    return Ok(received_buffer);
-                }
-            } else if connection.wants_write() {
-                info!("Session wants write...");
-                let mut output: std::vec::Vec<u8> = std::vec::Vec::new();
-                connection.write_tls(&mut output).map_err(|e| {
-                    error!("Failed to write TLS.  Error produced: {:?}.", e);
-                    e
-                })?;
-                let _res = tx.send((session_id, output)).map_err(|e| {
-                    error!(
-                        "Failed to send data on TX channel.  Error produced: {:?}.",
-                        e
-                    );
-                    e
-                })?;
-            }
-        }
-        Err(VeracruzServerError::DirectStrError(
-            "Terminate due to server crash",
-        ))
-    }
-
-    fn create_client_test_connection(
-        client_cert_filename: &Path,
-        client_key_filename: &Path,
+    fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
+        client_cert_filename: P,
+        client_key_filename: Q,
         ciphersuite_str: &str,
-    ) -> Result<rustls::ClientConnection, VeracruzServerError> {
+    ) -> Result<rustls::ClientConnection, Box<dyn Error + 'static>> {
         let client_cert = read_cert_file(client_cert_filename)?;
 
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
-            let data = std::fs::read(trust_path(CA_CERT)).unwrap();
-            let certs = rustls_pemfile::certs(&mut data.as_slice()).unwrap();
+            let data = std::fs::read(cert_key_dir(CA_CERT))?;
+            let certs = rustls_pemfile::certs(&mut data.as_slice())?;
             certs[0].clone()
         };
 
@@ -1788,9 +1368,7 @@ mod tests {
                 VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string())
             })?;
         let mut root_store = rustls::RootCertStore::empty();
-        root_store
-            .add(&rustls::Certificate(proxy_service_cert))
-            .map_err(|err| VeracruzServerError::WebpkiError(err))?;
+        root_store.add(&rustls::Certificate(proxy_service_cert))?;
 
         let client_config = rustls::ClientConfig::builder()
             .with_cipher_suites(&[cipher_suite])
@@ -1799,35 +1377,36 @@ mod tests {
             .with_root_certificates(root_store)
             .with_single_cert([client_cert].to_vec(), client_priv_key)?;
 
-        let enclave_name_as_server = rustls::ServerName::try_from("ComputeEnclave.dev")
-            .map_err(|err| VeracruzServerError::WebpkiDNSNameError(err))?;
+        let enclave_name_as_server = rustls::ServerName::try_from("ComputeEnclave.dev")?;
         Ok(rustls::ClientConnection::new(
-            std::sync::Arc::new(client_config),
+            Arc::new(client_config),
             enclave_name_as_server,
         )?)
     }
 
-    fn read_cert_file(filename: &Path) -> Result<rustls::Certificate, VeracruzServerError> {
-        let mut cert_file = std::fs::File::open(filename)?;
-        let mut cert_buffer = std::vec::Vec::new();
+    fn read_cert_file<P: AsRef<Path>>(
+        filename: P,
+    ) -> Result<rustls::Certificate, Box<dyn Error + 'static>> {
+        let mut cert_file = File::open(filename)?;
+        let mut cert_buffer = Vec::new();
         cert_file.read_to_end(&mut cert_buffer)?;
         let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls_pemfile::certs(&mut cursor)
-            .map_err(|_| VeracruzServerError::TLSUnspecifiedError)?;
+        let certs = rustls_pemfile::certs(&mut cursor)?;
         if certs.len() == 0 {
-            Err(VeracruzServerError::InvalidLengthError("certs.len()", 1))
+            Err(format!("certs.len() is zero").into())
         } else {
             Ok(rustls::Certificate(certs[0].clone()))
         }
     }
 
-    fn read_priv_key_file(filename: &Path) -> Result<rustls::PrivateKey, VeracruzServerError> {
-        let mut key_file = std::fs::File::open(filename)?;
-        let mut key_buffer = std::vec::Vec::new();
+    fn read_priv_key_file<P: AsRef<Path>>(
+        filename: P,
+    ) -> Result<rustls::PrivateKey, Box<dyn Error + 'static>> {
+        let mut key_file = File::open(filename)?;
+        let mut key_buffer = Vec::new();
         key_file.read_to_end(&mut key_buffer)?;
         let mut cursor = std::io::Cursor::new(key_buffer);
-        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)
-            .map_err(|_| VeracruzServerError::TLSUnspecifiedError)?;
+        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)?;
         Ok(rustls::PrivateKey(rsa_keys[0].clone()))
     }
 }
