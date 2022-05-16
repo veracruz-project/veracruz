@@ -38,8 +38,7 @@ mod tests {
         },
         thread,
         thread::JoinHandle,
-        time::Duration,
-        time::Instant,
+        time::{Duration, Instant},
         vec::Vec,
     };
     use transport_protocol;
@@ -185,16 +184,12 @@ mod tests {
                     "spawned thread calling server with url:{:?}",
                     proxy_attestation_server_url
                 );
-                let debug_flag = if cfg!(feature = "debug") {
-                    true
-                } else {
-                    false
-                };
+                let debug_flag = if cfg!(feature = "debug") { true } else { false };
                 let server = proxy_attestation_server::server::server(
                     proxy_attestation_server_url,
                     cert_key_dir(CA_CERT).as_path(),
                     cert_key_dir(CA_KEY).as_path(),
-                    debug_flag
+                    debug_flag,
                 )
                 .unwrap();
                 sys.block_on(server).unwrap();
@@ -205,12 +200,13 @@ mod tests {
     }
 
     #[test]
-    /// Load a policy and initialize veracruz server (including runtime), and proxy attestation server. Attestation happen during the veracruz runtime initialisation phase.
+    /// Load a policy and initialize veracruz server (including runtime), and proxy attestation server.
+    /// Attestation happen during the veracruz runtime initialisation phase.
     fn basic_init_destroy_enclave() {
         timeout(Duration::from_secs(TIME_OUT_SECS), || {
-        let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
-        VeracruzServerEnclave::new(&policy_json).unwrap();
+            let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
+            proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+            VeracruzServerEnclave::new(&policy_json).unwrap();
         })
     }
 
@@ -218,10 +214,10 @@ mod tests {
     /// Load policy file and check if a new session tls can be opened
     fn basic_new_session() {
         timeout(Duration::from_secs(TIME_OUT_SECS), || {
-        let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
-        // start the proxy attestation server
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
-        init_veracruz_server_and_tls_session(policy_json).unwrap();
+            let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
+            // start the proxy attestation server
+            proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+            init_veracruz_server_and_tls_session(policy_json).unwrap();
         })
     }
 
@@ -238,7 +234,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -251,7 +254,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -264,7 +274,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -276,7 +293,13 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -288,7 +311,13 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -302,10 +331,15 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
-
 
     #[test]
     /// A client attempts to use an unauthorized key
@@ -317,7 +351,13 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, CLIENT_CERT, UNAUTHORIZED_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            UNAUTHORIZED_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -331,7 +371,13 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, UNAUTHORIZED_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            UNAUTHORIZED_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -345,7 +391,13 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, UNAUTHORIZED_CERT, UNAUTHORIZED_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            UNAUTHORIZED_CERT,
+            UNAUTHORIZED_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -360,25 +412,43 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Test for several rounds of appending data and executing program. 
+    /// Test for several rounds of appending data and executing program.
     /// It sums up an initial f64 number and two streams of f64 numbers.
     fn basic_number_accumulation_batch_process() {
         let mut events = vec![
             TestEvent::write_program(NUMBER_STREM_WASM),
             TestEvent::write_data(SINGLE_F64_DATA),
         ];
-        events.append(&mut TestEvent::batch_process_events(data_dir(F64_STREAM_PATH),NUMBER_STREM_WASM, "/output/accumulation.dat"));
+        events.append(&mut TestEvent::batch_process_events(
+            data_dir(F64_STREAM_PATH),
+            NUMBER_STREM_WASM,
+            "/output/accumulation.dat",
+        ));
         events.push(TestEvent::ShutDown);
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
-    /// Integration test: linear regression. 
+    /// Integration test: linear regression.
     /// Compute the gradient and intercept,
     /// i.e. the LinearRegression struct, given a series of point in the
     /// two-dimensional space.  Data sources: linear-regression, a vec of points
@@ -392,7 +462,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -417,7 +494,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -433,7 +517,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -451,7 +542,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -461,10 +559,16 @@ mod tests {
             TestEvent::write_program(NUMBER_STREM_WASM),
             TestEvent::write_data(SINGLE_F64_DATA),
             TestEvent::read_result("/output/accumulation.dat"),
-            TestEvent::ShutDown
+            TestEvent::ShutDown,
         ];
 
-        let result = TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS));
+        let result = TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        );
         assert!(result.is_err(), "An error should occur");
     }
 
@@ -479,7 +583,14 @@ mod tests {
             TestEvent::ShutDown,
         ];
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -487,10 +598,11 @@ mod tests {
     /// Ref to https://github.com/kimandrik/IDASH2017.
     /// data sources: idash2017/*.dat
     fn performance_idash2017() {
-        let mut events = vec![
-            TestEvent::write_program(LOGISTICS_REGRESSION_WASM),
-        ];
-        events.append(&mut TestEvent::write_all(data_dir(LOGISTICS_REGRESSION_DATA_PATH), "/input/idash2017/"));
+        let mut events = vec![TestEvent::write_program(LOGISTICS_REGRESSION_WASM)];
+        events.append(&mut TestEvent::write_all(
+            data_dir(LOGISTICS_REGRESSION_DATA_PATH),
+            "/input/idash2017/",
+        ));
         events.append(&mut vec![
             TestEvent::execute(LOGISTICS_REGRESSION_WASM),
             // only read two outputs
@@ -499,7 +611,14 @@ mod tests {
             TestEvent::ShutDown,
         ]);
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -507,10 +626,11 @@ mod tests {
     /// Ref: https://github.com/woonhulktin/HETSA.
     /// data sources: macd/*.dat
     fn performance_macd() {
-        let mut events = vec![
-            TestEvent::write_program(MACD_WASM),
-        ];
-        events.append(&mut TestEvent::write_all(data_dir(MACD_DATA_PATH), "/input/macd/"));
+        let mut events = vec![TestEvent::write_program(MACD_WASM)];
+        events.append(&mut TestEvent::write_all(
+            data_dir(MACD_DATA_PATH),
+            "/input/macd/",
+        ));
         events.append(&mut vec![
             TestEvent::execute(MACD_WASM),
             // only read two outputs
@@ -518,17 +638,25 @@ mod tests {
             TestEvent::ShutDown,
         ]);
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
 
     #[test]
     /// Performance test: intersection-sum.
     /// data sources: private-set-inter-sum/*.dat
     fn performance_set_intersection_sum() {
-        let mut events = vec![
-            TestEvent::write_program(INTERSECTION_SET_SUM_WASM),
-        ];
-        events.append(&mut TestEvent::write_all(data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH), "/input/private-set-inter-sum/"));
+        let mut events = vec![TestEvent::write_program(INTERSECTION_SET_SUM_WASM)];
+        events.append(&mut TestEvent::write_all(
+            data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
+            "/input/private-set-inter-sum/",
+        ));
         events.append(&mut vec![
             TestEvent::execute(INTERSECTION_SET_SUM_WASM),
             // only read two outputs
@@ -536,9 +664,15 @@ mod tests {
             TestEvent::ShutDown,
         ]);
 
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, Duration::from_secs(TIME_OUT_SECS)).unwrap();
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
     }
-
 
     /// Events that drive the test.
     #[derive(Debug, Clone)]
@@ -561,42 +695,36 @@ mod tests {
         /// Create a test event for provisioning program. The function adds the local and remote
         /// path prefices on the filename.
         fn write_program(filename: &str) -> TestEvent {
-            TestEvent::WriteFile(
-                runtime_program_dir(filename),
-                program_dir(filename),
-            )
+            TestEvent::WriteFile(runtime_program_dir(filename), program_dir(filename))
         }
 
         /// Create a test event for provisioning data. The function adds the local and remote
         /// path prefices on the filename.
         fn write_data(filename: &str) -> TestEvent {
-            TestEvent::WriteFile(
-                runtime_data_dir(filename),
-                data_dir(filename),
-            )
+            TestEvent::WriteFile(runtime_data_dir(filename), data_dir(filename))
         }
 
         /// Create a list of events for provisioning data files in the `local_dir_path`. The
         /// `local_dir_path` will be replaced by `remote_dir_path`.
         fn write_all<T: AsRef<Path>, K: AsRef<Path>>(
             dir_path: T,
-            remote_dir_path: K) ->  Vec<TestEvent> {
-            TestEvent::input_list(dir_path, remote_dir_path).into_iter().map(|(remote,local)| TestEvent::WriteFile(remote,local)).collect()
+            remote_dir_path: K,
+        ) -> Vec<TestEvent> {
+            TestEvent::input_list(dir_path, remote_dir_path)
+                .into_iter()
+                .map(|(remote, local)| TestEvent::WriteFile(remote, local))
+                .collect()
         }
 
         /// Create a test event for executing a program. The function adds the remote
         /// path prefices on the filename.
         fn execute<T: AsRef<str>>(filename: T) -> TestEvent {
-            TestEvent::Execute(
-                runtime_program_dir(filename),
-            )
+            TestEvent::Execute(runtime_program_dir(filename))
         }
 
         /// Create a test event for reading result.
         fn read_result<T: AsRef<str>>(filepath: T) -> TestEvent {
-            TestEvent::ReadFile(
-                String::from(filepath.as_ref())
-            )
+            TestEvent::ReadFile(String::from(filepath.as_ref()))
         }
 
         /// Function produces a vec of input lists. Each list corresponds to a round
@@ -618,10 +746,11 @@ mod tests {
             // the remote in each batch. Note that the provisioning use `append` request rather then
             // `write` request anf the remote path is of prefix `remote_dir_path`.
             // For example, in the previous example, if in the second batch, sub-directory `2`,
-            // there is a file `local_dir_path/2/a.dat`, 
+            // there is a file `local_dir_path/2/a.dat`,
             // then a TestEvent::Append('remote_dir_path/a.dat', `local_dir_path/2/a.dat`) will be
             // created.
-            let mut dir_entries = local_dir_path.as_ref()
+            let mut dir_entries = local_dir_path
+                .as_ref()
                 .read_dir()
                 .expect(&format!("invalid path: {:?}", local_dir_path.as_ref()))
                 .filter_map(|e| e.map(|x| x.path()).ok())
@@ -636,7 +765,12 @@ mod tests {
             // Add append, execute and read_result events in each round.
             for entry in dir_entries.iter() {
                 // Add all the append requests.
-                rst.append(&mut TestEvent::input_list(entry, &remote_dir_path).into_iter().map(|(remote,local)| TestEvent::AppendFile(remote,local)).collect());
+                rst.append(
+                    &mut TestEvent::input_list(entry, &remote_dir_path)
+                        .into_iter()
+                        .map(|(remote, local)| TestEvent::AppendFile(remote, local))
+                        .collect(),
+                );
                 // Add execute request.
                 rst.push(TestEvent::execute(program_filename));
                 rst.push(TestEvent::read_result(result_path));
@@ -644,8 +778,6 @@ mod tests {
 
             rst
         }
-
-
 
         /// Function produces a vec of pairs of remote (des) file and local (src) file path,
         /// which corresponds to provisioning/overwriting the content of the local file to the remote file.
@@ -688,7 +820,6 @@ mod tests {
 
             rst
         }
-
     }
 
     /// Test states.
@@ -720,7 +851,9 @@ mod tests {
             policy_filename: P,
             client_cert_filename: Q,
             client_key_filename: K,
-            events: Vec<TestEvent>, timeout: Duration) -> Result<(), Box<dyn Error + 'static>> {
+            events: Vec<TestEvent>,
+            timeout: Duration,
+        ) -> Result<(), Box<dyn Error + 'static>> {
             Self::new(
                 policy_dir(policy_filename),
                 cert_key_dir(client_cert_filename),
@@ -822,7 +955,8 @@ mod tests {
 
             while test_alive_flag.load(Ordering::SeqCst) {
                 let received = receiver.recv();
-                let (session_id, received_buffer) = received.map_err(|e| format!("Server: {:?}", e))?;
+                let (session_id, received_buffer) =
+                    received.map_err(|e| format!("Server: {:?}", e))?;
                 info!(
                     "Server: receive {} byte(s) on session ID {}.",
                     received_buffer.len(),
@@ -862,10 +996,13 @@ mod tests {
         }
 
         /// Execute this test. The client sends messages though the channel to the server
-        /// thread driven by `events`. It comsumes the ownership of `self`, 
+        /// thread driven by `events`. It comsumes the ownership of `self`,
         /// because it will join server thread at the end.
-        fn execute(mut self, events: Vec<TestEvent>, timeout: Duration) -> Result<(), Box<dyn Error + 'static>> {
-
+        fn execute(
+            mut self,
+            events: Vec<TestEvent>,
+            timeout: Duration,
+        ) -> Result<(), Box<dyn Error + 'static>> {
             // Spawn a thread that will send the timeout signal by killing alive flag.
             let alive_flag_clone = self.alive_flag.clone();
             std::thread::spawn(move || {
@@ -881,7 +1018,7 @@ mod tests {
                 info!("Process event {:?}.", event);
                 let time_init = Instant::now();
                 let response = self.process_event(&event).map_err(|e| {
-                    error!("Client: {:?}",e);
+                    error!("Client: {:?}", e);
                     self.alive_flag.store(false, Ordering::SeqCst);
                     e
                 })?;
@@ -900,7 +1037,10 @@ mod tests {
             Ok(())
         }
 
-        fn process_event(&mut self, event: &TestEvent) -> Result<transport_protocol::RuntimeManagerResponse, Box<dyn Error + 'static>> {
+        fn process_event(
+            &mut self,
+            event: &TestEvent,
+        ) -> Result<transport_protocol::RuntimeManagerResponse, Box<dyn Error + 'static>> {
             let response = match event {
                 TestEvent::CheckHash => {
                     let response = self.check_policy_hash()?;
@@ -917,7 +1057,9 @@ mod tests {
                 TestEvent::ReadFile(remote_path) => self.read_file(&remote_path)?,
                 TestEvent::ShutDown => self.shutdown()?,
             };
-            Ok(transport_protocol::parse_runtime_manager_response(None, &response)?)
+            Ok(transport_protocol::parse_runtime_manager_response(
+                None, &response,
+            )?)
         }
 
         fn check_policy_hash(&mut self) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
@@ -1226,8 +1368,7 @@ mod tests {
                 VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string())
             })?;
         let mut root_store = rustls::RootCertStore::empty();
-        root_store
-            .add(&rustls::Certificate(proxy_service_cert))?;
+        root_store.add(&rustls::Certificate(proxy_service_cert))?;
 
         let client_config = rustls::ClientConfig::builder()
             .with_cipher_suites(&[cipher_suite])
