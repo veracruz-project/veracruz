@@ -408,6 +408,10 @@ impl VeracruzClient {
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
+        let certs = self.tls_connection.peer_cert();
+        if certs.iter().count() != 1 {
+            return Err(VeracruzClientError::NoPeerCertificatesError)
+        }
         //xx Presumably we must do something here!
         if false {
             let _ = self.compare_runtime_hash(b"");
