@@ -10,13 +10,17 @@
 //! information on licensing and copyright.
 
 use crate::error::VeracruzClientError;
+use log::{error, info};
 use mbedtls::{alloc::List, ssl::CipherSuite::*};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use std::{
+    convert::TryFrom,
     io::{Read, Write},
     path::Path,
     sync::{Arc, Mutex},
 };
+use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
+use webpki;
 
 /// VeracruzClient struct. The remote_session_id is shared between
 /// VeracruzClient and InsecureConnection so that it is available from
@@ -62,10 +66,10 @@ impl Write for InsecureConnection {
             .body(combined_string)
             .send() {
                 Ok(x) => x,
-                Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx1")),
+                Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::Other, "reqwest send failed")),
             };
         if ret.status() != reqwest::StatusCode::OK {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "xx2"))
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, "reqwest bad status"))
         }
         // We received a response ...
         let body = ret.text().unwrap();
@@ -412,11 +416,45 @@ impl VeracruzClient {
         if certs.iter().count() != 1 {
             return Err(VeracruzClientError::NoPeerCertificatesError)
         }
-        //xx Presumably we must do something here!
-        if false {
-            let _ = self.compare_runtime_hash(b"");
+        let cert = certs.iter().nth(0).unwrap().unwrap().iter().nth(0).unwrap();
+        let ee_cert = webpki::EndEntityCert::try_from(cert.as_der())?;
+        let ues = ee_cert.unrecognized_extensions();
+        // check for OUR extension
+        // The Extension is encoded using DER, which puts the first two
+        // elements in the ID in 1 byte, and the rest get their own bytes
+        // This encoding is specified in ITU Recommendation x.690,
+        // which is available here: https://www.itu.int/rec/T-REC-X.690-202102-I/en
+        // but it's deep inside a PDF...
+        let encoded_extension_id: [u8; 3] = [
+            VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40
+                + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
+            VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
+            VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
+        ];
+        match ues.get(&encoded_extension_id[..]) {
+            None => {
+                error!("Our extension is not present. This should be fatal");
+                Err(VeracruzClientError::RuntimeHashExtensionMissingError)
+            }
+            Some(data) => {
+                info!("Certificate extension present.");
+                let extension_data = data
+                    .read_all(VeracruzClientError::UnableToReadError, |input| {
+                        Ok(input.read_bytes_to_end())
+                    })?;
+                info!("Certificate extension extracted correctly.");
+                match self.compare_runtime_hash(extension_data.as_slice_less_safe()) {
+                    Ok(_) => {
+                        info!("Runtime hash matches.");
+                        Ok(())
+                    }
+                    Err(err) => {
+                        error!("Runtime hash mismatch: {}.", err);
+                        Err(err)
+                    }
+                }
+            }
         }
-        Ok(())
     }
 
     /// Send the data to the runtime_manager path on the Veracruz server
