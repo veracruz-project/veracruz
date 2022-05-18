@@ -1,10 +1,11 @@
-//! Common code for any implementation of WASI:
+//! Common code for any implementation of WASI
+//!
+//! This module contains:
 //! - An interface for handling memory access.
 //! - An interface for executing a program.
-//! - A WASI Wrapper. It wraps the strictly type WASI-like API
-//! in the virtual file system, and converts wasm number- and address-based
-//! parameters to properly typed parameters and rust-style error handling to
-//! c-style returning code.
+//! - A Wasi wrapper which wraps the strictly Wasi-like API in the virtual file
+//!   system, and converts Wasm number- and address-based parameters to
+//!   properly-typed parameters with Rust-style error handling (and vice versa).
 //!
 //! ## Authors
 //!
@@ -26,10 +27,12 @@ use crate::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
+use policy_utils::pipeline::Pipeline;
 use serde::{Deserialize, Serialize};
+use std::ffi::OsString;
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData, mem,
-    mem::size_of, ops::Deref, ops::DerefMut, slice, slice::from_raw_parts,
+    mem::size_of, ops::Deref, ops::DerefMut, path::Path, slice, slice::from_raw_parts,
     slice::from_raw_parts_mut, string::String, vec::Vec,
 };
 use strum_macros::{EnumString, IntoStaticStr};
@@ -44,9 +47,10 @@ use wasi_types::{
 // Common constants.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// List of WASI API.
-/// It can be converted between primitive numbers and enum values via `primitive` related dereive,
-/// and between lowercase str and enum values via `strum`.
+/// List of WASI API function names.
+/// These can be converted between primitive numbers and enum values via
+/// `primitive` derive macros, and between lowercase string and enum values via
+/// `strum`.
 #[derive(
     IntoStaticStr,
     EnumString,
@@ -110,7 +114,7 @@ pub enum WasiAPIName {
     _LAST,
 }
 
-/// List of Veracruz API.
+/// List of Veracruz API function names.
 #[derive(
     IntoStaticStr,
     EnumString,
@@ -361,7 +365,7 @@ impl<'a, T> DerefMut for BoundMut<'a, T> {
     }
 }
 
-/// Number of iovecs to store internally before needing dynamic memory
+/// Number of `iovec`s to store internally before needing dynamic memory
 const IOVECSLICES_SOO_COUNT: usize = 2;
 
 /// A type wrapping an array of IoVecs as directly-accessible slices.
@@ -390,9 +394,10 @@ impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
     fn as_ref(&self) -> &[&'a [u8]] {
         match &self.slices {
             IoVecSlicesStorage::Small(arr) => {
-                // looks a bit scary, but is just casting our `[Option<&[u8]>; 2]`
-                // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
-                // unsafety to do this without memory allocation.
+                // NB: this looks a bit scary, but is just casting our
+                // `[Option<&[u8]>; 2]` into a `&[&[u8]]`. This is perfectly
+                // valid Rust, though requires unsafety to do this without
+                // memory allocation.
                 let len = arr.iter().take_while(|x| x.is_some()).count();
                 unsafe { slice::from_raw_parts(arr.as_ptr() as *const &'a [u8], len) }
             }
@@ -427,9 +432,10 @@ impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
     fn as_mut(&mut self) -> &mut [&'a mut [u8]] {
         match &mut self.slices {
             IoVecSlicesMutStorage::Small(arr) => {
-                // looks a bit scary, but is just casting our `[Option<&[u8]>; 2]`
-                // into a `&[&[u8]]`. This is perfectly valid Rust, though requires
-                // unsafety to do this without memory allocation.
+                // NB: this looks a bit scary, but is just casting our
+                // `[Option<&[u8]>; 2]` into a `&[&[u8]]`. This is perfectly
+                // valid Rust, though requires unsafety to do this without
+                // memory allocation.
                 let len = arr.iter().take_while(|x| x.is_some()).count();
                 unsafe { slice::from_raw_parts_mut(arr.as_mut_ptr() as *mut &'a mut [u8], len) }
             }
@@ -438,7 +444,7 @@ impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
     }
 }
 
-/// A MemoryHandler trait for interacting with the wasm memory space.
+/// A `MemoryHandler` trait for interacting with the Wasm memory space.
 ///
 /// The API here is a bit tricky because we want to be able to leverage
 /// direct access to linear memory if available, and this is provided in
@@ -455,29 +461,29 @@ impl<'a, R> AsMut<[&'a mut [u8]]> for IoVecSlicesMut<'a, R> {
 /// ---
 ///
 /// At minimum, an implementation must implement `get_slice`, `get_slice_mut`,
-/// and `get_size. Without GATs, we can't describe the correct lifetimes in
+/// and `get_size`. Without GATs, we can't describe the correct lifetimes in
 /// this trait, so instead we require that `get_slice` and `get_slice` return
 /// associated types that implement a "lifetime-less" MemorySlice trait. It's
 /// up to the implementor to satisfy this, which most likely means unsafe code
 /// going through a pointer-type-cast in order to create a disjoint lifetime.
 ///
 /// To keep this from just being completely unsafe, we reintroduce the lifetime
-/// requirements with the Bound and BoundMut wrappers. These wrappers ensure
+/// requirements with the `Bound` and `BoundMut` wrappers. These wrappers ensure
 /// the structure remains allocated for the original lifetime, but in a scope
 /// where we can describe the lifetime in the MemoryHandler trait.
 ///
 /// ---
 ///
-/// In addition to all this, MemorySlice and MemorySliceMut have a special
+/// In addition to all this, `MemorySlice` and `MemorySliceMut` have a special
 /// requirement that the underlying struct is movable even behind a reference.
-/// This is described in more detail in the documentation of MemorySlice, and
-/// is required for the self-referential slices used in IoVecSlice and
-/// IoVecSliceMut without an unnecessary memory allocation.
+/// This is described in more detail in the documentation of `MemorySlice`, and
+/// is required for the self-referential slices used in `IoVecSlice` and
+/// `IoVecSliceMut` without an unnecessary memory allocation.
 ///
 /// ---
 ///
-/// NOTE: we purposely choose u32 here as the execution engine is likely
-/// received u32 as parameters.
+/// NOTE: we purposely choose `u32` here as the execution engine is likely
+/// received `u32` as parameters.
 ///
 pub trait MemoryHandler {
     /// A type representing a direct reference to memory
@@ -613,11 +619,11 @@ pub trait MemoryHandler {
             .collect()
     }
 
-    /// Unpack an array of iovec references
+    /// Unpack an array of `iovec` references
     ///
     /// The result of this is an array of slices that read directly from
     /// the underlying memory. The type is complicated in order to ensure the
-    /// correct lifetime, but it can be treated as a "simple" AsRef<&[&[u8]]>.
+    /// correct lifetime, but it can be treated as a "simple" `AsRef<&[&[u8]]>`.
     ///
     fn unpack_iovec<'a>(
         &'a self,
@@ -638,39 +644,42 @@ pub trait MemoryHandler {
             // execution the moment io gets involved.
             //
             // We want to reference directly into the engine's underlying memory
-            // if possible, and MemorySlice trait takes care of that (see MemorySlice
-            // for even more mess). But we take the simple reference a bit further
-            // here with iovecs since we want to reference multiple slices of
-            // the underlying memory while maintaining the lifetime of the original
-            // MemorySlice.
+            // if possible, and `MemorySlice` trait takes care of that (see
+            // `MemorySlice` for even more mess). But we take the simple
+            // reference a bit further here with iovecs since we want to
+            // reference multiple slices of the underlying memory while
+            // maintaining the lifetime of the original `MemorySlice`.
             //
-            // To provide this for any generic AsRef<[u8]> type requires a possibly
-            // self-referential type, which gets incredibly hairy in Rust. The "safe"
-            // way to do this would be to move the MemorySlice onto the heap
-            // and pin it with Box::pin, though this requires memory allocation
-            // and still requires pointers and a bit of unsafety to tie everything
-            // together.
+            // To provide this for any generic `AsRef<[u8]>` type requires a
+            // possibly self-referential type, which gets incredibly hairy in
+            // Rust. The "safe" way to do this would be to move the
+            // `MemorySlice` onto the heap and pin it with `Box::pin`, though
+            // this requires memory allocation and still requires pointers and
+            // a bit of unsafety to tie everything together.
             //
-            // In theory you could pin the MemorySlice to the stack, however it would
-            // need to be allocated in the callers stack and passed to this function,
-            // _greatly_ complicating this API (requiring MaybeUninit in any caller?).
+            // In theory you could pin the `MemorySlice` to the stack, however
+            // it would need to be allocated in the callers stack and passed
+            // to this function, _greatly_ complicating this API (requiring
+            // `MaybeUninit` in any caller?).
             //
-            // As an alternative, we can just require that the associated MemorySlice
-            // type is movable, even behind a borrow. This is outside of Rust's
-            // rules, but is actually reasonable for most types we would want to use
-            // for MemorySlice. This requirement is satisfied by `&[u8]`,
-            // `MutexGaurd<[u8]>`, and even Vec<u8>, but not by any type where `as_ref`
-            // referenced data in original struct, such as `[u8; 128]`.
+            // As an alternative, we can just require that the associated
+            // `MemorySlice` type is movable, even behind a borrow. This is
+            // outside of Rust's rules, but is actually reasonable for most
+            // types we would want to use for `MemorySlice`. This requirement
+            // is satisfied by `&[u8]`, `MutexGaurd<[u8]>`, and even `Vec<u8>`,
+            // but not by any type where `as_ref` referenced data in original
+            // struct, such as `[u8; 128]`.
             //
             // ---
             //
-            // Of course this sort of lifetime isn't checkable by Rust, since preventing
-            // borrowed moves is the whole point of the borrow checker, so we need
-            // to use a bit of unsafety to strip away the lifetime.
+            // Of course this sort of lifetime isn't checkable by Rust, since
+            // preventing borrowed moves is the whole point of the borrow
+            // checker, so we need to use a bit of unsafety to strip away the
+            // lifetime.
             //
-            // Note, we still enforce the correct lifetimes for any callers! This
-            // is accomplished by the `Bound` wrapper. There's more info on this
-            // on the `MemorySlice` and `Bound` traits/types
+            // Note, we still enforce the correct lifetimes for any callers!
+            // This is accomplished by the `Bound` wrapper. There's more info
+            // on this on the `MemorySlice` and `Bound` traits/types
             //
             let slice = &memory.as_ref()[usize::try_from_or_errno(iovec.buf)?
                 ..usize::try_from_or_errno(iovec.buf + iovec.len)?];
@@ -697,7 +706,8 @@ pub trait MemoryHandler {
     ///
     /// The result of this is an array of slices that writes directly into
     /// the underlying memory. The type is complicated in order to ensure the
-    /// correct lifetime, but it can be treated as a "simple" AsMut<&mut [&mut [u8]]>.
+    /// correct lifetime, but it can be treated as a "simple"
+    /// `AsMut<&mut [&mut [u8]]>`.
     ///
     fn unpack_iovec_mut<'a>(
         &'a mut self,
@@ -752,8 +762,9 @@ pub trait MemoryHandler {
         }
     }
 
-    /// Write the content to the buf_address and the starting address to buf_pointers.
-    /// For example:
+    /// Write the content to the `buf_address` and the starting address to
+    /// `buf_pointers`.  For example:
+    ///
     /// buf_address:
     /// --------------------------------------------------------------------
     ///  content[0] content[1] ......
@@ -784,16 +795,18 @@ pub trait MemoryHandler {
 // The host runtime state.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// A wrapper on VFS for WASI, which provides common API used by wasm execution engine.
+/// A wrapper on VFS for WASI, which provides common API used by wasm execution
+/// engine.
 #[derive(Clone)]
 pub struct WasiWrapper {
     /// The synthetic filesystem associated with this machine.
-    /// Note: Veracruz runtime should hold the root FileSystem handler.
-    ///       The FileSystem handler here should be a non-root handler spawned
-    ///       fro the root one.
-    ///       Both the Veracruz runtime and this WasiWrapper can update, i.e. mutate,
-    ///       the file system internal state, if their local FileSystem handlers have
-    ///       the appropriate capabilities.
+    ///
+    /// Note: Veracruz runtime should hold the root `FileSystem` handler.
+    ///       The `FileSystem` handler here should be a non-root handler spawned
+    ///       from the root one.  Both the Veracruz runtime and this
+    ///       `WasiWrapper` can update, i.e. mutate, the file system internal
+    ///       state, if their local `FileSystem` handlers have the appropriate
+    ///       capabilities.
     ///       ---------------------------
     ///           Runtime  |  WasiWrapper
     /// FileSystem(handler)| FileSystem(handler)
@@ -803,16 +816,14 @@ pub struct WasiWrapper {
     ///            |  Internal    |
     ///            ----------------
     filesystem: FileSystem,
-    /// The environment variables that have been passed to this program from the
-    /// global policy file.  These are stored as a key-value mapping from
-    /// variable name to value.
-    pub(crate) environment_variables: Vec<(String, String)>,
-    /// The array of program arguments that have been passed to this program,
-    /// again from the global policy file.
-    pub(crate) program_arguments: Vec<String>,
-    /// The exit code, if program calls proc_exit.
+    /// The exit code returned by the last executing program.
     exit_code: Option<u32>,
-    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be enabled.
+    /// The environment variables currently set, and their bindings.
+    environment_variables: Vec<(String, String)>,
+    /// The program arguments of the executable being executed.
+    program_arguments: Vec<String>,
+    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
+    /// enabled.
     pub(crate) enable_clock: bool,
     /// Whether strace is enabled.
     pub(crate) enable_strace: bool,
@@ -832,15 +843,20 @@ impl WasiWrapper {
     // Creating and modifying runtime states.
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
-    /// `principal` from `filesystem`
+    /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem
+    /// `filesystem` and register a set of environment variable bindings,
+    /// `environment_variables`.
     #[inline]
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
+    pub fn new(
+        filesystem: FileSystem,
+        environment_variables: Vec<(String, String)>,
+        enable_clock: bool,
+    ) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
-            environment_variables: Vec::new(),
-            program_arguments: Vec::new(),
             exit_code: None,
+            environment_variables,
+            program_arguments: Vec::new(),
             enable_clock,
             enable_strace: false,
         })
@@ -849,12 +865,6 @@ impl WasiWrapper {
     ///////////////////////////////////////////////////////
     //// Functions for the execution engine internal
     ///////////////////////////////////////////////////////
-
-    /// Return the exit code from `proc_exit` call.
-    #[inline]
-    pub(crate) fn exit_code(&self) -> Option<u32> {
-        self.exit_code
-    }
 
     /// Return a timestamp value for use by "filestat" functions,
     /// which will be zero if the clock is not enabled.
@@ -870,16 +880,53 @@ impl WasiWrapper {
         }
     }
 
+    /// Returns the exit code from the `proc_exit` call of the last executing
+    /// program, if any.
+    #[inline]
+    pub(crate) fn exit_code(&self) -> Option<u32> {
+        self.exit_code
+    }
+
+    /// Manually sets the exit code of the last-executed program to `code`.
+    #[inline]
+    pub(crate) fn set_exit_code(&mut self, code: u32) -> &mut Self {
+        self.exit_code = Some(code);
+        self
+    }
+
+    /// Resets the exit code of the last executing program to `None`, clearing
+    /// any previously-stored value.
+    #[inline]
+    pub(crate) fn suppress_exit_code(&mut self) -> &mut Self {
+        self.exit_code = None;
+        self
+    }
+
+    /// Sets the program arguments associated with the program being executed.
+    #[inline]
+    pub(crate) fn set_program_arguments(&mut self, arguments: Vec<String>) -> &mut Self {
+        self.program_arguments = arguments;
+        self
+    }
+
     fn strace(&self, func: &str) -> Strace {
         Strace::func(self.enable_strace, func)
+    }
+
+    /// Reads a file from the filesystem using an absolute path, `path`.
+    pub(crate) fn read_file_by_absolute_path<P>(&mut self, path: P) -> Result<Vec<u8>, ErrNo>
+    where
+        P: AsRef<Path>,
+    {
+        self.filesystem.read_file_by_absolute_path(path)
     }
 
     ////////////////////////////////////////////////////////////////////////////
     // WASI implementation
     ////////////////////////////////////////////////////////////////////////////
 
-    /// The implementation of the WASI `args_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `args_get` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn args_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -899,8 +946,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `args_sizes_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `args_sizes_get` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn args_sizes_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -922,8 +969,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `environ_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `environ_get` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn environ_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -946,8 +993,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// THe implementation of the WASI `environ_sizes_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// THe implementation of the WASI `environ_sizes_get` function. It
+    /// requires extra `memory_ref` to interact with the execution engine.
     pub(crate) fn environ_sizes_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -971,8 +1018,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `clock_res_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `clock_res_get` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn clock_res_get<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -998,8 +1045,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `clock_time_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `clock_time_get` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn clock_time_get<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1027,8 +1074,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_advise` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_advise` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_advise<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1049,8 +1096,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_allocate` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_allocate` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_allocate<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1066,8 +1113,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_close` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_close` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn fd_close<T: MemoryHandler>(
         &mut self,
@@ -1080,8 +1127,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_datasync` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_datasync` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn fd_datasync<T: MemoryHandler>(
         &mut self,
@@ -1094,8 +1141,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_fdstat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_fdstat_get` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_fdstat_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -1112,8 +1159,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_fdstat_set_flags` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_fdstat_set_flags` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_fdstat_set_flags<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1130,8 +1177,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_fdstat_set_rights` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_fdstat_set_rights` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_fdstat_set_rights<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1152,8 +1199,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_filestat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_filestat_get` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_filestat_get<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -1170,8 +1217,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_filestat_set_size` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_filestat_set_size` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn fd_filestat_set_size<T: MemoryHandler>(
         &mut self,
@@ -1186,8 +1233,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_filestat_set_times` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_filestat_set_times` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_filestat_set_times<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1214,8 +1261,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_pread` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_pread` function. It requires an extra
+    /// `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_pread<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1241,8 +1288,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_prestat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_prestat_get` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn fd_prestat_get<T: MemoryHandler>(
         &mut self,
@@ -1261,8 +1308,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_prestat_dir_name` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_prestat_dir_name` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_prestat_dir_name<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1289,8 +1336,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_pwrite` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_pwrite` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_pwrite<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1316,8 +1363,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_read` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_read` function. It requires an extra
+    /// `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_read<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1340,8 +1387,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_readdir` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_readdir` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_readdir<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1357,9 +1404,9 @@ impl WasiWrapper {
 
             let mut written = 0;
             for (dir, path) in dir_entries {
-                //NOTE: `buf_len` is the number of bytes dir entries can store.
-                //      If there is not enough space, stop writing and leave the rest of the buffer
-                //      untouched.
+                // NB: `buf_len` is the number of bytes dir entries can store.
+                // If there is not enough space, stop writing and leave the rest
+                // of the buffer untouched.
                 written += size_of::<DirEnt>() as u32;
                 if written > buf_len {
                     written = buf_len;
@@ -1385,8 +1432,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_renumber` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_renumber` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn fd_renumber<T: MemoryHandler>(
         &mut self,
@@ -1423,8 +1470,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_sync` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_sync` function. It requires an extra
+    /// `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn fd_sync<T: MemoryHandler>(&mut self, _: &mut T, fd: u32) -> FileSystemResult<()> {
         let mut strace = self.strace("fd_sync");
@@ -1433,8 +1480,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_tell` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_tell` function. It requires an extra
+    /// `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_tell<T: MemoryHandler>(
         &self,
         memory_ref: &mut T,
@@ -1451,8 +1498,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `fd_write` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `fd_write` function. It requires an extra
+    /// `memory_ref` to interact with the execution engine.
     pub(crate) fn fd_write<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1475,8 +1522,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_create_directory` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_create_directory` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_create_directory<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1494,8 +1541,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_filestat_get` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_filestat_get` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_filestat_get<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1519,8 +1566,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_filestat_set_times` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_filestat_set_times` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_filestat_set_times<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1557,8 +1604,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_link` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_link` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_link<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1586,8 +1633,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_open` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_open` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_open<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1633,8 +1680,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_readlink` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_readlink` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_readlink<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1667,8 +1714,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_remove_directory` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_remove_directory` function. It
+    /// requires an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_remove_directory<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1686,8 +1733,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_rename` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_rename` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_rename<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1712,8 +1759,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_symlink` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_symlink` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_symlink<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1735,8 +1782,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `path_unlink_file` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `path_unlink_file` function. It requires
+    /// an extra `memory_ref` to interact with the execution engine.
     pub(crate) fn path_unlink_file<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1754,8 +1801,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `poll_oneoff` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `poll_oneoff` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn poll_oneoff<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1777,16 +1824,16 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `proc_exit` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `proc_exit` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn proc_exit<T: MemoryHandler>(&mut self, _: &mut T, exit_code: u32) {
         let _strace = self.strace("proc_exit");
         self.exit_code = Some(exit_code)
     }
 
-    /// The implementation of the WASI `proc_raise` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `proc_raise` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn proc_raise<T: MemoryHandler>(
         &mut self,
@@ -1802,8 +1849,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `sched_yield` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `sched_yield` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     #[inline]
     pub(crate) fn sched_yield<T: MemoryHandler>(&mut self, _: &mut T) -> FileSystemResult<()> {
         let mut strace = self.strace("sched_yield");
@@ -1829,8 +1876,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `sock_recv` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn sock_recv<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1861,8 +1908,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `sock_send` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `sock_send` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn sock_send<T: MemoryHandler>(
         &mut self,
         memory_ref: &mut T,
@@ -1888,8 +1935,8 @@ impl WasiWrapper {
         strace.result(result)
     }
 
-    /// The implementation of the WASI `sock_recv` function. It requires an extra `memory_ref` to
-    /// interact with the execution engine.
+    /// The implementation of the WASI `sock_recv` function. It requires an
+    /// extra `memory_ref` to interact with the execution engine.
     pub(crate) fn sock_shutdown<T: MemoryHandler>(
         &mut self,
         _: &mut T,
@@ -1931,10 +1978,10 @@ impl WasiWrapper {
 // Fatal execution errors/runtime panics.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// A fatal, runtime error that terminates the Veracruz execution immediately.  This
-/// is akin to a "kernel panic" for Veracruz: these errors are not passed to the
-/// WASM program running on the platform, but are instead fundamental issues
-/// that require immediate shutdown as they cannot be fixed.
+/// A fatal, runtime error that terminates the Veracruz execution immediately.
+/// This is akin to a "kernel panic" for Veracruz: these errors are not passed
+/// to the WASM program running on the platform, but are instead fundamental
+/// issues that require immediate shutdown as they cannot be fixed.
 ///
 /// *NOTE*: care should be taken when presenting these errors to users when in
 /// release (e.g. not in debug) mode: they can give away a lot of information
@@ -1959,6 +2006,13 @@ pub enum FatalEngineError {
         /// The name of the host function that was being invoked.
         function_name: WasiAPIName,
     },
+    /// A specified file does not exist in the Veracruz filesystem.
+    #[error(
+        display = "FatalEngineError: The file '{:?}' does not exist or cannot be opened.  Error number '{:?}' returned from filesystem.",
+        _0,
+        _1
+    )]
+    FileDoesNotExistOrCannotBeOpened(OsString, ErrNo),
     /// The WASM program tried to invoke an unknown H-call on the Veracruz engine.
     #[error(display = "FatalEngineError: Unknown Host call invoked: '{:?}'.", _0)]
     UnknownHostFunction(HostFunctionIndexOrName),
@@ -2005,7 +2059,8 @@ pub enum HostFunctionIndexOrName {
     Name(String),
 }
 
-// Convertion from any error raised by any mutex of type <T> to FatalEngineError.
+// Conversion from any error raised by any mutex of type `T` to
+// `FatalEngineError`.
 impl<T> From<std::sync::PoisonError<T>> for FatalEngineError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         FatalEngineError::FailedToObtainLock(format!("{:?}", error))
@@ -2054,18 +2109,19 @@ pub(crate) enum EntrySignature {
 
 /// This is what an execution strategy exposes to clients outside of this
 /// library.  This functionality is sufficient to implement both
-/// `freestanding-execution-engine` and `runtime-manager` and if any functionality is
-/// missing that these components require then it should be added to this trait
-/// and implemented for all supported implementation strategies.
-///
-/// Note that the top-level function `execute` in this crate relies on this trait.
+/// `freestanding-execution-engine` and `runtime-manager` and if any
+/// functionality is missing that these components require then it should be
+/// added to this trait and implemented for all supported implementation
+/// strategies.
 pub trait ExecutionEngine: Send {
-    /// Invokes the entry point of the WASM program `file_name`.  Will fail if
-    /// the WASM program fails at runtime.  On success, returns the succ/error code
-    /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(
+    /// Entry point for the execution engine: invokes a pipeline of programs,
+    /// `pipeline`, with a specified set of execution engine options, `options`.
+    /// Returns `Ok(c)` if the pipeline successfully executed and returned a
+    /// success/error code, `c`, or returns `Err(e)` if some fatal execution
+    /// engine error occurred at runtime causing the pipeline to abort.
+    fn execute_pipeline(
         &mut self,
-        program: Vec<u8>,
+        pipeline: Pipeline,
         options: Options,
     ) -> Result<u32, FatalEngineError>;
 }

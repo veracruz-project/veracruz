@@ -25,8 +25,7 @@ use data_encoding::HEXLOWER;
 use log::{info, warn};
 use policy_utils::{
     expiry::Timepoint,
-    parsers::enforce_leading_backslash,
-    parsers::parse_renamable_paths,
+    parsers::{enforce_leading_backslash, parse_renamable_paths},
     policy::Policy,
     principal::{ExecutionStrategy, FileHash, FileRights, Identity, Program},
 };
@@ -133,6 +132,11 @@ struct Arguments {
     /// Note this is an array of string+path pairs, since a string enclave path
     /// can be provided along with the local file path.
     program_binaries: Vec<(String, PathBuf)>,
+    /// The conditional pipeline of programs to execute.  We parse this eagerly
+    /// to check for parsing issues before writing the string to the policy
+    /// file.  However, this string is then re-parsed by the Veracruz runtime
+    /// as we have no way of writing the binary AST into JSON.
+    pipeline: String,
     /// The hash of files.
     ///
     /// Note this is an array of string+path pairs, since a string enclave path
@@ -171,6 +175,7 @@ impl Arguments {
             output_policy_file: PathBuf::new(),
             certificate_expiry: None,
             program_binaries: Vec::new(),
+            pipeline: String::new(),
             hashes: Vec::new(),
             enclave_debug_mode: false,
             execution_strategy: String::new(),
@@ -795,6 +800,7 @@ fn serialize_json(arguments: &Arguments) -> Value {
     let policy = Policy::new(
         serialize_identities(arguments),
         serialize_binaries(arguments),
+        arguments.pipeline.clone(),
         format!(
             "{}",
             &arguments

@@ -67,10 +67,15 @@ pub enum PolicyError {
     EmptyRoleError(u64),
     #[error(display = "PolicyError: Policy is missing a field: {:?}", _0)]
     MissingPolicyFieldError(String),
-    #[error(display = "VeracruzUtil: Policy has no program file: {:?}.", _0)]
+    #[error(display = "PolicyError: Policy has no program file: {:?}.", _0)]
     NoProgramFileError(String),
-    #[error(display = "VeracruzUtil: IOError: {:?}.", _0)]
+    #[error(display = "PolicyError: IO-related error: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
+    #[error(
+        display = "PolicyError: Parsing failure when trying to parse pipeline: {:?}.",
+        _0
+    )]
+    PipelineParsingFailure(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
