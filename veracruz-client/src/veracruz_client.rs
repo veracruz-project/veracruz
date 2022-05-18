@@ -226,7 +226,13 @@ impl VeracruzClient {
             mbedtls::ssl::config::Preset::Default);
         config.set_min_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
         config.set_max_version(mbedtls::ssl::config::Version::Tls1_2).unwrap();
-        let cipher_suites : Vec<i32> = vec![EcdheEcdsaWithChacha20Poly1305Sha256.into(), 0]; //xx we should use policy.ciphersuite()
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite_mbedtls(policy.ciphersuite().as_str())
+            .ok_or_else(|| {
+                VeracruzClientError::TLSInvalidCiphersuiteError(
+                    policy.ciphersuite().to_string()
+                )
+            })?;
+        let cipher_suites : Vec<i32> = vec![policy_ciphersuite.into(), 0];
         config.set_ciphersuites(Arc::new(cipher_suites));
         let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
         let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None).unwrap());
