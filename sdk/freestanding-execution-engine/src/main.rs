@@ -27,6 +27,7 @@ use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use policy_utils::{
+    pipeline::Pipeline,
     principal::{ExecutionStrategy, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
@@ -81,10 +82,10 @@ struct CommandLineOptions {
     enable_clock: bool,
     /// Environment variables for the program.
     environment_variables: Vec<(String, String)>,
-    /// Command-line arguments for the program, including argv[0].
-    program_arguments: Vec<String>,
     /// Whether strace is enabled.
     enable_strace: bool,
+    /// The conditional pipeline of programs to execute.
+    pipeline: Pipeline,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
@@ -123,8 +124,17 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 .short("p")
                 .long("program")
                 .value_name("FILE")
-                .help("Paths to the WASM binary to be executed. It executes in order.")
+                .help("Paths to the WASM binary to be executed.")
                 .multiple(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("pipeline")
+                .short("r")
+                .long("pipeline")
+                .value_name("PIPELINE")
+                .help("The conditional pipeline of programs to be executed.")
+                .multiple(false)
                 .required(true),
         )
         .arg(
@@ -157,13 +167,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                     "Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
                      enabled.",
                 ),
-        )
-        .arg(
-            Arg::with_name("arg")
-                .long("arg")
-                .help("Specify a command-line argument.")
-                .value_name("ARG")
-                .multiple(true),
         )
         .arg(
             Arg::with_name("env")
@@ -209,6 +212,42 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     } else {
         return Err("No binary file provided.".into());
     };
+
+    let pipeline = if let Some(pipeline) = matches.value_of("pipeline") {
+        info!("Using '{:?}' as our executable pipeline.", pipeline);
+        pipeline
+    } else {
+        return Err("No executable pipeline provided".into());
+    };
+
+    // Do some quick correctness checks on the pipeline:
+    // 1. Does it parse?
+    // 2. Have all of the executables that it mentions actually been provided to
+    //    us for loading?
+    let pipeline = if let Some(pipeline) = Pipeline::parse(pipeline) {
+        let executables = pipeline.executables();
+
+        for e in executables.iter() {
+            let p = e
+                .clone()
+                .into_os_string()
+                .into_string()
+                .map_err(|_e| format!("Failed to convert path '{:?}' into string.", e))?;
+
+            if !program_sources.contains(&p) {
+                return Err(format!(
+                    "Unknown executable '{:?}' mentioned in pipeline '{:?}'.",
+                    e, pipeline
+                )
+                .into());
+            }
+        }
+
+        pipeline
+    } else {
+        return Err(format!("Failed to parse pipeline '{:?}'.", pipeline).into());
+    };
+
     let input_sources = if let Some(data) = matches.values_of("input") {
         let input_sources: Vec<String> = data.map(|e| e.to_string()).collect();
         info!(
@@ -244,10 +283,7 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
             })
             .collect(),
     };
-    let program_arguments = match matches.values_of("arg") {
-        None => Vec::new(),
-        Some(x) => x.map(|e| e.to_string()).collect(),
-    };
+
     let enable_strace = matches.is_present("strace");
 
     Ok(CommandLineOptions {
@@ -259,8 +295,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         dump_stderr,
         enable_clock,
         environment_variables,
-        program_arguments,
         enable_strace,
+        pipeline,
     })
 }
 
@@ -310,16 +346,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("Command line read successfully.");
 
     // Convert the program paths to absolute if needed.
+
     cmdline.program_sources.iter_mut().for_each(|e| {
         if !e.starts_with("/") {
             e.insert(0, '/');
         }
     });
 
-    // Contruct the right table
-    let mut right_table = HashMap::new();
-    // Contruct file table for all programs
+    // Construct file table for all programs
+
     let mut file_table = HashMap::new();
+
     let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
     let write_right = read_right
         | Rights::FD_WRITE
@@ -328,28 +365,40 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
+
     file_table.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), read_right);
     file_table.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), write_right);
     file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
+
     // Add read permission to input path
+
     for file_path in cmdline.input_sources.iter() {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), read_right);
     }
+
     // Add write permission to output path
+
     for file_path in cmdline.output_sources.iter() {
         // NOTE: inject the root path.
         file_table.insert(Path::new("/").join(file_path), write_right);
     }
 
+    // Construct the rights table
+
+    let mut right_table = HashMap::new();
+
     // Insert the file right for all programs
+
     for prog_path in &cmdline.program_sources {
         let program_id = Principal::Program(prog_path.to_string());
+
         right_table.insert(program_id.clone(), file_table.clone());
     }
 
     // Grant the super user read access to any file under the root. This is
     // used internally to read the program on behalf of the executing party
+
     let mut su_read_rights = HashMap::new();
     su_read_rights.insert(
         PathBuf::from("/"),
@@ -357,73 +406,89 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     right_table.insert(Principal::InternalSuperUser, su_read_rights);
 
-    info!("The final right tables: {:?}", right_table);
+    info!("The final rights table: {:?}", right_table);
 
     let mut vfs = FileSystem::new(right_table)?;
-
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
+
     info!("Data sources loaded.");
 
-    info!("Invoking programs in order {:?}.", cmdline.program_sources);
+    // Execute the pipeline with the supplied options
 
-    for prog_path in &cmdline.program_sources {
-        let main_time = Instant::now();
-        let options = Options {
-            environment_variables: cmdline.environment_variables.clone(),
-            program_arguments: cmdline.program_arguments.clone(),
-            enable_clock: cmdline.enable_clock,
-            enable_strace: cmdline.enable_strace,
-            ..Default::default()
-        };
-        let program = vfs.read_file_by_absolute_path(prog_path)?;
-        let return_code = execute(
-            &cmdline.execution_strategy,
-            vfs.spawn(&Principal::Program(prog_path.to_string()))?,
-            program,
-            options,
-        )?;
-        info!("return code of {}: {:?}", prog_path, return_code);
-        info!(
-            "time on {}: {} micro seconds",
-            prog_path,
-            main_time.elapsed().as_micros()
+    let options = Options {
+        enable_clock: cmdline.enable_clock,
+        enable_strace: cmdline.enable_strace,
+    };
+
+    info!(
+        "Invoking pipeline {:?} with options {:?}.",
+        cmdline.pipeline, options
+    );
+
+    let main_time = Instant::now();
+
+    let return_code = execute(
+        &cmdline.execution_strategy,
+        vfs.clone(),
+        cmdline.pipeline.clone(),
+        cmdline.environment_variables.clone(),
+        options,
+    )?;
+
+    info!(
+        "Return code of pipeline '{:?}' execution is: {:?}",
+        cmdline.pipeline, return_code
+    );
+
+    info!(
+        "Time to compute pipeline '{:?}': {} micro seconds",
+        cmdline.pipeline,
+        main_time.elapsed().as_micros()
+    );
+
+    // Dump the contents of the 'stdout' file
+
+    if cmdline.dump_stdout {
+        let buf = vfs.read_stdout()?;
+        let stdout_dump = std::str::from_utf8(&buf)?;
+
+        print!(
+            "---- stdout dump ----\n{}---- stdout dump end ----\n",
+            stdout_dump
         );
 
-        // Dump contents of stdout
-        if cmdline.dump_stdout {
-            let buf = vfs.read_stdout()?;
-            let stdout_dump = std::str::from_utf8(&buf)?;
-            print!(
-                "---- stdout dump ----\n{}---- stdout dump end ----\n",
-                stdout_dump
-            );
-            std::io::stdout().flush()?;
-        }
+        std::io::stdout().flush()?;
+    }
 
-        // Dump contents of stderr
-        if cmdline.dump_stderr {
-            let buf = vfs.read_stderr()?;
-            let stderr_dump = std::str::from_utf8(&buf)?;
-            eprint!(
-                "---- stderr dump ----\n{}---- stderr dump end ----\n",
-                stderr_dump
-            );
-            std::io::stderr().flush()?;
-        }
+    // Dump the contents of the 'stderr' file
+
+    if cmdline.dump_stderr {
+        let buf = vfs.read_stderr()?;
+        let stderr_dump = std::str::from_utf8(&buf)?;
+
+        eprint!(
+            "---- stderr dump ----\n{}---- stderr dump end ----\n",
+            stderr_dump
+        );
+
+        std::io::stderr().flush()?;
     }
 
     // Map all output directories
+
     for file_path in cmdline.output_sources.iter() {
         for (output_path, buf) in vfs
             .read_all_files_by_absolute_path(Path::new("/").join(file_path))?
             .iter()
         {
             let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
+
             if let Some(parent_path) = output_path.parent() {
                 if parent_path != Path::new("") {
                     create_dir_all(parent_path)?;
                 }
             }
+
             let mut to_write = File::create(output_path)?;
             to_write.write_all(&buf)?;
 
@@ -432,9 +497,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Ok(o) => o,
                 Err(_) => match std::str::from_utf8(buf) {
                     Ok(oo) => oo.to_string(),
-                    Err(_) => "(Cannot Parse as a utf8 string)".to_string(),
+                    Err(_) => "(Cannot parse as a UTF-8 string)".to_string(),
                 },
             };
+
             info!("{:?}: {:?}", output_path, decode);
         }
     }

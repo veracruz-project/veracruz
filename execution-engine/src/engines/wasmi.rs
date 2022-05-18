@@ -20,6 +20,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use log::error;
 use num::{FromPrimitive, ToPrimitive};
+use policy_utils::pipeline::Pipeline;
 use std::{boxed::Box, convert::TryFrom, mem, str::FromStr, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
@@ -86,11 +87,7 @@ impl MemoryHandler for MemoryRef {
     type Slice = &'static [u8];
     type SliceMut = &'static mut [u8];
 
-    fn get_slice<'a>(
-        &'a self,
-        address: u32,
-        length: u32,
-    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
+    fn get_slice(&self, address: u32, length: u32) -> FileSystemResult<Bound<Self::Slice>> {
         let address = usize::try_from(address).unwrap();
         let length = usize::try_from(length).unwrap();
         // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
@@ -106,11 +103,11 @@ impl MemoryHandler for MemoryRef {
         })))
     }
 
-    fn get_slice_mut<'a>(
-        &'a mut self,
+    fn get_slice_mut(
+        &mut self,
         address: u32,
         length: u32,
-    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
+    ) -> FileSystemResult<BoundMut<Self::SliceMut>> {
         let address = usize::try_from(address).unwrap();
         let length = usize::try_from(length).unwrap();
         // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
@@ -588,7 +585,7 @@ impl Externals for WASMIRuntimeState {
 /// Functionality of the `WASMIRuntimeState` type that relies on it satisfying
 /// the `Externals` and `ModuleImportResolver` constraints.
 impl WASMIRuntimeState {
-    /// Creates a new initial `HostProvisioningState`.
+    /// Creates a new initial `WASMIRuntimeState`.
     #[inline]
     pub fn new(filesystem: FileSystem, options: Options) -> FileSystemResult<Self> {
         Ok(Self {
@@ -1294,6 +1291,87 @@ impl WASMIRuntimeState {
         let address = args.nth_checked::<u32>(0)?;
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
+
+    /// Executes the pipeline, `pipeline`.
+    ///
+    /// Returns `Ok(code)` if the pipeline successfully executed and returned a
+    /// defined error code, `code`.  Alternatively, returns `Err(fatal)` to
+    /// signal that a fatal runtime error, `fatal`, occurred during the
+    /// execution of the pipeline.
+    pub(crate) fn execute_pipeline_inner(
+        &mut self,
+        pipeline: Pipeline,
+    ) -> Result<u32, FatalEngineError> {
+        match pipeline {
+            Pipeline::Abort => {
+                self.vfs.set_exit_code(1);
+                Ok(1)
+            }
+            Pipeline::Executable { path, arguments } => {
+                let content = self.vfs.read_file_by_absolute_path(&path).map_err(|e| {
+                    FatalEngineError::FileDoesNotExistOrCannotBeOpened(path.into_os_string(), e)
+                })?;
+
+                self.load_program(&content)?;
+                self.vfs.set_program_arguments(arguments);
+                self.vfs.suppress_exit_code();
+
+                let execution_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
+                let exit_code = self.vfs.exit_code();
+
+                match execution_result {
+                    Ok(None) => {
+                        // NB: if no explicit error code is produced then
+                        // default to `0`.
+                        Ok(exit_code.unwrap_or(0))
+                    }
+                    Ok(Some(RuntimeValue::I32(c))) => Ok(c as u32),
+                    Ok(Some(_)) => {
+                        // NB: some bizarre or unexpected return code was
+                        // produced.  Something has gone completely wrong...
+                        Err(FatalEngineError::ReturnedCodeError)
+                    }
+                    Err(Error::Trap(trap)) => {
+                        // NB: suppress the trap if the `proc_exit` function has
+                        // been called, in which case report the error code as
+                        // `error_code`.
+                        exit_code.ok_or(FatalEngineError::WASMITrapError(trap))
+                    }
+                    Err(err) => Err(FatalEngineError::WASMIError(err)),
+                }
+            }
+            Pipeline::Sequence { pipelines } => {
+                let mut last_result = 0u32;
+
+                for p in pipelines {
+                    self.vfs.suppress_exit_code();
+
+                    last_result = self.execute_pipeline_inner(p)?;
+
+                    if last_result != 0 {
+                        return Ok(last_result);
+                    }
+                }
+
+                Ok(last_result)
+            }
+            Pipeline::Conditional {
+                test,
+                andthen,
+                orelse,
+            } => {
+                let tresult = self.execute_pipeline_inner(*test)?;
+
+                self.vfs.suppress_exit_code();
+
+                if tresult == 0 {
+                    self.execute_pipeline_inner(*andthen)
+                } else {
+                    self.execute_pipeline_inner(*orelse)
+                }
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1303,41 +1381,21 @@ impl WASMIRuntimeState {
 /// The `WASMIRuntimeState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WASMIRuntimeState {
-    /// Executes the entry point of the WASM program provisioned into the
-    /// Veracruz host.
+    /// Executes the pipeline, `pipeline`, within the context of the execution
+    /// engine options, `options`.
     ///
-    /// Returns an error if no program is registered, the program registered
-    /// does not have an appropriate entry point, or if the machine is not
-    /// in the `LifecycleState::ReadyToExecute` state prior to being called.
-    ///
-    /// Also returns an error if the WASM program or the Veracruz instance
-    /// create a runtime trap during program execution (e.g. if the program
-    /// executes an abort instruction, or passes bad parameters to the Veracruz
-    /// host).
-    ///
-    /// Otherwise, returns the return value of the entry point function of the
-    /// program, along with a host state capturing the result of the program's
-    /// execution.
-    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
-        self.load_program(&program)?;
+    /// Returns `Ok(code)` if the pipeline successfully executed and returned a
+    /// defined error code, `code`.  Alternatively, returns `Err(fatal)` to
+    /// signal that a fatal runtime error, `fatal`, occurred during the
+    /// execution of the pipeline.
+    fn execute_pipeline(
+        &mut self,
+        pipeline: Pipeline,
+        options: Options,
+    ) -> Result<u32, FatalEngineError> {
+        self.vfs.enable_clock = options.enable_clock;
+        self.vfs.enable_strace = options.enable_strace;
 
-        let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
-        let exit_code = self.vfs.exit_code();
-
-        // Get the return code, ZERO as the default, or the exit_code if exists.
-        match execute_result {
-            // If the function does not explicitly provide return code,
-            // either read the exit_code passed by proc_exit call or use ZERO as the default.
-            Ok(None) => Ok(exit_code.unwrap_or(0)),
-            // Return the explicit return code
-            Ok(Some(RuntimeValue::I32(c))) => Ok(c as u32),
-            // NOTE: Surpress the trap, if the `proc_exit` is called.
-            //       In this case, the error code is exit_code.
-            Ok(Some(_)) => Err(anyhow!(FatalEngineError::ReturnedCodeError)),
-            // NOTE: Surpress the trap, if the `proc_exit` is called.
-            //       In this case, the error code is exit_code.
-            Err(Error::Trap(trap)) => exit_code.ok_or(anyhow!(trap)),
-            Err(err) => Err(anyhow!(err)),
-        }
+        self.execute_pipeline_inner(pipeline)
     }
 }

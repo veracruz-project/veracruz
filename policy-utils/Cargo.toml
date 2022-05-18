@@ -18,6 +18,7 @@ std = [
 
 [dependencies]
 anyhow = "1"
+chumsky = "0.8.0"
 err-derive = { version = "0.2", default-features = false }
 hex = { version = "0.4.2" }
 lexical-core = { version = "0.8.2", default-features = false }

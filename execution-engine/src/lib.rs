@@ -34,19 +34,12 @@ use crate::{
     engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
     fs::FileSystem,
 };
-use anyhow::Result;
-use policy_utils::principal::ExecutionStrategy;
-use std::{boxed::Box, string::String, vec::Vec};
+use policy_utils::{pipeline::Pipeline, principal::ExecutionStrategy};
+use std::boxed::Box;
 
 /// Runtime options for a program.
-#[derive(Default)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Options {
-    /// A list of key-value pairs corresponding to the environment variables of the
-    /// program, if any.
-    pub environment_variables: Vec<(String, String)>,
-    /// A list of strings, corresponding to the command-line arguments of the program,
-    /// if any.
-    pub program_arguments: Vec<String>,
     /// Whether clock-related functionality is enabled for the program.  If not
     /// enabled, clock- and time-related WASI host-calls return an unimplemented
     /// status code.
@@ -55,17 +48,22 @@ pub struct Options {
     pub enable_strace: bool,
 }
 
-/// The top-level function executes program `program` on
-/// the `filesystem` handler, in which inputs, outputs and programs are stored.
-/// The function requires execution `strategy`.
-/// It currently supports `interp` or `JIT`, backed by `WASI` and `wasmtime`, respectively.
+/// The top-level function executes the pipeline of programs, `pipeline`, on
+/// the `filesystem` handler, in which inputs, outputs and programs are stored,
+/// and an initial set of environment variables "shared" across the entire
+/// pipeline, `initial_environment_variables`.
+///
+/// The function also requires a specified execution `strategy`, which is either
+/// `interp` or `JIT`, backed by `WASMI` and `Wasmtime`, respectively.
+///
 /// Note that the `execute` function is essentially this library's
 /// interface to the outside world, and details exactly what external clients
 /// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: FileSystem,
-    program: Vec<u8>,
+    pipeline: Pipeline,
+    initial_environment_variables: Vec<(String, String)>,
     options: Options,
 ) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
@@ -80,5 +78,5 @@ pub fn execute(
             }
         }
     };
-    engine.invoke_entry_point(program)
+    engine.execute_pipeline(pipeline, options)
 }

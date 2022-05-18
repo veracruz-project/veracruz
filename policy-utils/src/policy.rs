@@ -41,6 +41,7 @@ use super::{
     Platform,
 };
 use anyhow::{anyhow, Result};
+use crate::pipeline::Pipeline;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -68,6 +69,14 @@ pub struct Policy {
     programs: Vec<Program>,
     /// The list of files, e.g. binaries and configurations, that must match given hashes.
     file_hashes: Vec<FileHash>,
+    /// The string representation of the conditional pipeline of programs to
+    /// execute, pre-parsed.
+    preparsed_pipeline: String,
+    /// The parsed, AST representation of the conditional pipeline of programs
+    /// to execute.  This is not present in the JSON representation of a policy
+    /// file.
+    #[serde(skip)]
+    parsed_pipeline: Option<Pipeline>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -100,7 +109,8 @@ pub struct Policy {
     /// The maximum amount of memory in MiB available to the isolate. Only
     /// enforced in Nitro for now.
     max_memory_mib: u32,
-    /// Hash of the JSON representation if the Policy was parsed from a file.
+    /// Hash of the JSON representation if the policy was parsed from a file.
+    /// This field is not present in the text JSON file.
     #[serde(skip)]
     policy_hash: Option<String>,
 }
@@ -112,6 +122,7 @@ impl Policy {
     pub fn new(
         identities: Vec<Identity<String>>,
         programs: Vec<Program>,
+        preparsed_pipeline: String,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
@@ -130,6 +141,8 @@ impl Policy {
             identities,
             proxy_service_cert,
             programs,
+            preparsed_pipeline,
+            parsed_pipeline: None,
             veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
@@ -193,6 +206,19 @@ impl Policy {
     #[inline]
     pub fn ciphersuite(&self) -> &String {
         &self.ciphersuite
+    }
+
+    /// Returns the AST of the pipeline of programs to execute.  Note that
+    /// the `Policy::new()` constructor calls `assert_valid()`, internally,
+    /// which checks that the pipeline can be parsed and sets `parsed_pipeline`
+    /// to `Some(p)`.  As a result, the `expect()` call, below, should never be
+    /// executed...
+    #[inline]
+    pub fn pipeline(&self) -> &Pipeline {
+        &self
+            .parsed_pipeline
+            .as_ref()
+            .expect("Pipeline should have been parsed by this point.")
     }
 
     /// Returns the hash of the trusted Veracruz runtime, associated with this
@@ -277,6 +303,13 @@ impl Policy {
         veracruz_utils::lookup_ciphersuite(self.ciphersuite()).ok_or(
             PolicyError::TLSInvalidCiphersuiteError(self.ciphersuite().to_string()),
         )?;
+
+        // Parse the pipeline
+        let parsed_pipeline = Pipeline::parse(&self.preparsed_pipeline).ok_or(
+            PolicyError::PipelineParsingFailure(self.preparsed_pipeline.clone()),
+        )?;
+
+        self.parsed_pipeline = Some(parsed_pipeline);
 
         // NB: no check of enclave certificate validity as there is no reliable
         // way of obtaining a time from within an enclave.  This is the

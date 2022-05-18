@@ -21,6 +21,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use log::info;
+use policy_utils::pipeline::Pipeline;
 use std::{
     convert::TryFrom,
     mem,
@@ -237,7 +238,7 @@ impl WasmtimeRuntimeState {
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
-    /// Raises a panic if the global wasmtime host is unavailable.
+    /// Raises a panic if the global Wasmtime host is unavailable.
     /// Returns an error if no program is registered, the program is invalid,
     /// the program contains invalid external function calls or if the machine is not
     /// in the `LifecycleState::ReadyToExecute` state prior to being called.
@@ -253,11 +254,12 @@ impl WasmtimeRuntimeState {
     pub(crate) fn invoke_engine(&self, binary: Vec<u8>) -> Result<u32> {
         let mut config = Config::default();
         config.wasm_simd(true);
+
         let engine = Engine::new(&config)?;
         let module = Module::new(&engine, binary)?;
         let mut linker = Linker::new(&engine);
 
-        info!("Initialize a wasmtime engine.");
+        info!("Initialized Wasmtime engine.");
 
         // Link all WASI functions
         let wasi_scope = WasiWrapper::WASI_SNAPSHOT_MODULE_NAME;
@@ -1107,15 +1109,93 @@ impl WasmtimeRuntimeState {
         let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
+
+    /// Executes the pipeline, `pipeline`.  Returns `Ok(code)` if execution of
+    /// the pipeline succeeds and returns error code, `code`.  Otherwise,
+    /// returns `Err(fatal)` if a fatal runtime error, `fatal`, occurs, during
+    /// execution of the pipeline.
+    fn execute_pipeline_inner(&mut self, pipeline: Pipeline) -> Result<u32, FatalEngineError> {
+        match pipeline {
+            Pipeline::Abort => {
+                // NB: minimize scope within which filesystem is locked
+                {
+                    let mut filesystem = self.filesystem.lock()?;
+                    filesystem.set_exit_code(1);
+                }
+                Ok(1)
+            }
+            Pipeline::Executable { path, arguments } => {
+                // NB: minimize scope within which filesystem is locked
+                let content = {
+                    let mut filesystem = self.filesystem.lock()?;
+                    filesystem.suppress_exit_code();
+                    filesystem.set_program_arguments(arguments);
+                    filesystem.read_file_by_absolute_path(&path).map_err(|e| {
+                        FatalEngineError::FileDoesNotExistOrCannotBeOpened(path.into_os_string(), e)
+                    })?
+                };
+
+                self.invoke_engine(content)
+            }
+            Pipeline::Sequence { pipelines } => {
+                let mut last_result = 0u32;
+
+                for p in pipelines {
+                    // NB: minimize scope within which filesystem is locked
+                    {
+                        let mut filesystem = self.filesystem.lock()?;
+                        filesystem.suppress_exit_code();
+                    }
+
+                    last_result = self.execute_pipeline_inner(p)?;
+
+                    if last_result != 0 {
+                        return Ok(last_result);
+                    }
+                }
+
+                Ok(last_result)
+            }
+            Pipeline::Conditional {
+                test,
+                andthen,
+                orelse,
+            } => {
+                let tresult = self.execute_pipeline_inner(*test)?;
+
+                // NB: minimize scope within which filesystem is locked
+                {
+                    let mut filesystem = self.filesystem.lock()?;
+                    filesystem.suppress_exit_code();
+                }
+
+                if tresult == 0 {
+                    self.execute_pipeline_inner(*andthen)
+                } else {
+                    self.execute_pipeline_inner(*orelse)
+                }
+            }
+        }
+    }
 }
 
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmtimeRuntimeState {
-    /// ExecutionEngine wrapper of invoke_entry_point.
-    /// Raises a panic if the global wasmtime host is unavailable.
+    /// ExecutionEngine wrapper of `execute_pipeline_inner`.  Raises a panic if
+    /// the global Wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
-        self.invoke_engine(program)
+    fn execute_pipeline(
+        &mut self,
+        pipeline: Pipeline,
+        options: Options,
+    ) -> Result<u32, FatalEngineError> {
+        // NOTE: minimize the locking scope.
+        {
+            let mut vfs = self.filesystem.lock()?;
+            vfs.enable_clock = options.enable_clock;
+            vfs.enable_strace = options.enable_strace;
+        }
+        self.execute_pipeline_inner(pipeline)
     }
 }
