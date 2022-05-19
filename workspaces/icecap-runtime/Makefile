@@ -9,6 +9,9 @@
 
 include ../common.mk
 
+mode ?= normal
+export mode
+
 icecap_plat ?= qemu
 
 WORKSPACE_DIR = $(abspath ..)
