@@ -26,7 +26,7 @@ jobs:
       - name: Running linux test script
         id: linux-build-and-test
         run: |
-            make -C /work/veracruz/workspaces linux-tests PROFILE=release
+            make -C /work/veracruz/workspaces linux-tests
 
   nitro:
     runs-on: ubuntu-latest
