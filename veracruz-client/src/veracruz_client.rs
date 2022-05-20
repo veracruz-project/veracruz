@@ -60,19 +60,21 @@ impl Write for InsecureConnection {
             "http://{:}/runtime_manager",
             self.veracruz_server_url,
         );
-        let client_build = reqwest::blocking::ClientBuilder::new().build().unwrap();
-        let ret = match client_build
-            .post(dest_url.as_str())
-            .body(combined_string)
-            .send() {
-                Ok(x) => x,
-                Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::Other, "reqwest send failed")),
-            };
-        if ret.status() != reqwest::StatusCode::OK {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "reqwest bad status"))
-        }
+        let body = std::thread::spawn(move || {
+            let client_build = reqwest::blocking::ClientBuilder::new().build().unwrap();
+            let ret = match client_build
+                .post(dest_url)
+                .body(combined_string)
+                .send() {
+                    Ok(x) => x,
+                    Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::Other, "reqwest send failed")),
+                };
+            if ret.status() != reqwest::StatusCode::OK {
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, "reqwest bad status"))
+            }
+            Ok(ret.text().unwrap())
+        }).join().unwrap()?;
         // We received a response ...
-        let body = ret.text().unwrap();
         let body_items = body.split_whitespace().collect::<Vec<&str>>();
         if !body_items.is_empty() {
             // If it was not empty, update the remote_session_id ...
