@@ -405,6 +405,7 @@ elfloader: $(elfloader_build_dir)/build/elfloader css-icecap.bin
 
 css-icecap.bin: $(elfloader_build_dir)/build/elfloader
 	cp $< $@
+	echo $(shell cut -f 3 -d ' ' $(elfloader_build_dir)/build/gen_headers/image_start_addr.h) > firmware_start
 
 .PHONY: build
 build: elfloader
