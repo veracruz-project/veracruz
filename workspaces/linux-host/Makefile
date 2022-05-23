@@ -15,7 +15,7 @@
 
 default: build
 
-tests: test-server test-client veracruz-test
+tests: veracruz-test test-server test-client
 
 WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
