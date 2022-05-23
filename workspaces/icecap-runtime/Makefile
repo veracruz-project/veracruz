@@ -418,4 +418,4 @@ css-icecap.bin: $(elfloader_build_dir)/build/elfloader
 build: elfloader
 
 .PHONY: clean
-	rm -rf css-icecap.bin $(build_dir)
+	rm -rf firmware_start css-icecap.bin $(build_dir)
