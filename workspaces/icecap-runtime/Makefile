@@ -412,5 +412,5 @@ build: elfloader
 
 .PHONY: clean
 clean:
-	rm -rf css-icecap.bin $(build_dir) t
+	rm -rf firmware_start css-icecap.bin $(build_dir) t
 	cargo clean
