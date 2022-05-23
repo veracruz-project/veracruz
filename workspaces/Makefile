@@ -25,7 +25,7 @@ linux: shared
 	$(MAKE) -C linux-host
 
 linux-tests:
-	$(MAKE) -C linux-host tests
+	$(MAKE) -C linux-host veracruz-test
 
 nitro: shared
 	$(MAKE) -C nitro-host
