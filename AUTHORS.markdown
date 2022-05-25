@@ -16,3 +16,4 @@ and is designed and written by the *Veracruz Development Team*:
 - Mohamed Abdelfatah (mohamedabdelfatah2027@gmail.com)
 - Aryan Godara (aryangodara03@gmail.com)
 - Sagar Arya (aryasagar125@gmail.com)
+- Federico Bozzini (federico.bozzini@arm.com)
