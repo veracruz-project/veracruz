@@ -19,6 +19,7 @@ pub mod veracruz_server_linux {
         tcp::{receive_message, send_message},
     };
     use log::{error, info};
+    use nix::sys::signal;
     use policy_utils::policy::Policy;
     use rand::Rng;
     use std::{
@@ -282,7 +283,21 @@ pub mod veracruz_server_linux {
                 runtime_enclave_binary_path, port
             );
 
-            let runtime_manager_process = Command::new(runtime_enclave_binary_path)
+            // Ignore SIGCHLD to avoid zombie processes.
+            unsafe {
+                signal::sigaction(
+                    signal::Signal::SIGCHLD,
+                    &signal::SigAction::new(
+                        signal::SigHandler::SigIgn,
+                        signal::SaFlags::empty(),
+                        signal::SigSet::empty(),
+                    ),
+                )
+                .expect("sigaction failed");
+            }
+
+            // Spawn the runtime manager.
+            let mut runtime_manager_process = Command::new(runtime_enclave_binary_path)
                 .arg("--port")
                 .arg(format!("{}", port))
                 .arg("--measurement")
@@ -296,6 +311,10 @@ pub mod veracruz_server_linux {
 
                     VeracruzServerError::IOError(e)
                 })?;
+
+            // Use a closure here so that we can catch any error and
+            // terminate the runtime manager.
+            let (received, runtime_manager_socket) = (|| {
 
             info!(
                 "Runtime Manager Enclave spawned.  Delaying {} seconds...",
@@ -427,6 +446,13 @@ pub mod veracruz_server_linux {
                 error!("Failed to receive response to certificate chain message message from runtime manager enclave.  Error returned: {:?}.", e);
 
                 VeracruzServerError::SocketError(e)
+            })?;
+
+                Ok((received, runtime_manager_socket))
+            })().map_err(|e| {
+                info!("Error in parent: Killing Runtime Manager process...");
+                let _ = runtime_manager_process.kill();
+                e
             })?;
 
             info!("Response received.");

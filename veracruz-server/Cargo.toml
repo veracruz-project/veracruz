@@ -33,6 +33,7 @@ icecap-qemu = []
 linux = [
   "data-encoding",
   "io-utils/linux",
+  "nix",
   "policy-utils/std",
   "tempfile",
   "veracruz-utils/linux",
