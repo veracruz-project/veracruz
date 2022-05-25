@@ -18,44 +18,16 @@
 //! information on licensing and copyright.
 
 const POLICY_FILENAME: &'static str = "single_client.json";
-const TRIPLE_POLICY_FILENAME: &'static str = "triple_policy.json";
 const CLIENT_CERT_FILENAME: &'static str = "client_rsa_cert.pem";
 const CLIENT_KEY_FILENAME: &'static str = "client_rsa_key.pem";
 
-const PROGRAM_CLIENT_CERT_FILENAME: &'static str = "program_client_cert.pem";
-const PROGRAM_CLIENT_KEY_FILENAME: &'static str = "program_client_key.pem";
-
-const DATA_CLIENT_CERT_FILENAME: &'static str = "data_client_cert.pem";
-const DATA_CLIENT_KEY_FILENAME: &'static str = "data_client_key.pem";
-
-const RESULT_CLIENT_CERT_FILENAME: &'static str = "result_client_cert.pem";
-
-const MOCK_ATTESTATION_ENCLAVE_CERT_FILENAME: &'static str = "server_rsa_cert.pem";
-const MOCK_ATTESTATION_ENCLAVE_NAME: &'static str = "localhost";
-
-use crate::error::*;
 use crate::veracruz_client::*;
-use std::{
-    env,
-    fs::File,
-    io::prelude::*,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::{env, fs::File, io::prelude::*, io::Read, path::PathBuf, sync::Arc};
 
 use actix_session::Session;
 use actix_web::http::StatusCode;
-use actix_web::{post, App, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{post, HttpRequest, HttpResponse};
 
-use rustls_pemfile;
-
-pub fn policy_path(filename: &str) -> PathBuf {
-    PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
-        .join(filename)
-}
-pub fn policy_directory() -> PathBuf {
-    PathBuf::from(env::var("VERACRUZ_POLICY_DIR").unwrap_or("../test-collateral".to_string()))
-}
 pub fn trust_path(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_TRUST_DIR").unwrap_or("../test-collateral".to_string()))
         .join(filename)
@@ -108,40 +80,6 @@ fn test_internal_read_cert_invalid_private_key() {
     assert!(VeracruzClient::pub_read_private_key(trust_path(CLIENT_CERT_FILENAME)).is_err());
 }
 
-/// Auxiliary function: read policy file
-fn read_policy(fname: &str) -> Result<String, VeracruzClientError> {
-    let policy_string = std::fs::read_to_string(fname)?;
-    Ok(policy_string.clone())
-}
-
-/// Auxiliary function: apply functor to all the policy file (json file) in the path
-fn iterate_over_policy(
-    test_collateral_path: &Path,
-    f: fn(Result<String, VeracruzClientError>) -> (),
-) {
-    for entry in test_collateral_path
-        .read_dir()
-        .expect(&format!("invalid path:{}", test_collateral_path.display()))
-    {
-        if let Ok(entry) = entry {
-            if let Some(extension_str) = entry
-                .path()
-                .extension()
-                .and_then(|extension_name| extension_name.to_str())
-            {
-                // iterate over all the json file
-                if extension_str.eq_ignore_ascii_case("json") {
-                    let policy_path = entry.path();
-                    if let Some(policy) = policy_path.to_str() {
-                        let policy = read_policy(policy);
-                        f(policy);
-                    }
-                }
-            }
-        }
-    }
-}
-
 #[test]
 #[ignore]
 fn veracruz_client_session() {
@@ -153,10 +91,10 @@ fn veracruz_client_session() {
             std::fs::File::open(server_cert_filename).expect("Cannot open cert file for reading");
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
-        let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls_pemfile::certs(&mut cursor).unwrap();
-        assert!(certs.len() > 0);
-        certs[0].clone()
+        cert_buffer.push(b'\0');
+        let certs = mbedtls::x509::Certificate::from_pem_multiple(&cert_buffer).unwrap();
+        assert!(certs.iter().count() == 1);
+        certs
     };
 
     let server_priv_key = {
@@ -164,10 +102,10 @@ fn veracruz_client_session() {
             std::fs::File::open(server_key_filename).expect("Cannot open key file for reading");
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer).unwrap();
-        let mut cursor = std::io::Cursor::new(key_buffer);
-        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)
+        key_buffer.push(b'\0');
+        let rsa_keys = mbedtls::pk::Pk::from_private_key(&key_buffer, None)
             .expect("file contains invalid rsa private key");
-        rsa_keys[0].clone()
+        rsa_keys
     };
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
@@ -184,29 +122,27 @@ fn veracruz_client_session() {
             .expect("Cannot open cert file for reading");
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
-        let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls_pemfile::certs(&mut cursor).unwrap();
-        assert!(certs.len() > 0);
-        certs[0].clone()
+        cert_buffer.push(b'\0');
+        let certs = mbedtls::x509::Certificate::from_pem_multiple(&cert_buffer).unwrap();
+        assert!(certs.iter().count() == 1);
+        certs
     };
 
-    let mut server_root_cert_store = rustls::RootCertStore::empty();
-    server_root_cert_store
-        .add(&rustls::Certificate(client_cert))
+    let mut config = mbedtls::ssl::Config::new(
+        mbedtls::ssl::config::Endpoint::Server,
+        mbedtls::ssl::config::Transport::Stream,
+        mbedtls::ssl::config::Preset::Default,
+    );
+    config.set_ca_list(Arc::new(client_cert), None);
+    config
+        .set_min_version(mbedtls::ssl::config::Version::Tls1_2)
         .unwrap();
-
-    let server_config = rustls::ServerConfig::builder()
-        .with_cipher_suites(&rustls::ALL_CIPHER_SUITES.to_vec())
-        .with_safe_default_kx_groups()
-        .with_protocol_versions(&[&rustls::version::TLS12])
-        .unwrap()
-        .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
-            server_root_cert_store,
-        ))
-        .with_single_cert(
-            vec![rustls::Certificate(server_cert.to_vec())],
-            rustls::PrivateKey(server_priv_key),
-        );
+    config
+        .set_max_version(mbedtls::ssl::config::Version::Tls1_2)
+        .unwrap();
+    config
+        .push_cert(Arc::new(server_cert), Arc::new(server_priv_key))
+        .unwrap();
 }
 
 /// simple index handler
@@ -229,62 +165,4 @@ async fn runtime_manager(
     Ok(HttpResponse::build(StatusCode::NOT_FOUND)
         .content_type("text/html; charset=utf-8")
         .body(format!("Not found, so why you looking?")))
-}
-
-async fn policy_server_loop(
-    _server_conn: &mut rustls::Connection,
-    server_url: &str,
-) -> Result<(), VeracruzClientError> {
-    HttpServer::new(|| App::new().service(runtime_manager))
-        .bind(server_url)
-        .unwrap()
-        .run()
-        .await
-        .map_err(|err| {
-            VeracruzClientError::DirectMessage(format!("HttpServer failed to run:{:?}", err))
-        })?;
-    Ok(())
-}
-
-#[allow(dead_code)]
-async fn client_loop(
-    tx: std::sync::mpsc::Sender<Vec<u8>>,
-    rx: std::sync::mpsc::Receiver<Vec<u8>>,
-    session: &mut crate::veracruz_client::VeracruzClient,
-) {
-    let one_tenth_sec = std::time::Duration::from_millis(100);
-    // The client initiates the handshake
-    let message = String::from("Client Hello");
-    session
-        .pub_send(&message.into_bytes())
-        .await
-        .expect("Failed to send data");
-    loop {
-        let received = rx.try_recv();
-        let mut received_buffer: Vec<u8> = Vec::new();
-        if received.is_ok() {
-            received_buffer = received.unwrap();
-        }
-        let output = session.pub_process(received_buffer).unwrap();
-        match output {
-            Some(output_data) => {
-                if output_data.len() > 0 {
-                    // output data needs to be sent to server
-                    tx.send(output_data).unwrap();
-                }
-            }
-            None => (),
-        }
-
-        // see if there's any actual data to read
-        match session.pub_get_data().unwrap() {
-            Some(x) => {
-                let received_str = std::string::String::from_utf8(x).unwrap();
-                assert_eq!(received_str, "Server Hello");
-                break;
-            }
-            None => (),
-        }
-        std::thread::sleep(one_tenth_sec);
-    }
 }
