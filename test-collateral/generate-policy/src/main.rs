@@ -632,7 +632,8 @@ fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
 
             values.push(Identity::new(certificates, id as u32, file_permissions));
         } else {
-            abort_with("Could not open certificate file.");
+            let error_msg = format!("Could not open certificate file {:?}.", cert);
+            abort_with(error_msg);
         }
     }
     values
