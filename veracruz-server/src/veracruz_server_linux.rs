@@ -20,6 +20,7 @@ pub mod veracruz_server_linux {
     };
     use log::{error, info};
     use policy_utils::policy::Policy;
+    use rand::Rng;
     use std::{
         env,
         error::Error,
@@ -51,8 +52,10 @@ pub mod veracruz_server_linux {
     const RUNTIME_ENCLAVE_SPAWN_DELAY: u64 = 2;
     /// IP address to use when communicating with the Runtime Manager enclave.
     const RUNTIME_MANAGER_ENCLAVE_ADDRESS: &str = "127.0.0.1";
-    /// Port to communicate with the Runtime Manager enclave on.
-    const RUNTIME_MANAGER_ENCLAVE_PORT: &str = "6000";
+    /// Minimum port number for the Runtime Manager enclave.
+    const RUNTIME_MANAGER_ENCLAVE_PORT_MIN: i32 = 6000;
+    /// Maximum port number for the Runtime Manager enclave.
+    const RUNTIME_MANAGER_ENCLAVE_PORT_MAX: i32 = 6999;
 
     /// The protocol to use with the proxy attestation server.
     const PROXY_ATTESTATION_PROTOCOL: &str = "psa";
@@ -270,14 +273,18 @@ pub mod veracruz_server_linux {
                 measurement
             );
 
+            // Choose a port number at random (to reduce risk of collision
+            // with another test that is still running).
+            let port = rand::thread_rng()
+                .gen_range(RUNTIME_MANAGER_ENCLAVE_PORT_MIN..RUNTIME_MANAGER_ENCLAVE_PORT_MAX + 1);
             info!(
                 "Starting runtime manager enclave (using binary {:?} and port {})",
-                runtime_enclave_binary_path, RUNTIME_MANAGER_ENCLAVE_PORT
+                runtime_enclave_binary_path, port
             );
 
             let runtime_manager_process = Command::new(runtime_enclave_binary_path)
                 .arg("--port")
-                .arg(RUNTIME_MANAGER_ENCLAVE_PORT)
+                .arg(format!("{}", port))
                 .arg("--measurement")
                 .arg(measurement)
                 .spawn()
@@ -299,7 +306,7 @@ pub mod veracruz_server_linux {
 
             let runtime_manager_address = format!(
                 "{}:{}",
-                RUNTIME_MANAGER_ENCLAVE_ADDRESS, RUNTIME_MANAGER_ENCLAVE_PORT
+                RUNTIME_MANAGER_ENCLAVE_ADDRESS, port
             );
 
             info!(
