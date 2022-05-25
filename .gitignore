@@ -19,6 +19,7 @@
 *.swo
 *.bin
 *.png
+/example/**
 **/target/**
 test-collateral/*.dat
 test-collateral/*.json
