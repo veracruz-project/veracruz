@@ -2953,8 +2953,6 @@ dependencies = [
  "policy-utils",
  "rand",
  "reqwest",
- "rustls",
- "rustls-pemfile",
  "serde_json",
  "structopt",
  "tokio",
