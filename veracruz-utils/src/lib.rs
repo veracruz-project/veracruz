@@ -45,3 +45,11 @@ pub fn lookup_ciphersuite(suite_string: &str) -> Option<rustls::SupportedCipherS
     }
     None
 }
+
+/// Look up ciphersuite by name. Return integer identifier on success.
+pub fn lookup_ciphersuite_mbedtls(suite_string: &str) -> Option<i32> {
+    // IANA official names have underscores, but mbedtls has hyphens,
+    // for example "TLS-ECDHE-ECDSA-WITH-CHACHA20-POLY1305-SHA256".
+    let name = suite_string.replace("_", "-");
+    mbedtls::ssl::ciphersuites::lookup_ciphersuite(&name)
+}
