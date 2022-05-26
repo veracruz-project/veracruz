@@ -2985,6 +2985,7 @@ dependencies = [
  "policy-utils",
  "postcard",
  "psa-attestation",
+ "rand",
  "rustls",
  "serde",
  "serde_json",
