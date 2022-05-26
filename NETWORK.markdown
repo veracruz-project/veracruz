@@ -34,13 +34,26 @@ Veracruz Server has the role of replaying requests between Veracruz Client and R
 
 
 
-## Network stack for the Proxy Attestation Server (TODO)
-* PAS runs HTTP server:
-/VerifyPAT
-/Start
-/PSA/
-/Nitro/
-* client & server connect to it
-* PAS layers: HTTP, base64, protobuf
-...
-* PAS: 127.0.0.1:3010
+## Proxy Attestation Server
+
+### Services
+The Proxy Attestation Server provides several services over HTTP:
+* `/VerifyPAT`: Verify proxy attestation token by looking for a device ID match in the database. Requested by Veracruz Client
+* `/Start`: Start attestation and return a device ID and a challenge. Requested by Veracruz Server
+* `/PSA`: Receive native (PSA) attestation token from Veracruz Server
+* `/Nitro`: Receive Nitro attestation token from Veracruz Server
+
+### Network stack
+```
++---------------------+
+| Attestation message |
++---------------------+
+|      protobuf       |
++---------------------+
+|       base64        |
++---------------------+
+|        HTTP         |
++---------------------+
+|         TCP         |
++---------------------+
+```
