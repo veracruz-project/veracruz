@@ -26,7 +26,6 @@ The latest project news is available on the [Veracruz project homepage](https://
 To jump straight into the codebase, please read the growing number of guides we have on how to get started with Veracruz:
 - [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown) - Set up a build environment for Veracruz
 - [CLI_QUICKSTART.markdown](CLI_QUICKSTART.markdown) - Quickly run Veracruz with a prepared demo program
-- [CLI_INSTRUCTIONS.markdown](CLI_INSTRUCTIONS.markdown) - A more in-depth guide to running Veracruz, including steps on how to generate certificates and the policy file.
 
 ## News
 
