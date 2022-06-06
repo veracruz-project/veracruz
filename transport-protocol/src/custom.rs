@@ -55,19 +55,6 @@ pub enum TransportProtocolError {
 }
 type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
-/// General documentation on the network stack (TODO: move it somewhere else)
-/// Each message is serialized by the sender, prefixed by its length, then gets
-/// encrypted at the TLS layer, then split into 16KB TLS records, sent one by
-/// one to the receiver.
-/// The first chunk therefore contains the protocol buffer's total length.
-/// If the incoming buffer reaches its expected length, the protocol buffer is
-/// considered complete and parsed into a message before flushing the incoming
-/// buffer and returning `Ok(message)`.
-/// Otherwise, the receiver knows it still needs to receive more chunks in order
-/// to parse the buffer, and returns `Ok(None)`.
-/// This technique significantly decreases message parsing time hence latency
-/// when dealing with large messages, e.g. files.
-
 /// Strip the length prefix from the input buffer.
 /// Return the length and the stripped buffer.
 /// This function must be called before deserializing a `protobuf` message
