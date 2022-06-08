@@ -10,6 +10,10 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
+use policy_utils::{
+    pipeline::Pipeline, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
+};
+
 use execution_engine::{execute, fs::FileSystem};
 use lazy_static::lazy_static;
 use policy_utils::{policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH};
@@ -71,7 +75,8 @@ pub(crate) struct ProtocolState {
     expected_shutdown_sources: Vec<u64>,
     /// The ref to the VFS, this is a FS handler with super user capability.
     vfs: FileSystem,
-    /// Digest table. Certain files must match the digest before writting to the filesystem.
+    /// Digest table. Certain files must match the digest before writing to
+    /// the filesystem.
     digest_table: HashMap<PathBuf, Vec<u8>>,
 }
 
@@ -187,29 +192,26 @@ impl ProtocolState {
         Ok(self.expected_shutdown_sources.contains(&client_id))
     }
 
-    /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
-    /// The client must have the right to execute the program.
-    pub(crate) fn execute(&mut self, client_id: &Principal, file_name: &str) -> ProvisioningResult {
+    /// Execute the program `file_name` on behalf of the client (participant)
+    /// identified by `client_id`.  The client must have the right to execute the
+    /// program.
+    pub(crate) fn execute(
+        &mut self,
+        client_id: &Principal,
+        initial_environment_variables: Vec<(String, String)>,
+        pipeline: Pipeline,
+    ) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
         let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
             ..Default::default()
         };
 
-        if !self
-            .vfs
-            .is_executable(client_id, &PathBuf::from(file_name))?
-        {
-            return Err(anyhow!(RuntimeManagerError::ExecutionDenied));
-        }
-
-        let program = self
-            .read_file(&Principal::InternalSuperUser, file_name)?
-            .ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
         let return_code = execute(
             &execution_strategy,
-            self.vfs.spawn(&Principal::Program(file_name.to_string()))?,
-            program,
+            self.vfs.clone(),
+            pipeline,
+            initial_environment_variables,
             options,
         )?;
 
