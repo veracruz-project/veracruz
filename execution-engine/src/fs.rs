@@ -189,12 +189,13 @@ enum InodeImpl {
 
 impl InodeImpl {
     const CURRENT_PATH_STR: &'static str = ".";
-    const PARRENT_PATH_STR: &'static str = "..";
+    const PARENT_PATH_STR: &'static str = "..";
+
     /// Return a new Directory InodeImpl containing only current and parent paths
     pub(crate) fn new_directory(current: Inode, parent: Inode) -> Self {
         let mut dir = HashMap::new();
         dir.insert(PathBuf::from(Self::CURRENT_PATH_STR), current);
-        dir.insert(PathBuf::from(Self::PARRENT_PATH_STR), parent);
+        dir.insert(PathBuf::from(Self::PARENT_PATH_STR), parent);
         Self::Directory(dir)
     }
 
@@ -439,6 +440,7 @@ impl InodeTable {
     /// The root directory inode. It will be pre-opened for any wasm program.
     /// File descriptors 0 to 2 are reserved for the standard streams.
     pub(self) const ROOT_DIRECTORY_INODE: Inode = Inode(2);
+
     fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
         let mut rst = Self {
             table: HashMap::new(),
@@ -774,18 +776,24 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////////
     // Creating filesystems.
     ////////////////////////////////////////////////////////////////////////////
-    /// The first file descriptor. It will be pre-opened for any wasm program.
+
+    /// The first file descriptor. It will be pre-opened for any Wasm program.
     pub const FIRST_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
     pub const DEFAULT_RIGHTS: Rights = Rights::all();
 
-    /// Creates a new, empty filesystem and return the superuser handler, which has all the
-    /// capabilities on the entire filesystem.
+    /// Path to the Postcard serialization native module.
+    pub const POSTCARD_SERVICE_PATH: &str = "/services/postcard_string.dat";
+    /// Path to the AES counter mode native module.
+    pub const AES_COUNTER_MODE_SERVICE_PATH: &str = "/services/aesctr.dat";
+
+    /// Creates a new, empty `Filesystem` and returns the superuser handle, which
+    /// has all the capabilities on the entire filesystem.
     ///
-    /// NOTE: the file descriptors 0, 1, and 2 are pre-allocated for stdin and
-    /// similar with respect to the parameter `std_streams_table`.
-    /// Rust programs are going to expect that this is true, so we
-    /// need to preallocate some files corresponding to those, here.
+    /// NOTE: the file descriptors `0`, `1`, and `2` are pre-allocated for `stdin`
+    /// and similar with respect to the parameter `std_streams_table`.  Userspace
+    /// Wasm programs are going to expect that this is true, so we need to
+    /// preallocate some files corresponding to those, here.
     pub fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -793,6 +801,7 @@ impl FileSystem {
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table)?)),
             prestat_table: HashMap::new(),
         };
+
         let mut all_rights = HashMap::new();
         all_rights.insert(PathBuf::from("/"), Rights::all());
         all_rights.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), Rights::all());
@@ -800,21 +809,23 @@ impl FileSystem {
         all_rights.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), Rights::all());
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
+
         let mut services = Vec::new();
+
         let service: Box<dyn Service> = Box::new(PostcardService::new());
-        services.push((
-            "/services/postcard_string.dat",
-            Arc::new(Mutex::new(service)),
-        ));
+        services.push((POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
+
         let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
-        services.push(("/services/aesctr.dat", Arc::new(Mutex::new(service))));
+        services.push((AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
+
         rst.install_services(services)?;
+
         Ok(rst)
     }
 
-    /// This is the ONLY public API to create a new FileSystem (handler).
-    /// It return a FileSystem where directories are pre-opened with appropriate
-    /// capabilities in related to `principal`.
+    /// This is the *only* public API to create a new `FileSystem` (handler).
+    /// It returns a `FileSystem` where directories are pre-opened with appropriate
+    /// capabilities in relation to a principal, `principal`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -822,9 +833,11 @@ impl FileSystem {
             inode_table: self.inode_table.clone(),
             prestat_table: HashMap::new(),
         };
-        // Must clone as install_prestat need to lock the inode_table too
+
+        // Must clone as `install_prestat` needs to lock the `inode_table` too
         let rights_table = self.lock_inode_table()?.get_rights(principal)?.clone();
         rst.install_prestat::<PathBuf>(&rights_table)?;
+
         Ok(rst)
     }
 

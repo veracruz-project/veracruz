@@ -1312,6 +1312,7 @@ impl WASMIRuntimeState {
                 })?;
 
                 self.load_program(&content)?;
+
                 self.vfs.set_program_arguments(arguments);
                 self.vfs.suppress_exit_code();
 
