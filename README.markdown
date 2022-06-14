@@ -44,7 +44,7 @@ You can access this channel [here](https://join.slack.com/t/confidentialcomputin
 Anybody and everybody is welcome to join to meet the team and discuss the project!
 
 We also have a weekly open Zoom meeting that you are welcome to join which is held every Thursday, 15:00 (BST) / 10:00 (CDT), and last for an hour.
-You can join with [this](https://armltd.zoom.us/j/95458320669?pwd=Uks2OFJ5TjROZURCdjlGKzJOTDI3UT09&from=addon) link.
+You can join with [this](https://armltd.zoom.us/j/98953009653?pwd=WVhqKzZOaDRWb2F5OTlpbzgyN2tnZz09) link.
 Come along and meet the team, find out what everybody is working on, and discuss ideas for improving Veracruz!
 
 ## Citing Veracruz
