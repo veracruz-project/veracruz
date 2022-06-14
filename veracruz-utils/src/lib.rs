@@ -33,21 +33,8 @@ pub mod sha256;
 /// certificates.
 pub static VERACRUZ_RUNTIME_HASH_EXTENSION_ID: [u8; 4] = [2, 5, 30, 1];
 
-pub fn lookup_ciphersuite(suite_string: &str) -> Option<rustls::SupportedCipherSuite> {
-    let ciphersuite_enum = match rustls::CipherSuite::lookup_value(suite_string) {
-        Ok(suite) => suite,
-        Err(_) => return None,
-    };
-    for this_supported_ciphersuite in rustls::ALL_CIPHER_SUITES {
-        if this_supported_ciphersuite.suite() == ciphersuite_enum {
-            return Some(*this_supported_ciphersuite);
-        }
-    }
-    None
-}
-
 /// Look up ciphersuite by name. Return integer identifier on success.
-pub fn lookup_ciphersuite_mbedtls(suite_string: &str) -> Option<i32> {
+pub fn lookup_ciphersuite(suite_string: &str) -> Option<i32> {
     // IANA official names have underscores, but mbedtls has hyphens,
     // for example "TLS-ECDHE-ECDSA-WITH-CHACHA20-POLY1305-SHA256".
     let name = suite_string.replace("_", "-");

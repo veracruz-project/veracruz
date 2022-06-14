@@ -137,7 +137,7 @@ mod tests {
     pub fn setup(proxy_attestation_server_url: String) {
         SETUP.call_once(|| {
             info!("SETUP.call_once called");
-            std::env::set_var("RUST_LOG", "debug,actix_server=info,actix_web=info,tokio_reactor=info,hyper=info,reqwest=info,rustls=info");
+            std::env::set_var("RUST_LOG", "debug,actix_server=info,actix_web=info,tokio_reactor=info,hyper=info,reqwest=info");
 
             env_logger::builder().init();
             let _main_loop_handle = std::thread::spawn(|| {
