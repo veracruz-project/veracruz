@@ -16,8 +16,8 @@
 use anyhow::{self, Ok};
 use std::{env, fs, process};
 
-const INPUT_FILENAME: &'static str = "/input/random_search_text.txt";
-const OUTPUT_FILENAME: &'static str = "/output/search_results.txt";
+const INPUT_FILENAME: &'static str = "/input/hello-world-1.dat";
+const OUTPUT_FILENAME: &'static str = "/output/search_results.dat";
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();

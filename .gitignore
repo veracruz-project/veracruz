@@ -19,6 +19,9 @@
 *.swo
 *.bin
 *.png
+*.dat
+*.txt
+*.csv
 /example/**
 **/target/**
 test-collateral/*.dat
