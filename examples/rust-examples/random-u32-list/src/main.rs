@@ -18,7 +18,7 @@ use rand::Rng;
 use std::fs;
 
 fn main() -> anyhow::Result<()> {
-    let output = "/input/unsorted_numbers.txt";
+    let output = "/output/unsorted_numbers.txt";
     let bytes = rand::thread_rng().gen::<[u32; 32]>().iter().map(|n| n.to_string()).collect::<Vec<String>>().join(",");
     println!("{}", bytes);
     fs::write(output, bytes)?;

@@ -446,6 +446,28 @@ mod tests {
     }
 
     #[test]
+    /// Test for several rounds of appending data and executing program.
+    /// It sums up an initial f64 number and two streams of f64 numbers.
+    fn basic_pipeline() {
+        let events = vec![
+            TestEvent::write_program(RANDOM_U32_LIST_WASM),
+            TestEvent::write_program(SORT_NUBMER_WASM),
+            TestEvent::execute(RANDOM_U32_LIST_WASM),
+            TestEvent::execute(SORT_NUBMER_WASM),
+            TestEvent::read_result("/output/sorted_numbers.txt"),
+            TestEvent::ShutDown,
+        ];
+        TestExecutor::test_template(
+            POLICY,
+            CLIENT_CERT,
+            CLIENT_KEY,
+            events,
+            Duration::from_secs(TIME_OUT_SECS),
+        )
+        .unwrap();
+    }
+
+    #[test]
     /// Integration test: linear regression.
     /// Compute the gradient and intercept,
     /// i.e. the LinearRegression struct, given a series of point in the

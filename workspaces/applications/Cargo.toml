@@ -30,8 +30,10 @@ members = [
   "crates/examples/rust-examples/private-set-intersection",
   "crates/examples/rust-examples/private-set-intersection-sum",
   "crates/examples/rust-examples/random-source",
+  "crates/examples/rust-examples/random-u32-list",
   "crates/examples/rust-examples/read-file",
   "crates/examples/rust-examples/shamir-secret-sharing",
+  "crates/examples/rust-examples/sort-numbers",
   "crates/examples/rust-examples/string-edit-distance",
   "crates/examples/rust-examples/fd-create",
 ]

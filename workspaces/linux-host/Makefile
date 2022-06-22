@@ -67,7 +67,7 @@ CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 
 test-server: test-dependencies
 	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
-	RUST_LOG="veracruz_server_test=info,error" $(CARGO_TEST) -p veracruz-server-test basic_random_source -- --test-threads=1 --nocapture
+	RUST_LOG="veracruz_server_test=info,error" $(CARGO_TEST) -p veracruz-server-test basic_pipeline -- --test-threads=1 --nocapture
 
 #test-client: test-dependencies
 	#$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1

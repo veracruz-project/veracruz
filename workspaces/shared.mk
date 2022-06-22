@@ -30,7 +30,9 @@ WASM_PROG_LIST = random-source.wasm \
 				private-set-intersection-sum.wasm \
 				number-stream-accumulation.wasm \
 				read-file.wasm \
+				random-u32-list.wasm \
 				shamir-secret-sharing.wasm \
+				sort-numbers.wasm \
 				fd-create.wasm \
 				aesctr-native.wasm
 

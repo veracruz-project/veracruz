@@ -17,7 +17,7 @@
 use std::fs;
 use anyhow;
 
-const INPUT_FILENAME: &'static str = "/input/unsorted_numbers.txt";
+const INPUT_FILENAME: &'static str = "/output/unsorted_numbers.txt";
 const OUTPUT_FILENAME: &'static str = "/output/sorted_numbers.txt";
 
 fn main() -> anyhow::Result<()> {

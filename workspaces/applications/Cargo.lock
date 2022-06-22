@@ -688,6 +688,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "random-u32-list"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "rand 0.8.5",
+]
+
+[[package]]
 name = "rawpointer"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -869,6 +877,13 @@ dependencies = [
 
 [[package]]
 name = "shamir-secret-sharing"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
+name = "sort-numbers"
 version = "0.3.0"
 dependencies = [
  "anyhow",
