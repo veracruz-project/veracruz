@@ -7,4 +7,4 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.14"
-libveracruz = { path = "../../rust/libveracruz" }
+libveracruz = { path = "../../../sdk/rust/libveracruz" }
