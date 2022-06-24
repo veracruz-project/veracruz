@@ -2,7 +2,7 @@
 authors = ["The Veracruz Development Team"]
 description = "Veracruz integration test-suite.  Tests trusted Veracruz runtime functioanlity, and session management code, without establishing a network connection."
 edition = "2018"
-name = "veracruz-server-test"
+name = "tests"
 version = "0.3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
