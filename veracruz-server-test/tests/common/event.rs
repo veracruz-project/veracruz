@@ -1,8 +1,8 @@
-use std::{
-    path::{Path, PathBuf},
-    env,
-};
 use crate::common::util::*;
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 /// Events that drive the test.
 #[derive(Debug, Clone)]

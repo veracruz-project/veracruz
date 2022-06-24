@@ -1,0 +1,492 @@
+//! Veracruz test material
+//!
+//! One of the main Veracruz integration tests, as lots of material is imported
+//! directly or indirectly, here.
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+
+mod common;
+
+use common::event::TestEvent;
+use common::proxy_attestation_server::*;
+use common::util::*;
+
+// Policies
+const SINGLE_CLIENT_POLICY: &'static str = "single_client.json";
+const LINEAR_REGRESSION_DUAL_POLICY: &'static str = "dual_policy.json";
+const LINEAR_REGRESSION_TRIPLE_POLICY: &'static str = "triple_policy_1.json";
+const LINEAR_REGRESSION_PARALLEL_POLICY: &'static str = "dual_parallel_policy.json";
+const INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_2.json";
+const PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_3.json";
+const STRING_EDIT_DISTANCE_TRIPLE_POLICY: &'static str = "triple_policy_4.json";
+const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str = "quadruple_policy.json";
+
+// Identities
+const PROGRAM_CLIENT_CERT: &'static str = "program_client_cert.pem";
+const PROGRAM_CLIENT_KEY: &'static str = "program_client_key.pem";
+const RESULT_CLIENT_CERT: &'static str = "result_client_cert.pem";
+const RESULT_CLIENT_KEY: &'static str = "result_client_key.pem";
+const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
+const CLIENT_KEY: &'static str = "client_rsa_key.pem";
+const DATA_CLIENT_CERT: &'static str = "data_client_cert.pem";
+const DATA_CLIENT_KEY: &'static str = "data_client_key.pem";
+const DATA_CLIENT_SECOND_CERT: &'static str = "never_used_cert.pem";
+const DATA_CLIENT_SECOND_KEY: &'static str = "never_used_key.pem";
+
+// Programs
+const CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM: &'static str = "intersection-set-sum.wasm";
+const STRING_EDIT_DISTANCE_WASM: &'static str = "string-edit-distance.wasm";
+const LINEAR_REGRESSION_WASM: &'static str = "linear-regression.wasm";
+const RANDOM_SOURCE_WASM: &'static str = "random-source.wasm";
+
+// Data
+const LINEAR_REGRESSION_DATA: &'static str = "linear-regression.dat";
+const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str = "intersection-customer.dat";
+const INTERSECTION_SET_SUM_ADVERTISEMENT_DATA: &'static str =
+    "intersection-advertisement-viewer.dat";
+const STRING_1_DATA: &'static str = "hello-world-1.dat";
+const STRING_2_DATA: &'static str = "hello-world-2.dat";
+
+const TIME_OUT_SECS: u64 = 1200;
+
+use actix_rt::{
+    time::{sleep, Instant},
+};
+use anyhow::{anyhow, Result};
+use either::{Left, Right};
+use env_logger;
+use log::{error, info};
+use policy_utils::policy::Policy;
+use std::{
+    env::{self, VarError},
+    future::Future,
+    path::Path,
+    time::Duration,
+};
+use veracruz_client::{self, VeracruzClient};
+use veracruz_server;
+
+/// A wrapper to force tests to panic after a timeout.
+///
+/// Note this is overrideable with the VERACRUZ_TEST_TIMEOUT environment
+/// variable, which provides a timeout in seconds
+pub async fn timeout<F: Future>(timeout: Duration, f: F) -> <F as Future>::Output {
+    let timeout = match env::var("VERACRUZ_TEST_TIMEOUT")
+        .map_err(Left)
+        .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
+    {
+        Ok(val) => Duration::from_secs(val),
+        Err(Left(VarError::NotPresent)) => timeout,
+        Err(err) => panic!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err),
+    };
+
+    match actix_web::rt::time::timeout(timeout, f).await {
+        Ok(r) => r,
+        Err(_) => panic!(
+            "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
+            timeout
+        ),
+    }
+}
+
+/// A test of veracruz using network communication using a single session
+#[actix_rt::test]
+async fn veracruz_phase1_get_random_one_client() {
+    TestExecutor::test_template(
+        SINGLE_CLIENT_POLICY,
+        &vec![(CLIENT_CERT, CLIENT_KEY)],
+        vec![
+            (0, TestEvent::write_program(RANDOM_SOURCE_WASM)),
+            (0, TestEvent::execute(RANDOM_SOURCE_WASM)),
+            (0, TestEvent::read_result("/output/random.dat")),
+            (0, TestEvent::ShutDown),
+        ],
+        TIME_OUT_SECS,
+    )
+    .await
+    .unwrap();
+}
+
+/// A test of veracruz using network communication using two sessions (one for program and one for data)
+#[actix_rt::test]
+async fn veracruz_phase1_linear_regression_two_clients() {
+    TestExecutor::test_template(
+        LINEAR_REGRESSION_DUAL_POLICY,
+        &vec![
+            (PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY),
+            (DATA_CLIENT_CERT, DATA_CLIENT_KEY),
+        ],
+        vec![
+            (0, TestEvent::write_program(LINEAR_REGRESSION_WASM)),
+            (1, TestEvent::write_data(LINEAR_REGRESSION_DATA)),
+            (0, TestEvent::execute(LINEAR_REGRESSION_WASM)),
+            (1, TestEvent::read_result("/output/linear-regression.dat")),
+            (0, TestEvent::ShutDown),
+        ],
+        TIME_OUT_SECS,
+    )
+    .await
+    .unwrap();
+}
+
+/// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
+#[actix_rt::test]
+async fn veracruz_phase2_linear_regression_three_clients() {
+    TestExecutor::test_template(
+        LINEAR_REGRESSION_TRIPLE_POLICY,
+        &vec![
+            (PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY),
+            (DATA_CLIENT_CERT, DATA_CLIENT_KEY),
+            (RESULT_CLIENT_CERT, RESULT_CLIENT_KEY),
+        ],
+        vec![
+            (0, TestEvent::write_program(LINEAR_REGRESSION_WASM)),
+            (1, TestEvent::write_data(LINEAR_REGRESSION_DATA)),
+            (0, TestEvent::execute(LINEAR_REGRESSION_WASM)),
+            (1, TestEvent::read_result("/output/linear-regression.dat")),
+            (2, TestEvent::read_result("/output/linear-regression.dat")),
+            (0, TestEvent::ShutDown),
+        ],
+        TIME_OUT_SECS,
+    )
+    .await
+    .unwrap();
+}
+
+/// A test of veracruz using network communication using four sessions
+/// (one for program, one for the first data, and one for the second data and retrieval.)
+#[actix_rt::test]
+#[ignore] // FIXME: test currently disabled because it fails on IceCap
+async fn veracruz_phase2_intersection_set_sum_three_clients() {
+    TestExecutor::test_template(
+        INTERSECTION_SET_SUM_TRIPLE_POLICY,
+        &vec![
+            (PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY),
+            (DATA_CLIENT_CERT, DATA_CLIENT_KEY),
+            (RESULT_CLIENT_CERT, RESULT_CLIENT_KEY),
+        ],
+        vec![
+            (
+                0,
+                TestEvent::write_program(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            ),
+            (
+                1,
+                TestEvent::write_data(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
+            ),
+            (2, TestEvent::write_data(INTERSECTION_SET_SUM_CUSTOMER_DATA)),
+            (
+                0,
+                TestEvent::execute(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
+            ),
+            (
+                2,
+                TestEvent::read_result("/output/intersection-set-sum.dat"),
+            ),
+            (0, TestEvent::ShutDown),
+        ],
+        TIME_OUT_SECS,
+    )
+    .await
+    .unwrap();
+}
+
+/// A test of veracruz using network communication using three sessions
+/// (one for program, one for the first data, and one for the second data and retrieval.)
+#[actix_rt::test]
+async fn veracruz_phase2_string_edit_distance_three_clients() {
+    TestExecutor::test_template(
+        STRING_EDIT_DISTANCE_TRIPLE_POLICY,
+        &vec![
+            (PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY),
+            (DATA_CLIENT_CERT, DATA_CLIENT_KEY),
+            (RESULT_CLIENT_CERT, RESULT_CLIENT_KEY),
+        ],
+        vec![
+            (0, TestEvent::write_program(STRING_EDIT_DISTANCE_WASM)),
+            (1, TestEvent::write_data(STRING_1_DATA)),
+            (2, TestEvent::write_data(STRING_2_DATA)),
+            (0, TestEvent::execute(STRING_EDIT_DISTANCE_WASM)),
+            (
+                2,
+                TestEvent::read_result("/output/string-edit-distance.dat"),
+            ),
+            (0, TestEvent::ShutDown),
+        ],
+        TIME_OUT_SECS,
+    )
+    .await
+    .unwrap();
+}
+
+/// A test of veracruz using network communication using four sessions
+/// (one for program, one for the first data, one for the second data, and one for retrieval.)
+#[actix_rt::test]
+async fn veracruz_phase3_string_edit_distance_four_clients() {
+    TestExecutor::test_template(
+        STRING_EDIT_DISTANCE_QUADRUPLE_POLICY,
+        &vec![
+            (PROGRAM_CLIENT_CERT, PROGRAM_CLIENT_KEY),
+            (DATA_CLIENT_CERT, DATA_CLIENT_KEY),
+            (DATA_CLIENT_SECOND_CERT, DATA_CLIENT_SECOND_KEY),
+            (RESULT_CLIENT_CERT, RESULT_CLIENT_KEY),
+        ],
+        vec![
+            (0, TestEvent::write_program(STRING_EDIT_DISTANCE_WASM)),
+            (1, TestEvent::write_data(STRING_1_DATA)),
+            (2, TestEvent::write_data(STRING_2_DATA)),
+            (0, TestEvent::execute(STRING_EDIT_DISTANCE_WASM)),
+            (
+                3,
+                TestEvent::read_result("/output/string-edit-distance.dat"),
+            ),
+            (0, TestEvent::ShutDown),
+        ],
+        TIME_OUT_SECS,
+    )
+    .await
+    .unwrap();
+}
+
+/// a test of veracruz using network communication using two parallel sessions
+/// (one for program, one for data sending and retrieving)
+#[actix_rt::test]
+async fn veracruz_phase4_linear_regression_two_clients_parallel() {
+    timeout(Duration::from_secs(1200), async {
+        let (_, policy_json, _) =
+            read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
+        let policy = Policy::from_json(&policy_json).unwrap();
+
+        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+
+        sleep(std::time::Duration::from_millis(5000)).await;
+        let policy_file = policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY);
+        let policy_json_clone = policy_json.clone();
+        let server_handle = server_tls_loop(policy_json_clone);
+
+        let program_provider_handle = async {
+            sleep(std::time::Duration::from_millis(10000)).await;
+            info!("### program provider start.");
+            let mut client = veracruz_client::VeracruzClient::new(
+                cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
+                cert_key_dir(PROGRAM_CLIENT_KEY).as_path(),
+                &policy_json,
+            )?;
+            let prog_path = program_dir(LINEAR_REGRESSION_WASM);
+            info!("### program provider read binary.");
+            let program_data = read_local_file(prog_path).unwrap();
+            info!("### program provider send binary.");
+            client
+                .send_program("/program/linear-regression.wasm", &program_data)
+                .await?;
+            Result::<()>::Ok(())
+        };
+        let data_provider_handle = async {
+            sleep(std::time::Duration::from_millis(15000)).await;
+            info!("### data provider start.");
+            let mut client = veracruz_client::VeracruzClient::new(
+                cert_key_dir(DATA_CLIENT_CERT).as_path(),
+                cert_key_dir(DATA_CLIENT_KEY).as_path(),
+                &policy_json,
+            )?;
+
+            let data_filename = data_dir(LINEAR_REGRESSION_DATA);
+            info!("### data provider read input.");
+            let data = read_local_file(&data_filename).unwrap();
+            info!("### data provider send input.");
+            client
+                .send_data("/input/linear-regression.dat", &data)
+                .await?;
+            info!("### data provider read result.");
+            client
+                .request_compute("/program/linear-regression.wasm")
+                .await?;
+            client.get_results("/output/linear-regression.dat").await?;
+            info!("### data provider request shutdown.");
+            client.request_shutdown().await?;
+            Result::<()>::Ok(())
+        };
+
+        let result = futures::future::try_join3(
+            server_handle,
+            program_provider_handle,
+            data_provider_handle,
+        )
+        .await;
+        assert!(result.is_ok(), "error: {:?}", result);
+    })
+    .await
+}
+
+async fn server_tls_loop<P: AsRef<str>>(policy_json: P) -> Result<()> {
+    // TODO change
+    //let (_, policy_text, _) = read_policy(policy_filename).unwrap();
+    veracruz_server::server::server(policy_json.as_ref()).map_err(|e| anyhow!("Veracruz server error {:?}",e))?.await?;
+    Ok(())
+}
+
+/// Test states.
+struct TestExecutor {
+    // The policy for the runtime.
+    policy: Policy,
+    // The json string of the policy
+    policy_json: String,
+}
+
+impl TestExecutor {
+    async fn test_template<P: AsRef<str>, Q: AsRef<str>, K: AsRef<str>>(
+        // Policy files
+        policy_filename: P,
+        // List of client's certificates and private keys
+        client_cert_key_pairs: &[(Q, K)],
+        events: Vec<(usize, TestEvent)>,
+        timeout_sec: u64,
+    ) -> Result<()> {
+        Self::new(policy_dir(policy_filename))?
+            .execute(
+                &client_cert_key_pairs
+                    .iter()
+                    .map(|(cert, key)| (cert_key_dir(cert), cert_key_dir(key)))
+                    .collect::<Vec<_>>(),
+                events,
+                Duration::from_secs(timeout_sec),
+            )
+            .await?;
+        Ok(())
+    }
+
+    fn new<P: AsRef<Path>>(policy_path: P) -> Result<Self> {
+        let _ = env_logger::Builder::from_default_env()
+            .write_style(env_logger::fmt::WriteStyle::Always)
+            .is_test(true)
+            .try_init();
+        info!("Initialise proxy attestation server.");
+        // Read the the policy
+        let (policy, policy_json, _) = read_policy(policy_path)?;
+
+        // start the proxy attestation server
+        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+
+        Ok(TestExecutor {
+            policy,
+            policy_json,
+        })
+    }
+
+    /// Execute this test. Clients collectively execute as a block, driven by the `events`, in
+    /// parallel with the server.
+    async fn execute<P: AsRef<Path>, Q: AsRef<Path>>(
+        self,
+        client_cert_key_pairs: &[(P, Q)],
+        events: Vec<(usize, TestEvent)>,
+        timeout: Duration,
+    ) -> Result<()> {
+        // create the async block, use `?` to convert the error type.
+        // NOTE: this does not run the code but only create a future.
+        let policy_json_clone = self.policy_json.clone();
+        let server_handle =  server_tls_loop(policy_json_clone);
+
+        // create the async block for all clients driven by events.
+        // NOTE: this does not run the code but only create a future.
+        let clients_handle = async move {
+            // Wait for the server
+            sleep(std::time::Duration::from_millis(1000)).await;
+
+            info!("Initialise clients.");
+            // Initialise all clients
+            let mut clients = Vec::new();
+            for (cert, key) in client_cert_key_pairs.iter() {
+                clients.push(veracruz_client::VeracruzClient::new(
+                    cert.as_ref(),
+                    key.as_ref(),
+                    &self.policy_json,
+                )?);
+            }
+
+            // Process the events
+            for (client_index, event) in events.iter() {
+                let mut client = clients.get_mut(*client_index).ok_or(anyhow!(
+                    "cannot find client of index {}",
+                    client_index
+                ))?;
+                info!("Process client{} event {:?}.", client_index, event);
+                let time_init = Instant::now();
+                Self::process_event(&mut client, &event)
+                    .await
+                    .map_err(|e| {
+                        error!("Client of index {}: {:?}", client_index, e);
+                        e
+                    })?;
+                info!(
+                    "The event {:?} finished in {:?}.",
+                    event,
+                    time_init.elapsed()
+                );
+            }
+            Result::<()>::Ok(())
+        };
+
+        // Trigger the async, and execute them in parallel
+        let timeout = match env::var("VERACRUZ_TEST_TIMEOUT")
+            .map_err(Left)
+            .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
+        {
+            Ok(val) => Duration::from_secs(val),
+            Err(Left(VarError::NotPresent)) => timeout,
+            Err(err) => {
+                return Err(anyhow!(
+                    "Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}",
+                    err
+                ))
+            }
+        };
+
+        // Propogating both timeout and error from the try_join.
+        actix_web::rt::time::timeout(timeout, async {
+            // Must wrap in a async for the timeout, as it requests a future.
+            futures::try_join!(server_handle, clients_handle)
+        })
+        .await
+        .map_err(|_| {
+            anyhow!(
+                "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
+                timeout
+            )
+        })??;
+        Ok(())
+    }
+
+    async fn process_event(client: &mut VeracruzClient, event: &TestEvent) -> Result<()> {
+        match event {
+            // FIXME
+            TestEvent::CheckHash => {
+                client.check_policy_hash().await?;
+                client.check_runtime_hash()?;
+            }
+            TestEvent::WriteFile(remote_path, local_path) => {
+                let data = read_local_file(local_path)?;
+                client.send_data(remote_path, &data).await?;
+            }
+            TestEvent::AppendFile(remote_path, local_path) => {
+                let data = read_local_file(local_path)?;
+                client.append_file(remote_path, &data).await?;
+            }
+            TestEvent::Execute(remote_path) => {
+                client.request_compute(remote_path).await?;
+            }
+            TestEvent::ReadFile(remote_path) => {
+                let result = client.get_results(&remote_path).await?;
+                info!("receive data of bytes {}", result.len());
+            }
+            TestEvent::ShutDown => client.request_shutdown().await?,
+        };
+        Ok(())
+    }
+}

@@ -1,11 +1,14 @@
-use std::{ 
-    path::PathBuf,
-    sync::mpsc::channel,
-    time::Duration,
-    env::{self, VarError},
-    thread,
-};
 use either::{Left, Right};
+use policy_utils::policy::Policy;
+use std::{
+    env::{self, VarError},
+    io::Read,
+    path::{Path, PathBuf},
+    sync::mpsc::channel,
+    thread,
+    time::Duration,
+};
+use veracruz_utils::sha256::sha256;
 
 /// Add the policy directory, reading from environment variable `$VERACRUZ_POLICY_DIR` or using the
 /// default `test-collateral`.
@@ -66,7 +69,6 @@ pub fn timeout<R: Send + 'static, F: (FnOnce() -> R) + Send + 'static>(
         Err(err) => panic!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err),
     };
 
-    // based on https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
     let (done_tx, done_rx) = channel();
     let thread = thread::spawn(move || {
         let r = f();
@@ -81,4 +83,22 @@ pub fn timeout<R: Send + 'static, F: (FnOnce() -> R) + Send + 'static>(
             timeout
         ),
     }
+}
+
+/// Auxiliary function: read policy file
+pub fn read_policy<T: AsRef<Path>>(fname: T) -> anyhow::Result<(Policy, String, String)> {
+    let fname = fname.as_ref();
+    let policy_json = std::fs::read_to_string(fname)?;
+
+    let policy_hash = sha256(policy_json.as_bytes());
+    let policy_hash_str = hex::encode(&policy_hash);
+    let policy = Policy::from_json(policy_json.as_ref())?;
+    Ok((policy, policy_json.to_string(), policy_hash_str))
+}
+
+pub fn read_local_file<T: AsRef<Path>>(filename: T) -> anyhow::Result<Vec<u8>> {
+    let mut data_file = std::fs::File::open(filename.as_ref())?;
+    let mut data_buffer = std::vec::Vec::new();
+    data_file.read_to_end(&mut data_buffer)?;
+    Ok(data_buffer)
 }

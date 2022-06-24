@@ -1,5 +1,5 @@
-use actix_rt::System;
 use crate::common::util::*;
+use actix_rt::System;
 use log::info;
 use proxy_attestation_server;
 use std::sync::Once;
@@ -33,4 +33,3 @@ pub fn proxy_attestation_setup(proxy_attestation_server_url: String) {
     // Sleep to wait for the proxy attestation server to start
     std::thread::sleep(std::time::Duration::from_millis(100));
 }
-

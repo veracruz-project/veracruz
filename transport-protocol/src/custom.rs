@@ -229,8 +229,21 @@ pub fn serialize_read_file(file_name: &str) -> TransportProtocolResult {
     set_length_prefix(&mut buffer)
 }
 
+// TODO FIXME
 /// Serialize a stream data package and its package ID.
 pub fn serialize_stream(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
+    let mut data = transport_protocol::Data::new();
+    data.set_data(data_buffer.to_vec());
+    data.set_file_name(file_name.to_string());
+    let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
+    transport_protocol.set_append_file(data);
+
+    // Prefix buffer with its length
+    let mut buffer = transport_protocol.write_to_bytes()?;
+    set_length_prefix(&mut buffer)
+}
+
+pub fn serialize_append_file(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Data::new();
     data.set_data(data_buffer.to_vec());
     data.set_file_name(file_name.to_string());
@@ -428,23 +441,6 @@ pub fn serialize_request_policy_hash() -> TransportProtocolResult {
 
     // Prefix buffer with its length
     let mut buffer = request.write_to_bytes()?;
-    set_length_prefix(&mut buffer)
-}
-
-/// Serialize the request for querying state of the enclave.
-pub fn serialize_machine_state(machine_state: u8) -> TransportProtocolResult {
-    let mut response = transport_protocol::RuntimeManagerResponse::new();
-
-    response.set_status(transport_protocol::ResponseStatus::SUCCESS);
-    let mut state = transport_protocol::State::new();
-    let slice = &vec![machine_state];
-
-    state.state.resize(slice.len(), 0);
-    state.state.copy_from_slice(slice);
-    response.set_state(state);
-
-    // Prefix buffer with its length
-    let mut buffer = response.write_to_bytes()?;
     set_length_prefix(&mut buffer)
 }
 

@@ -310,6 +310,7 @@ impl VeracruzClient {
         }
     }
 
+    // TODO rework
     /// Check the policy and runtime hashes, and then send the `data` to the remote `path`.
     pub async fn send_data<P: AsRef<Path>>(
         &mut self,
@@ -338,6 +339,34 @@ impl VeracruzClient {
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(()),
             _ => Err(VeracruzClientError::ResponseError("send_data", status)),
+        }
+    }
+
+    /// Check the policy and runtime hashes, and then send the `data` to the remote `path`.
+    pub async fn append_file<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        data: &[u8],
+    ) -> Result<(), VeracruzClientError> {
+        let path = enforce_leading_backslash(
+            path.as_ref()
+                .to_str()
+                .ok_or(VeracruzClientError::InvalidPath)?,
+        );
+        let serialized_data = transport_protocol::serialize_append_file(data, &path)?;
+        let response = self.send(&serialized_data).await?;
+
+        let parsed_response = transport_protocol::parse_runtime_manager_response(
+            *self
+                .remote_session_id
+                .lock()
+                .map_err(|_| VeracruzClientError::LockFailed)?,
+            &response,
+        )?;
+        let status = parsed_response.get_status();
+        match status {
+            transport_protocol::ResponseStatus::SUCCESS => Ok(()),
+            _ => Err(VeracruzClientError::ResponseError("append file", status)),
         }
     }
 
@@ -421,7 +450,7 @@ impl VeracruzClient {
     }
 
     /// Request the hash of the remote policy and check if it matches.
-    async fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
+    pub async fn check_policy_hash(&mut self) -> Result<(), VeracruzClientError> {
         let serialized_rph = transport_protocol::serialize_request_policy_hash()?;
         let response = self.send(&serialized_rph).await?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(
@@ -469,8 +498,8 @@ impl VeracruzClient {
     }
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
-    fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
-        let certs = self.tls_context.peer_cert()?;
+    pub fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
+        let certs = self.tls_context.peer_cert();
         if certs.iter().count() != 1 {
             return Err(VeracruzClientError::NoPeerCertificatesError);
         }
