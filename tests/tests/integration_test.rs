@@ -283,7 +283,7 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             let program_data = read_local_file(prog_path).unwrap();
             info!("### program provider send binary.");
             client
-                .send_program("/program/linear-regression.wasm", &program_data)
+                .write_file("/program/linear-regression.wasm", &program_data)
                 .await?;
             Result::<()>::Ok(())
         };
@@ -301,13 +301,13 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             let data = read_local_file(&data_filename).unwrap();
             info!("### data provider send input.");
             client
-                .send_data("/input/linear-regression.dat", &data)
+                .write_file("/input/linear-regression.dat", &data)
                 .await?;
             info!("### data provider read result.");
             client
                 .request_compute("/program/linear-regression.wasm")
                 .await?;
-            client.get_results("/output/linear-regression.dat").await?;
+            client.read_file("/output/linear-regression.dat").await?;
             info!("### data provider request shutdown.");
             client.request_shutdown().await?;
             Result::<()>::Ok(())
@@ -471,7 +471,7 @@ impl TestExecutor {
             }
             TestEvent::WriteFile(remote_path, local_path) => {
                 let data = read_local_file(local_path)?;
-                client.send_data(remote_path, &data).await?;
+                client.write_file(remote_path, &data).await?;
             }
             TestEvent::AppendFile(remote_path, local_path) => {
                 let data = read_local_file(local_path)?;
@@ -481,7 +481,7 @@ impl TestExecutor {
                 client.request_compute(remote_path).await?;
             }
             TestEvent::ReadFile(remote_path) => {
-                let result = client.get_results(&remote_path).await?;
+                let result = client.read_file(&remote_path).await?;
                 info!("receive data of bytes {}", result.len());
             }
             TestEvent::ShutDown => client.request_shutdown().await?,

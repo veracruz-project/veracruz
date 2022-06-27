@@ -53,7 +53,7 @@ pub enum TransportProtocolError {
     )]
     MutexError(u32),
 }
-type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
+pub type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
 
 /// Strip the length prefix from the input buffer.
 /// Return the length and the stripped buffer.
