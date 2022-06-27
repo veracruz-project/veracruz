@@ -289,21 +289,9 @@ impl Policy {
         }
 
         // Check the ciphersuite
-        #[cfg(features = "std")]
-        {
-            let policy_ciphersuite = rustls::CipherSuite::lookup_value(self.ciphersuite())
-                .map_err(|_| {
-                    PolicyError::TLSInvalidCiphersuiteError(self.get_ciphersuite().to_string())
-                })?;
-            if !rustls::ALL_CIPHERSUITES
-                .iter()
-                .fold(false, |acc, sup| acc || (sup.suite == policy_ciphersuite))
-            {
-                return Err(PolicyError::TLSUnsupportedCyphersuiteError(
-                    policy_ciphersuite,
-                ));
-            }
-        }
+        veracruz_utils::lookup_ciphersuite(self.ciphersuite()).ok_or(
+            PolicyError::TLSInvalidCiphersuiteError(self.ciphersuite().to_string()),
+        )?;
 
         // NB: no check of enclave certificate validity as there is no reliable
         // way of obtaining a time from within an enclave.  This is the

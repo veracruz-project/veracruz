@@ -27,10 +27,6 @@
 	path = third-party/nitro-enclave-attestation-document
 	url = https://github.com/veracruz-project/nitro-enclave-attestation-document.git
 	branch = veracruz-v2
-[submodule "third-party/rustls"]
-	path = third-party/rustls
-	url = https://github.com/veracruz-project/rustls.git
-	branch = self_signed
 [submodule "third-party/wasi-types"]
 	path = third-party/wasi-types
 	url = https://github.com/veracruz-project/wasi-types.git

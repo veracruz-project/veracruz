@@ -10,8 +10,6 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
-#[cfg(feature = "std")]
-use rustls::{CipherSuite, Error as TLSError};
 use std::{string::String, time::SystemTimeError};
 #[cfg(feature = "std")]
 use x509_parser::error::PEMError;
@@ -41,9 +39,6 @@ pub enum PolicyError {
     // NOTE: it is strange to work with nom::Err, which disallows unwrap.
     #[error(display = "PolicyError: X509Error: {:?}.", _0)]
     X509ParserError(String),
-    #[cfg(feature = "std")]
-    #[error(display = "PolicyError: TLSError: {:?}.", _0)]
-    TLSError(#[error(source)] TLSError),
     #[error(display = "PolicyError: TLSError: invalid cyphersuite: {:?}.", _0)]
     TLSInvalidCiphersuiteError(String),
     #[error(display = "PolicyError: SystemTimeError: {:?}.", _0)]
@@ -56,9 +51,6 @@ pub enum PolicyError {
     EnclaveExpireError,
     #[error(display = "PolicyError: Certificate expired: {:?}.", _0)]
     CertificateExpireError(String),
-    #[cfg(feature = "std")]
-    #[error(display = "PolicyError: TLSError: Unsupported cyphersuite {:?}.", _0)]
-    TLSUnsupportedCyphersuiteError(CipherSuite),
     #[error(display = "PolicyError: Certificate format error: {:?}.", _0)]
     CertificateFormatError(String),
     #[error(display = "PolicyError: Duplicated client ID {}.", _0)]

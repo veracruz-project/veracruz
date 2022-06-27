@@ -27,6 +27,7 @@ use std::{env, fs::File, io::prelude::*, io::Read, path::PathBuf, sync::Arc};
 use actix_session::Session;
 use actix_web::http::StatusCode;
 use actix_web::{post, HttpRequest, HttpResponse};
+use mbedtls::x509::Certificate;
 
 pub fn trust_path(filename: &str) -> PathBuf {
     PathBuf::from(env::var("VERACRUZ_TRUST_DIR").unwrap_or("../test-collateral".to_string()))
@@ -92,7 +93,7 @@ fn veracruz_client_session() {
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
         cert_buffer.push(b'\0');
-        let certs = mbedtls::x509::Certificate::from_pem_multiple(&cert_buffer).unwrap();
+        let certs = Certificate::from_pem_multiple(&cert_buffer).unwrap();
         assert!(certs.iter().count() == 1);
         certs
     };
@@ -123,7 +124,7 @@ fn veracruz_client_session() {
         let mut cert_buffer = std::vec::Vec::new();
         cert_file.read_to_end(&mut cert_buffer).unwrap();
         cert_buffer.push(b'\0');
-        let certs = mbedtls::x509::Certificate::from_pem_multiple(&cert_buffer).unwrap();
+        let certs = Certificate::from_pem_multiple(&cert_buffer).unwrap();
         assert!(certs.iter().count() == 1);
         certs
     };

@@ -18,15 +18,12 @@ use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use io_utils::{error::SocketError, http::HttpError};
-use rustls::Error as TLSError;
 use std::error::Error;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
 #[derive(Debug, Error)]
 pub enum VeracruzServerError {
-    #[error(display = "VeracruzServer: TLSError: {:?}.", _0)]
-    TLSError(#[error(source)] TLSError),
     #[error(display = "VeracruzServer: HexError: {:?}.", _0)]
     HexError(#[error(source)] hex::FromHexError),
     #[error(display = "VeracruzServer: Utf8Error: {:?}.", _0)]
@@ -51,8 +48,6 @@ pub enum VeracruzServerError {
     InvalidCiphersuiteError(String),
     #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
     WebpkiError(#[error(source)] webpki::Error),
-    #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
-    WebpkiDNSNameError(#[error(source)] rustls::client::InvalidDnsNameError),
     #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
     #[error(display = "VeracruzServer: TryIntoError: {}.", _0)]

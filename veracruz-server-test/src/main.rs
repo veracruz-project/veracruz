@@ -21,9 +21,10 @@ mod tests {
     use either::{Left, Right};
     use env_logger;
     use log::{error, info};
+    use mbedtls::alloc::List;
+    use mbedtls::x509::Certificate;
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
-    use rustls_pemfile;
     use std::{
         convert::TryFrom,
         env::{self, VarError},
@@ -34,7 +35,7 @@ mod tests {
         sync::{
             atomic::{AtomicBool, Ordering},
             mpsc::{channel, Receiver, Sender},
-            Arc, Once,
+            Arc, Mutex, Once,
         },
         thread,
         thread::JoinHandle,
@@ -74,8 +75,6 @@ mod tests {
     const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
     const POSTCARD_NATIVE_WASM: &'static str = "postcard-native.wasm";
     const POSTCARD_WASM: &'static str = "postcard-wasm.wasm";
-    const SORT_NUBMER_WASM: &'static str = "sort-numbers.wasm";
-    const RANDOM_U32_LIST_WASM: &'static str = "random-u32-list.wasm";
     // Data
     const LINEAR_REGRESSION_DATA: &'static str = "linear-regression.dat";
     const INTERSECTION_SET_SUM_CUSTOMER_DATA: &'static str = "intersection-customer.dat";
@@ -833,14 +832,75 @@ mod tests {
         client_tls_sender: Sender<(u32, Vec<u8>)>,
         // Paths to client certification and private key.
         // Note that we only have one client in all tests.
-        client_connection: rustls::ClientConnection,
+        client_connection: mbedtls::ssl::Context<InsecureConnection>,
         client_connection_id: u32,
+        // Read and write buffers shared with InsecureConnection.
+        shared_buffers: Arc<Mutex<Buffers>>,
         // A alive flag. This is to solve the problem where the server thread still in loop while
         // client thread is terminated.
         alive_flag: Arc<AtomicBool>,
         // Hold the server thread. The test will join the thread in the end to check the server
         // state.
         server_thread: JoinHandle<Result<(), String>>,
+    }
+
+    struct Buffers {
+        // Read buffer used by mbedtls for cyphertext.
+        read_buffer: Vec<u8>,
+        // Write buffer used by mbedtls for cyphertext.
+        write_buffer: Option<Vec<u8>>,
+    }
+
+    /// This is the structure given to mbedtls and used for reading and
+    /// writing cyphertext, using the standard Read and Write traits.
+    struct InsecureConnection {
+        // Read and write buffers shared with Session.
+        shared_buffers: Arc<Mutex<Buffers>>,
+    }
+
+    // To convert any error to a std::io error:
+    fn std_err(error_text: &str) -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::Other, error_text)
+    }
+
+    impl Read for InsecureConnection {
+        fn read(&mut self, data: &mut [u8]) -> Result<usize, std::io::Error> {
+            // Return as much data from the read_buffer as fits.
+            let mut shared_buffers = self
+                .shared_buffers
+                .lock()
+                .map_err(|_| std_err("lock failed"))?;
+            let n = std::cmp::min(data.len(), shared_buffers.read_buffer.len());
+            if n == 0 {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::WouldBlock,
+                    "InsecureConnection Read",
+                ))
+            } else {
+                data[0..n].clone_from_slice(&shared_buffers.read_buffer[0..n]);
+                shared_buffers.read_buffer = shared_buffers.read_buffer[n..].to_vec();
+                Ok(n)
+            }
+        }
+    }
+
+    impl Write for InsecureConnection {
+        fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> {
+            // Append to write buffer.
+            let mut shared_buffers = self
+                .shared_buffers
+                .lock()
+                .map_err(|_| std_err("lock failed"))?;
+            match &mut shared_buffers.write_buffer {
+                None => shared_buffers.write_buffer = Some(data.to_vec()),
+                Some(x) => x.extend_from_slice(data),
+            }
+            // Return value to indicate that we handled all the data.
+            Ok(data.len())
+        }
+        fn flush(&mut self) -> Result<(), std::io::Error> {
+            Ok(())
+        }
     }
 
     impl TestExecutor {
@@ -859,8 +919,7 @@ mod tests {
                 cert_key_dir(client_cert_filename),
                 cert_key_dir(client_key_filename),
             )?
-            .execute(events, timeout)?;
-            Ok(())
+            .execute(events, timeout)
         }
 
         /// Create a new test executor. It initiates a server in a separate thread and creates a
@@ -883,15 +942,19 @@ mod tests {
             let (server_tls_sender, client_tls_receiver) = channel::<Vec<u8>>();
             let (client_tls_sender, server_tls_receiver) = channel::<(u32, Vec<u8>)>();
 
+            let shared_buffers = Arc::new(Mutex::new(Buffers {
+                read_buffer: vec![],
+                write_buffer: None,
+            }));
+
             info!("Initialise a client with its certificate and key.");
             // Create a fake client session which only ends to the simulated connecting channel.
-            let mut client_connection = create_client_test_connection(
+            let client_connection = create_client_test_connection(
                 client_cert_path,
                 client_key_path,
                 &policy.ciphersuite(),
+                Arc::clone(&shared_buffers),
             )?;
-            // Set the buffer size to unlimited. The `client_send` function assumes this property.
-            client_connection.set_buffer_limit(None);
 
             info!("Initialise Veracruz runtime.");
             // Create the server
@@ -934,6 +997,7 @@ mod tests {
                 policy_hash,
                 client_connection,
                 client_connection_id,
+                shared_buffers,
                 client_tls_sender,
                 client_tls_receiver,
                 alive_flag,
@@ -1107,11 +1171,16 @@ mod tests {
             };
 
             // Get all the certificates. Assume that the handshake completes.
-            let certs = self.client_connection.peer_certificates().ok_or(format!(
-                "No peer certificate found. Potentially wait handshake."
-            ))?;
-
-            let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
+            let certs = self.client_connection.peer_cert()?;
+            if certs.iter().count() != 1 {
+                return Err(format!("no peer certificates").into());
+            }
+            let cert = certs
+                .ok_or("unexpected certificate")?
+                .iter()
+                .nth(0)
+                .ok_or("unexpected certificate")?;
+            let ee_cert = webpki::EndEntityCert::try_from(cert.as_der())?;
             let ues = ee_cert.unrecognized_extensions();
 
             // check for OUR extension
@@ -1199,88 +1268,77 @@ mod tests {
                 "Client: client send with length of data {:?}",
                 send_data.len()
             );
-            let connection: &mut rustls::ClientConnection = &mut self.client_connection;
-            let mut connection_writter = connection.writer();
-            // The buffer size is set unlimited. `write_all` here should not fail.
-            connection_writter
-                .write_all(&send_data[..])
-                .map_err(|e| format!("Failed to send all data.  Error produced: {:?}.", e))?;
-            connection_writter.flush()?;
-
-            let mut output: Vec<u8> = Vec::new();
-
-            connection
-                .write_tls(&mut output)
-                .map_err(|e| format!("Failed to write TLS.  Error produced: {:?}.", e))?;
-
-            self.client_tls_sender
-                .send((self.client_connection_id, output))
-                .map_err(|e| {
-                    format!(
-                        "Failed to send data on TX channel.  Error produced: {:?}.",
-                        e
-                    )
-                })?;
-
-            info!("Client: package is sent");
-
-            // Always check if other threads in the this test instance is still running.
+            let connection = &mut self.client_connection;
+            let mut write_all_succeeded = false;
             while self.alive_flag.load(Ordering::SeqCst) {
-                // Priority write.
-                if connection.wants_write() {
-                    info!("Client: session wants write...");
-                    let mut output: Vec<u8> = Vec::new();
-                    connection
-                        .write_tls(&mut output)
-                        .map_err(|e| format!("Failed to write TLS. Error produced: {:?}.", e))?;
-                    let _res = self
-                        .client_tls_sender
-                        .send((self.client_connection_id, output))
-                        .map_err(|e| {
-                            format!(
-                                "Failed to send data on TX channel. Error produced: {:?}.",
-                                e
-                            )
-                        })?;
-                } else if !connection.is_handshaking() || connection.wants_read() {
-                    let received = self.client_tls_receiver.recv()?;
-                    info!("Client: received is OK, and we're not handshaking...");
-
-                    // It is possible to receive an empty messsage.
-                    if received.len() == 0 {
-                        continue;
-                    }
-
-                    // convert the vec<u8> to read trait
-                    let mut slice = &received[..];
-                    connection
-                        .read_tls(&mut slice)
-                        .map_err(|e| format!("Failed to read TLS. Error produced: {:?}.", e))?;
-                    connection.process_new_packets().map_err(|e| {
-                        format!("Failed to process new packets. Error produced: {:?}.", e)
-                    })?;
-
-                    let mut received_buffer: Vec<u8> = Vec::new();
-
-                    match connection.reader().read_to_end(&mut received_buffer) {
-                        Ok(_num) => (),
-                        // It is allowed to block, but we care more on the received buffer.
-                        Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
+                // connection.write_all
+                if !write_all_succeeded {
+                    match connection.write_all(&send_data[..]) {
+                        Ok(()) => write_all_succeeded = true,
                         Err(err) => {
+                            if err.kind() == std::io::ErrorKind::WouldBlock {
+                                ()
+                            } else {
+                                return Err(format!(
+                                    "Failed to send all data.  Error produced: {:?}.",
+                                    err
+                                )
+                                .into());
+                            }
+                        }
+                    }
+                }
+
+                // write_buffer.take
+                let taken = self
+                    .shared_buffers
+                    .lock()
+                    .map_err(|_| "lock failed")?
+                    .write_buffer
+                    .take();
+                match taken {
+                    None => (),
+                    Some(output) => {
+                        // client_tls_sender.send
+                        self.client_tls_sender
+                            .send((self.client_connection_id, output))
+                            .map_err(|e| {
+                                format!(
+                                    "Failed to send data on TX channel. Error produced: {:?}.",
+                                    e
+                                )
+                            })?;
+
+                        // client_tls_receiver.recv
+                        let received = self.client_tls_receiver.recv()?;
+
+                        // read_buffer.extend_from_slice
+                        self.shared_buffers
+                            .lock()
+                            .map_err(|_| "lock failed")?
+                            .read_buffer
+                            .extend_from_slice(&received);
+                    }
+                }
+
+                // connection.read_to_end
+                let mut received_buffer: Vec<u8> = Vec::new();
+                let res = connection.read_to_end(&mut received_buffer);
+                if received_buffer.len() > 0 {
+                    return Ok(received_buffer);
+                }
+                match res {
+                    Ok(_) => (),
+                    Err(err) => {
+                        if err.kind() == std::io::ErrorKind::WouldBlock {
+                            ()
+                        } else {
                             return Err(format!(
                                 "Failed to read data to end.  Error produced: {:?}.",
                                 err
                             )
                             .into());
                         }
-                    };
-
-                    info!("Client: received_buffer.len() {}", received_buffer.len());
-
-                    if received_buffer.len() > 0 {
-                        info!("Client: finished sending via TLS.");
-                        // NOTE: this is the place where function succeeds.
-                        return Ok(received_buffer);
                     }
                 }
             }
@@ -1352,61 +1410,67 @@ mod tests {
         client_cert_filename: P,
         client_key_filename: Q,
         ciphersuite_str: &str,
-    ) -> Result<rustls::ClientConnection, Box<dyn Error + 'static>> {
+        shared_buffers: Arc<Mutex<Buffers>>,
+    ) -> Result<mbedtls::ssl::Context<InsecureConnection>, Box<dyn Error + 'static>> {
         let client_cert = read_cert_file(client_cert_filename)?;
 
         let client_priv_key = read_priv_key_file(client_key_filename)?;
 
         let proxy_service_cert = {
-            let data = std::fs::read(cert_key_dir(CA_CERT))?;
-            let certs = rustls_pemfile::certs(&mut data.as_slice())?;
-            certs[0].clone()
-        };
+            let mut data = std::fs::read(cert_key_dir(CA_CERT))?;
+            data.push(b'\0');
+            let certs = Certificate::from_pem_multiple(&data)?;
+            if certs.iter().count() < 1 {
+                Err("no certificates")
+            } else {
+                Ok(certs)
+            }
+        }?;
 
-        let cipher_suite =
-            veracruz_utils::lookup_ciphersuite(ciphersuite_str).ok_or_else(|| {
-                VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string())
-            })?;
-        let mut root_store = rustls::RootCertStore::empty();
-        root_store.add(&rustls::Certificate(proxy_service_cert))?;
+        let mut root_store = List::new();
+        root_store.append(proxy_service_cert);
 
-        let client_config = rustls::ClientConfig::builder()
-            .with_cipher_suites(&[cipher_suite])
-            .with_safe_default_kx_groups()
-            .with_protocol_versions(&[&rustls::version::TLS12])?
-            .with_root_certificates(root_store)
-            .with_single_cert([client_cert].to_vec(), client_priv_key)?;
-
-        let enclave_name_as_server = rustls::ServerName::try_from("ComputeEnclave.dev")?;
-        Ok(rustls::ClientConnection::new(
-            Arc::new(client_config),
-            enclave_name_as_server,
-        )?)
+        let mut config = mbedtls::ssl::Config::new(
+            mbedtls::ssl::config::Endpoint::Client,
+            mbedtls::ssl::config::Transport::Stream,
+            mbedtls::ssl::config::Preset::Default,
+        );
+        config.set_min_version(mbedtls::ssl::config::Version::Tls1_2)?;
+        config.set_max_version(mbedtls::ssl::config::Version::Tls1_2)?;
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(ciphersuite_str)
+            .ok_or_else(|| "invalid ciphersuite")?;
+        let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];
+        config.set_ciphersuites(Arc::new(cipher_suites));
+        let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
+        let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None)?);
+        config.set_rng(rng);
+        config.set_ca_list(Arc::new(root_store), None);
+        config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
+        let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
+        let conn = InsecureConnection { shared_buffers };
+        let _ = ctx.establish(conn, None);
+        Ok(ctx)
     }
 
     fn read_cert_file<P: AsRef<Path>>(
         filename: P,
-    ) -> Result<rustls::Certificate, Box<dyn Error + 'static>> {
-        let mut cert_file = File::open(filename)?;
-        let mut cert_buffer = Vec::new();
-        cert_file.read_to_end(&mut cert_buffer)?;
-        let mut cursor = std::io::Cursor::new(cert_buffer);
-        let certs = rustls_pemfile::certs(&mut cursor)?;
-        if certs.len() == 0 {
-            Err(format!("certs.len() is zero").into())
+    ) -> Result<List<Certificate>, Box<dyn Error + 'static>> {
+        let mut buffer = std::fs::read(filename)?;
+        buffer.push(b'\0');
+        let cert_vec = Certificate::from_pem_multiple(&buffer)?;
+        if cert_vec.iter().count() == 1 {
+            Ok(cert_vec)
         } else {
-            Ok(rustls::Certificate(certs[0].clone()))
+            Err(format!("certs.len() is zero").into())
         }
     }
 
     fn read_priv_key_file<P: AsRef<Path>>(
         filename: P,
-    ) -> Result<rustls::PrivateKey, Box<dyn Error + 'static>> {
-        let mut key_file = File::open(filename)?;
-        let mut key_buffer = Vec::new();
-        key_file.read_to_end(&mut key_buffer)?;
-        let mut cursor = std::io::Cursor::new(key_buffer);
-        let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)?;
-        Ok(rustls::PrivateKey(rsa_keys[0].clone()))
+    ) -> Result<mbedtls::pk::Pk, Box<dyn Error + 'static>> {
+        let mut buffer = std::fs::read(filename)?;
+        buffer.push(b'\0');
+        let pkey_vec = mbedtls::pk::Pk::from_private_key(&buffer, None)?;
+        Ok(pkey_vec)
     }
 }

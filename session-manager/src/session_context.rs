@@ -12,17 +12,16 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::{io::Cursor, string::String, vec::Vec};
-
 use crate::{
     error::SessionManagerError,
     session::{Principal, Session},
 };
 use mbedtls;
+use mbedtls::alloc::List;
+use mbedtls::x509::Certificate;
 use platform_services::getrandom;
 use policy_utils::policy::Policy;
-use rustls::{Certificate, PrivateKey, RootCertStore, ServerConfig};
-use rustls_pemfile;
+use std::{string::String, sync::Arc, vec::Vec};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -33,20 +32,21 @@ use rustls_pemfile;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Converts a string into a parsed X509 cryptographic certificate.
-fn convert_cert_buffer<'a, U>(cert_string: U) -> Result<Certificate, SessionManagerError>
+fn convert_cert_buffer<'a, U>(cert_string: U) -> Result<List<Certificate>, SessionManagerError>
 where
     U: Into<&'a String>,
 {
-    let mut cursor = Cursor::new(cert_string.into());
-    rustls_pemfile::certs(&mut cursor)
-        .map_err(|_| SessionManagerError::TLSUnspecifiedError)
-        .and_then(|certs| {
-            if certs.is_empty() {
-                Err(SessionManagerError::NoCertificateError)
-            } else {
-                Ok(Certificate(certs[0].clone()))
-            }
-        })
+    let cert_string_string: &String = cert_string.into();
+    let mut buffer = std::vec::Vec::new();
+    buffer.extend_from_slice(cert_string_string.as_bytes());
+    buffer.push(b'\0');
+    let cert_vec = Certificate::from_pem_multiple(&buffer)
+        .map_err(|_| SessionManagerError::TLSUnspecifiedError)?;
+    if cert_vec.iter().count() < 1 {
+        Err(SessionManagerError::NoCertificateError)
+    } else {
+        Ok(cert_vec)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,20 +56,20 @@ where
 /// A session context contains various bits of meta-data, such as certificates
 /// and server configuration options, for managing a server session.
 pub struct SessionContext {
-    /// An intermediate ConfigBuilder that will be present after the policy is
-    /// provided but before the certificate chain is provided
-    server_config_builder:
-        Option<rustls::ConfigBuilder<rustls::ServerConfig, rustls::server::WantsServerCert>>,
-    /// The configuration options for the server.
-    server_config: Option<ServerConfig>,
+    /// Vector of permitted cypher suites as used by mbedtls.
+    cipher_suites: Vec<i32>,
+    /// Root certificates.
+    root_certs: List<Certificate>,
+    /// Certificate chain.
+    cert_chain: List<Certificate>,
     /// The global policy associated with the Veracruz computation, detailing
     /// identities and roles for all principals, amongst other things.
     policy: Option<Policy>,
     /// The set of principals, as specified in the Veracruz global policy, with
     /// their identifying certificates and roles.
     principals: Option<Vec<Principal>>,
-    /// The private key used by the server
-    server_private_key: PrivateKey,
+    /// The private key used by the server (as a Vec<u8> for convenience)
+    server_private_key: Vec<u8>,
     /// The public key used by the server (as a Vec<u8> for convenience)
     server_public_key: Vec<u8>,
 }
@@ -87,13 +87,14 @@ impl SessionContext {
                 mbedtls::pk::Pk::generate_ec(&mut rng, mbedtls::pk::EcGroupId::SecP256R1)?;
             (
                 key.write_public_der_vec()?[23..].to_vec(),
-                rustls::PrivateKey(key.write_private_der_vec()?),
+                key.write_private_der_vec()?,
             )
         };
 
         Ok(Self {
-            server_config_builder: None,
-            server_config: None,
+            cipher_suites: vec![0],
+            root_certs: List::new(),
+            cert_chain: List::new(),
             principals: None,
             policy: None,
             server_public_key,
@@ -105,7 +106,7 @@ impl SessionContext {
         // create the root_cert_store that contains all of the certs of the clients that can connect
         // Note: We are not using a CA here, so each client that needs to connect must have it's
         // cert directly in the RootCertStore
-        let mut root_cert_store = RootCertStore::empty();
+        let mut root_certs = List::new();
         let mut principals = Vec::new();
 
         for identity in policy.identities().iter() {
@@ -116,7 +117,7 @@ impl SessionContext {
                 identity.file_rights().to_vec(),
             );
 
-            root_cert_store.add(&cert)?;
+            root_certs.append(cert);
 
             principals.push(principal);
         }
@@ -126,15 +127,8 @@ impl SessionContext {
                 SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().clone())
             })?;
 
-        let server_config_builder = rustls::ServerConfig::builder()
-            .with_cipher_suites(&[policy_ciphersuite])
-            .with_safe_default_kx_groups()
-            .with_protocol_versions(&[&rustls::version::TLS12])?
-            .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
-                root_cert_store,
-            ));
-
-        self.server_config_builder = Some(server_config_builder);
+        self.cipher_suites = vec![policy_ciphersuite, 0];
+        self.root_certs = root_certs;
         self.principals = Some(principals);
         self.policy = Some(policy);
 
@@ -142,30 +136,38 @@ impl SessionContext {
     }
 
     pub fn set_cert_chain(&mut self, chain_data: &Vec<Vec<u8>>) -> Result<(), SessionManagerError> {
-        let mut cert_chain: Vec<rustls::Certificate> = Vec::new();
+        let mut cert_chain = List::new();
         for this_chain_data in chain_data {
-            let cert: rustls::Certificate = rustls::Certificate(this_chain_data.clone());
-            cert_chain.push(cert);
+            cert_chain.append(Certificate::from_pem_multiple(this_chain_data)?)
         }
-        let config_builder_option = self.server_config_builder.take(); // After this, server_config_builder will be None
-        match config_builder_option {
-            Some(config_builder) => {
-                let config =
-                    config_builder.with_single_cert(cert_chain, self.server_private_key.clone())?;
-                self.server_config = Some(config);
-            }
-            None => return Err(SessionManagerError::InvalidStateError),
-        }
-        return Ok(());
+        self.cert_chain = cert_chain;
+        Ok(())
     }
 
     /// Returns the configuration associated with the server.
     #[inline]
-    pub fn server_config(&self) -> Result<ServerConfig, SessionManagerError> {
-        match &self.server_config {
-            Some(config) => return Ok(config.clone()),
-            None => return Err(SessionManagerError::InvalidStateError),
-        }
+    pub fn server_config(&self) -> Result<mbedtls::ssl::Config, SessionManagerError> {
+        let mut config = mbedtls::ssl::Config::new(
+            mbedtls::ssl::config::Endpoint::Server,
+            mbedtls::ssl::config::Transport::Stream,
+            mbedtls::ssl::config::Preset::Default,
+        );
+        config.set_ciphersuites(Arc::new(self.cipher_suites.clone()));
+        let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
+        let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None)?);
+        config.set_rng(rng);
+        config.set_min_version(mbedtls::ssl::config::Version::Tls1_2)?;
+        config.set_max_version(mbedtls::ssl::config::Version::Tls1_2)?;
+        config.set_ca_list(Arc::new(self.root_certs.clone()), None);
+        config.push_cert(
+            Arc::new(self.cert_chain.clone()),
+            Arc::new(mbedtls::pk::Pk::from_private_key(
+                &self.server_private_key,
+                None,
+            )?),
+        )?;
+        config.set_authmode(mbedtls::ssl::config::AuthMode::Required);
+        Ok(config)
     }
 
     /// Returns the principals associated with the server.
@@ -188,8 +190,8 @@ impl SessionContext {
     /// Returning the private key seems a little irresponsible (not that the
     /// software requesting it couldn't just inspect the memory, but still...)
     #[inline]
-    pub fn private_key(&self) -> PrivateKey {
-        return self.server_private_key.clone();
+    pub fn private_key(&self) -> &[u8] {
+        &self.server_private_key
     }
 
     /// Creates a new session, using server configuration and information about

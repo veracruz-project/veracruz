@@ -13,9 +13,9 @@
 #include <stdio.h>
 #include <string.h>
 
-int snprintf(char *str, size_t size, const char *format, ...)
+int vsnprintf(char *str, size_t size, const char *format, __builtin_va_list ap)
 {
-    // HACK instead of implementing snprintf, just:
+    // HACK instead of implementing vsnprintf, just:
     //  - copy the format string directly
     size_t i;
     for (i = 0; i < size - 1 && format[i] != '\0'; i++)

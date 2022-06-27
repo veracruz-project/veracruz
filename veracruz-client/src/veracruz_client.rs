@@ -12,6 +12,7 @@
 use crate::error::VeracruzClientError;
 use log::{error, info};
 use mbedtls::alloc::List;
+use mbedtls::x509::Certificate;
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use std::{
     convert::TryFrom,
@@ -47,9 +48,16 @@ impl Read for InsecureConnection {
     fn read(&mut self, data: &mut [u8]) -> Result<usize, std::io::Error> {
         // Return as much data from the read_buffer as fits.
         let n = std::cmp::min(data.len(), self.read_buffer.len());
-        data[0..n].clone_from_slice(&self.read_buffer[0..n]);
-        self.read_buffer = self.read_buffer[n..].to_vec();
-        Ok(n)
+        if n == 0 {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::WouldBlock,
+                "InsecureConnection Read",
+            ))
+        } else {
+            data[0..n].clone_from_slice(&self.read_buffer[0..n]);
+            self.read_buffer = self.read_buffer[n..].to_vec();
+            Ok(n)
+        }
     }
 }
 
@@ -133,12 +141,10 @@ impl VeracruzClient {
     /// Return Ok(vec) if succ
     /// Otherwise return Err(msg) with the error message as String
     // TODO: use generic functions to unify read_cert and read_private_key
-    fn read_cert<P: AsRef<Path>>(
-        filename: P,
-    ) -> Result<List<mbedtls::x509::Certificate>, VeracruzClientError> {
+    fn read_cert<P: AsRef<Path>>(filename: P) -> Result<List<Certificate>, VeracruzClientError> {
         let mut buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         buffer.push(b'\0');
-        let cert_vec = mbedtls::x509::Certificate::from_pem_multiple(&buffer)
+        let cert_vec = Certificate::from_pem_multiple(&buffer)
             .map_err(|_| VeracruzClientError::TLSUnspecifiedError)?;
         if cert_vec.iter().count() == 1 {
             Ok(cert_vec)
@@ -236,12 +242,9 @@ impl VeracruzClient {
         let proxy_service_cert = {
             let mut certs_pem = policy.proxy_service_cert().clone();
             certs_pem.push('\0');
-            let certs = mbedtls::x509::Certificate::from_pem_multiple(certs_pem.as_bytes())
-                .map_err(|_| {
-                    VeracruzClientError::X509ParserError(
-                        "mbedtls::x509::Certificate::from_pem_multiple".to_string(),
-                    )
-                })?;
+            let certs = Certificate::from_pem_multiple(certs_pem.as_bytes()).map_err(|_| {
+                VeracruzClientError::X509ParserError("Certificate::from_pem_multiple".to_string())
+            })?;
             certs
         };
         let mut config = mbedtls::ssl::Config::new(
@@ -251,12 +254,10 @@ impl VeracruzClient {
         );
         config.set_min_version(mbedtls::ssl::config::Version::Tls1_2)?;
         config.set_max_version(mbedtls::ssl::config::Version::Tls1_2)?;
-        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite_mbedtls(
-            policy.ciphersuite().as_str(),
-        )
-        .ok_or_else(|| {
-            VeracruzClientError::TLSInvalidCiphersuiteError(policy.ciphersuite().to_string())
-        })?;
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite().as_str())
+            .ok_or_else(|| {
+                VeracruzClientError::TLSInvalidCiphersuiteError(policy.ciphersuite().to_string())
+            })?;
         let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];
         config.set_ciphersuites(Arc::new(cipher_suites));
         let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
@@ -471,14 +472,11 @@ impl VeracruzClient {
 
     /// Request the hash of the remote veracruz runtime and check if it matches.
     fn check_runtime_hash(&self) -> Result<(), VeracruzClientError> {
-        let certs = self.tls_context.peer_cert();
+        let certs = self.tls_context.peer_cert()?;
         if certs.iter().count() != 1 {
             return Err(VeracruzClientError::NoPeerCertificatesError);
         }
         let cert = certs
-            .iter()
-            .nth(0)
-            .ok_or(VeracruzClientError::UnexpectedCertificateError)?
             .ok_or(VeracruzClientError::UnexpectedCertificateError)?
             .iter()
             .nth(0)
@@ -527,7 +525,10 @@ impl VeracruzClient {
     async fn send(&mut self, data: &[u8]) -> Result<Vec<u8>, VeracruzClientError> {
         self.tls_context.write_all(&data)?;
         let mut response = vec![];
-        self.tls_context.read_to_end(&mut response)?;
+        match self.tls_context.read_to_end(&mut response) {
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => 0,
+            x => x?,
+        };
         Ok(response)
     }
 
@@ -542,7 +543,7 @@ impl VeracruzClient {
     #[cfg(test)]
     pub fn pub_read_cert<P: AsRef<Path>>(
         filename: P,
-    ) -> Result<List<mbedtls::x509::Certificate>, VeracruzClientError> {
+    ) -> Result<List<Certificate>, VeracruzClientError> {
         VeracruzClient::read_cert(filename)
     }
 

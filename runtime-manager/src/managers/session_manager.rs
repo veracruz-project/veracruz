@@ -11,7 +11,6 @@
 
 use crate::managers::{ProtocolState, RuntimeManagerError, MY_SESSION_MANAGER};
 use policy_utils::policy::Policy;
-use rustls::PrivateKey;
 use session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::csr;
@@ -119,7 +118,7 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), RuntimeManage
         // The incoming buffer is not full, so we cannot parse a complete protobuf
         // message.  We need to wait longer for this to arrive.
         None => Ok(()),
-        Some(response) => Ok(this_session.return_data(&response)?),
+        Some(response) => Ok(this_session.write_plaintext_data(&response)?),
     }
 }
 
@@ -147,17 +146,17 @@ pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), RuntimeManagerError>
 
 pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
     match super::SESSIONS.lock()?.get_mut(&session_id) {
-        Some(this_session) => Ok(this_session.read_tls_needed()),
+        Some(this_session) => Ok(this_session.read_tls_needed()?),
         None => Err(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
         )),
     }
 }
 
-fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
+fn get_enclave_private_key_der() -> Result<Vec<u8>, RuntimeManagerError> {
     match &*super::MY_SESSION_MANAGER.lock()? {
         Some(session_manager) => {
-            return Ok(session_manager.private_key());
+            return Ok(session_manager.private_key().to_vec());
         }
         None => {
             return Err(RuntimeManagerError::UninitializedSessionError(
@@ -168,7 +167,7 @@ fn get_enclave_private_key() -> Result<PrivateKey, RuntimeManagerError> {
 }
 
 pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
-    let private_key_der = get_enclave_private_key()?.0;
+    let private_key_der = get_enclave_private_key_der()?;
     let csr =
         csr::generate_csr(&private_key_der).map_err(|err| RuntimeManagerError::CertError(err))?;
     return Ok(csr);
