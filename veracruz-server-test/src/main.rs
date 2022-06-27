@@ -26,7 +26,6 @@ mod tests {
     use policy_utils::{policy::Policy, Platform};
     use proxy_attestation_server;
     use std::{
-        convert::TryFrom,
         env::{self, VarError},
         error::Error,
         fs::File,
@@ -1180,33 +1179,18 @@ mod tests {
                 .iter()
                 .nth(0)
                 .ok_or("unexpected certificate")?;
-            let ee_cert = webpki::EndEntityCert::try_from(cert.as_der())?;
-            let ues = ee_cert.unrecognized_extensions();
-
+            let extensions = cert.extensions()?;
             // check for OUR extension
-            let encoded_extension_id: [u8; 3] = [
-                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-                VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
-            ];
-            let data = ues
-                .get(&encoded_extension_id[..])
-                .ok_or(format!("Our certificate extension is not present."))?;
-            info!("Certificate extension found.");
-
-            let extension_data = data
-                .read_all(format!("Can't read veracruz custom extension."), |input| {
-                    Ok(input.read_bytes_to_end())
-                })?;
-
-            if compare_policy_hash(
-                extension_data.as_slice_less_safe(),
-                &self.policy,
-                &target_platform,
-            ) {
-                Ok(())
-            } else {
-                Err(format!("None of the runtime manager hashes matched.").into())
+            match veracruz_utils::find_extension(extensions, &VERACRUZ_RUNTIME_HASH_EXTENSION_ID) {
+                None => Err(format!("Our certificate extension is not present.").into()),
+                Some(data) => {
+                    info!("Certificate extension found.");
+                    if compare_policy_hash(&data, &self.policy, &target_platform) {
+                        Ok(())
+                    } else {
+                        Err(format!("None of the runtime manager hashes matched.").into())
+                    }
+                }
             }
         }
 

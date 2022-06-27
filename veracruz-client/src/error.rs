@@ -38,8 +38,6 @@ pub enum VeracruzClientError {
     X509ParserPEMError(x509_parser::error::PEMError),
     #[error(display = "VeracruzClient: X509Error: {:?}.", _0)]
     X509ParserError(String),
-    #[error(display = "VeracruzClient: WebpkiError: {:?}.", _0)]
-    WebpkiError(#[error(source)] webpki::Error),
     #[error(display = "VeracruzClient: TryIntoError: {}.", _0)]
     TryIntoError(#[error(source)] std::num::TryFromIntError),
     #[error(display = "VeracruzClient: ParseIntError: {}.", _0)]

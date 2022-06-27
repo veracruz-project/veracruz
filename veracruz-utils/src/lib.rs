@@ -40,3 +40,27 @@ pub fn lookup_ciphersuite(suite_string: &str) -> Option<i32> {
     let name = suite_string.replace("_", "-");
     mbedtls::ssl::ciphersuites::lookup_ciphersuite(&name)
 }
+
+/// Find an extension with the given identifier in a list of extensions,
+/// typically taken from a certificate.
+pub fn find_extension(
+    extensions: Vec<mbedtls::x509::certificate::Extension>,
+    id: &[u8],
+) -> Option<Vec<u8>> {
+    for e in extensions {
+        let this_id = e.oid.components();
+        if id.len() == this_id.len() {
+            let mut equal = true;
+            for i in 0..id.len() {
+                if u64::from(id[i]) != this_id[i] {
+                    equal = false;
+                    break;
+                }
+            }
+            if equal {
+                return Some(e.value);
+            }
+        }
+    }
+    None
+}

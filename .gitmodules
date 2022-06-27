@@ -15,14 +15,6 @@
 [submodule "icecap/sysroot/rust"]
 	path = icecap/sysroot/rust
 	url = https://gitlab.com/arm-research/security/icecap/rust.git
-[submodule "third-party/ring"]
-	path = third-party/ring
-	url = https://github.com/veracruz-project/ring.git
-	branch = veracruz-v2
-[submodule "third-party/webpki"]
-	path = third-party/webpki
-	url = https://github.com/veracruz-project/webpki.git
-	branch = veracruz-v2
 [submodule "third-party/nitro-enclave-attestation-document"]
 	path = third-party/nitro-enclave-attestation-document
 	url = https://github.com/veracruz-project/nitro-enclave-attestation-document.git

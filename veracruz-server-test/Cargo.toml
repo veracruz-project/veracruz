@@ -47,5 +47,3 @@ proxy-attestation-server = { path = "../proxy-attestation-server" }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
-webpki = { version = "0.22", features = ["alloc", "std"] }
-webpki-roots = "0.22"
