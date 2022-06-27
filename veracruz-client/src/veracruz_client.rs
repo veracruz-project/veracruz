@@ -280,6 +280,7 @@ impl VeracruzClient {
         })
     }
 
+    // TODO REMOVE
     /// Check the policy and runtime hashes, and then send the `program` to the remote `path`.
     pub async fn send_program<P: AsRef<Path>>(
         &mut self,
@@ -294,7 +295,7 @@ impl VeracruzClient {
                 .to_str()
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
-        let serialized_program = transport_protocol::serialize_program(program, &path)?;
+        let serialized_program = transport_protocol::serialize_write_file(program, &path)?;
         let response = self.send(&serialized_program).await?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(
             *self
@@ -310,7 +311,7 @@ impl VeracruzClient {
         }
     }
 
-    // TODO rework
+    // TODO REMOVE
     /// Check the policy and runtime hashes, and then send the `data` to the remote `path`.
     pub async fn send_data<P: AsRef<Path>>(
         &mut self,
@@ -325,7 +326,7 @@ impl VeracruzClient {
                 .to_str()
                 .ok_or(VeracruzClientError::InvalidPath)?,
         );
-        let serialized_data = transport_protocol::serialize_program_data(data, &path)?;
+        let serialized_data = transport_protocol::serialize_write_file(data, &path)?;
         let response = self.send(&serialized_data).await?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(
@@ -342,7 +343,35 @@ impl VeracruzClient {
         }
     }
 
-    /// Check the policy and runtime hashes, and then send the `data` to the remote `path`.
+    /// Request to write `data` to the `path` from the beginning.
+    pub async fn write_file<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        data: &[u8],
+    ) -> Result<(), VeracruzClientError> {
+        let path = enforce_leading_backslash(
+            path.as_ref()
+                .to_str()
+                .ok_or(VeracruzClientError::InvalidPath)?,
+        );
+        let serialized_data = transport_protocol::serialize_write_file(data, &path)?;
+        let response = self.send(&serialized_data).await?;
+
+        let parsed_response = transport_protocol::parse_runtime_manager_response(
+            *self
+                .remote_session_id
+                .lock()
+                .map_err(|_| VeracruzClientError::LockFailed)?,
+            &response,
+        )?;
+        let status = parsed_response.get_status();
+        match status {
+            transport_protocol::ResponseStatus::SUCCESS => Ok(()),
+            _ => Err(VeracruzClientError::ResponseError("write file", status)),
+        }
+    }
+
+    /// Request to append `data` to the `path`.
     pub async fn append_file<P: AsRef<Path>>(
         &mut self,
         path: P,
@@ -568,45 +597,5 @@ impl VeracruzClient {
     #[cfg(test)]
     pub async fn pub_send(&mut self, data: &Vec<u8>) -> Result<Vec<u8>, VeracruzClientError> {
         self.send(data).await
-    }
-}
-
-#[allow(dead_code)]
-fn print_hex(data: &[u8]) -> String {
-    let mut ret_val = String::new();
-    for this_byte in data {
-        ret_val.push_str(format!("{:02x}", this_byte).as_str());
-    }
-    ret_val
-}
-
-#[allow(dead_code)]
-fn decode_tls_message(data: &[u8]) {
-    match data[0] {
-        0x16 => {
-            print!("Handshake: ");
-            match data[5] {
-                0x01 => println!("Client hello"),
-                0x02 => println!("Server hello"),
-                0x0b => println!("Certificate"),
-                0x0c => println!("ServerKeyExchange"),
-                0x0d => println!("CertificateRequest"),
-                0x0e => println!("ServerHelloDone"),
-                0x10 => println!("ClientKeyExchange"),
-                0x0f => println!("CertificateVerify"),
-                0x14 => println!("Finished"),
-                _ => println!("Unknown"),
-            }
-        }
-        0x14 => {
-            println!("ChangeCipherSpec");
-        }
-        0x15 => {
-            println!("Alert");
-        }
-        0x17 => {
-            println!("ApplicationData");
-        }
-        _ => println!("Unknown"),
     }
 }

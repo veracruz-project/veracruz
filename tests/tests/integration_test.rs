@@ -267,7 +267,6 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
         proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
 
         sleep(std::time::Duration::from_millis(5000)).await;
-        let policy_file = policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY);
         let policy_json_clone = policy_json.clone();
         let server_handle = server_tls_loop(policy_json_clone);
 

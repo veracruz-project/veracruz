@@ -786,7 +786,7 @@ impl TestExecutor {
     ) -> anyhow::Result<Vec<u8>> {
         // Read the local data and create a protobuf message.
         let data = read_local_file(local_path)?;
-        let serialized_data = transport_protocol::serialize_stream(&data, remote_path)?;
+        let serialized_data = transport_protocol::serialize_append_file(&data, remote_path)?;
         self.client_send(&serialized_data[..])
     }
 
