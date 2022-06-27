@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use err_derive::Error;
+use nix::unistd::alarm;
 use serde_json::Value;
 use std::{os::unix::io::AsRawFd, process::Command};
 
@@ -60,6 +61,10 @@ pub struct NitroEnclave {
 
 /// The port that is used to communicate with the enclave
 const VERACRUZ_PORT: u32 = 5005;
+
+/// Delay (in seconds) before terminating this process with SIGALRM if
+/// the attempt to "connect" to the enclave does not return.
+const NITRO_ENCLAVE_CONNECT_TIMEOUT: u32 = 30;
 
 impl NitroEnclave {
     /// create a new Nitro enclave, started with the file in eif_path
@@ -124,12 +129,16 @@ impl NitroEnclave {
             serde_json::from_value(enclave_data["EnclaveCID"].clone()).unwrap()
         };
 
+        alarm::set(NITRO_ENCLAVE_CONNECT_TIMEOUT);
+        let vsocket = crate::vsocket::VsockSocket::connect(cid, VERACRUZ_PORT)?;
+        alarm::cancel();
+
         let enclave: Self = NitroEnclave {
             enclave_id: enclave_data["EnclaveID"]
                 .to_string()
                 .trim_matches('"')
                 .to_string(),
-            vsocksocket: crate::vsocket::VsockSocket::connect(cid, VERACRUZ_PORT)?,
+            vsocksocket: vsocket,
             nitro_cli_path: nitro_cli_path.to_string(),
         };
         Ok(enclave)
