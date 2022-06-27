@@ -182,6 +182,9 @@ pub enum VeracruzServerError {
     #[cfg(feature = "nitro")]
     #[error(display = "NitroServer: Non-Success HTTP Response received")]
     NonSuccessHttp,
+    /// Runtime manager did not start up correctly.
+    #[error(display = "Runtime manager did not start up correctly")]
+    RuntimeManagerFailed,
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {

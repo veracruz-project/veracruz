@@ -173,6 +173,11 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                 .help("SHA256 measurement of the Runtime Manager enclave binary.")
                 .value_name("MEASUREMENT"),
         )
+        .arg(
+            Arg::with_name("write_nl_when_ready")
+                .long("write-nl")
+                .help("Write a newline character when server is ready."),
+        )
         .get_matches();
 
     let port = if let Some(port) = matches.value_of("port") {
@@ -216,6 +221,10 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
     })?;
 
     info!("TCP listener created on {}.", address);
+
+    if matches.is_present("write_nl_when_ready") {
+        println!("");
+    }
 
     let (mut fd, client_addr) = listener.accept().map_err(|ioerr| {
         error!(

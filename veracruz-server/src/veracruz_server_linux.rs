@@ -20,6 +20,7 @@ pub mod veracruz_server_linux {
     };
     use log::{error, info};
     use nix::sys::signal;
+    use nix::unistd::alarm;
     use policy_utils::policy::Policy;
     use rand::Rng;
     use std::{
@@ -29,9 +30,7 @@ pub mod veracruz_server_linux {
         io::Read,
         net::{Shutdown, TcpStream},
         os::unix::fs::PermissionsExt,
-        process::{Child, Command},
-        thread::sleep,
-        time::Duration,
+        process::{Child, Command, Stdio},
     };
     use tempfile::{self, TempDir};
     use transport_protocol::{
@@ -48,9 +47,9 @@ pub mod veracruz_server_linux {
 
     /// The Runtime Manager binary (the enclave), included at compile time
     const RUNTIME_ENCLAVE_BINARY_IMAGE: &[u8] = include_bytes!(env!("RUNTIME_ENCLAVE_BINARY_PATH"));
-    /// Spawn delay to apply (in seconds) between spawning the Runtime Manager enclave and trying
-    /// to contact it.
-    const RUNTIME_ENCLAVE_SPAWN_DELAY: u64 = 2;
+    /// Delay (in seconds) before terminating this process with SIGALRM if
+    /// the Runtime Manager has not yet started up.
+    const RUNTIME_ENCLAVE_STARTUP_TIMEOUT: u32 = 30;
     /// IP address to use when communicating with the Runtime Manager enclave.
     const RUNTIME_MANAGER_ENCLAVE_ADDRESS: &str = "127.0.0.1";
     /// Minimum port number for the Runtime Manager enclave.
@@ -302,6 +301,8 @@ pub mod veracruz_server_linux {
                 .arg(format!("{}", port))
                 .arg("--measurement")
                 .arg(measurement)
+                .arg("--write-nl")
+                .stdout(Stdio::piped())
                 .spawn()
                 .map_err(|e| {
                     error!(
@@ -316,12 +317,16 @@ pub mod veracruz_server_linux {
             // terminate the runtime manager.
             let (received, runtime_manager_socket) = (|| {
 
-            info!(
-                "Runtime Manager Enclave spawned.  Delaying {} seconds...",
-                RUNTIME_ENCLAVE_SPAWN_DELAY
-            );
-
-            sleep(Duration::from_secs(RUNTIME_ENCLAVE_SPAWN_DELAY));
+            // Request SIGALRM after the specified time has elapsed.
+            alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
+            let mut buf: [u8; 1] = [0];
+            runtime_manager_process.stdout.take()
+                .ok_or(VeracruzServerError::RuntimeManagerFailed)?
+                .read_exact(&mut buf)?;
+            alarm::cancel(); // Cancel the alarm.
+            if buf[0] != b'\n' {
+                return Err(VeracruzServerError::RuntimeManagerFailed);
+            }
 
             let runtime_manager_address = format!(
                 "{}:{}",
