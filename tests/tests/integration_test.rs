@@ -325,8 +325,6 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
 }
 
 async fn server_tls_loop<P: AsRef<str>>(policy_json: P) -> Result<()> {
-    // TODO change
-    //let (_, policy_text, _) = read_policy(policy_filename).unwrap();
     veracruz_server::server::server(policy_json.as_ref()).map_err(|e| anyhow!("Veracruz server error {:?}",e))?.await?;
     Ok(())
 }
@@ -464,7 +462,6 @@ impl TestExecutor {
 
     async fn process_event(client: &mut VeracruzClient, event: &TestEvent) -> Result<()> {
         match event {
-            // FIXME
             TestEvent::CheckHash => {
                 client.check_policy_hash().await?;
                 client.check_runtime_hash()?;

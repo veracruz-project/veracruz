@@ -370,7 +370,7 @@ impl VeracruzClient {
 
     /// Indicate the veracruz to shutdown.
     pub async fn request_shutdown(&mut self) -> Result<(), VeracruzClientError> {
-        let parsed_response = self
+        self
             .request_functor("", &[], |_, _| {
                 transport_protocol::serialize_request_shutdown()
             })

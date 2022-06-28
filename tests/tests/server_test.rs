@@ -506,7 +506,7 @@ impl TestExecutor {
         policy_path: P,
         client_cert_path: Q,
         client_key_path: K,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         let _ = env_logger::Builder::from_default_env()
             .write_style(env_logger::fmt::WriteStyle::Always)
             .is_test(true)
@@ -588,7 +588,7 @@ impl TestExecutor {
         receiver: Receiver<(u32, Vec<u8>)>,
         test_alive_flag: Arc<AtomicBool>,
         test_init_flag: Arc<AtomicBool>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         info!("Server: simulated server loop starts...");
 
         test_init_flag.store(true, Ordering::SeqCst);
@@ -672,7 +672,7 @@ impl TestExecutor {
     fn process_event(
         &mut self,
         event: &TestEvent,
-    ) -> anyhow::Result<transport_protocol::RuntimeManagerResponse> {
+    ) -> Result<transport_protocol::RuntimeManagerResponse> {
         let response = match event {
             TestEvent::CheckHash => {
                 let response = self.check_policy_hash()?;
@@ -694,7 +694,7 @@ impl TestExecutor {
         )?)
     }
 
-    fn check_policy_hash(&mut self) -> anyhow::Result<Vec<u8>> {
+    fn check_policy_hash(&mut self) -> Result<Vec<u8>> {
         let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()?;
 
         let response = self.client_send(&serialized_request_policy_hash[..])?;
@@ -719,7 +719,7 @@ impl TestExecutor {
     /// Check the runtime manager hash. This function assumes that
     /// `self.client_connection` handshake completes. Any previous invocation of `self.client_send`
     /// will achieve this status, e.g. `self.eheck_policy_hash`
-    fn check_runtime_manager_hash(&mut self) -> anyhow::Result<()> {
+    fn check_runtime_manager_hash(&mut self) -> Result<()> {
         // Set up the test target platform
         let target_platform = if cfg!(feature = "linux") {
             Platform::Linux
@@ -771,7 +771,7 @@ impl TestExecutor {
         &mut self,
         remote_path: &str,
         local_path: P,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> Result<Vec<u8>> {
         // Read the local data and create a protobuf message.
         let data = read_local_file(local_path)?;
         let serialized_data = transport_protocol::serialize_write_file(&data, remote_path)?;
@@ -783,7 +783,7 @@ impl TestExecutor {
         &mut self,
         remote_path: &str,
         local_path: P,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> Result<Vec<u8>> {
         // Read the local data and create a protobuf message.
         let data = read_local_file(local_path)?;
         let serialized_data = transport_protocol::serialize_append_file(&data, remote_path)?;
@@ -791,22 +791,22 @@ impl TestExecutor {
     }
 
     #[inline]
-    fn execute_program(&mut self, remote_path: &str) -> anyhow::Result<Vec<u8>> {
+    fn execute_program(&mut self, remote_path: &str) -> Result<Vec<u8>> {
         self.client_send(&transport_protocol::serialize_request_result(remote_path)?[..])
     }
 
     #[inline]
-    fn read_file(&mut self, remote_path: &str) -> anyhow::Result<Vec<u8>> {
+    fn read_file(&mut self, remote_path: &str) -> Result<Vec<u8>> {
         self.client_send(&transport_protocol::serialize_read_file(remote_path)?[..])
     }
 
     #[inline]
-    fn shutdown(&mut self) -> anyhow::Result<Vec<u8>> {
+    fn shutdown(&mut self) -> Result<Vec<u8>> {
         self.client_send(&transport_protocol::serialize_request_shutdown()?[..])
     }
 
     /// The client sends TLS packages via the simulated channel.
-    fn client_send(&mut self, send_data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    fn client_send(&mut self, send_data: &[u8]) -> Result<Vec<u8>> {
         info!(
             "Client: client send with length of data {:?}",
             send_data.len()
@@ -905,7 +905,7 @@ impl TestExecutor {
 /// Auxiliary function: initialise the Veracruz server from policy and open a tls session
 fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     policy_json: T,
-) -> anyhow::Result<(VeracruzServerEnclave, u32)> {
+) -> Result<(VeracruzServerEnclave, u32)> {
     let mut veracruz_server = VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}",e))?;
 
     // wait for the client to start
@@ -951,7 +951,7 @@ fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
     client_cert_filename: P,
     client_key_filename: Q,
     ciphersuite_str: &str,
-) -> anyhow::Result<rustls::ClientConnection> {
+) -> Result<rustls::ClientConnection> {
     let client_cert = read_cert_file(client_cert_filename)?;
 
     let client_priv_key = read_priv_key_file(client_key_filename)?;
@@ -981,7 +981,7 @@ fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
     )?)
 }
 
-fn read_cert_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<rustls::Certificate> {
+fn read_cert_file<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate> {
     let mut cert_file = File::open(filename)?;
     let mut cert_buffer = Vec::new();
     cert_file.read_to_end(&mut cert_buffer)?;
@@ -994,7 +994,7 @@ fn read_cert_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<rustls::Certifi
     }
 }
 
-fn read_priv_key_file<P: AsRef<Path>>(filename: P) -> anyhow::Result<rustls::PrivateKey> {
+fn read_priv_key_file<P: AsRef<Path>>(filename: P) -> Result<rustls::PrivateKey> {
     let mut key_file = File::open(filename)?;
     let mut key_buffer = Vec::new();
     key_file.read_to_end(&mut key_buffer)?;
