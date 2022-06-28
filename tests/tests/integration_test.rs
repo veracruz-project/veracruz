@@ -56,9 +56,7 @@ const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
 const TIME_OUT_SECS: u64 = 1200;
 
-use actix_rt::{
-    time::{sleep, Instant},
-};
+use actix_rt::time::{sleep, Instant};
 use anyhow::{anyhow, Result};
 use either::{Left, Right};
 use env_logger;
@@ -325,7 +323,9 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
 }
 
 async fn server_tls_loop<P: AsRef<str>>(policy_json: P) -> Result<()> {
-    veracruz_server::server::server(policy_json.as_ref()).map_err(|e| anyhow!("Veracruz server error {:?}",e))?.await?;
+    veracruz_server::server::server(policy_json.as_ref())
+        .map_err(|e| anyhow!("Veracruz server error {:?}", e))?
+        .await?;
     Ok(())
 }
 
@@ -388,7 +388,7 @@ impl TestExecutor {
         // create the async block, use `?` to convert the error type.
         // NOTE: this does not run the code but only create a future.
         let policy_json_clone = self.policy_json.clone();
-        let server_handle =  server_tls_loop(policy_json_clone);
+        let server_handle = server_tls_loop(policy_json_clone);
 
         // create the async block for all clients driven by events.
         // NOTE: this does not run the code but only create a future.
@@ -409,10 +409,9 @@ impl TestExecutor {
 
             // Process the events
             for (client_index, event) in events.iter() {
-                let mut client = clients.get_mut(*client_index).ok_or(anyhow!(
-                    "cannot find client of index {}",
-                    client_index
-                ))?;
+                let mut client = clients
+                    .get_mut(*client_index)
+                    .ok_or(anyhow!("cannot find client of index {}", client_index))?;
                 info!("Process client{} event {:?}.", client_index, event);
                 let time_init = Instant::now();
                 Self::process_event(&mut client, &event)
@@ -437,12 +436,7 @@ impl TestExecutor {
         {
             Ok(val) => Duration::from_secs(val),
             Err(Left(VarError::NotPresent)) => timeout,
-            Err(err) => {
-                return Err(anyhow!(
-                    "Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}",
-                    err
-                ))
-            }
+            Err(err) => return Err(anyhow!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err)),
         };
 
         // Propogating both timeout and error from the try_join.

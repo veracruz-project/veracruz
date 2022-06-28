@@ -21,8 +21,8 @@ use common::proxy_attestation_server::*;
 use common::util::*;
 use env_logger;
 use log::{error, info};
+use mbedtls::{alloc::List, x509::Certificate};
 use policy_utils::{policy::Policy, Platform};
-use rustls_pemfile;
 use std::{
     convert::TryFrom,
     error::Error,
@@ -32,7 +32,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{channel, Receiver, Sender},
-        Arc,
+        Arc, Mutex,
     },
     thread,
     thread::JoinHandle,
@@ -469,14 +469,75 @@ struct TestExecutor {
     client_tls_sender: Sender<(u32, Vec<u8>)>,
     // Paths to client certification and private key.
     // Note that we only have one client in all tests.
-    client_connection: rustls::ClientConnection,
+    client_connection: mbedtls::ssl::Context<InsecureConnection>,
     client_connection_id: u32,
+    // Read and write buffers shared with InsecureConnection.
+    shared_buffers: Arc<Mutex<Buffers>>,
     // A alive flag. This is to solve the problem where the server thread still in loop while
     // client thread is terminated.
     alive_flag: Arc<AtomicBool>,
     // Hold the server thread. The test will join the thread in the end to check the server
     // state.
     server_thread: JoinHandle<Result<()>>,
+}
+
+struct Buffers {
+    // Read buffer used by mbedtls for cyphertext.
+    read_buffer: Vec<u8>,
+    // Write buffer used by mbedtls for cyphertext.
+    write_buffer: Option<Vec<u8>>,
+}
+
+/// This is the structure given to mbedtls and used for reading and
+/// writing cyphertext, using the standard Read and Write traits.
+struct InsecureConnection {
+    // Read and write buffers shared with Session.
+    shared_buffers: Arc<Mutex<Buffers>>,
+}
+
+// To convert any error to a std::io error:
+fn std_err(error_text: &str) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, error_text)
+}
+
+impl Read for InsecureConnection {
+    fn read(&mut self, data: &mut [u8]) -> Result<usize, std::io::Error> {
+        // Return as much data from the read_buffer as fits.
+        let mut shared_buffers = self
+            .shared_buffers
+            .lock()
+            .map_err(|_| std_err("lock failed"))?;
+        let n = std::cmp::min(data.len(), shared_buffers.read_buffer.len());
+        if n == 0 {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::WouldBlock,
+                "InsecureConnection Read",
+            ))
+        } else {
+            data[0..n].clone_from_slice(&shared_buffers.read_buffer[0..n]);
+            shared_buffers.read_buffer = shared_buffers.read_buffer[n..].to_vec();
+            Ok(n)
+        }
+    }
+}
+
+impl Write for InsecureConnection {
+    fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> {
+        // Append to write buffer.
+        let mut shared_buffers = self
+            .shared_buffers
+            .lock()
+            .map_err(|_| std_err("lock failed"))?;
+        match &mut shared_buffers.write_buffer {
+            None => shared_buffers.write_buffer = Some(data.to_vec()),
+            Some(x) => x.extend_from_slice(data),
+        }
+        // Return value to indicate that we handled all the data.
+        Ok(data.len())
+    }
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        Ok(())
+    }
 }
 
 impl TestExecutor {
@@ -523,22 +584,29 @@ impl TestExecutor {
         let (server_tls_sender, client_tls_receiver) = channel::<Vec<u8>>();
         let (client_tls_sender, server_tls_receiver) = channel::<(u32, Vec<u8>)>();
 
+        let shared_buffers = Arc::new(Mutex::new(Buffers {
+            read_buffer: vec![],
+            write_buffer: None,
+        }));
+
         info!("Initialise a client with its certificate and key.");
         // Create a fake client session which only ends to the simulated connecting channel.
-        let mut client_connection = create_client_test_connection(
+        let client_connection = create_client_test_connection(
             client_cert_path,
             client_key_path,
             &policy.ciphersuite(),
+            Arc::clone(&shared_buffers),
         )?;
-        // Set the buffer size to unlimited. The `client_send` function assumes this property.
-        client_connection.set_buffer_limit(None);
 
         info!("Initialise Veracruz runtime.");
         // Create the server
-        let mut veracruz_server = VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}",e))?;
+        let mut veracruz_server =
+            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
 
         // Create the client tls session. Note that we need the session id.
-        let client_connection_id = veracruz_server.new_tls_session().map_err(|e| anyhow!("{:?}",e))?;
+        let client_connection_id = veracruz_server
+            .new_tls_session()
+            .map_err(|e| anyhow!("{:?}", e))?;
         if client_connection_id == 0 {
             return Err(anyhow!("client session id is zero"));
         }
@@ -574,6 +642,7 @@ impl TestExecutor {
             policy_hash,
             client_connection,
             client_connection_id,
+            shared_buffers,
             client_tls_sender,
             client_tls_receiver,
             alive_flag,
@@ -608,13 +677,19 @@ impl TestExecutor {
                     // This point has a high chance to fail.
                     error!("Veracruz Server: {:?}", e);
                     e
-                }).map_err(|e| anyhow!("{:?}",e))?;
+                })
+                .map_err(|e| anyhow!("{:?}", e))?;
 
             // At least send an empty message, this notifies the client.
             let output_data = output_data_option.unwrap_or_else(|| vec![vec![]]);
 
             for output in output_data.iter() {
-                sender.send(output.clone())?;
+                sender.send(output.clone()).map_err(|e| {
+                    anyhow!(
+                        "Failed to send data on TX channel.  Error produced: {:?}.",
+                        e
+                    )
+                })?;
             }
 
             if !veracruz_active_flag {
@@ -665,7 +740,8 @@ impl TestExecutor {
         // Wait the server to finish.
         self.server_thread
             .join()
-            .map_err(|e| anyhow!("server thread failed with error {:?}", e))?.map_err(|e| anyhow!("{:?}",e))?;
+            .map_err(|e| anyhow!("server thread failed with error {:?}", e))?
+            .map_err(|e| anyhow!("{:?}", e))?;
         Ok(())
     }
 
@@ -695,7 +771,13 @@ impl TestExecutor {
     }
 
     fn check_policy_hash(&mut self) -> Result<Vec<u8>> {
-        let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()?;
+        let serialized_request_policy_hash =
+            transport_protocol::serialize_request_policy_hash().map_err(|e| {
+                anyhow!(
+                    "Failed to serialize request for policy hash.  Error produced: {:?}.",
+                    e
+                )
+            })?;
 
         let response = self.client_send(&serialized_request_policy_hash[..])?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(None, &response)?;
@@ -718,7 +800,7 @@ impl TestExecutor {
 
     /// Check the runtime manager hash. This function assumes that
     /// `self.client_connection` handshake completes. Any previous invocation of `self.client_send`
-    /// will achieve this status, e.g. `self.eheck_policy_hash`
+    /// will achieve this status, e.g. `self.check_policy_hash`
     fn check_runtime_manager_hash(&mut self) -> Result<()> {
         // Set up the test target platform
         let target_platform = if cfg!(feature = "linux") {
@@ -732,46 +814,32 @@ impl TestExecutor {
         };
 
         // Get all the certificates. Assume that the handshake completes.
-        let certs = self.client_connection.peer_certificates().ok_or(anyhow!(
-            "No peer certificate found. Potentially wait handshake."
-        ))?;
-
-        let ee_cert = webpki::EndEntityCert::try_from(certs[0].as_ref())?;
-        let ues = ee_cert.unrecognized_extensions();
-
+        let certs = self.client_connection.peer_cert()?;
+        if certs.iter().count() != 1 {
+            return Err(anyhow!("no peer certificates"));
+        }
+        let cert = certs
+            .ok_or(anyhow!("unexpected certificate"))?
+            .iter()
+            .nth(0)
+            .ok_or(anyhow!("unexpected certificate"))?;
+        let extensions = cert.extensions()?;
         // check for OUR extension
-        let encoded_extension_id: [u8; 3] = [
-            VERACRUZ_RUNTIME_HASH_EXTENSION_ID[0] * 40 + VERACRUZ_RUNTIME_HASH_EXTENSION_ID[1],
-            VERACRUZ_RUNTIME_HASH_EXTENSION_ID[2],
-            VERACRUZ_RUNTIME_HASH_EXTENSION_ID[3],
-        ];
-        let data = ues
-            .get(&encoded_extension_id[..])
-            .ok_or(anyhow!("Our certificate extension is not present."))?;
-        info!("Certificate extension found.");
-
-        let extension_data = data
-            .read_all(anyhow!("Can't read veracruz custom extension."), |input| {
-                Ok(input.read_bytes_to_end())
-            })?;
-
-        if compare_policy_hash(
-            extension_data.as_slice_less_safe(),
-            &self.policy,
-            &target_platform,
-        ) {
-            Ok(())
-        } else {
-            Err(anyhow!("None of the runtime manager hashes matched.").into())
+        match veracruz_utils::find_extension(extensions, &VERACRUZ_RUNTIME_HASH_EXTENSION_ID) {
+            None => Err(anyhow!("Our certificate extension is not present.")),
+            Some(data) => {
+                info!("Certificate extension found.");
+                if compare_policy_hash(&data, &self.policy, &target_platform) {
+                    Ok(())
+                } else {
+                    Err(anyhow!("None of the runtime manager hashes matched."))
+                }
+            }
         }
     }
 
     #[inline]
-    fn write_file<P: AsRef<Path>>(
-        &mut self,
-        remote_path: &str,
-        local_path: P,
-    ) -> Result<Vec<u8>> {
+    fn write_file<P: AsRef<Path>>(&mut self, remote_path: &str, local_path: P) -> Result<Vec<u8>> {
         // Read the local data and create a protobuf message.
         let data = read_local_file(local_path)?;
         let serialized_data = transport_protocol::serialize_write_file(&data, remote_path)?;
@@ -779,11 +847,7 @@ impl TestExecutor {
     }
 
     #[inline]
-    fn append_file<P: AsRef<Path>>(
-        &mut self,
-        remote_path: &str,
-        local_path: P,
-    ) -> Result<Vec<u8>> {
+    fn append_file<P: AsRef<Path>>(&mut self, remote_path: &str, local_path: P) -> Result<Vec<u8>> {
         // Read the local data and create a protobuf message.
         let data = read_local_file(local_path)?;
         let serialized_data = transport_protocol::serialize_append_file(&data, remote_path)?;
@@ -811,94 +875,81 @@ impl TestExecutor {
             "Client: client send with length of data {:?}",
             send_data.len()
         );
-        let connection: &mut rustls::ClientConnection = &mut self.client_connection;
-        let mut connection_writter = connection.writer();
-        // The buffer size is set unlimited. `write_all` here should not fail.
-        connection_writter
-            .write_all(&send_data[..])
-            .map_err(|e| anyhow!("Failed to send all data.  Error produced: {:?}.", e))?;
-        connection_writter.flush()?;
-
-        let mut output: Vec<u8> = Vec::new();
-
-        connection
-            .write_tls(&mut output)
-            .map_err(|e| anyhow!("Failed to write TLS.  Error produced: {:?}.", e))?;
-
-        self.client_tls_sender
-            .send((self.client_connection_id, output))
-            .map_err(|e| {
-                anyhow!(
-                    "Failed to send data on TX channel.  Error produced: {:?}.",
-                    e
-                )
-            })?;
-
-        info!("Client: package is sent");
-
-        // Always check if other threads in the this test instance is still running.
+        let connection = &mut self.client_connection;
+        let mut write_all_succeeded = false;
         while self.alive_flag.load(Ordering::SeqCst) {
-            // Priority write.
-            if connection.wants_write() {
-                info!("Client: session wants write...");
-                let mut output: Vec<u8> = Vec::new();
-                connection
-                    .write_tls(&mut output)
-                    .map_err(|e| anyhow!("Failed to write TLS. Error produced: {:?}.", e))?;
-                let _res = self
-                    .client_tls_sender
-                    .send((self.client_connection_id, output))
-                    .map_err(|e| {
-                        anyhow!(
-                            "Failed to send data on TX channel. Error produced: {:?}.",
-                            e
-                        )
-                    })?;
-            } else if !connection.is_handshaking() || connection.wants_read() {
-                let received = self.client_tls_receiver.recv()?;
-                info!("Client: received is OK, and we're not handshaking...");
-
-                // It is possible to receive an empty messsage.
-                if received.len() == 0 {
-                    continue;
-                }
-
-                // convert the vec<u8> to read trait
-                let mut slice = &received[..];
-                connection
-                    .read_tls(&mut slice)
-                    .map_err(|e| anyhow!("Failed to read TLS. Error produced: {:?}.", e))?;
-                connection.process_new_packets().map_err(|e| {
-                    anyhow!("Failed to process new packets. Error produced: {:?}.", e)
-                })?;
-
-                let mut received_buffer: Vec<u8> = Vec::new();
-
-                match connection.reader().read_to_end(&mut received_buffer) {
-                    Ok(_num) => (),
-                    // It is allowed to block, but we care more on the received buffer.
-                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
+            // connection.write_all
+            if !write_all_succeeded {
+                match connection.write_all(&send_data[..]) {
+                    Ok(()) => write_all_succeeded = true,
                     Err(err) => {
+                        if err.kind() == std::io::ErrorKind::WouldBlock {
+                            ()
+                        } else {
+                            return Err(anyhow!(
+                                "Failed to send all data.  Error produced: {:?}.",
+                                err
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // write_buffer.take
+            let taken = self
+                .shared_buffers
+                .lock()
+                .map_err(|_| anyhow!("lock failed"))?
+                .write_buffer
+                .take();
+            match taken {
+                None => (),
+                Some(output) => {
+                    // client_tls_sender.send
+                    self.client_tls_sender
+                        .send((self.client_connection_id, output))
+                        .map_err(|e| {
+                            anyhow!(
+                                "Failed to send data on TX channel. Error produced: {:?}.",
+                                e
+                            )
+                        })?;
+
+                    // client_tls_receiver.recv
+                    let received = self.client_tls_receiver.recv()?;
+
+                    // read_buffer.extend_from_slice
+                    self.shared_buffers
+                        .lock()
+                        .map_err(|_| anyhow!("lock failed"))?
+                        .read_buffer
+                        .extend_from_slice(&received);
+                }
+            }
+
+            // connection.read_to_end
+            let mut received_buffer: Vec<u8> = Vec::new();
+            let res = connection.read_to_end(&mut received_buffer);
+            if received_buffer.len() > 0 {
+                return Ok(received_buffer);
+            }
+            match res {
+                Ok(_) => (),
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::WouldBlock {
+                        ()
+                    } else {
                         return Err(anyhow!(
                             "Failed to read data to end.  Error produced: {:?}.",
                             err
-                        )
-                        .into());
+                        ));
                     }
-                };
-
-                info!("Client: received_buffer.len() {}", received_buffer.len());
-
-                if received_buffer.len() > 0 {
-                    info!("Client: finished sending via TLS.");
-                    // NOTE: this is the place where function succeeds.
-                    return Ok(received_buffer);
                 }
             }
         }
 
         // If reach here, it means the server crashed.
-        Err(anyhow!("Terminate due to server crash").into())
+        Err(anyhow!("Terminate due to server crash"))
     }
 }
 
@@ -906,12 +957,15 @@ impl TestExecutor {
 fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     policy_json: T,
 ) -> Result<(VeracruzServerEnclave, u32)> {
-    let mut veracruz_server = VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}",e))?;
+    let mut veracruz_server =
+        VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
 
     // wait for the client to start
     std::thread::sleep(Duration::from_millis(100));
 
-    let session_id = veracruz_server.new_tls_session().map_err(|e| anyhow!("{:?}",e))?;
+    let session_id = veracruz_server
+        .new_tls_session()
+        .map_err(|e| anyhow!("{:?}", e))?;
     if session_id != 0 {
         Ok((veracruz_server, session_id))
     } else {
@@ -951,54 +1005,62 @@ fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
     client_cert_filename: P,
     client_key_filename: Q,
     ciphersuite_str: &str,
-) -> Result<rustls::ClientConnection> {
+    shared_buffers: Arc<Mutex<Buffers>>,
+) -> Result<mbedtls::ssl::Context<InsecureConnection>> {
     let client_cert = read_cert_file(client_cert_filename)?;
 
     let client_priv_key = read_priv_key_file(client_key_filename)?;
 
     let proxy_service_cert = {
-        let data = std::fs::read(cert_key_dir(CA_CERT))?;
-        let certs = rustls_pemfile::certs(&mut data.as_slice())?;
-        certs[0].clone()
-    };
+        let mut data = std::fs::read(cert_key_dir(CA_CERT))?;
+        data.push(b'\0');
+        let certs = Certificate::from_pem_multiple(&data)?;
+        if certs.iter().count() < 1 {
+            Err(anyhow!("no certificates"))
+        } else {
+            Ok(certs)
+        }
+    }?;
 
-    let cipher_suite = veracruz_utils::lookup_ciphersuite(ciphersuite_str)
-        .ok_or(VeracruzServerError::InvalidCiphersuiteError(ciphersuite_str.to_string())).map_err(|e| anyhow!("{:?}",e))?;
-    let mut root_store = rustls::RootCertStore::empty();
-    root_store.add(&rustls::Certificate(proxy_service_cert))?;
+    let mut root_store = List::new();
+    root_store.append(proxy_service_cert);
 
-    let client_config = rustls::ClientConfig::builder()
-        .with_cipher_suites(&[cipher_suite])
-        .with_safe_default_kx_groups()
-        .with_protocol_versions(&[&rustls::version::TLS12])?
-        .with_root_certificates(root_store)
-        .with_single_cert([client_cert].to_vec(), client_priv_key)?;
-
-    let enclave_name_as_server = rustls::ServerName::try_from("ComputeEnclave.dev")?;
-    Ok(rustls::ClientConnection::new(
-        Arc::new(client_config),
-        enclave_name_as_server,
-    )?)
+    let mut config = mbedtls::ssl::Config::new(
+        mbedtls::ssl::config::Endpoint::Client,
+        mbedtls::ssl::config::Transport::Stream,
+        mbedtls::ssl::config::Preset::Default,
+    );
+    config.set_min_version(mbedtls::ssl::config::Version::Tls1_2)?;
+    config.set_max_version(mbedtls::ssl::config::Version::Tls1_2)?;
+    let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(ciphersuite_str)
+        .ok_or_else(|| anyhow!("invalid ciphersuite"))?;
+    let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];
+    config.set_ciphersuites(Arc::new(cipher_suites));
+    let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
+    let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None)?);
+    config.set_rng(rng);
+    config.set_ca_list(Arc::new(root_store), None);
+    config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
+    let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
+    let conn = InsecureConnection { shared_buffers };
+    let _ = ctx.establish(conn, None);
+    Ok(ctx)
 }
 
-fn read_cert_file<P: AsRef<Path>>(filename: P) -> Result<rustls::Certificate> {
-    let mut cert_file = File::open(filename)?;
-    let mut cert_buffer = Vec::new();
-    cert_file.read_to_end(&mut cert_buffer)?;
-    let mut cursor = std::io::Cursor::new(cert_buffer);
-    let certs = rustls_pemfile::certs(&mut cursor)?;
-    if certs.len() == 0 {
-        Err(anyhow!("certs.len() is zero").into())
+fn read_cert_file<P: AsRef<Path>>(filename: P) -> Result<List<Certificate>> {
+    let mut buffer = std::fs::read(filename)?;
+    buffer.push(b'\0');
+    let cert_vec = Certificate::from_pem_multiple(&buffer)?;
+    if cert_vec.iter().count() == 1 {
+        Ok(cert_vec)
     } else {
-        Ok(rustls::Certificate(certs[0].clone()))
+        Err(anyhow!("certs.len() is zero"))
     }
 }
 
-fn read_priv_key_file<P: AsRef<Path>>(filename: P) -> Result<rustls::PrivateKey> {
-    let mut key_file = File::open(filename)?;
-    let mut key_buffer = Vec::new();
-    key_file.read_to_end(&mut key_buffer)?;
-    let mut cursor = std::io::Cursor::new(key_buffer);
-    let rsa_keys = rustls_pemfile::rsa_private_keys(&mut cursor)?;
-    Ok(rustls::PrivateKey(rsa_keys[0].clone()))
+fn read_priv_key_file<P: AsRef<Path>>(filename: P) -> Result<mbedtls::pk::Pk> {
+    let mut buffer = std::fs::read(filename)?;
+    buffer.push(b'\0');
+    let pkey_vec = mbedtls::pk::Pk::from_private_key(&buffer, None)?;
+    Ok(pkey_vec)
 }
