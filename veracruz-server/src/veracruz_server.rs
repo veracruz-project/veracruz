@@ -46,8 +46,6 @@ pub enum VeracruzServerError {
     TLSUnspecifiedError,
     #[error(display = "VeracruzServer: Invalid cipher suite: {:?}", _0)]
     InvalidCiphersuiteError(String),
-    #[error(display = "VeracruzServer: webpki: {:?}.", _0)]
-    WebpkiError(#[error(source)] webpki::Error),
     #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
     #[error(display = "VeracruzServer: TryIntoError: {}.", _0)]

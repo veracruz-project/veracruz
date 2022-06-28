@@ -32,6 +32,3 @@ resolver = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
-
-[patch.crates-io]
-webpki = { path = "crates/third-party/webpki" }
