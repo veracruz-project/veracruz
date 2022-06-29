@@ -148,7 +148,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     }
     let payload_vec =
         unsafe { std::slice::from_raw_parts(payload.ptr as *const u8, payload.len as usize) };
-    if attestation_context.challenge != payload_vec[8..40] {
+    if attestation_context.challenge != payload_vec[61..93] {
         return Err(ProxyAttestationServerError::MismatchError {
             variable: "payload_vec[8..40]",
             expected: attestation_context.challenge.to_vec(),
@@ -156,7 +156,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         });
     }
 
-    let received_csr_hash = &payload_vec[86..118];
+    let received_csr_hash = &payload_vec[240..272];
     let calculated_csr_hash = sha256(&csr);
     if received_csr_hash != calculated_csr_hash {
         println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
@@ -167,7 +167,8 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         });
     }
 
-    let received_enclave_hash: Vec<u8> = payload_vec[47..79].to_vec();
+    println!("Payload_vec:{:02x?}", payload_vec);
+    let received_enclave_hash: Vec<u8> = payload_vec[199..231].to_vec();
 
     let cert = crate::attestation::convert_csr_to_certificate(&csr, &received_enclave_hash)
         .map_err(|err| {

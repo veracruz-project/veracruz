@@ -1376,7 +1376,7 @@ mod tests {
                 Ok(bytes) => bytes,
             };
 
-            info!("Comparing runtime manager hash {:?} (from policy) against {:?} (received) for platform {:?}.", expected_bytes, received, platform);
+            info!("Comparing runtime manager hash {:02x?} (from policy) against {:02x?} (received) for platform {:?}.", expected_bytes, received, platform);
 
             if &received[..] != expected_bytes.as_slice() {
                 info!("Runtime manager hash does not match.");
