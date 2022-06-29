@@ -45,7 +45,7 @@ fn test_internal_read_all_bytes_in_file_succ() {
     if let Err(_) = File::create(filename).and_then(|mut file| file.write_all(content)) {
         panic!("cannot create test file: {}", filename);
     }
-    let rst = VeracruzClient::pub_read_all_bytes_in_file(filename);
+    let rst = VeracruzClient::read_all_bytes_in_file(filename);
     assert!(rst.is_ok());
     let rst_content = rst.unwrap();
     assert_eq!(rst_content, content);
@@ -53,32 +53,32 @@ fn test_internal_read_all_bytes_in_file_succ() {
 
 #[test]
 fn test_internal_read_all_bytes_in_file_invalid_file() {
-    assert!(VeracruzClient::pub_read_all_bytes_in_file(data_dir("invalid_file")).is_err());
+    assert!(VeracruzClient::read_all_bytes_in_file(data_dir("invalid_file")).is_err());
 }
 
 #[test]
 fn test_internal_read_all_bytes_in_file_invalid_path() {
-    assert!(VeracruzClient::pub_read_all_bytes_in_file("invalid_path").is_err());
+    assert!(VeracruzClient::read_all_bytes_in_file("invalid_path").is_err());
 }
 
 #[test]
 fn test_internal_read_cert_succ() {
-    assert!(VeracruzClient::pub_read_cert(trust_path(CLIENT_CERT_FILENAME)).is_ok());
+    assert!(VeracruzClient::read_cert(trust_path(CLIENT_CERT_FILENAME)).is_ok());
 }
 
 #[test]
 fn test_internal_read_cert_invalid_certificate() {
-    assert!(VeracruzClient::pub_read_cert(trust_path(CLIENT_KEY_FILENAME)).is_err());
+    assert!(VeracruzClient::read_cert(trust_path(CLIENT_KEY_FILENAME)).is_err());
 }
 
 #[test]
 fn test_internal_read_private_key_succ() {
-    assert!(VeracruzClient::pub_read_private_key(trust_path(CLIENT_KEY_FILENAME)).is_ok());
+    assert!(VeracruzClient::read_private_key(trust_path(CLIENT_KEY_FILENAME)).is_ok());
 }
 
 #[test]
 fn test_internal_read_cert_invalid_private_key() {
-    assert!(VeracruzClient::pub_read_private_key(trust_path(CLIENT_CERT_FILENAME)).is_err());
+    assert!(VeracruzClient::read_private_key(trust_path(CLIENT_CERT_FILENAME)).is_err());
 }
 
 #[test]

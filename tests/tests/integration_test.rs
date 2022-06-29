@@ -281,8 +281,7 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             let program_data = read_local_file(prog_path).unwrap();
             info!("### program provider send binary.");
             client
-                .write_file("/program/linear-regression.wasm", &program_data)
-                .await?;
+                .write_file("/program/linear-regression.wasm", &program_data)?;
             Result::<()>::Ok(())
         };
         let data_provider_handle = async {
@@ -299,15 +298,13 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             let data = read_local_file(&data_filename).unwrap();
             info!("### data provider send input.");
             client
-                .write_file("/input/linear-regression.dat", &data)
-                .await?;
+                .write_file("/input/linear-regression.dat", &data)?;
             info!("### data provider read result.");
             client
-                .request_compute("/program/linear-regression.wasm")
-                .await?;
-            client.read_file("/output/linear-regression.dat").await?;
+                .request_compute("/program/linear-regression.wasm")?;
+            client.read_file("/output/linear-regression.dat")?;
             info!("### data provider request shutdown.");
-            client.request_shutdown().await?;
+            client.request_shutdown()?;
             Result::<()>::Ok(())
         };
 
@@ -331,8 +328,8 @@ async fn server_tls_loop<P: AsRef<str>>(policy_json: P) -> Result<()> {
 
 /// Test states.
 struct TestExecutor {
-    // The policy for the runtime.
-    policy: Policy,
+    //// The policy for the runtime.
+    //policy: Policy,
     // The json string of the policy
     policy_json: String,
 }
@@ -372,7 +369,7 @@ impl TestExecutor {
         proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
 
         Ok(TestExecutor {
-            policy,
+            //policy,
             policy_json,
         })
     }
@@ -415,7 +412,6 @@ impl TestExecutor {
                 info!("Process client{} event {:?}.", client_index, event);
                 let time_init = Instant::now();
                 Self::process_event(&mut client, &event)
-                    .await
                     .map_err(|e| {
                         error!("Client of index {}: {:?}", client_index, e);
                         e
@@ -454,28 +450,28 @@ impl TestExecutor {
         Ok(())
     }
 
-    async fn process_event(client: &mut VeracruzClient, event: &TestEvent) -> Result<()> {
+    fn process_event(client: &mut VeracruzClient, event: &TestEvent) -> Result<()> {
         match event {
             TestEvent::CheckHash => {
-                client.check_policy_hash().await?;
+                client.check_policy_hash()?;
                 client.check_runtime_hash()?;
             }
             TestEvent::WriteFile(remote_path, local_path) => {
                 let data = read_local_file(local_path)?;
-                client.write_file(remote_path, &data).await?;
+                client.write_file(remote_path, &data)?;
             }
             TestEvent::AppendFile(remote_path, local_path) => {
                 let data = read_local_file(local_path)?;
-                client.append_file(remote_path, &data).await?;
+                client.append_file(remote_path, &data)?;
             }
             TestEvent::Execute(remote_path) => {
-                client.request_compute(remote_path).await?;
+                client.request_compute(remote_path)?;
             }
             TestEvent::ReadFile(remote_path) => {
-                let result = client.read_file(&remote_path).await?;
+                let result = client.read_file(&remote_path)?;
                 info!("receive data of bytes {}", result.len());
             }
-            TestEvent::ShutDown => client.request_shutdown().await?,
+            TestEvent::ShutDown => client.request_shutdown()?,
         };
         Ok(())
     }
