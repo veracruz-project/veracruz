@@ -16,7 +16,11 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::{aes::AesCounterModeService, postcard::PostcardService};
+use crate::native_modules::{
+    aes::AesCounterModeService,
+    postcard::PostcardService,
+    aead::AeadService
+};
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -808,6 +812,8 @@ impl FileSystem {
         ));
         let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
         services.push(("/services/aesctr.dat", Arc::new(Mutex::new(service))));
+        let service: Box<dyn Service> = Box::new(AeadService::new());
+        services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;
         Ok(rst)
     }
