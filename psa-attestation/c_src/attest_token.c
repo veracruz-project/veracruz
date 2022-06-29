@@ -101,7 +101,6 @@ attest_token_encode_finish(struct attest_token_encode_ctx *encode_ctx,
 	enum t_cose_err_t       cose_res;
 
 	/* -- Finish up the COSE_Sign1. This is where the signing happens -- */
-	printf("calling t_cose_sign1_encode_signature\n");
 	cose_res = t_cose_sign1_encode_signature(
 					&(encode_ctx->signer_ctx),
 					&(encode_ctx->cbor_enc_ctx));
@@ -111,7 +110,6 @@ attest_token_encode_finish(struct attest_token_encode_ctx *encode_ctx,
 	// }
 
 	if (cose_res) {
-		printf("t_cose_sign1_encode_signature failed with code:%d\n", cose_res);
 		/* Main errors are invoking the hash or signature */
 		return ATTEST_TOKEN_ERR_COSE_ERROR;
 	}

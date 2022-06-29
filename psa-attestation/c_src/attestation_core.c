@@ -91,7 +91,6 @@ error_mapping_to_psa_attest_err_t(enum attest_token_err_t token_err)
 static psa_key_handle_t key_handle;
 
 void attest_core_set_key_handle(psa_key_handle_t new_key_handle) {
-    printf("attest_core_set_key_handle with handle: %d\n", new_key_handle);
     key_handle = new_key_handle;
 }
 /*!
@@ -114,7 +113,6 @@ attest_create_token(struct q_useful_buf_c *fw_hash,
                     struct q_useful_buf   *token,
                     struct q_useful_buf_c *completed_token)
 {
-    printf("attest_create_token started, key_handle:%d\n", key_handle);
     enum psa_attest_err_t attest_err = PSA_ATTEST_ERR_SUCCESS;
     enum attest_token_err_t token_err;
     //struct attest_token_ctx attest_token_ctx;
@@ -131,7 +129,6 @@ attest_create_token(struct q_useful_buf_c *fw_hash,
 					      T_COSE_ALGORITHM_ES256,
 					      token);
     if (token_ret != ATTEST_TOKEN_ERR_SUCCESS) {
-        printf("attest_token_encode_start failed:%d\n", token_ret);
         attest_err = error_mapping_to_psa_attest_err_t(token_err);
         return attest_err;
     }
@@ -226,23 +223,15 @@ attest_create_token(struct q_useful_buf_c *fw_hash,
     /* Finish up creating the token. This is where the actual signature
     * is generated. This finishes up the CBOR encoding too.
     */
-    printf("calling attest_token_encode_finish\n");
 	token_ret = attest_token_encode_finish(
 				&attestation_token_ctx,
 				completed_token);
 
     if (token_ret != ATTEST_TOKEN_ERR_SUCCESS) {
-        printf("attest_token_encode_finish failed:%d\n", token_ret);
         attest_err = error_mapping_to_psa_attest_err_t(token_err);
         return attest_err;
     }
 
-    printf("attest_create_token finished with code:%d\n", attest_err);
-    printf("created token:");
-    for (uint16_t i = 0; i < completed_token->len; i++) {
-        printf("0x%02x, ", ((uint8_t*)completed_token->ptr)[i]);
-    }
-    printf("\n");
     return attest_err;
 }
 
