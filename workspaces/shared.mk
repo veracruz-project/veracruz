@@ -9,9 +9,6 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-WARNING_COLOR := "\e[1;33m"
-INFO_COLOR := "\e[1;32m"
-RESET_COLOR := "\e[0m"
 PLATFORM := $(shell uname)
 
 .PHONY: wasm-files datasets policy-files test-collateral
@@ -33,7 +30,9 @@ WASM_PROG_LIST = random-source.wasm \
 				private-set-intersection-sum.wasm \
 				number-stream-accumulation.wasm \
 				read-file.wasm \
+				random-u32-list.wasm \
 				shamir-secret-sharing.wasm \
+				sort-numbers.wasm \
 				fd-create.wasm \
 				aesctr-native.wasm
 
@@ -58,8 +57,9 @@ $(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm:
 # Datasets
 
 datasets: $(OUT_DIR)
+	$(MAKE) -C $(WORKSPACE_DIR)/data-generators
 	$(MAKE) -C ../host datasets
-	cp -r ../../sdk/datasets/* $(OUT_DIR)
+	cp -r ../../examples/datasets/* $(OUT_DIR)
 	cp ../../test-collateral/*.pem $(OUT_DIR)
 
 ###################################################
@@ -124,8 +124,8 @@ POLICY_FILES ?= \
 
 PGEN = $(WORKSPACE_DIR)/host/target/$(PROFILE_PATH)/generate-policy
 
-$(PGEN): $(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/src/main.rs \
-	$(WORKSPACE_DIR)/host/crates/test-collateral/generate-policy/Cargo.toml
+$(PGEN): $(WORKSPACE_DIR)/host/crates/sdk/generate-policy/src/main.rs \
+	$(WORKSPACE_DIR)/host/crates/sdk/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
 policy-files: $(OUT_DIR) $(MEASUREMENT_FILE) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))

@@ -20,22 +20,8 @@ exclude = [
   "crates/third-party/wasmi",
 ]
 members = [
-  # Data generators
-  "crates/sdk/data-generators/csv-encoder",
-  "crates/sdk/data-generators/idash2017-logistic-regression-generator",
-  "crates/sdk/data-generators/image-processing-generator",
-  "crates/sdk/data-generators/intersection-set-sum-generator",
-  "crates/sdk/data-generators/linear-regression-generator",
-  "crates/sdk/data-generators/moving-average-convergence-divergence-generator",
-  "crates/sdk/data-generators/number-stream-generator",
-  "crates/sdk/data-generators/postcard-generator",
-  "crates/sdk/data-generators/private-set-intersection-generator",
-  "crates/sdk/data-generators/private-set-intersection-sum-generator",
-  "crates/sdk/data-generators/shamir-secret-sharing",
-  "crates/sdk/data-generators/string-generator",
-
   "crates/sdk/freestanding-execution-engine",
-  "crates/test-collateral/generate-policy",
+  "crates/sdk/generate-policy",
 ]
 resolver = "2"
 

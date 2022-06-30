@@ -88,15 +88,13 @@ CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
 	--features icecap
 
 test-server: test-dependencies
-	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
-	$(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	$(CARGO_TEST) -p veracruz-test --no-run
-	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
+	$(CARGO_TEST) -p tests --test integration_test -- --test-threads=1
 
 $(VERACRUZ_ICECAP_QEMU_IMAGE):
 	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)
@@ -124,9 +122,8 @@ clippy: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests \
-		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
-		--features veracruz-test/icecap \
-		--features veracruz-server-test/icecap \
+		$(PROFILE_FLAG) -p tests \
+		--features tests/icecap \
 		-- $(CLIPPY_OPTIONS)
 
 clean:

@@ -66,15 +66,15 @@ CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	cargo test $(PROFILE_FLAG) --features linux
 
 test-server: test-dependencies
-	$(CARGO_TEST) -p veracruz-server-test --no-run -- --nocapture
-	RUST_LOG="veracruz_server_test=info,error" $(CARGO_TEST) -p veracruz-server-test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) -p tests --no-run -- --nocapture
+	RUST_LOG="server_test=info,error" $(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	$(CARGO_TEST) -p veracruz-test --no-run
-	$(CARGO_TEST) -p veracruz-test -- --test-threads=1
+	$(CARGO_TEST) -p tests --no-run -- --nocapture
+	RUST_LOG="integration_test=info,error" $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1 --nocapture
 
 $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
@@ -97,9 +97,8 @@ clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	# workspace testing crates
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
 		cargo clippy --tests \
-		$(PROFILE_FLAG) -p veracruz-test -p veracruz-server-test \
-		--features veracruz-test/linux \
-		--features veracruz-server-test/linux \
+		$(PROFILE_FLAG) -p tests \
+		--features tests/linux \
 		-- $(CLIPPY_OPTIONS)
 
 doc:

@@ -217,7 +217,10 @@ async fn main() {
             }
         };
 
-        match veracruz_client.send_program(&program_name, &program_data).await {
+        match veracruz_client
+            .write_file(&program_name, &program_data)
+            .await
+        {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -258,7 +261,7 @@ async fn main() {
             }
         };
 
-        match veracruz_client.send_data(data_name, &data_data).await {
+        match veracruz_client.write_file(data_name, &data_data).await {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -294,7 +297,7 @@ async fn main() {
         );
         did_something = true;
 
-        let results = match veracruz_client.get_results(output_name).await {
+        let results = match veracruz_client.read_file(output_name).await {
             Ok(results) => results,
             Err(err) => {
                 eprintln!("{}", err);
