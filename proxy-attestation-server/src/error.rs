@@ -46,12 +46,6 @@ pub enum ProxyAttestationServerError {
         expected: std::vec::Vec<u8>,
         received: std::vec::Vec<u8>,
     },
-    #[error(
-        display = "ProxyAttestationServer: {} failed with error code {:?}.",
-        _0,
-        _1
-    )]
-    UnsafeCallError(&'static str, u32),
     #[error(display = "ProxyAttestationServer: No proxy PSA attestation token.")]
     NoProxyPSAAttestationTokenError,
     #[error(
