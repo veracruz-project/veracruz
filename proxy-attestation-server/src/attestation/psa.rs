@@ -18,7 +18,7 @@ use psa_attestation::{
     t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
 };
 use rand::Rng;
-use std::{collections::HashMap, ffi::c_void, sync::Mutex};
+use std::{collections::HashMap, convert::TryInto, ffi::c_void, sync::Mutex};
 use veracruz_utils::sha256::sha256;
 
 // Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
@@ -65,6 +65,69 @@ pub fn start(firmware_version: &str, device_id: i32) -> ProxyAttestationServerRe
     Ok(base64::encode(&serialized_attestation_init))
 }
 
+use psa_crypto::types::key::{Attributes, Type, Lifetime, Policy, UsageFlags};
+use psa_crypto::types::algorithm::{Algorithm, AsymmetricSignature, Hash};
+
+#[derive(Clone)]
+struct Verifier {
+    key_id: Option<psa_crypto::types::key::Id>,
+}
+
+impl Verifier {
+    pub fn verify(&self, sig: &[u8], data: &[u8]) -> Result<(), String> {
+        let mut hash: [u8; 32] = [0; 32];
+        psa_crypto::operations::hash::hash_compute(Hash::Sha256.into(), data, &mut hash).unwrap();
+        let alg = AsymmetricSignature::Ecdsa {
+            hash_alg: Hash::Sha256.into(),
+        };
+        if let Some(key_id) = self.key_id {
+            match psa_crypto::operations::asym_signature::verify_hash(key_id, alg, &hash, &sig) {
+                Ok(_) => return Ok(()),
+                Err(_) => return Err("Verify hash failed".to_string()),
+            }
+        } else {
+            return Err("Invalid state".to_string());
+        }
+    }
+
+    pub fn set_key(&mut self, key_data: &[u8]) -> Result<(), String> {
+        
+        let mut usage_flags: UsageFlags = Default::default();
+        usage_flags.set_verify_hash();
+        let attributes = Attributes {
+            key_type: Type::EccPublicKey {
+                curve_family:psa_crypto::types::key::EccFamily::SecpR1,
+            },
+            bits: 256,
+            lifetime: Lifetime::Volatile,
+            policy: Policy {
+                usage_flags: usage_flags,
+                permitted_algorithms: Algorithm::AsymmetricSignature(AsymmetricSignature::Ecdsa {
+                    hash_alg: Hash::Sha256.into(),
+                }),
+            },
+        };
+
+        self.key_id = Some(psa_crypto::operations::key_management::import(
+            attributes, // attributes
+            None, // Id
+            key_data, // data
+        ).unwrap());
+
+        return Ok(());
+    }
+}
+
+impl Drop for Verifier {
+    fn drop(&mut self) {
+        if let Some(key_id) = self.key_id {
+            unsafe { psa_crypto::operations::key_management::destroy(key_id) };
+        }
+    }
+}
+
+use coset::CborSerializable;
+
 pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder {
     let received_bytes = base64::decode(&body_string)?;
 
@@ -87,94 +150,107 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         (*context).clone()
     };
 
-    let mut t_cose_ctx: t_cose_sign1_verify_ctx = unsafe { ::std::mem::zeroed() };
-    unsafe { t_cose_sign1_verify_init(&mut t_cose_ctx, 0) };
-
-    let mut key_handle: u32 = 0;
-    let lpk_ret = unsafe {
-        t_cose_sign1_verify_load_public_key(
-            &PUBLIC_KEY as *const u8,
-            PUBLIC_KEY.len() as u64,
-            &mut key_handle,
-        )
+    let mut verifier = Verifier {
+        key_id: None,
     };
-    if lpk_ret != 0 {
-        return Err(ProxyAttestationServerError::UnsafeCallError(
-            "attestation_token t_cose_sign1_verify_load_public_key",
-            lpk_ret,
-        ));
+
+    let cbor: ciborium::value::Value = ciborium::de::from_reader(&*token).unwrap();
+    let (tag_value, entry) = cbor.as_tag().unwrap();
+    if tag_value != 18 {
+        panic!("Wrong tag value");
     }
 
-    let cose_key = t_cose_key {
-        crypto_lib: t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA,
-        k: t_cose_key__bindgen_ty_1 {
-            key_handle: key_handle as u64,
-        },
-    };
-    unsafe { t_cose_sign1_set_verification_key(&mut t_cose_ctx, cose_key) };
-    let sign1 = q_useful_buf_c {
-        ptr: token.as_ptr() as *mut c_void,
-        len: token.len() as u64,
-    };
-    let mut payload_vec = Vec::with_capacity(token.len());
-    let mut payload = q_useful_buf_c {
-        ptr: payload_vec.as_mut_ptr() as *mut c_void,
-        len: payload_vec.capacity() as u64,
-    };
+    
+    let mut serialized_array: Vec<u8> = Vec::new();
+    ciborium::ser::into_writer(&entry, &mut serialized_array).unwrap();
+    let sign1 = coset::CoseSign1::from_slice(&serialized_array).unwrap();
 
-    let mut decoded_parameters: t_cose_parameters = unsafe { ::std::mem::zeroed() };
+    //let mut sign1 = coset::CoseSign1::from_tagged_slice(&token);
 
-    let sv_ret = unsafe {
-        t_cose_sign1_verify(
-            &mut t_cose_ctx,
-            sign1,
-            &mut payload,
-            &mut decoded_parameters,
-        )
-    };
-    // remove the key from storage
-    let dpk_ret = unsafe { t_cose_sign1_verify_delete_public_key(&mut key_handle) };
-    if dpk_ret != 0 {
-        println!("proxy-attestation-server::attestation::psa_attestation_token Was unable to delete public key, and received the error code:{:?}.
-                  I can't do anything about it, and it may not cause a problem right now, but this will probably end badly for you.", dpk_ret);
+    // TODO: look at using CoseSign1::from_cbor_value instead if serializing and deserializing
+    let aad: [u8; 0] = [];
+    verifier.set_key(&PUBLIC_KEY).unwrap();
+    sign1.verify_signature(&aad, |sig, data| verifier.verify(sig, data))
+        .map_err(|_| ProxyAttestationServerError::FailedToVerifyError("signature verification failed"))?;
+    let sign1_array = entry.as_array().unwrap();
+    // we want array element 2 which is the signed body
+    let body_bytes = sign1_array[2].as_bytes().unwrap();
+    let body_parsed: ciborium::value::Value = ciborium::de::from_reader(&body_bytes[..]).unwrap();
+    let body_map = body_parsed.as_map().unwrap();
+    let mut csr_hash_matched: bool = false;
+    let mut received_enclave_hash: Option<Vec<u8>> = None;
+    let mut received_challenge: Option<Vec<u8>> = None;
+    for map_pair in body_map {
+        let index = &map_pair.0;
+        let value = &map_pair.1;
+
+        let index_value: i32 = index.as_integer().unwrap().try_into().unwrap();
+        if index_value == -75006 {
+            let sw_components = value.as_array().unwrap();
+            for this_sw_component in sw_components {
+                let sw_component_map = this_sw_component.as_map().unwrap();
+                for this_sw_component_item in sw_component_map {
+                    let index = &this_sw_component_item.0;
+                    let value = &this_sw_component_item.1;
+                    let index_int: i32 = index.as_integer().unwrap().try_into().unwrap();
+                    match index_int {
+                        5 => {
+                            let received_csr_hash = value.as_bytes().unwrap();
+                            let calculated_csr_hash = sha256(&csr);
+                            if *received_csr_hash != calculated_csr_hash {
+                                println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
+                                return Err(ProxyAttestationServerError::MismatchError {
+                                    variable: "received_csr_hash",
+                                    expected: calculated_csr_hash,
+                                    received: received_csr_hash.clone(),
+                                });
+                            } else {
+                                csr_hash_matched = true;
+                            }
+                        },
+                        2 => {
+                            let enclave_hash = value.as_bytes().unwrap();
+                            received_enclave_hash = Some(enclave_hash.clone());
+                        },
+                        _ => (), // do nothing for other tags
+                    }
+                }
+            }
+        } else if index_value == 10 {
+            received_challenge = Some(value.as_bytes().unwrap().to_vec());
+        }
     }
-
-    if sv_ret != 0 {
-        println!("sv_ret:{:}", sv_ret);
-        return Err(ProxyAttestationServerError::UnsafeCallError(
-            "attestation_token t_cose_sign1_verify",
-            sv_ret,
-        ));
-    }
-    let payload_vec =
-        unsafe { std::slice::from_raw_parts(payload.ptr as *const u8, payload.len as usize) };
-    if attestation_context.challenge != payload_vec[61..93] {
-        return Err(ProxyAttestationServerError::MismatchError {
-            variable: "payload_vec[8..40]",
-            expected: attestation_context.challenge.to_vec(),
-            received: payload_vec[8..40].to_vec(),
-        });
-    }
-
-    let received_csr_hash = &payload_vec[240..272];
-    let calculated_csr_hash = sha256(&csr);
-    if received_csr_hash != calculated_csr_hash {
+    if !csr_hash_matched {
         println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
-        return Err(ProxyAttestationServerError::MismatchError {
-            variable: "received_csr_hash",
-            expected: calculated_csr_hash,
-            received: received_csr_hash.to_vec(),
-        });
+        return Err(ProxyAttestationServerError::MissingFieldError("csr_hash"));
     }
 
-    println!("Payload_vec:{:02x?}", payload_vec);
-    let received_enclave_hash: Vec<u8> = payload_vec[199..231].to_vec();
+    if let Some(received_challenge_value) = received_challenge {
+        if attestation_context.challenge[..] != received_challenge_value[..] {
+            return Err(ProxyAttestationServerError::MismatchError {
+                variable: "received_challenge_value",
+                expected: attestation_context.challenge.to_vec(),
+                received: received_challenge_value,
+            });
+        } else {
+            println!("Challenges matched, biatch!");
+        }
+    } else {
+        return Err(ProxyAttestationServerError::MissingFieldError("challenge"));
+    }
 
-    let cert = crate::attestation::convert_csr_to_certificate(&csr, &received_enclave_hash)
-        .map_err(|err| {
-            println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);
-            err
-        })?;
+    let cert = if let Some(enclave_hash) = received_enclave_hash {
+        println!("received_enclave_hash:{:?}", enclave_hash);
+
+        let cert = crate::attestation::convert_csr_to_certificate(&csr, &enclave_hash)
+            .map_err(|err| {
+                println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);
+                err
+            })?;
+        cert
+    } else {
+        return Err(ProxyAttestationServerError::MissingFieldError("enclave_hash"));
+    };
 
     let root_cert_der = crate::attestation::get_ca_certificate()?;
 
