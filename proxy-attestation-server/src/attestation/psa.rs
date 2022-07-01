@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::error::*;
+use coset::TaggedCborSerializable;
 use lazy_static::lazy_static;
 use psa_attestation::{
     q_useful_buf_c, t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA, t_cose_key,
@@ -154,27 +155,13 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         key_id: None,
     };
 
-    let cbor: ciborium::value::Value = ciborium::de::from_reader(&*token).unwrap();
-    let (tag_value, entry) = cbor.as_tag().unwrap();
-    if tag_value != 18 {
-        panic!("Wrong tag value");
-    }
+    let mut sign1 = coset::CoseSign1::from_tagged_slice(&token).unwrap();
 
-    
-    let mut serialized_array: Vec<u8> = Vec::new();
-    ciborium::ser::into_writer(&entry, &mut serialized_array).unwrap();
-    let sign1 = coset::CoseSign1::from_slice(&serialized_array).unwrap();
-
-    //let mut sign1 = coset::CoseSign1::from_tagged_slice(&token);
-
-    // TODO: look at using CoseSign1::from_cbor_value instead if serializing and deserializing
     let aad: [u8; 0] = [];
     verifier.set_key(&PUBLIC_KEY).unwrap();
     sign1.verify_signature(&aad, |sig, data| verifier.verify(sig, data))
         .map_err(|_| ProxyAttestationServerError::FailedToVerifyError("signature verification failed"))?;
-    let sign1_array = entry.as_array().unwrap();
-    // we want array element 2 which is the signed body
-    let body_bytes = sign1_array[2].as_bytes().unwrap();
+    let body_bytes = sign1.payload.unwrap();
     let body_parsed: ciborium::value::Value = ciborium::de::from_reader(&body_bytes[..]).unwrap();
     let body_map = body_parsed.as_map().unwrap();
     let mut csr_hash_matched: bool = false;
