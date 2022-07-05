@@ -18,7 +18,7 @@ use std::{
     fs::File,
     io::{BufReader, Read, Write},
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{Arc, atomic::{AtomicU32, Ordering}},
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
@@ -30,7 +30,8 @@ use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 /// check this, it is safer to use a Mutex.
 pub struct VeracruzClient {
     tls_context: Context<InsecureConnection>,
-    remote_session_id: Arc<Mutex<Option<u32>>>,
+    // The default should be ZERO
+    remote_session_id: Arc<AtomicU32>,
     policy: Policy,
     policy_hash: String,
 }
@@ -40,7 +41,8 @@ pub struct VeracruzClient {
 struct InsecureConnection {
     read_buffer: Vec<u8>,
     veracruz_server_url: String,
-    remote_session_id: Arc<Mutex<Option<u32>>>,
+    // The default should be ZERO
+    remote_session_id: Arc<AtomicU32>,
 }
 
 impl Read for InsecureConnection {
@@ -69,10 +71,7 @@ impl Write for InsecureConnection {
         let string_data = base64::encode(&data);
         let combined_string = format!(
             "{:} {:}",
-            self.remote_session_id
-                .lock()
-                .map_err(|_| err("lock failed"))?
-                .unwrap_or(0),
+            self.remote_session_id.load(Ordering::SeqCst),
             string_data
         );
         let dest_url = format!("http://{:}/runtime_manager", self.veracruz_server_url);
@@ -100,10 +99,7 @@ impl Write for InsecureConnection {
             let received_session_id = body_items[0]
                 .parse::<u32>()
                 .map_err(|_| err("bad session id"))?;
-            *self
-                .remote_session_id
-                .lock()
-                .map_err(|_| err("lock failed"))? = Some(received_session_id);
+            self.remote_session_id.store(received_session_id, Ordering::SeqCst);
             // And append response data to the read_buffer.
             for item in body_items.iter().skip(1) {
                 let this_body_data = base64::decode(item).map_err(|_| err("base64::decode"))?;
@@ -244,17 +240,17 @@ impl VeracruzClient {
         config.set_ca_list(Arc::new(proxy_service_cert), None);
         config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
         let mut ctx = Context::new(Arc::new(config));
-        let remote_session_id = Arc::new(Mutex::new(Some(0)));
+        let remote_session_id = Arc::new(AtomicU32::new(0));
         let conn = InsecureConnection {
             read_buffer: vec![],
             veracruz_server_url: policy.veracruz_server_url().to_string(),
-            remote_session_id: Arc::clone(&remote_session_id),
+            remote_session_id: remote_session_id.clone(),
         };
         ctx.establish(conn, None)?;
 
         Ok(VeracruzClient {
             tls_context: ctx,
-            remote_session_id: Arc::clone(&remote_session_id),
+            remote_session_id: remote_session_id.clone(),
             policy,
             policy_hash,
         })
@@ -277,10 +273,7 @@ impl VeracruzClient {
         let response = self.send(&serialized_data)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(
-            *self
-                .remote_session_id
-                .lock()
-                .map_err(|_| anyhow!(VeracruzClientError::LockSessionFailed))?,
+            Some(self.remote_session_id.load(Ordering::SeqCst)),
             &response,
         )?;
         let status = parsed_response.get_status();
@@ -379,25 +372,15 @@ impl VeracruzClient {
             .ok_or(anyhow!(VeracruzClientError::UnexpectedCertificate))?;
         let extensions = cert.extensions()?;
         // check for OUR extension
-        match veracruz_utils::find_extension(extensions, &VERACRUZ_RUNTIME_HASH_EXTENSION_ID) {
-            None => {
-                error!("Our extension is not present. This should be fatal");
-                Err(anyhow!(VeracruzClientError::RuntimeHashExtensionMissing))
-            }
-            Some(data) => {
-                info!("Certificate extension present.");
-                match self.compare_runtime_hash(&data) {
-                    Ok(_) => {
-                        info!("Runtime hash matches.");
-                        Ok(())
-                    }
-                    Err(err) => {
-                        error!("Runtime hash mismatch: {}.", err);
-                        Err(err)
-                    }
-                }
-            }
-        }
+        let data = veracruz_utils::find_extension(extensions, &VERACRUZ_RUNTIME_HASH_EXTENSION_ID).ok_or({
+            error!("Our extension is not present. This should be fatal");
+            anyhow!(VeracruzClientError::RuntimeHashExtensionMissing)
+        })?;
+        info!("Certificate extension present.");
+        self.compare_runtime_hash(&data).map_err(|err|{
+            error!("Runtime hash mismatch: {}.", err);
+            anyhow!(err)
+        })
     }
 
     /// Send the data to the runtime_manager path on the Veracruz server
@@ -406,8 +389,10 @@ impl VeracruzClient {
         self.tls_context.write_all(&data)?;
         let mut response = vec![];
         match self.tls_context.read_to_end(&mut response) {
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => 0,
-            x => x?,
+            Ok(_) => (),
+            // Suppress the following err
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
+            Err(err) => return Err(anyhow!(err)),
         };
         Ok(response)
     }

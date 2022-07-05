@@ -35,6 +35,4 @@ pub enum VeracruzClientError {
     UnexpectedRuntimeHash,
     #[error(display = "VeracruzClient: Unvalid path")]
     InvalidPath,
-    #[error(display = "VeracruzClient: Lock session failed")]
-    LockSessionFailed,
 }
