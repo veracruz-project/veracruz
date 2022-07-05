@@ -9,18 +9,17 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use crate::managers::{self, RuntimeManagerError};
+use anyhow::{anyhow, Result};
 use io_utils::raw_fd::{receive_buffer, send_buffer};
-use nix::sys::socket::listen as listen_vsock;
-use nix::sys::socket::{accept, bind, SockAddr};
-use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
+use nix::sys::socket::{
+    accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
+};
 use nsm_api;
 use nsm_lib;
 use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
-
-use crate::managers;
-use crate::managers::RuntimeManagerError;
 
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
@@ -37,14 +36,13 @@ const BACKLOG: usize = 128;
 const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
 /// The main function for the Nitro Runtime Manager enclave
-pub fn nitro_main() -> Result<(), RuntimeManagerError> {
+pub fn nitro_main() -> Result<()> {
     let socket_fd = socket(
         AddressFamily::Vsock,
         SockType::Stream,
         SockFlag::empty(),
         None,
-    )
-    .map_err(|err| RuntimeManagerError::SocketError(err))?;
+    )?;
     println!(
         "runtime_manager_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
         CID, PORT
@@ -52,19 +50,17 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
 
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
-    bind(socket_fd, &sockaddr).map_err(|err| RuntimeManagerError::SocketError(err))?;
+    bind(socket_fd, &sockaddr)?;
     println!("runtime_manager_nitro::nitro_main calling accept");
 
-    listen_vsock(socket_fd, BACKLOG).map_err(|err| RuntimeManagerError::SocketError(err))?;
+    listen_vsock(socket_fd, BACKLOG)?;
 
-    let fd = accept(socket_fd).map_err(|err| RuntimeManagerError::SocketError(err))?;
+    let fd = accept(socket_fd)?;
     println!("runtime_manager_nitro::nitro_main accept succeeded. looping");
 
     loop {
-        let received_buffer =
-            receive_buffer(fd).map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
-        let received_message: RuntimeManagerRequest = bincode::deserialize(&received_buffer)
-            .map_err(|err| RuntimeManagerError::BincodeError(err))?;
+        let received_buffer = receive_buffer(fd)?;
+        let received_message: RuntimeManagerRequest = bincode::deserialize(&received_buffer)?;
         let return_message = match received_message {
             RuntimeManagerRequest::Attestation(challenge, challenge_id) => {
                 attestation(&challenge, challenge_id)?
@@ -122,21 +118,18 @@ pub fn nitro_main() -> Result<(), RuntimeManagerError> {
                 RuntimeManagerResponse::Status(Status::Unimplemented)
             }
         };
-        let return_buffer = bincode::serialize(&return_message)
-            .map_err(|err| RuntimeManagerError::BincodeError(err))?;
+        let return_buffer = bincode::serialize(&return_message)?;
+        //.map_err(|err| RuntimeManagerError::BincodeError(err))?;
         println!(
             "runtime_manager_nitro::main calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
-        send_buffer(fd, &return_buffer)
-            .map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
+        send_buffer(fd, &return_buffer)?;
+        //.map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     }
 }
 
-fn attestation(
-    challenge: &[u8],
-    _challenge_id: i32,
-) -> Result<RuntimeManagerResponse, RuntimeManagerError> {
+fn attestation(challenge: &[u8], _challenge_id: i32) -> Result<RuntimeManagerResponse> {
     println!("runtime_manager_nitro::attestation started");
     managers::session_manager::init_session_manager()?;
     // generate the csr
@@ -147,7 +140,7 @@ fn attestation(
         let mut buffer_len: u32 = buffer.len() as u32;
         let nsm_fd = nsm_lib::nsm_lib_init();
         if nsm_fd < 0 {
-            return Err(RuntimeManagerError::NsmLibError(nsm_fd));
+            return Err(anyhow!(RuntimeManagerError::NsmLibError(nsm_fd)));
         }
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
@@ -164,7 +157,7 @@ fn attestation(
         };
         match status {
             nsm_api::api::ErrorCode::Success => (),
-            _ => return Err(RuntimeManagerError::NsmErrorCode(status)),
+            _ => return Err(anyhow!(RuntimeManagerError::NsmErrorCode(status))),
         }
         unsafe {
             buffer.set_len(buffer_len as usize);
@@ -176,10 +169,7 @@ fn attestation(
 }
 
 /// Handler for the RuntimeManagerRequest::Initialize message
-fn initialize(
-    policy_json: &str,
-    cert_chain: &Vec<Vec<u8>>,
-) -> Result<RuntimeManagerResponse, RuntimeManagerError> {
+fn initialize(policy_json: &str, cert_chain: &Vec<Vec<u8>>) -> Result<RuntimeManagerResponse> {
     managers::session_manager::load_policy(policy_json)?;
     println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;

@@ -9,10 +9,10 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use policy_utils::{policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH};
-
+use anyhow::{anyhow, Result};
 use execution_engine::{execute, fs::FileSystem};
 use lazy_static::lazy_static;
+use policy_utils::{policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH};
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -55,7 +55,7 @@ lazy_static! {
 type ProvisioningResponse = Option<Vec<u8>>;
 
 /// Result type of provisioning functions.
-pub type ProvisioningResult = Result<ProvisioningResponse, RuntimeManagerError>;
+pub type ProvisioningResult = Result<ProvisioningResponse>;
 
 /// The configuration details for the ongoing provisioning of secrets into the
 /// Veracruz platform, containing information that must be persisted across the
@@ -79,10 +79,7 @@ impl ProtocolState {
     /// Constructs a new `ProtocolState` from a global policy.  The selected
     /// execution strategy is extrated from the global policy and a suitable
     /// Veracruz execution strategy is selected based on that.
-    pub fn new(
-        global_policy: Policy,
-        global_policy_hash: String,
-    ) -> Result<Self, RuntimeManagerError> {
+    pub fn new(global_policy: Policy, global_policy_hash: String) -> Result<Self> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let mut rights_table = global_policy.get_rights_table();
@@ -90,10 +87,7 @@ impl ProtocolState {
         // Grant the super user read access to any file under the root. This is
         // used internally to read the program on behalf of the executing party
         let mut su_read_rights = HashMap::new();
-        su_read_rights.insert(
-            PathBuf::from("/"),
-            Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR,
-        );
+        su_read_rights.insert(PathBuf::from("/"), Rights::all());
         rights_table.insert(Principal::InternalSuperUser, su_read_rights);
 
         let digest_table = global_policy.get_file_hash_table()?;
@@ -124,16 +118,16 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
         data: Vec<u8>,
-    ) -> Result<(), RuntimeManagerError> {
+    ) -> Result<()> {
         // Check the digest, if necessary
         if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
             let incoming_digest = sha256(&data);
             if incoming_digest.len() != digest.len() {
-                return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
+                return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
             }
             for (lhs, rhs) in digest.iter().zip(incoming_digest.iter()) {
                 if lhs != rhs {
-                    return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
+                    return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
                 }
             }
         }
@@ -155,11 +149,11 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
         data: Vec<u8>,
-    ) -> Result<(), RuntimeManagerError> {
+    ) -> Result<()> {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
         if self.digest_table.contains_key(&PathBuf::from(file_name)) {
-            return Err(RuntimeManagerError::FileSystemError(ErrNo::Access));
+            return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
         }
         self.vfs.spawn(client_id)?.write_file_by_absolute_path(
             file_name, data, // set the append flag to true
@@ -173,7 +167,7 @@ impl ProtocolState {
         &self,
         client_id: &Principal,
         file_name: &str,
-    ) -> Result<Option<Vec<u8>>, RuntimeManagerError> {
+    ) -> Result<Option<Vec<u8>>> {
         let mut vfs = self.vfs.spawn(client_id)?;
         let rst = match file_name {
             "stderr" => vfs.read_stderr()?,
@@ -189,10 +183,7 @@ impl ProtocolState {
     /// Requests shutdown on behalf of a client, as identified by their client
     /// ID.
     /// TODO: Do something better (https://github.com/veracruz-project/veracruz/issues/393)
-    pub(crate) fn request_and_check_shutdown(
-        &mut self,
-        client_id: u64,
-    ) -> Result<bool, RuntimeManagerError> {
+    pub(crate) fn request_and_check_shutdown(&mut self, client_id: u64) -> Result<bool> {
         Ok(self.expected_shutdown_sources.contains(&client_id))
     }
 
@@ -207,10 +198,9 @@ impl ProtocolState {
 
         if !self
             .vfs
-            .is_executable(client_id, &PathBuf::from(file_name))
-            .map_err(|e| RuntimeManagerError::FileSystemError(e))?
+            .is_executable(client_id, &PathBuf::from(file_name))?
         {
-            return Err(RuntimeManagerError::ExecutionDenied);
+            return Err(anyhow!(RuntimeManagerError::ExecutionDenied));
         }
 
         let program = self

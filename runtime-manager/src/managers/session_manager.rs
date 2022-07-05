@@ -10,24 +10,24 @@
 //! information on licensing and copyright.
 
 use crate::managers::{ProtocolState, RuntimeManagerError, MY_SESSION_MANAGER};
+use anyhow::{anyhow, Result};
 use policy_utils::policy::Policy;
 use session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::csr;
 use veracruz_utils::sha256::sha256;
 
-pub fn init_session_manager() -> Result<(), RuntimeManagerError> {
+pub fn init_session_manager() -> Result<()> {
     let new_session_manager = SessionContext::new()?;
 
-    {
-        let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
-        *session_manager_state = Some(new_session_manager);
-    }
+    *super::MY_SESSION_MANAGER
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionManager))? = Some(new_session_manager);
 
     Ok(())
 }
 
-pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
+pub fn load_policy(policy_json: &str) -> Result<()> {
     let policy_hash = sha256(&policy_json.as_bytes());
     let policy = Policy::from_json(policy_json)?;
 
@@ -35,70 +35,69 @@ pub fn load_policy(policy_json: &str) -> Result<(), RuntimeManagerError> {
         super::DEBUG_FLAG.store(true, Ordering::SeqCst);
     }
 
-    {
-        let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash))?;
-        let mut protocol_state = super::PROTOCOL_STATE.lock()?;
-        *protocol_state = Some(state);
-    }
-    {
-        let mut session_manager_state = super::MY_SESSION_MANAGER.lock()?;
-        match &mut *session_manager_state {
-            Some(state) => state.set_policy(policy)?,
-            None => {
-                return Err(RuntimeManagerError::UninitializedSessionError(
-                    "session_manager_state",
-                ))
-            }
-        }
-    }
-    return Ok(());
-}
+    let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash))?;
+    *super::PROTOCOL_STATE
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockProtocolState))? = Some(state);
 
-pub fn load_cert_chain(chain: &Vec<Vec<u8>>) -> Result<(), RuntimeManagerError> {
-    let mut sm_guard = MY_SESSION_MANAGER.lock()?;
-    match &mut *sm_guard {
-        Some(session_manager) => {
-            session_manager.set_cert_chain(chain)?;
-        }
-        None => {
-            return Err(RuntimeManagerError::UninitializedSessionError(
-                "load_cert_chain",
-            ))
-        }
-    }
-    return Ok(());
-}
-
-pub fn new_session() -> Result<u32, RuntimeManagerError> {
-    let local_session_id = super::SESSION_COUNTER.fetch_add(1, Ordering::SeqCst);
-
-    let session = match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(my_session_manager) => my_session_manager.create_session()?,
-        None => {
-            return Err(RuntimeManagerError::UninitializedSessionError(
-                "new_session",
-            ))
-        }
-    };
-
-    super::SESSIONS.lock()?.insert(local_session_id, session);
-    Ok(local_session_id)
-}
-
-pub fn close_session(session_id: u32) -> Result<(), RuntimeManagerError> {
-    super::SESSIONS.lock()?.remove(&session_id);
+    super::MY_SESSION_MANAGER
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionManager))?
+        .as_mut()
+        .ok_or(anyhow!(RuntimeManagerError::UninitializedSessionError(
+            "session_manager_state",
+        )))?
+        .set_policy(policy)?;
     Ok(())
 }
 
-pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), RuntimeManagerError> {
-    let mut sessions = super::SESSIONS.lock()?;
-    let this_session =
-        sessions
-            .get_mut(&session_id)
-            .ok_or(RuntimeManagerError::UnavailableSessionError(
-                session_id as u64,
-            ))?;
-    let _result = this_session.send_tls_data(&mut input_data.to_vec())?;
+pub fn load_cert_chain(chain: &Vec<Vec<u8>>) -> Result<()> {
+    MY_SESSION_MANAGER
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionManager))?
+        .as_mut()
+        .ok_or(anyhow!(RuntimeManagerError::UninitializedSessionError(
+            "load_cert_chain",
+        )))?
+        .set_cert_chain(chain)?;
+    Ok(())
+}
+
+pub fn new_session() -> Result<u32> {
+    let local_session_id = super::SESSION_COUNTER.fetch_add(1, Ordering::SeqCst);
+
+    let session = super::MY_SESSION_MANAGER
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionManager))?
+        .as_mut()
+        .ok_or(anyhow!(RuntimeManagerError::UninitializedSessionError(
+            "new_session",
+        )))?
+        .create_session()?;
+
+    super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?
+        .insert(local_session_id, session);
+    Ok(local_session_id)
+}
+
+pub fn close_session(session_id: u32) -> Result<()> {
+    super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?
+        .remove(&session_id);
+    Ok(())
+}
+
+pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<()> {
+    let mut sessions = super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?;
+    let this_session = sessions.get_mut(&session_id).ok_or(anyhow!(
+        RuntimeManagerError::UnavailableSessionError(session_id as u64,)
+    ))?;
+    this_session.send_tls_data(&mut input_data.to_vec())?;
 
     let plaintext_option = this_session.read_plaintext_data()?;
 
@@ -123,52 +122,59 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<(), RuntimeManage
 }
 
 // TODO: The 'match' inside the and_then closure is difficult to parse
-pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>), RuntimeManagerError> {
-    let (result, _) = match super::SESSIONS.lock()?.get_mut(&session_id) {
+pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>)> {
+    let (result, _) = match super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?
+        .get_mut(&session_id)
+    {
         Some(this_session) => {
             let result = this_session.read_tls_data();
             let needed = this_session.read_tls_needed();
             //TODO: change the error type
             Ok((result, needed))
         }
-        None => Err(RuntimeManagerError::UnavailableSessionError(
+        None => Err(anyhow!(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
-        )),
+        ))),
     }?;
 
-    let active_flag = super::PROTOCOL_STATE.lock()?.is_some();
+    let active_flag = super::PROTOCOL_STATE
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockProtocolState))?
+        .is_some();
 
     match result? {
         Some(output_data) => Ok((active_flag, output_data)),
-        None => Err(RuntimeManagerError::NoDataError),
+        None => Err(anyhow!(RuntimeManagerError::NoDataError)),
     }
 }
 
-pub fn get_data_needed(session_id: u32) -> Result<bool, RuntimeManagerError> {
-    match super::SESSIONS.lock()?.get_mut(&session_id) {
-        Some(this_session) => Ok(this_session.read_tls_needed()?),
-        None => Err(RuntimeManagerError::UnavailableSessionError(
+pub fn get_data_needed(session_id: u32) -> Result<bool> {
+    Ok(super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?
+        .get_mut(&session_id)
+        .ok_or(anyhow!(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
-        )),
-    }
+        )))?
+        .read_tls_needed()?)
 }
 
-fn get_enclave_private_key_der() -> Result<Vec<u8>, RuntimeManagerError> {
-    match &*super::MY_SESSION_MANAGER.lock()? {
-        Some(session_manager) => {
-            return Ok(session_manager.private_key().to_vec());
-        }
-        None => {
-            return Err(RuntimeManagerError::UninitializedSessionError(
-                "get_enclave_private_key",
-            ));
-        }
-    }
+fn get_enclave_private_key_der() -> Result<Vec<u8>> {
+    Ok(super::MY_SESSION_MANAGER
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionManager))?
+        .as_mut()
+        .ok_or(anyhow!(RuntimeManagerError::UninitializedSessionError(
+            "get_enclave_private_key",
+        )))?
+        .private_key()
+        .to_vec())
 }
 
-pub fn generate_csr() -> Result<Vec<u8>, RuntimeManagerError> {
+pub fn generate_csr() -> Result<Vec<u8>> {
     let private_key_der = get_enclave_private_key_der()?;
-    let csr =
-        csr::generate_csr(&private_key_der).map_err(|err| RuntimeManagerError::CertError(err))?;
+    let csr = csr::generate_csr(&private_key_der).map_err(|err| anyhow!(err))?;
     return Ok(csr);
 }
