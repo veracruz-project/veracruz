@@ -328,8 +328,6 @@ async fn server_tls_loop<P: AsRef<str>>(policy_json: P) -> Result<()> {
 
 /// Test states.
 struct TestExecutor {
-    //// The policy for the runtime.
-    //policy: Policy,
     // The json string of the policy
     policy_json: String,
 }
@@ -369,7 +367,6 @@ impl TestExecutor {
         proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
 
         Ok(TestExecutor {
-            //policy,
             policy_json,
         })
     }
