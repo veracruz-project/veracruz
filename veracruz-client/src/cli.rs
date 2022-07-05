@@ -217,10 +217,7 @@ async fn main() {
             }
         };
 
-        match veracruz_client
-            .write_file(&program_name, &program_data)
-            .await
-        {
+        match veracruz_client.write_file(&program_name, &program_data) {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -261,7 +258,7 @@ async fn main() {
             }
         };
 
-        match veracruz_client.write_file(data_name, &data_data).await {
+        match veracruz_client.write_file(data_name, &data_data) {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -275,7 +272,7 @@ async fn main() {
         qprintln!(opt, "Requesting compute of <enclave>/{}", compute_name);
         did_something = true;
 
-        match veracruz_client.request_compute(&compute_name).await {
+        match veracruz_client.request_compute(&compute_name) {
             Ok(_) => {}
             Err(err) => {
                 eprintln!("{}", err);
@@ -297,7 +294,7 @@ async fn main() {
         );
         did_something = true;
 
-        let results = match veracruz_client.read_file(output_name).await {
+        let results = match veracruz_client.read_file(output_name) {
             Ok(results) => results,
             Err(err) => {
                 eprintln!("{}", err);
@@ -329,7 +326,7 @@ async fn main() {
         qprintln!(opt, "Shutting down enclave");
         did_something = true;
 
-        match veracruz_client.request_shutdown().await {
+        match veracruz_client.request_shutdown() {
             Ok(()) => {}
             Err(err) => {
                 eprintln!("{}", err);
