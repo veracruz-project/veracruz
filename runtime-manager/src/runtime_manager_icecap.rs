@@ -11,8 +11,8 @@
 
 extern crate alloc;
 
+use anyhow::Result;
 use core::{convert::TryFrom, mem::size_of};
-
 use icecap_core::{
     config::*,
     logger::{DisplayMode, Level, Logger},
@@ -21,13 +21,10 @@ use icecap_core::{
 };
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
-
 use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
-
-use crate::managers::{session_manager, RuntimeManagerError};
-
+use crate::managers::session_manager;
 use bincode;
 use serde::{Deserialize, Serialize};
 
@@ -200,7 +197,7 @@ impl RuntimeManager {
         &self,
         _device_id: i32,
         challenge: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>), RuntimeManagerError> {
+    ) -> Result<(Vec<u8>, Vec<u8>)> {
         let csr = session_manager::generate_csr()?;
         let token = attestation_hack::native_attestation(&challenge, &csr)?;
         Ok((token, csr))
@@ -228,7 +225,6 @@ fn icecap_runtime_init() {
 // Attestation not yet implemented in IceCap itself.
 mod attestation_hack {
 
-    use super::RuntimeManagerError;
     use veracruz_utils::sha256::sha256;
 
     const EXAMPLE_PRIVATE_KEY: [u8; 32] = [
@@ -251,7 +247,7 @@ mod attestation_hack {
     pub(super) fn native_attestation(
         challenge: &[u8],
         csr: &[u8],
-    ) -> Result<Vec<u8>, RuntimeManagerError> {
+    ) -> anyhow::Result<Vec<u8>> {
         let root_private_key = &ROOT_PRIVATE_KEY;
         let enclave_hash = &RUNTIME_MANAGER_HASH;
         let csr_hash = sha256(csr);
