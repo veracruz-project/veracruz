@@ -17,12 +17,12 @@
 
 #![allow(non_camel_case_types, clippy::too_many_arguments)]
 
+use anyhow::Result;
 use crate::{
     fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
-    wasi::strace::Strace,
+    engines::strace::Strace,
     Options,
 };
-
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
@@ -1980,22 +1980,14 @@ pub enum FatalEngineError {
     #[error(display = "FatalEngineError: WASM program returns code other than wasi ErrNo.")]
     ReturnedCodeError,
     /// A lock could not be obtained for some reason, wrappiing the failure information as String.
-    #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
-    FailedToObtainLock(String),
-    /// Wrapper for WASI Trap.
-    #[error(display = "FatalEngineError: WASMIError: Trap: {:?}.", _0)]
-    WASMITrapError(#[source(error)] wasmi::Trap),
-    /// Wrapper for WASI Error other than Trap.
-    #[error(display = "FatalEngineError: WASMIError {:?}.", _0)]
-    WASMIError(#[source(error)] wasmi::Error),
-    #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
-    WASIError(#[source(error)] wasi_types::ErrNo),
-    /// anyhow Error Wrapper.
-    #[error(display = "FatalEngineError: anyhow Error {:?}.", _0)]
-    AnyhowError(String),
-    /// Wasmtime trap.
-    #[error(display = "FatalEngineError: Wasmtime Trap Error {:?}.", _0)]
-    WasmtimeTrapError(String),
+    //#[error(display = "FatalEngineError: Failed to obtain lock {:?}.", _0)]
+    //FailedToObtainLock(String),
+    #[error(display = "FatalEngineError: Failed to obtain lock on the engine or components of the engine.")]
+    FailedLockEngine,
+    #[error(display = "FatalEngineError: Failed to obtain lock on the file system.")]
+    FailedLockFileSystem,
+    #[error(display = "FatalEngineError: Wasm engine trap: {:?}", _0)]
+    Trap(String),
 }
 
 /// Either the index or the name of a host call
@@ -2003,34 +1995,6 @@ pub enum FatalEngineError {
 pub enum HostFunctionIndexOrName {
     Index(usize),
     Name(String),
-}
-
-// Convertion from any error raised by any mutex of type <T> to FatalEngineError.
-impl<T> From<std::sync::PoisonError<T>> for FatalEngineError {
-    fn from(error: std::sync::PoisonError<T>) -> Self {
-        FatalEngineError::FailedToObtainLock(format!("{:?}", error))
-    }
-}
-
-impl From<anyhow::Error> for FatalEngineError {
-    fn from(error: anyhow::Error) -> Self {
-        FatalEngineError::AnyhowError(format!("{:?}", error))
-    }
-}
-
-#[cfg(any(feature = "std", feature = "nitro"))]
-impl From<wasmtime::Trap> for FatalEngineError {
-    fn from(error: wasmtime::Trap) -> Self {
-        FatalEngineError::WasmtimeTrapError(format!("{:?}", error))
-    }
-}
-
-impl From<WasiAPIName> for FatalEngineError {
-    fn from(error: WasiAPIName) -> Self {
-        FatalEngineError::BadArgumentsToHostFunction {
-            function_name: error,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2067,5 +2031,5 @@ pub trait ExecutionEngine: Send {
         &mut self,
         program: Vec<u8>,
         options: Options,
-    ) -> Result<u32, FatalEngineError>;
+    ) -> Result<u32>;
 }

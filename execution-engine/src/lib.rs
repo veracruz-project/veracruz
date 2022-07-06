@@ -24,15 +24,16 @@ extern crate num_derive;
 
 pub mod fs;
 mod native_modules;
-mod wasi;
+mod engines;
 // Expose the error to the external.
-pub use wasi::common::FatalEngineError;
+pub use engines::common::FatalEngineError;
 
+use anyhow::{anyhow, Result};
 #[cfg(feature = "std")]
-use crate::wasi::wasmtime::WasmtimeRuntimeState;
+use crate::engines::wasmtime::WasmtimeRuntimeState;
 use crate::{
     fs::FileSystem,
-    wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
+    engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
 use policy_utils::principal::ExecutionStrategy;
 use std::{boxed::Box, string::String, vec::Vec};
@@ -77,7 +78,7 @@ pub fn execute(
     filesystem: FileSystem,
     program: Vec<u8>,
     options: Options,
-) -> Result<u32, FatalEngineError> {
+) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
             Box::new(WASMIRuntimeState::new(filesystem, options.enable_clock)?)
@@ -87,7 +88,7 @@ pub fn execute(
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
                     Box::new(WasmtimeRuntimeState::new(filesystem, options.enable_clock)?)
                 } else {
-                    return Err(FatalEngineError::EngineIsNotReady);
+                    return Err(anyhow!(FatalEngineError::EngineIsNotReady));
                 }
             }
         }

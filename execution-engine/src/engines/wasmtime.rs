@@ -11,9 +11,10 @@
 
 #![allow(clippy::too_many_arguments)]
 
+use anyhow::{anyhow, Result};
 use crate::{
     fs::{FileSystem, FileSystemResult},
-    wasi::common::{
+    engines::common::{
         Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, MemoryHandler,
         MemorySlice, MemorySliceMut, VeracruzAPIName, WasiAPIName, WasiWrapper,
     },
@@ -227,7 +228,7 @@ pub struct WasmtimeRuntimeState {
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> Result<Self, FatalEngineError> {
+    pub fn new(filesystem: FileSystem, enable_clock: bool) -> Result<Self> {
         Ok(Self {
             filesystem: Arc::new(Mutex::new(WasiWrapper::new(filesystem, enable_clock)?)),
         })
@@ -249,7 +250,7 @@ impl WasmtimeRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    pub(crate) fn invoke_engine(&self, binary: Vec<u8>) -> Result<u32, FatalEngineError> {
+    pub(crate) fn invoke_engine(&self, binary: Vec<u8>) -> Result<u32> {
         let mut config = Config::default();
         config.wasm_simd(true);
         let engine = Engine::new(&config)?;
@@ -494,7 +495,7 @@ impl WasmtimeRuntimeState {
             EntrySignature::NoParameters => instance
                 .get_typed_func::<(), (), _>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
                 .call(&mut store, ()),
-            EntrySignature::NoEntryFound => return Err(FatalEngineError::NoProgramEntryPoint),
+            EntrySignature::NoEntryFound => return Err(anyhow!(FatalEngineError::NoProgramEntryPoint)),
         };
 
         info!("Execution returns.");
@@ -502,7 +503,7 @@ impl WasmtimeRuntimeState {
         // NOTE: Surpress the trap, if `proc_exit` is called.
         //       In this case, the error code is in .exit_code().
         //
-        let exit_code = store.into_data().lock()?.exit_code();
+        let exit_code = store.into_data().lock().map_err(|_|anyhow!(FatalEngineError::FailedLockEngine))?.exit_code();
         info!("Exit code {:?}", exit_code);
         match exit_code {
             Some(e) => Ok(e),
@@ -1109,10 +1110,10 @@ impl ExecutionEngine for WasmtimeRuntimeState {
         &mut self,
         program: Vec<u8>,
         options: Options,
-    ) -> Result<u32, FatalEngineError> {
+    ) -> Result<u32> {
         // NOTE: minimize the locking scope.
         {
-            let mut vfs = self.filesystem.lock()?;
+            let mut vfs = self.filesystem.lock().map_err(|_| anyhow!(FatalEngineError::FailedLockFileSystem))?;
             vfs.environment_variables = options.environment_variables;
             vfs.program_arguments = options.program_arguments;
             vfs.enable_clock = options.enable_clock;
