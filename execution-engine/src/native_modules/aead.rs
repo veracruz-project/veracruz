@@ -1,4 +1,3 @@
-
 //! A native module for decryption and encryption of AEAD.
 //!
 //! ## Authors
@@ -10,7 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult, Service};
+use crate::fs::{FileSystem, FileSystemResult};
+use crate::native_modules::common::Service;
 use psa_crypto::{
     operations::aead::{decrypt, encrypt},
     operations::key_management,
@@ -114,16 +114,13 @@ impl AeadService {
         psa_crypto::init().map_err(|_| ErrNo::Canceled)?;
         let imported_key =
             key_management::import(attributes, None, &key[..]).map_err(|_| ErrNo::Canceled)?;
-        
+
         let output_buffer_size = if *is_encryption {
-                attributes
-                .aead_encrypt_output_size(alg.into() , input.len())
-            } 
-        else {
-                attributes
-                .aead_decrypt_output_size(alg.into() , input.len())
-            }
-            .map_err(|_| ErrNo::Canceled)?;
+            attributes.aead_encrypt_output_size(alg.into(), input.len())
+        } else {
+            attributes.aead_decrypt_output_size(alg.into(), input.len())
+        }
+        .map_err(|_| ErrNo::Canceled)?;
 
         let mut output = vec![0; output_buffer_size];
 

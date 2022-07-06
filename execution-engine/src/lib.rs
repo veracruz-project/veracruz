@@ -22,23 +22,24 @@ extern crate std;
 #[macro_use]
 extern crate num_derive;
 
+mod engines;
 pub mod fs;
 mod native_modules;
-mod engines;
 // Expose the error to the external.
 pub use engines::common::FatalEngineError;
 
-use anyhow::{anyhow, Result};
 #[cfg(feature = "std")]
 use crate::engines::wasmtime::WasmtimeRuntimeState;
 use crate::{
-    fs::FileSystem,
     engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
+    fs::FileSystem,
 };
+use anyhow::{anyhow, Result};
 use policy_utils::principal::ExecutionStrategy;
 use std::{boxed::Box, string::String, vec::Vec};
 
 /// Runtime options for a program.
+#[derive(Default)]
 pub struct Options {
     /// A list of key-value pairs corresponding to the environment variables of the
     /// program, if any.
@@ -52,18 +53,6 @@ pub struct Options {
     pub enable_clock: bool,
     /// Whether strace-like output is enabled.
     pub enable_strace: bool,
-}
-
-impl Default for Options {
-    #[inline]
-    fn default() -> Options {
-        Options {
-            environment_variables: Vec::new(),
-            program_arguments: Vec::new(),
-            enable_clock: false,
-            enable_strace: false,
-        }
-    }
 }
 
 /// The top-level function executes program `program` on
@@ -81,12 +70,12 @@ pub fn execute(
 ) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, options.enable_clock)?)
+            Box::new(WASMIRuntimeState::new(filesystem, &options)?)
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, options.enable_clock)?)
+                    Box::new(WasmtimeRuntimeState::new(filesystem, &options)?)
                 } else {
                     return Err(anyhow!(FatalEngineError::EngineIsNotReady));
                 }

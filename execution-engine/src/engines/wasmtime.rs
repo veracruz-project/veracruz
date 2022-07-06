@@ -11,15 +11,15 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use anyhow::{anyhow, Result};
 use crate::{
-    fs::{FileSystem, FileSystemResult},
     engines::common::{
         Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError, MemoryHandler,
         MemorySlice, MemorySliceMut, VeracruzAPIName, WasiAPIName, WasiWrapper,
     },
+    fs::{FileSystem, FileSystemResult},
     Options,
 };
+use anyhow::{anyhow, Result};
 use log::info;
 use std::{
     convert::TryFrom,
@@ -114,7 +114,7 @@ impl<T> MemorySlice for WasmtimeSlice<'_, T> {}
 impl<T> MemorySliceMut for WasmtimeSliceMut<'_, T> {}
 
 /// Impl the MemoryHandler for Caller.
-/// This allows passing the Caller to WasiWrapper on any VFS call. Implementation 
+/// This allows passing the Caller to WasiWrapper on any VFS call. Implementation
 /// here is *NOT* thread-safe, if multiple threads manipulate this Wasmtime instance.
 impl<'a, T: 'static> MemoryHandler for Caller<'a, T> {
     type Slice = WasmtimeSlice<'static, T>;
@@ -216,8 +216,8 @@ fn check_main(tau: &ExternType) -> EntrySignature {
 ////////////////////////////////////////////////////////////////////////////////
 /// The facade of WASMTIME host provisioning state.
 pub struct WasmtimeRuntimeState {
-    /// The WASI file system wrapper. It is a sharable structure protected by lock. 
-    /// The common pattern is to clone it and try to lock it, to obtain the underlining 
+    /// The WASI file system wrapper. It is a sharable structure protected by lock.
+    /// The common pattern is to clone it and try to lock it, to obtain the underlining
     /// WasiWrapper.
     filesystem: SharedMutableWasiWrapper,
 }
@@ -228,9 +228,9 @@ pub struct WasmtimeRuntimeState {
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> Result<Self> {
+    pub fn new(filesystem: FileSystem, options: &Options) -> Result<Self> {
         Ok(Self {
-            filesystem: Arc::new(Mutex::new(WasiWrapper::new(filesystem, enable_clock)?)),
+            filesystem: Arc::new(Mutex::new(WasiWrapper::new(filesystem, options)?)),
         })
     }
 
@@ -495,7 +495,9 @@ impl WasmtimeRuntimeState {
             EntrySignature::NoParameters => instance
                 .get_typed_func::<(), (), _>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
                 .call(&mut store, ()),
-            EntrySignature::NoEntryFound => return Err(anyhow!(FatalEngineError::NoProgramEntryPoint)),
+            EntrySignature::NoEntryFound => {
+                return Err(anyhow!(FatalEngineError::NoProgramEntryPoint))
+            }
         };
 
         info!("Execution returns.");
@@ -503,14 +505,21 @@ impl WasmtimeRuntimeState {
         // NOTE: Surpress the trap, if `proc_exit` is called.
         //       In this case, the error code is in .exit_code().
         //
-        let exit_code = store.into_data().lock().map_err(|_|anyhow!(FatalEngineError::FailedLockEngine))?.exit_code();
+        let exit_code = store
+            .into_data()
+            .lock()
+            .map_err(|_| anyhow!(FatalEngineError::FailedLockEngine))?
+            .exit_code();
         info!("Exit code {:?}", exit_code);
         match exit_code {
             Some(e) => Ok(e),
             // If proc_exit is not call, return possible error and trap,
             // otherwise the actual return code or default success code `0`.
             None => {
-                info!("The return trace: {:?}, (it should not reach here).", return_from_main);
+                info!(
+                    "The return trace: {:?}, (it should not reach here).",
+                    return_from_main
+                );
                 return_from_main?;
                 Ok(0)
             }
@@ -1106,14 +1115,13 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(
-        &mut self,
-        program: Vec<u8>,
-        options: Options,
-    ) -> Result<u32> {
+    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32> {
         // NOTE: minimize the locking scope.
         {
-            let mut vfs = self.filesystem.lock().map_err(|_| anyhow!(FatalEngineError::FailedLockFileSystem))?;
+            let mut vfs = self
+                .filesystem
+                .lock()
+                .map_err(|_| anyhow!(FatalEngineError::FailedLockFileSystem))?;
             vfs.environment_variables = options.environment_variables;
             vfs.program_arguments = options.program_arguments;
             vfs.enable_clock = options.enable_clock;

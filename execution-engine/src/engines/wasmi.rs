@@ -9,15 +9,15 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use anyhow::{anyhow, Result};
 use crate::{
-    fs::{FileSystem, FileSystemResult},
     engines::common::{
         Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError,
         HostFunctionIndexOrName, MemoryHandler, VeracruzAPIName, WasiAPIName, WasiWrapper,
     },
+    fs::{FileSystem, FileSystemResult},
     Options,
 };
+use anyhow::{anyhow, Result};
 use log::error;
 use num::{FromPrimitive, ToPrimitive};
 use std::{boxed::Box, convert::TryFrom, mem, str::FromStr, string::ToString, vec::Vec};
@@ -411,10 +411,7 @@ impl TypeCheck {
 
     /// Check if the numbers of parameters in `args` is correct against the wasi function call `index`.
     /// Return FatalEngineError::BadArgumentsToHostFunction{ index }, if not.
-    pub(crate) fn check_args_number(
-        args: &RuntimeArgs,
-        index: WasiAPIName,
-    ) -> Result<()> {
+    pub(crate) fn check_args_number(args: &RuntimeArgs, index: WasiAPIName) -> Result<()> {
         if args.len() == Self::get_params(APIName::WasiAPIName(index)).len() {
             Ok(())
         } else {
@@ -579,9 +576,10 @@ impl Externals for WASMIRuntimeState {
             APIName::VeracruzAPIName(veracruz_call_index) => match veracruz_call_index {
                 VeracruzAPIName::FD_CREATE => self.veracruz_fd_create(args),
             },
-        }.map_err(|e|{
-            error!("{}",e);
-            FatalEngineError::Trap(format!("{}",e))
+        }
+        .map_err(|e| {
+            error!("{}", e);
+            FatalEngineError::Trap(format!("{}", e))
         })?;
         Ok(Some(RuntimeValue::I32((return_code as i16).into())))
     }
@@ -592,9 +590,9 @@ impl Externals for WASMIRuntimeState {
 impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     #[inline]
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
+    pub fn new(filesystem: FileSystem, options: &Options) -> FileSystemResult<Self> {
         Ok(Self {
-            vfs: WasiWrapper::new(filesystem, enable_clock)?,
+            vfs: WasiWrapper::new(filesystem, options)?,
             program_module: None,
             memory: None,
         })
@@ -1320,12 +1318,10 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(
-        &mut self,
-        program: Vec<u8>,
-        options: Options,
-    ) -> Result<u32> {
+    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32> {
         self.load_program(&program)?;
+        self.vfs.environment_variables = options.environment_variables;
+        self.vfs.program_arguments = options.program_arguments;
         self.vfs.enable_clock = options.enable_clock;
         self.vfs.enable_strace = options.enable_strace;
 

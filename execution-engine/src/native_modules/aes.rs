@@ -9,7 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult, Service};
+use crate::fs::{FileSystem, FileSystemResult};
+use crate::native_modules::common::Service;
 use psa_crypto::{
     operations::cipher::{decrypt, encrypt},
     operations::key_management,

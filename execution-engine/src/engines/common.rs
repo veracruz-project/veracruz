@@ -17,12 +17,12 @@
 
 #![allow(non_camel_case_types, clippy::too_many_arguments)]
 
-use anyhow::Result;
 use crate::{
-    fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
     engines::strace::Strace,
+    fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
     Options,
 };
+use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
@@ -835,14 +835,14 @@ impl WasiWrapper {
     /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
     /// `principal` from `filesystem`
     #[inline]
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
+    pub fn new(filesystem: FileSystem, options: &Options) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
-            environment_variables: Vec::new(),
-            program_arguments: Vec::new(),
+            environment_variables: options.environment_variables.clone(),
+            program_arguments: options.program_arguments.clone(),
             exit_code: None,
-            enable_clock,
-            enable_strace: false,
+            enable_clock: options.enable_clock,
+            enable_strace: options.enable_strace,
         })
     }
 
@@ -1982,7 +1982,9 @@ pub enum FatalEngineError {
     /// A lock could not be obtained for some reason, wrappiing the failure information as String.
     //#[error(display = "FatalEngineError: Failed to obtain lock {:?}.", _0)]
     //FailedToObtainLock(String),
-    #[error(display = "FatalEngineError: Failed to obtain lock on the engine or components of the engine.")]
+    #[error(
+        display = "FatalEngineError: Failed to obtain lock on the engine or components of the engine."
+    )]
     FailedLockEngine,
     #[error(display = "FatalEngineError: Failed to obtain lock on the file system.")]
     FailedLockFileSystem,
@@ -2027,9 +2029,5 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(
-        &mut self,
-        program: Vec<u8>,
-        options: Options,
-    ) -> Result<u32>;
+    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32>;
 }
