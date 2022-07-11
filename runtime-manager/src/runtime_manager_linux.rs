@@ -256,7 +256,6 @@ pub fn linux_main() -> Result<()> {
                     derr
                 );
                 derr
-                //RuntimeManagerError::BincodeError(derr)
             })?;
 
         info!("Received message: {:?}.", received_message);
@@ -377,7 +376,6 @@ pub fn linux_main() -> Result<()> {
                 serr
             );
             serr
-            //RuntimeManagerError::BincodeError(serr)
         })?;
 
         info!("Sending message: {:?}.", return_message);
@@ -385,7 +383,6 @@ pub fn linux_main() -> Result<()> {
         send_buffer(&mut fd, &return_buffer).map_err(|e| {
             error!("Failed to send message.  Error produced: {}.", e);
             e
-            //RuntimeManagerError::IOError(e)
         })?;
     }
 }

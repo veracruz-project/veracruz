@@ -11,7 +11,6 @@
 
 extern crate alloc;
 
-use anyhow::Result;
 use core::{convert::TryFrom, mem::size_of};
 use icecap_core::{
     config::*,
@@ -197,7 +196,7 @@ impl RuntimeManager {
         &self,
         _device_id: i32,
         challenge: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>)> {
+    ) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
         let csr = session_manager::generate_csr()?;
         let token = attestation_hack::native_attestation(&challenge, &csr)?;
         Ok((token, csr))

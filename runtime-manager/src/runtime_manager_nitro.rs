@@ -119,13 +119,11 @@ pub fn nitro_main() -> Result<()> {
             }
         };
         let return_buffer = bincode::serialize(&return_message)?;
-        //.map_err(|err| RuntimeManagerError::BincodeError(err))?;
         println!(
             "runtime_manager_nitro::main calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
         send_buffer(fd, &return_buffer)?;
-        //.map_err(|err| RuntimeManagerError::VeracruzSocketError(err))?;
     }
 }
 
