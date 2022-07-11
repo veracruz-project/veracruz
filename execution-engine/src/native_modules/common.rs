@@ -9,8 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use std::fmt::Debug;
 use crate::fs::{FileSystem, FileSystemResult};
+use std::fmt::Debug;
 
 pub trait Service: Send {
     fn name(&self) -> &str;

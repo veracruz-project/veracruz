@@ -17,8 +17,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::native_modules::{
-    common::Service,
-    aead::AeadService, aes::AesCounterModeService, postcard::PostcardService,
+    aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
 };
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},

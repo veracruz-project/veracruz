@@ -835,7 +835,15 @@ impl WasiWrapper {
     /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
     /// `principal` from `filesystem`
     #[inline]
-    pub fn new(filesystem: FileSystem, Options{environment_variables, program_arguments, enable_clock, enable_strace}: Options) -> FileSystemResult<Self> {
+    pub fn new(
+        filesystem: FileSystem,
+        Options {
+            environment_variables,
+            program_arguments,
+            enable_clock,
+            enable_strace,
+        }: Options,
+    ) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
             environment_variables,
@@ -1979,15 +1987,15 @@ pub enum FatalEngineError {
     /// Wrapper for direct error message.
     #[error(display = "FatalEngineError: WASM program returns code other than wasi ErrNo.")]
     ReturnedCodeError,
-    /// A lock could not be obtained for some reason, wrappiing the failure information as String.
-    //#[error(display = "FatalEngineError: Failed to obtain lock {:?}.", _0)]
-    //FailedToObtainLock(String),
+    /// The lock to engine could not be obtained.
     #[error(
         display = "FatalEngineError: Failed to obtain lock on the engine or components of the engine."
     )]
     FailedLockEngine,
+    /// The lock to file system could not be obtained.
     #[error(display = "FatalEngineError: Failed to obtain lock on the file system.")]
     FailedLockFileSystem,
+    /// Engine trap.
     #[error(display = "FatalEngineError: Wasm engine trap: {:?}", _0)]
     Trap(String),
 }

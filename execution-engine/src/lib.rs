@@ -69,9 +69,7 @@ pub fn execute(
     options: Options,
 ) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, options)?)
-        }
+        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, options)?),
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
