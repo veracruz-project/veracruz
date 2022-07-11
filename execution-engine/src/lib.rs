@@ -70,17 +70,17 @@ pub fn execute(
 ) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, &options)?)
+            Box::new(WASMIRuntimeState::new(filesystem, options)?)
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, &options)?)
+                    Box::new(WasmtimeRuntimeState::new(filesystem, options)?)
                 } else {
                     return Err(anyhow!(FatalEngineError::EngineIsNotReady));
                 }
             }
         }
     };
-    engine.invoke_entry_point(program, options)
+    engine.invoke_entry_point(program)
 }

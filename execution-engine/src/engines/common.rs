@@ -835,14 +835,14 @@ impl WasiWrapper {
     /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
     /// `principal` from `filesystem`
     #[inline]
-    pub fn new(filesystem: FileSystem, options: &Options) -> FileSystemResult<Self> {
+    pub fn new(filesystem: FileSystem, Options{environment_variables, program_arguments, enable_clock, enable_strace}: Options) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
-            environment_variables: options.environment_variables.clone(),
-            program_arguments: options.program_arguments.clone(),
+            environment_variables,
+            program_arguments,
+            enable_clock,
+            enable_strace,
             exit_code: None,
-            enable_clock: options.enable_clock,
-            enable_strace: options.enable_strace,
         })
     }
 
@@ -2029,5 +2029,5 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32>;
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32>;
 }

@@ -590,7 +590,7 @@ impl Externals for WASMIRuntimeState {
 impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     #[inline]
-    pub fn new(filesystem: FileSystem, options: &Options) -> FileSystemResult<Self> {
+    pub fn new(filesystem: FileSystem, options: Options) -> FileSystemResult<Self> {
         Ok(Self {
             vfs: WasiWrapper::new(filesystem, options)?,
             program_module: None,
@@ -1318,12 +1318,8 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32> {
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
         self.load_program(&program)?;
-        self.vfs.environment_variables = options.environment_variables;
-        self.vfs.program_arguments = options.program_arguments;
-        self.vfs.enable_clock = options.enable_clock;
-        self.vfs.enable_strace = options.enable_strace;
 
         let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
         let exit_code = self.vfs.exit_code();

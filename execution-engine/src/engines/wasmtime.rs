@@ -228,7 +228,7 @@ pub struct WasmtimeRuntimeState {
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(filesystem: FileSystem, options: &Options) -> Result<Self> {
+    pub fn new(filesystem: FileSystem, options: Options) -> Result<Self> {
         Ok(Self {
             filesystem: Arc::new(Mutex::new(WasiWrapper::new(filesystem, options)?)),
         })
@@ -1115,18 +1115,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// ExecutionEngine wrapper of invoke_entry_point.
     /// Raises a panic if the global wasmtime host is unavailable.
     #[inline]
-    fn invoke_entry_point(&mut self, program: Vec<u8>, options: Options) -> Result<u32> {
-        // NOTE: minimize the locking scope.
-        {
-            let mut vfs = self
-                .filesystem
-                .lock()
-                .map_err(|_| anyhow!(FatalEngineError::FailedLockFileSystem))?;
-            vfs.environment_variables = options.environment_variables;
-            vfs.program_arguments = options.program_arguments;
-            vfs.enable_clock = options.enable_clock;
-            vfs.enable_strace = options.enable_strace;
-        }
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
         self.invoke_engine(program)
     }
 }
