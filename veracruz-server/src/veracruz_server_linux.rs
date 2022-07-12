@@ -221,7 +221,7 @@ pub mod veracruz_server_linux {
                     e
                 );
 
-                VeracruzServerError::VeracruzUtilError(e)
+                e
             })?;
 
             // temporary directory to store image

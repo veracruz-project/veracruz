@@ -34,7 +34,7 @@ use crate::{
     engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
     fs::FileSystem,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use policy_utils::principal::ExecutionStrategy;
 use std::{boxed::Box, string::String, vec::Vec};
 

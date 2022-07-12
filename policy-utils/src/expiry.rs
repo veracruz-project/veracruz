@@ -46,7 +46,7 @@ impl Timepoint {
     ///
     /// Fails if the fields do not conform with the formatting expectations of
     /// ISO-8601.
-    pub fn new<T, U>(year: T, month: U, day: U, hour: U, minute: U) -> Result<Self, PolicyError>
+    pub fn new<T, U>(year: T, month: U, day: U, hour: U, minute: U) -> anyhow::Result<Self>
     where
         T: Into<u32>,
         U: Into<u8>,
@@ -56,32 +56,8 @@ impl Timepoint {
         let hour = hour.into();
         let minute = minute.into();
 
-        if minute > 59 {
-            return Err(PolicyError::CertificateFormatError(format!(
-                "invalid expiry minute {}",
-                minute
-            )));
-        }
-
-        if hour > 23 {
-            return Err(PolicyError::CertificateFormatError(format!(
-                "invalid expiry hour {}",
-                hour
-            )));
-        }
-
-        if day > 31 {
-            return Err(PolicyError::CertificateFormatError(format!(
-                "invalid expiry day {}",
-                day
-            )));
-        }
-
-        if month > 12 {
-            return Err(PolicyError::CertificateFormatError(format!(
-                "invalid expiry month {}",
-                month
-            )));
+        if minute > 59 || hour > 23 || day > 31 || month > 12 {
+            return Err(anyhow::anyhow!(PolicyError::FormatError));
         }
 
         Ok(Self {

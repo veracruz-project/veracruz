@@ -126,8 +126,8 @@ pub enum VeracruzServerError {
     },
     #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "VeracruzServer: PolicyError: {:?}.", _0)]
-    VeracruzUtilError(#[error(source)] policy_utils::error::PolicyError),
+    //#[error(display = "VeracruzServer: PolicyError: {:?}.", _0)]
+    //VeracruzUtilError(#[error(source)] policy_utils::error::PolicyError),
     #[error(display = "VeracruzServer: Postcard Error: {:?}.", _0)]
     PostcardError(#[error(source)] postcard::Error),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]
@@ -178,11 +178,20 @@ pub enum VeracruzServerError {
     /// Runtime manager did not start up correctly.
     #[error(display = "Runtime manager did not start up correctly")]
     RuntimeManagerFailed,
+    /// Return the anyhow.
+    #[error(display = "Runtime manager did not start up correctly")]
+    Anyhow(anyhow::Error),
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         VeracruzServerError::LockError(format!("{:?}", error))
+    }
+}
+
+impl From<anyhow::Error> for VeracruzServerError {
+    fn from(error: anyhow::Error) -> Self {
+        VeracruzServerError::Anyhow(error)
     }
 }
 

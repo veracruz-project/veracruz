@@ -12,6 +12,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow::{anyhow, Result};
 use super::error::PolicyError;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
@@ -213,11 +214,9 @@ impl Identity<String> {
     /// NOTE: the X509 apparently does not check the end of certificates for a
     /// valid certificate termination line.  As a result, we check that in this
     /// function.
-    pub fn assert_valid(&self) -> Result<(), PolicyError> {
+    pub fn assert_valid(&self) -> Result<()> {
         if !self.certificate().ends_with("-----END CERTIFICATE-----") {
-            return Err(PolicyError::CertificateFormatError(
-                self.certificate().clone(),
-            ));
+            return Err(anyhow!(PolicyError::FormatError));
         }
 
         #[cfg(features = "std")]
@@ -228,9 +227,7 @@ impl Identity<String> {
             let parsed_cert = parsed_cert.0.parse_x509()?.tbs_certificate;
 
             if parsed_cert.validity.time_to_expiration().is_none() {
-                return Err(PolicyError::CertificateExpireError(
-                    self.certificate().clone(),
-                ));
+                return Err(anyhow!(PolicyError::FormatError));
             }
         }
 

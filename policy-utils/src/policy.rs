@@ -34,8 +34,9 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use super::Platform;
+use anyhow::{anyhow, Result};
 use super::{
+    Platform,
     error::PolicyError,
     expiry::Timepoint,
     principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable},
@@ -124,7 +125,7 @@ impl Policy {
         file_hashes: Vec<FileHash>,
         enable_clock: bool,
         max_memory_mib: u32,
-    ) -> Result<Self, PolicyError> {
+    ) -> Result<Self> {
         let policy = Self {
             identities,
             proxy_service_cert,
@@ -152,7 +153,7 @@ impl Policy {
     /// Parses a Veracruz policy type from a JSON-encoded string, `json`,
     /// validating the well-formedness of the resulting policy in the process.
     /// Returns `Ok(policy)` iff these well-formedness checks pass.
-    pub fn from_json(json: &str) -> Result<Self, PolicyError> {
+    pub fn from_json(json: &str) -> Result<Self> {
         // parse json
         let mut policy: Self = serde_json::from_str(json)?;
         policy.assert_valid()?;
@@ -197,40 +198,12 @@ impl Policy {
     /// Returns the hash of the trusted Veracruz runtime, associated with this
     /// policy.
     #[inline]
-    pub fn runtime_manager_hash(&self, platform: &Platform) -> Result<&String, PolicyError> {
+    pub fn runtime_manager_hash(&self, platform: &Platform) -> Result<&String> {
         let hash = match platform {
-            Platform::Linux => match &self.runtime_manager_hash_linux {
-                Some(hash) => hash,
-                None => {
-                    return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_linux".to_string(),
-                    ))
-                }
-            },
-            Platform::Nitro => match &self.runtime_manager_hash_nitro {
-                Some(hash) => hash,
-                None => {
-                    return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_nitro".to_string(),
-                    ))
-                }
-            },
-            Platform::IceCap => match &self.runtime_manager_hash_icecap {
-                Some(hash) => hash,
-                None => {
-                    return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_icecap".to_string(),
-                    ))
-                }
-            },
-            Platform::Mock => match &self.runtime_manager_hash_nitro {
-                Some(hash) => hash,
-                None => {
-                    return Err(PolicyError::MissingPolicyFieldError(
-                        "runtime_manager_hash_nitro".to_string(),
-                    ))
-                }
-            },
+            Platform::Linux => self.runtime_manager_hash_linux.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::Nitro => self.runtime_manager_hash_nitro.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::IceCap => self.runtime_manager_hash_icecap.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::Mock => self.runtime_manager_hash_nitro.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
         };
         Ok(&hash)
     }
@@ -275,7 +248,7 @@ impl Policy {
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
     /// is found to be invalid.  In all other cases, `Ok(())` is returned.
-    fn assert_valid(&self) -> Result<(), PolicyError> {
+    fn assert_valid(&self) -> Result<()> {
         let mut client_ids = Vec::new();
 
         for identity in self.identities.iter() {
@@ -283,7 +256,7 @@ impl Policy {
 
             // check IDs of all the participants
             if client_ids.contains(identity.id()) {
-                return Err(PolicyError::DuplicatedClientIDError(*identity.id() as u64));
+                return Err(anyhow!(PolicyError::FormatError));
             }
             client_ids.push(*identity.id());
         }
@@ -316,13 +289,13 @@ impl Policy {
     /// X509 certificate, `cert`, is present within the list of
     /// identities/principals associated with this policy.  Otherwise, returns
     /// an error.
-    pub fn check_client_id(&self, cert: &str) -> Result<u64, PolicyError> {
+    pub fn check_client_id(&self, cert: &str) -> Result<u64> {
         for identity in self.identities().iter() {
             if identity.certificate().as_str() == cert {
                 return Ok(*identity.id() as u64);
             }
         }
-        Err(PolicyError::InvalidClientCertificateError(cert.to_string()))
+        Err(anyhow!(PolicyError::InvalidClientCertificateError(cert.to_string())))
     }
 
     /// Return the CapabilityTable in this policy. It contains capabilities related to all
@@ -344,7 +317,7 @@ impl Policy {
     }
 
     /// Return the file hash table, mapping filenames to their expected hashes.
-    pub fn get_file_hash_table(&self) -> Result<HashMap<PathBuf, Vec<u8>>, PolicyError> {
+    pub fn get_file_hash_table(&self) -> Result<HashMap<PathBuf, Vec<u8>>> {
         let mut table = HashMap::new();
 
         for file_hash in self.file_hashes.iter() {
@@ -357,7 +330,7 @@ impl Policy {
     }
 
     /// Return the program input table, mapping program filenames to their expected input filenames.
-    pub fn get_input_table(&self) -> Result<HashMap<String, Vec<PathBuf>>, PolicyError> {
+    pub fn get_input_table(&self) -> Result<HashMap<String, Vec<PathBuf>>> {
         let mut table = HashMap::new();
         for program in &self.programs {
             let program_file_name = program.program_file_name();
