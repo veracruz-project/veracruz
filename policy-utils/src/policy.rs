@@ -34,13 +34,13 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use anyhow::{anyhow, Result};
 use super::{
-    Platform,
     error::PolicyError,
     expiry::Timepoint,
     principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable},
+    Platform,
 };
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -200,10 +200,22 @@ impl Policy {
     #[inline]
     pub fn runtime_manager_hash(&self, platform: &Platform) -> Result<&String> {
         let hash = match platform {
-            Platform::Linux => self.runtime_manager_hash_linux.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
-            Platform::Nitro => self.runtime_manager_hash_nitro.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
-            Platform::IceCap => self.runtime_manager_hash_icecap.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
-            Platform::Mock => self.runtime_manager_hash_nitro.as_ref().ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::Linux => self
+                .runtime_manager_hash_linux
+                .as_ref()
+                .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::Nitro => self
+                .runtime_manager_hash_nitro
+                .as_ref()
+                .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::IceCap => self
+                .runtime_manager_hash_icecap
+                .as_ref()
+                .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
+            Platform::Mock => self
+                .runtime_manager_hash_nitro
+                .as_ref()
+                .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
         };
         Ok(&hash)
     }
@@ -295,7 +307,9 @@ impl Policy {
                 return Ok(*identity.id() as u64);
             }
         }
-        Err(anyhow!(PolicyError::InvalidClientCertificateError(cert.to_string())))
+        Err(anyhow!(PolicyError::InvalidClientCertificateError(
+            cert.to_string()
+        )))
     }
 
     /// Return the CapabilityTable in this policy. It contains capabilities related to all

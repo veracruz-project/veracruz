@@ -26,7 +26,7 @@ use bincode::{deserialize, serialize};
 use clap::{App, Arg};
 use hex::decode_to_slice;
 use io_utils::fd::{receive_buffer, send_buffer};
-use log::{error, info, trace};
+use log::{error, info};
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };

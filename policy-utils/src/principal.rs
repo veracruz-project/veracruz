@@ -12,8 +12,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use anyhow::{anyhow, Result};
 use super::error::PolicyError;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
