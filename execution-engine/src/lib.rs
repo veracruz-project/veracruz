@@ -22,22 +22,24 @@ extern crate std;
 #[macro_use]
 extern crate num_derive;
 
+mod engines;
 pub mod fs;
 mod native_modules;
-mod wasi;
 // Expose the error to the external.
-pub use wasi::common::FatalEngineError;
+pub use engines::common::FatalEngineError;
 
 #[cfg(feature = "std")]
-use crate::wasi::wasmtime::WasmtimeRuntimeState;
+use crate::engines::wasmtime::WasmtimeRuntimeState;
 use crate::{
+    engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
     fs::FileSystem,
-    wasi::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
 };
+use anyhow::{anyhow, Result};
 use policy_utils::principal::ExecutionStrategy;
 use std::{boxed::Box, string::String, vec::Vec};
 
 /// Runtime options for a program.
+#[derive(Default)]
 pub struct Options {
     /// A list of key-value pairs corresponding to the environment variables of the
     /// program, if any.
@@ -53,18 +55,6 @@ pub struct Options {
     pub enable_strace: bool,
 }
 
-impl Default for Options {
-    #[inline]
-    fn default() -> Options {
-        Options {
-            environment_variables: Vec::new(),
-            program_arguments: Vec::new(),
-            enable_clock: false,
-            enable_strace: false,
-        }
-    }
-}
-
 /// The top-level function executes program `program` on
 /// the `filesystem` handler, in which inputs, outputs and programs are stored.
 /// The function requires execution `strategy`.
@@ -77,20 +67,18 @@ pub fn execute(
     filesystem: FileSystem,
     program: Vec<u8>,
     options: Options,
-) -> Result<u32, FatalEngineError> {
+) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, options.enable_clock)?)
-        }
+        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, options)?),
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, options.enable_clock)?)
+                    Box::new(WasmtimeRuntimeState::new(filesystem, options)?)
                 } else {
-                    return Err(FatalEngineError::EngineIsNotReady);
+                    return Err(anyhow!(FatalEngineError::EngineIsNotReady));
                 }
             }
         }
     };
-    engine.invoke_entry_point(program, options)
+    engine.invoke_entry_point(program)
 }

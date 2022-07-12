@@ -11,8 +11,9 @@
 //! information on licensing and copyright.
 
 use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
+use anyhow::{anyhow, Result};
 use policy_utils::principal::Principal;
-use std::{result::Result, vec::Vec};
+use std::vec::Vec;
 use transport_protocol::{
     transport_protocol::{
         RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
@@ -34,7 +35,7 @@ fn response_success(result: Option<Vec<u8>>) -> Vec<u8> {
 
 /// Encodes an error code indicating that somebody sent an invalid or malformed
 /// protocol request.
-fn response_invalid_request() -> super::ProvisioningResult {
+fn response_invalid_request() -> ProvisioningResult {
     let rst = transport_protocol::serialize_result(
         transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST as i32,
         None,
@@ -114,17 +115,16 @@ fn dispatch_on_read(
 /// guarantee better security, but if a client detects something's wrong, they
 /// may want the ability.
 fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
-    let mut protocol_state_guard = super::PROTOCOL_STATE.lock()?;
+    let mut protocol_state_guard = super::PROTOCOL_STATE
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockProtocolState))?;
     let protocol_state = protocol_state_guard
         .as_mut()
-        .ok_or_else(|| RuntimeManagerError::UninitializedProtocolState)?;
+        .ok_or(anyhow!(RuntimeManagerError::UninitializedProtocolState))?;
 
     match request {
         MESSAGE::write_file(data) => dispatch_on_write(protocol_state, data, client_id),
         MESSAGE::append_file(data) => dispatch_on_append(protocol_state, data, client_id),
-        MESSAGE::request_pi_hash(_) => {
-            Ok(Some(transport_protocol::serialize_pi_hash(b"deprecated")?))
-        }
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
         MESSAGE::request_result(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
@@ -147,12 +147,12 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
 fn parse_incoming_buffer(
     tls_session_id: u32,
     input: Vec<u8>,
-) -> Result<Option<transport_protocol::RuntimeManagerRequest>, RuntimeManagerError> {
+) -> Result<Option<transport_protocol::RuntimeManagerRequest>> {
     match transport_protocol::parse_runtime_manager_request(Some(tls_session_id), &input) {
         Ok(v) => Ok(Some(v)),
         Err(e) => match e {
             TransportProtocolError::PartialBuffer(_) => Ok(None),
-            e2 => Err(RuntimeManagerError::TransportProtocolError(e2)),
+            e2 => Err(anyhow!(e2)),
         },
     }
 }

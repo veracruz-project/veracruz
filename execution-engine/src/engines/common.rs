@@ -18,11 +18,11 @@
 #![allow(non_camel_case_types, clippy::too_many_arguments)]
 
 use crate::{
+    engines::strace::Strace,
     fs::{FileSystem, FileSystemResult, TryFromOrErrNo},
-    wasi::strace::Strace,
     Options,
 };
-
+use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
@@ -835,14 +835,22 @@ impl WasiWrapper {
     /// Creates a new initial `WasiWrapper`. It will spawn a new filesystem handler for the
     /// `principal` from `filesystem`
     #[inline]
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
+    pub fn new(
+        filesystem: FileSystem,
+        Options {
+            environment_variables,
+            program_arguments,
+            enable_clock,
+            enable_strace,
+        }: Options,
+    ) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
-            environment_variables: Vec::new(),
-            program_arguments: Vec::new(),
-            exit_code: None,
+            environment_variables,
+            program_arguments,
             enable_clock,
-            enable_strace: false,
+            enable_strace,
+            exit_code: None,
         })
     }
 
@@ -1979,23 +1987,17 @@ pub enum FatalEngineError {
     /// Wrapper for direct error message.
     #[error(display = "FatalEngineError: WASM program returns code other than wasi ErrNo.")]
     ReturnedCodeError,
-    /// A lock could not be obtained for some reason, wrappiing the failure information as String.
-    #[error(display = "ProvisioningError: Failed to obtain lock {:?}.", _0)]
-    FailedToObtainLock(String),
-    /// Wrapper for WASI Trap.
-    #[error(display = "FatalEngineError: WASMIError: Trap: {:?}.", _0)]
-    WASMITrapError(#[source(error)] wasmi::Trap),
-    /// Wrapper for WASI Error other than Trap.
-    #[error(display = "FatalEngineError: WASMIError {:?}.", _0)]
-    WASMIError(#[source(error)] wasmi::Error),
-    #[error(display = "FatalEngineError: Wasi-ErrNo {:?}.", _0)]
-    WASIError(#[source(error)] wasi_types::ErrNo),
-    /// anyhow Error Wrapper.
-    #[error(display = "FatalEngineError: anyhow Error {:?}.", _0)]
-    AnyhowError(String),
-    /// Wasmtime trap.
-    #[error(display = "FatalEngineError: Wasmtime Trap Error {:?}.", _0)]
-    WasmtimeTrapError(String),
+    /// The lock to engine could not be obtained.
+    #[error(
+        display = "FatalEngineError: Failed to obtain lock on the engine or components of the engine."
+    )]
+    FailedLockEngine,
+    /// The lock to file system could not be obtained.
+    #[error(display = "FatalEngineError: Failed to obtain lock on the file system.")]
+    FailedLockFileSystem,
+    /// Engine trap.
+    #[error(display = "FatalEngineError: Wasm engine trap: {:?}", _0)]
+    Trap(String),
 }
 
 /// Either the index or the name of a host call
@@ -2003,34 +2005,6 @@ pub enum FatalEngineError {
 pub enum HostFunctionIndexOrName {
     Index(usize),
     Name(String),
-}
-
-// Convertion from any error raised by any mutex of type <T> to FatalEngineError.
-impl<T> From<std::sync::PoisonError<T>> for FatalEngineError {
-    fn from(error: std::sync::PoisonError<T>) -> Self {
-        FatalEngineError::FailedToObtainLock(format!("{:?}", error))
-    }
-}
-
-impl From<anyhow::Error> for FatalEngineError {
-    fn from(error: anyhow::Error) -> Self {
-        FatalEngineError::AnyhowError(format!("{:?}", error))
-    }
-}
-
-#[cfg(any(feature = "std", feature = "nitro"))]
-impl From<wasmtime::Trap> for FatalEngineError {
-    fn from(error: wasmtime::Trap) -> Self {
-        FatalEngineError::WasmtimeTrapError(format!("{:?}", error))
-    }
-}
-
-impl From<WasiAPIName> for FatalEngineError {
-    fn from(error: WasiAPIName) -> Self {
-        FatalEngineError::BadArgumentsToHostFunction {
-            function_name: error,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2063,9 +2037,5 @@ pub trait ExecutionEngine: Send {
     /// Invokes the entry point of the WASM program `file_name`.  Will fail if
     /// the WASM program fails at runtime.  On success, returns the succ/error code
     /// returned by the WASM program entry point as an `i32` value.
-    fn invoke_entry_point(
-        &mut self,
-        program: Vec<u8>,
-        options: Options,
-    ) -> Result<u32, FatalEngineError>;
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32>;
 }

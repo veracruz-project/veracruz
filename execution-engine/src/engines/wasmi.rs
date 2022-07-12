@@ -10,13 +10,15 @@
 //! and copyright information.
 
 use crate::{
-    fs::{FileSystem, FileSystemResult},
-    wasi::common::{
+    engines::common::{
         Bound, BoundMut, EntrySignature, ExecutionEngine, FatalEngineError,
         HostFunctionIndexOrName, MemoryHandler, VeracruzAPIName, WasiAPIName, WasiWrapper,
     },
+    fs::{FileSystem, FileSystemResult},
     Options,
 };
+use anyhow::{anyhow, Result};
+use log::error;
 use num::{FromPrimitive, ToPrimitive};
 use std::{boxed::Box, convert::TryFrom, mem, str::FromStr, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
@@ -142,7 +144,7 @@ pub(crate) struct WASMIRuntimeState {
     /// A reference to the WASM program's linear memory (or "heap").
     memory: Option<MemoryRef>,
 }
-pub(crate) type WasiResult = Result<ErrNo, FatalEngineError>;
+pub(crate) type WasiResult = Result<ErrNo>;
 
 /// The return type for H-Call implementations.
 ///
@@ -409,14 +411,13 @@ impl TypeCheck {
 
     /// Check if the numbers of parameters in `args` is correct against the wasi function call `index`.
     /// Return FatalEngineError::BadArgumentsToHostFunction{ index }, if not.
-    pub(crate) fn check_args_number(
-        args: &RuntimeArgs,
-        index: WasiAPIName,
-    ) -> Result<(), FatalEngineError> {
+    pub(crate) fn check_args_number(args: &RuntimeArgs, index: WasiAPIName) -> Result<()> {
         if args.len() == Self::get_params(APIName::WasiAPIName(index)).len() {
             Ok(())
         } else {
-            Err(index.into())
+            Err(anyhow!(FatalEngineError::BadArgumentsToHostFunction {
+                function_name: index,
+            }))
         }
     }
 }
@@ -449,10 +450,10 @@ fn check_main(module: &ModuleInstance) -> EntrySignature {
 
 /// Finds the linear memory of the WASM module, `module`, and returns it,
 /// otherwise creating a fatal host error that will kill the Veracruz instance.
-fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef, FatalEngineError> {
+fn get_module_memory(module: &ModuleRef) -> Result<MemoryRef> {
     match module.export_by_name(WasiWrapper::LINEAR_MEMORY_NAME) {
         Some(ExternVal::Memory(memoryref)) => Ok(memoryref),
-        _otherwise => Err(FatalEngineError::NoMemoryRegistered),
+        _otherwise => Err(anyhow!(FatalEngineError::NoMemoryRegistered)),
     }
 }
 
@@ -575,7 +576,11 @@ impl Externals for WASMIRuntimeState {
             APIName::VeracruzAPIName(veracruz_call_index) => match veracruz_call_index {
                 VeracruzAPIName::FD_CREATE => self.veracruz_fd_create(args),
             },
-        }?;
+        }
+        .map_err(|e| {
+            error!("{}", e);
+            FatalEngineError::Trap(format!("{}", e))
+        })?;
         Ok(Some(RuntimeValue::I32((return_code as i16).into())))
     }
 }
@@ -585,9 +590,9 @@ impl Externals for WASMIRuntimeState {
 impl WASMIRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
     #[inline]
-    pub fn new(filesystem: FileSystem, enable_clock: bool) -> FileSystemResult<Self> {
+    pub fn new(filesystem: FileSystem, options: Options) -> FileSystemResult<Self> {
         Ok(Self {
-            vfs: WasiWrapper::new(filesystem, enable_clock)?,
+            vfs: WasiWrapper::new(filesystem, options)?,
             program_module: None,
             memory: None,
         })
@@ -597,11 +602,11 @@ impl WASMIRuntimeState {
 
     #[inline]
     /// Returns the ref to the wasm memory or the ErrNo if fails.
-    pub(crate) fn memory(&self) -> Result<MemoryRef, FatalEngineError> {
+    pub(crate) fn memory(&self) -> Result<MemoryRef> {
         match &self.memory {
             //NOTE: The cost is very minimum as it is a reference to memory.
             Some(m) => Ok(m.clone()),
-            None => Err(FatalEngineError::NoMemoryRegistered),
+            None => Err(anyhow!(FatalEngineError::NoMemoryRegistered)),
         }
     }
 
@@ -612,7 +617,7 @@ impl WASMIRuntimeState {
     /// Loads a compiled program into the host state.  Tries to parse `buffer`
     /// to obtain a WASM `Module` struct.  Returns an appropriate error if this
     /// fails.
-    fn load_program(&mut self, buffer: &[u8]) -> Result<(), FatalEngineError> {
+    fn load_program(&mut self, buffer: &[u8]) -> Result<()> {
         let module = Module::from_buffer(buffer)?;
         let env_resolver = wasmi::ImportsBuilder::new()
             .with_resolver(WasiWrapper::WASI_SNAPSHOT_MODULE_NAME, self)
@@ -620,7 +625,7 @@ impl WASMIRuntimeState {
 
         let not_started_module_ref = ModuleInstance::new(&module, &env_resolver)?;
         if not_started_module_ref.has_start() {
-            return Err(FatalEngineError::InvalidWASMModule);
+            return Err(anyhow!(FatalEngineError::InvalidWASMModule));
         }
 
         let module_ref = not_started_module_ref.assert_no_start();
@@ -1313,14 +1318,8 @@ impl ExecutionEngine for WASMIRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    fn invoke_entry_point(
-        &mut self,
-        program: Vec<u8>,
-        options: Options,
-    ) -> Result<u32, FatalEngineError> {
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
         self.load_program(&program)?;
-        self.vfs.enable_clock = options.enable_clock;
-        self.vfs.enable_strace = options.enable_strace;
 
         let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
         let exit_code = self.vfs.exit_code();
@@ -1334,11 +1333,11 @@ impl ExecutionEngine for WASMIRuntimeState {
             Ok(Some(RuntimeValue::I32(c))) => Ok(c as u32),
             // NOTE: Surpress the trap, if the `proc_exit` is called.
             //       In this case, the error code is exit_code.
-            Ok(Some(_)) => Err(FatalEngineError::ReturnedCodeError),
+            Ok(Some(_)) => Err(anyhow!(FatalEngineError::ReturnedCodeError)),
             // NOTE: Surpress the trap, if the `proc_exit` is called.
             //       In this case, the error code is exit_code.
-            Err(Error::Trap(trap)) => exit_code.ok_or(FatalEngineError::WASMITrapError(trap)),
-            Err(err) => Err(FatalEngineError::WASMIError(err)),
+            Err(Error::Trap(trap)) => exit_code.ok_or(anyhow!(trap)),
+            Err(err) => Err(anyhow!(err)),
         }
     }
 }

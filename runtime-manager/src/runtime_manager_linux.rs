@@ -21,6 +21,7 @@ use crate::managers::{
     },
     RuntimeManagerError,
 };
+use anyhow::{anyhow, Result};
 use bincode::{deserialize, serialize};
 use clap::{App, Arg};
 use hex::decode_to_slice;
@@ -83,7 +84,7 @@ fn native_attestation(
     csr: Vec<u8>,
     challenge: Vec<u8>,
     runtime_manager_hash: &[u8],
-) -> Result<Vec<u8>, RuntimeManagerError> {
+) -> Result<Vec<u8>> {
     let csr_hash = sha256(&csr);
 
     let mut root_key_handle: u32 = 0;
@@ -97,10 +98,10 @@ fn native_attestation(
     };
 
     if 0 != ret {
-        return Err(RuntimeManagerError::UnsafeCallError(
+        return Err(anyhow!(RuntimeManagerError::UnsafeCallError(
             "psa_initial_attest_load_key",
             ret as u32,
-        ));
+        )));
     }
 
     let mut token = Vec::with_capacity(2048);
@@ -123,10 +124,10 @@ fn native_attestation(
     };
 
     if 0 != ret {
-        return Err(RuntimeManagerError::UnsafeCallError(
+        return Err(anyhow!(RuntimeManagerError::UnsafeCallError(
             "psa_initial_attest_get_token",
             ret as u32,
-        ));
+        )));
     }
 
     unsafe { token.set_len(token_len as usize) };
@@ -134,10 +135,10 @@ fn native_attestation(
     let ret = unsafe { psa_initial_attest_remove_key(root_key_handle) };
 
     if 0 != ret {
-        return Err(RuntimeManagerError::UnsafeCallError(
+        return Err(anyhow!(RuntimeManagerError::UnsafeCallError(
             "psa_initial_attest_remove_key",
             ret as u32,
-        ));
+        )));
     }
 
     Ok(token)
@@ -150,7 +151,7 @@ fn native_attestation(
 /// Main entry point for Linux: parses command line arguments to find the port
 /// number we should be listening on for incoming connections from the Veracruz
 /// server.  Parses incoming messages, and acts on them.
-pub fn linux_main() -> Result<(), RuntimeManagerError> {
+pub fn linux_main() -> Result<()> {
     env_logger::init();
 
     let matches = App::new("Linux runtime manager enclave")
@@ -185,7 +186,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
         port
     } else {
         error!("Did not receive any port to listen on.  Exiting...");
-        return Err(RuntimeManagerError::CommandLineArguments);
+        return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
     let measurement = if let Some(measurement) = matches.value_of("runtime_manager_measurement") {
@@ -196,7 +197,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
         measurement
     } else {
         error!("Did not receive any expected Runtime Manager enclave measurement.  Exiting...");
-        return Err(RuntimeManagerError::CommandLineArguments);
+        return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
     let mut measurement_bytes = vec![0u8; 32];
@@ -207,7 +208,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
             measurement, err
         );
 
-        return Err(RuntimeManagerError::CommandLineArguments);
+        return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     }
 
     let address = format!("{}:{}", INCOMING_ADDRESS, port);
@@ -217,7 +218,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
     let listener = TcpListener::bind(&address).map_err(|e| {
         error!("Could not bind TCP listener.  Error produced: {}.", e);
 
-        RuntimeManagerError::IOError(e)
+        anyhow!(e)
     })?;
 
     info!("TCP listener created on {}.", address);
@@ -231,7 +232,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
             "Failed to accept any incoming TCP connection.  Error produced: {}.",
             ioerr
         );
-        RuntimeManagerError::IOError(ioerr)
+        anyhow!(ioerr)
     })?;
 
     // Configure TCP to flush outgoing buffers immediately. This reduces latency
@@ -245,7 +246,7 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
 
         let received_buffer: Vec<u8> = receive_buffer(&mut fd).map_err(|err| {
             error!("Failed to receive message.  Error produced: {}.", err);
-            RuntimeManagerError::IOError(err)
+            anyhow!(err)
         })?;
 
         let received_message: RuntimeManagerRequest =
@@ -254,11 +255,10 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                     "Failed to deserialize received message.  Error produced: {}.",
                     derr
                 );
-                RuntimeManagerError::BincodeError(derr)
+                derr
             })?;
 
-        info!("Received message.");
-        trace!("Received message: {:?}.", received_message);
+        info!("Received message: {:?}.", received_message);
 
         let return_message = match received_message {
             RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
@@ -375,15 +375,14 @@ pub fn linux_main() -> Result<(), RuntimeManagerError> {
                 "Failed to serialize returned message.  Error produced: {}.",
                 serr
             );
-            RuntimeManagerError::BincodeError(serr)
+            serr
         })?;
 
-        info!("Sending message");
-        trace!("Sending message: {:?}.", return_message);
+        info!("Sending message: {:?}.", return_message);
 
         send_buffer(&mut fd, &return_buffer).map_err(|e| {
             error!("Failed to send message.  Error produced: {}.", e);
-            RuntimeManagerError::IOError(e)
+            e
         })?;
     }
 }
