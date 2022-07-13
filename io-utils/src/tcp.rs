@@ -11,7 +11,6 @@
 
 use anyhow::Result;
 use super::{
-    error::SocketError,
     fd::{receive_buffer, send_buffer},
 };
 use bincode::{deserialize, serialize};
