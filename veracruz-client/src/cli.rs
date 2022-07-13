@@ -9,7 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use policy_utils::{error::PolicyError, parsers, policy::Policy};
+use anyhow::anyhow;
+use policy_utils::{parsers, policy::Policy};
 use std::{fs, io, io::Read, io::Write, path, process};
 use structopt::StructOpt;
 use veracruz_client::VeracruzClient;
@@ -152,7 +153,7 @@ async fn main() {
 
     // load policy
     let policy = fs::read_to_string(&opt.policy_path)
-        .map_err(|err| PolicyError::from(err))
+        .map_err(|err| anyhow!(err))
         .and_then(|policy_json| Policy::from_json(&policy_json));
     let policy = match policy {
         Ok(policy) => policy,

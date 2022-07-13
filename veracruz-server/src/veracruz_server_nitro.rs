@@ -49,7 +49,7 @@ pub mod veracruz_server_nitro {
                     e
                 );
 
-                VeracruzServerError::HttpError(e)
+                e
             })?;
 
             println!("VeracruzServerNitro::new instantiating Runtime Manager");
@@ -63,8 +63,7 @@ pub mod veracruz_server_nitro {
                     &runtime_manager_eif_path,
                     true,
                     *policy.max_memory_mib(),
-                )
-                .map_err(|err| VeracruzServerError::NitroError(err))?
+                )?
             };
             #[cfg(not(feature = "debug"))]
             let runtime_manager_enclave = {
@@ -74,8 +73,7 @@ pub mod veracruz_server_nitro {
                     &runtime_manager_eif_path,
                     false,
                     *policy.max_memory_mib(),
-                )
-                .map_err(VeracruzServerError::NitroError)?
+                )?
             };
             println!("VeracruzServerNitro::new NitroEnclave::new returned");
             let meta = Self {
@@ -269,8 +267,7 @@ pub mod veracruz_server_nitro {
         challenge_id: i32,
     ) -> Result<Vec<Vec<u8>>, VeracruzServerError> {
         let serialized_nitro_attestation_doc_request =
-            transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)
-                .map_err(VeracruzServerError::TransportProtocol)?;
+            transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)?;
         let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
         let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
         println!(
@@ -283,7 +280,7 @@ pub mod veracruz_server_nitro {
                 e
             );
 
-            VeracruzServerError::HttpError(e)
+            e
         })?;
 
         println!(
@@ -291,9 +288,8 @@ pub mod veracruz_server_nitro {
             received_body
         );
 
-        let body_vec = base64::decode(&received_body).map_err(VeracruzServerError::Base64Decode)?;
-        let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)
-            .map_err(VeracruzServerError::TransportProtocol)?;
+        let body_vec = base64::decode(&received_body)?;
+        let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
 
         let (re_cert, ca_cert) = if response.has_cert_chain() {
             let cert_chain = response.get_cert_chain();

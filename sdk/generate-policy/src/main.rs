@@ -10,6 +10,7 @@
 //! and copyright information.
 
 use std::{
+    fmt::Debug,
     convert::TryFrom,
     fs::{read_to_string, File},
     io::{Read, Write},
@@ -40,11 +41,9 @@ use wasi_types::Rights;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Aborts the program with a message on `stderr`.
-fn abort_with<T>(msg: T) -> !
-where
-    T: Into<String>,
+fn abort_with<T: Debug>(msg: T) -> !
 {
-    eprintln!("{}", msg.into());
+    eprintln!("{:?}", msg);
     exit(1);
 }
 
@@ -371,7 +370,7 @@ list of files may be provided.")
             .map(|b| match parse_renamable_paths(b) {
                 Ok(paths) => paths,
                 Err(err) => {
-                    abort_with(err.to_string_lossy());
+                    abort_with(err);
                 }
             })
             .flatten()
@@ -387,7 +386,7 @@ list of files may be provided.")
             .map(|b| match parse_renamable_paths(b) {
                 Ok(paths) => paths,
                 Err(err) => {
-                    abort_with(err.to_string_lossy());
+                    abort_with(err);
                 }
             })
             .flatten()

@@ -15,6 +15,7 @@
 
 #[cfg(feature = "std")]
 use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
+use anyhow::Result;
 #[cfg(feature = "std")]
 use std::{borrow::Cow, ffi, path};
 
@@ -30,7 +31,7 @@ use std::{borrow::Cow, ffi, path};
 pub fn parse_renamable_path(s: &ffi::OsStr) -> Result<(String, path::PathBuf), ffi::OsString> {
     let s = s
         .to_str()
-        .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
+        .ok_or(ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
     match s.splitn(2, '=').collect::<Vec<_>>().as_slice() {
         [name, path] => Ok((String::from(*name), path::PathBuf::from(*path))),
@@ -55,7 +56,7 @@ pub fn parse_renamable_paths(
 ) -> Result<Vec<(String, path::PathBuf)>, ffi::OsString> {
     let s = s
         .to_str()
-        .ok_or_else(|| ffi::OsString::from(format!("invalid path: {:?}", s)))?;
+        .ok_or(ffi::OsString::from(format!("invalid path: {:?}", s)))?;
 
     s.split(',')
         .map(|s| parse_renamable_path(s.as_ref()))

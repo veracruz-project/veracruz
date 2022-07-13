@@ -11,13 +11,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing all copyright.
 
-/// Platform-specific material, or material that is common to all
-/// platforms/backends that Veracruz supports all does not fit elsewhere.
-pub mod platform;
-
-#[cfg(feature = "nitro")]
-pub use crate::platform::nitro::*;
-
 /// Material related to cerficate signing requests (CSR).
 pub mod csr;
 

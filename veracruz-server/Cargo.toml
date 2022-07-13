@@ -46,6 +46,7 @@ nitro = [
 ]
 
 [dependencies]
+anyhow = "1"
 actix-http = "3"
 actix-rt = { version = "2", optional = true }
 actix-web = "4"

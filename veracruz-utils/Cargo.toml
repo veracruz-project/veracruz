@@ -27,6 +27,7 @@ std = [
 ]
 
 [dependencies]
+anyhow = "1"
 bincode = { version = "1.2.1", default-features = false, optional = true }
 err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }

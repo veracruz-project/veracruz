@@ -9,9 +9,10 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow::anyhow;
 use actix_rt;
 use log::info;
-use policy_utils::{error::PolicyError, policy::Policy};
+use policy_utils::policy::Policy;
 use std::{fs, path, process};
 use structopt::StructOpt;
 use veracruz_server;
@@ -35,7 +36,7 @@ fn main() {
     // load policy
     info!("Loading policy {:?}", opt.policy_path);
     let policy_result = fs::read_to_string(&opt.policy_path)
-        .map_err(|err| PolicyError::from(err))
+        .map_err(|err| anyhow!(err))
         .and_then(|policy_json| Ok((Policy::from_json(&policy_json)?, policy_json)));
     let (policy, policy_json) = match policy_result {
         Ok((policy, policy_json)) => (policy, policy_json),

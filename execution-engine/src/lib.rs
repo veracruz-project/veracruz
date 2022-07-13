@@ -34,7 +34,7 @@ use crate::{
     engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
     fs::FileSystem,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use policy_utils::principal::ExecutionStrategy;
 use std::{boxed::Box, string::String, vec::Vec};
 
@@ -75,7 +75,7 @@ pub fn execute(
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
                     Box::new(WasmtimeRuntimeState::new(filesystem, options)?)
                 } else {
-                    return Err(anyhow!(FatalEngineError::EngineIsNotReady));
+                    return Err(anyhow::anyhow!(FatalEngineError::EngineIsNotReady));
                 }
             }
         }

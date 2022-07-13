@@ -9,11 +9,12 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
+use anyhow::Result;
 use byteorder::{ByteOrder, LittleEndian};
 
 /// Sends a `buffer` of data (by first transmitting an encoded length followed by
 /// the data proper) to the file descriptor `fd`.
-pub fn send_buffer<T>(mut fd: T, buffer: &[u8]) -> Result<(), std::io::Error>
+pub fn send_buffer<T>(mut fd: T, buffer: &[u8]) -> Result<()>
 where
     T: std::io::Write,
 {
@@ -45,7 +46,7 @@ where
 
 /// Reads a buffer of data from a file descriptor `fd` by first reading a length
 /// of data, followed by the data proper.
-pub fn receive_buffer<T>(mut fd: T) -> Result<Vec<u8>, std::io::Error>
+pub fn receive_buffer<T>(mut fd: T) -> Result<Vec<u8>>
 where
     T: std::io::Read,
 {
