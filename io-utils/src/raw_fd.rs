@@ -12,7 +12,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use super::error::SocketError;
+use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
 use nix::{
     errno::Errno::EINTR,
@@ -26,7 +26,7 @@ use std::{os::unix::io::RawFd, vec::Vec};
 
 /// Send a buffer of data (using a length, buffer protocol) to the file
 /// descriptor `fd`
-pub fn send_buffer(fd: RawFd, buffer: &[u8]) -> Result<(), SocketError> {
+pub fn send_buffer(fd: RawFd, buffer: &[u8]) -> Result<()> {
     let len = buffer.len();
     // first, send the length of the buffer
     {
@@ -34,12 +34,7 @@ pub fn send_buffer(fd: RawFd, buffer: &[u8]) -> Result<(), SocketError> {
         LittleEndian::write_u64(&mut buf, buffer.len() as u64);
         let mut sent_bytes = 0;
         while sent_bytes < buf.len() {
-            sent_bytes += match send(fd, &buf[sent_bytes..buf.len()], MsgFlags::empty()) {
-                Ok(size) => size,
-                Err(err) => {
-                    return Err(SocketError::NixError(err));
-                }
-            };
+            sent_bytes += send(fd, &buf[sent_bytes..buf.len()], MsgFlags::empty())?;
         }
     }
     // next, send the buffer
@@ -50,7 +45,7 @@ pub fn send_buffer(fd: RawFd, buffer: &[u8]) -> Result<(), SocketError> {
                 Ok(size) => size,
                 Err(nix::Error::Sys(_)) => 0,
                 Err(err) => {
-                    return Err(SocketError::NixError(err));
+                    return Err(anyhow!(err));
                 }
             };
             sent_bytes += size;
@@ -61,7 +56,7 @@ pub fn send_buffer(fd: RawFd, buffer: &[u8]) -> Result<(), SocketError> {
 
 /// Read a buffer of data (using a length, buffer protocol) from the file
 /// descriptor `fd`
-pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, SocketError> {
+pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>> {
     // first, read the length
     let length = {
         let mut buf = [0u8; 9];
@@ -73,7 +68,7 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, SocketError> {
                 Err(nix::Error::Sys(EINTR)) => 0,
                 Err(err) => {
                     println!("I have experienced an error:{:?}", err);
-                    return Err(SocketError::NixError(err));
+                    return Err(anyhow!(err));
                 }
             }
         }
@@ -89,7 +84,7 @@ pub fn receive_buffer(fd: RawFd) -> Result<Vec<u8>, SocketError> {
                 Ok(size) => size,
                 Err(nix::Error::Sys(EINTR)) => 0,
                 Err(err) => {
-                    return Err(SocketError::NixError(err));
+                    return Err(anyhow!(err));
                 }
             }
         }

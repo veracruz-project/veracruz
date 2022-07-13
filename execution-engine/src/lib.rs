@@ -75,7 +75,7 @@ pub fn execute(
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
                     Box::new(WasmtimeRuntimeState::new(filesystem, options)?)
                 } else {
-                    return Err(anyhow!(FatalEngineError::EngineIsNotReady));
+                    return Err(anyhow::anyhow!(FatalEngineError::EngineIsNotReady));
                 }
             }
         }

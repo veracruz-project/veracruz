@@ -82,12 +82,6 @@ pub enum VeracruzServerError {
     )]
     InvalidRuntimeManagerResponse(veracruz_utils::runtime_manager_message::RuntimeManagerResponse),
     #[cfg(feature = "nitro")]
-    #[error(
-        display = "VeracruzServer: Received Invalid Nitro Root Enclave Message: {:?}",
-        _0
-    )]
-    #[cfg(feature = "nitro")]
-    InvalidNitroRootEnclaveMessage(veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage),
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: Received Invalid Protocol Buffer Message")]
     InvalidProtoBufMessage,
@@ -126,8 +120,6 @@ pub enum VeracruzServerError {
     },
     #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    //#[error(display = "VeracruzServer: PolicyError: {:?}.", _0)]
-    //VeracruzUtilError(#[error(source)] policy_utils::error::PolicyError),
     #[error(display = "VeracruzServer: Postcard Error: {:?}.", _0)]
     PostcardError(#[error(source)] postcard::Error),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]

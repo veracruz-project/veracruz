@@ -313,8 +313,7 @@ impl VeracruzServer for VeracruzServerIceCap {
             policy.proxy_attestation_server_url(),
             "psa",
             FIRMWARE_VERSION,
-        )
-        .map_err(VeracruzServerError::HttpError)?;
+        )?;
 
         let (token, csr) =
             match self_.communicate(&RuntimeManagerRequest::Attestation(challenge, device_id))? {
@@ -328,17 +327,15 @@ impl VeracruzServer for VeracruzServerIceCap {
 
         let (root_cert, compute_cert) = {
             let req =
-                transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id)
-                    .map_err(VeracruzServerError::TransportProtocolError)?;
+                transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id)?;
             let req = base64::encode(&req);
             let url = format!(
                 "{:}/PSA/AttestationToken",
                 policy.proxy_attestation_server_url()
             );
-            let resp = post_buffer(&url, &req).map_err(VeracruzServerError::HttpError)?;
+            let resp = post_buffer(&url, &req)?;
             let resp = base64::decode(&resp)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)
-                .map_err(VeracruzServerError::TransportProtocolError)?;
+            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)?;
             let cert_chain = pasr.get_cert_chain();
             let root_cert = cert_chain.get_root_cert();
             let compute_cert = cert_chain.get_enclave_cert();

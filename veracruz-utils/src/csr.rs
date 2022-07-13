@@ -9,8 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow::{anyhow, Result};
 use std::vec::Vec;
-
 use err_derive::Error;
 use mbedtls;
 use platform_services::getrandom;
@@ -23,17 +23,6 @@ use platform_services::getrandom;
 /// error type contains more constructors when compiling for clients or hosts.
 #[derive(Debug, Error)]
 pub enum CertError {
-    #[error(
-        display = "CertError: Invalid: length for `{}`, expected {:?} but received {:?}.",
-        variable,
-        expected,
-        received
-    )]
-    InvalidLength {
-        variable: &'static str,
-        expected: usize,
-        received: usize,
-    },
     #[error(
         display = "CertError: Invalid UTC Inputs: M:{}, D:{}, H:{}, min:{}, s:{}",
         month,
@@ -51,7 +40,7 @@ pub enum CertError {
     },
 }
 
-pub fn generate_csr(private_key_der: &[u8]) -> Result<Vec<u8>, CertError> {
+pub fn generate_csr(private_key_der: &[u8]) -> Result<Vec<u8>> {
     let mut pk_private = mbedtls::pk::Pk::from_private_key(private_key_der, None).unwrap();
     let mut rng = |buffer: *mut u8, size: usize| {
         let mut slice = unsafe { std::slice::from_raw_parts_mut(buffer, size) };
@@ -85,15 +74,15 @@ pub fn generate_utc_time(
     hour: u32,
     minute: u32,
     second: u32,
-) -> Result<Vec<u8>, CertError> {
+) -> Result<Vec<u8>> {
     if month > 11 || day > 30 || hour > 23 || minute > 59 || second > 59 {
-        return Err(CertError::InvalidUtcInputs {
+        return Err(anyhow!(CertError::InvalidUtcInputs {
             month,
             day,
             hour,
             minute,
             second,
-        });
+        }));
     }
     let year = year % 2000;
     let generated_time = format!(

@@ -14,8 +14,6 @@ use err_derive::Error;
 use io_utils::error::SocketError;
 #[cfg(feature = "nitro")]
 use nix;
-#[cfg(feature = "nitro")]
-use veracruz_utils::platform::nitro::nitro::NitroRootEnclaveMessage;
 
 #[derive(Debug, Error)]
 pub enum RuntimeManagerError {
@@ -47,9 +45,6 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: NSM Error code: {:?}", _0)]
     NsmErrorCode(nsm_api::api::ErrorCode),
-    #[cfg(feature = "nitro")]
-    #[error(display = "RuntimeManager: wrong message type received: {:?}", _0)]
-    WrongMessageTypeError(NitroRootEnclaveMessage),
     #[error(
         display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}",
         _0,

@@ -12,17 +12,15 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
-use curl::{
-    easy::{Easy, List},
-    Error as CurlError,
-};
+use anyhow::{anyhow, Result};
+use curl::easy::{Easy, List};
 use err_derive::Error;
 use log::{error, info, trace};
 use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
     parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
-    ProxyAttestationServerResponse, TransportProtocolError,
+    ProxyAttestationServerResponse
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -32,26 +30,9 @@ use transport_protocol::{
 /// HTTP-related errors.
 #[derive(Debug, Error)]
 pub enum HttpError {
-    /// An error originating from Curl was raised.
-    #[error(display = "An error originating from Curl was raised: {}.", _0)]
-    CurlError(CurlError),
     /// An unexpected HTTP status code was returned.
     #[error(display = "An unexpected HTTP return code was returned.")]
     HttpSuccess,
-    #[error(
-        display = "A transport protocol message could not be (de)serialized: {}.",
-        _0
-    )]
-    SerializationError(TransportProtocolError),
-    #[error(
-        display = "A base64-encoded message could not be (de)serialized: {}.",
-        _0
-    )]
-    Base64Error(base64::DecodeError),
-    #[error(display = "A transport protocol error occurred: {}.", _0)]
-    TransportProtocolError(TransportProtocolError),
-    #[error(display = "An attestation-related error occurred: {}.", _0)]
-    AttestationError(TransportProtocolError),
     #[error(display = "The proxy attestation service issued an unexpected reply.")]
     ProtocolError(ProxyAttestationServerResponse),
 }
@@ -63,7 +44,7 @@ pub enum HttpError {
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
 /// Curl session fails for any reason, or if a non-success HTTP code is
 /// returned.
-pub fn post_buffer<U, B>(url: U, buffer: B) -> Result<String, HttpError>
+pub fn post_buffer<U, B>(url: U, buffer: B) -> Result<String>
 where
     U: AsRef<str>,
     B: AsRef<str>,
@@ -83,7 +64,7 @@ where
     curl_request.url(url).map_err(|err| {
         error!("Failed to set URL with Curl.  Error produced: {:?}.", err);
 
-        HttpError::CurlError(err)
+        err
     })?;
 
     let mut headers = List::new();
@@ -95,7 +76,7 @@ where
                 err
             );
 
-            HttpError::CurlError(err)
+            err
         })?;
 
     curl_request.http_headers(headers).map_err(|err| {
@@ -104,7 +85,7 @@ where
             err
         );
 
-        HttpError::CurlError(err)
+        err
     })?;
     curl_request.post(true).map_err(|err| {
         error!(
@@ -112,7 +93,7 @@ where
             err
         );
 
-        HttpError::CurlError(err)
+        err
     })?;
     curl_request
         .post_field_size(buffer.len() as u64)
@@ -122,7 +103,7 @@ where
                 err
             );
 
-            HttpError::CurlError(err)
+            err
         })?;
 
     let mut buffer_reader = StringReader::new(buffer);
@@ -140,7 +121,7 @@ where
                     err
                 );
 
-                HttpError::CurlError(err)
+                err
             })?;
 
         transfer
@@ -164,7 +145,7 @@ where
                     err
                 );
 
-                HttpError::CurlError(err)
+                err
             })?;
 
         info!("Received response body.");
@@ -190,7 +171,7 @@ where
                     err
                 );
 
-                HttpError::CurlError(err)
+                err
             })?;
 
         transfer.perform().map_err(|err| {
@@ -199,14 +180,14 @@ where
                 err
             );
 
-            HttpError::CurlError(err)
+            err
         })?;
     }
 
     info!("Received response header: {}.", received_header);
 
     if !received_header.contains("HTTP/1.1 200 OK\r") {
-        return Err(HttpError::HttpSuccess);
+        return Err(anyhow!(HttpError::HttpSuccess));
     }
 
     info!("Buffer successfully posted.");
@@ -222,15 +203,11 @@ where
 /// Returns a device ID and a generated challenge from the Proxy Attestation
 /// Service, which is generated in response to the "Start" message, if the
 /// message is successfully sent.
-pub fn send_proxy_attestation_server_start<U, P, F>(
+pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>, F: AsRef<str>>(
     proxy_attestation_server_url_base: U,
     protocol_name: P,
     firmware_version: F,
-) -> Result<(i32, Vec<u8>), HttpError>
-where
-    U: AsRef<str>,
-    P: AsRef<str>,
-    F: AsRef<str>,
+) -> Result<(i32, Vec<u8>)>
 {
     let proxy_attestation_server_url_base = proxy_attestation_server_url_base.as_ref();
     let protocol_name = protocol_name.as_ref();
@@ -244,7 +221,7 @@ where
             e
         );
 
-        HttpError::SerializationError(e)
+        e
     })?;
 
     let encoded_start_msg = base64::encode(&start_msg);
@@ -268,18 +245,17 @@ where
             e
         );
 
-        HttpError::Base64Error(e)
+        e
     })?;
 
     let response = parse_proxy_attestation_server_response(None, &response_body).map_err(|e| {
         error!("Failed to parse response to Start message from Proxy Attestation Service.  Error produced: {:?}.", e);
 
-        HttpError::TransportProtocolError(e)
+        e
     })?;
 
     info!("Response successfully parsed.");
 
-    #[cfg(any(feature = "linux", feature = "nitro", feature = "icecap"))]
     if response.has_psa_attestation_init() {
         let (challenge, device_id) =
             parse_psa_attestation_init(response.get_psa_attestation_init()).map_err(|e| {
@@ -288,7 +264,7 @@ where
                 e
             );
 
-                HttpError::AttestationError(e)
+                e
             })?;
 
         info!("Device ID and challenge successfully obtained from Proxy Attestation Service.");
@@ -297,6 +273,6 @@ where
     } else {
         error!("Unexpected response from Proxy Attestation Service.  Expecting PSA attestation initialization message.");
 
-        Err(HttpError::ProtocolError(response))
+        Err(anyhow!(HttpError::ProtocolError(response)))
     }
 }
