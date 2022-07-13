@@ -9,10 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
+use super::fd::{receive_buffer, send_buffer};
 use anyhow::Result;
-use super::{
-    fd::{receive_buffer, send_buffer},
-};
 use bincode::{deserialize, serialize};
 use log::error;
 use serde::{de::DeserializeOwned, Serialize};

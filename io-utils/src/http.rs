@@ -20,7 +20,7 @@ use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
     parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
-    ProxyAttestationServerResponse
+    ProxyAttestationServerResponse,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -207,8 +207,7 @@ pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>, F: AsRe
     proxy_attestation_server_url_base: U,
     protocol_name: P,
     firmware_version: F,
-) -> Result<(i32, Vec<u8>)>
-{
+) -> Result<(i32, Vec<u8>)> {
     let proxy_attestation_server_url_base = proxy_attestation_server_url_base.as_ref();
     let protocol_name = protocol_name.as_ref();
     let firmware_version = firmware_version.as_ref();

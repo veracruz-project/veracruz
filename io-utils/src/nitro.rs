@@ -45,12 +45,7 @@ const NITRO_ENCLAVE_CONNECT_TIMEOUT: u32 = 30;
 
 impl NitroEnclave {
     /// create a new Nitro enclave, started with the file in eif_path
-    pub fn new(
-        nitro_sbin: bool,
-        eif_path: &str,
-        debug: bool,
-        max_memory_mib: u32,
-    ) -> Result<Self> {
+    pub fn new(nitro_sbin: bool, eif_path: &str, debug: bool, max_memory_mib: u32) -> Result<Self> {
         let max_memory_mib_str = max_memory_mib.to_string();
         let mut args = vec![
             "run-enclave",

@@ -10,10 +10,10 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use std::vec::Vec;
 use err_derive::Error;
 use mbedtls;
 use platform_services::getrandom;
+use std::vec::Vec;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Error type.
