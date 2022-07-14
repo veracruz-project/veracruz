@@ -17,6 +17,7 @@ std = [
 ]
 
 [dependencies]
+anyhow = "1"
 err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 platform-services = { path = "../platform-services" }

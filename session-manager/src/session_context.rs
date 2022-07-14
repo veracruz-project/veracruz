@@ -16,9 +16,13 @@ use crate::{
     error::SessionManagerError,
     session::{Principal, Session},
 };
-use mbedtls;
-use mbedtls::alloc::List;
-use mbedtls::x509::Certificate;
+use anyhow::{anyhow, Result};
+use mbedtls::{
+    self,
+    alloc::List,
+    ssl::{config, Config},
+    x509::Certificate,
+};
 use platform_services::getrandom;
 use policy_utils::policy::Policy;
 use std::{string::String, sync::Arc, vec::Vec};
@@ -32,18 +36,14 @@ use std::{string::String, sync::Arc, vec::Vec};
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Converts a string into a parsed X509 cryptographic certificate.
-fn convert_cert_buffer<'a, U>(cert_string: U) -> Result<List<Certificate>, SessionManagerError>
-where
-    U: Into<&'a String>,
-{
+fn convert_cert_buffer<'a, U: Into<&'a String>>(cert_string: U) -> Result<List<Certificate>> {
     let cert_string_string: &String = cert_string.into();
     let mut buffer = std::vec::Vec::new();
     buffer.extend_from_slice(cert_string_string.as_bytes());
     buffer.push(b'\0');
-    let cert_vec = Certificate::from_pem_multiple(&buffer)
-        .map_err(|_| SessionManagerError::TLSUnspecifiedError)?;
+    let cert_vec = Certificate::from_pem_multiple(&buffer)?;
     if cert_vec.iter().count() < 1 {
-        Err(SessionManagerError::NoCertificateError)
+        Err(anyhow!(SessionManagerError::NoCertificateError))
     } else {
         Ok(cert_vec)
     }
@@ -76,7 +76,7 @@ pub struct SessionContext {
 
 impl SessionContext {
     /// Creates a new context
-    pub fn new() -> Result<Self, SessionManagerError> {
+    pub fn new() -> Result<Self> {
         let (server_public_key, server_private_key) = {
             let mut rng = |buffer: *mut u8, size: usize| {
                 let mut slice = unsafe { std::slice::from_raw_parts_mut(buffer, size) };
@@ -102,7 +102,7 @@ impl SessionContext {
         })
     }
 
-    pub fn set_policy(&mut self, policy: Policy) -> Result<(), SessionManagerError> {
+    pub fn set_policy(&mut self, policy: Policy) -> Result<()> {
         // create the root_cert_store that contains all of the certs of the clients that can connect
         // Note: We are not using a CA here, so each client that needs to connect must have it's
         // cert directly in the RootCertStore
@@ -122,10 +122,10 @@ impl SessionContext {
             principals.push(principal);
         }
         // create the configuration
-        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(&policy.ciphersuite())
-            .ok_or_else(|| {
+        let policy_ciphersuite =
+            veracruz_utils::lookup_ciphersuite(&policy.ciphersuite()).ok_or(anyhow!(
                 SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().clone())
-            })?;
+            ))?;
 
         self.cipher_suites = vec![policy_ciphersuite, 0];
         self.root_certs = root_certs;
@@ -135,7 +135,7 @@ impl SessionContext {
         return Ok(());
     }
 
-    pub fn set_cert_chain(&mut self, chain_data: &Vec<Vec<u8>>) -> Result<(), SessionManagerError> {
+    pub fn set_cert_chain(&mut self, chain_data: &Vec<Vec<u8>>) -> Result<()> {
         let mut cert_chain = List::new();
         for this_chain_data in chain_data {
             cert_chain.append(Certificate::from_pem_multiple(this_chain_data)?)
@@ -146,18 +146,18 @@ impl SessionContext {
 
     /// Returns the configuration associated with the server.
     #[inline]
-    pub fn server_config(&self) -> Result<mbedtls::ssl::Config, SessionManagerError> {
-        let mut config = mbedtls::ssl::Config::new(
-            mbedtls::ssl::config::Endpoint::Server,
-            mbedtls::ssl::config::Transport::Stream,
-            mbedtls::ssl::config::Preset::Default,
+    pub fn server_config(&self) -> Result<Config> {
+        let mut config = Config::new(
+            config::Endpoint::Server,
+            config::Transport::Stream,
+            config::Preset::Default,
         );
         config.set_ciphersuites(Arc::new(self.cipher_suites.clone()));
         let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
         let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None)?);
         config.set_rng(rng);
-        config.set_min_version(mbedtls::ssl::config::Version::Tls1_2)?;
-        config.set_max_version(mbedtls::ssl::config::Version::Tls1_2)?;
+        config.set_min_version(config::Version::Tls1_2)?;
+        config.set_max_version(config::Version::Tls1_2)?;
         config.set_ca_list(Arc::new(self.root_certs.clone()), None);
         config.push_cert(
             Arc::new(self.cert_chain.clone()),
@@ -166,16 +166,16 @@ impl SessionContext {
                 None,
             )?),
         )?;
-        config.set_authmode(mbedtls::ssl::config::AuthMode::Required);
+        config.set_authmode(config::AuthMode::Required);
         Ok(config)
     }
 
     /// Returns the principals associated with the server.
     #[inline]
-    pub fn principals(&self) -> Result<&Vec<Principal>, SessionManagerError> {
+    pub fn principals(&self) -> Result<&Vec<Principal>> {
         match &self.principals {
-            Some(principals) => return Ok(&principals),
-            None => return Err(SessionManagerError::InvalidStateError),
+            Some(principals) => Ok(&principals),
+            None => Err(anyhow!(SessionManagerError::InvalidStateError)),
         }
     }
 
@@ -198,7 +198,7 @@ impl SessionContext {
     /// the principals that are stored in this context.  Fails iff the creation
     /// of the new session fails.
     #[inline]
-    pub fn create_session(&self) -> Result<Session, SessionManagerError> {
+    pub fn create_session(&self) -> Result<Session> {
         Ok(Session::new(self.server_config()?, self.principals()?)?)
     }
 }
