@@ -16,16 +16,8 @@ pub type ProxyAttestationServerResponder = Result<String, ProxyAttestationServer
 
 #[derive(Debug, Error)]
 pub enum ProxyAttestationServerError {
-    #[error(display = "ProxyAttestationServer: HexError: {:?}.", _0)]
-    HexError(#[error(source)] hex::FromHexError),
     #[error(display = "ProxyAttestationServer: Base64Error: {:?}.", _0)]
     Base64Error(#[error(source)] base64::DecodeError),
-    #[error(display = "ProxyAttestationServer: TransportProtocolError: {:?}.", _0)]
-    TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
-    #[error(display = "ProxyAttestationServer: Utf8Error: {:?}.", _0)]
-    Utf8Error(#[error(source)] std::str::Utf8Error),
-    #[error(display = "ProxyAttestationServer: SerdeJsonError: {:?}.", _0)]
-    SerdeJsonError(#[error(source)] serde_json::Error),
     #[error(
         display = "ProxyAttestationServer: OpenSSLError (an error stack): {:#?}.",
         _0
@@ -64,8 +56,6 @@ pub enum ProxyAttestationServerError {
         _0
     )]
     MissingFieldError(&'static str),
-    #[error(display = "ProxyAttestationServer: Failed to verify {}.", _0)]
-    FailedToVerifyError(&'static str),
     #[error(display = "ProxyAttestationServer: Unknown attestation protocol.")]
     UnknownAttestationTokenError,
     #[error(
@@ -76,10 +66,6 @@ pub enum ProxyAttestationServerError {
     UnsupportedRequestError,
     #[error(display = "ProxyAttestationServer: Direct message {}.", _0)]
     DirectMessageError(String, StatusCode),
-    #[error(display = "ProxyAttestationServer: cbor error {}.", _0)]
-    CborError(String),
-    #[error(display = "ProxyAttestationServer: Mutex error {}.", _0)]
-    MutexError(String),
     #[error(display = "ProxyAttestationServer: CSR Verify failed")]
     CsrVerifyError,
     #[error(display = "ProxyAttestationServer: IOError {}.", _0)]
