@@ -9,7 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
+use crate::common::{VeracruzServer, VeracruzServerError};
 use err_derive::Error;
 use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
@@ -264,7 +264,11 @@ impl IceCapRealm {
     fn shutdown(self) -> Result<(), IceCapError> {
         println!("vc-server: shutting down");
         self.signal_handle.close();
-        self.child.lock().unwrap().kill().map_err(|e| IceCapError::ChannelError(e))?;
+        self.child
+            .lock()
+            .unwrap()
+            .kill()
+            .map_err(|e| IceCapError::ChannelError(e))?;
         Ok(())
     }
 }
@@ -276,7 +280,11 @@ impl VeracruzServerIceCap {
         &mut self,
         request: &RuntimeManagerRequest,
     ) -> Result<RuntimeManagerResponse, VeracruzServerError> {
-        let response = self.0.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?.communicate(request)?;
+        let response = self
+            .0
+            .as_mut()
+            .ok_or(VeracruzServerError::UninitializedEnclaveError)?
+            .communicate(request)?;
         Ok(response)
     }
 
@@ -312,8 +320,9 @@ impl VeracruzServer for VeracruzServerIceCap {
             };
 
         let (root_cert, compute_cert) = {
-            let req =
-                transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id)?;
+            let req = transport_protocol::serialize_native_psa_attestation_token(
+                &token, &csr, device_id,
+            )?;
             let req = base64::encode(&req);
             let url = format!(
                 "{:}/PSA/AttestationToken",

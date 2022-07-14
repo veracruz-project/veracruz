@@ -1,6 +1,6 @@
-//! Veracruz server
+//! Veracruz Server on Specific Platforms.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
@@ -9,11 +9,9 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub mod common;
-pub use self::common::*;
-
-pub mod server;
-pub use self::server::*;
-
-pub mod platforms;
-pub use self::platforms::*;
+#[cfg(feature = "icecap")]
+pub mod icecap;
+#[cfg(feature = "linux")]
+pub mod linux;
+#[cfg(feature = "nitro")]
+pub mod nitro;

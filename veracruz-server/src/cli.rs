@@ -9,8 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use anyhow::anyhow;
 use actix_rt;
+use anyhow::anyhow;
 use log::info;
 use policy_utils::policy::Policy;
 use std::{fs, path, process};

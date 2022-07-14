@@ -11,7 +11,7 @@
 
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
-    use crate::veracruz_server::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
+    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use io_utils::{
         http::{post_buffer, send_proxy_attestation_server_start},
         nitro::NitroEnclave,
@@ -125,10 +125,7 @@ pub mod veracruz_server_nitro {
             Ok(meta)
         }
 
-        fn plaintext_data(
-            &mut self,
-            _data: Vec<u8>,
-        ) -> VeracruzServerResult<Option<Vec<u8>>> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
             Err(VeracruzServerError::UnimplementedError)
         }
 
@@ -289,7 +286,8 @@ pub mod veracruz_server_nitro {
         );
 
         let body_vec = base64::decode(&received_body)?;
-        let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
+        let response =
+            transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
 
         let (re_cert, ca_cert) = if response.has_cert_chain() {
             let cert_chain = response.get_cert_chain();

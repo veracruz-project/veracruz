@@ -12,7 +12,7 @@
 #[cfg(feature = "linux")]
 pub mod veracruz_server_linux {
 
-    use crate::{veracruz_server::VeracruzServer, VeracruzServerError, VeracruzServerResult};
+    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use data_encoding::HEXLOWER;
     use io_utils::{
         http::{post_buffer, send_proxy_attestation_server_start},
@@ -141,10 +141,7 @@ pub mod veracruz_server_linux {
         ///    deserialized.
         /// 3. The Runtime Manager enclave sends back a message indicating that
         ///    it was not expecting further TLS data to be requested.
-        pub fn read_tls_data(
-            &mut self,
-            session_id: u32,
-        ) ->VeracruzServerResult<(bool, Vec<u8>)> {
+        pub fn read_tls_data(&mut self, session_id: u32) -> VeracruzServerResult<(bool, Vec<u8>)> {
             info!(
                 "Reading TLS data from Runtime Manager enclave (with session: {}).",
                 session_id
@@ -490,10 +487,7 @@ pub mod veracruz_server_linux {
         }
 
         #[inline]
-        fn plaintext_data(
-            &mut self,
-            _data: Vec<u8>,
-        ) -> VeracruzServerResult<Option<Vec<u8>>> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
             Err(VeracruzServerError::UnimplementedError)
         }
 
@@ -509,7 +503,8 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)?;
+            let message: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)?;
 
             match message {
                 RuntimeManagerResponse::TlsSession(session_id) => {
@@ -540,7 +535,8 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)?;
+            let message: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)?;
 
             info!("Response received.");
 
@@ -584,7 +580,8 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)?;
+            let message: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)?;
 
             info!("Response received.");
 

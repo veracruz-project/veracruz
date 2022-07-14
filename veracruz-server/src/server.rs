@@ -9,14 +9,13 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::veracruz_server::*;
+use crate::common::*;
 #[cfg(feature = "icecap")]
-use crate::veracruz_server_icecap::VeracruzServerIceCap as VeracruzServerEnclave;
+use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]
-use crate::veracruz_server_linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
+use crate::platforms::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
-use crate::veracruz_server_nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
-
+use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;
 use futures::executor;
@@ -27,7 +26,7 @@ use std::{
     thread,
 };
 
-type EnclaveHandlerServer = Box<dyn crate::veracruz_server::VeracruzServer + Sync + Send>;
+type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
 #[post("/veracruz_server")]

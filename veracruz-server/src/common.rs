@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 #[cfg(feature = "icecap")]
-use crate::veracruz_server_icecap::IceCapError;
+use crate::platforms::icecap::IceCapError;
 use actix_web::{error, http::StatusCode, HttpResponse, HttpResponseBuilder};
 use err_derive::Error;
 #[cfg(feature = "nitro")]
