@@ -9,11 +9,12 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow::{anyhow, Result};
 use crate::transport_protocol;
 use err_derive::Error;
 use lazy_static::lazy_static;
 use protobuf::{error::ProtobufError, Message, ProtobufEnum};
-use std::{collections::HashMap, result::Result, string::ToString, sync::Mutex, vec::Vec};
+use std::{collections::HashMap, string::ToString, sync::Mutex, vec::Vec};
 
 pub const LENGTH_PREFIX_SIZE: usize = 8;
 
@@ -53,7 +54,7 @@ pub enum TransportProtocolError {
     )]
     MutexError(u32),
 }
-pub type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolError>;
+pub type TransportProtocolResult = Result<std::vec::Vec<u8>>;
 
 /// Strip the length prefix from the input buffer.
 /// Return the length and the stripped buffer.
@@ -61,9 +62,9 @@ pub type TransportProtocolResult = Result<std::vec::Vec<u8>, TransportProtocolEr
 fn get_length_prefix(
     session_id: u32,
     buffer: &[u8],
-) -> Result<(u64, &[u8]), TransportProtocolError> {
+) -> Result<(u64, &[u8])> {
     if buffer.len() < LENGTH_PREFIX_SIZE {
-        return Err(TransportProtocolError::MissingLengthPrefix(session_id));
+        return Err(anyhow!(TransportProtocolError::MissingLengthPrefix(session_id)));
     }
 
     let mut length_bytes: [u8; LENGTH_PREFIX_SIZE] = [0; LENGTH_PREFIX_SIZE];
@@ -112,7 +113,7 @@ fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> Transpor
 
     let (expected_length, incoming_buffer) = match incoming_buffer_hash.get_mut(&session_id) {
         Some(v) => v,
-        None => return Err(TransportProtocolError::BufferNotFound(session_id)),
+        None => return Err(anyhow!(TransportProtocolError::BufferNotFound(session_id))),
     };
 
     // Append chunk to incoming buffer
@@ -128,7 +129,7 @@ fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> Transpor
     // might be the case or if it is hopeless and we could just error out.
 
     if incoming_buffer.len() < *expected_length as usize {
-        Err(TransportProtocolError::PartialBuffer(session_id))
+        Err(anyhow!(TransportProtocolError::PartialBuffer(session_id)))
     } else {
         let incoming_buffer = incoming_buffer.to_vec();
         incoming_buffer_hash.remove(&session_id);
@@ -140,7 +141,7 @@ fn handle_protocol_buffer(session_id: Option<u32>, mut input: &[u8]) -> Transpor
 pub fn parse_runtime_manager_request(
     session_id: Option<u32>,
     buffer: &[u8],
-) -> Result<transport_protocol::RuntimeManagerRequest, TransportProtocolError> {
+) -> Result<transport_protocol::RuntimeManagerRequest> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::RuntimeManagerRequest,
@@ -151,7 +152,7 @@ pub fn parse_runtime_manager_request(
 pub fn parse_runtime_manager_response(
     session_id: Option<u32>,
     buffer: &[u8],
-) -> Result<transport_protocol::RuntimeManagerResponse, TransportProtocolError> {
+) -> Result<transport_protocol::RuntimeManagerResponse> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::RuntimeManagerResponse,
@@ -161,7 +162,7 @@ pub fn parse_runtime_manager_response(
 pub fn parse_proxy_attestation_server_request(
     session_id: Option<u32>,
     buffer: &[u8],
-) -> Result<transport_protocol::ProxyAttestationServerRequest, TransportProtocolError> {
+) -> Result<transport_protocol::ProxyAttestationServerRequest> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::ProxyAttestationServerRequest,
@@ -171,7 +172,7 @@ pub fn parse_proxy_attestation_server_request(
 pub fn parse_proxy_attestation_server_response(
     session_id: Option<u32>,
     buffer: &[u8],
-) -> Result<transport_protocol::ProxyAttestationServerResponse, TransportProtocolError> {
+) -> Result<transport_protocol::ProxyAttestationServerResponse> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
     Ok(protobuf::parse_from_bytes::<
         transport_protocol::ProxyAttestationServerResponse,
@@ -376,7 +377,7 @@ pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> Trans
 
 pub fn parse_psa_attestation_init(
     pai: &transport_protocol::PsaAttestationInit,
-) -> Result<(std::vec::Vec<u8>, i32), TransportProtocolError> {
+) -> Result<(std::vec::Vec<u8>, i32)> {
     Ok((pai.get_challenge().to_vec(), pai.get_device_id()))
 }
 
@@ -472,7 +473,7 @@ pub fn serialize_result(
 
 pub fn parse_result(
     response: &transport_protocol::RuntimeManagerResponse,
-) -> Result<Option<std::vec::Vec<u8>>, TransportProtocolError> {
+) -> Result<Option<std::vec::Vec<u8>>> {
     let status = response.get_status();
     let decoded_status = match status {
         transport_protocol::ResponseStatus::UNSET => -1,
@@ -485,7 +486,7 @@ pub fn parse_result(
         transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST => 6,
     };
     if status != transport_protocol::ResponseStatus::SUCCESS {
-        return Err(TransportProtocolError::ResponseStatusError(decoded_status));
+        return Err(anyhow!(TransportProtocolError::ResponseStatusError(decoded_status)));
     }
 
     let data_opt = {

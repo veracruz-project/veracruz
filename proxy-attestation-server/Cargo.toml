@@ -35,6 +35,7 @@ nitro = [
 ]
 
 [dependencies]
+anyhow = "1"
 actix-http = "3"
 actix-rt = "2"
 actix-web = "4"

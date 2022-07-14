@@ -86,11 +86,19 @@ pub enum ProxyAttestationServerError {
     IOError(#[error(source)] std::io::Error),
     #[error(display = "ProxyAttestationServer: BadState error")]
     BadStateError,
+    #[error(display = "ProxyAttestationServer: Anyhow error {:?}", _0)]
+    Anyhow(anyhow::Error),
 }
 
 impl<T> From<std::sync::PoisonError<T>> for ProxyAttestationServerError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         ProxyAttestationServerError::LockError(format!("{:?}", error))
+    }
+}
+
+impl From<anyhow::Error> for ProxyAttestationServerError {
+    fn from(error: anyhow::Error) -> Self {
+        ProxyAttestationServerError::Anyhow(error)
     }
 }
 

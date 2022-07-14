@@ -150,10 +150,16 @@ fn parse_incoming_buffer(
 ) -> Result<Option<transport_protocol::RuntimeManagerRequest>> {
     match transport_protocol::parse_runtime_manager_request(Some(tls_session_id), &input) {
         Ok(v) => Ok(Some(v)),
-        Err(e) => match e {
-            TransportProtocolError::PartialBuffer(_) => Ok(None),
-            e2 => Err(anyhow!(e2)),
+        Err(e) => {
+            match e.downcast_ref::<TransportProtocolError>() {
+                Some(TransportProtocolError::PartialBuffer(_)) => Ok(None),
+                _otherwise => Err(e),
+            }
         },
+        //match e {
+            //TransportProtocolError::PartialBuffer(_) => Ok(None),
+            //e2 => Err(anyhow!(e2)),
+        //},
     }
 }
 

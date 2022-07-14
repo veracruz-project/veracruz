@@ -404,7 +404,7 @@ pub mod veracruz_server_linux {
                 let req = serialize_native_psa_attestation_token(&token, &csr, challenge_id).map_err(|e| {
                     error!("Failed to serialize native PSA attestation token request.  Error received: {:?}.", e);
 
-                    VeracruzServerError::TransportProtocolError(e)
+                    e
                 })?;
                 let req = base64::encode(&req);
                 let url = format!("{}/PSA/AttestationToken", proxy_attestation_server_url);
@@ -421,7 +421,7 @@ pub mod veracruz_server_linux {
                 let pasr = parse_proxy_attestation_server_response(None, &resp).map_err(|e| {
                     error!("Failed to parse reponse from proxy attestation server.  Error received: {:?}.", e);
 
-                    VeracruzServerError::TransportProtocolError(e)
+                    e
                 })?;
                 let cert_chain = pasr.get_cert_chain();
                 let root_cert = cert_chain.get_root_cert();
