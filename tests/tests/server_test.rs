@@ -40,13 +40,13 @@ use std::{
     vec::Vec,
 };
 use transport_protocol;
-use veracruz_server::veracruz_server::*;
+use veracruz_server::common::*;
 #[cfg(feature = "icecap")]
-use veracruz_server::VeracruzServerIceCap as VeracruzServerEnclave;
+use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]
-use veracruz_server::VeracruzServerLinux as VeracruzServerEnclave;
+use veracruz_server::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
-use veracruz_server::VeracruzServerNitro as VeracruzServerEnclave;
+use veracruz_server::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
