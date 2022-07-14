@@ -124,20 +124,18 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     let (att_doc_data, device_id) =
         transport_protocol::parse_nitro_attestation_doc(parsed.get_nitro_attestation_doc());
 
-    let attestation_document =
-        AttestationDocument::authenticate(&att_doc_data, &AWS_NITRO_ROOT_CERTIFICATE).map_err(
-            |err| {
-                println!(
+    let attestation_document = AttestationDocument::authenticate(
+        &att_doc_data,
+        &AWS_NITRO_ROOT_CERTIFICATE,
+    )
+    .map_err(|err| {
+        println!(
             "proxy-attestation-server::nitro::attestation_token authenticate_token failed:{:?}",
             err
         );
-                let _ignore = std::io::stdout().flush();
-                ProxyAttestationServerError::CborError(format!(
-                    "parse_nitro_token failed to parse token data:{:?}",
-                    err
-                ))
-            },
-        )?;
+        let _ignore = std::io::stdout().flush();
+        anyhow::anyhow!(err)
+    })?;
 
     let attestation_context = {
         let mut ac_hash = ATTESTATION_CONTEXT.lock()
