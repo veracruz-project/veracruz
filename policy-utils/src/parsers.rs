@@ -15,7 +15,6 @@
 
 #[cfg(feature = "std")]
 use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
-use anyhow::Result;
 #[cfg(feature = "std")]
 use std::{borrow::Cow, ffi, path};
 
