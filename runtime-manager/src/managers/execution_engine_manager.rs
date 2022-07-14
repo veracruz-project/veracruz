@@ -156,10 +156,6 @@ fn parse_incoming_buffer(
                 _otherwise => Err(e),
             }
         },
-        //match e {
-            //TransportProtocolError::PartialBuffer(_) => Ok(None),
-            //e2 => Err(anyhow!(e2)),
-        //},
     }
 }
 
