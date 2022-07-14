@@ -13,9 +13,8 @@
 
 use crate::error::SessionManagerError;
 use anyhow::{anyhow, Result};
-use mbedtls::{alloc::List, x509::Certificate};
+use mbedtls::{alloc::List, x509::Certificate, ssl::Config};
 use policy_utils::principal::Identity;
-
 use std::{
     io::{Read, Write},
     sync::{Arc, Mutex},
