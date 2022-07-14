@@ -81,21 +81,9 @@ pub enum IceCapError {
     #[error(display = "IceCap: Qemu spawn error: {}", _0)]
     QemuSpawnError(io::Error),
     #[error(display = "IceCap: Serialization error: {}", _0)]
-    SerializationError(bincode::Error),
+    SerializationError(#[error(source)] bincode::Error),
     #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
     UnexpectedRuntimeManagerResponse(RuntimeManagerResponse),
-}
-
-impl From<IceCapError> for VeracruzServerError {
-    fn from(err: IceCapError) -> VeracruzServerError {
-        VeracruzServerError::IceCapError(err)
-    }
-}
-
-impl From<bincode::Error> for VeracruzServerError {
-    fn from(err: bincode::Error) -> VeracruzServerError {
-        VeracruzServerError::from(IceCapError::SerializationError(err))
-    }
 }
 
 /// IceCap implementation of 'VeracruzServer'
@@ -116,7 +104,7 @@ struct IceCapRealm {
 
 impl IceCapRealm {
     fn spawn() -> Result<IceCapRealm, VeracruzServerError> {
-        fn env_flags(var: &str, default: &[&str]) -> Result<Vec<String>, VeracruzServerError> {
+        fn env_flags(var: &str, default: &[&str]) -> Result<Vec<String>, IceCapError> {
             match env::var(var) {
                 Ok(var) => Ok(var.split_whitespace().map(|s| s.to_owned()).collect()),
                 Err(env::VarError::NotPresent) => {
@@ -246,7 +234,7 @@ impl IceCapRealm {
     fn communicate(
         &mut self,
         request: &RuntimeManagerRequest,
-    ) -> Result<RuntimeManagerResponse, VeracruzServerError> {
+    ) -> Result<RuntimeManagerResponse, IceCapError> {
         // send request
         let raw_request = bincode::serialize(request)?;
         let raw_header = bincode::serialize(&u32::try_from(raw_request.len()).unwrap())?;
@@ -273,10 +261,10 @@ impl IceCapRealm {
     }
 
     // NOTE close can report errors, but drop can still happen in weird cases
-    fn shutdown(self) -> Result<(), VeracruzServerError> {
+    fn shutdown(self) -> Result<(), IceCapError> {
         println!("vc-server: shutting down");
         self.signal_handle.close();
-        self.child.lock().unwrap().kill()?;
+        self.child.lock().unwrap().kill().map_err(|e| IceCapError::ChannelError(e))?;
         Ok(())
     }
 }
@@ -288,10 +276,8 @@ impl VeracruzServerIceCap {
         &mut self,
         request: &RuntimeManagerRequest,
     ) -> Result<RuntimeManagerResponse, VeracruzServerError> {
-        match &mut self.0 {
-            Some(realm) => realm.communicate(request),
-            None => Err(VeracruzServerError::UninitializedEnclaveError),
-        }
+        let response = self.0.as_mut().ok_or(VeracruzServerError::UninitializedEnclaveError)?.communicate(request)?;
+        Ok(response)
     }
 
     fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
