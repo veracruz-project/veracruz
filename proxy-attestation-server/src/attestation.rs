@@ -162,7 +162,7 @@ fn convert_csr_to_certificate(
     // TODO: Currently setting the certificate expiry to a day from now. In the
     // future it would be good to make it configurable (also, 1 day seems a bit
     // long in this context)
-    let expiry =openssl::asn1::Asn1Time::days_from_now(1)
+    let expiry = openssl::asn1::Asn1Time::days_from_now(1)
                      .map_err(|err| {
                          println!("proxy-attestation-server::attestation::convert_csr_to_certificate days_from_now failed:{:?}", err);
                          err

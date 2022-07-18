@@ -15,16 +15,25 @@ use crate::attestation::nitro;
 #[cfg(any(feature = "linux", feature = "icecap"))]
 use crate::attestation::psa;
 use crate::error::*;
-use actix_web::{dev::Server, middleware, web, App, HttpServer};
+use actix_web::{dev::Server, middleware, web, App, HttpServer, HttpRequest, HttpResponse, Error};
 use lazy_static::lazy_static;
 use std::{
     net::ToSocketAddrs,
     path,
     sync::atomic::{AtomicBool, Ordering},
 };
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslVerifyMode};
 
 lazy_static! {
     pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
+}
+
+/// just to test
+async fn index(req: HttpRequest) -> Result<HttpResponse, Error> {
+    println!("{:?}", req);
+    Ok(HttpResponse::Ok()
+        .content_type("text/plain")
+        .body("Welcome!"))
 }
 
 #[allow(unused)]
@@ -68,6 +77,7 @@ pub fn server<U, P1, P2>(
     url: U,
     ca_cert_path: P1,
     ca_key_path: P2,
+    proxy_service_cert: String,
     debug: bool,
 ) -> Result<Server, String>
 where
@@ -90,14 +100,21 @@ where
             err
         )
     })?;
+
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+    //builder.set_verify(SslVerifyMode::NONE);
+    builder.set_private_key_file("key.pem", SslFiletype::PEM).unwrap();
+    builder.set_certificate_chain_file("cert.pem").unwrap();
+   
     let server = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
+            .service(web::resource("/index.html").to(index))
             .route("/Start", web::post().to(attestation::start))
             .route("/PSA/{psa_request}", web::post().to(psa_router))
             .route("/Nitro/{nitro_request}", web::post().to(nitro_router))
     })
-    .bind(url)
+    .bind_openssl(url, builder)
     .map_err(|err| format!("binding error: {:?}", err))?
     .run();
     Ok(server)
