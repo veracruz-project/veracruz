@@ -12,7 +12,7 @@
 #[cfg(feature = "linux")]
 pub mod veracruz_server_linux {
 
-    use crate::{veracruz_server::VeracruzServer, VeracruzServerError};
+    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use data_encoding::HEXLOWER;
     use io_utils::{
         http::{post_buffer, send_proxy_attestation_server_start},
@@ -85,7 +85,7 @@ pub mod veracruz_server_linux {
         /// 2. The response could be not be received, or deserialized.
         /// 3. The response was received and deserialized correctly, but was of
         ///    an unexpected form.
-        pub fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
+        pub fn tls_data_needed(&mut self, session_id: u32) -> VeracruzServerResult<bool> {
             info!("Checking whether TLS data can be read from Runtime Manager enclave (with session: {}).", session_id);
 
             info!("Sending TLS data check message.");
@@ -141,10 +141,7 @@ pub mod veracruz_server_linux {
         ///    deserialized.
         /// 3. The Runtime Manager enclave sends back a message indicating that
         ///    it was not expecting further TLS data to be requested.
-        pub fn read_tls_data(
-            &mut self,
-            session_id: u32,
-        ) -> Result<(bool, Vec<u8>), VeracruzServerError> {
+        pub fn read_tls_data(&mut self, session_id: u32) -> VeracruzServerResult<(bool, Vec<u8>)> {
             info!(
                 "Reading TLS data from Runtime Manager enclave (with session: {}).",
                 session_id
@@ -205,7 +202,7 @@ pub mod veracruz_server_linux {
 
     impl VeracruzServer for VeracruzServerLinux {
         /// Creates a new instance of the `VeracruzServerLinux` type.
-        fn new(policy: &str) -> Result<Self, VeracruzServerError>
+        fn new(policy: &str) -> VeracruzServerResult<Self>
         where
             Self: Sized,
         {
@@ -407,7 +404,7 @@ pub mod veracruz_server_linux {
                 let req = serialize_native_psa_attestation_token(&token, &csr, challenge_id).map_err(|e| {
                     error!("Failed to serialize native PSA attestation token request.  Error received: {:?}.", e);
 
-                    VeracruzServerError::TransportProtocolError(e)
+                    e
                 })?;
                 let req = base64::encode(&req);
                 let url = format!("{}/PSA/AttestationToken", proxy_attestation_server_url);
@@ -424,7 +421,7 @@ pub mod veracruz_server_linux {
                 let pasr = parse_proxy_attestation_server_response(None, &resp).map_err(|e| {
                     error!("Failed to parse reponse from proxy attestation server.  Error received: {:?}.", e);
 
-                    VeracruzServerError::TransportProtocolError(e)
+                    e
                 })?;
                 let cert_chain = pasr.get_cert_chain();
                 let root_cert = cert_chain.get_root_cert();
@@ -490,14 +487,11 @@ pub mod veracruz_server_linux {
         }
 
         #[inline]
-        fn plaintext_data(
-            &mut self,
-            _data: Vec<u8>,
-        ) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
             Err(VeracruzServerError::UnimplementedError)
         }
 
-        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> VeracruzServerResult<u32> {
             info!("Requesting new TLS session.");
 
             send_message(
@@ -509,7 +503,8 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)?;
+            let message: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)?;
 
             match message {
                 RuntimeManagerResponse::TlsSession(session_id) => {
@@ -528,7 +523,7 @@ pub mod veracruz_server_linux {
             }
         }
 
-        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
+        fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()> {
             info!("Requesting close of TLS session with ID: {}.", session_id);
 
             send_message(
@@ -540,7 +535,8 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)?;
+            let message: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)?;
 
             info!("Response received.");
 
@@ -569,7 +565,7 @@ pub mod veracruz_server_linux {
             &mut self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
+        ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)> {
             info!(
                 "Sending TLS data to runtime manager enclave (with session {}).",
                 session_id
@@ -584,7 +580,8 @@ pub mod veracruz_server_linux {
 
             info!("Awaiting response...");
 
-            let message: RuntimeManagerResponse = receive_message(&mut self.runtime_manager_socket)?;
+            let message: RuntimeManagerResponse =
+                receive_message(&mut self.runtime_manager_socket)?;
 
             info!("Response received.");
 

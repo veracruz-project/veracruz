@@ -32,10 +32,9 @@ lazy_static! {
 
 /// Reads a PEM certificate from `pem_cert_path`, converts it to DER format,
 /// and stores it in CA_CERT_DER for use by the service
-pub fn load_ca_certificate<P>(pem_cert_path: P) -> Result<(), ProxyAttestationServerError>
-where
-    P: AsRef<path::Path>,
-{
+pub fn load_ca_certificate<P: AsRef<path::Path>>(
+    pem_cert_path: P,
+) -> Result<(), ProxyAttestationServerError> {
     let mut f = std::fs::File::open(pem_cert_path).map_err(ProxyAttestationServerError::IOError)?;
     let mut buffer: Vec<u8> = Vec::new();
     f.read_to_end(&mut buffer)?;

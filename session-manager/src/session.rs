@@ -12,10 +12,9 @@
 //! information on licensing and copyright.
 
 use crate::error::SessionManagerError;
-use mbedtls::alloc::List;
-use mbedtls::x509::Certificate;
+use anyhow::{anyhow, Result};
+use mbedtls::{alloc::List, x509::Certificate, ssl::Config};
 use policy_utils::principal::Identity;
-
 use std::{
     io::{Read, Write},
     sync::{Arc, Mutex},
@@ -107,10 +106,7 @@ impl Write for InsecureConnection {
 impl Session {
     /// Creates a new session from a server configuration and a list of
     /// principals.
-    pub fn new(
-        config: mbedtls::ssl::Config,
-        principals: &Vec<Principal>,
-    ) -> Result<Self, SessionManagerError> {
+    pub fn new(config: Config, principals: &Vec<Principal>) -> Result<Self> {
         let tls_context = mbedtls::ssl::Context::new(Arc::new(config));
         let shared_buffers = Arc::new(Mutex::new(Buffers {
             read_buffer: vec![],
@@ -126,10 +122,10 @@ impl Session {
     }
 
     /// Writes the contents of `input` over the session's TLS server session.
-    pub fn send_tls_data(&mut self, input: &mut Vec<u8>) -> Result<(), SessionManagerError> {
+    pub fn send_tls_data(&mut self, input: &mut Vec<u8>) -> Result<()> {
         self.shared_buffers
             .lock()
-            .map_err(|_| SessionManagerError::LockError)?
+            .map_err(|_| SessionManagerError::SharedBufferLock)?
             .read_buffer
             .append(input);
         Ok(())
@@ -137,7 +133,7 @@ impl Session {
 
     /// Writes the entirety of the `input` buffer over the TLS connection.
     #[inline]
-    pub fn write_plaintext_data(&mut self, input: &[u8]) -> Result<(), SessionManagerError> {
+    pub fn write_plaintext_data(&mut self, input: &[u8]) -> Result<()> {
         self.tls_context.write_all(&input)?;
         Ok(())
     }
@@ -146,18 +142,18 @@ impl Session {
     /// session has no data to read, returns `Ok(None)`.  If data is available
     /// for reading, returns `Ok(Some(buffer))` for some byte buffer, `buffer`.
     /// If reading fails, then an error is returned.
-    pub fn read_tls_data(&mut self) -> Result<Option<Vec<u8>>, SessionManagerError> {
+    pub fn read_tls_data(&mut self) -> Result<Option<Vec<u8>>> {
         let mut shared_buffers = self
             .shared_buffers
             .lock()
-            .map_err(|_| SessionManagerError::LockError)?;
+            .map_err(|_| SessionManagerError::SharedBufferLock)?;
         Ok(shared_buffers.write_buffer.take())
     }
 
     /// Reads data via the established TLS session, returning the unique client
     /// ID and the set of roles associated with the principal that sent the
     /// data.
-    pub fn read_plaintext_data(&mut self) -> Result<Option<(u32, Vec<u8>)>, SessionManagerError> {
+    pub fn read_plaintext_data(&mut self) -> Result<Option<(u32, Vec<u8>)>> {
         let mut received_buffer = vec![];
         self.established()?;
         let t = self.tls_context.read_to_end(&mut received_buffer);
@@ -171,10 +167,10 @@ impl Session {
             let peer_certs = self.tls_context.peer_cert()?;
             if peer_certs.iter().count() == 1 {
                 let peer_cert = peer_certs
-                    .ok_or(SessionManagerError::PeerCertificateError)?
+                    .ok_or(anyhow!(SessionManagerError::PeerCertificateError))?
                     .iter()
                     .nth(0)
-                    .ok_or(SessionManagerError::PeerCertificateError)?
+                    .ok_or(anyhow!(SessionManagerError::PeerCertificateError))?
                     .as_der();
 
                 for principal in self.principals.iter() {
@@ -196,17 +192,17 @@ impl Session {
 
     /// Returns `true` iff the session's TLS server session has data to be read.
     #[inline]
-    pub fn read_tls_needed(&self) -> Result<bool, SessionManagerError> {
+    pub fn read_tls_needed(&self) -> Result<bool> {
         let r = Ok(self
             .shared_buffers
             .lock()
-            .map_err(|_| SessionManagerError::LockError)?
+            .map_err(|_| SessionManagerError::SharedBufferLock)?
             .write_buffer
             .is_some());
         r
     }
 
-    fn established(&mut self) -> Result<(), SessionManagerError> {
+    fn established(&mut self) -> Result<()> {
         if !self.established {
             let conn = InsecureConnection {
                 shared_buffers: Arc::clone(&self.shared_buffers),

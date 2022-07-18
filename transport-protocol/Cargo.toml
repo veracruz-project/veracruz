@@ -10,6 +10,7 @@ version = "0.3.0"
 icecap = []
 
 [dependencies]
+anyhow = "1"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 protobuf = "=2.8.1"

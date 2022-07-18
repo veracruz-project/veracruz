@@ -11,7 +11,7 @@
 
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
-    use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
+    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use io_utils::{
         http::{post_buffer, send_proxy_attestation_server_start},
         nitro::NitroEnclave,
@@ -34,7 +34,7 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServer for VeracruzServerNitro {
-        fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
+        fn new(policy_json: &str) -> VeracruzServerResult<Self> {
             // Set up, initialize Nitro Root Enclave
             let policy: Policy = Policy::from_json(policy_json)?;
 
@@ -125,14 +125,11 @@ pub mod veracruz_server_nitro {
             Ok(meta)
         }
 
-        fn plaintext_data(
-            &mut self,
-            _data: Vec<u8>,
-        ) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
             Err(VeracruzServerError::UnimplementedError)
         }
 
-        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
+        fn new_tls_session(&mut self) -> VeracruzServerResult<u32> {
             let nls_message = RuntimeManagerRequest::NewTlsSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
@@ -151,7 +148,7 @@ pub mod veracruz_server_nitro {
             Ok(session_id)
         }
 
-        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
+        fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()> {
             let cts_message = RuntimeManagerRequest::CloseTlsSession(session_id);
             let cts_buffer = bincode::serialize(&cts_message)?;
 
@@ -171,7 +168,7 @@ pub mod veracruz_server_nitro {
             &mut self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
+        ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)> {
             let std_message: RuntimeManagerRequest =
                 RuntimeManagerRequest::SendTlsData(session_id, input);
             let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
@@ -243,7 +240,7 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServerNitro {
-        fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
+        fn tls_data_needed(&self, session_id: u32) -> VeracruzServerResult<bool> {
             let gtdn_message = RuntimeManagerRequest::GetTlsDataNeeded(session_id);
             let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
 
@@ -265,7 +262,7 @@ pub mod veracruz_server_nitro {
         proxy_attestation_server_url: &str,
         att_doc: &[u8],
         challenge_id: i32,
-    ) -> Result<Vec<Vec<u8>>, VeracruzServerError> {
+    ) -> VeracruzServerResult<Vec<Vec<u8>>> {
         let serialized_nitro_attestation_doc_request =
             transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)?;
         let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
@@ -289,7 +286,8 @@ pub mod veracruz_server_nitro {
         );
 
         let body_vec = base64::decode(&received_body)?;
-        let response = transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
+        let response =
+            transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
 
         let (re_cert, ca_cert) = if response.has_cert_chain() {
             let cert_chain = response.get_cert_chain();
