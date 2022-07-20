@@ -44,10 +44,6 @@ struct Opt {
     #[structopt(long, parse(from_os_str))]
     ca_key: path::PathBuf,
 
-    /// this should be changed .. path to proxy_service_cert
-    #[structopt(long)]
-    proxy_service_cert: String,
-
     /// Enable/disable debugging
     #[structopt(long)]
     debug: bool,
@@ -72,7 +68,6 @@ fn main() {
         &opt.url,
         &opt.ca_cert,
         &opt.ca_key,
-        opt.proxy_service_cert,
         opt.debug,
     ) {
         Ok(proxy_attestation_server) => proxy_attestation_server,

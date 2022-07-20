@@ -51,7 +51,7 @@ where
     Ok(())
 }
 
-fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
+pub fn get_ca_certificate() -> Result<Vec<u8>, ProxyAttestationServerError> {
     let ccd_guard = CA_CERT_DER.lock()?;
     match &*ccd_guard {
         None => Err(ProxyAttestationServerError::BadStateError),
@@ -79,7 +79,7 @@ where
     Ok(())
 }
 
-fn get_ca_key() -> Result<openssl::pkey::PKey<openssl::pkey::Private>, ProxyAttestationServerError>
+pub fn get_ca_key() -> Result<openssl::pkey::PKey<openssl::pkey::Private>, ProxyAttestationServerError>
 {
     let guard = CA_KEY_PKEY.lock()?;
     match &*guard {

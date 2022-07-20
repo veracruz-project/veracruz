@@ -22,7 +22,13 @@ use std::{
     path,
     sync::atomic::{AtomicBool, Ordering},
 };
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslVerifyMode};
+use openssl::ssl::{SslAcceptor, SslMethod};
+use openssl::asn1::Asn1Time;
+use openssl::bn::{BigNum, MsbOption};
+use openssl::hash::MessageDigest;
+use openssl::pkey::{PKey, Private};
+use openssl::x509::extension::{BasicConstraints, KeyUsage, SubjectAlternativeName};
+use openssl::x509::{X509NameBuilder, X509Req, X509ReqBuilder, X509};
 
 lazy_static! {
     pub static ref DEBUG_MODE: AtomicBool = AtomicBool::new(false);
@@ -73,11 +79,70 @@ async fn nitro_router(
     Err(ProxyAttestationServerError::UnimplementedRequestError)
 }
 
+// Generate a certificate signing request using CA private key
+fn generate_csr(key: PKey<Private>) -> Result<X509Req, ProxyAttestationServerError> {
+    let mut req_builder = X509ReqBuilder::new()?;
+    req_builder.set_pubkey(&key)?;
+    let mut x509_name = X509NameBuilder::new()?;
+    x509_name.append_entry_by_text("CN", "localhost")?;
+    let x509_name = x509_name.build();
+    req_builder.set_subject_name(&x509_name)?;
+    req_builder.sign(&key, MessageDigest::sha256())?;
+    let req = req_builder.build();
+    Ok(req)
+}
+
+// Convert CSR to an X509 certificate and sign it
+fn convert_csr_to_certificate_sign(csr: X509Req, ca_cert: X509, ca_key: PKey<Private>) -> Result<X509, ProxyAttestationServerError> {
+    // first, verify the signature on the CSR
+    let public_key = csr.public_key()?;
+    let verify_result = csr.verify(&public_key)?;
+    if !verify_result {
+        println!("proxy_attestation_server::convert_csr_to_certificate_sign verify of CSR failed");
+        return Err(ProxyAttestationServerError::CsrVerifyError);
+    }
+
+    let mut cert_builder = X509::builder()?;
+    cert_builder.set_version(2)?;
+    let serial_number = {
+        let mut serial = BigNum::new()?;
+        serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
+        serial.to_asn1_integer()?
+    };
+    cert_builder.set_serial_number(&serial_number)?;
+    cert_builder.set_subject_name(csr.subject_name())?;
+    cert_builder.set_issuer_name(ca_cert.subject_name())?;
+    cert_builder.set_pubkey(csr.public_key()?.as_ref())?;
+    let not_before = Asn1Time::days_from_now(0)?;
+    cert_builder.set_not_before(&not_before)?;
+    // need to double check.. 
+    let not_after = Asn1Time::days_from_now(356)?;
+    cert_builder.set_not_after(&not_after)?;
+
+    let subject_alt_name = SubjectAlternativeName::new()
+        .dns("localhost")
+        .build(&cert_builder.x509v3_context(Some(&ca_cert), None))?;
+    cert_builder.append_extension(subject_alt_name)?;
+
+    cert_builder.append_extension(BasicConstraints::new().build()?)?;
+
+    cert_builder.append_extension(
+        KeyUsage::new()
+            .critical()
+            .non_repudiation()
+            .digital_signature()
+            .key_encipherment()
+            .build()?,
+    )?;
+
+    cert_builder.sign(&ca_key, MessageDigest::sha256())?;
+    Ok(cert_builder.build())
+}
+
 pub fn server<U, P1, P2>(
     url: U,
     ca_cert_path: P1,
     ca_key_path: P2,
-    proxy_service_cert: String,
     debug: bool,
 ) -> Result<Server, String>
 where
@@ -100,11 +165,38 @@ where
             err
         )
     })?;
+    let ca_cert_der = crate::attestation::get_ca_certificate().map_err(|err| {
+        format!(
+            "proxy-attestation-server::server::server get_ca_certificate returned an error:{:?}",
+            err
+        )
+    })?;
+    let ca_cert = openssl::x509::X509::from_der(&ca_cert_der).map_err(|err| {
+        format!(
+            "proxy-attestation-server::server::server get_ca_certificate returned an error:{:?}",
+            err
+        )
+    })?;
+    let private_key = crate::attestation::get_ca_key().map_err(|err| {
+        format!(
+            "proxy-attestation-server::server::server get_ca_key returned an error:{:?}",
+            err
+        )
+    })?;
 
+    let csr = generate_csr(private_key.clone()).map_err(|err| {
+        format!(
+            "proxy-attestation-server::server::generate_csr returned an error:{:?}",
+            err
+        )
+    })?;
+    let cert = convert_csr_to_certificate_sign(csr, ca_cert, private_key.clone()).unwrap();
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-    //builder.set_verify(SslVerifyMode::NONE);
-    builder.set_private_key_file("key.pem", SslFiletype::PEM).unwrap();
-    builder.set_certificate_chain_file("cert.pem").unwrap();
+
+    builder.set_certificate(&cert).unwrap();
+    builder.set_private_key(&private_key).unwrap();
+    //builder.set_private_key_file("key.pem", SslFiletype::PEM).unwrap();
+    //builder.set_certificate_chain_file("cert.pem").unwrap();
    
     let server = HttpServer::new(move || {
         App::new()
