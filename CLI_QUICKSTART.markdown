@@ -123,7 +123,7 @@ $ openssl genrsa 2048 \
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-program-key.pem \
     -out example/example-program-cert.pem \
-    -config test-collateral/cert.conf
+    -config workspaces/cert.conf
 
 $ openssl genrsa 2048 \
     | openssl pkcs8 -nocrypt -traditional \
@@ -131,7 +131,7 @@ $ openssl genrsa 2048 \
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-data0-key.pem \
     -out example/example-data0-cert.pem \
-    -config test-collateral/cert.conf
+    -config workspaces/cert.conf
 
 $ openssl genrsa 2048 \
     | openssl pkcs8 -nocrypt -traditional \
@@ -139,7 +139,7 @@ $ openssl genrsa 2048 \
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-data1-key.pem \
     -out example/example-data1-cert.pem \
-    -config test-collateral/cert.conf
+    -config workspaces/cert.conf
 
 $ openssl genrsa 2048 \
     | openssl pkcs8 -nocrypt -traditional \
@@ -147,7 +147,7 @@ $ openssl genrsa 2048 \
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-data2-key.pem \
     -out example/example-data2-cert.pem \
-    -config test-collateral/cert.conf
+    -config workspaces/cert.conf
 
 $ openssl genrsa 2048 \
     | openssl pkcs8 -nocrypt -traditional \
@@ -155,7 +155,7 @@ $ openssl genrsa 2048 \
 $ openssl req -new -x509 -sha256 -nodes -days 3650 \
     -key example/example-result-key.pem \
     -out example/example-result-cert.pem \
-    -config test-collateral/cert.conf
+    -config workspaces/cert.conf
 ```
 
 And since the Proxy Attestation Server acts as a certificate authority,
@@ -168,7 +168,7 @@ $ openssl req -new -x509 -sha256 -nodes -days 1825 \
     -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
     -key example/example-ca-key.pem \
     -out example/example-ca-cert.pem \
-    -config test-collateral/ca-cert.conf
+    -config workspaces/cert.conf
 ```
 
 ## Creating a policy file
