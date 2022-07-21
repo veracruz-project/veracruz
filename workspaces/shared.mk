@@ -59,10 +59,10 @@ $(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm:
 CA_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/CAKey.pem
 CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
 
-$(CA_KEY): 
+$(CA_KEY): $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl ecparam -name secp256k1 -genkey -noout -out $@
 
-$(CA_CRT): $(CA_KEY)
+$(CA_CRT): $(CA_KEY) $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/ca-cert.conf
 
 CLIENT_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_key.pem
@@ -79,10 +79,13 @@ NEVER_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_cert.pem
 CERTS = $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(NEVER_CRT)
 KEYS = $(CLIENT_KEY) $(PROGRAM_KEY) $(DATA_KEY) $(RESULT_KEY) $(NEVER_KEY)
 
-$(KEYS): %.pem :
+$(WORKSPACE_DIR)/host/crates/test-collateral:
+	mkdir -p $@
+
+$(KEYS): %.pem : $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl genrsa -out $@ 2048
 
-$(CERTS): $(WORKSPACE_DIR)/host/crates/test-collateral/%_cert.pem : $(WORKSPACE_DIR)/host/crates/test-collateral/%_key.pem
+$(CERTS): $(WORKSPACE_DIR)/host/crates/test-collateral/%_cert.pem : $(WORKSPACE_DIR)/host/crates/test-collateral/%_key.pem $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/cert.conf
 
 ###################################################
