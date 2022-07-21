@@ -45,13 +45,6 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "nitro")]
     #[error(display = "RuntimeManager: NSM Error code: {:?}", _0)]
     NsmErrorCode(nsm_api::api::ErrorCode),
-    #[error(
-        display = "RuntimeManager: Data wrong size for field {:?}. Wanted:{:?}, got:{:?}",
-        _0,
-        _1,
-        _2
-    )]
-    DataWrongSizeForField(std::string::String, usize, usize),
     #[error(display = "RuntimeManager: Execution denied.")]
     ExecutionDenied,
     #[error(display = "RuntimeManager: Failed to obtain lock on protocol state.")]

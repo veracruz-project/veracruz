@@ -54,9 +54,41 @@ $(WORKSPACE_DIR)/applications/target/wasm32-wasi/$(PROFILE_PATH)/%.wasm:
 	$(MAKE) -C $(WORKSPACE_DIR)/applications
 
 ###################################################
+# Keys and certs
+
+CA_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/CAKey.pem
+CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
+
+$(CA_KEY): 
+	openssl ecparam -name secp256k1 -genkey -noout -out $@
+
+$(CA_CRT): $(CA_KEY)
+	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/ca-cert.conf
+
+CLIENT_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_key.pem
+CLIENT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_cert.pem
+PROGRAM_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/program_client_key.pem
+PROGRAM_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/program_client_cert.pem
+DATA_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/data_client_key.pem
+DATA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/data_client_cert.pem
+RESULT_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/result_client_key.pem
+RESULT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/result_client_cert.pem
+NEVER_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_key.pem
+NEVER_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_cert.pem
+
+CERTS = $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(NEVER_CRT)
+KEYS = $(CLIENT_KEY) $(PROGRAM_KEY) $(DATA_KEY) $(RESULT_KEY) $(NEVER_KEY)
+
+$(KEYS): %.pem :
+	openssl genrsa -out $@ 2048
+
+$(CERTS): $(WORKSPACE_DIR)/host/crates/test-collateral/%_cert.pem : $(WORKSPACE_DIR)/host/crates/test-collateral/%_key.pem
+	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/cert.conf
+
+###################################################
 # Datasets
 
-datasets: $(OUT_DIR)
+datasets: $(OUT_DIR) $(CERTS) $(KEYS) $(CA_KEY) $(CA_CRT)
 	$(MAKE) -C $(WORKSPACE_DIR)/data-generators
 	$(MAKE) -C ../host datasets
 	cp -r ../../examples/datasets/* $(OUT_DIR)
@@ -133,15 +165,7 @@ policy-files: $(OUT_DIR) $(MEASUREMENT_FILE) $(patsubst %.json, $(OUT_DIR)/%.jso
 
 PROGRAM_DIR = /program/
 
-CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
-CLIENT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_cert.pem
-PROGRAM_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/program_client_cert.pem
-DATA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/data_client_cert.pem
-RESULT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/result_client_cert.pem
-NEVER_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/never_used_cert.pem
-EXPIRED_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/expired_cert.pem
-
-CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(EXPIRED_CRT) $(MEASUREMENT_FILE)
+CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(MEASUREMENT_FILE)
 
 PGEN_COMMON_PARAMS = --proxy-attestation-server-cert $(CA_CRT) $(MEASUREMENT_PARAMETER) \
 	--certificate-expiry $(CERTIFICATE_EXPIRY) --execution-strategy Interpretation

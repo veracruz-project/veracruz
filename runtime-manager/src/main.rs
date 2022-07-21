@@ -15,27 +15,26 @@
 #![cfg_attr(any(feature = "icecap"), feature(rustc_private))]
 #![cfg_attr(any(feature = "icecap"), feature(format_args_nl))]
 
-#[cfg(feature = "linux")]
-pub mod runtime_manager_linux;
-
-#[cfg(feature = "icecap")]
-pub mod runtime_manager_icecap;
-#[cfg(feature = "icecap")]
-pub use crate::runtime_manager_icecap::*;
-
-#[cfg(feature = "nitro")]
-pub mod runtime_manager_nitro;
-
 pub mod managers;
+pub mod platforms;
+
+#[cfg(feature = "linux")]
+pub use platforms::linux;
+#[cfg(feature = "icecap")]
+pub use platforms::icecap;
+#[cfg(feature = "icecap")]
+pub use crate::platforms::icecap::*;
+#[cfg(feature = "nitro")]
+pub use platforms::nitro;
 
 #[cfg(feature = "nitro")]
 fn main() -> Result<(), String> {
-    runtime_manager_nitro::nitro_main()
+    nitro::nitro_main()
         .map_err(|err| format!("Runtime Manager::main nitro_main returned error: {:?}", err))
 }
 
 #[cfg(feature = "linux")]
 fn main() -> Result<(), String> {
-    runtime_manager_linux::linux_main()
+    linux::linux_main()
         .map_err(|err| format!("Runtime Manager::main linux_main returned error: {:?}", err))
 }
