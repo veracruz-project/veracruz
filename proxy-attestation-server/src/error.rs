@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use actix_web::{error, http::StatusCode, HttpResponse, HttpResponseBuilder};
+use coset::CoseError;
 use err_derive::Error;
 
 pub type ProxyAttestationServerResponder = Result<String, ProxyAttestationServerError>;
@@ -23,6 +24,23 @@ pub enum ProxyAttestationServerError {
         _0
     )]
     OpenSSLError(#[error(source)] openssl::error::ErrorStack),
+    #[error(
+        display = "ProxyAttestationServer: PSACrypto Error: {:#?}",
+        _0
+    )]
+    PSACryptoError(String),
+    #[error(
+        display = "ProxyAttestationServer: CoseError: {:#?}",
+        _0
+    )]
+    CoseError(CoseError),
+    #[error(
+        display = "ProxyAttestationServer: CiboriumError: {:#?}",
+        _0
+    )]
+    CiboriumError(ciborium::de::Error<std::io::Error>),
+    #[error(display = "ProxyAttestationServer: CurlError: {:?}.", _0)]
+    CurlError(#[error(source)] curl::Error),
     #[error(display = "ProxyAttestationServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
     #[error(
@@ -64,6 +82,8 @@ pub enum ProxyAttestationServerError {
     IOError(#[error(source)] std::io::Error),
     #[error(display = "ProxyAttestationServer: BadState error")]
     BadStateError,
+    #[error(display = "ProxyAttestationServer: IntConversionError")]
+    IntConversionError,
     #[error(display = "ProxyAttestationServer: Anyhow error {:?}", _0)]
     Anyhow(anyhow::Error),
 }
