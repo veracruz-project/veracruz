@@ -28,7 +28,7 @@ icecap = [
   "psa-attestation/icecap",
   "openssl/vendored",
 ]
-linux = ["psa-attestation/linux"]
+linux = []
 nitro = [
   "nitro-enclave-attestation-document",
   "psa-attestation/nitro",
