@@ -168,7 +168,7 @@ $ openssl req -new -x509 -sha256 -nodes -days 1825 \
     -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
     -key example/example-ca-key.pem \
     -out example/example-ca-cert.pem \
-    -config workspaces/cert.conf
+    -config workspaces/ca-cert.conf
 ```
 
 ## Creating a policy file
