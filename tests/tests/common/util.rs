@@ -56,6 +56,7 @@ pub fn runtime_data_dir<T: AsRef<str>>(filename: T) -> String {
 ///
 /// Note this is overrideable with the VERACRUZ_TEST_TIMEOUT environment
 /// variable, which provides a timeout in seconds
+#[allow(dead_code)] // FIXME
 pub fn timeout<R: Send + 'static, F: (FnOnce() -> R) + Send + 'static>(
     timeout: Duration,
     f: F,

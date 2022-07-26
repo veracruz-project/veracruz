@@ -14,7 +14,6 @@
 
 mod common;
 
-use actix_rt::System;
 use anyhow::{anyhow, Result};
 use common::event::TestEvent;
 use common::proxy_attestation_server::*;
@@ -24,9 +23,7 @@ use log::{error, info};
 use mbedtls::{alloc::List, x509::Certificate};
 use policy_utils::{policy::Policy, Platform};
 use std::{
-    convert::TryFrom,
     error::Error,
-    fs::File,
     io::{Read, Write},
     path::Path,
     sync::{

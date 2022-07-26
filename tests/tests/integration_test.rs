@@ -24,7 +24,6 @@ const LINEAR_REGRESSION_DUAL_POLICY: &'static str = "dual_policy.json";
 const LINEAR_REGRESSION_TRIPLE_POLICY: &'static str = "triple_policy_1.json";
 const LINEAR_REGRESSION_PARALLEL_POLICY: &'static str = "dual_parallel_policy.json";
 const INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_2.json";
-const PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_3.json";
 const STRING_EDIT_DISTANCE_TRIPLE_POLICY: &'static str = "triple_policy_4.json";
 const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str = "quadruple_policy.json";
 
@@ -280,8 +279,7 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             info!("### program provider read binary.");
             let program_data = read_local_file(prog_path).unwrap();
             info!("### program provider send binary.");
-            client
-                .write_file("/program/linear-regression.wasm", &program_data)?;
+            client.write_file("/program/linear-regression.wasm", &program_data)?;
             Result::<()>::Ok(())
         };
         let data_provider_handle = async {
@@ -297,11 +295,9 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             info!("### data provider read input.");
             let data = read_local_file(&data_filename).unwrap();
             info!("### data provider send input.");
-            client
-                .write_file("/input/linear-regression.dat", &data)?;
+            client.write_file("/input/linear-regression.dat", &data)?;
             info!("### data provider read result.");
-            client
-                .request_compute("/program/linear-regression.wasm")?;
+            client.request_compute("/program/linear-regression.wasm")?;
             client.read_file("/output/linear-regression.dat")?;
             info!("### data provider request shutdown.");
             client.request_shutdown()?;
@@ -366,9 +362,7 @@ impl TestExecutor {
         // start the proxy attestation server
         proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
 
-        Ok(TestExecutor {
-            policy_json,
-        })
+        Ok(TestExecutor { policy_json })
     }
 
     /// Execute this test. Clients collectively execute as a block, driven by the `events`, in
@@ -408,11 +402,10 @@ impl TestExecutor {
                     .ok_or(anyhow!("cannot find client of index {}", client_index))?;
                 info!("Process client{} event {:?}.", client_index, event);
                 let time_init = Instant::now();
-                Self::process_event(&mut client, &event)
-                    .map_err(|e| {
-                        error!("Client of index {}: {:?}", client_index, e);
-                        e
-                    })?;
+                Self::process_event(&mut client, &event).map_err(|e| {
+                    error!("Client of index {}: {:?}", client_index, e);
+                    e
+                })?;
                 info!(
                     "The event {:?} finished in {:?}.",
                     event,

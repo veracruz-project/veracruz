@@ -118,7 +118,6 @@ POLICY_FILES ?= \
 	dual_parallel_policy.json \
 	triple_policy_1.json \
 	triple_policy_2.json \
-	triple_policy_3.json \
 	triple_policy_4.json \
 	quadruple_policy.json
 
