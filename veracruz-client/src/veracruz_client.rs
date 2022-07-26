@@ -18,7 +18,10 @@ use std::{
     fs::File,
     io::{BufReader, Read, Write},
     path::Path,
-    sync::{Arc, atomic::{AtomicU32, Ordering}},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
@@ -99,7 +102,8 @@ impl Write for InsecureConnection {
             let received_session_id = body_items[0]
                 .parse::<u32>()
                 .map_err(|_| err("bad session id"))?;
-            self.remote_session_id.store(received_session_id, Ordering::SeqCst);
+            self.remote_session_id
+                .store(received_session_id, Ordering::SeqCst);
             // And append response data to the read_buffer.
             for item in body_items.iter().skip(1) {
                 let this_body_data = base64::decode(item).map_err(|_| err("base64::decode"))?;
@@ -153,7 +157,11 @@ impl VeracruzClient {
     pub(crate) fn read_private_key<P: AsRef<Path>>(filename: P) -> Result<Pk> {
         let mut buffer = VeracruzClient::read_all_bytes_in_file(filename)?;
         buffer.push(b'\0');
-        let pkey_vec = Pk::from_private_key(&buffer, None)?;
+        let pkey_vec = Pk::from_private_key(
+            &mut mbedtls::rng::CtrDrbg::new(Arc::new(mbedtls::rng::OsEntropy::new()), None)?,
+            &buffer,
+            None,
+        )?;
         Ok(pkey_vec)
     }
 
@@ -372,12 +380,13 @@ impl VeracruzClient {
             .ok_or(anyhow!(VeracruzClientError::UnexpectedCertificate))?;
         let extensions = cert.extensions()?;
         // check for OUR extension
-        let data = veracruz_utils::find_extension(extensions, &VERACRUZ_RUNTIME_HASH_EXTENSION_ID).ok_or({
-            error!("Our extension is not present. This should be fatal");
-            anyhow!(VeracruzClientError::RuntimeHashExtensionMissing)
-        })?;
+        let data = veracruz_utils::find_extension(extensions, &VERACRUZ_RUNTIME_HASH_EXTENSION_ID)
+            .ok_or({
+                error!("Our extension is not present. This should be fatal");
+                anyhow!(VeracruzClientError::RuntimeHashExtensionMissing)
+            })?;
         info!("Certificate extension present.");
-        self.compare_runtime_hash(&data).map_err(|err|{
+        self.compare_runtime_hash(&data).map_err(|err| {
             error!("Runtime hash mismatch: {}.", err);
             anyhow!(err)
         })

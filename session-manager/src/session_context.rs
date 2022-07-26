@@ -162,6 +162,7 @@ impl SessionContext {
         config.push_cert(
             Arc::new(self.cert_chain.clone()),
             Arc::new(mbedtls::pk::Pk::from_private_key(
+                &mut mbedtls::rng::CtrDrbg::new(Arc::new(mbedtls::rng::OsEntropy::new()), None)?,
                 &self.server_private_key,
                 None,
             )?),

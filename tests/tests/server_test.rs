@@ -771,8 +771,8 @@ impl TestExecutor {
     }
 
     fn check_policy_hash(&mut self) -> Result<Vec<u8>> {
-        let serialized_request_policy_hash =
-            transport_protocol::serialize_request_policy_hash().map_err(|e| {
+        let serialized_request_policy_hash = transport_protocol::serialize_request_policy_hash()
+            .map_err(|e| {
                 anyhow!(
                     "Failed to serialize request for policy hash.  Error produced: {:?}.",
                     e
@@ -1061,6 +1061,10 @@ fn read_cert_file<P: AsRef<Path>>(filename: P) -> Result<List<Certificate>> {
 fn read_priv_key_file<P: AsRef<Path>>(filename: P) -> Result<mbedtls::pk::Pk> {
     let mut buffer = std::fs::read(filename)?;
     buffer.push(b'\0');
-    let pkey_vec = mbedtls::pk::Pk::from_private_key(&buffer, None)?;
+    let pkey_vec = mbedtls::pk::Pk::from_private_key(
+        &mut mbedtls::rng::CtrDrbg::new(Arc::new(mbedtls::rng::OsEntropy::new()), None)?,
+        &buffer,
+        None,
+    )?;
     Ok(pkey_vec)
 }
