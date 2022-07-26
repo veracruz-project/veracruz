@@ -1177,6 +1177,7 @@ checksum = "ec58677acfea8a15352d42fc87d11d63596ade9239e0a7c9352914417515dbe6"
 name = "io-utils"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "base64",
  "bincode",
  "byteorder",
@@ -1668,6 +1669,7 @@ dependencies = [
 name = "policy-utils"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "err-derive",
  "hex",
  "lexical-core",
@@ -1975,6 +1977,7 @@ dependencies = [
 name = "runtime_manager_enclave"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "aws-nitro-enclaves-nsm-api",
  "bincode",
  "clap",
@@ -2171,6 +2174,7 @@ dependencies = [
 name = "session-manager"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "err-derive",
  "mbedtls",
  "platform-services",
@@ -2399,6 +2403,7 @@ dependencies = [
 name = "transport-protocol"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "err-derive",
  "lazy_static",
  "protobuf",
@@ -2484,6 +2489,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 name = "veracruz-utils"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "err-derive",
  "mbedtls",

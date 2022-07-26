@@ -10,8 +10,8 @@
 //! and copyright information.
 
 use std::{
-    fmt::Debug,
     convert::TryFrom,
+    fmt::Debug,
     fs::{read_to_string, File},
     io::{Read, Write},
     net::SocketAddr,
@@ -41,8 +41,7 @@ use wasi_types::Rights;
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Aborts the program with a message on `stderr`.
-fn abort_with<T: Debug>(msg: T) -> !
-{
+fn abort_with<T: Debug>(msg: T) -> ! {
     eprintln!("{:?}", msg);
     exit(1);
 }
@@ -80,7 +79,7 @@ information.";
 const VERSION: &'static str = "0.1.0";
 
 /// The single supported ciphersuite embedded in the policy file.
-const POLICY_CIPHERSUITE: &'static str = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256";
+const POLICY_CIPHERSUITE: &'static str = "TLS1_3_CHACHA20_POLY1305_SHA256";
 
 /// The default filename of the output JSON policy file, if no alternative is
 /// provided on the command line.

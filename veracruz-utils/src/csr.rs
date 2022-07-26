@@ -41,12 +41,12 @@ pub enum CertError {
 }
 
 pub fn generate_csr(private_key_der: &[u8]) -> Result<Vec<u8>> {
-    let mut pk_private = mbedtls::pk::Pk::from_private_key(private_key_der, None).unwrap();
     let mut rng = |buffer: *mut u8, size: usize| {
         let mut slice = unsafe { std::slice::from_raw_parts_mut(buffer, size) };
         getrandom(&mut slice);
         0
     };
+    let mut pk_private = mbedtls::pk::Pk::from_private_key(&mut rng, private_key_der, None)?;
     let csr = mbedtls::x509::csr::Builder::new()
         .key(&mut pk_private)
         .subject("C=US")

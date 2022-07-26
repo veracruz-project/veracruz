@@ -104,8 +104,13 @@ fn veracruz_client_session() {
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer).unwrap();
         key_buffer.push(b'\0');
-        let rsa_keys = mbedtls::pk::Pk::from_private_key(&key_buffer, None)
-            .expect("file contains invalid rsa private key");
+        let rsa_keys = mbedtls::pk::Pk::from_private_key(
+            &mut mbedtls::rng::CtrDrbg::new(Arc::new(mbedtls::rng::OsEntropy::new()), None)
+                .unwrap(),
+            &key_buffer,
+            None,
+        )
+        .expect("file contains invalid rsa private key");
         rsa_keys
     };
 
@@ -136,10 +141,10 @@ fn veracruz_client_session() {
     );
     config.set_ca_list(Arc::new(client_cert), None);
     config
-        .set_min_version(mbedtls::ssl::config::Version::Tls1_2)
+        .set_min_version(mbedtls::ssl::config::Version::Tls1_3)
         .unwrap();
     config
-        .set_max_version(mbedtls::ssl::config::Version::Tls1_2)
+        .set_max_version(mbedtls::ssl::config::Version::Tls1_3)
         .unwrap();
     config
         .push_cert(Arc::new(server_cert), Arc::new(server_priv_key))

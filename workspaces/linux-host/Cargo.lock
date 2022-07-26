@@ -1269,6 +1269,7 @@ dependencies = [
 name = "io-utils"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "base64",
  "bincode",
  "byteorder",
@@ -1864,6 +1865,7 @@ dependencies = [
 name = "policy-utils"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "err-derive",
  "hex",
  "lexical-core",
@@ -1985,6 +1987,7 @@ dependencies = [
  "actix-http",
  "actix-rt",
  "actix-web",
+ "anyhow",
  "base64",
  "curl",
  "env_logger",
@@ -2561,6 +2564,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "tests"
+version = "0.3.0"
+dependencies = [
+ "actix-rt",
+ "actix-web",
+ "anyhow",
+ "curl",
+ "either",
+ "env_logger",
+ "err-derive",
+ "futures",
+ "hex",
+ "log",
+ "mbedtls",
+ "policy-utils",
+ "postcard",
+ "proxy-attestation-server",
+ "transport-protocol",
+ "veracruz-client",
+ "veracruz-server",
+ "veracruz-utils",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2729,6 +2756,7 @@ dependencies = [
 name = "transport-protocol"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "err-derive",
  "lazy_static",
  "protobuf",
@@ -2828,6 +2856,7 @@ dependencies = [
  "actix-rt",
  "actix-session",
  "actix-web",
+ "anyhow",
  "base64",
  "curl",
  "env_logger",
@@ -2854,6 +2883,7 @@ dependencies = [
  "actix-http",
  "actix-rt",
  "actix-web",
+ "anyhow",
  "base64",
  "bincode",
  "curl",
@@ -2880,50 +2910,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "veracruz-server-test"
-version = "0.3.0"
-dependencies = [
- "actix-rt",
- "curl",
- "either",
- "env_logger",
- "hex",
- "lazy_static",
- "log",
- "mbedtls",
- "policy-utils",
- "proxy-attestation-server",
- "transport-protocol",
- "veracruz-server",
- "veracruz-utils",
-]
-
-[[package]]
-name = "veracruz-test"
-version = "0.3.0"
-dependencies = [
- "actix-rt",
- "actix-web",
- "either",
- "env_logger",
- "err-derive",
- "futures",
- "lazy_static",
- "log",
- "policy-utils",
- "postcard",
- "proxy-attestation-server",
- "serde",
- "serde_json",
- "transport-protocol",
- "veracruz-client",
- "veracruz-server",
-]
-
-[[package]]
 name = "veracruz-utils"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "err-derive",
  "mbedtls",
