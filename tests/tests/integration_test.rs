@@ -24,7 +24,6 @@ const LINEAR_REGRESSION_DUAL_POLICY: &'static str = "dual_policy.json";
 const LINEAR_REGRESSION_TRIPLE_POLICY: &'static str = "triple_policy_1.json";
 const LINEAR_REGRESSION_PARALLEL_POLICY: &'static str = "dual_parallel_policy.json";
 const INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_2.json";
-const PERMUTED_INTERSECTION_SET_SUM_TRIPLE_POLICY: &'static str = "triple_policy_3.json";
 const STRING_EDIT_DISTANCE_TRIPLE_POLICY: &'static str = "triple_policy_4.json";
 const STRING_EDIT_DISTANCE_QUADRUPLE_POLICY: &'static str = "quadruple_policy.json";
 

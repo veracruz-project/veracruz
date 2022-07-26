@@ -8,10 +8,12 @@ use std::{
 #[derive(Debug, Clone)]
 pub(crate) enum TestEvent {
     // Check the policy and runtime hash
+    #[allow(dead_code)] // FIXME
     CheckHash,
     // Write a remote file
     WriteFile(String, PathBuf),
     // Append a remote file
+    #[allow(dead_code)] // FIXME
     AppendFile(String, PathBuf),
     // Execute a remote file
     Execute(String),
@@ -36,6 +38,7 @@ impl TestEvent {
 
     /// Create a list of events for provisioning data files in the `local_dir_path`. The
     /// `local_dir_path` will be replaced by `remote_dir_path`.
+    #[allow(dead_code)] // FIXME
     pub(crate) fn write_all<T: AsRef<Path>, K: AsRef<Path>>(
         dir_path: T,
         remote_dir_path: K,
@@ -60,6 +63,7 @@ impl TestEvent {
     /// Function produces a vec of input lists. Each list corresponds to a round
     /// and is a vec of pairs of remote (des) file and local (src) file path,
     /// which corresponds to provisioning/appending the content of the local file to the remote file.
+    #[allow(dead_code)] // FIXME
     pub(crate) fn batch_process_events<T: AsRef<Path>, K: AsRef<str>, Q: AsRef<str>>(
         local_dir_path: T,
         program_filename: K,
@@ -113,6 +117,7 @@ impl TestEvent {
     /// Read all files and diretory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
     /// E.g. if call the function with '/local/path/' and '/remote/path/',
     /// the result could be [(/remote/path/a.txt, /local/path/a.txt), (/remote/path/b/c.txt, /local/path/b/c.txt), ... ].
+    #[allow(dead_code)] // FIXME
     pub(crate) fn input_list<T: AsRef<Path>, K: AsRef<Path>>(
         dir_path: T,
         remote_dir_path: K,
