@@ -15,7 +15,7 @@ pub mod veracruz_server_linux {
     use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use data_encoding::HEXLOWER;
     use io_utils::{
-        http::{post_buffer, send_proxy_attestation_server_start},
+        http::{HttpError, HttpResponse, post_string, send_proxy_attestation_server_start},
         tcp::{receive_message, send_message},
     };
     use log::{error, info};
@@ -408,11 +408,17 @@ pub mod veracruz_server_linux {
                 })?;
                 let req = base64::encode(&req);
                 let url = format!("{}/PSA/AttestationToken", proxy_attestation_server_url);
-                let resp = post_buffer(&url, &req).map_err(|e| {
-                    error!("Failed to send request to proxy attestation server (at URL {:?}).  Error received: {:?}.", url, e);
+                let resp = match post_string(&url, &req, None).map_err(|e| {
+                        error!("Failed to send request to proxy attestation server (at URL {:?}).  Error received: {:?}.", url, e);
 
-                    e
-                })?;
+                        VeracruzServerError::HttpError(e)
+                    })? {
+                    HttpResponse::Ok(body) => body,
+                    not_ok => {
+                        error!("post buffer returned a non-Ok status code:{:?}", not_ok);
+                        return Err(VeracruzServerError::HttpError(HttpError::HttpSuccess));
+                    }
+                };
                 let resp = base64::decode(&resp).map_err(|e| {
                     error!("Failed to Base64 decode response from proxy attestation server.  Error received: {:?}.", e);
 

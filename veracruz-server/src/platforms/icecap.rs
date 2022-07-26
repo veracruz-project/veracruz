@@ -11,7 +11,7 @@
 
 use crate::common::{VeracruzServer, VeracruzServerError};
 use err_derive::Error;
-use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
+use io_utils::http::{post_string, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
 use signal_hook::{
     consts::SIGINT,
@@ -328,7 +328,7 @@ impl VeracruzServer for VeracruzServerIceCap {
                 "{:}/PSA/AttestationToken",
                 policy.proxy_attestation_server_url()
             );
-            let resp = post_buffer(&url, &req)?;
+            let resp = post_string(&url, &req, None).map_err(VeracruzServerError::HttpError)?;
             let resp = base64::decode(&resp)?;
             let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)?;
             let cert_chain = pasr.get_cert_chain();

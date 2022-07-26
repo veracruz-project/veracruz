@@ -84,6 +84,8 @@ pub enum ProxyAttestationServerError {
     BadStateError,
     #[error(display = "ProxyAttestationServer: IntConversionError")]
     IntConversionError,
+    #[error(display = "ProxyAttestationServer: Http Error {}.", _0)]
+    HttpError(io_utils::http::HttpError)
     #[error(display = "ProxyAttestationServer: Anyhow error {:?}", _0)]
     Anyhow(anyhow::Error),
 }

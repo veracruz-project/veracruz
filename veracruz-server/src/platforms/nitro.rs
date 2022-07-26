@@ -13,7 +13,7 @@
 pub mod veracruz_server_nitro {
     use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use io_utils::{
-        http::{post_buffer, send_proxy_attestation_server_start},
+        http::{post_string, send_proxy_attestation_server_start},
         nitro::NitroEnclave,
     };
     use policy_utils::policy::Policy;
@@ -271,7 +271,7 @@ pub mod veracruz_server_nitro {
             "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
             url
         );
-        let received_body: String = post_buffer(&url, &encoded_str).map_err(|e| {
+        let received_body: String = post_string(&url, &encoded_str, None).map_err(|e| {
             println!(
                 "Failed to post native attestation token.  Error produced: {}.",
                 e

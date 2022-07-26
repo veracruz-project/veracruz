@@ -12,6 +12,15 @@
 use crate::error::*;
 use coset::{CoseSign1, TaggedCborSerializable};
 use lazy_static::lazy_static;
+use io_utils::http::{HttpResponse, post_bytes};
+use lazy_static::lazy_static;
+use log::error;
+use psa_attestation::{
+    q_useful_buf_c, t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA, t_cose_key,
+    t_cose_key__bindgen_ty_1, t_cose_parameters, t_cose_sign1_set_verification_key,
+    t_cose_sign1_verify, t_cose_sign1_verify_ctx, t_cose_sign1_verify_delete_public_key,
+    t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
+};
 use rand::Rng;
 use std::{collections::HashMap, convert::TryInto, sync::Mutex};
 use veracruz_utils::sha256::sha256;
@@ -135,13 +144,46 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
         parsed.get_native_psa_attestation_token(),
     );
 
-    let attestation_context = {
-        let ac_hash = ATTESTATION_CONTEXT.lock()?;
-        let context = ac_hash
-            .get(&device_id)
-            .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))?;
-        (*context).clone()
-    };
+    let (received_enclave_hash, received_csr_hash) = verify_attestation_token(&token, device_id)
+        .map_err(|err| {
+            println!("proxy-attestation-server/attestation/psa/attestation_token Verification of token failed: {:?}", err);
+            ProxyAttestationServerError::FailedToVerifyError("attestation_token Failed to verify attestation token")
+        }
+    )?;
+
+    //let received_csr_hash = &token_payload[86..118];
+    let calculated_csr_hash = sha256(&csr);
+    if received_csr_hash != calculated_csr_hash {
+        println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
+        return Err(ProxyAttestationServerError::MismatchError {
+            variable: "received_csr_hash",
+            expected: calculated_csr_hash,
+            received: received_csr_hash.to_vec(),
+        });
+    }
+
+    let cert = crate::attestation::convert_csr_to_certificate(&csr, &received_enclave_hash)
+        .map_err(|err| {
+            println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);
+            err
+        })?;
+
+    let root_cert_der = crate::attestation::get_ca_certificate()?;
+
+    let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
+
+    let response_b64 = base64::encode(&response_bytes);
+
+    // clean up the Attestation Context by removing this context
+    // {
+    //     let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+    //     ac_hash.remove(&device_id);
+    // }
+
+    Ok(response_b64)
+}
+
+fn _verify_attestation_token(token: &[u8], device_id: i32) -> Result<&[u8], ProxyAttestationServerError> {
 
     let mut verifier = Verifier {
         key_id: None,
@@ -231,31 +273,69 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     } else {
         return Err(ProxyAttestationServerError::MissingFieldError("challenge"));
     }
+    return Ok(payload_slice);
+}
 
-    let cert = if let Some(enclave_hash) = received_enclave_hash {
-        println!("received_enclave_hash:{:?}", enclave_hash);
-
-        let cert = crate::attestation::convert_csr_to_certificate(&csr, &enclave_hash)
-            .map_err(|err| {
-                println!("proxy-attestation-server::attestation::psa::attestation_token convert_csr_to_certificate failed:{:?}", err);
-                err
-            })?;
-        cert
-    } else {
-        return Err(ProxyAttestationServerError::MissingFieldError("enclave_hash"));
+fn verify_attestation_token(token: &[u8], device_id: i32) -> Result<(Vec<u8>, Vec<u8>), ProxyAttestationServerError> {
+    println!("proxy-attestation-server::verify_attestation_token started");
+    let challenge = {
+        let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
+        ac_hash
+            .remove(&device_id)
+            .ok_or(ProxyAttestationServerError::NoDeviceError(device_id))?.challenge
     };
 
-    let root_cert_der = crate::attestation::get_ca_certificate()?;
+    let encoded_challenge = base64::encode(&challenge);
+    let buffer = format!("nonce={:}", &encoded_challenge);
+    let url = format!("192.168.32.3:8080/challenge-response/v1/newSession");
+    let session_info = post_bytes(&url, &challenge, None)
+        .map_err(|err| {
+            ProxyAttestationServerError::HttpError(err)
+        })?;
 
-    let response_bytes = transport_protocol::serialize_cert_chain(&cert.to_der()?, &root_cert_der)?;
+    let verify_path = match session_info {
+        HttpResponse::Created(location, _body) => {
+            location
+        },
+        not_created => {
+            error!("proxy-attestation-server::verify_attestation_token failed to post_bytes:{:?}", not_created);
+            return Err(ProxyAttestationServerError::FailedToVerifyError("Unknown verify error"));
+        }
+    };
 
-    let response_b64 = base64::encode(&response_bytes);
+    // post to /challenge-response/v1/session/sessionId token
+    let url = format!("192.168.32.3:8080{:}", verify_path);
+    println!("proxy-attestation-server::verify_attestation_token calling post buffer for verify to url:{:?}", url);
+    let result = post_bytes(&url, &token, Some("application/psa-attestation-token"))
+        .map_err(|err| {
+            ProxyAttestationServerError::HttpError(err)
+        })?;
+    let json_data = match result {
+        HttpResponse::Ok(data) => data,
+        _ => return Err(ProxyAttestationServerError::UnimplementedRequestError),
+    };
+    let serde_data: serde_json::Value  = serde_json::from_str(&json_data)
+        .map_err(|err| {
+            println!("serde_json::from_str failed:{:?}", err);
+            ProxyAttestationServerError::SerdeJsonError(err)
+        })?;
 
-    // clean up the Attestation Context by removing this context
-    {
-        let mut ac_hash = ATTESTATION_CONTEXT.lock()?;
-        ac_hash.remove(&device_id);
+    let received_nonce = base64::decode(&serde_data["result"]["processed_evidence"]["nonce"].as_str().unwrap())
+        .map_err(|err| ProxyAttestationServerError::Base64Error(err))?;
+    if received_nonce != challenge {
+        println!("proxy-attestation-server::attestation::psa::verify_attestation_token received_hash:{:?} did not match challenge:{:?}", received_nonce, challenge);
+        return Err(ProxyAttestationServerError::MismatchError {
+            variable: "challenge",
+            expected:challenge.to_vec(),
+            received:received_nonce
+        });
     }
 
-    Ok(response_b64)
+    let enclave_hash = base64::decode(&serde_data["result"]["processed_evidence"]["software-components"][0]["measurement-value"].as_str().unwrap())
+        .map_err(|err| ProxyAttestationServerError::Base64Error(err))?;
+
+    let csr_hash = base64::decode(serde_data["result"]["processed_evidence"]["software-components"][0]["signer-id"].as_str().unwrap())
+        .map_err(|err| ProxyAttestationServerError::Base64Error(err))?;
+
+    return Ok((enclave_hash.to_vec(), csr_hash.to_vec()));
 }

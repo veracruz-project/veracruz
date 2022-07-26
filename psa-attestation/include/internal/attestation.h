@@ -75,7 +75,7 @@ attest_get_boot_data(uint8_t major_type,
  *
  * \return Returns error code as specified in \ref psa_attest_err_t
  */
- #if 0
+ #if 1
 enum psa_attest_err_t
 attest_get_caller_client_id(int32_t *caller_id);
 #endif
