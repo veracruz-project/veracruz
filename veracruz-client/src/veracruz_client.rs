@@ -236,8 +236,8 @@ impl VeracruzClient {
 
         use mbedtls::ssl::config::{Config, Endpoint, Preset, Transport, Version};
         let mut config = Config::new(Endpoint::Client, Transport::Stream, Preset::Default);
-        config.set_min_version(Version::Tls1_2)?;
-        config.set_max_version(Version::Tls1_2)?;
+        config.set_min_version(Version::Tls1_3)?;
+        config.set_max_version(Version::Tls1_3)?;
         let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite().as_str())
             .ok_or(anyhow!(VeracruzClientError::UnexpectedCiphersuite))?;
         let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];

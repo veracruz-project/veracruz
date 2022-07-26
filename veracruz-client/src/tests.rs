@@ -141,10 +141,10 @@ fn veracruz_client_session() {
     );
     config.set_ca_list(Arc::new(client_cert), None);
     config
-        .set_min_version(mbedtls::ssl::config::Version::Tls1_2)
+        .set_min_version(mbedtls::ssl::config::Version::Tls1_3)
         .unwrap();
     config
-        .set_max_version(mbedtls::ssl::config::Version::Tls1_2)
+        .set_max_version(mbedtls::ssl::config::Version::Tls1_3)
         .unwrap();
     config
         .push_cert(Arc::new(server_cert), Arc::new(server_priv_key))
