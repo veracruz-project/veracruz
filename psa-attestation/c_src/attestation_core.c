@@ -17,7 +17,7 @@
 //#include "tfm_plat_device_id.h"
 //#include "tfm_plat_boot_seed.h"
 //#include "tfm_attest_hal.h"
-#include "attest_token_new.h"
+#include "attest_token.h"
 #include "attest_eat_defines.h"
 #include "t_cose_common.h"
 //#include "tfm_memory_utils.h"

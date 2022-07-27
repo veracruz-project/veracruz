@@ -11,16 +11,9 @@
 
 use crate::error::*;
 use coset::{CoseSign1, TaggedCborSerializable};
-use lazy_static::lazy_static;
 use io_utils::http::{HttpResponse, post_bytes};
 use lazy_static::lazy_static;
 use log::error;
-use psa_attestation::{
-    q_useful_buf_c, t_cose_crypto_lib_t_T_COSE_CRYPTO_LIB_PSA, t_cose_key,
-    t_cose_key__bindgen_ty_1, t_cose_parameters, t_cose_sign1_set_verification_key,
-    t_cose_sign1_verify, t_cose_sign1_verify_ctx, t_cose_sign1_verify_delete_public_key,
-    t_cose_sign1_verify_init, t_cose_sign1_verify_load_public_key,
-};
 use rand::Rng;
 use std::{collections::HashMap, convert::TryInto, sync::Mutex};
 use veracruz_utils::sha256::sha256;
@@ -183,98 +176,7 @@ pub fn attestation_token(body_string: String) -> ProxyAttestationServerResponder
     Ok(response_b64)
 }
 
-fn _verify_attestation_token(token: &[u8], device_id: i32) -> Result<&[u8], ProxyAttestationServerError> {
-
-    let mut verifier = Verifier {
-        key_id: None,
-    };
-
-    let sign1 = CoseSign1::from_tagged_slice(&token)
-        .map_err(|err| ProxyAttestationServerError::CoseError(err))?;
-
-    let aad: [u8; 0] = [];
-    verifier.set_key(&PUBLIC_KEY)?;
-    sign1.verify_signature(&aad, |sig, data| verifier.verify(sig, data))
-        .map_err(|_| ProxyAttestationServerError::FailedToVerifyError("signature verification failed"))?;
-    let body_bytes = sign1.payload.ok_or(ProxyAttestationServerError::MissingFieldError("sign1.payload"))?;
-    let body_parsed: ciborium::value::Value = ciborium::de::from_reader(&body_bytes[..])
-        .map_err(|err| ProxyAttestationServerError::CiboriumError(err))?;
-    let body_map = body_parsed.as_map().ok_or(ProxyAttestationServerError::MissingFieldError("body_parsed.as_map"))?;
-    let mut csr_hash_matched: bool = false;
-    let mut received_enclave_hash: Option<Vec<u8>> = None;
-    let mut received_challenge: Option<Vec<u8>> = None;
-    for map_pair in body_map {
-        let index = &map_pair.0;
-        let value = &map_pair.1;
-
-        let index_value: i32 = index.as_integer()
-            .ok_or(ProxyAttestationServerError::MissingFieldError("index.as_integer"))?
-            .try_into()
-            .map_err(|_| ProxyAttestationServerError::IntConversionError)?;
-        if index_value == -75006 {
-            let sw_components = value.as_array()
-                .ok_or(ProxyAttestationServerError::MissingFieldError("value.as_array"))?;
-            for this_sw_component in sw_components {
-                let sw_component_map = this_sw_component.as_map()
-                    .ok_or(ProxyAttestationServerError::MissingFieldError("this_sw_component.as_map"))?;
-                for this_sw_component_item in sw_component_map {
-                    let index = &this_sw_component_item.0;
-                    let value = &this_sw_component_item.1;
-                    let index_int: i32 = index.as_integer()
-                        .ok_or(ProxyAttestationServerError::MissingFieldError("index.as_integer"))?
-                        .try_into()
-                        .map_err(|_| ProxyAttestationServerError::IntConversionError)?;
-                    match index_int {
-                        5 => {
-                            let received_csr_hash = value.as_bytes()
-                                .ok_or(ProxyAttestationServerError::MissingFieldError("value.as_bytes()"))?;
-                            let calculated_csr_hash = sha256(&csr);
-                            if *received_csr_hash != calculated_csr_hash {
-                                println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
-                                return Err(ProxyAttestationServerError::MismatchError {
-                                    variable: "received_csr_hash",
-                                    expected: calculated_csr_hash,
-                                    received: received_csr_hash.clone(),
-                                });
-                            } else {
-                                csr_hash_matched = true;
-                            }
-                        },
-                        2 => {
-                            let enclave_hash = value.as_bytes()
-                                .ok_or(ProxyAttestationServerError::MissingFieldError("value.as_bytes()"))?;
-                            received_enclave_hash = Some(enclave_hash.clone());
-                        },
-                        _ => (), // do nothing for other tags
-                    }
-                }
-            }
-        } else if index_value == 10 {
-            received_challenge = Some(value.as_bytes()
-                .ok_or(ProxyAttestationServerError::MissingFieldError("value.as_bytes()"))?
-                .to_vec());
-        }
-    }
-    if !csr_hash_matched {
-        println!("proxy_attestation_server::attestation::psa::attestation_token csr hash failed to verify");
-        return Err(ProxyAttestationServerError::MissingFieldError("csr_hash"));
-    }
-
-    if let Some(received_challenge_value) = received_challenge {
-        if attestation_context.challenge[..] != received_challenge_value[..] {
-            return Err(ProxyAttestationServerError::MismatchError {
-                variable: "received_challenge_value",
-                expected: attestation_context.challenge.to_vec(),
-                received: received_challenge_value,
-            });
-        } else {
-            println!("Challenges matched, biatch!");
-        }
-    } else {
-        return Err(ProxyAttestationServerError::MissingFieldError("challenge"));
-    }
-    return Ok(payload_slice);
-}
+static VERAISON_VERIFIER_IP_ADDRESS: &str = "192.168.32.3:8080";
 
 fn verify_attestation_token(token: &[u8], device_id: i32) -> Result<(Vec<u8>, Vec<u8>), ProxyAttestationServerError> {
     println!("proxy-attestation-server::verify_attestation_token started");
@@ -287,7 +189,7 @@ fn verify_attestation_token(token: &[u8], device_id: i32) -> Result<(Vec<u8>, Ve
 
     let encoded_challenge = base64::encode(&challenge);
     let buffer = format!("nonce={:}", &encoded_challenge);
-    let url = format!("192.168.32.3:8080/challenge-response/v1/newSession");
+    let url = format!("{:}/challenge-response/v1/newSession", VERAISON_VERIFIER_IP_ADDRESS);
     let session_info = post_bytes(&url, &challenge, None)
         .map_err(|err| {
             ProxyAttestationServerError::HttpError(err)
@@ -304,7 +206,7 @@ fn verify_attestation_token(token: &[u8], device_id: i32) -> Result<(Vec<u8>, Ve
     };
 
     // post to /challenge-response/v1/session/sessionId token
-    let url = format!("192.168.32.3:8080{:}", verify_path);
+    let url = format!("{:}{:}", VERAISON_VERIFIER_IP_ADDRESS, verify_path);
     println!("proxy-attestation-server::verify_attestation_token calling post buffer for verify to url:{:?}", url);
     let result = post_bytes(&url, &token, Some("application/psa-attestation-token"))
         .map_err(|err| {
