@@ -60,7 +60,7 @@ CA_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/CAKey.pem
 CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
 
 $(CA_KEY): $(WORKSPACE_DIR)/host/crates/test-collateral
-	openssl ecparam -name secp256k1 -genkey -noout -out $@
+	openssl ecparam -name prime256v1 -genkey -noout -out $@
 
 $(CA_CRT): $(CA_KEY) $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/ca-cert.conf

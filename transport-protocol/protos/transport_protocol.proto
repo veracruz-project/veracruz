@@ -84,11 +84,6 @@ message SgxQuote {
   uint32 signature_len = 9;
 }
 
-message Program {
-  string file_name = 1;
-  bytes code = 2;
-}
-
 message Data {
   string file_name = 1;
   bytes data = 2;
