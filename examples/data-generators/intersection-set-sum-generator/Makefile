@@ -10,8 +10,8 @@
 # and copyright information.
 
 FILE_PREFIX = intersection
-SIZE = 1000
-DIFF = 250
+SIZE = 100
+DIFF = 25
 TARGET_DATS = $(addprefix $(FILE_PREFIX)-,advertisement-viewer.dat customer.dat)
 SEED = 0
 TARGET_DIR = ../../datasets/

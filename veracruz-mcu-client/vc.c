@@ -651,14 +651,14 @@ int vc_send_program(vc_t *vc,
             name, program_len);
     // construct program protobuf
     Tp_RuntimeManagerRequest send_program = {
-        .which_message_oneof = Tp_RuntimeManagerRequest_program_tag,
-        .message_oneof.program.file_name.funcs.encode = vc_encode_bytes,
-        .message_oneof.program.file_name.arg = &(struct const_bytes){
+        .which_message_oneof = Tp_RuntimeManagerRequest_write_file_tag,
+        .message_oneof.data.file_name.funcs.encode = vc_encode_bytes,
+        .message_oneof.data.file_name.arg = &(struct const_bytes){
             .buf = name,
             .len = strlen(name),
         },
-        .message_oneof.program.code.funcs.encode = vc_encode_bytes,
-        .message_oneof.program.code.arg = &(struct const_bytes){
+        .message_oneof.data.data.funcs.encode = vc_encode_bytes,
+        .message_oneof.data.data.arg = &(struct const_bytes){
             .buf = program,
             .len = program_len,
         },

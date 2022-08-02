@@ -31,8 +31,7 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
     },
-    thread,
-    thread::JoinHandle,
+    thread::{self, JoinHandle},
     time::{Duration, Instant},
     vec::Vec,
 };
@@ -707,8 +706,8 @@ impl TestExecutor {
     fn execute(mut self, events: Vec<TestEvent>, timeout: Duration) -> anyhow::Result<()> {
         // Spawn a thread that will send the timeout signal by killing alive flag.
         let alive_flag_clone = self.alive_flag.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(timeout);
+        thread::spawn(move || {
+            thread::sleep(timeout);
             if alive_flag_clone.load(Ordering::SeqCst) {
                 error!(
                     "--->>> Force timeout. It is very likely to trigger error on the test. <<<---"
@@ -958,7 +957,7 @@ fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
         VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
 
     // wait for the client to start
-    std::thread::sleep(Duration::from_millis(100));
+    thread::sleep(Duration::from_millis(100));
 
     let session_id = veracruz_server
         .new_tls_session()

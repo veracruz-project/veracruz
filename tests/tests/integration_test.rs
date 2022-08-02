@@ -160,7 +160,6 @@ async fn veracruz_phase2_linear_regression_three_clients() {
 /// A test of veracruz using network communication using four sessions
 /// (one for program, one for the first data, and one for the second data and retrieval.)
 #[actix_rt::test]
-#[ignore] // FIXME: test currently disabled because it fails on IceCap
 async fn veracruz_phase2_intersection_set_sum_three_clients() {
     TestExecutor::test_template(
         INTERSECTION_SET_SUM_TRIPLE_POLICY,
