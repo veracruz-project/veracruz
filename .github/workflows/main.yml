@@ -80,6 +80,6 @@ jobs:
           sed -n '/``` bash/,/```/{/```/d; p}' CLI_QUICKSTART.markdown \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^\$/{s/^\$ \?//; p}' \
-            >> CLI_QUICKSTART.markdown.sh
+            > CLI_QUICKSTART.markdown.sh
           # run the quickstart
           bash -euxo pipefail CLI_QUICKSTART.markdown.sh
