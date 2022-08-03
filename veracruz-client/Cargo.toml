@@ -36,7 +36,6 @@ structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tokio = { version = "1.0", default-features = false, optional = true}
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
-x509-parser = "0.13.0"
 
 [dev-dependencies]
 actix-http = "3"

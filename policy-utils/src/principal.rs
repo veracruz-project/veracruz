@@ -221,12 +221,16 @@ impl Identity<String> {
 
         #[cfg(features = "std")]
         {
-            let parsed_cert =
-                x509_parser::pem::Pem::read(std::io::Cursor::new(self.certificate().as_bytes()))?;
+            use mbedtls::x509::Certificate;
+            use veracruz_utils::csr::generate_x509_time_now;
 
-            let parsed_cert = parsed_cert.0.parse_x509()?.tbs_certificate;
-
-            if parsed_cert.validity.time_to_expiration().is_none() {
+            let mut buffer: Vec<u8> = self.certificate().as_bytes().to_vec();
+            buffer.push(b'\0');
+            let cert = Certificate::from_pem(&buffer)?;
+            let not_before = cert.not_before()?.to_x509_time();
+            let not_after = cert.not_after()?.to_x509_time();
+            let now = generate_x509_time_now();
+            if now < not_before || now > not_after {
                 return Err(anyhow!(PolicyError::FormatError));
             }
         }
