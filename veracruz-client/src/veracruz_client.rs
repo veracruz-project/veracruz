@@ -15,8 +15,7 @@ use log::{error, info};
 use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use std::{
-    fs::File,
-    io::{BufReader, Read, Write},
+    io::{Read, Write},
     path::Path,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -172,21 +171,32 @@ impl VeracruzClient {
         client_cert_filename: P,
         public_key: &mut Pk,
     ) -> Result<()> {
-        let cert_file = File::open(&client_cert_filename)?;
-        let parsed_cert = x509_parser::pem::Pem::read(BufReader::new(cert_file))?;
-        let parsed_cert = parsed_cert.0.parse_x509()?.tbs_certificate;
-        let cert_public_key_der =
-            Pk::from_public_key(parsed_cert.subject_pki.subject_public_key.data)?
-                .write_public_der_vec()?;
+        // Read and parse certificate.
+        let mut buffer = VeracruzClient::read_all_bytes_in_file(&client_cert_filename)?;
+        buffer.push(b'\0');
+        let mut cert = Certificate::from_pem(&buffer)?;
 
+        // Compare public keys as DER.
+        let cert_public_key_der = cert.public_key_mut().write_public_der_vec()?;
         let public_key_der = public_key.write_public_der_vec()?;
         if cert_public_key_der != public_key_der {
-            Err(anyhow!(VeracruzClientError::UnexpectedKey))
-        } else if parsed_cert.validity.time_to_expiration().is_none() {
-            Err(anyhow!(VeracruzClientError::UnexpectedCertificate))
-        } else {
-            Ok(())
+            return Err(anyhow!(VeracruzClientError::UnexpectedKey));
         }
+
+        // Check validity period.
+        #[cfg(features = "std")]
+        {
+            use veracruz_utils::csr::generate_x509_time_now;
+
+            let not_before = cert.not_before()?.to_x509_time();
+            let not_after = cert.not_after()?.to_x509_time();
+            let now = generate_x509_time_now();
+            if now < not_before || now > not_after {
+                return Err(anyhow!(VeracruzClientError::UnexpectedCertificate));
+            }
+        }
+
+        Ok(())
     }
 
     /// Load the client certificate and key, and the global policy, which contains information

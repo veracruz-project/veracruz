@@ -21,6 +21,7 @@ nitro = [
   "serde_json/std",
 ]
 std = [
+  "chrono",
   "platform-services/std",
   "serde/std",
   "serde_json/std",
@@ -29,6 +30,7 @@ std = [
 [dependencies]
 anyhow = "1"
 bincode = { version = "1.2.1", default-features = false, optional = true }
+chrono = { version = "0.4.19", optional = true }
 err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 platform-services = { path = "../platform-services" }
@@ -36,4 +38,3 @@ psa-crypto = { path = "../third-party/rust-psa-crypto/psa-crypto" }
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 serde = { version = "1.0.115", default-features = false, optional = true }
 serde_json = { version = "1.0", default-features = false }
-x509-parser = { version = "0.13.0", optional = true }

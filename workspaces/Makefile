@@ -76,6 +76,7 @@ shared-clean:
 	$(MAKE) -C applications clean
 	$(MAKE) -C host clean
 	$(MAKE) -C data-generators clean
+	rm -f host/crates/test-collateral/*.pem
 
 clean-cargo-lock:
 	rm -f */Cargo.lock
