@@ -109,7 +109,7 @@ $ cp workspaces/applications/target/wasm32-wasi/release/shamir-secret-sharing.wa
 
 ## Generating certificates
 
-Identities in Veracruz are specified by a private RSA key and signed
+Identities in Veracruz are specified by a private key and signed
 x509 certificate.
 
 In practice, a single identity can have many roles, but for our example
@@ -117,42 +117,32 @@ we're going to create a separate identity for the program provider, result
 reader, and three data providers:
 
 ``` bash
-$ openssl genrsa 2048 \
-    | openssl pkcs8 -nocrypt -traditional \
-    > example/example-program-key.pem
-$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+$ openssl ecparam -name prime256v1 -genkey > example/example-program-key.pem
+$ openssl req -x509 -days 3650 \
     -key example/example-program-key.pem \
     -out example/example-program-cert.pem \
     -config workspaces/cert.conf
 
-$ openssl genrsa 2048 \
-    | openssl pkcs8 -nocrypt -traditional \
-    > example/example-data0-key.pem
-$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+$ openssl ecparam -name prime256v1 -genkey > example/example-data0-key.pem
+$ openssl req -x509 -days 3650 \
     -key example/example-data0-key.pem \
     -out example/example-data0-cert.pem \
     -config workspaces/cert.conf
 
-$ openssl genrsa 2048 \
-    | openssl pkcs8 -nocrypt -traditional \
-    > example/example-data1-key.pem
-$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+$ openssl ecparam -name prime256v1 -genkey > example/example-data1-key.pem
+$ openssl req -x509 -days 3650 \
     -key example/example-data1-key.pem \
     -out example/example-data1-cert.pem \
     -config workspaces/cert.conf
 
-$ openssl genrsa 2048 \
-    | openssl pkcs8 -nocrypt -traditional \
-    > example/example-data2-key.pem
-$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+$ openssl ecparam -name prime256v1 -genkey > example/example-data2-key.pem
+$ openssl req -x509 -days 3650 \
     -key example/example-data2-key.pem \
     -out example/example-data2-cert.pem \
     -config workspaces/cert.conf
 
-$ openssl genrsa 2048 \
-    | openssl pkcs8 -nocrypt -traditional \
-    > example/example-result-key.pem
-$ openssl req -new -x509 -sha256 -nodes -days 3650 \
+$ openssl ecparam -name prime256v1 -genkey > example/example-result-key.pem
+$ openssl req -x509 -days 3650 \
     -key example/example-result-key.pem \
     -out example/example-result-cert.pem \
     -config workspaces/cert.conf
@@ -162,9 +152,8 @@ And since the Proxy Attestation Server acts as a certificate authority,
 we also need to provide it with its own identity:
 
 ``` bash
-$ openssl ecparam -name prime256v1 -genkey -noout \
-    -out example/example-ca-key.pem
-$ openssl req -new -x509 -sha256 -nodes -days 1825 \
+$ openssl ecparam -name prime256v1 -genkey > example/example-ca-key.pem
+$ openssl req -x509 -days 1825 \
     -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
     -key example/example-ca-key.pem \
     -out example/example-ca-cert.pem \

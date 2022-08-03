@@ -29,15 +29,16 @@ cp sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-sec
 ./sdk/wasm-checker/wabt/bin/wasm-strip veracruz-mcu-client/test-data/test-binary.wasm
 
 # setup identities
-openssl genrsa -out veracruz-mcu-client/test-data/test-key.pem 2048
-openssl req -new -x509 -sha256 -nodes -days 3650 \
+openssl ecparam -name prime256v1 -genkey \
+    -out veracruz-mcu-client/test-data/test-key.pem
+openssl req -x509 -sha256 -days 3650 \
     -key veracruz-mcu-client/test-data/test-key.pem \
     -out veracruz-mcu-client/test-data/test-cert.pem \
     -config test-collateral/cert.conf
 
-openssl ecparam -name prime256v1 -genkey -noout \
+openssl ecparam -name prime256v1 -genkey \
     -out veracruz-mcu-client/test-data/test-ca-key.pem
-openssl req -new -x509 -sha256 -nodes -days 1825 \
+openssl req -x509 -sha256 -days 1825 \
     -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
     -key veracruz-mcu-client/test-data/test-ca-key.pem \
     -out veracruz-mcu-client/test-data/test-ca-cert.pem \

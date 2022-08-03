@@ -24,33 +24,37 @@ make -C sdk/rust-examples/audio-event-triangulation
 cp sdk/rust-examples/audio-event-triangulation/target/wasm32-wasi/release/audio-event-triangulation.wasm veracruz-mcu-client/example/audio-event-triangulation.wasm
 
 # setup identities
-openssl genrsa -out veracruz-mcu-client/example/controller-key.pem 2048
-openssl req -new -x509 -sha256 -nodes -days 3650 \
+openssl ecparam -name prime256v1 -genkey \
+    -out veracruz-mcu-client/example/controller-key.pem
+openssl req -x509 -sha256 -days 3650 \
     -key veracruz-mcu-client/example/controller-key.pem \
     -out veracruz-mcu-client/example/controller-cert.pem \
     -config test-collateral/cert.conf
 
-openssl genrsa -out veracruz-mcu-client/example/mcu0-key.pem 2048
-openssl req -new -x509 -sha256 -nodes -days 3650 \
+openssl ecparam -name prime256v1 -genkey \
+    -out veracruz-mcu-client/example/mcu0-key.pem
+openssl req -x509 -sha256 -days 3650 \
     -key veracruz-mcu-client/example/mcu0-key.pem \
     -out veracruz-mcu-client/example/mcu0-cert.pem \
     -config test-collateral/cert.conf
 
-openssl genrsa -out veracruz-mcu-client/example/mcu1-key.pem 2048
-openssl req -new -x509 -sha256 -nodes -days 3650 \
+openssl ecparam -name prime256v1 -genkey \
+    -out veracruz-mcu-client/example/mcu1-key.pem
+openssl req -x509 -sha256 -days 3650 \
     -key veracruz-mcu-client/example/mcu1-key.pem \
     -out veracruz-mcu-client/example/mcu1-cert.pem \
     -config test-collateral/cert.conf
 
-openssl genrsa -out veracruz-mcu-client/example/mcu2-key.pem 2048
-openssl req -new -x509 -sha256 -nodes -days 3650 \
+openssl ecparam -name prime256v1 -genkey \
+    -out veracruz-mcu-client/example/mcu2-key.pem
+openssl req -x509 -sha256 -days 3650 \
     -key veracruz-mcu-client/example/mcu2-key.pem \
     -out veracruz-mcu-client/example/mcu2-cert.pem \
     -config test-collateral/cert.conf
 
-openssl ecparam -name prime256v1 -genkey -noout \
+openssl ecparam -name prime256v1 -genkey \
     -out veracruz-mcu-client/example/ca-key.pem
-openssl req -new -x509 -sha256 -nodes -days 1825 \
+openssl req -x509 -sha256 -days 1825 \
     -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
     -key veracruz-mcu-client/example/ca-key.pem \
     -out veracruz-mcu-client/example/ca-cert.pem \

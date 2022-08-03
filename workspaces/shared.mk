@@ -60,13 +60,13 @@ CA_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/CAKey.pem
 CA_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/CACert.pem
 
 $(CA_KEY): $(WORKSPACE_DIR)/host/crates/test-collateral
-	openssl ecparam -name prime256v1 -genkey -noout -out $@
+	openssl ecparam -name prime256v1 -genkey -out $@
 
 $(CA_CRT): $(CA_KEY) $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/ca-cert.conf
 
-CLIENT_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_key.pem
-CLIENT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/client_rsa_cert.pem
+CLIENT_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/client_key.pem
+CLIENT_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/client_cert.pem
 PROGRAM_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/program_client_key.pem
 PROGRAM_CRT = $(WORKSPACE_DIR)/host/crates/test-collateral/program_client_cert.pem
 DATA_KEY = $(WORKSPACE_DIR)/host/crates/test-collateral/data_client_key.pem
@@ -83,7 +83,7 @@ $(WORKSPACE_DIR)/host/crates/test-collateral:
 	mkdir -p $@
 
 $(KEYS): %.pem : $(WORKSPACE_DIR)/host/crates/test-collateral
-	openssl genrsa -out $@ 2048
+	openssl ecparam -name prime256v1 -genkey -out $@
 
 $(CERTS): $(WORKSPACE_DIR)/host/crates/test-collateral/%_cert.pem : $(WORKSPACE_DIR)/host/crates/test-collateral/%_key.pem $(WORKSPACE_DIR)/host/crates/test-collateral
 	openssl req -x509 -key $< -out $@ -config $(WORKSPACE_DIR)/cert.conf
