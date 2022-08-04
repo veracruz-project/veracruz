@@ -47,8 +47,8 @@ use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
 const POLICY: &'static str = "single_client.json";
-const CLIENT_CERT: &'static str = "client_rsa_cert.pem";
-const CLIENT_KEY: &'static str = "client_rsa_key.pem";
+const CLIENT_CERT: &'static str = "client_cert.pem";
+const CLIENT_KEY: &'static str = "client_key.pem";
 const UNAUTHORIZED_CERT: &'static str = "data_client_cert.pem";
 const UNAUTHORIZED_KEY: &'static str = "data_client_key.pem";
 // Programs

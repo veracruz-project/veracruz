@@ -18,8 +18,8 @@
 //! information on licensing and copyright.
 
 const POLICY_FILENAME: &'static str = "single_client.json";
-const CLIENT_CERT_FILENAME: &'static str = "client_rsa_cert.pem";
-const CLIENT_KEY_FILENAME: &'static str = "client_rsa_key.pem";
+const CLIENT_CERT_FILENAME: &'static str = "client_cert.pem";
+const CLIENT_KEY_FILENAME: &'static str = "client_key.pem";
 
 use crate::veracruz_client::*;
 use std::{env, fs::File, io::prelude::*, io::Read, path::PathBuf, sync::Arc};
@@ -84,8 +84,8 @@ fn test_internal_read_cert_invalid_private_key() {
 #[test]
 #[ignore]
 fn veracruz_client_session() {
-    let server_cert_filename = trust_path("server_rsa_cert.pem");
-    let server_key_filename = trust_path("server_rsa_key.pem");
+    let server_cert_filename = trust_path("server_cert.pem");
+    let server_key_filename = trust_path("server_key.pem");
 
     let server_cert = {
         let mut cert_file =
@@ -104,14 +104,14 @@ fn veracruz_client_session() {
         let mut key_buffer = std::vec::Vec::new();
         key_file.read_to_end(&mut key_buffer).unwrap();
         key_buffer.push(b'\0');
-        let rsa_keys = mbedtls::pk::Pk::from_private_key(
+        let keys = mbedtls::pk::Pk::from_private_key(
             &mut mbedtls::rng::CtrDrbg::new(Arc::new(mbedtls::rng::OsEntropy::new()), None)
                 .unwrap(),
             &key_buffer,
             None,
         )
-        .expect("file contains invalid rsa private key");
-        rsa_keys
+        .expect("file contains invalid private key");
+        keys
     };
 
     let policy_json = std::fs::read_to_string(POLICY_FILENAME).unwrap();
