@@ -63,8 +63,6 @@ pub enum RuntimeManagerRequest {
     Initialize(String, Vec<Vec<u8>>),
     /// A request to establish a new TLS session with the enclave.
     NewTlsSession,
-    /// A request to reset the enclave.
-    ResetEnclave,
     /// Request to send TLS data to the enclave.  Parameters in order are:
     /// - The Session ID of the TLS Session associated with the data,
     /// - The TLS data.
