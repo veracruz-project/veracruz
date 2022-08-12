@@ -185,10 +185,6 @@ impl RuntimeManager {
                     RuntimeManagerResponse::TlsData(data, active)
                 }
             },
-            RuntimeManagerRequest::ResetEnclave => {
-                /* NB: don't do anything in response to this... */
-                RuntimeManagerResponse::Status(Status::Success)
-            }
         })
     }
 
