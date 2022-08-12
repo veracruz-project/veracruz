@@ -80,6 +80,7 @@ impl Write for InsecureConnection {
         // Spawn a separate thread so that we can use reqwest::blocking.
         let body = std::thread::spawn(move || {
             let client_build = reqwest::blocking::ClientBuilder::new()
+                .timeout(None)
                 .build()
                 .map_err(|_| err("reqwest new"))?;
             let ret = client_build
