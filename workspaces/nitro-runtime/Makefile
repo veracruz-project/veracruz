@@ -41,6 +41,7 @@ runtime-manager-enclave:
 	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
 	cargo build --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
 		--features nitro -p runtime_manager_enclave
+	strip target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave
 
 doc:
 	cargo doc
