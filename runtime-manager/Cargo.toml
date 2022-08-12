@@ -15,6 +15,9 @@ name = "runtime_manager_enclave"
 path = "src/main.rs"
 
 [features]
+debug = [
+  "session-manager/debug",
+]
 default = []
 icecap = [
   "bincode",
