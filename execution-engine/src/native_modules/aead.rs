@@ -11,12 +11,7 @@
 
 use crate::fs::{FileSystem, FileSystemResult};
 use crate::native_modules::common::Service;
-use psa_crypto::{
-    operations::aead::{decrypt, encrypt},
-    operations::key_management,
-    types::algorithm::{Aead, AeadWithDefaultLengthTag},
-    types::key::{Attributes, Lifetime, Policy, Type, UsageFlags},
-};
+use mbedtls::cipher::{Authenticated, Cipher, Decryption, Encryption, Fresh};
 use serde::Deserialize;
 use std::path::PathBuf;
 use wasi_types::ErrNo;
@@ -85,6 +80,7 @@ impl AeadService {
     /// The core service. It encrypts or decrypts, depending on the flag `is_encryption`, the input read
     /// from the path `input_path` using the `key` and `iv`, and writes the result to the file at `output_path`.
     fn encryption_decryption(&mut self, fs: &mut FileSystem) -> FileSystemResult<()> {
+        let tag_len = 16; // standard default
         let AeadService {
             key,
             iv,
@@ -93,51 +89,46 @@ impl AeadService {
             output_path,
             is_encryption,
         } = self;
-        let alg = Aead::AeadWithDefaultLengthTag(AeadWithDefaultLengthTag::Gcm);
 
         // Read the input. The service must have the permission.
         let input = fs.read_file_by_absolute_path(&input_path)?;
 
-        // Standard step to use AEAD interface in psa_crypto.
-        let mut usage_flags: UsageFlags = Default::default();
-        usage_flags.set_encrypt();
-        usage_flags.set_decrypt();
-        let attributes = Attributes {
-            key_type: Type::Aes,
-            bits: 128,
-            lifetime: Lifetime::Volatile,
-            policy: Policy {
-                usage_flags,
-                permitted_algorithms: alg.into(),
-            },
-        };
-        psa_crypto::init().map_err(|_| ErrNo::Canceled)?;
-        let imported_key =
-            key_management::import(attributes, None, &key[..]).map_err(|_| ErrNo::Canceled)?;
+        let mut output = Vec::new();
 
-        let output_buffer_size = if *is_encryption {
-            attributes.aead_encrypt_output_size(alg.into(), input.len())
+        if *is_encryption {
+            let cypher: Cipher<Encryption, Authenticated, Fresh> = mbedtls::cipher::Cipher::new(
+                mbedtls::cipher::raw::CipherId::Aes,
+                mbedtls::cipher::raw::CipherMode::GCM,
+                key.len() as u32 * 8,
+            )
+            .map_err(|_| ErrNo::Canceled)?;
+
+            output.resize(input.len() + tag_len, 0);
+
+            let (n, _) = cypher
+                .set_key_iv(&key[..], &iv[..])
+                .map_err(|_| ErrNo::Canceled)?
+                .encrypt_auth(&aad, &input, &mut output[..], tag_len)
+                .map_err(|_| ErrNo::Canceled)?;
+            output.resize(n, 0);
         } else {
-            attributes.aead_decrypt_output_size(alg.into(), input.len())
+            let cypher: Cipher<Decryption, Authenticated, Fresh> = mbedtls::cipher::Cipher::new(
+                mbedtls::cipher::raw::CipherId::Aes,
+                mbedtls::cipher::raw::CipherMode::GCM,
+                key.len() as u32 * 8,
+            )
+            .map_err(|_| ErrNo::Canceled)?;
+
+            output.resize(input.len() + tag_len, 0);
+
+            let (n, _) = cypher
+                .set_key_iv(&key[..], &iv[..])
+                .map_err(|_| ErrNo::Canceled)?
+                .decrypt_auth(&aad, &input, &mut output, tag_len)
+                .map_err(|_| ErrNo::Canceled)?;
+            output.resize(n, 0);
         }
-        .map_err(|_| ErrNo::Canceled)?;
 
-        let mut output = vec![0; output_buffer_size];
-
-        // call the enc or dec based on the `is_encryption` bool
-        let length = if *is_encryption { encrypt } else { decrypt }(
-            imported_key,
-            alg.into(),
-            &iv[..],
-            &aad,
-            &input,
-            &mut output,
-        )
-        .map_err(|_| ErrNo::Canceled)?;
-
-        // Write result. The result is resized to the actual size
-        // returned by AEAD call, to avoid leaking sensitive information.
-        output.resize(length, 0);
         fs.write_file_by_absolute_path(&output_path, output, true)
     }
 

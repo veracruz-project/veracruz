@@ -27,9 +27,6 @@
 	path = third-party/wasmi
 	url = https://github.com/veracruz-project/wasmi.git
 	branch = veracruz
-[submodule "third-party/rust-psa-crypto"]
-	path = third-party/rust-psa-crypto
-	url = https://github.com/veracruz-project/rust-psa-crypto.git
 [submodule "workspaces/icecap-runtime/deps/seL4"]
 	path = workspaces/icecap-runtime/deps/seL4
 	url = https://gitlab.com/arm-research/security/icecap/seL4.git

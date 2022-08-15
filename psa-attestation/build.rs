@@ -47,7 +47,7 @@ fn main() {
 
     println!("cargo:rustc-link-lib=static=psa_attestation");
     println!("cargo:rustc-link-search={:}", target_dir);
-    // These two C libraries come from psa-crypto / psa-crypto-sys:
+    // These two C libraries come from mbedtls-sys-auto:
     println!("cargo:rustc-link-lib=static=mbedcrypto");
     println!("cargo:rustc-link-lib=static=shim");
 
