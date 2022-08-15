@@ -11,7 +11,7 @@
 
 OUT_DIR?=.
 CFLAGS=-g -fPIC
-INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../../third-party/rust-psa-crypto/psa-crypto-sys/vendor/include -I ../lib/QCBOR/inc -I ../lib/t_cose/inc -I ../lib/t_cose/inc/t_cose -I ../lib/psa_crypto/include/
+INCLUDE_PATHS=-I ../include/ -I ../include/internal/ -I ../../third-party/rust-mbedtls/mbedtls-sys/vendor/include -I ../lib/QCBOR/inc -I ../lib/t_cose/inc -I ../lib/t_cose/inc/t_cose -I ../lib/psa_crypto/include/
 
 .PHONY: clean all
 
@@ -57,7 +57,7 @@ $(OUT_DIR)/qcbor_err_to_str.o: $(QCBOR_SRC_DIR)/qcbor_err_to_str.c
 
 T_COSE_OBJ=$(OUT_DIR)/t_cose_sign1_verify.o $(OUT_DIR)/t_cose_sign1_sign.o $(OUT_DIR)/t_cose_util.o $(OUT_DIR)/t_cose_parameters.o $(OUT_DIR)/t_cose_psa_crypto.o
 T_COSE_SRC_DIR=../lib/t_cose
-T_COSE_INCLUDE_PATHS=-I../lib/QCBOR/inc -I../lib/t_cose/inc -I../lib/t_cose/src -I../../third-party/rust-psa-crypto/psa-crypto-sys/vendor/include -DT_COSE_USE_PSA_CRYPTO
+T_COSE_INCLUDE_PATHS=-I../lib/QCBOR/inc -I../lib/t_cose/inc -I../lib/t_cose/src -I../../third-party/rust-mbedtls/mbedtls-sys/vendor/include -DT_COSE_USE_PSA_CRYPTO
 
 $(OUT_DIR)/t_cose_sign1_verify.o: $(T_COSE_SRC_DIR)/src/t_cose_sign1_verify.c
 	$(CC) -c $(CFLAGS) -o $@ $< $(T_COSE_INCLUDE_PATHS)

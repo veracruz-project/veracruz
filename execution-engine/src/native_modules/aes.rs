@@ -11,12 +11,7 @@
 
 use crate::fs::{FileSystem, FileSystemResult};
 use crate::native_modules::common::Service;
-use psa_crypto::{
-    operations::cipher::{decrypt, encrypt},
-    operations::key_management,
-    types::algorithm::Cipher::Ctr,
-    types::key::{Attributes, Lifetime, Policy, Type, UsageFlags},
-};
+use mbedtls::cipher::{Cipher, Decryption, Encryption, Fresh, Traditional};
 use serde::Deserialize;
 use std::path::PathBuf;
 use wasi_types::ErrNo;
@@ -94,36 +89,56 @@ impl AesCounterModeService {
         // Read the input. The service must have the permission.
         let input = fs.read_file_by_absolute_path(&input_path)?;
 
-        // Standard step to use AES interface in psa_crypto.
-        let mut usage_flags: UsageFlags = Default::default();
-        usage_flags.set_encrypt();
-        usage_flags.set_decrypt();
-        let attributes = Attributes {
-            key_type: Type::Aes,
-            bits: 128,
-            lifetime: Lifetime::Volatile,
-            policy: Policy {
-                usage_flags,
-                permitted_algorithms: Ctr.into(),
-            },
-        };
-        psa_crypto::init().map_err(|_| ErrNo::Canceled)?;
-        let imported_key =
-            key_management::import(attributes, None, &key[..]).map_err(|_| ErrNo::Canceled)?;
-        let mut output = vec![0; input.len()];
-        // call the enc or dec based on the `is_encryption` bool
-        let length = if *is_encryption { encrypt } else { decrypt }(
-            imported_key,
-            Ctr,
-            &input,
-            &iv[..],
-            &mut output,
-        )
-        .map_err(|_| ErrNo::Canceled)?;
+        let mut output = Vec::new();
 
-        // Write result. The result is resized to the actual size
-        // returned by AES call, to avoid leaking sensetive information.
-        output.resize(length, 0);
+        if *is_encryption {
+            let cypher: Cipher<Encryption, Traditional, Fresh> = mbedtls::cipher::Cipher::new(
+                mbedtls::cipher::raw::CipherId::Aes,
+                mbedtls::cipher::raw::CipherMode::CTR,
+                key.len() as u32 * 8,
+            )
+            .map_err(|_| ErrNo::Canceled)?;
+
+            let block_size = cypher.block_size();
+            // For some reason, the length of the output buffer needs to be
+            // a multiple of the block size and at least two blocks:
+            let padded_size = std::cmp::max(
+                2 * block_size,
+                (input.len() + block_size - 1) / block_size * block_size,
+            );
+            output.resize(padded_size, 0);
+
+            cypher
+                .set_key_iv(&key[..], &iv[..])
+                .map_err(|_| ErrNo::Canceled)?
+                .encrypt(&input, &mut output)
+                .map_err(|_| ErrNo::Canceled)?;
+        } else {
+            let cypher: Cipher<Decryption, Traditional, Fresh> = mbedtls::cipher::Cipher::new(
+                mbedtls::cipher::raw::CipherId::Aes,
+                mbedtls::cipher::raw::CipherMode::CTR,
+                key.len() as u32 * 8,
+            )
+            .map_err(|_| ErrNo::Canceled)?;
+
+            let block_size = cypher.block_size();
+            // For some reason, the length of the output buffer needs to be
+            // a multiple of the block size and at least two blocks:
+            let padded_size = std::cmp::max(
+                2 * block_size,
+                (input.len() + block_size - 1) / block_size * block_size,
+            );
+            output.resize(padded_size, 0);
+
+            cypher
+                .set_key_iv(&key[..], &iv[..])
+                .map_err(|_| ErrNo::Canceled)?
+                .decrypt(&input, &mut output)
+                .map_err(|_| ErrNo::Canceled)?;
+        }
+
+        // We only need as many bytes from the output as the input:
+        output.resize(input.len(), 0);
         fs.write_file_by_absolute_path(&output_path, output, true)
     }
 
