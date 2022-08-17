@@ -19,8 +19,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#![no_std]
-
 use crate::result::Result;
 use cfg_if::cfg_if;
 
@@ -41,6 +39,9 @@ cfg_if! {
             "Unrecognised feature: platforms supported are Icecap, Nitro and std.");
     }
 }
+
+// Shim layer
+pub mod shim;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Platform services
