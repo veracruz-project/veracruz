@@ -14,10 +14,7 @@ crate-type = ["rlib"]
 # build.rs depends on features
 icecap = []
 linux = []
-nitro = [
-# FIXME: fake_random is not secure! (Also, does this run in the enclave?)
-  "mbedtls-sys-auto/fake_random",
-]
+nitro = []
 
 [dependencies]
 libc = "0.2.124"

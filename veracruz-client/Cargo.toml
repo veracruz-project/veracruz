@@ -16,10 +16,7 @@ required-features = ["cli"]
 cli = ["structopt", "env_logger", "tokio/rt", "tokio/macros"]
 icecap = []
 linux = []
-nitro = [
-# FIXME: fake_random is not secure! (Also, does this run in the enclave?)
-  "mbedtls/fake_random",
-]
+nitro = []
 
 [dependencies]
 anyhow = "1"
