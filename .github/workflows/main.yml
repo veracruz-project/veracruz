@@ -83,3 +83,10 @@ jobs:
             > CLI_QUICKSTART.markdown.sh
           # run the quickstart
           bash -euxo pipefail CLI_QUICKSTART.markdown.sh
+      - name: Running tlstest/README.md
+        id: tlstest
+        run: |
+          # Extract and execute bash code blocks from README.md:
+          cd tests/tlstest && \
+          sed -n '/``` bash/,/```/{/```/d; p}' README.md > README.md.sh && \
+          bash -euxo pipefail README.md.sh

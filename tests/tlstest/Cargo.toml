@@ -1,0 +1,7 @@
+[package]
+name = "tlstest"
+edition = "2018"
+version = "0.3.0"
+
+[dependencies]
+mbedtls = { path = "../../third-party/rust-mbedtls/mbedtls" }
