@@ -38,4 +38,9 @@ pub enum PolicyError {
     InvalidPath,
     #[error(display = "PolicyError: Invalid platform.")]
     InvalidPlatform,
+    #[error(
+        display = "PolicyError: Parsing failure when trying to parse pipeline: {:?}.",
+        _0
+    )]
+    PipelineParsingFailure(String),
 }

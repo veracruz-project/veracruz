@@ -27,7 +27,6 @@ use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
-use policy_utils::pipeline::Pipeline;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::{
@@ -850,16 +849,15 @@ impl WasiWrapper {
     pub fn new(
         filesystem: FileSystem,
         Options {
-            environment_variables,
-            program_arguments,
             enable_clock,
             enable_strace,
         }: Options,
     ) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
-            environment_variables,
-            program_arguments,
+            //TODO make it pass from outside
+            environment_variables: Vec::new(),
+            program_arguments: Vec::new(),
             enable_clock,
             enable_strace,
             exit_code: None,
@@ -2083,14 +2081,9 @@ pub(crate) enum EntrySignature {
 /// added to this trait and implemented for all supported implementation
 /// strategies.
 pub trait ExecutionEngine: Send {
-    /// Entry point for the execution engine: invokes a pipeline of programs,
-    /// `pipeline`, with a specified set of execution engine options, `options`.
-    /// Returns `Ok(c)` if the pipeline successfully executed and returned a
+    /// Entry point for the execution engine: invokes the `program` binary,
+    /// Returns `Ok(c)` if it successfully executed and returned a
     /// success/error code, `c`, or returns `Err(e)` if some fatal execution
     /// engine error occurred at runtime causing the pipeline to abort.
-    fn execute_pipeline(
-        &mut self,
-        pipeline: Pipeline,
-        options: Options,
-    ) -> Result<u32, FatalEngineError>;
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32>;
 }

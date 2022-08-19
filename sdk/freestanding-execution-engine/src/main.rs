@@ -27,10 +27,12 @@ use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use policy_utils::{
-    pipeline::Pipeline,
+    pipeline::Expr, 
+    parsers::parse_pipeline,
     principal::{ExecutionStrategy, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
+
 use std::{
     collections::HashMap,
     error::Error,
@@ -69,8 +71,6 @@ struct CommandLineOptions {
     input_sources: Vec<String>,
     /// The list of file names passed as ouput.
     output_sources: Vec<String>,
-    /// The paths passed as the WASM programs to be executed (in order).
-    program_sources: Vec<String>,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
     /// Whether the contents of `stdout` should be dumped before exiting.
@@ -85,7 +85,7 @@ struct CommandLineOptions {
     /// Whether strace is enabled.
     enable_strace: bool,
     /// The conditional pipeline of programs to execute.
-    pipeline: Pipeline,
+    pipeline: Box<Expr>,
 }
 
 /// Parses the command line options, building a `CommandLineOptions` struct out
@@ -118,15 +118,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                      into disk on the host. All program are granted with write capabilities.",
                 )
                 .multiple(true),
-        )
-        .arg(
-            Arg::with_name("program")
-                .short("p")
-                .long("program")
-                .value_name("FILE")
-                .help("Paths to the WASM binary to be executed.")
-                .multiple(true)
-                .required(true),
         )
         .arg(
             Arg::with_name("pipeline")
@@ -205,47 +196,11 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         }
     };
 
-    let program_sources = if let Some(data) = matches.values_of("program") {
-        let program_sources: Vec<String> = data.map(|e| e.to_string()).collect();
-        info!("Using '{:?}' as our WASM executable.", program_sources);
-        program_sources
-    } else {
-        return Err("No binary file provided.".into());
-    };
 
-    let pipeline = if let Some(pipeline) = matches.value_of("pipeline") {
-        info!("Using '{:?}' as our executable pipeline.", pipeline);
-        pipeline
+    let pipeline = if let Some(pipeline_string) = matches.value_of("pipeline") {
+        parse_pipeline(pipeline_string)?
     } else {
         return Err("No executable pipeline provided".into());
-    };
-
-    // Do some quick correctness checks on the pipeline:
-    // 1. Does it parse?
-    // 2. Have all of the executables that it mentions actually been provided to
-    //    us for loading?
-    let pipeline = if let Some(pipeline) = Pipeline::parse(pipeline) {
-        let executables = pipeline.executables();
-
-        for e in executables.iter() {
-            let p = e
-                .clone()
-                .into_os_string()
-                .into_string()
-                .map_err(|_e| format!("Failed to convert path '{:?}' into string.", e))?;
-
-            if !program_sources.contains(&p) {
-                return Err(format!(
-                    "Unknown executable '{:?}' mentioned in pipeline '{:?}'.",
-                    e, pipeline
-                )
-                .into());
-            }
-        }
-
-        pipeline
-    } else {
-        return Err(format!("Failed to parse pipeline '{:?}'.", pipeline).into());
     };
 
     let input_sources = if let Some(data) = matches.values_of("input") {
@@ -289,7 +244,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
     Ok(CommandLineOptions {
         input_sources,
         output_sources,
-        program_sources,
         execution_strategy,
         dump_stdout,
         dump_stderr,
@@ -347,11 +301,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Convert the program paths to absolute if needed.
 
-    cmdline.program_sources.iter_mut().for_each(|e| {
-        if !e.starts_with("/") {
-            e.insert(0, '/');
-        }
-    });
 
     // Construct file table for all programs
 
@@ -390,19 +339,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Insert the file right for all programs
 
-    for prog_path in &cmdline.program_sources {
-        let program_id = Principal::Program(prog_path.to_string());
-
-        right_table.insert(program_id.clone(), file_table.clone());
-    }
-
     // Grant the super user read access to any file under the root. This is
     // used internally to read the program on behalf of the executing party
 
     let mut su_read_rights = HashMap::new();
     su_read_rights.insert(
         PathBuf::from("/"),
-        Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR,
+        write_right,
     );
     right_table.insert(Principal::InternalSuperUser, su_read_rights);
 
@@ -431,8 +374,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &cmdline.execution_strategy,
         vfs.clone(),
         cmdline.pipeline.clone(),
-        cmdline.environment_variables.clone(),
-        options,
+        &options,
     )?;
 
     info!(

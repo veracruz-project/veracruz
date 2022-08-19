@@ -21,7 +21,6 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use log::info;
-use policy_utils::pipeline::Pipeline;
 use std::{
     convert::TryFrom,
     mem,
@@ -519,7 +518,7 @@ impl WasmtimeRuntimeState {
             // otherwise the actual return code or default success code `0`.
             None => {
                 info!(
-                    "The return trace: {:?}, (it should not reach here).",
+                    "The return trace: {:?}, (`proc_exit` is not call).",
                     return_from_main
                 );
                 return_from_main?;
@@ -1110,92 +1109,15 @@ impl WasmtimeRuntimeState {
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
 
-    /// Executes the pipeline, `pipeline`.  Returns `Ok(code)` if execution of
-    /// the pipeline succeeds and returns error code, `code`.  Otherwise,
-    /// returns `Err(fatal)` if a fatal runtime error, `fatal`, occurs, during
-    /// execution of the pipeline.
-    fn execute_pipeline_inner(&mut self, pipeline: Pipeline) -> Result<u32, FatalEngineError> {
-        match pipeline {
-            Pipeline::Abort => {
-                // NB: minimize scope within which filesystem is locked
-                {
-                    let mut filesystem = self.filesystem.lock()?;
-                    filesystem.set_exit_code(1);
-                }
-                Ok(1)
-            }
-            Pipeline::Executable { path, arguments } => {
-                // NB: minimize scope within which filesystem is locked
-                let content = {
-                    let mut filesystem = self.filesystem.lock()?;
-                    filesystem.suppress_exit_code();
-                    filesystem.set_program_arguments(arguments);
-                    filesystem.read_file_by_absolute_path(&path).map_err(|e| {
-                        FatalEngineError::FileDoesNotExistOrCannotBeOpened(path.into_os_string(), e)
-                    })?
-                };
-
-                self.invoke_engine(content)
-            }
-            Pipeline::Sequence { pipelines } => {
-                let mut last_result = 0u32;
-
-                for p in pipelines {
-                    // NB: minimize scope within which filesystem is locked
-                    {
-                        let mut filesystem = self.filesystem.lock()?;
-                        filesystem.suppress_exit_code();
-                    }
-
-                    last_result = self.execute_pipeline_inner(p)?;
-
-                    if last_result != 0 {
-                        return Ok(last_result);
-                    }
-                }
-
-                Ok(last_result)
-            }
-            Pipeline::Conditional {
-                test,
-                andthen,
-                orelse,
-            } => {
-                let tresult = self.execute_pipeline_inner(*test)?;
-
-                // NB: minimize scope within which filesystem is locked
-                {
-                    let mut filesystem = self.filesystem.lock()?;
-                    filesystem.suppress_exit_code();
-                }
-
-                if tresult == 0 {
-                    self.execute_pipeline_inner(*andthen)
-                } else {
-                    self.execute_pipeline_inner(*orelse)
-                }
-            }
-        }
-    }
 }
 
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmtimeRuntimeState {
-    /// ExecutionEngine wrapper of `execute_pipeline_inner`.  Raises a panic if
+    /// ExecutionEngine wrapper of `invoke_engine`.  Raises a panic if
     /// the global Wasmtime host is unavailable.
     #[inline]
-    fn execute_pipeline(
-        &mut self,
-        pipeline: Pipeline,
-        options: Options,
-    ) -> Result<u32, FatalEngineError> {
-        // NOTE: minimize the locking scope.
-        {
-            let mut vfs = self.filesystem.lock()?;
-            vfs.enable_clock = options.enable_clock;
-            vfs.enable_strace = options.enable_strace;
-        }
-        self.execute_pipeline_inner(pipeline)
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
+        self.invoke_engine(program)
     }
 }

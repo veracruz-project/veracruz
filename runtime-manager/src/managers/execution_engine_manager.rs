@@ -12,7 +12,7 @@
 
 use super::{ProtocolState, ProvisioningResult, RuntimeManagerError};
 use anyhow::{anyhow, Result};
-use policy_utils::principal::Principal;
+use policy_utils::{pipeline::Expr, principal::Principal};
 use std::vec::Vec;
 use transport_protocol::{
     transport_protocol::{
@@ -60,7 +60,8 @@ fn dispatch_on_result(
     protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.execute(&Principal::Participant(client_id), &file_name)
+    //TODO fill in the correct virtural filesystem handler
+    protocol_state.execute(&Principal::Participant(client_id), Vec::new(), Box::new(Expr::Literal(file_name)))
 }
 
 /// Write a file into the VFS. It will overwrite previous content. Fails if the client has no permission.

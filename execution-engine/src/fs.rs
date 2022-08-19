@@ -785,9 +785,9 @@ impl FileSystem {
     pub const DEFAULT_RIGHTS: Rights = Rights::all();
 
     /// Path to the Postcard serialization native module.
-    pub const POSTCARD_SERVICE_PATH: &str = "/services/postcard_string.dat";
+    pub const POSTCARD_SERVICE_PATH: &'static str = "/services/postcard_string.dat";
     /// Path to the AES counter mode native module.
-    pub const AES_COUNTER_MODE_SERVICE_PATH: &str = "/services/aesctr.dat";
+    pub const AES_COUNTER_MODE_SERVICE_PATH: &'static str = "/services/aesctr.dat";
 
     /// Creates a new, empty `Filesystem` and returns the superuser handle, which
     /// has all the capabilities on the entire filesystem.
@@ -815,10 +815,10 @@ impl FileSystem {
         let mut services = Vec::new();
 
         let service: Box<dyn Service> = Box::new(PostcardService::new());
-        services.push((POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
+        services.push((Self::POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
 
         let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
-        services.push((AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
+        services.push((Self::AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
         let service: Box<dyn Service> = Box::new(AeadService::new());
         services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;

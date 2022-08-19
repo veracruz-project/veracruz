@@ -25,20 +25,16 @@ extern crate num_derive;
 mod engines;
 pub mod fs;
 mod native_modules;
+mod pipeline;
 // Expose the error to the external.
 pub use engines::common::FatalEngineError;
 
-#[cfg(feature = "std")]
-use crate::engines::wasmtime::WasmtimeRuntimeState;
-use crate::{
-    engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
-    fs::FileSystem,
-};
-use policy_utils::{pipeline::Pipeline, principal::ExecutionStrategy};
+use crate::fs::FileSystem;
+use policy_utils::{pipeline::Expr, principal::ExecutionStrategy};
 use std::boxed::Box;
 
 /// Runtime options for a program.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]
 pub struct Options {
     /// Whether clock-related functionality is enabled for the program.  If not
     /// enabled, clock- and time-related WASI host-calls return an unimplemented
@@ -62,21 +58,9 @@ pub struct Options {
 pub fn execute(
     strategy: &ExecutionStrategy,
     filesystem: FileSystem,
-    pipeline: Pipeline,
-    initial_environment_variables: Vec<(String, String)>,
-    options: Options,
-) -> Result<u32> {
-    let mut engine: Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, options)?),
-        ExecutionStrategy::JIT => {
-            cfg_if::cfg_if! {
-                if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, options)?)
-                } else {
-                    return Err(anyhow::anyhow!(FatalEngineError::EngineIsNotReady));
-                }
-            }
-        }
-    };
-    engine.execute_pipeline(pipeline, options)
+    pipeline: Box<Expr>,
+    options: &Options,
+) -> anyhow::Result<u32> {
+    //TODO install the environment variables 
+    Ok(pipeline::execute_pipeline(strategy, filesystem, pipeline, options)?.0)
 }

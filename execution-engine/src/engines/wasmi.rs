@@ -20,7 +20,6 @@ use crate::{
 use anyhow::{anyhow, Result};
 use log::error;
 use num::{FromPrimitive, ToPrimitive};
-use policy_utils::pipeline::Pipeline;
 use std::{boxed::Box, convert::TryFrom, mem, str::FromStr, string::ToString, vec::Vec};
 use wasi_types::ErrNo;
 use wasmi::{
@@ -1292,87 +1291,6 @@ impl WASMIRuntimeState {
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
 
-    /// Executes the pipeline, `pipeline`.
-    ///
-    /// Returns `Ok(code)` if the pipeline successfully executed and returned a
-    /// defined error code, `code`.  Alternatively, returns `Err(fatal)` to
-    /// signal that a fatal runtime error, `fatal`, occurred during the
-    /// execution of the pipeline.
-    pub(crate) fn execute_pipeline_inner(
-        &mut self,
-        pipeline: Pipeline,
-    ) -> Result<u32, FatalEngineError> {
-        match pipeline {
-            Pipeline::Abort => {
-                self.vfs.set_exit_code(1);
-                Ok(1)
-            }
-            Pipeline::Executable { path, arguments } => {
-                let content = self.vfs.read_file_by_absolute_path(&path).map_err(|e| {
-                    FatalEngineError::FileDoesNotExistOrCannotBeOpened(path.into_os_string(), e)
-                })?;
-
-                self.load_program(&content)?;
-
-                self.vfs.set_program_arguments(arguments);
-                self.vfs.suppress_exit_code();
-
-                let execution_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
-                let exit_code = self.vfs.exit_code();
-
-                match execution_result {
-                    Ok(None) => {
-                        // NB: if no explicit error code is produced then
-                        // default to `0`.
-                        Ok(exit_code.unwrap_or(0))
-                    }
-                    Ok(Some(RuntimeValue::I32(c))) => Ok(c as u32),
-                    Ok(Some(_)) => {
-                        // NB: some bizarre or unexpected return code was
-                        // produced.  Something has gone completely wrong...
-                        Err(FatalEngineError::ReturnedCodeError)
-                    }
-                    Err(Error::Trap(trap)) => {
-                        // NB: suppress the trap if the `proc_exit` function has
-                        // been called, in which case report the error code as
-                        // `error_code`.
-                        exit_code.ok_or(FatalEngineError::WASMITrapError(trap))
-                    }
-                    Err(err) => Err(FatalEngineError::WASMIError(err)),
-                }
-            }
-            Pipeline::Sequence { pipelines } => {
-                let mut last_result = 0u32;
-
-                for p in pipelines {
-                    self.vfs.suppress_exit_code();
-
-                    last_result = self.execute_pipeline_inner(p)?;
-
-                    if last_result != 0 {
-                        return Ok(last_result);
-                    }
-                }
-
-                Ok(last_result)
-            }
-            Pipeline::Conditional {
-                test,
-                andthen,
-                orelse,
-            } => {
-                let tresult = self.execute_pipeline_inner(*test)?;
-
-                self.vfs.suppress_exit_code();
-
-                if tresult == 0 {
-                    self.execute_pipeline_inner(*andthen)
-                } else {
-                    self.execute_pipeline_inner(*orelse)
-                }
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1382,21 +1300,33 @@ impl WASMIRuntimeState {
 /// The `WASMIRuntimeState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WASMIRuntimeState {
-    /// Executes the pipeline, `pipeline`, within the context of the execution
+    /// Executes the program, `program`, within the context of the execution
     /// engine options, `options`.
     ///
     /// Returns `Ok(code)` if the pipeline successfully executed and returned a
     /// defined error code, `code`.  Alternatively, returns `Err(fatal)` to
     /// signal that a fatal runtime error, `fatal`, occurred during the
     /// execution of the pipeline.
-    fn execute_pipeline(
-        &mut self,
-        pipeline: Pipeline,
-        options: Options,
-    ) -> Result<u32, FatalEngineError> {
-        self.vfs.enable_clock = options.enable_clock;
-        self.vfs.enable_strace = options.enable_strace;
+    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
+        self.load_program(&program)?;
 
-        self.execute_pipeline_inner(pipeline)
+        let execute_result = self.invoke_export(WasiWrapper::ENTRY_POINT_NAME);
+        let exit_code = self.vfs.exit_code();
+
+        // Get the return code, ZERO as the default, or the exit_code if exists.
+        match execute_result {
+            // If the function does not explicitly provide return code,
+            // either read the exit_code passed by proc_exit call or use ZERO as the default.
+            Ok(None) => Ok(exit_code.unwrap_or(0)),
+            // Return the explicit return code
+            Ok(Some(RuntimeValue::I32(c))) => Ok(c as u32),
+            // NOTE: Surpress the trap, if the `proc_exit` is called.
+            //       In this case, the error code is exit_code.
+            Ok(Some(_)) => Err(anyhow!(FatalEngineError::ReturnedCodeError)),
+            // NOTE: Surpress the trap, if the `proc_exit` is called.
+            //       In this case, the error code is exit_code.
+            Err(Error::Trap(trap)) => exit_code.ok_or(anyhow!(trap)),
+            Err(err) => Err(anyhow!(err)),
+        }
     }
 }

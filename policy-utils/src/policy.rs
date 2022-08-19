@@ -41,7 +41,7 @@ use super::{
     Platform,
 };
 use anyhow::{anyhow, Result};
-use crate::pipeline::Pipeline;
+use crate::pipeline::Expr;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -61,7 +61,7 @@ use wasi_types::Rights;
 /// and contains data that every principal needs to audit and understand before
 /// they enroll in a computation, so that they are capable of assessing whether
 /// a computation is "safe" or not for them to join.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Policy {
     /// The identities of every principal involved in a computation.
     identities: Vec<Identity<String>>,
@@ -76,7 +76,7 @@ pub struct Policy {
     /// to execute.  This is not present in the JSON representation of a policy
     /// file.
     #[serde(skip)]
-    parsed_pipeline: Option<Pipeline>,
+    parsed_pipeline: Option<Box<Expr>>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -137,12 +137,14 @@ impl Policy {
         enable_clock: bool,
         max_memory_mib: u32,
     ) -> Result<Self> {
-        let policy = Self {
+        let parsed_pipeline = Some(crate::parsers::parse_pipeline(&preparsed_pipeline)?);
+
+        let mut policy = Self {
             identities,
             proxy_service_cert,
             programs,
             preparsed_pipeline,
-            parsed_pipeline: None,
+            parsed_pipeline,
             veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
@@ -206,19 +208,6 @@ impl Policy {
     #[inline]
     pub fn ciphersuite(&self) -> &String {
         &self.ciphersuite
-    }
-
-    /// Returns the AST of the pipeline of programs to execute.  Note that
-    /// the `Policy::new()` constructor calls `assert_valid()`, internally,
-    /// which checks that the pipeline can be parsed and sets `parsed_pipeline`
-    /// to `Some(p)`.  As a result, the `expect()` call, below, should never be
-    /// executed...
-    #[inline]
-    pub fn pipeline(&self) -> &Pipeline {
-        &self
-            .parsed_pipeline
-            .as_ref()
-            .expect("Pipeline should have been parsed by this point.")
     }
 
     /// Returns the hash of the trusted Veracruz runtime, associated with this
@@ -286,7 +275,7 @@ impl Policy {
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
     /// is found to be invalid.  In all other cases, `Ok(())` is returned.
-    fn assert_valid(&self) -> Result<()> {
+    fn assert_valid(&mut self) -> Result<()> {
         let mut client_ids = Vec::new();
 
         for identity in self.identities.iter() {
@@ -304,12 +293,6 @@ impl Policy {
             PolicyError::TLSInvalidCiphersuiteError(self.ciphersuite().to_string()),
         )?;
 
-        // Parse the pipeline
-        let parsed_pipeline = Pipeline::parse(&self.preparsed_pipeline).ok_or(
-            PolicyError::PipelineParsingFailure(self.preparsed_pipeline.clone()),
-        )?;
-
-        self.parsed_pipeline = Some(parsed_pipeline);
 
         // NB: no check of enclave certificate validity as there is no reliable
         // way of obtaining a time from within an enclave.  This is the

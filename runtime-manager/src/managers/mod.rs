@@ -11,12 +11,10 @@
 
 use anyhow::{anyhow, Result};
 use policy_utils::{
-    pipeline::Pipeline, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
+    pipeline::Expr, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
 };
-
 use execution_engine::{execute, fs::FileSystem};
 use lazy_static::lazy_static;
-use policy_utils::{policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH};
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -199,7 +197,7 @@ impl ProtocolState {
         &mut self,
         client_id: &Principal,
         initial_environment_variables: Vec<(String, String)>,
-        pipeline: Pipeline,
+        pipeline: Box<Expr>,
     ) -> ProvisioningResult {
         let execution_strategy = self.global_policy.execution_strategy();
         let options = execution_engine::Options {
@@ -209,10 +207,10 @@ impl ProtocolState {
 
         let return_code = execute(
             &execution_strategy,
+            // TODO spawn one???
             self.vfs.clone(),
             pipeline,
-            initial_environment_variables,
-            options,
+            &options,
         )?;
 
         let response = Self::response_error_code_returned(return_code);

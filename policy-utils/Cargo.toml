@@ -27,3 +27,8 @@ serde = { version = "1.0.115", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
+lalrpop-util = { version = "0.18", features = ["lexer"] }
+regex = "1"
+
+[build-dependencies]
+lalrpop = { version = "0.18", features = ["lexer"] }
