@@ -12,8 +12,6 @@ icecap = [
   "policy-utils/icecap",
 ]
 nitro = [
-# FIXME: fake_random is not secure!
-  "mbedtls/fake_random",
   "platform-services/nitro",
   "policy-utils/std",
   "wasmtime",
