@@ -10,6 +10,7 @@ icecap = [
   "policy-utils/icecap",
 ]
 nitro = [
+  "mbedtls/monitor_getrandom",
   "policy-utils/std",
 ]
 std = [

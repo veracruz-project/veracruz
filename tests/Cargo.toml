@@ -27,6 +27,7 @@ linux = [
   "veracruz-utils/linux",
 ]
 nitro = [
+  "mbedtls/monitor_getrandom",
   "policy-utils/std",
   "proxy-attestation-server/nitro",
   "veracruz-server/nitro",

@@ -12,6 +12,7 @@ icecap = [
   "policy-utils/icecap",
 ]
 nitro = [
+  "mbedtls/monitor_getrandom",
   "platform-services/nitro",
   "policy-utils/std",
   "wasmtime",

@@ -14,7 +14,9 @@ crate-type = ["rlib"]
 # build.rs depends on features
 icecap = []
 linux = []
-nitro = []
+nitro = [
+  "mbedtls-sys-auto/monitor_getrandom",
+]
 
 [dependencies]
 libc = "0.2.124"

@@ -7,6 +7,9 @@ version = "0.3.0"
 
 [features]
 icecap = []
+nitro = [
+  "mbedtls/monitor_getrandom",
+]
 std = [
   "hex/std",
   "serde/std",

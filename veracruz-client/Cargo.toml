@@ -16,7 +16,9 @@ required-features = ["cli"]
 cli = ["structopt", "env_logger", "tokio/rt", "tokio/macros"]
 icecap = []
 linux = []
-nitro = []
+nitro = [
+  "mbedtls/monitor_getrandom",
+]
 
 [dependencies]
 anyhow = "1"

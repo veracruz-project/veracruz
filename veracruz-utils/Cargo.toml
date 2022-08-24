@@ -16,6 +16,7 @@ linux = [
   "serde_json/std",
 ]
 nitro = [
+  "mbedtls/monitor_getrandom",
   "platform-services/nitro",
   "serde/derive",
   "serde_json/std",
