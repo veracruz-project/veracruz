@@ -79,7 +79,7 @@ fn execute_program(
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
                     Box::new(WasmtimeRuntimeState::new(filesystem, options.clone())?)
                 } else {
-                    return Err(anyhow::anyhow!(FatalEngineError::EngineIsNotReady));
+                    return Err(anyhow::anyhow!(crate::engines::common::FatalEngineError::EngineIsNotReady));
                 }
             }
         }

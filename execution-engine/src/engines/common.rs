@@ -28,7 +28,6 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use err_derive::Error;
 use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
-use std::ffi::OsString;
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData, mem,
     mem::size_of, ops::Deref, ops::DerefMut, path::Path, slice, slice::from_raw_parts,
@@ -2008,13 +2007,6 @@ pub enum FatalEngineError {
         /// The name of the host function that was being invoked.
         function_name: WasiAPIName,
     },
-    /// A specified file does not exist in the Veracruz filesystem.
-    #[error(
-        display = "FatalEngineError: The file '{:?}' does not exist or cannot be opened.  Error number '{:?}' returned from filesystem.",
-        _0,
-        _1
-    )]
-    FileDoesNotExistOrCannotBeOpened(OsString, ErrNo),
     /// The WASM program tried to invoke an unknown H-call on the Veracruz engine.
     #[error(display = "FatalEngineError: Unknown Host call invoked: '{:?}'.", _0)]
     UnknownHostFunction(HostFunctionIndexOrName),
