@@ -8,8 +8,7 @@ version = "0.3.0"
 [features]
 icecap = []
 nitro = [
-# FIXME: fake_random is not secure! (Also, does this run in the enclave?)
-  "mbedtls/fake_random",
+  "mbedtls/monitor_getrandom",
 ]
 std = [
   "hex/std",
