@@ -296,7 +296,7 @@ fn load_input_source<T: AsRef<Path>>(
 /// invoking the entry point.
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let mut cmdline = parse_command_line()?;
+    let cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
     // Convert the program paths to absolute if needed.

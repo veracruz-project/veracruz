@@ -37,11 +37,10 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable},
+    principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable, Pipeline},
     Platform,
 };
 use anyhow::{anyhow, Result};
-use crate::pipeline::Expr;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -69,14 +68,8 @@ pub struct Policy {
     programs: Vec<Program>,
     /// The list of files, e.g. binaries and configurations, that must match given hashes.
     file_hashes: Vec<FileHash>,
-    /// The string representation of the conditional pipeline of programs to
-    /// execute, pre-parsed.
-    preparsed_pipeline: String,
-    /// The parsed, AST representation of the conditional pipeline of programs
-    /// to execute.  This is not present in the JSON representation of a policy
-    /// file.
-    #[serde(skip)]
-    parsed_pipeline: Option<Box<Expr>>,
+    /// The list of pipelines.
+    pipelines: Vec<Pipeline>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -122,7 +115,7 @@ impl Policy {
     pub fn new(
         identities: Vec<Identity<String>>,
         programs: Vec<Program>,
-        preparsed_pipeline: String,
+        mut pipelines: Vec<Pipeline>,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
@@ -137,14 +130,17 @@ impl Policy {
         enable_clock: bool,
         max_memory_mib: u32,
     ) -> Result<Self> {
-        let parsed_pipeline = Some(crate::parsers::parse_pipeline(&preparsed_pipeline)?);
+
+
+        for p in pipelines.iter_mut() {
+            p.parse()?;
+        }
 
         let mut policy = Self {
             identities,
             proxy_service_cert,
             programs,
-            preparsed_pipeline,
-            parsed_pipeline,
+            pipelines,
             veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
