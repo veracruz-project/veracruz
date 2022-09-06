@@ -23,6 +23,8 @@ use std::{
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
+static VERAISON_VERIFIER_IP_ADDRESS: &str = "172.22.0.4:8080";
+
 lazy_static! {
     static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);
     static ref CA_CERT_DER: std::sync::Mutex<Option<Vec<u8>>> = std::sync::Mutex::new(None);
@@ -104,15 +106,15 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
         println!("proxy-attestation-server::attestation::start doesn't have start_msg");
         return Err(ProxyAttestationServerError::MissingFieldError("start msg"));
     }
-    let (protocol, firmware_version) = transport_protocol::parse_start_msg(&parsed);
+    let (protocol, _firmware_version) = transport_protocol::parse_start_msg(&parsed);
 
     let device_id = DEVICE_ID.fetch_add(1, Ordering::SeqCst);
 
     match protocol.as_str() {
         #[cfg(any(feature = "linux", feature = "icecap"))]
-        "psa" => psa::start(&firmware_version, device_id),
+        "psa" => psa::start(device_id),
         #[cfg(feature = "nitro")]
-        "nitro" => nitro::start(&firmware_version, device_id),
+        "nitro" => nitro::start(device_id),
         _ => Err(ProxyAttestationServerError::UnknownAttestationTokenError),
     }
 }

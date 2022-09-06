@@ -13,9 +13,10 @@
 pub mod veracruz_server_nitro {
     use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use io_utils::{
-        http::{post_string, send_proxy_attestation_server_start},
+        http::{HttpError, HttpResponse, post_string, send_proxy_attestation_server_start},
         nitro::NitroEnclave,
     };
+    use log::error;
     use policy_utils::policy::Policy;
     use std::{env, error::Error};
     use veracruz_utils::runtime_manager_message::{
@@ -271,14 +272,20 @@ pub mod veracruz_server_nitro {
             "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
             url
         );
-        let received_body: String = post_string(&url, &encoded_str, None).map_err(|e| {
+        let received_body: String = match post_string(&url, &encoded_str, None).map_err(|e| {
             println!(
                 "Failed to post native attestation token.  Error produced: {}.",
                 e
             );
 
-            e
-        })?;
+            VeracruzServerError::HttpError(e)
+        })? {
+            HttpResponse::Ok(body) => body,
+            not_ok => {
+                error!("post buffer returned a non-Ok status code:{:?}", not_ok);
+                return Err(VeracruzServerError::HttpError(HttpError::HttpSuccess));
+            }
+        };
 
         println!(
             "veracruz-server-nitro::post_psa_attestation_token received buffer:{:?}",

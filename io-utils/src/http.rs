@@ -386,7 +386,6 @@ where
         })?;
     }
 
-    println!("Received response header: {}.", received_header);
     let response = if received_header.contains("HTTP/1.1 200 OK\r") {
         HttpResponse::Ok(received_body)
     } else if received_header.contains("HTTP/1.1 201 Created\r") {
