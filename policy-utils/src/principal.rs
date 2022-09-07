@@ -17,8 +17,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
-use crate::pipeline::Expr;
-use crate::parsers::parse_pipeline;
+use crate::{pipeline::Expr, parsers::parse_pipeline};
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.

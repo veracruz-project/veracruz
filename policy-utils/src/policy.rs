@@ -136,7 +136,7 @@ impl Policy {
             p.parse()?;
         }
 
-        let mut policy = Self {
+        let policy = Self {
             identities,
             proxy_service_cert,
             programs,
@@ -271,7 +271,7 @@ impl Policy {
 
     /// Checks that the policy is valid, returning `Err(reason)` iff the policy
     /// is found to be invalid.  In all other cases, `Ok(())` is returned.
-    fn assert_valid(&mut self) -> Result<()> {
+    fn assert_valid(&self) -> Result<()> {
         let mut client_ids = Vec::new();
 
         for identity in self.identities.iter() {
@@ -288,7 +288,6 @@ impl Policy {
         veracruz_utils::lookup_ciphersuite(self.ciphersuite()).ok_or(
             PolicyError::TLSInvalidCiphersuiteError(self.ciphersuite().to_string()),
         )?;
-
 
         // NB: no check of enclave certificate validity as there is no reliable
         // way of obtaining a time from within an enclave.  This is the

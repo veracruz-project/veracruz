@@ -32,7 +32,6 @@ use policy_utils::{
     principal::{ExecutionStrategy, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
-
 use std::{
     collections::HashMap,
     error::Error,
