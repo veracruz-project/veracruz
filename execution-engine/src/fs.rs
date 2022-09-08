@@ -1892,6 +1892,33 @@ impl FileSystem {
         Ok(rst)
     }
 
+    /// Check if a `file_name` exists.
+    /// Note: this function *has* side effect ! 
+    /// It will try to open the file and then close it.
+    pub fn file_exists<T: AsRef<Path>>(
+        &mut self,
+        file_name: T,
+    ) -> Result<bool, ErrNo> {
+        let file_name = file_name.as_ref();
+        let (fd, file_name) = self.find_prestat(file_name)?;
+        match self.path_open(
+            fd,
+            LookupFlags::empty(),
+            file_name,
+            OpenFlags::empty(),
+            FileSystem::DEFAULT_RIGHTS,
+            FileSystem::DEFAULT_RIGHTS,
+            FdFlags::empty(),
+        ) {
+            Ok(new_fd) => {
+                self.fd_close(new_fd)?;
+                Ok(true)
+            }
+            Err(Access) => Err(Access),
+            Err(_) => Ok(false),
+        }
+    }
+
     /// A public API for writing to stdin.
     #[inline]
     pub fn write_stdin(&mut self, buf: &[u8]) -> FileSystemResult<usize> {

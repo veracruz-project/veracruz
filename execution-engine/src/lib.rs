@@ -62,5 +62,5 @@ pub fn execute(
     options: &Options,
 ) -> anyhow::Result<u32> {
     //TODO install the environment variables 
-    Ok(pipeline::execute_pipeline(strategy, filesystem, pipeline, options)?.0)
+    Ok(pipeline::execute_pipeline(strategy, filesystem.clone(), filesystem, pipeline, options)?.0)
 }

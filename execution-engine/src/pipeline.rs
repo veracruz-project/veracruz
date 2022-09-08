@@ -30,7 +30,8 @@ use log::info;
 pub fn execute_pipeline(
     strategy: &ExecutionStrategy,
     // TODO: Assume it is the filesystem to execute the entire pipeline
-    mut filesystem: FileSystem,
+    mut caller_filesystem: FileSystem,
+    pipeline_filesystem: FileSystem,
     pipeline: Box<Expr>,
     options: &Options,
 ) -> Result<(u32, FileSystem)> {
@@ -39,33 +40,44 @@ pub fn execute_pipeline(
         Literal(path_string) => {
             info!("Literal {:?}", path_string);
             // read and call execute_program
-            let binary = filesystem.read_file_by_absolute_path(path_string)?;
+            let binary = caller_filesystem.read_file_by_absolute_path(path_string)?;
             info!("Successful to read binary");
             // DO we do somoething on the filesystem, intersection with the 
-            let return_code = execute_program(strategy, filesystem.clone(), binary, options)?;
-            Ok((return_code, filesystem))
+            let return_code = execute_program(strategy, pipeline_filesystem, binary, options)?;
+            Ok((return_code, caller_filesystem))
         },
         Seq(vec) => {
             info!("Seq {:?}", vec);
+            // default return_code is zero.
+            let mut return_code = 0;
             for expr in vec {
-                let (return_code, return_filesystem) = execute_pipeline(strategy, filesystem, expr, options)?;
+                let (cur_return_code, return_filesystem) = execute_pipeline(strategy, caller_filesystem, pipeline_filesystem.clone(), expr, options)?;
                 // ownership movement here
-                filesystem = return_filesystem;
+                caller_filesystem = return_filesystem;
+                return_code = cur_return_code;
                 if return_code != 0 {
-                    return Ok((return_code, filesystem));
+                    return Ok((return_code, caller_filesystem));
                 }
             }
             //TODO change the return code
-            Ok((0, filesystem))
+            Ok((return_code, caller_filesystem))
         },
         IfElse(cond, true_branch, false_branch) => {
             info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
-            // TODO impl
-            Ok((0, filesystem))
+            let (return_code, caller_filesystem) = if caller_filesystem.file_exists(cond)? {
+                execute_pipeline(strategy, caller_filesystem, pipeline_filesystem.clone(), true_branch, options)?
+            } else {
+                match false_branch {
+                    Some(f) => execute_pipeline(strategy, caller_filesystem, pipeline_filesystem.clone(), f, options)?,
+                    None => (0, caller_filesystem),
+                }
+            };
+            Ok((return_code, caller_filesystem))
         },
     }
 }
 
+/// Execute the `program`. All I/O operations in the program are through at `filesystem`.
 fn execute_program(
     strategy: &ExecutionStrategy,
     filesystem: FileSystem,
