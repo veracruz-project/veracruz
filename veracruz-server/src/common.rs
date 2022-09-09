@@ -12,6 +12,7 @@
 #[cfg(feature = "icecap")]
 use crate::platforms::icecap::IceCapError;
 use err_derive::Error;
+use io_utils::http::HttpError;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use std::error::Error;
@@ -24,6 +25,8 @@ pub enum VeracruzServerError {
     SerdeJsonError(#[error(source)] serde_json::Error),
     #[error(display = "VeracruzServer: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
+    #[error(display = "VeracruzServer: HttpError: {:?}", _0)]
+    HttpError(HttpError),
     #[error(display = "VeracruzServer: Base64Error: {:?}.", _0)]
     Base64Error(#[error(source)] base64::DecodeError),
     #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]

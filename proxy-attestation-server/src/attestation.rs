@@ -23,7 +23,7 @@ use std::{
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
-static VERAISON_VERIFIER_IP_ADDRESS: &str = "172.22.0.4:8080";
+static VERAISON_VERIFIER_IP_ADDRESS: &str = "172.22.0.3:8080";
 
 lazy_static! {
     static ref DEVICE_ID: AtomicI32 = AtomicI32::new(1);

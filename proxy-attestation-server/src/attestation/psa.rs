@@ -146,6 +146,10 @@ fn verify_attestation_token(token: &[u8], device_id: i32) -> Result<(Vec<u8>, Ve
         })?;
 
     println!("serde_data:{:?}", serde_data);
+    if serde_data["status"].as_str().unwrap() == "failed" {
+        println!("We've failed. We don't know why we've failed. You need to find out why we've failed");
+        return Err(ProxyAttestationServerError::Anyhow(anyhow::anyhow!("Unspecified remote server error")));
+    }
     let result_field = serde_data["result"].as_str().unwrap();
     let decoded_result = base64::decode(&result_field).unwrap();
     let decoded_result_field_str = std::str::from_utf8(&decoded_result).unwrap();

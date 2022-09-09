@@ -12,7 +12,11 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result as AnyhowResult};
+use curl::{
+    easy::{Easy, List},
+    Error as CurlError,
+};
 use err_derive::Error;
 use log::{error, info, trace};
 use regex::Regex;
@@ -20,7 +24,7 @@ use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
     parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
-    ProxyAttestationServerResponse,
+    ProxyAttestationServerResponse, TransportProtocolError,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -30,9 +34,26 @@ use transport_protocol::{
 /// HTTP-related errors.
 #[derive(Debug, Error)]
 pub enum HttpError {
+    /// An error originating from Curl was raised.
+    #[error(display = "An error originating from Curl was raised: {}.", _0)]
+    CurlError(CurlError),
     /// An unexpected HTTP status code was returned.
     #[error(display = "An unexpected HTTP return code was returned.")]
     HttpSuccess,
+    #[error(
+        display = "A transport protocol message could not be (de)serialized: {}.",
+        _0
+    )]
+    SerializationError(TransportProtocolError),
+    #[error(
+        display = "A base64-encoded message could not be (de)serialized: {}.",
+        _0
+    )]
+    Base64Error(base64::DecodeError),
+    #[error(display = "A transport protocol error occurred: {}.", _0)]
+    TransportProtocolError(TransportProtocolError),
+    #[error(display = "An attestation-related error occurred: {}.", _0)]
+    AttestationError(TransportProtocolError),
     #[error(display = "The proxy attestation service issued an unexpected reply.")]
     ProtocolError(ProxyAttestationServerResponse),
 }
@@ -55,7 +76,7 @@ pub enum HttpResponse {
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
 /// Curl session fails for any reason, or if a non-success HTTP code is
 /// returned.
-pub fn post_string<U, B>(url: U, buffer: B, content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
+pub fn post_string<U, B>(url: U, buffer: B, content_type_option: Option<&str>) -> AnyhowResult<HttpResponse, HttpError>
 where
     U: AsRef<str>,
     B: AsRef<str>,
@@ -75,7 +96,7 @@ where
     curl_request.url(url).map_err(|err| {
         error!("Failed to set URL with Curl.  Error produced: {:?}.", err);
 
-        err
+        return HttpError::CurlError(err);
     })?;
 
     let mut headers = List::new();
@@ -110,7 +131,7 @@ where
             err
         );
 
-        err
+        return HttpError::CurlError(err);
     })?;
     curl_request.post(true).map_err(|err| {
         error!(
@@ -118,7 +139,7 @@ where
             err
         );
 
-        err
+        return HttpError::CurlError(err);
     })?;
     curl_request
         .post_field_size(buffer.len() as u64)
@@ -128,7 +149,7 @@ where
                 err
             );
 
-            err
+            return HttpError::CurlError(err);
         })?;
 
     let mut buffer_reader = StringReader::new(buffer);
@@ -146,7 +167,7 @@ where
                     err
                 );
 
-                err
+                return HttpError::CurlError(err);
             })?;
 
         transfer
@@ -170,7 +191,7 @@ where
                     err
                 );
 
-                err
+                return HttpError::CurlError(err);
             })?;
 
         info!("Received response body.");
@@ -196,7 +217,7 @@ where
                     err
                 );
 
-                err
+                return HttpError::CurlError(err);
             })?;
 
         transfer.perform().map_err(|err| {
@@ -205,7 +226,7 @@ where
                 err
             );
 
-            err
+            return HttpError::CurlError(err);
         })?;
     }
 
@@ -228,6 +249,7 @@ where
     } else if received_header.contains("HTTP/1.1 206 Partial Content\r") {
         HttpResponse::PartialContent(received_body)
     } else {
+        println!("post_string: received_header:{:?}", received_header);
         return Err(HttpError::HttpSuccess);
     };
     Ok(response)
@@ -236,7 +258,7 @@ where
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
 /// Curl session fails for any reason, or if a non-success HTTP code is
 /// returned.
-pub fn post_bytes<U, B>(url: U, buffer: B, content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
+pub fn post_bytes<U, B>(url: U, buffer: B, content_type_option: Option<&str>) -> AnyhowResult<HttpResponse, HttpError>
 where
     U: AsRef<str>,
     B: AsRef<[u8]>,
@@ -404,6 +426,7 @@ where
     } else if received_header.contains("HTTP/1.1 206 Partial Content\r") {
         HttpResponse::PartialContent(received_body)
     } else {
+        println!("post_bytes: received_header:{:?}", received_header);
         return Err(HttpError::HttpSuccess);
     };
     Ok(response)
@@ -421,7 +444,7 @@ pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>, F: AsRe
     proxy_attestation_server_url_base: U,
     protocol_name: P,
     firmware_version: F,
-) -> Result<(i32, Vec<u8>)> {
+) -> AnyhowResult<(i32, Vec<u8>)> {
     let proxy_attestation_server_url_base = proxy_attestation_server_url_base.as_ref();
     let protocol_name = protocol_name.as_ref();
     let firmware_version = firmware_version.as_ref();
@@ -450,8 +473,8 @@ pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>, F: AsRe
         })? {
         HttpResponse::Ok(body) => body,
         non_ok => {
-            error!("Received incorrect response:{:?} from post_string", non_ok);
-            return Err(HttpError::HttpSuccess);
+            println!("Received incorrect response:{:?} from post_string", non_ok);
+            return Err(anyhow!(HttpError::HttpSuccess));
         }
     };
 

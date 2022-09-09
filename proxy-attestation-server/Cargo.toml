@@ -53,7 +53,6 @@ nb-connect = "1.0.3"
 openssl = "0.10.24"
 percent-encoding = "2.1"
 psa-attestation = { path = "../psa-attestation" }
-psa-crypto = { path = "../third-party/rust-psa-crypto/psa-crypto" }
 rand = "0.8.3"
 serde_json = "1.0"
 stringreader = "0.1"

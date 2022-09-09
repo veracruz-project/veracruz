@@ -12,6 +12,7 @@
 use actix_web::{error, http::StatusCode, HttpResponse, HttpResponseBuilder};
 use coset::CoseError;
 use err_derive::Error;
+use serde_json;
 
 pub type ProxyAttestationServerResponder = Result<String, ProxyAttestationServerError>;
 
@@ -54,8 +55,6 @@ pub enum ProxyAttestationServerError {
         expected: std::vec::Vec<u8>,
         received: std::vec::Vec<u8>,
     },
-    #[error(display = "ProxyAttestationServer: No proxy PSA attestation token.")]
-    NoProxyPSAAttestationTokenError,
     #[error(
         display = "ProxyAttestationServer: Failed to obtain device with ID {}.",
         _0
@@ -66,6 +65,8 @@ pub enum ProxyAttestationServerError {
         _0
     )]
     MissingFieldError(&'static str),
+    #[error(display = "ProxyAttestationServer: Failed to verify {}.", _0)]
+    FailedToVerifyError(&'static str),
     #[error(display = "ProxyAttestationServer: Unknown attestation protocol.")]
     UnknownAttestationTokenError,
     #[error(
@@ -85,7 +86,9 @@ pub enum ProxyAttestationServerError {
     #[error(display = "ProxyAttestationServer: IntConversionError")]
     IntConversionError,
     #[error(display = "ProxyAttestationServer: Http Error {}.", _0)]
-    HttpError(io_utils::http::HttpError)
+    HttpError(io_utils::http::HttpError),
+    #[error(display = "ProxyAttestationServer: Serde JSON Error {}.", _0)]
+    SerdeJsonError(serde_json::Error),
     #[error(display = "ProxyAttestationServer: Anyhow error {:?}", _0)]
     Anyhow(anyhow::Error),
 }
