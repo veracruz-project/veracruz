@@ -42,7 +42,8 @@ build:
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \
 		--features cli
-	strip target/$(PROFILE_PATH)/proxy-attestation-server target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
+	# Strip symbols and build ID to save space and avoid reproducibility issues
+	strip --remove-section=.note.gnu.build-id target/$(PROFILE_PATH)/proxy-attestation-server target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
