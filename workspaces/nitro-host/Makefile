@@ -34,6 +34,7 @@ CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inceptio
 all: build test-collateral
 
 build:
+	RUSTFLAGS="-C link-args=-Wl,--build-id=none" \
 	$(CC) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG) \
 		-p proxy-attestation-server \
