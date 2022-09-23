@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use icecap_start_generic::declare_generic_main;
 use icecap_core::config::*;
 use icecap_core::prelude::*;
+use icecap_core::prelude::vec::Vec;
 use icecap_core::ring_buffer::{BufferedRingBuffer, RingBuffer};
 
 use virtio_drivers::VirtIOConsole;
