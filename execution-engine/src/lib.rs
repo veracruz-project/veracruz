@@ -42,6 +42,10 @@ pub struct Options {
     pub enable_clock: bool,
     /// Whether strace-like output is enabled.
     pub enable_strace: bool,
+    /// The environment variables currently set, and their bindings.
+    pub environment_variables: Vec<(String, String)>,
+    /// The program arguments of the executable being executed.
+    pub program_arguments: Vec<String>,
 }
 
 /// The top-level function executes the pipeline of programs, `pipeline`, on
@@ -57,10 +61,10 @@ pub struct Options {
 /// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    filesystem: FileSystem,
+    caller_filesystem: FileSystem,
+    pipepine_filesystem: FileSystem,
     pipeline: Box<Expr>,
     options: &Options,
 ) -> anyhow::Result<u32> {
-    //TODO install the environment variables 
-    Ok(pipeline::execute_pipeline(strategy, filesystem.clone(), filesystem, pipeline, options)?.0)
+    Ok(pipeline::execute_pipeline(strategy, caller_filesystem, pipepine_filesystem, pipeline, options)?.0)
 }

@@ -40,7 +40,7 @@ pub fn execute_pipeline(
         Literal(path_string) => {
             info!("Literal {:?}", path_string);
             // read and call execute_program
-            let binary = caller_filesystem.read_file_by_absolute_path(path_string)?;
+            let binary = caller_filesystem.read_exeutable_by_absolute_path(path_string)?;
             info!("Successful to read binary");
             // DO we do somoething on the filesystem, intersection with the 
             let return_code = execute_program(strategy, pipeline_filesystem, binary, options)?;

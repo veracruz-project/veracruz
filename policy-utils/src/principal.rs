@@ -32,6 +32,8 @@ pub enum Principal {
     Participant(u64),
     /// Program in Veracruz, indentified by the program file name.
     Program(String),
+    /// Pipeline in Veracruz, indentified by the pipeline name.
+    Pipeline(String),
     /// No Capability, the bottom Capability. It is used in some Initialization.
     NoCap,
 }
@@ -149,7 +151,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    /// creates a veracruz program.
+    /// Creates a veracruz pipeline.
     #[inline]
     pub fn new<T: Into<u32>>(name: String, id: T, preparsed_pipeline: String, file_rights: Vec<FileRights>) -> Result<Self>
     {
@@ -163,11 +165,25 @@ impl Pipeline {
         })
     }
     
+    /// Parse the pipeline.
+    #[inline]
     pub fn parse(&mut self)  -> Result<()> {
         if let None = self.parsed_pipeline {
             self.parsed_pipeline = Some(parse_pipeline(&self.preparsed_pipeline)?);
         }
         Ok(())
+    }
+    
+    /// Return the name of the pipeline.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Return file rights map associated to the program.
+    #[inline]
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
+        FileRights::compute_right_map(&self.file_rights)
     }
 }
 

@@ -30,7 +30,7 @@ use platform_services::{getclockres, getclocktime, getrandom, result};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::AsMut, convert::AsRef, convert::TryFrom, io::Cursor, marker::PhantomData, mem,
-    mem::size_of, ops::Deref, ops::DerefMut, path::Path, slice, slice::from_raw_parts,
+    mem::size_of, ops::Deref, ops::DerefMut, slice, slice::from_raw_parts,
     slice::from_raw_parts_mut, string::String, vec::Vec,
 };
 use strum_macros::{EnumString, IntoStaticStr};
@@ -850,13 +850,15 @@ impl WasiWrapper {
         Options {
             enable_clock,
             enable_strace,
+            environment_variables,
+            program_arguments,
         }: Options,
     ) -> FileSystemResult<Self> {
         Ok(Self {
             filesystem,
             //TODO make it pass from outside
-            environment_variables: Vec::new(),
-            program_arguments: Vec::new(),
+            environment_variables,
+            program_arguments,
             enable_clock,
             enable_strace,
             exit_code: None,
@@ -888,38 +890,8 @@ impl WasiWrapper {
         self.exit_code
     }
 
-    /// Manually sets the exit code of the last-executed program to `code`.
-    #[inline]
-    pub(crate) fn set_exit_code(&mut self, code: u32) -> &mut Self {
-        self.exit_code = Some(code);
-        self
-    }
-
-    /// Resets the exit code of the last executing program to `None`, clearing
-    /// any previously-stored value.
-    #[inline]
-    pub(crate) fn suppress_exit_code(&mut self) -> &mut Self {
-        self.exit_code = None;
-        self
-    }
-
-    /// Sets the program arguments associated with the program being executed.
-    #[inline]
-    pub(crate) fn set_program_arguments(&mut self, arguments: Vec<String>) -> &mut Self {
-        self.program_arguments = arguments;
-        self
-    }
-
     fn strace(&self, func: &str) -> Strace {
         Strace::func(self.enable_strace, func)
-    }
-
-    /// Reads a file from the filesystem using an absolute path, `path`.
-    pub(crate) fn read_file_by_absolute_path<P>(&mut self, path: P) -> Result<Vec<u8>, ErrNo>
-    where
-        P: AsRef<Path>,
-    {
-        self.filesystem.read_file_by_absolute_path(path)
     }
 
     ////////////////////////////////////////////////////////////////////////////

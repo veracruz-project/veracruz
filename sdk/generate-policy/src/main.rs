@@ -29,7 +29,6 @@ use std::{
     io::{Read, Write},
     net::SocketAddr,
     path::PathBuf,
-    process::exit,
     str::FromStr,
 };
 use veracruz_utils::sha256::sha256;

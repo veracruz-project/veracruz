@@ -46,6 +46,7 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
+use log::error;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -1205,6 +1206,23 @@ impl FileSystem {
         offset: FileSize,
     ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_READ)?;
+        self.fd_pread_internal(fd, bufs, offset)
+    }
+
+    /// A rust-style implementation for `fd_pread`, yet without rights check.
+    /// The actual WASI spec, requires, after `fd`, an extra parameter of type IoVec,
+    /// to which the content should be written.
+    /// Also the WASI requires the function returns the number of byte read.
+    /// However, the implementation of WASI spec of fd_pread depends on
+    /// how a particular execution engine handles the memory.
+    /// That is, different engines provide different API to interact the linear memory
+    /// space of WASM. Hence, the method here return the read bytes as `Vec<u8>`.
+    fn fd_pread_internal<B: AsMut<[u8]>>(
+        &self,
+        fd: Fd,
+        bufs: &mut [B],
+        offset: FileSize,
+    ) -> FileSystemResult<usize> {
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
         let f = self.lock_inode_table()?;
@@ -1296,6 +1314,22 @@ impl FileSystem {
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
         let read_len = self.fd_pread(fd, bufs, offset)?;
+        self.fd_seek(fd, read_len as i64, Whence::Current)?;
+        Ok(read_len)
+    }
+
+    /// Function `fd_read_executable` reads an executable. This function should *only* be called
+    /// internally. It directly calls `fd_pread` with the
+    /// current `offset` of Fd `fd` and then calls `fd_seek`.
+    pub(crate) fn fd_read_executable<B: AsMut<[u8]>>(
+        &mut self,
+        fd: Fd,
+        bufs: &mut [B],
+    ) -> FileSystemResult<usize> {
+        self.check_right(&fd, Rights::FD_EXECUTE)?;
+        let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
+
+        let read_len = self.fd_pread_internal(fd, bufs, offset)?;
         self.fd_seek(fd, read_len as i64, Whence::Current)?;
         Ok(read_len)
     }
@@ -1817,6 +1851,52 @@ impl FileSystem {
         &mut self,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
+        //let file_name = file_name.as_ref();
+        //let (fd, file_name) = self.find_prestat(file_name)?;
+        //let fd = self.path_open(
+            //fd,
+            //LookupFlags::empty(),
+            //file_name,
+            //OpenFlags::empty(),
+            //FileSystem::DEFAULT_RIGHTS,
+            //FileSystem::DEFAULT_RIGHTS,
+            //FdFlags::empty(),
+        //)?;
+        //if !self
+            //.fd_table
+            //.get(&fd)
+            //.ok_or(ErrNo::BadF)?
+            //.fd_stat
+            //.rights_base
+            //.contains(Rights::FD_READ | Rights::FD_SEEK)
+        //{
+            //return Err(ErrNo::Access);
+        //}
+        //let file_stat = self.fd_filestat_get(fd)?;
+        //let mut vec = vec![0u8; file_stat.file_size as usize];
+        //let read_size = self.fd_read(fd, &mut [&mut vec[..]])?;
+        //debug_assert_eq!(read_size, vec.len());
+        //self.fd_close(fd)?;
+        //Ok(vec)
+        self.read_file_by_absolute_path_internal(file_name, false)
+    }
+
+    /// Read a file on path `file_name`.
+    /// The `principal` must have the right on `path_open`,
+    /// `fd_read` and `fd_seek`.
+    pub fn read_exeutable_by_absolute_path<T: AsRef<Path>>(
+        &mut self,
+        file_name: T,
+    ) -> Result<Vec<u8>, ErrNo> {
+        self.read_file_by_absolute_path_internal(file_name, true)
+    }
+
+    fn read_file_by_absolute_path_internal<T: AsRef<Path>>(
+        &mut self,
+        file_name: T,
+        is_reading_executable: bool,
+    ) -> Result<Vec<u8>, ErrNo> {
+        let expected_rights = Rights::FD_SEEK | if is_reading_executable {Rights::FD_EXECUTE} else {Rights::FD_READ};
         let file_name = file_name.as_ref();
         let (fd, file_name) = self.find_prestat(file_name)?;
         let fd = self.path_open(
@@ -1834,13 +1914,18 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?
             .fd_stat
             .rights_base
-            .contains(Rights::FD_READ | Rights::FD_SEEK)
+            .contains(expected_rights)
         {
+            error!("internal read denies, expected rights {:?}", expected_rights);
             return Err(ErrNo::Access);
         }
         let file_stat = self.fd_filestat_get(fd)?;
         let mut vec = vec![0u8; file_stat.file_size as usize];
-        let read_size = self.fd_read(fd, &mut [&mut vec[..]])?;
+        let read_size = if is_reading_executable {
+            self.fd_read_executable(fd, &mut [&mut vec[..]])?
+        } else {
+            self.fd_read(fd, &mut [&mut vec[..]])?
+        };
         debug_assert_eq!(read_size, vec.len());
         self.fd_close(fd)?;
         Ok(vec)
@@ -1914,7 +1999,7 @@ impl FileSystem {
                 self.fd_close(new_fd)?;
                 Ok(true)
             }
-            Err(Access) => Err(Access),
+            Err(ErrNo::Access) => Err(ErrNo::Access),
             Err(_) => Ok(false),
         }
     }

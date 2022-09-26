@@ -360,6 +360,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let options = Options {
         enable_clock: cmdline.enable_clock,
         enable_strace: cmdline.enable_strace,
+        environment_variables: cmdline.environment_variables,
+        ..Default::default()
     };
 
     info!(
@@ -371,6 +373,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let return_code = execute(
         &cmdline.execution_strategy,
+        vfs.clone(),
         vfs.clone(),
         cmdline.pipeline.clone(),
         &options,

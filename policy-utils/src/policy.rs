@@ -333,8 +333,12 @@ impl Policy {
             table.insert(id, right_map);
         }
         for program in &self.programs {
-            let program_file_name = program.program_file_name();
-            let id = Principal::Program(program_file_name.to_string());
+            let id = Principal::Program(program.program_file_name().to_string());
+            let right_map = program.file_rights_map();
+            table.insert(id, right_map);
+        }
+        for program in &self.pipelines {
+            let id = Principal::Pipeline(program.name().to_string());
             let right_map = program.file_rights_map();
             table.insert(id, right_map);
         }

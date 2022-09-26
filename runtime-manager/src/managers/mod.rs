@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
     path::PathBuf,
-    string::{String, ToString},
+    string::String,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Mutex,
@@ -27,6 +27,7 @@ use std::{
 };
 use veracruz_utils::sha256::sha256;
 use wasi_types::{ErrNo, Rights};
+use log::{error, info};
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -191,24 +192,27 @@ impl ProtocolState {
     }
 
     /// Execute the program `file_name` on behalf of the client (participant)
-    /// identified by `client_id`.  The client must have the right to execute the
+    /// identified by `principal`.  The client must have the right to execute the
     /// program.
     pub(crate) fn execute(
         &mut self,
-        client_id: &Principal,
-        initial_environment_variables: Vec<(String, String)>,
+        caller_principal: &Principal,
+        execution_principal: &Principal,
+        environment_variables: Vec<(String, String)>,
         pipeline: Box<Expr>,
     ) -> ProvisioningResult {
+        info!("Execute program, caller: {:?} and execution: {:?}", caller_principal, execution_principal);
         let execution_strategy = self.global_policy.execution_strategy();
         let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
+            environment_variables,
             ..Default::default()
         };
 
         let return_code = execute(
             &execution_strategy,
-            // TODO spawn one???
-            self.vfs.clone(),
+            self.vfs.spawn(caller_principal)?,
+            self.vfs.spawn(execution_principal)?,
             pipeline,
             &options,
         )?;
