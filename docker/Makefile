@@ -1,4 +1,4 @@
-VERSION = v22.05
+VERSION = v22.09
 IMAGE ?= veracruz
 CONTAINER ?= veracruz
 VERACRUZ_ROOT ?= ..
@@ -67,8 +67,11 @@ ci-exec:
 ci-image: ci/Dockerfile.cache ci-base
 	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/ci:$(VERSION) -f $< .
 
-ci-image-tag:
+ci-image-tag: ci-image
 	docker tag $(IMAGE)/ci:$(VERSION) ghcr.io/veracruz-project/veracruz/ci:$(VERSION)
+
+ci-image-push: ci-image-tag
+	docker push ghcr.io/veracruz-project/veracruz/ci:$(VERSION)
 
 # "localci" is similar to "ci" but does not run as root to avoid problems
 # with file permissions.
