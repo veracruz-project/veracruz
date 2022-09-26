@@ -5,18 +5,22 @@ VERACRUZ_ROOT ?= ..
 USER ?= $(shell id -un)
 UID ?= $(shell id -u)
 OS_NAME := $(shell uname -s | tr A-Z a-z)
+ARCH = $(shell uname -m)
 AWS_NITRO_CLI_REVISION = v1.1.0
-NE_GID := $(shell getent group ne | awk -F: '{printf $$3}')
 
 ifeq ($(OS_NAME),darwin)
 LOCALIP = $(shell "(ifconfig en0 ; ifconfig en1) | grep "inet " | grep -Fv 127.0.0.1 | awk '{print $2}'")
-DOCKER_GROUP_ID=$(shell stat -f "%g" $(shell realpath /var/run/docker.sock))
+DOCKER_GROUP_ID=$(shell stat -f "%g" $(shell readlink -f /var/run/docker.sock))
+ifeq ($(ARCH),arm64)
+ARCH = aarch64
+endif
 else
 LOCALIP = $(shell ip -4 address show eth0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
-DOCKER_GROUP_ID=$(shell stat --format "%g" $(shell realpath /var/run/docker.sock))
+DOCKER_GROUP_ID=$(shell stat --format "%g" $(shell readlink -f /var/run/docker.sock))
+NE_GID := $(shell getent group ne | awk -F: '{printf $$3}')
 endif
 
-BUILD_ARGS = --build-arg ARCH=$(shell uname -m) \
+BUILD_ARGS = --build-arg ARCH=$(ARCH) \
 	--build-arg VERSION=$(VERSION)
 
 DOCKER_RUN_PARAMS = \
@@ -173,7 +177,6 @@ ifeq (,$(wildcard aws-nitro-enclaves-cli))
 endif
 	cd "aws-nitro-enclaves-cli" && git checkout $(AWS_NITRO_CLI_REVISION) || \
 		(git fetch ; git checkout $(AWS_NITRO_CLI_REVISION))
-	perl -i -pe 's/readlink -f/realpath/' aws-nitro-enclaves-cli/Makefile # Work-around to build on Mac
-	make -C aws-nitro-enclaves-cli nitro-cli
+	make -C aws-nitro-enclaves-cli HOST_MACHINE=$(ARCH) nitro-cli
 	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) \
 		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro:$(VERSION) -f $< .
