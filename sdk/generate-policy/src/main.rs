@@ -724,7 +724,7 @@ fn serialize_capability_entry(cap_string: &str) -> Result<FileRights> {
         | Rights::PATH_CREATE_DIRECTORY;
 
     #[allow(non_snake_case)]
-    let EXECUTE_RIGHTS = Rights::PATH_OPEN | Rights::FD_EXECUTE;
+    let EXECUTE_RIGHTS = Rights::PATH_OPEN | Rights::FD_EXECUTE | Rights::FD_SEEK;
 
     let mut split = cap_string.split(':');
     let file_name = enforce_leading_backslash(
