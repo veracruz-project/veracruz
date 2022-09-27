@@ -10,7 +10,8 @@ icecap = [
   "policy-utils/icecap",
 ]
 nitro = [
-  "mbedtls/monitor_getrandom",
+# FIXME: fake_random is not secure!
+  "mbedtls/fake_random",
   "policy-utils/std",
 ]
 std = [
