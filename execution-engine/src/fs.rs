@@ -1851,33 +1851,6 @@ impl FileSystem {
         &mut self,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
-        //let file_name = file_name.as_ref();
-        //let (fd, file_name) = self.find_prestat(file_name)?;
-        //let fd = self.path_open(
-            //fd,
-            //LookupFlags::empty(),
-            //file_name,
-            //OpenFlags::empty(),
-            //FileSystem::DEFAULT_RIGHTS,
-            //FileSystem::DEFAULT_RIGHTS,
-            //FdFlags::empty(),
-        //)?;
-        //if !self
-            //.fd_table
-            //.get(&fd)
-            //.ok_or(ErrNo::BadF)?
-            //.fd_stat
-            //.rights_base
-            //.contains(Rights::FD_READ | Rights::FD_SEEK)
-        //{
-            //return Err(ErrNo::Access);
-        //}
-        //let file_stat = self.fd_filestat_get(fd)?;
-        //let mut vec = vec![0u8; file_stat.file_size as usize];
-        //let read_size = self.fd_read(fd, &mut [&mut vec[..]])?;
-        //debug_assert_eq!(read_size, vec.len());
-        //self.fd_close(fd)?;
-        //Ok(vec)
         self.read_file_by_absolute_path_internal(file_name, false)
     }
 

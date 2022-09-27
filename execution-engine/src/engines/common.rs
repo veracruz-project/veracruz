@@ -848,10 +848,10 @@ impl WasiWrapper {
     pub fn new(
         filesystem: FileSystem,
         Options {
-            enable_clock,
-            enable_strace,
             environment_variables,
             program_arguments,
+            enable_clock,
+            enable_strace,
         }: Options,
     ) -> FileSystemResult<Self> {
         Ok(Self {
@@ -869,6 +869,13 @@ impl WasiWrapper {
     //// Functions for the execution engine internal
     ///////////////////////////////////////////////////////
 
+    /// Returns the exit code from the `proc_exit` call of the last executing
+    /// program, if any.
+    #[inline]
+    pub(crate) fn exit_code(&self) -> Option<u32> {
+        self.exit_code
+    }
+
     /// Return a timestamp value for use by "filestat" functions,
     /// which will be zero if the clock is not enabled.
     fn filestat_time(&self) -> Timestamp {
@@ -881,13 +888,6 @@ impl WasiWrapper {
                 _ => time0,
             }
         }
-    }
-
-    /// Returns the exit code from the `proc_exit` call of the last executing
-    /// program, if any.
-    #[inline]
-    pub(crate) fn exit_code(&self) -> Option<u32> {
-        self.exit_code
     }
 
     fn strace(&self, func: &str) -> Strace {

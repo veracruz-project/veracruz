@@ -61,7 +61,6 @@ fn dispatch_on_result(
     protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> ProvisioningResult {
-    //TODO fill in the correct virtural filesystem handler
     info!("call {}", client_id);
     protocol_state.execute(&Principal::Participant(client_id), &Principal::Program(file_name.clone()), Vec::new(), Box::new(Expr::Literal(file_name)))
 }

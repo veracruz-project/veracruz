@@ -84,10 +84,11 @@ pub fn enforce_leading_backslash(path: &str) -> Cow<str> {
     }
 }
 
+/// Parse a pineline string `pipeline_str` and return the syntax tree.
 pub fn parse_pipeline(pipeline_str : &str) -> anyhow::Result<Box<Expr>> {
     let engine = pipeline::ExprsParser::new();
 
-    // TODO: not sure why the parse need a 'static str, use the box to escape and rebox 
+    // NOTE: not sure why the parse need a 'static str, use the box to escape and rebox 
     let tmp : &'static str = Box::leak(Box::new(pipeline_str.to_owned().into_boxed_str()));
     let rst = engine.parse(&tmp)?.clone();
     // Re-box so the tmp will drop

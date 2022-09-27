@@ -518,7 +518,7 @@ impl WasmtimeRuntimeState {
             // otherwise the actual return code or default success code `0`.
             None => {
                 info!(
-                    "The return trace: {:?}, (`proc_exit` is not call).",
+                    "The return trace: {:?}, (`proc_exit` is not called).",
                     return_from_main
                 );
                 return_from_main?;

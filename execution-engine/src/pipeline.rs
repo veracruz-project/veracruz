@@ -27,14 +27,16 @@ use crate::Options;
 use anyhow::Result;
 use log::info;
 
+/// Execute `pipeline`. Program will be read with the `caller_filesystem`, who should have
+/// `FD_EXECUTE` and `FD_SEEK` permissions and executed with `pipeline_filesystem`.
+/// The function will return the error code.
 pub fn execute_pipeline(
     strategy: &ExecutionStrategy,
-    // TODO: Assume it is the filesystem to execute the entire pipeline
-    mut caller_filesystem: FileSystem,
-    pipeline_filesystem: FileSystem,
+    caller_filesystem: &mut FileSystem,
+    pipeline_filesystem: &FileSystem,
     pipeline: Box<Expr>,
     options: &Options,
-) -> Result<(u32, FileSystem)> {
+) -> Result<u32> {
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
         Literal(path_string) => {
@@ -42,37 +44,34 @@ pub fn execute_pipeline(
             // read and call execute_program
             let binary = caller_filesystem.read_exeutable_by_absolute_path(path_string)?;
             info!("Successful to read binary");
-            // DO we do somoething on the filesystem, intersection with the 
-            let return_code = execute_program(strategy, pipeline_filesystem, binary, options)?;
-            Ok((return_code, caller_filesystem))
+            let return_code = execute_program(strategy, pipeline_filesystem.clone(), binary, options)?;
+            Ok(return_code)
         },
         Seq(vec) => {
             info!("Seq {:?}", vec);
-            // default return_code is zero.
-            let mut return_code = 0;
             for expr in vec {
-                let (cur_return_code, return_filesystem) = execute_pipeline(strategy, caller_filesystem, pipeline_filesystem.clone(), expr, options)?;
-                // ownership movement here
-                caller_filesystem = return_filesystem;
-                return_code = cur_return_code;
+                let return_code = execute_pipeline(strategy, caller_filesystem, pipeline_filesystem, expr, options)?;
+
+                // An error occurs
                 if return_code != 0 {
-                    return Ok((return_code, caller_filesystem));
+                    return Ok(return_code);
                 }
             }
-            //TODO change the return code
-            Ok((return_code, caller_filesystem))
+
+            // default return_code is zero.
+            Ok(0)
         },
         IfElse(cond, true_branch, false_branch) => {
             info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
-            let (return_code, caller_filesystem) = if caller_filesystem.file_exists(cond)? {
-                execute_pipeline(strategy, caller_filesystem, pipeline_filesystem.clone(), true_branch, options)?
+            let return_code = if caller_filesystem.file_exists(cond)? {
+                execute_pipeline(strategy, caller_filesystem, pipeline_filesystem, true_branch, options)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(strategy, caller_filesystem, pipeline_filesystem.clone(), f, options)?,
-                    None => (0, caller_filesystem),
+                    Some(f) => execute_pipeline(strategy, caller_filesystem, pipeline_filesystem, f, options)?,
+                    None => 0,
                 }
             };
-            Ok((return_code, caller_filesystem))
+            Ok(return_code)
         },
     }
 }
