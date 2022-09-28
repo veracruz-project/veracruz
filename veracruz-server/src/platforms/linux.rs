@@ -59,8 +59,6 @@ pub mod veracruz_server_linux {
 
     /// The protocol to use with the proxy attestation server.
     const PROXY_ATTESTATION_PROTOCOL: &str = "psa";
-    /// The firmware version to use when communicating with the proxy attestation server.
-    const FIRMWARE_VERSION: &str = "0.0";
 
     /// A struct capturing all the metadata needed to start and communicate with
     /// the Linux root enclave.
@@ -353,7 +351,6 @@ pub mod veracruz_server_linux {
             let (challenge_id, challenge) = send_proxy_attestation_server_start(
                 proxy_attestation_server_url,
                 PROXY_ATTESTATION_PROTOCOL,
-                FIRMWARE_VERSION,
             )
             .map_err(|e| {
                 error!(

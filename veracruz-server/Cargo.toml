@@ -67,3 +67,8 @@ structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils", optional = true }
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "serde",                # for serialization
+]

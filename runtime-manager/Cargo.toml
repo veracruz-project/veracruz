@@ -97,3 +97,9 @@ transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi", optional = true }
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "serde",                # for serialization
+]
+

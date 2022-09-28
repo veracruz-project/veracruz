@@ -106,7 +106,7 @@ pub async fn start(body_string: String) -> ProxyAttestationServerResponder {
         println!("proxy-attestation-server::attestation::start doesn't have start_msg");
         return Err(ProxyAttestationServerError::MissingFieldError("start msg"));
     }
-    let (protocol, _firmware_version) = transport_protocol::parse_start_msg(&parsed);
+    let protocol = transport_protocol::parse_start_msg(&parsed);
 
     let device_id = DEVICE_ID.fetch_add(1, Ordering::SeqCst);
 

@@ -29,7 +29,6 @@ linux = [
 nitro = [
   "mbedtls/monitor_getrandom",
   "policy-utils/std",
-  "proxy-attestation-server/nitro",
   "veracruz-server/nitro",
   "veracruz-utils/nitro",
 ]
@@ -43,7 +42,7 @@ hex = "0.4.2"
 log = "0.4.13"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 policy-utils = { path = "../policy-utils", optional = true }
-proxy-attestation-server = { path = "../proxy-attestation-server" }
+proxy-attestation-server = { path = "../proxy-attestation-server", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }

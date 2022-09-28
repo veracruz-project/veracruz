@@ -17,9 +17,12 @@ use nix::sys::socket::{
 };
 use nsm_api;
 use nsm_lib;
+use uuid::Uuid;
 use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
+
+use std::io::Write;
 
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
@@ -62,8 +65,8 @@ pub fn nitro_main() -> Result<()> {
         let received_buffer = receive_buffer(fd)?;
         let received_message: RuntimeManagerRequest = bincode::deserialize(&received_buffer)?;
         let return_message = match received_message {
-            RuntimeManagerRequest::Attestation(challenge, challenge_id) => {
-                attestation(&challenge, challenge_id)?
+            RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
+                attestation(&challenge)?
             }
             RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => {
                 initialize(&policy_json, &certificate_chain)?
@@ -113,10 +116,6 @@ pub fn nitro_main() -> Result<()> {
                 };
                 return_message
             }
-            _ => {
-                println!("runtime_manager_nitro::main Unknown Opcode");
-                RuntimeManagerResponse::Status(Status::Unimplemented)
-            }
         };
         let return_buffer = bincode::serialize(&return_message)?;
         println!(
@@ -127,7 +126,7 @@ pub fn nitro_main() -> Result<()> {
     }
 }
 
-fn attestation(challenge: &[u8], _challenge_id: i32) -> Result<RuntimeManagerResponse> {
+fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
     println!("runtime_manager_nitro::attestation started");
     managers::session_manager::init_session_manager()?;
     // generate the csr
@@ -167,7 +166,7 @@ fn attestation(challenge: &[u8], _challenge_id: i32) -> Result<RuntimeManagerRes
 }
 
 /// Handler for the RuntimeManagerRequest::Initialize message
-fn initialize(policy_json: &str, cert_chain: &Vec<Vec<u8>>) -> Result<RuntimeManagerResponse> {
+fn initialize(policy_json: &str, cert_chain: &Vec<u8>) -> Result<RuntimeManagerResponse> {
     managers::session_manager::load_policy(policy_json)?;
     println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;

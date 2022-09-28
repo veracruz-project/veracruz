@@ -20,12 +20,15 @@ use curl::{
 use err_derive::Error;
 use log::{error, info, trace};
 use regex::Regex;
+use serde::Deserialize;
+use serde_json;
 use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
     parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
     ProxyAttestationServerResponse, TransportProtocolError,
 };
+use uuid::Uuid;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Errors.
@@ -56,6 +59,8 @@ pub enum HttpError {
     AttestationError(TransportProtocolError),
     #[error(display = "The proxy attestation service issued an unexpected reply.")]
     ProtocolError(ProxyAttestationServerResponse),
+    #[error(display = "Unable to convert bytes to UTF8: {}.", _0)]
+    Utf8Error(std::str::Utf8Error),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -64,13 +69,13 @@ pub enum HttpError {
 
 #[derive(Debug)]
 pub enum HttpResponse {
-    Ok(String), // 200: Body
-    Created(String, String), //201: Location, Body
-    Accepted(String), // 202: Body
-    NonAuthoritativeInformation(String), // 203: Body
+    Ok(Vec<u8>), // 200: Body
+    Created(String, Vec<u8>), //201: Location, Body
+    Accepted(Vec<u8>), // 202: Body
+    NonAuthoritativeInformation(Vec<u8>), // 203: Body
     NoContent, // 204
-    ResetContent(String), // 205: Body
-    PartialContent(String), // 206: Body
+    ResetContent(Vec<u8>), // 205: Body
+    PartialContent(Vec<u8>), // 206: Body
 }
 
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
@@ -153,7 +158,7 @@ where
         })?;
 
     let mut buffer_reader = StringReader::new(buffer);
-    let mut received_body = String::new();
+    let mut received_body: Vec<u8> = Vec::new();
     let mut received_header = String::new();
 
     {
@@ -172,16 +177,7 @@ where
 
         transfer
             .write_function(|buf| {
-                received_body.push_str(from_utf8(buf).unwrap_or_else(|_| {
-                    panic!("{}", {
-                        trace!(
-                            "Error converting data {:?} from UTF-8.  Continuing with default value.",
-                            buf
-                        );
-
-                        &format!("Error converting data {:?} from UTF-8.", buf)
-                    })
-                }));
+                received_body.extend_from_slice(buf);
 
                 Ok(buf.len())
             })
@@ -332,7 +328,7 @@ where
         })?;
 
     let mut buffer_reader = std::io::Cursor::new(buffer);
-    let mut received_body = String::new();
+    let mut received_body: Vec<u8> = Vec::new();
     let mut received_header = String::new();
     {
         let mut transfer = curl_request.transfer();
@@ -350,16 +346,7 @@ where
 
         transfer
             .write_function(|buf| {
-                received_body.push_str(from_utf8(buf).unwrap_or_else(|_| {
-                    panic!("{}", {
-                        trace!(
-                            "Error converting data {:?} from UTF-8.  Continuing with default value.",
-                            buf
-                        );
-
-                        &format!("Error converting data {:?} from UTF-8.", buf)
-                    })
-                }));
+                received_body.extend_from_slice(buf);
 
                 Ok(buf.len())
             })
@@ -440,80 +427,40 @@ where
 /// Returns a device ID and a generated challenge from the Proxy Attestation
 /// Service, which is generated in response to the "Start" message, if the
 /// message is successfully sent.
-pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>, F: AsRef<str>>(
+pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>>(
     proxy_attestation_server_url_base: U,
     protocol_name: P,
-    firmware_version: F,
-) -> AnyhowResult<(i32, Vec<u8>)> {
+) -> AnyhowResult<(Uuid, Vec<u8>)> {
     let proxy_attestation_server_url_base = proxy_attestation_server_url_base.as_ref();
     let protocol_name = protocol_name.as_ref();
-    let firmware_version = firmware_version.as_ref();
 
     info!("Sending Start message to Proxy Attestation Service.");
 
-    let start_msg = serialize_start_msg(protocol_name, firmware_version).map_err(|e| {
-        error!(
-            "Failed to serialize Start message.  Error produced: {:?}.",
-            e
-        );
 
-        e
-    })?;
+    let url = format!("{}/proxy/v1/Start", proxy_attestation_server_url_base);
+    let empty_buffer: Vec<u8> = Vec::new();
 
-    let encoded_start_msg = base64::encode(&start_msg);
-
-    let url = format!("{}/Start", proxy_attestation_server_url_base);
-
-    let response = match post_string(&url, &encoded_start_msg, None).map_err(|e| {
+    let (id, nonce) = match post_bytes(&url, empty_buffer, None).map_err(|e| {
             error!(
                 "Failed to send proxy attestation service start message.  Error produced: {}.",
                 e
             );
             e
         })? {
-        HttpResponse::Ok(body) => body,
-        non_ok => {
-            println!("Received incorrect response:{:?} from post_string", non_ok);
+        HttpResponse::Created(location, body) => {
+            (location, body)
+        }
+        non_created => {
+            println!("Received incorrect response:{:?} from post_string", non_created);
             return Err(anyhow!(HttpError::HttpSuccess));
         }
     };
-
-    info!("Response received from Proxy Attestation Service.");
-
-    let response_body = base64::decode(&response).map_err(|e| {
-        error!(
-            "Failed to deserialize response from Proxy Attestation Service.  Error produced: {:?}.",
+    println!("calling parse_str on id:{:?}", id);
+    let id = Uuid::parse_str(&id)
+        .map_err(|e| {
+            println!("Uuid::parse_str failed:{:?}", e);
             e
-        );
+        })?;
 
-        e
-    })?;
-
-    let response = parse_proxy_attestation_server_response(None, &response_body).map_err(|e| {
-        error!("Failed to parse response to Start message from Proxy Attestation Service.  Error produced: {:?}.", e);
-
-        e
-    })?;
-
-    info!("Response successfully parsed.");
-
-    if response.has_psa_attestation_init() {
-        let (challenge, device_id) =
-            parse_psa_attestation_init(response.get_psa_attestation_init()).map_err(|e| {
-                error!(
-                "Failed to parse PSA attestation initialization message.  Error produced: {:?}.",
-                e
-            );
-
-                e
-            })?;
-
-        info!("Device ID and challenge successfully obtained from Proxy Attestation Service.");
-
-        Ok((device_id, challenge))
-    } else {
-        error!("Unexpected response from Proxy Attestation Service.  Expecting PSA attestation initialization message.");
-
-        Err(anyhow!(HttpError::ProtocolError(response)))
-    }
+    return Ok((id, nonce));
 }

@@ -68,9 +68,6 @@ const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &[&str] = &["-kernel", "{image_p
 // Include image at compile time
 const VERACRUZ_ICECAP_QEMU_IMAGE: &[u8] = include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
 
-// TODO is this needed?
-const FIRMWARE_VERSION: &str = "0.3.0";
-
 /// Class of IceCap-specific errors.
 #[derive(Debug, Error)]
 pub enum IceCapError {
@@ -305,8 +302,7 @@ impl VeracruzServer for VeracruzServerIceCap {
 
         let (device_id, challenge) = send_proxy_attestation_server_start(
             policy.proxy_attestation_server_url(),
-            "psa",
-            FIRMWARE_VERSION,
+            "psa"
         )?;
 
         let (token, csr) =

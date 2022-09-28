@@ -51,7 +51,7 @@ pub fn load_policy(policy_json: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn load_cert_chain(chain: &Vec<Vec<u8>>) -> Result<()> {
+pub fn load_cert_chain(chain: &Vec<u8>) -> Result<()> {
     MY_SESSION_MANAGER
         .lock()
         .map_err(|_| anyhow!(RuntimeManagerError::LockSessionManager))?

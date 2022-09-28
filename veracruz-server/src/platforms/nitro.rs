@@ -13,12 +13,13 @@
 pub mod veracruz_server_nitro {
     use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use io_utils::{
-        http::{HttpError, HttpResponse, post_string, send_proxy_attestation_server_start},
+        http::{HttpError, HttpResponse, post_bytes, post_string, send_proxy_attestation_server_start},
         nitro::NitroEnclave,
     };
     use log::error;
     use policy_utils::policy::Policy;
     use std::{env, error::Error};
+    use uuid::Uuid;
     use veracruz_utils::runtime_manager_message::{
         RuntimeManagerRequest, RuntimeManagerResponse, Status,
     };
@@ -27,8 +28,6 @@ pub mod veracruz_server_nitro {
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
     /// The protocol to use when interacting with the proxy attestation server.
     const PROXY_ATTESTATION_PROTOCOL: &str = "nitro";
-    /// The protocol version we are using with the proxy attestation server.
-    const FIRMWARE_VERSION: &str = "0.0";
 
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
@@ -40,9 +39,8 @@ pub mod veracruz_server_nitro {
             let policy: Policy = Policy::from_json(policy_json)?;
 
             let (challenge_id, challenge) = send_proxy_attestation_server_start(
-                policy.proxy_attestation_server_url(),
-                PROXY_ATTESTATION_PROTOCOL,
-                FIRMWARE_VERSION,
+                crate::server::VERAISON_VERIFIER_IP_ADDRESS,
+                PROXY_ATTESTATION_PROTOCOL
             )
             .map_err(|e| {
                 eprintln!(
@@ -99,7 +97,8 @@ pub mod veracruz_server_nitro {
             };
 
             let cert_chain = post_native_attestation_token(
-                policy.proxy_attestation_server_url(),
+                //policy.proxy_attestation_server_url(),
+                crate::server::VERAISON_VERIFIER_IP_ADDRESS,
                 &attestation_doc,
                 challenge_id,
             )?;
@@ -262,17 +261,14 @@ pub mod veracruz_server_nitro {
     fn post_native_attestation_token(
         proxy_attestation_server_url: &str,
         att_doc: &[u8],
-        challenge_id: i32,
-    ) -> VeracruzServerResult<Vec<Vec<u8>>> {
-        let serialized_nitro_attestation_doc_request =
-            transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)?;
-        let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
-        let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
+        challenge_id: Uuid,
+    ) -> VeracruzServerResult<Vec<u8>> {
+        let url = format!("{:}/proxy/v1/Nitro/{:}", proxy_attestation_server_url, challenge_id);
         println!(
             "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
             url
         );
-        let received_body: String = match post_string(&url, &encoded_str, None).map_err(|e| {
+        let received_body = match post_bytes(&url, &att_doc, Some("application/aws-nitro-document")).map_err(|e| {
             println!(
                 "Failed to post native attestation token.  Error produced: {}.",
                 e
@@ -280,7 +276,9 @@ pub mod veracruz_server_nitro {
 
             VeracruzServerError::HttpError(e)
         })? {
-            HttpResponse::Ok(body) => body,
+            HttpResponse::Ok(body) => {
+                body
+            },
             not_ok => {
                 error!("post buffer returned a non-Ok status code:{:?}", not_ok);
                 return Err(VeracruzServerError::HttpError(HttpError::HttpSuccess));
@@ -292,17 +290,7 @@ pub mod veracruz_server_nitro {
             received_body
         );
 
-        let body_vec = base64::decode(&received_body)?;
-        let response =
-            transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
-
-        let (re_cert, ca_cert) = if response.has_cert_chain() {
-            let cert_chain = response.get_cert_chain();
-            (cert_chain.get_enclave_cert(), cert_chain.get_root_cert())
-        } else {
-            return Err(VeracruzServerError::InvalidProtoBufMessage);
-        };
-        let cert_chain: Vec<Vec<u8>> = vec![re_cert.to_vec(), ca_cert.to_vec()];
-        Ok(cert_chain)
+        let cert_chain = received_body;
+        Ok(cert_chain.to_vec())
     }
 }

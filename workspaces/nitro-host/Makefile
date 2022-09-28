@@ -37,13 +37,11 @@ build:
 	RUSTFLAGS="-C link-args=-Wl,--build-id=none" \
 	$(CC) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG) \
-		-p proxy-attestation-server \
 		-p veracruz-client -p veracruz-server \
-		--features proxy-attestation-server/nitro \
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \
 		--features cli
-	strip target/$(PROFILE_PATH)/proxy-attestation-server target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
+	strip target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
@@ -53,15 +51,15 @@ test-dependencies: test-collateral
 
 CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
 
-test-server: test-dependencies
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test server_test --features debug -- --test-threads=1
+test-server: # test-dependencies
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test server_test --features debug -- --test-threads=1 #--nocapture integration_linear_regression
 	./nitro-terminate.sh
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1 --nocapture
 	./nitro-terminate.sh
 
 doc:
@@ -73,10 +71,9 @@ fmt:
 clippy: 
 	# workspace members and relevant dependencies
 	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
-		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils  \
-		--features proxy-attestation-server/nitro\
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \
 		--features io-utils/nitro \

@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Status messages.
@@ -43,7 +44,7 @@ pub enum RuntimeManagerRequest {
     /// parameters:
     /// Vec<u8> - the challenge value
     /// i32     - the challenge ID
-    Attestation(Vec<u8>, i32),
+    Attestation(Vec<u8>, Uuid),
     /// A request to close an already established TLS session.  Parameters in
     /// order are:
     /// - The Session ID of the session to be closed.
@@ -60,7 +61,7 @@ pub enum RuntimeManagerRequest {
     /// parameters:
     /// String  - The policy, in JSON format
     /// Vec<Vec<u8>> - The certificate chain for the enclave
-    Initialize(String, Vec<Vec<u8>>),
+    Initialize(String, Vec<u8>),
     /// A request to establish a new TLS session with the enclave.
     NewTlsSession,
     /// Request to send TLS data to the enclave.  Parameters in order are:
