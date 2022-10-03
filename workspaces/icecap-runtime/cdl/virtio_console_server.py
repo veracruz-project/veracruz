@@ -4,9 +4,11 @@ from icecap_framework.utils import align_up, align_down, PAGE_SIZE, PAGE_SIZE_BI
 import itertools as it
 
 BADGE_IRQ = 1 << 0
-BADGE_CLIENT = 1 << 1
+BADGE_TX = 1 << 1
+BADGE_RX = 1 << 2
 
 MMIO_BLOCK_SIZE = 512
+NS_POOL_PADDR_start = 0xc0000000
 VIRTIO_PARAMS = {
     "qemu": {
         "paddr": 0xa000000,
@@ -15,6 +17,12 @@ VIRTIO_PARAMS = {
         "poolsize": 32 * 4096,
     },
     "lkvm": {
+        "paddr": 0x10000,
+        "irq": 0x20 + 0x4,
+        "count": 1,
+        "poolsize": 32 * 4096,
+    },
+    "lkvm_realm": {
         "paddr": 0x10000,
         "irq": 0x20 + 0x4,
         "count": 1,
@@ -65,16 +73,23 @@ class VirtioConsoleServer(GenericElfComponent):
 
         # allocate some pages to put at a fixed address for communication over virtio
         virtio_pool_pages = []
+        if plat == "lkvm_realm":
+            paddr = NS_POOL_PADDR_start
         for vaddr in range(
                 virtio_pool_vaddr,
                 align_up(virtio_pool_vaddr + virtio["poolsize"], PAGE_SIZE),
                 PAGE_SIZE):
-            page = self.alloc(ObjectType.seL4_FrameObject,
-                name='virtio_page_{:#x}'.format(vaddr), size=4096)
-            cap = self.cspace().alloc(page, read=True, write=True, cached=False)
-            virtio_pool_pages.append(cap)
-            self.addr_space().add_hack_page(vaddr, PAGE_SIZE,
-                Cap(page, read=True, write=True, cached=False))
+            # if we are inside a realm, virtio pages need to be inside the NS pool to be shared with the host
+            if plat == "lkvm_realm":
+                self.map_with_size(PAGE_SIZE, vaddr=vaddr, paddr=paddr, read=True, write=True, cached=True, virtio_pages=virtio_pool_pages)
+                paddr += PAGE_SIZE
+            elif plat == "lkvm":
+                page = self.alloc(ObjectType.seL4_FrameObject,
+                    name='virtio_page_{:#x}'.format(vaddr), size=4096)
+                cap = self.cspace().alloc(page, read=True, write=True, cached=False)
+                virtio_pool_pages.append(cap)
+                self.addr_space().add_hack_page(vaddr, PAGE_SIZE,
+                    Cap(page, read=True, write=True, cached=True))
 
         # create irq handler objects to catch all virtio IRQs
         self.event_nfn = self.alloc(ObjectType.seL4_NotificationObject, name='event_nfn')
@@ -82,7 +97,7 @@ class VirtioConsoleServer(GenericElfComponent):
         for irq in range(virtio["irq"], virtio["irq"] + virtio["count"]):
             irq_handler = self.alloc(ObjectType.seL4_IRQHandler,
                 name='irq_{}_handler'.format(irq),
-                number=irq, trigger=ARMIRQMode.seL4_ARM_IRQ_LEVEL,
+                number=irq, trigger=ARMIRQMode.seL4_ARM_IRQ_EDGE,
                 notification=Cap(self.event_nfn, badge=BADGE_IRQ))
             cap = self.cspace().alloc(irq_handler)
             virtio_irq_handlers.append(cap)
@@ -96,24 +111,30 @@ class VirtioConsoleServer(GenericElfComponent):
             'event_nfn': self.cspace().alloc(self.event_nfn, read=True),
             'badges': {
                 'irq': BADGE_IRQ,
-                'client': BADGE_CLIENT,
+                'tx': BADGE_TX,
+                'rx': BADGE_RX,
                 },
             }
 
-    def register_client(self, client, kick_nfn, kick_nfn_badge):
+    def register_client(self, client, kick_nfn, kick_tx_badge, kick_rx_badge):
         server_rb_objs, client_rb_objs = self.composition.alloc_ring_buffer(
             a_name=self.name, a_size_bits=BLOCK_SIZE_BITS,
             b_name=client.name, b_size_bits=BLOCK_SIZE_BITS,
             )
-        kick_cap = self.cspace().alloc(kick_nfn, badge=kick_nfn_badge, write=True)
+        kick_tx_cap = self.cspace().alloc(kick_nfn, badge=kick_tx_badge, write=True)
+        kick_rx_cap = self.cspace().alloc(kick_nfn, badge=kick_rx_badge, write=True)
         self._arg['client_ring_buffer'] = {
             'ring_buffer': self.map_ring_buffer(server_rb_objs),
             'kicks': {
-                'read': kick_cap,
-                'write': kick_cap,
+                'read': kick_tx_cap,
+                'write': kick_rx_cap,
                 },
             }
-        return client_rb_objs, client.cspace().alloc(self.event_nfn, badge=BADGE_CLIENT, write=True)
+        return (
+            client_rb_objs,
+            client.cspace().alloc(self.event_nfn, badge=BADGE_TX, write=True),
+            client.cspace().alloc(self.event_nfn, badge=BADGE_RX, write=True),
+        )
 
     def arg_json(self):
         return self._arg

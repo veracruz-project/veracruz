@@ -16,6 +16,7 @@ extern crate alloc;
 
 use bincode;
 use core::{convert::TryFrom, mem::size_of};
+use core::fmt::Write;
 use icecap_core::{
     config::*,
     logger::{DisplayMode, Level, Logger},
@@ -40,48 +41,59 @@ struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Badges {
-    virtio_console_server_ring_buffer: Badge,
+    //virtio_console_server_ring_buffer: Badge,
+    virtio_console_server_tx: Badge,
+    virtio_console_server_rx: Badge,
 }
 
 fn main(config: Config) -> Fallible<()> {
     // TODO why do we need this?
     icecap_runtime_init();
-
+    debug_println!("hello from runtime manager");
     debug_println!("icecap-realmos: initializing...");
 
     // enable ring buffer to serial-server
-    let virtio_console_client =
-        RingBuffer::unmanaged_from_config(&config.virtio_console_server_ring_buffer);
-    virtio_console_client.enable_notify_read();
-    virtio_console_client.enable_notify_write();
+    let mut virtio_console_client = BufferedRingBuffer::new(
+        RingBuffer::unmanaged_from_config(
+            &config.virtio_console_server_ring_buffer,
+        )
+    );
+
+    // send hello
+    //fmt::out!(&mut virtio_console_client, "\nhello from application over virtio-console-server!\n");
     debug_println!("icecap-realmos: enabled ring buffer");
 
+    // get input
     debug_println!("icecap-realmos: running...");
     RuntimeManager::new(
         virtio_console_client,
         config.event_nfn,
-        config.badges.virtio_console_server_ring_buffer,
+        config.badges.virtio_console_server_tx,
+        config.badges.virtio_console_server_rx,
     )
     .run()
 }
 
 struct RuntimeManager {
-    channel: RingBuffer,
+    channel: BufferedRingBuffer,
     event: Notification,
-    virtio_console_server_ring_buffer_badge: Badge,
+    virtio_console_server_tx: Badge,
+    virtio_console_server_rx: Badge,
     active: bool,
 }
 
 impl RuntimeManager {
     fn new(
-        channel: RingBuffer,
+        channel: BufferedRingBuffer,
         event: Notification,
-        virtio_console_server_ring_buffer_badge: Badge,
+        virtio_console_server_tx: Badge,
+        virtio_console_server_rx: Badge,
     ) -> Self {
         Self {
             channel: channel,
             event: event,
-            virtio_console_server_ring_buffer_badge: virtio_console_server_ring_buffer_badge,
+            virtio_console_server_tx: virtio_console_server_tx,
+            virtio_console_server_rx: virtio_console_server_rx,
             active: true,
         }
     }
@@ -93,18 +105,27 @@ impl RuntimeManager {
         let mut runtime = CommonRuntime::new(&icecap_runtime);
         loop {
             let badge = self.event.wait();
-            if badge & self.virtio_console_server_ring_buffer_badge != 0 {
-                self.process(&mut runtime)?;
-                self.channel.enable_notify_read();
-                self.channel.enable_notify_write();
-
+            if badge &  self.virtio_console_server_rx != 0 {
+                //self.process()?;
+                if let Some(chars) = self.channel.rx() {
+                    for c in chars.iter() {
+                        debug_println!("icecap-realmos: getting input");
+                        //out!(&mut virtio_console_client, "input: {:?}\n", char::from(*c));
+                    }
+                }
+                //self.channel.enable_notify_read();
+                //self.channel.enable_notify_write();
+                self.channel.rx_callback();
                 if !self.active {
                     return Ok(());
                 }
             }
+            // always handle tx operations
+            self.channel.tx_callback();
         }
     }
 
+    /*
     fn process(&mut self, runtime: &mut CommonRuntime) -> Fallible<()> {
         // recv request if we have a full request in our ring buffer
         if self.channel.poll_read() < size_of::<u32>() {
@@ -146,6 +167,8 @@ impl RuntimeManager {
 
         Ok(())
     }
+    */
+
 }
 
 const LOG_LEVEL: Level = Level::Error;

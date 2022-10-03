@@ -19,6 +19,7 @@ icecap = [
   "veracruz-utils/icecap",
 ]
 icecap-lkvm = []
+icecap-lkvm_realm = []
 icecap-qemu = []
 linux = [
   "bincode",
