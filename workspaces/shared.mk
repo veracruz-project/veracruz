@@ -178,7 +178,7 @@ $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES)
 	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
 	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
 	    $(foreach prog_name,$(WASM_PROG_FILES),--binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)") \
-	    $(foreach prog_name,$(WASM_PROG_FILES),--pipeline "$(PROGRAM_DIR)$(notdir $(prog_name)) ;" --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)") \
+	    --pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if /output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; }" --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)" \
             --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
 	    --enclave-debug-mode $(PGEN_COMMON_PARAMS) --max-memory-mib $(MAX_MEMORY_MIB) --output-policy-file $@
 

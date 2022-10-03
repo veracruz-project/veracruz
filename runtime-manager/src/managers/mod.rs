@@ -27,7 +27,7 @@ use std::{
 };
 use veracruz_utils::sha256::sha256;
 use wasi_types::{ErrNo, Rights};
-use log::{error, info};
+use log::info;
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -184,6 +184,16 @@ impl ProtocolState {
         Ok(Some(rst))
     }
 
+    pub(crate) fn read_pipeline_script(
+        &self,
+        pipeline_id: usize,
+    ) -> Result<Box<Expr>> {
+        info!("try tp read pipeline_id {}.", pipeline_id);
+        let expr = self.global_policy.get_pipeline(pipeline_id)?.get_parsed_pipeline().map(|e| e.clone())?;
+        info!("result {:?}",expr);
+        Ok(expr)
+    }
+
     /// Requests shutdown on behalf of a client, as identified by their client
     /// ID.
     /// TODO: Do something better (https://github.com/veracruz-project/veracruz/issues/393)
@@ -221,6 +231,7 @@ impl ProtocolState {
         Ok(Some(response))
     }
 
+    /// Internal function converts error code to response message.
     #[inline]
     fn response_error_code_returned(error_code: u32) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(

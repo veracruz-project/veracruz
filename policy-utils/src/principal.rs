@@ -185,6 +185,12 @@ impl Pipeline {
     pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
         FileRights::compute_right_map(&self.file_rights)
     }
+
+    /// Return the pipeline AST.
+    #[inline]
+    pub fn get_parsed_pipeline(&self) -> Result<&Box<Expr>> {
+        self.parsed_pipeline.as_ref().ok_or(anyhow!("The pipeline is not parsed"))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

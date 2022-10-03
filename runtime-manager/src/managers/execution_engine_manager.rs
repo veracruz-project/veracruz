@@ -20,7 +20,6 @@ use transport_protocol::{
     },
     TransportProtocolError,
 };
-use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Protocol response messages.
@@ -55,14 +54,24 @@ fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult
     Ok(Some(response))
 }
 
-/// Returns the result of a computation, computing the result first.
+/// Request to execute the file at `file_path`.
 fn dispatch_on_result(
     transport_protocol::RequestResult { file_name, .. }: transport_protocol::RequestResult,
     protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> ProvisioningResult {
-    info!("call {}", client_id);
     protocol_state.execute(&Principal::Participant(client_id), &Principal::Program(file_name.clone()), Vec::new(), Box::new(Expr::Literal(file_name)))
+}
+
+/// Request to compute the pipeline of `pipeline_id`.
+fn dispatch_on_pipeline(
+    transport_protocol::RequestResult { file_name, .. }: transport_protocol::RequestResult,
+    protocol_state: &mut ProtocolState,
+    client_id: u64,
+) -> ProvisioningResult {
+    let pipeline_id = file_name.parse::<usize>()?;
+    let pipeline = protocol_state.read_pipeline_script(pipeline_id)?;
+    protocol_state.execute(&Principal::Participant(client_id), &Principal::Pipeline(file_name), Vec::new(), pipeline)
 }
 
 /// Write a file into the VFS. It will overwrite previous content. Fails if the client has no permission.
@@ -130,6 +139,9 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
         MESSAGE::request_result(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
+        }
+        MESSAGE::request_pipeline(result_request) => {
+            dispatch_on_pipeline(result_request, protocol_state, client_id)
         }
         MESSAGE::request_shutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;

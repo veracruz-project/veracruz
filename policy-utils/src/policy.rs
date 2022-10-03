@@ -167,6 +167,11 @@ impl Policy {
     pub fn from_json(json: &str) -> Result<Self> {
         // parse json
         let mut policy: Self = serde_json::from_str(json)?;
+
+        for p in policy.pipelines.iter_mut() {
+            p.parse()?;
+        }
+
         policy.assert_valid()?;
 
         // include hash?
@@ -370,6 +375,11 @@ impl Policy {
             );
         }
         Ok(table)
+    }
+
+    /// Return the pipeline of `pipeline_id`
+    pub fn get_pipeline(&self, pipeline_id: usize) -> Result<&Pipeline> {
+        self.pipelines.get(pipeline_id).ok_or(anyhow!("Failed to find pipeline {}", pipeline_id))
     }
 
     /// Extract the input filenames from a right_map. If a prorgam has rights call

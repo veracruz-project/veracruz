@@ -233,7 +233,7 @@ pub fn serialize_request_pipeline(pipeline_name: &str) -> TransportProtocolResul
     let mut command = transport_protocol::RequestResult::new();
     command.set_file_name(pipeline_name.to_string());
     let mut request = transport_protocol::RuntimeManagerRequest::new();
-    request.set_request_result(command);
+    request.set_request_pipeline(command);
 
     // Prefix buffer with its length
     let mut buffer = request.write_to_bytes()?;
