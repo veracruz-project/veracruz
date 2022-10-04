@@ -32,7 +32,8 @@ struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Badges {
     irq: Badge,
-    client: Badge,
+    tx: Badge,
+    rx: Badge,
 }
 
 // Pool to manage pages which are accessible by both the guest and the host
@@ -145,6 +146,7 @@ pub unsafe extern "C" fn virtio_virt_to_phys(vaddr: usize) -> usize {
 
 // entry point
 fn main(config: Config) -> Fallible<()> {
+    debug_println!("Hello from virtio-console-server!");
     // FIXME: Yield 10 times to let the runtime start before the console server
     for _i in 1..10 {
         icecap_core::sel4::yield_();
@@ -231,7 +233,7 @@ fn main(config: Config) -> Fallible<()> {
             virtio_irq_handler.ack()?;
         }
 
-        if badge & config.badges.client != 0 {
+        if badge & config.badges.rx != 0 {
             rb.rx_callback();
             rb.tx_callback();
             if let Some(chars) = rb.rx() {
