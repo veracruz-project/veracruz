@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+use alloc::format;
 use core::ops::Range;
 
 use serde::{Deserialize, Serialize};
@@ -194,10 +196,19 @@ fn main(config: Config) -> Fallible<()> {
         }
     }
 
+    debug_println!("virtio{}@{:012x}: sending...", virtio_i, virtio_mmio);
+    // we need to send over a frame, allocate one from the pool
+    let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
+    let formatted = format!("\nhello from virtio-console-server over virtio{}@{:012x}!\n\n", virtio_i, virtio_mmio);
+    send_page[..formatted.as_bytes().len()].copy_from_slice(&formatted.as_bytes());
+    console.send_slice(&send_page[..formatted.as_bytes().len()])?;
+
     // begin processing requests
     let mut rb = BufferedRingBuffer::new(RingBuffer::unmanaged_from_config(
         &config.client_ring_buffer,
     ));
+
+    debug_println!("virtio{}@{:012x}: processing requests...", virtio_i, virtio_mmio);
     let send_page = unsafe { VIRTIO_POOL.as_mut() }
         .unwrap()
         .alloc(virtio_drivers::PAGE_SIZE)?;
@@ -218,7 +229,7 @@ fn main(config: Config) -> Fallible<()> {
 
     loop {
         let badge = config.event_nfn.wait();
-
+        debug_println!("virtio{}@{:012x}: received notification\n", virtio_i, virtio_mmio);
         if badge & config.badges.irq != 0 {
             loop {
                 console.ack_interrupt()?;

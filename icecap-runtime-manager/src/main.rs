@@ -55,18 +55,17 @@ fn main(config: Config) -> Fallible<()> {
     debug_println!("hello from runtime manager");
     debug_println!("icecap-realmos: initializing...");
 
-    debug_println!("icecap-realmos: 1 - should print hello ....");
     // enable ring buffer to serial-server
     let mut virtio_console_client = BufferedRingBuffer::new(
         RingBuffer::unmanaged_from_config(
             &config.virtio_console_server_ring_buffer,
         )
     );
-    debug_println!("icecap-realmos: 2 - should print hello ....");
+
     // send hello
 
     out!(&mut virtio_console_client, "\nhello from application over virtio-console-server!\n");
-    debug_println!("icecap-realmos: 3 - should print hello ....");
+
     debug_println!("icecap-realmos: enabled ring buffer");
 
     // get input
