@@ -63,10 +63,9 @@ fn main(config: Config) -> Fallible<()> {
     );
 
     // send hello
+    out!(&mut virtio_console_client, "\nhello from veracruz runtime manager over virtio-console-server!\n");
 
-    out!(&mut virtio_console_client, "\nhello from application over virtio-console-server!\n");
-
-    debug_println!("icecap-realmos: enabled ring buffer");
+    //debug_println!("icecap-realmos: enabled ring buffer");
 
     // get input
     debug_println!("icecap-realmos: running...");

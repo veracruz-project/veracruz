@@ -209,24 +209,10 @@ fn main(config: Config) -> Fallible<()> {
     ));
 
     debug_println!("virtio{}@{:012x}: processing requests...", virtio_i, virtio_mmio);
-    let send_page = unsafe { VIRTIO_POOL.as_mut() }
-        .unwrap()
-        .alloc(virtio_drivers::PAGE_SIZE)?;
 
     // we may have already received data to send, but lost the notification
     // during initialization, so there may already be data in our ring buffer
     // we need to write out
-    rb.rx_callback();
-    rb.tx_callback();
-    if let Some(chars) = rb.rx() {
-        for chunk in chars.chunks(virtio_drivers::PAGE_SIZE) {
-            send_page[..chunk.len()].copy_from_slice(chunk);
-            console.send_slice(&send_page[..chunk.len()])?;
-        }
-    }
-    rb.ring_buffer().enable_notify_read();
-    rb.ring_buffer().enable_notify_write();
-
     loop {
         let badge = config.event_nfn.wait();
         debug_println!("virtio{}@{:012x}: received notification\n", virtio_i, virtio_mmio);
