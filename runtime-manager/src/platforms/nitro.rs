@@ -17,12 +17,10 @@ use nix::sys::socket::{
 };
 use nsm_api;
 use nsm_lib;
-use uuid::Uuid;
-use veracruz_utils::runtime_manager_message::{
-    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+use veracruz_utils::{
+    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status},
+    sha256::sha256
 };
-
-use std::io::Write;
 
 /// The CID for the VSOCK to listen on
 /// Currently set to all 1's so it will listen on all of them
@@ -139,11 +137,12 @@ fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
         if nsm_fd < 0 {
             return Err(anyhow!(RuntimeManagerError::NsmLibError(nsm_fd)));
         }
+        let csr_hash = sha256(&csr);
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
                 nsm_fd,                        //fd
-                csr.as_ptr() as *const u8,     // user_data
-                csr.len() as u32,              // user_data_len
+                csr_hash.as_ptr() as *const u8,     // user_data
+                csr_hash.len() as u32,              // user_data_len
                 challenge.as_ptr(),            // nonce_data
                 challenge.len() as u32,        // nonce_len
                 std::ptr::null() as *const u8, // pub_key_data
@@ -162,13 +161,12 @@ fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
         buffer.clone()
     };
 
-    return Ok(RuntimeManagerResponse::AttestationData(att_doc));
+    return Ok(RuntimeManagerResponse::AttestationData(att_doc, csr));
 }
 
 /// Handler for the RuntimeManagerRequest::Initialize message
 fn initialize(policy_json: &str, cert_chain: &Vec<u8>) -> Result<RuntimeManagerResponse> {
     managers::session_manager::load_policy(policy_json)?;
-    println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;
 
     return Ok(RuntimeManagerResponse::Status(Status::Success));

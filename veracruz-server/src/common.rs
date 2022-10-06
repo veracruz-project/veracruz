@@ -12,9 +12,9 @@
 #[cfg(feature = "icecap")]
 use crate::platforms::icecap::IceCapError;
 use err_derive::Error;
-use io_utils::http::HttpError;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
+use reqwest;
 use std::error::Error;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
@@ -26,7 +26,7 @@ pub enum VeracruzServerError {
     #[error(display = "VeracruzServer: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
     #[error(display = "VeracruzServer: HttpError: {:?}", _0)]
-    HttpError(HttpError),
+    HttpError(reqwest::StatusCode),
     #[error(display = "VeracruzServer: Base64Error: {:?}.", _0)]
     Base64Error(#[error(source)] base64::DecodeError),
     #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]
@@ -76,6 +76,8 @@ pub enum VeracruzServerError {
     /// Return the anyhow.
     #[error(display = "Runtime manager did not start up correctly")]
     Anyhow(anyhow::Error),
+    #[error(display = "VeracruzServer: Reqwest Error: {:?}", _0)]
+    ReqwestError(reqwest::Error),
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {

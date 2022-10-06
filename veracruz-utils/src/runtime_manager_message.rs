@@ -77,12 +77,6 @@ pub enum RuntimeManagerRequest {
 /// and deserialized using bincode after transport.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RuntimeManagerResponse {
-    #[cfg(feature = "nitro")]
-    /// The response to the `Attestation` request.
-    /// parameters:
-    /// Vec<u8> - The nitro attestation document from the enclave
-    AttestationData(Vec<u8>),
-    #[cfg(any(feature = "icecap", feature = "linux"))]
     /// The response to the `Attestation` request.  Parameters (in order) are:
     /// - A byte encoding of the PSA attestation token,
     /// - A byte encoding of the Certificate Signing Request.

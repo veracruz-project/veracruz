@@ -20,12 +20,9 @@ use curl::{
 use err_derive::Error;
 use log::{error, info, trace};
 use regex::Regex;
-use serde::Deserialize;
-use serde_json;
 use std::{io::Read, str::from_utf8, string::String, vec::Vec};
 use stringreader::StringReader;
 use transport_protocol::{
-    parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
     ProxyAttestationServerResponse, TransportProtocolError,
 };
 use uuid::Uuid;
@@ -427,12 +424,10 @@ where
 /// Returns a device ID and a generated challenge from the Proxy Attestation
 /// Service, which is generated in response to the "Start" message, if the
 /// message is successfully sent.
-pub fn send_proxy_attestation_server_start<U: AsRef<str>, P: AsRef<str>>(
-    proxy_attestation_server_url_base: U,
-    protocol_name: P,
+pub fn send_proxy_attestation_server_start<U: AsRef<str>>(
+    proxy_attestation_server_url_base: U
 ) -> AnyhowResult<(Uuid, Vec<u8>)> {
     let proxy_attestation_server_url_base = proxy_attestation_server_url_base.as_ref();
-    let protocol_name = protocol_name.as_ref();
 
     info!("Sending Start message to Proxy Attestation Service.");
 

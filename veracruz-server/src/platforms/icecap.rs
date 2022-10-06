@@ -301,8 +301,7 @@ impl VeracruzServer for VeracruzServerIceCap {
         let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
         let (device_id, challenge) = send_proxy_attestation_server_start(
-            policy.proxy_attestation_server_url(),
-            "psa"
+            policy.proxy_attestation_server_url()
         )?;
 
         let (token, csr) =

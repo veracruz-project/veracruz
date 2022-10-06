@@ -11,13 +11,14 @@
 
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
-    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
+    use crate::common::{VeracruzServer, VeracruzServerError};
+    use base64;
     use io_utils::{
-        http::{HttpError, HttpResponse, post_bytes, post_string, send_proxy_attestation_server_start},
+        http::send_proxy_attestation_server_start,
         nitro::NitroEnclave,
     };
-    use log::error;
     use policy_utils::policy::Policy;
+    use reqwest;
     use std::{env, error::Error};
     use uuid::Uuid;
     use veracruz_utils::runtime_manager_message::{
@@ -27,20 +28,18 @@ pub mod veracruz_server_nitro {
     /// Path of the Runtime Manager enclave EIF file.
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
     /// The protocol to use when interacting with the proxy attestation server.
-    const PROXY_ATTESTATION_PROTOCOL: &str = "nitro";
 
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
     }
 
     impl VeracruzServer for VeracruzServerNitro {
-        fn new(policy_json: &str) -> VeracruzServerResult<Self> {
+        fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             // Set up, initialize Nitro Root Enclave
             let policy: Policy = Policy::from_json(policy_json)?;
 
             let (challenge_id, challenge) = send_proxy_attestation_server_start(
                 crate::server::VERAISON_VERIFIER_IP_ADDRESS,
-                PROXY_ATTESTATION_PROTOCOL
             )
             .map_err(|e| {
                 eprintln!(
@@ -80,14 +79,14 @@ pub mod veracruz_server_nitro {
             };
             println!("VeracruzServerNitro::new Runtime Manager instantiated. Calling initialize");
 
-            let attestation_doc = {
+            let (attestation_doc, csr) = {
                 let attestation = RuntimeManagerRequest::Attestation(challenge, challenge_id);
                 meta.enclave
                     .send_buffer(&bincode::serialize(&attestation)?)?;
                 // read the response
                 let response = meta.enclave.receive_buffer()?;
                 match bincode::deserialize(&response[..])? {
-                    RuntimeManagerResponse::AttestationData(doc) => doc,
+                    RuntimeManagerResponse::AttestationData(doc, csr) => (doc, csr),
                     response_message => {
                         return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
                             response_message,
@@ -100,6 +99,7 @@ pub mod veracruz_server_nitro {
                 //policy.proxy_attestation_server_url(),
                 crate::server::VERAISON_VERIFIER_IP_ADDRESS,
                 &attestation_doc,
+                &csr,
                 challenge_id,
             )?;
 
@@ -125,11 +125,11 @@ pub mod veracruz_server_nitro {
             Ok(meta)
         }
 
-        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             Err(VeracruzServerError::UnimplementedError)
         }
 
-        fn new_tls_session(&mut self) -> VeracruzServerResult<u32> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerRequest::NewTlsSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
@@ -148,7 +148,7 @@ pub mod veracruz_server_nitro {
             Ok(session_id)
         }
 
-        fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()> {
+        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
             let cts_message = RuntimeManagerRequest::CloseTlsSession(session_id);
             let cts_buffer = bincode::serialize(&cts_message)?;
 
@@ -168,7 +168,7 @@ pub mod veracruz_server_nitro {
             &mut self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)> {
+        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
             let std_message: RuntimeManagerRequest =
                 RuntimeManagerRequest::SendTlsData(session_id, input);
             let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
@@ -240,7 +240,7 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServerNitro {
-        fn tls_data_needed(&self, session_id: u32) -> VeracruzServerResult<bool> {
+        fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
             let gtdn_message = RuntimeManagerRequest::GetTlsDataNeeded(session_id);
             let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
 
@@ -257,40 +257,48 @@ pub mod veracruz_server_nitro {
         }
     }
 
+    fn post_attestation_doc_csr(url: &str, att_doc: &[u8], csr: &[u8]) -> Result<Vec<u8>, VeracruzServerError> {
+        let client_builder = reqwest::blocking::ClientBuilder::new();
+
+        let client = client_builder.build()
+            .map_err(|err| {
+                VeracruzServerError::ReqwestError(err)
+            })?;
+        let form = reqwest::blocking::multipart::Form::new()
+            .text("doc", base64::encode(att_doc))
+            .text("csr", base64::encode(csr));
+
+        let response = client.post(url)
+            .multipart(form)
+            .send()
+            .map_err(|err| {
+                VeracruzServerError::ReqwestError(err)
+            })?;
+        let cert_chain = match response.status() {
+            reqwest::StatusCode::OK => {
+                response.bytes()
+                .map_err(|err| {
+                    VeracruzServerError::ReqwestError(err)
+                })?
+            }
+            bad_status => {
+                return Err(VeracruzServerError::HttpError(bad_status));
+            }
+        };
+        return Ok(cert_chain.to_vec());
+    }
+
     /// Send the native (AWS Nitro) attestation token to the proxy attestation server
     fn post_native_attestation_token(
         proxy_attestation_server_url: &str,
         att_doc: &[u8],
+        csr: &[u8],
         challenge_id: Uuid,
-    ) -> VeracruzServerResult<Vec<u8>> {
-        let url = format!("{:}/proxy/v1/Nitro/{:}", proxy_attestation_server_url, challenge_id);
-        println!(
-            "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
-            url
-        );
-        let received_body = match post_bytes(&url, &att_doc, Some("application/aws-nitro-document")).map_err(|e| {
-            println!(
-                "Failed to post native attestation token.  Error produced: {}.",
-                e
-            );
-
-            VeracruzServerError::HttpError(e)
-        })? {
-            HttpResponse::Ok(body) => {
-                body
-            },
-            not_ok => {
-                error!("post buffer returned a non-Ok status code:{:?}", not_ok);
-                return Err(VeracruzServerError::HttpError(HttpError::HttpSuccess));
-            }
-        };
-
-        println!(
-            "veracruz-server-nitro::post_psa_attestation_token received buffer:{:?}",
-            received_body
-        );
-
-        let cert_chain = received_body;
+    ) -> Result<Vec<u8>, VeracruzServerError> {
+        let url = format!("http://{:}/proxy/v1/Nitro/{:}", proxy_attestation_server_url, challenge_id);
+        let cert_chain = post_attestation_doc_csr(&url, att_doc, csr).map_err(|e| {
+            e
+        })?;
         Ok(cert_chain.to_vec())
     }
 }

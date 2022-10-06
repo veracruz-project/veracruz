@@ -22,7 +22,6 @@ icecap-lkvm = ["veracruz-server/icecap-lkvm"]
 icecap-qemu = ["veracruz-server/icecap-qemu"]
 linux = [
   "policy-utils/std",
-  "proxy-attestation-server/linux",
   "veracruz-server/linux",
   "veracruz-utils/linux",
 ]
