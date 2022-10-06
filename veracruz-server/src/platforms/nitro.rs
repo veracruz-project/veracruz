@@ -265,7 +265,7 @@ pub mod veracruz_server_nitro {
                 VeracruzServerError::ReqwestError(err)
             })?;
         let form = reqwest::blocking::multipart::Form::new()
-            .text("doc", base64::encode(att_doc))
+            .text("token", base64::encode(att_doc))
             .text("csr", base64::encode(csr));
 
         let response = client.post(url)
