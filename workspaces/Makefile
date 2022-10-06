@@ -31,6 +31,9 @@ nitro: shared
 	$(MAKE) -C nitro-host
 	$(MAKE) -C nitro-runtime
 
+icecap-cca: shared
+	$(MAKE) -C icecap-host build-cca
+
 icecap: shared
 	$(MAKE) -C icecap-runtime build
 	$(MAKE) -C icecap-host

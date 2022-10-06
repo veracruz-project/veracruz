@@ -36,6 +36,8 @@ include mk/$(icecap_plat).mk
 
 VERACRUZ_ICECAP_QEMU_IMAGE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
 
+VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS = $(WORKSPACE_DIR)/icecap-runtime/firmware_start 
+
 BUILD_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE)
 TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
 	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
@@ -51,7 +53,16 @@ build: rustup-plat icecap-runtime
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) $(host_feature_flags) $(V_FLAG)
 
-build-veracruz-server-test: rustup-plat icecap-runtime
+build-cca: rustup-plat $(VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS)
+	$(COMPILERS) $(BUILD_PARAMETERS) \
+		cargo build $(PROFILE_FLAG) \
+		-p veracruz-server \
+		--features veracruz-server/icecap-cca \
+		--features cli \
+		$(host_feature_flags) \
+		$(V_FLAG)
+
+build-veracruz-server-test: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo test --no-run $(PROFILE_FLAG) \
 		$(host_feature_flags) \
