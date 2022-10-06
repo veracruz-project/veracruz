@@ -27,6 +27,14 @@ icecap = [
   "veracruz-utils/icecap",
 ]
 icecap-lkvm = []
+icecap-cca = [
+  "policy-utils/icecap",
+  "psa-attestation",
+  "io-utils/icecap",
+  "tempfile",
+  "signal-hook",
+  "veracruz-utils/icecap",
+]
 icecap-lkvm_realm = []
 icecap-qemu = []
 linux = [

@@ -9,6 +9,10 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#[cfg(feature = "icecap")]
+use crate::platforms::icecap::IceCapError;
+#[cfg(feature = "icecap-cca")]
+use crate::platforms::icecap_cca::IceCapError;
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use nitro_enclave::NitroError;

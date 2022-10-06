@@ -37,43 +37,37 @@ use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
 
-const VERACRUZ_ICECAP_QEMU_BIN_DEFAULT: &'static [&'static str] = &["qemu-system-aarch64"];
-const VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-machine",
-    "virt,virtualization=on,gic-version=2",
-    "-cpu",
-    "cortex-a57",
-    "-smp",
+///work/cca/platform/lkvm run --irqchip=gicv3 --console=serial 
+/// --network mode=none --tty 4 --no9p -c 1 -m 512 -f /work/cca/platform/veracruz.bin --firmware-address 0x80be1000
+/// run --realm --irqchip=gicv3 --console=serial --network mode=none --tty 4 --no9p --ns-pool-size 3M -c 1 -m 512 
+/// 
+const VERACRUZ_ICECAP_LKVM_BIN_DEFAULT: &'static [&'static str] = &["/work/cca/platform/lkvm"];
+const VERACRUZ_ICECAP_LKVM_FLAGS_DEFAULT: &'static [&'static str] = &[
+    "run",
+    "--realm",
+    "--irqchip=gicv3",
+    "--console=serial", 
+    "--network",
+    "mode=none",
+    "--tty",
     "4",
+    "--no9p",
+    "--ns-pool-size",
+    "3M",
+    "-c",
+    "1",
     "-m",
-    "3072",
-    "-semihosting-config",
-    "enable=on,target=native",
-    "-netdev",
-    "user,id=netdev0",
-    "-serial",
-    "mon:stdio",
-    "-nographic",
+    "512",
 ];
-const VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT: &'static [&'static str] = &[
-    "-chardev",
-    "socket,path={console0_path},server=on,wait=off,id=charconsole0",
-    //"-chardev", "socket,server=on,host=localhost,port=1234,id=charconsole0",
-    "-device",
-    "virtio-serial-device",
-    "-device",
-    "virtconsole,chardev=charconsole0,id=console0",
-];
-const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] =
-    &["-kernel", "{image_path}"];
+const VERACRUZ_ICECAP_LKVM_FIRMWARE_IMAGE_DEFAULT: &'static [&'static str] = &["-f", "/work/cca/platform/veracruz.bin"];
+const VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS_DEFAULT: &'static [&'static str] = &["--firmware-address", "0x80be1000"];
+//const VERACRUZ_LKVM_FIRMWARE_IMAGE: &'static [&'static str] = &["-f", "{firmware_path}"];
+//const VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT: &'static [&'static str] = &["-kernel", "{image_path}"];
 
-// Include image at compile time
-const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] =
-    include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
-
+// Include image at compile time -- not now, hardcode everything atm
+//const VERACRUZ_ICECAP_QEMU_IMAGE: &'static [u8] = include_bytes!(env!("VERACRUZ_ICECAP_QEMU_IMAGE"));
 // TODO is this needed?
 const FIRMWARE_VERSION: &str = "0.3.0";
-
 /// Class of IceCap-specific errors.
 #[derive(Debug, Error)]
 pub enum IceCapError {
@@ -81,8 +75,8 @@ pub enum IceCapError {
     InvalidEnvironmentVariableValue { variable: String },
     #[error(display = "IceCap: Channel error: {}", _0)]
     ChannelError(io::Error),
-    #[error(display = "IceCap: Qemu spawn error: {}", _0)]
-    QemuSpawnError(io::Error),
+    #[error(display = "IceCap: LKVM spawn error: {}", _0)]
+    LkvmSpawnError(io::Error),
     #[error(display = "IceCap: Serialization error: {}", _0)]
     SerializationError(bincode::Error),
     #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
@@ -132,53 +126,36 @@ impl IceCapRealm {
         }
 
         // Allow overriding these from environment variables
-        let qemu_bin = env_flags("VERACRUZ_ICECAP_QEMU_BIN", VERACRUZ_ICECAP_QEMU_BIN_DEFAULT)?;
-        let qemu_flags = env_flags(
-            "VERACRUZ_ICECAP_QEMU_FLAGS",
-            VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT,
+        let lkvm_bin = env_flags("VERACRUZ_ICECAP_LKVM_BIN_DEFAULT", VERACRUZ_ICECAP_LKVM_BIN_DEFAULT)?;
+        let lkvm_flags = env_flags("VERACRUZ_ICECAP_LKVM_FLAGS", VERACRUZ_ICECAP_LKVM_FLAGS_DEFAULT)?;
+        let lkvm_firmware_flags = env_flags(
+            "VERACRUZ_ICECAP_LKVM_FIRMWARE_IMAGE",
+            VERACRUZ_ICECAP_LKVM_FIRMWARE_IMAGE_DEFAULT,
         )?;
-        let qemu_console_flags = env_flags(
-            "VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS",
-            VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT,
+        let lkvm_firmware_address_flags = env_flags(
+            "VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS",
+            VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS_DEFAULT,
         )?;
-        let qemu_image_flags = env_flags(
-            "VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS",
-            VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT,
-        )?;
-
         // temporary directory for things
         let tempdir = tempfile::tempdir()?;
 
-        // write the image to a temporary file, this makes sure our server is
-        // idempotent
-        let image_path = tempdir.path().join("image");
-        fs::write(&image_path, VERACRUZ_ICECAP_QEMU_IMAGE)?;
-        println!("vc-server: using image: {:?}", image_path);
-
-        // create a temporary socket for communication
-        let channel_path = tempdir.path().join("console0");
-        println!("vc-server: using unix socket: {:?}", channel_path);
-
         // startup qemu
         let child = Arc::new(Mutex::new(
-            Command::new(&qemu_bin[0])
-                .args(&qemu_bin[1..])
-                .args(&qemu_flags)
-                .args(
+            Command::new(&lkvm_bin[0])
+                .args(&lkvm_bin[1..])
+                .args(&lkvm_flags)
+                /*.args(
                     qemu_console_flags
                         .iter()
                         .map(|s| s.replace("{console0_path}", channel_path.to_str().unwrap())),
-                )
-                .args(
-                    qemu_image_flags
-                        .iter()
-                        .map(|s| s.replace("{image_path}", image_path.to_str().unwrap())),
-                )
+                )*/
+                .args(&lkvm_firmware_flags)
+                .args(&lkvm_firmware_address_flags)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .map_err(IceCapError::QemuSpawnError)?,
+                .map_err(IceCapError::LkvmSpawnError)?,
         ));
 
         // forward stderr/stdin via threads, this is necessary to avoid stdio
@@ -187,7 +164,7 @@ impl IceCapRealm {
             let mut child_stdout = child.lock().unwrap().stdout.take().unwrap();
             move || {
                 let err = io::copy(&mut child_stdout, &mut io::stdout());
-                eprintln!("vc-server: qemu: stdout closed: {:?}", err);
+                eprintln!("vc-server: lkvm: stdout closed: {:?}", err);
             }
         });
 
@@ -195,7 +172,7 @@ impl IceCapRealm {
             let mut child_stderr = child.lock().unwrap().stderr.take().unwrap();
             move || {
                 let err = io::copy(&mut child_stderr, &mut io::stderr());
-                eprintln!("vc-server: qemu: stderr closed: {:?}", err);
+                eprintln!("vc-server: lkvm: stderr closed: {:?}", err);
             }
         });
 
@@ -206,13 +183,16 @@ impl IceCapRealm {
             let child = child.clone();
             move || {
                 for sig in signals.forever() {
-                    eprintln!("vc-server: qemu: Killed by signal: {:?}", sig);
+                    eprintln!("vc-server: lkvm: Killed by signal: {:?}", sig);
                     child.lock().unwrap().kill().unwrap();
                     signal_hook::low_level::emulate_default_handler(SIGINT).unwrap();
                 }
             }
         });
 
+        let tempdir = tempfile::tempdir()?;
+        let channel_path = tempdir.path().join("console0");
+        println!("vc-server: using unix socket: {:?}", channel_path);
         // connect via socket
         let channel = loop {
             match UnixStream::connect(&channel_path) {
@@ -233,6 +213,7 @@ impl IceCapRealm {
                 }
             };
         };
+        
 
         Ok(IceCapRealm {
             child: child,
@@ -283,9 +264,9 @@ impl IceCapRealm {
     }
 }
 
-pub struct VeracruzServerIceCap(Option<IceCapRealm>);
+pub struct VeracruzServerIceCapCCA(Option<IceCapRealm>);
 
-impl VeracruzServerIceCap {
+impl VeracruzServerIceCapCCA {
     fn communicate(
         &mut self,
         request: &RuntimeManagerRequest,
@@ -304,7 +285,7 @@ impl VeracruzServerIceCap {
     }
 }
 
-impl VeracruzServer for VeracruzServerIceCap {
+impl VeracruzServer for VeracruzServerIceCapCCA {
     fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
         let policy: Policy = Policy::from_json(policy_json)?;
 
@@ -430,7 +411,7 @@ impl VeracruzServer for VeracruzServerIceCap {
     }
 }
 
-impl Drop for VeracruzServerIceCap {
+impl Drop for VeracruzServerIceCapCCA {
     fn drop(&mut self) {
         if let Err(err) = self.shutdown_isolate() {
             panic!("Realm failed to shutdown: {}", err)

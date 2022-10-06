@@ -10,6 +10,14 @@
 //! information on licensing and copyright.
 
 use crate::common::*;
+#[cfg(feature = "icecap")]
+use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
+#[cfg(feature = "icecap-cca")]
+use crate::platforms::icecap_cca::VeracruzServerIceCapCCA as VeracruzServerEnclave;
+#[cfg(feature = "linux")]
+use crate::platforms::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
+#[cfg(feature = "nitro")]
+use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use policy_utils::policy::Policy;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};

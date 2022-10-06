@@ -14,3 +14,11 @@ pub mod strace;
 pub(crate) mod wasmi;
 #[cfg(feature = "std")]
 pub(crate) mod wasmtime;
+#[cfg(feature = "icecap")]
+pub mod icecap;
+#[cfg(feature = "icecap-cca")]
+pub mod icecap_cca;
+#[cfg(feature = "linux")]
+pub mod linux;
+#[cfg(feature = "nitro")]
+pub mod nitro;
