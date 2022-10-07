@@ -128,7 +128,7 @@ fn native_attestation(
     // EAT UEID of type RAND.
     // Length must be 33 bytes
     // first byte MUST be 0x01 (RAND)
-    // next 32 bytes must be the hash of the key (Is this the public or private key? It's unclear, presume the public key because a hash of the public key could theoretically bleed info
+    // next 32 bytes must be the hash of the key (Is this the public or private key? It's unclear, presume the public key because a hash of the private key could theoretically bleed info
     // about the private key)
     let public_key_hash = sha256(&TOTALLY_INSECURE_ROOT_PUBLIC_KEY);
     let mut enclave_name: Vec<u8> = Vec::new();
