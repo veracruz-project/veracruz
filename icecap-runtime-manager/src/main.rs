@@ -27,9 +27,22 @@ use icecap_std_external;
 use runtime_manager::common_runtime::CommonRuntime;
 use serde::{Deserialize, Serialize};
 
-use core::fmt::Write;
-#[macro_use]
-pub mod fmt;
+use core::fmt::{self, Write};
+use icecap_core::ring_buffer::*;
+
+pub(crate) struct Writer<'a>(pub &'a mut BufferedRingBuffer);
+
+macro_rules! out {
+    ($dst:expr, $($arg:tt)*) => (Writer($dst).write_fmt(format_args!($($arg)*)).unwrap());
+}
+
+    
+impl fmt::Write for Writer<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.0.tx(s.as_bytes());
+        Ok(())
+    }
+}
 
 mod icecap_runtime;
 

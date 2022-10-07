@@ -28,11 +28,12 @@ icecap = [
 ]
 icecap-lkvm = []
 icecap-cca = [
+  "io-utils/icecap",
+  "openssl/vendored",
   "policy-utils/icecap",
   "psa-attestation",
-  "io-utils/icecap",
-  "tempfile",
   "signal-hook",
+  "tempfile",
   "veracruz-utils/icecap",
 ]
 icecap-lkvm_realm = []

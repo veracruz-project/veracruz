@@ -9,8 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::veracruz_server::{VeracruzServer, VeracruzServerError};
-use bincode;
+use crate::common::{VeracruzServer, VeracruzServerError};
 use err_derive::Error;
 use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
@@ -78,15 +77,9 @@ pub enum IceCapError {
     #[error(display = "IceCap: LKVM spawn error: {}", _0)]
     LkvmSpawnError(io::Error),
     #[error(display = "IceCap: Serialization error: {}", _0)]
-    SerializationError(bincode::Error),
+    SerializationError(#[error(source)] bincode::Error),
     #[error(display = "IceCap: Unexpected response from runtime manager: {:?}", _0)]
     UnexpectedRuntimeManagerResponse(RuntimeManagerResponse),
-}
-
-impl From<IceCapError> for VeracruzServerError {
-    fn from(err: IceCapError) -> VeracruzServerError {
-        VeracruzServerError::IceCapError(err)
-    }
 }
 
 impl From<bincode::Error> for VeracruzServerError {
@@ -296,8 +289,7 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
             policy.proxy_attestation_server_url(),
             "psa",
             FIRMWARE_VERSION,
-        )
-        .map_err(VeracruzServerError::HttpError)?;
+        )?;
 
         let (token, csr) =
             match self_.communicate(&RuntimeManagerRequest::Attestation(challenge, device_id))? {
@@ -311,17 +303,15 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
 
         let (root_cert, compute_cert) = {
             let req =
-                transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id)
-                    .map_err(VeracruzServerError::TransportProtocolError)?;
+                transport_protocol::serialize_native_psa_attestation_token(&token, &csr, device_id)?;
             let req = base64::encode(&req);
             let url = format!(
                 "{:}/PSA/AttestationToken",
                 policy.proxy_attestation_server_url()
             );
-            let resp = post_buffer(&url, &req).map_err(VeracruzServerError::HttpError)?;
+            let resp = post_buffer(&url, &req)?;
             let resp = base64::decode(&resp)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)
-                .map_err(VeracruzServerError::TransportProtocolError)?;
+            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)?;
             let cert_chain = pasr.get_cert_chain();
             let root_cert = cert_chain.get_root_cert();
             let compute_cert = cert_chain.get_enclave_cert();
