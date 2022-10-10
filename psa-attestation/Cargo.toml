@@ -15,7 +15,8 @@ crate-type = ["rlib"]
 icecap = []
 linux = []
 nitro = [
-  "mbedtls-sys-auto/monitor_getrandom",
+# FIXME: fake_random is not secure!
+  "mbedtls-sys-auto/fake_random",
 ]
 
 [dependencies]

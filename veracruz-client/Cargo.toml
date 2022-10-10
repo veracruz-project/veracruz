@@ -17,7 +17,8 @@ cli = ["structopt", "env_logger", "tokio/rt", "tokio/macros"]
 icecap = []
 linux = []
 nitro = [
-  "mbedtls/monitor_getrandom",
+# FIXME: fake_random is not secure!
+  "mbedtls/fake_random",
 ]
 
 [dependencies]
