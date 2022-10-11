@@ -100,8 +100,7 @@ impl AesCounterModeService {
             .map_err(|_| ErrNo::Canceled)?;
 
             let block_size = cypher.block_size();
-            // For some reason, the length of the output buffer needs to be
-            // a multiple of the block size and at least two blocks:
+            // Mbed TLS requires the output buffer to be at least `ilen + block_size` long
             let padded_size = (input.len() + 2 * block_size - 1) / block_size * block_size;
             output.resize(padded_size, 0);
 
@@ -119,8 +118,7 @@ impl AesCounterModeService {
             .map_err(|_| ErrNo::Canceled)?;
 
             let block_size = cypher.block_size();
-            // For some reason, the length of the output buffer needs to be
-            // a multiple of the block size and at least two blocks:
+            // Mbed TLS requires the output buffer to be at least `ilen + block_size` long
             let padded_size = (input.len() + 2 * block_size - 1) / block_size * block_size;
             output.resize(padded_size, 0);
 
