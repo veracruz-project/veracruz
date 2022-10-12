@@ -39,7 +39,7 @@ pub mod veracruz_server_nitro {
             let policy: Policy = Policy::from_json(policy_json)?;
 
             let (challenge_id, challenge) = send_proxy_attestation_server_start(
-                crate::server::VERAISON_VERIFIER_IP_ADDRESS,
+                policy.proxy_attestation_server_url(),
             )
             .map_err(|e| {
                 eprintln!(
@@ -96,8 +96,7 @@ pub mod veracruz_server_nitro {
             };
 
             let cert_chain = post_native_attestation_token(
-                //policy.proxy_attestation_server_url(),
-                crate::server::VERAISON_VERIFIER_IP_ADDRESS,
+                policy.proxy_attestation_server_url(),
                 &attestation_doc,
                 &csr,
                 challenge_id,

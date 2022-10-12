@@ -26,8 +26,6 @@ use std::thread;
 type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
-pub static VERAISON_VERIFIER_IP_ADDRESS: &str = "172.22.0.4:8080";
-
 #[post("/veracruz_server")]
 async fn veracruz_server_request(
     enclave_handler: web::Data<EnclaveHandler>,

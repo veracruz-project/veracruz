@@ -24,7 +24,6 @@ mod tests {
     use mbedtls::alloc::List;
     use mbedtls::x509::Certificate;
     use policy_utils::{policy::Policy, Platform};
-    use proxy_attestation_server;
     use std::{
         env::{self, VarError},
         error::Error,

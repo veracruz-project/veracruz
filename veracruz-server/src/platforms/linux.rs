@@ -345,7 +345,7 @@ pub mod veracruz_server_linux {
             let proxy_attestation_server_url = policy.proxy_attestation_server_url();
 
             let (challenge_id, challenge) = send_proxy_attestation_server_start(
-                crate::server::VERAISON_VERIFIER_IP_ADDRESS,
+                proxy_attestation_server_url,
             )
             .map_err(|e| {
                 error!(
@@ -394,7 +394,7 @@ pub mod veracruz_server_linux {
             info!("Requesting certificate chain from proxy attestation server.");
 
             let cert_chain = {
-                let cert_chain = post_attestation_token_csr(crate::server::VERAISON_VERIFIER_IP_ADDRESS, &token, &csr, challenge_id)
+                let cert_chain = post_attestation_token_csr(proxy_attestation_server_url, &token, &csr, challenge_id)
                     .map_err(|err| {
                         error!("post_attestation_token_csr failed:{:?}", err);
                         err
