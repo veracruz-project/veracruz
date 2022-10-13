@@ -92,7 +92,7 @@ impl From<bincode::Error> for VeracruzServerError {
 struct IceCapRealm {
     // NOTE the order of these fields matter due to drop ordering
     child: Arc<Mutex<Child>>,
-    channel: UnixStream,
+    /*channel: UnixStream,
     #[allow(dead_code)]
     stdout_handler: JoinHandle<()>,
     #[allow(dead_code)]
@@ -102,6 +102,7 @@ struct IceCapRealm {
     signal_handler: JoinHandle<()>,
     #[allow(dead_code)]
     tempdir: TempDir,
+    */
 }
 
 impl IceCapRealm {
@@ -144,16 +145,19 @@ impl IceCapRealm {
                 )*/
                 .args(&lkvm_firmware_flags)
                 .args(&lkvm_firmware_address_flags)
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
+               // .stdin(Stdio::null())
+               .stdout(Stdio::inherit())
+               .stderr(Stdio::inherit())
+                //.stderr(Stdio::piped())
                 .spawn()
                 .map_err(IceCapError::LkvmSpawnError)?,
         ));
 
+        let status = child.lock().unwrap().wait();
+        println!("Exited with status {:?}", status);
         // forward stderr/stdin via threads, this is necessary to avoid stdio
         // issues under Cargo test
-        let stdout_handler = thread::spawn({
+ /*       let stdout_handler = thread::spawn({
             let mut child_stdout = child.lock().unwrap().stdout.take().unwrap();
             move || {
                 let err = io::copy(&mut child_stdout, &mut io::stdout());
@@ -168,7 +172,7 @@ impl IceCapRealm {
                 eprintln!("vc-server: lkvm: stderr closed: {:?}", err);
             }
         });
-
+*/
         // hookup signal handler so SIGINT will teardown the child process
         let mut signals = Signals::new(&[SIGINT])?;
         let signal_handle = signals.handle();
@@ -183,7 +187,7 @@ impl IceCapRealm {
             }
         });
 
-        let tempdir = tempfile::tempdir()?;
+    /*    let tempdir = tempfile::tempdir()?;
         let channel_path = tempdir.path().join("console0");
         println!("vc-server: using unix socket: {:?}", channel_path);
         // connect via socket
@@ -207,15 +211,15 @@ impl IceCapRealm {
             };
         };
         
-
+*/
         Ok(IceCapRealm {
             child: child,
-            stdout_handler: stdout_handler,
+            /*stdout_handler: stdout_handler,
             stderr_handler: stderr_handler,
             signal_handle: signal_handle,
             signal_handler: signal_handler,
             channel: channel,
-            tempdir: tempdir,
+            tempdir: tempdir,*/
         })
     }
 
@@ -226,23 +230,23 @@ impl IceCapRealm {
         // send request
         let raw_request = bincode::serialize(request)?;
         let raw_header = bincode::serialize(&u32::try_from(raw_request.len()).unwrap())?;
-        self.channel
+       /* self.channel
             .write_all(&raw_header)
             .map_err(IceCapError::ChannelError)?;
         self.channel
             .write_all(&raw_request)
             .map_err(IceCapError::ChannelError)?;
-
+*/
         // recv response
         let mut raw_header = [0; size_of::<u32>()];
-        self.channel
-            .read_exact(&mut raw_header)
-            .map_err(IceCapError::ChannelError)?;
+     //   self.channel
+       //     .read_exact(&mut raw_header)
+         //   .map_err(IceCapError::ChannelError)?;
         let header = bincode::deserialize::<u32>(&raw_header)?;
         let mut raw_response = vec![0; usize::try_from(header).unwrap()];
-        self.channel
-            .read_exact(&mut raw_response)
-            .map_err(IceCapError::ChannelError)?;
+      //  self.channel
+        //    .read_exact(&mut raw_response)
+          //  .map_err(IceCapError::ChannelError)?;
         let response = bincode::deserialize::<RuntimeManagerResponse>(&raw_response)?;
 
         Ok(response)
@@ -251,7 +255,7 @@ impl IceCapRealm {
     // NOTE close can report errors, but drop can still happen in weird cases
     fn shutdown(self) -> Result<(), VeracruzServerError> {
         println!("vc-server: shutting down");
-        self.signal_handle.close();
+        //self.signal_handle.close();
         self.child.lock().unwrap().kill()?;
         Ok(())
     }
@@ -284,7 +288,7 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
 
         // create the realm
         let mut self_ = Self(Some(IceCapRealm::spawn()?));
-
+/*
         let (device_id, challenge) = send_proxy_attestation_server_start(
             policy.proxy_attestation_server_url(),
             "psa",
@@ -329,7 +333,7 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
                 ))
             }
         }
-
+*/
         Ok(self_)
     }
 
