@@ -27,9 +27,6 @@ To jump straight into the codebase, please read the growing number of guides we 
 - [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown) - Set up a build environment for Veracruz
 - [CLI_QUICKSTART.markdown](CLI_QUICKSTART.markdown) - Quickly run Veracruz with a prepared demo program
 
-## Security disclaimer
-As of September 27th, 2022, due to an [entropy bug presumably affecting AWS Nitro enclaves](https://github.com/aws/aws-nitro-enclaves-sdk-bootstrap/issues/15), our Nitro backend relies on a temporary workaround for RNG. More specifically, Mbed TLS' RNG has been changed to return an array of all zeroes. This is a temporary workaround that will be removed when the root cause is fixed by AWS.
-
 ## News
 
 - **May 2022**: we have released Veracruz 22.05 (see the `veracruz-2205` Git tag).  See `documents/release-notes/VERACRUZ-2205.markdown` for notable changes in this release.
