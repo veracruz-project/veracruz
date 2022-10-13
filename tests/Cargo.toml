@@ -27,8 +27,7 @@ linux = [
   "veracruz-utils/linux",
 ]
 nitro = [
-# FIXME: fake_random is not secure!
-  "mbedtls/fake_random",
+  "mbedtls/monitor_getrandom",
   "policy-utils/std",
   "proxy-attestation-server/nitro",
   "veracruz-server/nitro",

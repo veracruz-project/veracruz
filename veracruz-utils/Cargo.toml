@@ -16,8 +16,7 @@ linux = [
   "serde_json/std",
 ]
 nitro = [
-# FIXME: fake_random is not secure!
-  "mbedtls/fake_random",
+  "mbedtls/monitor_getrandom",
   "platform-services/nitro",
   "serde/derive",
   "serde_json/std",
