@@ -24,9 +24,6 @@ const CLIENT_KEY_FILENAME: &'static str = "client_key.pem";
 use crate::veracruz_client::*;
 use std::{env, fs::File, io::prelude::*, io::Read, path::PathBuf, sync::Arc};
 
-use actix_session::Session;
-use actix_web::http::StatusCode;
-use actix_web::{post, HttpRequest, HttpResponse};
 use mbedtls::x509::Certificate;
 
 pub fn trust_path(filename: &str) -> PathBuf {
@@ -149,26 +146,4 @@ fn veracruz_client_session() {
     config
         .push_cert(Arc::new(server_cert), Arc::new(server_priv_key))
         .unwrap();
-}
-
-/// simple index handler
-#[post("/runtime_manager")]
-async fn runtime_manager(
-    session: Session,
-    req: HttpRequest,
-) -> Result<HttpResponse, actix_web::Error> {
-    println!("runtime_manager:{:?}", req);
-    // session
-    let mut counter = 1;
-    if let Some(count) = session.get::<i32>("counter")? {
-        println!("SESSION value: {}", count);
-        counter = count + 1;
-    }
-
-    // set counter to session
-    session.insert("counter", counter)?;
-
-    Ok(HttpResponse::build(StatusCode::NOT_FOUND)
-        .content_type("text/html; charset=utf-8")
-        .body(format!("Not found, so why you looking?")))
 }
