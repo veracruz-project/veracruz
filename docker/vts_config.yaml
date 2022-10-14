@@ -9,7 +9,7 @@ en-store:
 po-store:
   backend: memory
 po-agent:
-  backend: memory
+  backend: opa
 vts-grpc:
   server:
     addr: 127.0.0.1:50051

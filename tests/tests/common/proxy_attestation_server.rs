@@ -30,6 +30,7 @@ struct ProxyChildren {
 }
 
 impl Drop for ProxyChildren {
+    // Note: This `Drop` is never being called for `proxy_children` because `drop` is never called for static variables (for apparently good reasons)
     fn drop(&mut self) {
         println!("Dropping ProxyChildren");
         let _kill_ignore = self.vts_child.kill();

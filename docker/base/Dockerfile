@@ -18,11 +18,12 @@
 from golang:1.19 AS go_builder
 
 RUN set -eux; \
+    echo "iteration 0"; \
     git clone --branch aws_nitro https://github.com/dreemkiller/services.git; \
     git clone --branch proxy_attestation_server https://github.com/veracruz-project/VeracruzVerifier.git; \
     cd VeracruzVerifier; \
-    go build -o ./vts github.com/veraison/services/vts/cmd; \
-    go build -o ./provisioning github.com/veraison/services/provisioning/cmd; \
+    go build -o ./vts github.com/veraison/services/vts/cmd/vts-service; \
+    go build -o ./provisioning github.com/veraison/services/provisioning/cmd/provisioning-service; \
     go build -o ./corim-psa-decoder github.com/veraison/services/provisioning/plugins/corim-psa-decoder; \
     go build -o ./corim-nitro-decoder github.com/veraison/services/provisioning/plugins/corim-nitro-decoder; \
     go build -o ./scheme-psa-iot github.com/veraison/services/vts/plugins/scheme-psa-iot; \
