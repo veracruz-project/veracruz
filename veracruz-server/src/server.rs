@@ -29,30 +29,6 @@ use std::{
 type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
-#[post("/veracruz_server")]
-async fn veracruz_server_request(
-    enclave_handler: web::Data<EnclaveHandler>,
-    _request: HttpRequest,
-    input_data: String,
-) -> VeracruzServerResponder {
-    let input_data_decoded = base64::decode(&input_data)?;
-
-    let mut enclave_handler_locked = enclave_handler.lock()?;
-
-    let enclave = enclave_handler_locked
-        .as_mut()
-        .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-
-    let result = enclave.plaintext_data(input_data_decoded)?;
-
-    let result_string = match result {
-        Some(return_data) => base64::encode(&return_data),
-        None => String::new(),
-    };
-
-    Ok(result_string)
-}
-
 #[post("/runtime_manager")]
 async fn runtime_manager_request(
     enclave_handler: web::Data<EnclaveHandler>,
@@ -133,7 +109,6 @@ pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
             .wrap(middleware::Logger::default())
             .app_data(web::Data::new(shutdown_channel_tx.clone()))
             .app_data(web::Data::new(VERACRUZ_SERVER.clone()))
-            .service(veracruz_server_request)
             .service(runtime_manager_request)
     })
     .bind(&policy.veracruz_server_url())?
