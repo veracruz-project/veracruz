@@ -15,10 +15,10 @@ anyhow = "1"
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bincode = { version = "1.2.1", default-features = false, optional = true }
 byteorder = { version = "1.4.3", optional = true }
-curl = "0.4.43"
 err-derive = "0.2"
 log = "0.4.13"
 nix = { version = "0.20.2", optional = true }
+reqwest = { version = "0.11", default-features = false, features = ["blocking"] }
 serde = { version = "1.0.115", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, optional = true }
 stringreader = "0.1"

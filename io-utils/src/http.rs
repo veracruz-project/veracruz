@@ -13,11 +13,9 @@
 //! and licensing information.
 
 use anyhow::{anyhow, Result};
-use curl::easy::{Easy, List};
 use err_derive::Error;
-use log::{error, info, trace};
-use std::{io::Read, str::from_utf8, string::String, vec::Vec};
-use stringreader::StringReader;
+use log::{error, info};
+use std::{string::String, vec::Vec};
 use transport_protocol::{
     parse_proxy_attestation_server_response, parse_psa_attestation_init, serialize_start_msg,
     ProxyAttestationServerResponse,
@@ -44,155 +42,26 @@ pub enum HttpError {
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
 /// Curl session fails for any reason, or if a non-success HTTP code is
 /// returned.
-pub fn post_buffer<U, B>(url: U, buffer: B) -> Result<String>
-where
-    U: AsRef<str>,
-    B: AsRef<str>,
-{
-    let url = url.as_ref();
-    let buffer = buffer.as_ref();
-
-    info!(
-        "Posting buffer {} ({} bytes) to {}.",
-        buffer,
-        buffer.len(),
-        url
-    );
-
-    let mut curl_request = Easy::new();
-
-    curl_request.url(url).map_err(|err| {
-        error!("Failed to set URL with Curl.  Error produced: {:?}.", err);
-
-        err
-    })?;
-
-    let mut headers = List::new();
-    headers
-        .append("Content-Type: application/octet-stream")
-        .map_err(|err| {
-            error!(
-                "Failed to append `Content-Type` header.  Error produced: {:?}.",
-                err
-            );
-
-            err
-        })?;
-
-    curl_request.http_headers(headers).map_err(|err| {
-        error!(
-            "Failed to set HTTP headers with Curl.  Error produced: {:?}.",
-            err
-        );
-
-        err
-    })?;
-    curl_request.post(true).map_err(|err| {
-        error!(
-            "Failed to set post field to `true` with Curl.  Error produced: {:?}.",
-            err
-        );
-
-        err
-    })?;
-    curl_request
-        .post_field_size(buffer.len() as u64)
-        .map_err(|err| {
-            error!(
-                "Failed to set post field size with Curl.  Error produced: {:?}.",
-                err
-            );
-
-            err
-        })?;
-
-    let mut buffer_reader = StringReader::new(buffer);
-    let mut received_body = String::new();
-    let mut received_header = String::new();
-
-    {
-        let mut transfer = curl_request.transfer();
-
-        transfer
-            .read_function(|buf| Ok(buffer_reader.read(buf).unwrap_or(0)))
-            .map_err(|err| {
-                error!(
-                    "Failed to register read function with Curl.  Error produced: {:?}.",
-                    err
-                );
-
-                err
-            })?;
-
-        transfer
-            .write_function(|buf| {
-                received_body.push_str(from_utf8(buf).unwrap_or_else(|_| {
-                    panic!("{}", {
-                        trace!(
-                            "Error converting data {:?} from UTF-8.  Continuing with default value.",
-                            buf
-                        );
-
-                        &format!("Error converting data {:?} from UTF-8.", buf)
-                    })
-                }));
-
-                Ok(buf.len())
-            })
-            .map_err(|err| {
-                error!(
-                    "Failed to register write function with Curl.  Error produced: {:?}.",
-                    err
-                );
-
-                err
-            })?;
-
-        info!("Received response body.");
-
-        transfer
-            .header_function(|buf| {
-                received_header.push_str(from_utf8(buf).unwrap_or_else(|_| {
-                    panic!("{}", {
-                        trace!(
-                            "Error converting data {:?} from UTF-8.  Continuing with default value.",
-                            buf
-                        );
-
-                        &format!("Error converting data {:?} from UTF-8", buf)
-                    })
-                }));
-
-                true
-            })
-            .map_err(|err| {
-                error!(
-                    "Failed to register header function with Curl.  Error produced: {:?}.",
-                    err
-                );
-
-                err
-            })?;
-
-        transfer.perform().map_err(|err| {
-            error!(
-                "Failed to perform data transfer with Curl.  Error produced: {:?}.",
-                err
-            );
-
-            err
-        })?;
-    }
-
-    info!("Received response header: {}.", received_header);
-
-    if !received_header.contains("HTTP/1.1 200 OK\r") {
-        return Err(anyhow!(HttpError::HttpSuccess));
-    }
-
-    info!("Buffer successfully posted.");
-
-    Ok(received_body)
+pub fn post_buffer(url: &String, buffer: &String) -> Result<String> {
+    let url: String = format!("http://{}", &url);
+    let buffer: String = buffer.to_string();
+    // To convert any error to a std::io error:
+    let err = |t| std::io::Error::new(std::io::ErrorKind::Other, t);
+    // Spawn a separate thread so that we can use reqwest::blocking.
+    let body = std::thread::spawn(move || {
+        let ret = reqwest::blocking::Client::new()
+            .post(url)
+            .body(buffer)
+            .send()
+            .map_err(|_| err("HTTP error"))?;
+        if ret.status() != reqwest::StatusCode::OK {
+            return Err(err("HTTP error"));
+        }
+        Ok(ret.text().map_err(|_| err("HTTP error"))?)
+    })
+    .join()
+    .map_err(|_| err("HTTP error"))??;
+    Ok(body)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
