@@ -23,7 +23,6 @@ icecap = [
   "veracruz-utils/icecap",
 ]
 icecap-cca = [
-  "openssl/vendored",
   "policy-utils/icecap",
   "proxy-attestation-server/icecap",
   "veracruz-server/icecap-cca",

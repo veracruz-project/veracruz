@@ -45,7 +45,7 @@ use std::{
 use transport_protocol;
 use veracruz_server::common::*;
 #[cfg(feature = "icecap-cca")]
-use crate::platforms::icecap_cca::VeracruzServerIceCapCCA as VeracruzServerEnclave;
+use veracruz_server::icecap_cca::VeracruzServerIceCapCCA as VeracruzServerEnclave;
 #[cfg(feature = "icecap")]
 use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]

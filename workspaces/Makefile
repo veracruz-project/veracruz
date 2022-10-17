@@ -32,12 +32,16 @@ nitro: shared
 	$(MAKE) -C nitro-runtime
 
 icecap-cca: shared
+	$(MAKE) -C icecap-runtime icecap_plat=lkvm_realm PROFILE=dev elfloader
 	$(MAKE) -C icecap-host icecap_plat=lkvm_realm build-cca
 
 icecap: shared
 	$(MAKE) -C icecap-runtime build
 	$(MAKE) -C icecap-host
 
+icecap-tests-cca:
+	$(MAKE) -C icecap-host tests-cca
+	
 icecap-tests:
 	$(MAKE) -C icecap-host tests
 
