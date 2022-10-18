@@ -11,11 +11,11 @@
 
 #[cfg(feature = "icecap")]
 use crate::platforms::icecap::IceCapError;
-use actix_web::{error, http::StatusCode, HttpResponse, HttpResponseBuilder};
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use std::error::Error;
+use tokio::sync::mpsc;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -31,8 +31,10 @@ pub enum VeracruzServerError {
     LockError(String),
     #[error(display = "VeracruzServer: ParseIntError: {}.", _0)]
     ParseIntError(#[error(source)] std::num::ParseIntError),
-    #[error(display = "VeracruzServer: MpscSendError (of type ()) Error: {}.", _0)]
-    MpscSendEmptyError(#[error(source)] std::sync::mpsc::SendError<()>),
+    #[error(display = "VeracruzServer: mpsc SendError (of type ()) Error: {}.", _0)]
+    MpscSendEmptyError(#[error(source)] mpsc::error::SendError<()>),
+    #[error(display = "VeracruzServer: FromUtf8Error")]
+    FromUtf8Error(#[error(source)] std::string::FromUtf8Error),
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
@@ -87,15 +89,6 @@ impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {
 impl From<anyhow::Error> for VeracruzServerError {
     fn from(error: anyhow::Error) -> Self {
         VeracruzServerError::Anyhow(error)
-    }
-}
-
-impl error::ResponseError for VeracruzServerError {
-    fn error_response(&self) -> HttpResponse {
-        HttpResponseBuilder::new(self.status_code()).body(format!("{:?}", self))
-    }
-    fn status_code(&self) -> StatusCode {
-        StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 

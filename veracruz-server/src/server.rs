@@ -16,26 +16,21 @@ use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 use crate::platforms::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
-use actix_web::{dev::Server, middleware, post, web, App, HttpRequest, HttpServer};
 use base64;
-use futures::executor;
 use policy_utils::policy::Policy;
-use std::{
-    sync::mpsc,
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::sync::{Arc, Mutex};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
 
 type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
-#[post("/runtime_manager")]
-async fn runtime_manager_request(
-    enclave_handler: web::Data<EnclaveHandler>,
-    stopper: web::Data<mpsc::Sender<()>>,
-    _request: HttpRequest,
-    input_data: String,
-) -> VeracruzServerResponder {
+fn veracruz_server_request(
+    enclave_handler: EnclaveHandler,
+    shutdown_tx: mpsc::UnboundedSender<()>,
+    input_data: &str,
+) -> Result<String, VeracruzServerError> {
     let fields = input_data.split_whitespace().collect::<Vec<&str>>();
     if fields.len() < 2 {
         return Err(VeracruzServerError::InvalidRequestFormatError);
@@ -73,7 +68,7 @@ async fn runtime_manager_request(
         // Drop the `VeracruzServer` object which triggers enclave shutdown
         *enclave_handler_locked = None;
 
-        stopper.send(())?;
+        shutdown_tx.send(())?;
     }
 
     // Response this request
@@ -91,36 +86,49 @@ async fn runtime_manager_request(
     Ok(result)
 }
 
-/// Return an actix server. The caller should call .await for starting the service.
-pub fn server(policy_json: &str) -> Result<Server, VeracruzServerError> {
+async fn handle_veracruz_server_request(
+    enclave_handler: EnclaveHandler,
+    shutdown_tx: mpsc::UnboundedSender<()>,
+    mut stream: TcpStream,
+) -> Result<(), VeracruzServerError> {
+    let mut buf = vec![];
+    stream.read_to_end(&mut buf).await?;
+    let input_data = String::from_utf8(buf)?;
+    let result = veracruz_server_request(enclave_handler, shutdown_tx, &input_data)?;
+    stream.write_all(result.as_bytes()).await?;
+    stream.shutdown().await?;
+    Ok(())
+}
+
+async fn serve_veracruz_server_requests(
+    veracruz_server_url: &str,
+    enclave_handler: EnclaveHandler,
+    shutdown_tx: mpsc::UnboundedSender<()>,
+) -> Result<(), VeracruzServerError> {
+    let listener = TcpListener::bind(veracruz_server_url).await?;
+    loop {
+        let (socket, _) = listener.accept().await?;
+        let enclave_handler = enclave_handler.clone();
+        let shutdown_tx = shutdown_tx.clone();
+        tokio::spawn(async move {
+            let _ = handle_veracruz_server_request(enclave_handler, shutdown_tx, socket).await;
+        });
+    }
+}
+
+/// A server that listens on one TCP port.
+pub async fn server(policy_json: &str) -> Result<(), VeracruzServerError> {
     let policy: Policy = serde_json::from_str(policy_json)?;
     #[allow(non_snake_case)]
     let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(
         VeracruzServerEnclave::new(policy_json)?,
     ))));
 
-    // create a channel for stop server
-    let (shutdown_channel_tx, shutdown_channel_rx) = mpsc::channel::<()>();
+    // create a channel for stopping the server
+    let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
 
-    let server = HttpServer::new(move || {
-        // give the server a Sender in .data
-        App::new()
-            // pass in the shutdown channel and enclave handler VERACRUZ_SERVER to the server
-            .wrap(middleware::Logger::default())
-            .app_data(web::Data::new(shutdown_channel_tx.clone()))
-            .app_data(web::Data::new(VERACRUZ_SERVER.clone()))
-            .service(runtime_manager_request)
-    })
-    .bind(&policy.veracruz_server_url())?
-    .run();
-
-    // Get the Server handle and pass it to the thread for shutting down the server
-    let handle = server.handle();
-    thread::spawn(move || {
-        // wait for shutdown signal and stop the server gracefully
-        if shutdown_channel_rx.recv().is_ok() {
-            executor::block_on(handle.stop(true));
-        }
-    });
-    Ok(server)
+    tokio::select! {
+        x = serve_veracruz_server_requests(&policy.veracruz_server_url(), VERACRUZ_SERVER.clone(), shutdown_tx.clone()) => x,
+        _ = async { shutdown_rx.recv().await } => Ok(()),
+    }
 }

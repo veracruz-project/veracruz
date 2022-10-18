@@ -9,7 +9,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use actix_rt;
 use anyhow::anyhow;
 use log::info;
 use policy_utils::policy::Policy;
@@ -47,27 +46,22 @@ fn main() {
     };
     info!("Loaded policy {}", policy.policy_hash().unwrap_or("???"));
 
-    // create Actix runtime
-    let sys = actix_rt::System::new();
+    // create runtime
+    let rt = tokio::runtime::Runtime::new().unwrap_or_else(|err| {
+        eprintln!("{}", err);
+        process::exit(1);
+    });
 
     // create Veracruz Server instance
-    let veracruz_server = match veracruz_server::server::server(&policy_json) {
-        Ok(veracruz_server) => veracruz_server,
-        Err(err) => {
-            eprintln!("{}", err);
-            process::exit(1);
-        }
-    };
+    let veracruz_server = veracruz_server::server::server(&policy_json);
 
     println!(
         "Veracruz Server running on {}",
         policy.veracruz_server_url()
     );
-    match sys.block_on(veracruz_server) {
-        Ok(_) => {}
-        Err(err) => {
+    rt.block_on(async { veracruz_server.await })
+        .unwrap_or_else(|err| {
             eprintln!("{}", err);
             process::exit(1);
-        }
-    }
+        });
 }

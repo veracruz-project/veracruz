@@ -22,6 +22,8 @@ use std::{
         Arc,
     },
 };
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 /// VeracruzClient struct. The remote_session_id is shared between
@@ -76,27 +78,25 @@ impl Write for InsecureConnection {
             self.remote_session_id.load(Ordering::SeqCst),
             string_data
         );
-        let dest_url = format!("http://{:}/runtime_manager", self.veracruz_server_url);
-        // Spawn a separate thread so that we can use reqwest::blocking.
-        let body = std::thread::spawn(move || {
-            let client_build = reqwest::blocking::ClientBuilder::new()
-                .timeout(None)
-                .build()
-                .map_err(|_| err("reqwest new"))?;
-            let ret = client_build
-                .post(dest_url)
-                .body(combined_string)
-                .send()
-                .map_err(|_| err("reqwest send"))?;
-            if ret.status() != reqwest::StatusCode::OK {
-                return Err(err("reqwest bad status"));
-            }
-            Ok(ret.text().map_err(|_| err("reqwest text"))?)
+        let addr = self.veracruz_server_url.to_string();
+        // Spawn a separate thread so that we can start an async runtime.
+        let body = std::thread::spawn(move || -> Result<Vec<u8>, std::io::Error> {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(async {
+                let mut socket = TcpStream::connect(addr).await?;
+                socket.write_all(combined_string.as_bytes()).await?;
+                socket.shutdown().await?;
+                let mut buf = vec![];
+                socket.read_to_end(&mut buf).await?;
+                Ok(buf)
+            })
         })
         .join()
         .map_err(|_| err("join failed"))??;
+
         // We received a response ...
-        let body_items = body.split_whitespace().collect::<Vec<&str>>();
+        let body_str = std::str::from_utf8(&body).map_err(|_| err("bad UTF-8"))?;
+        let body_items = body_str.split_whitespace().collect::<Vec<&str>>();
         if !body_items.is_empty() {
             // If it was not empty, update the remote_session_id ...
             let received_session_id = body_items[0]

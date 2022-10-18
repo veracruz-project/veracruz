@@ -55,7 +55,6 @@ const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
 const TIME_OUT_SECS: u64 = 1200;
 
-use actix_rt::time::{sleep, Instant};
 use anyhow::{anyhow, Result};
 use either::{Left, Right};
 use env_logger;
@@ -67,6 +66,7 @@ use std::{
     path::Path,
     time::Duration,
 };
+use tokio::time::{sleep, Instant};
 use veracruz_client::{self, VeracruzClient};
 use veracruz_server;
 
@@ -84,7 +84,7 @@ pub async fn timeout<F: Future>(timeout: Duration, f: F) -> <F as Future>::Outpu
         Err(err) => panic!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err),
     };
 
-    match actix_web::rt::time::timeout(timeout, f).await {
+    match tokio::time::timeout(timeout, f).await {
         Ok(r) => r,
         Err(_) => panic!(
             "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
@@ -94,7 +94,7 @@ pub async fn timeout<F: Future>(timeout: Duration, f: F) -> <F as Future>::Outpu
 }
 
 /// A test of veracruz using network communication using a single session
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase1_get_random_one_client() {
     TestExecutor::test_template(
         SINGLE_CLIENT_POLICY,
@@ -112,7 +112,7 @@ async fn veracruz_phase1_get_random_one_client() {
 }
 
 /// A test of veracruz using network communication using two sessions (one for program and one for data)
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase1_linear_regression_two_clients() {
     TestExecutor::test_template(
         LINEAR_REGRESSION_DUAL_POLICY,
@@ -134,7 +134,7 @@ async fn veracruz_phase1_linear_regression_two_clients() {
 }
 
 /// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase2_linear_regression_three_clients() {
     TestExecutor::test_template(
         LINEAR_REGRESSION_TRIPLE_POLICY,
@@ -159,7 +159,7 @@ async fn veracruz_phase2_linear_regression_three_clients() {
 
 /// A test of veracruz using network communication using four sessions
 /// (one for program, one for the first data, and one for the second data and retrieval.)
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase2_intersection_set_sum_three_clients() {
     TestExecutor::test_template(
         INTERSECTION_SET_SUM_TRIPLE_POLICY,
@@ -196,7 +196,7 @@ async fn veracruz_phase2_intersection_set_sum_three_clients() {
 
 /// A test of veracruz using network communication using three sessions
 /// (one for program, one for the first data, and one for the second data and retrieval.)
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase2_string_edit_distance_three_clients() {
     TestExecutor::test_template(
         STRING_EDIT_DISTANCE_TRIPLE_POLICY,
@@ -224,7 +224,7 @@ async fn veracruz_phase2_string_edit_distance_three_clients() {
 
 /// A test of veracruz using network communication using four sessions
 /// (one for program, one for the first data, one for the second data, and one for retrieval.)
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase3_string_edit_distance_four_clients() {
     TestExecutor::test_template(
         STRING_EDIT_DISTANCE_QUADRUPLE_POLICY,
@@ -253,7 +253,7 @@ async fn veracruz_phase3_string_edit_distance_four_clients() {
 
 /// a test of veracruz using network communication using two parallel sessions
 /// (one for program, one for data sending and retrieving)
-#[actix_rt::test]
+#[tokio::test]
 async fn veracruz_phase4_linear_regression_two_clients_parallel() {
     timeout(Duration::from_secs(1200), async {
         let (_, policy_json, _) =
@@ -262,12 +262,12 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
 
         proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
 
-        sleep(std::time::Duration::from_millis(5000)).await;
         let policy_json_clone = policy_json.clone();
         let server_handle = server_tls_loop(policy_json_clone);
 
         let program_provider_handle = async {
-            sleep(std::time::Duration::from_millis(10000)).await;
+            // Wait for the server
+            sleep(Duration::from_millis(30000)).await;
             info!("### program provider start.");
             let mut client = veracruz_client::VeracruzClient::new(
                 cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
@@ -282,7 +282,8 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             Result::<()>::Ok(())
         };
         let data_provider_handle = async {
-            sleep(std::time::Duration::from_millis(15000)).await;
+            // Wait for the server
+            sleep(Duration::from_millis(30000)).await;
             info!("### data provider start.");
             let mut client = veracruz_client::VeracruzClient::new(
                 cert_key_dir(DATA_CLIENT_CERT).as_path(),
@@ -314,10 +315,12 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
     .await
 }
 
-async fn server_tls_loop<P: AsRef<str>>(policy_json: P) -> Result<()> {
-    veracruz_server::server::server(policy_json.as_ref())
-        .map_err(|e| anyhow!("Veracruz server error {:?}", e))?
-        .await?;
+async fn server_tls_loop(policy_json: String) -> Result<()> {
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(veracruz_server::server::server(&policy_json))
+            .unwrap();
+    });
     Ok(())
 }
 
@@ -381,7 +384,7 @@ impl TestExecutor {
         // NOTE: this does not run the code but only create a future.
         let clients_handle = async move {
             // Wait for the server
-            sleep(std::time::Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(30000)).await;
 
             info!("Initialise clients.");
             // Initialise all clients
@@ -425,7 +428,7 @@ impl TestExecutor {
         };
 
         // Propogating both timeout and error from the try_join.
-        actix_web::rt::time::timeout(timeout, async {
+        tokio::time::timeout(timeout, async {
             // Must wrap in a async for the timeout, as it requests a future.
             futures::try_join!(server_handle, clients_handle)
         })
