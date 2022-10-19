@@ -40,8 +40,8 @@ icecap: shared
 	$(MAKE) -C icecap-host
 
 icecap-tests-cca:
-	$(MAKE) -C icecap-host tests-cca
-	
+	$(MAKE) -C icecap-host icecap_plat=lkvm_realm tests-cca
+
 icecap-tests:
 	$(MAKE) -C icecap-host tests
 

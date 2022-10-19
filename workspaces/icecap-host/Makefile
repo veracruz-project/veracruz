@@ -96,8 +96,8 @@ test-dependencies: test-collateral icecap-runtime
 CARGO_TEST = $(COMPILERS) $(QEMU_TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
 	--features icecap
 
-CCA_CARGO_TEST = $(COMPILERS) $(CCA_TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
-	--features icecap-cca
+CCA_CARGO_TEST = $(COMPILERS)  $(CCA_TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
+	$(host_feature_flags) --features icecap-cca
 
 build-tests:
 	$(CARGO_TEST) --no-run
@@ -108,8 +108,8 @@ test-server: test-dependencies build-tests
 build-tests-cca:
 	$(CCA_CARGO_TEST) --no-run
 
-test-server-cca: test-dependencies build-tests-cca
-	$(CCA_CARGO_TEST) -p tests --test server_test basic_random_source --no-run -- --test-threads=1 --nocapture
+test-server-cca: test-collateral
+	$(CCA_CARGO_TEST) -p tests --test server_test --no-run -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
