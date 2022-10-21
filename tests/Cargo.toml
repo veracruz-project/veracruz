@@ -36,7 +36,6 @@ nitro = [
 
 [dependencies]
 actix-rt = "2"
-actix-web = "4"
 anyhow = "1"
 either = "1.6.1"
 env_logger = "0.9.0"
@@ -48,6 +47,7 @@ mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
+tokio = { version = "1.16.1", default-features = false, features = [] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }
