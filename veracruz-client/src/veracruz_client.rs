@@ -11,6 +11,7 @@
 
 use crate::error::VeracruzClientError;
 use anyhow::{anyhow, Result};
+use bincode;
 use log::{error, info};
 use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
@@ -22,8 +23,6 @@ use std::{
         Arc,
     },
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 /// VeracruzClient struct. The remote_session_id is shared between
@@ -72,43 +71,28 @@ impl Write for InsecureConnection {
         let err = |t| std::io::Error::new(std::io::ErrorKind::Other, t);
 
         // Send all the data to the server.
-        let string_data = base64::encode(&data);
-        let combined_string = format!(
-            "{:} {:}",
-            self.remote_session_id.load(Ordering::SeqCst),
-            string_data
-        );
+        let mut combined_data =
+            bincode::serialize(&self.remote_session_id.load(Ordering::SeqCst)).unwrap();
+        assert_eq!(combined_data.len(), 4);
+        combined_data.extend_from_slice(&data);
         let addr = self.veracruz_server_url.to_string();
-        // Spawn a separate thread so that we can start an async runtime.
-        let body = std::thread::spawn(move || -> Result<Vec<u8>, std::io::Error> {
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(async {
-                let mut socket = TcpStream::connect(addr).await?;
-                socket.write_all(combined_string.as_bytes()).await?;
-                socket.shutdown().await?;
-                let mut buf = vec![];
-                socket.read_to_end(&mut buf).await?;
-                Ok(buf)
-            })
-        })
-        .join()
-        .map_err(|_| err("join failed"))??;
+        let mut socket = std::net::TcpStream::connect(addr)?;
+        socket.write_all(&combined_data)?;
+        socket.shutdown(std::net::Shutdown::Write)?;
+        let mut body = vec![];
+        socket.read_to_end(&mut body)?;
 
         // We received a response ...
-        let body_str = std::str::from_utf8(&body).map_err(|_| err("bad UTF-8"))?;
-        let body_items = body_str.split_whitespace().collect::<Vec<&str>>();
-        if !body_items.is_empty() {
+        if body.len() > 0 {
+            if body.len() < 4 {
+                return Err(err("bad session id"));
+            }
             // If it was not empty, update the remote_session_id ...
-            let received_session_id = body_items[0]
-                .parse::<u32>()
-                .map_err(|_| err("bad session id"))?;
+            let received_session_id = bincode::deserialize(&body).unwrap();
             self.remote_session_id
                 .store(received_session_id, Ordering::SeqCst);
             // And append response data to the read_buffer.
-            for item in body_items.iter().skip(1) {
-                let this_body_data = base64::decode(item).map_err(|_| err("base64::decode"))?;
-                self.read_buffer.extend_from_slice(&this_body_data)
-            }
+            self.read_buffer.extend_from_slice(&body[4..]);
         }
         // Return value to indicate that we handled all the data.
         Ok(data.len())

@@ -16,26 +16,24 @@ use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 use crate::platforms::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
-use base64;
+use bincode;
 use policy_utils::policy::Policy;
+use std::io::{Read, Write};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::mpsc;
+use std::thread;
 
 type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
 fn veracruz_server_request(
     enclave_handler: EnclaveHandler,
-    shutdown_tx: mpsc::UnboundedSender<()>,
-    input_data: &str,
-) -> Result<String, VeracruzServerError> {
-    let fields = input_data.split_whitespace().collect::<Vec<&str>>();
-    if fields.len() < 2 {
+    input_data: &[u8],
+) -> Result<Vec<u8>, VeracruzServerError> {
+    if input_data.len() < 4 {
         return Err(VeracruzServerError::InvalidRequestFormatError);
     }
-    let session_id = match fields[0].parse::<u32>()? {
+    let session_id = match bincode::deserialize(&input_data).unwrap() {
         0 => {
             let mut enclave_handler_locked = enclave_handler.lock()?;
 
@@ -48,8 +46,7 @@ fn veracruz_server_request(
         n @ 1u32..=std::u32::MAX => n,
     };
 
-    let received_data = fields[1];
-    let received_data_decoded = base64::decode(&received_data)?;
+    let received_data = &input_data[4..];
 
     let (active_flag, output_data_option) = {
         let mut enclave_handler_locked = enclave_handler.lock()?;
@@ -58,7 +55,7 @@ fn veracruz_server_request(
             .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
 
-        enclave.tls_data(session_id, received_data_decoded)?
+        enclave.tls_data(session_id, received_data.to_vec())?
     };
 
     // Shutdown the enclave
@@ -67,68 +64,61 @@ fn veracruz_server_request(
 
         // Drop the `VeracruzServer` object which triggers enclave shutdown
         *enclave_handler_locked = None;
-
-        shutdown_tx.send(())?;
     }
 
     // Response this request
     let result = match output_data_option {
-        None => String::new(),
+        None => vec![],
         Some(output_data) => {
-            let output_data_formatted = output_data
-                .iter()
-                .map(|item| base64::encode(&item))
-                .collect::<Vec<String>>()
-                .join(" ");
-            format!("{:} {}", session_id, output_data_formatted)
+            let mut output = bincode::serialize(&session_id).unwrap();
+            assert_eq!(output.len(), 4);
+            for x in output_data {
+                output.extend_from_slice(&x);
+            }
+            output
         }
     };
     Ok(result)
 }
 
-async fn handle_veracruz_server_request(
+fn handle_veracruz_server_request(
     enclave_handler: EnclaveHandler,
-    shutdown_tx: mpsc::UnboundedSender<()>,
     mut stream: TcpStream,
 ) -> Result<(), VeracruzServerError> {
     let mut buf = vec![];
-    stream.read_to_end(&mut buf).await?;
-    let input_data = String::from_utf8(buf)?;
-    let result = veracruz_server_request(enclave_handler, shutdown_tx, &input_data)?;
-    stream.write_all(result.as_bytes()).await?;
-    stream.shutdown().await?;
+    stream.read_to_end(&mut buf)?;
+    let result = veracruz_server_request(enclave_handler, &buf)?;
+    stream.write_all(&result)?;
+    stream.shutdown(Shutdown::Both)?;
     Ok(())
 }
 
-async fn serve_veracruz_server_requests(
+fn serve_veracruz_server_requests(
     veracruz_server_url: &str,
     enclave_handler: EnclaveHandler,
-    shutdown_tx: mpsc::UnboundedSender<()>,
 ) -> Result<(), VeracruzServerError> {
-    let listener = TcpListener::bind(veracruz_server_url).await?;
-    loop {
-        let (socket, _) = listener.accept().await?;
-        let enclave_handler = enclave_handler.clone();
-        let shutdown_tx = shutdown_tx.clone();
-        tokio::spawn(async move {
-            let _ = handle_veracruz_server_request(enclave_handler, shutdown_tx, socket).await;
-        });
-    }
+    let listener = TcpListener::bind(veracruz_server_url)?;
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let stream = stream.unwrap();
+            let enclave_handler = enclave_handler.clone();
+            thread::spawn(|| {
+                let _ = handle_veracruz_server_request(enclave_handler, stream);
+            });
+        }
+    });
+    Ok(())
 }
 
 /// A server that listens on one TCP port.
-pub async fn server(policy_json: &str) -> Result<(), VeracruzServerError> {
+/// This function returns when the spawned thread is listening.
+pub fn server(policy_json: &str) -> Result<(), VeracruzServerError> {
     let policy: Policy = serde_json::from_str(policy_json)?;
     #[allow(non_snake_case)]
     let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(Box::new(
         VeracruzServerEnclave::new(policy_json)?,
     ))));
 
-    // create a channel for stopping the server
-    let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
-
-    tokio::select! {
-        x = serve_veracruz_server_requests(&policy.veracruz_server_url(), VERACRUZ_SERVER.clone(), shutdown_tx.clone()) => x,
-        _ = async { shutdown_rx.recv().await } => Ok(()),
-    }
+    serve_veracruz_server_requests(&policy.veracruz_server_url(), VERACRUZ_SERVER.clone())?;
+    Ok(())
 }
