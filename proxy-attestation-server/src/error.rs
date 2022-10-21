@@ -23,8 +23,6 @@ pub enum ProxyAttestationServerError {
         _0
     )]
     OpenSSLError(#[error(source)] openssl::error::ErrorStack),
-    #[error(display = "ProxyAttestationServer: CurlError: {:?}.", _0)]
-    CurlError(#[error(source)] curl::Error),
     #[error(display = "ProxyAttestationServer: Failed to obtain lock {:?}.", _0)]
     LockError(String),
     #[error(
