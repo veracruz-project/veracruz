@@ -53,49 +53,17 @@ const INTERSECTION_SET_SUM_ADVERTISEMENT_DATA: &'static str =
 const STRING_1_DATA: &'static str = "hello-world-1.dat";
 const STRING_2_DATA: &'static str = "hello-world-2.dat";
 
-const TIME_OUT_SECS: u64 = 1200;
-
 use anyhow::{anyhow, Result};
-use either::{Left, Right};
 use env_logger;
 use log::{error, info};
 use policy_utils::policy::Policy;
-use std::{
-    env::{self, VarError},
-    future::Future,
-    path::Path,
-    time::Duration,
-};
-use tokio::time::Instant;
+use std::{path::Path, thread, time::Instant};
 use veracruz_client::{self, VeracruzClient};
 use veracruz_server;
 
-/// A wrapper to force tests to panic after a timeout.
-///
-/// Note this is overrideable with the VERACRUZ_TEST_TIMEOUT environment
-/// variable, which provides a timeout in seconds
-pub async fn timeout<F: Future>(timeout: Duration, f: F) -> <F as Future>::Output {
-    let timeout = match env::var("VERACRUZ_TEST_TIMEOUT")
-        .map_err(Left)
-        .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
-    {
-        Ok(val) => Duration::from_secs(val),
-        Err(Left(VarError::NotPresent)) => timeout,
-        Err(err) => panic!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err),
-    };
-
-    match tokio::time::timeout(timeout, f).await {
-        Ok(r) => r,
-        Err(_) => panic!(
-            "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
-            timeout
-        ),
-    }
-}
-
 /// A test of veracruz using network communication using a single session
-#[tokio::test]
-async fn veracruz_phase1_get_random_one_client() {
+#[test]
+fn veracruz_phase1_get_random_one_client() {
     TestExecutor::test_template(
         SINGLE_CLIENT_POLICY,
         &vec![(CLIENT_CERT, CLIENT_KEY)],
@@ -105,15 +73,13 @@ async fn veracruz_phase1_get_random_one_client() {
             (0, TestEvent::read_result("/output/random.dat")),
             (0, TestEvent::ShutDown),
         ],
-        TIME_OUT_SECS,
     )
-    .await
     .unwrap();
 }
 
 /// A test of veracruz using network communication using two sessions (one for program and one for data)
-#[tokio::test]
-async fn veracruz_phase1_linear_regression_two_clients() {
+#[test]
+fn veracruz_phase1_linear_regression_two_clients() {
     TestExecutor::test_template(
         LINEAR_REGRESSION_DUAL_POLICY,
         &vec![
@@ -127,15 +93,13 @@ async fn veracruz_phase1_linear_regression_two_clients() {
             (1, TestEvent::read_result("/output/linear-regression.dat")),
             (0, TestEvent::ShutDown),
         ],
-        TIME_OUT_SECS,
     )
-    .await
     .unwrap();
 }
 
 /// A test of veracruz using network communication using three sessions (one for program, one for data, and one for retrieval)
-#[tokio::test]
-async fn veracruz_phase2_linear_regression_three_clients() {
+#[test]
+fn veracruz_phase2_linear_regression_three_clients() {
     TestExecutor::test_template(
         LINEAR_REGRESSION_TRIPLE_POLICY,
         &vec![
@@ -151,16 +115,14 @@ async fn veracruz_phase2_linear_regression_three_clients() {
             (2, TestEvent::read_result("/output/linear-regression.dat")),
             (0, TestEvent::ShutDown),
         ],
-        TIME_OUT_SECS,
     )
-    .await
     .unwrap();
 }
 
 /// A test of veracruz using network communication using four sessions
 /// (one for program, one for the first data, and one for the second data and retrieval.)
-#[tokio::test]
-async fn veracruz_phase2_intersection_set_sum_three_clients() {
+#[test]
+fn veracruz_phase2_intersection_set_sum_three_clients() {
     TestExecutor::test_template(
         INTERSECTION_SET_SUM_TRIPLE_POLICY,
         &vec![
@@ -188,16 +150,14 @@ async fn veracruz_phase2_intersection_set_sum_three_clients() {
             ),
             (0, TestEvent::ShutDown),
         ],
-        TIME_OUT_SECS,
     )
-    .await
     .unwrap();
 }
 
 /// A test of veracruz using network communication using three sessions
 /// (one for program, one for the first data, and one for the second data and retrieval.)
-#[tokio::test]
-async fn veracruz_phase2_string_edit_distance_three_clients() {
+#[test]
+fn veracruz_phase2_string_edit_distance_three_clients() {
     TestExecutor::test_template(
         STRING_EDIT_DISTANCE_TRIPLE_POLICY,
         &vec![
@@ -216,16 +176,14 @@ async fn veracruz_phase2_string_edit_distance_three_clients() {
             ),
             (0, TestEvent::ShutDown),
         ],
-        TIME_OUT_SECS,
     )
-    .await
     .unwrap();
 }
 
 /// A test of veracruz using network communication using four sessions
 /// (one for program, one for the first data, one for the second data, and one for retrieval.)
-#[tokio::test]
-async fn veracruz_phase3_string_edit_distance_four_clients() {
+#[test]
+fn veracruz_phase3_string_edit_distance_four_clients() {
     TestExecutor::test_template(
         STRING_EDIT_DISTANCE_QUADRUPLE_POLICY,
         &vec![
@@ -245,75 +203,79 @@ async fn veracruz_phase3_string_edit_distance_four_clients() {
             ),
             (0, TestEvent::ShutDown),
         ],
-        TIME_OUT_SECS,
     )
-    .await
     .unwrap();
 }
 
 /// a test of veracruz using network communication using two parallel sessions
 /// (one for program, one for data sending and retrieving)
-#[tokio::test]
-async fn veracruz_phase4_linear_regression_two_clients_parallel() {
-    timeout(Duration::from_secs(1200), async {
-        let (_, policy_json, _) =
-            read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
-        let policy = Policy::from_json(&policy_json).unwrap();
+#[test]
+fn veracruz_phase4_linear_regression_two_clients_parallel() {
+    let (_, policy_json, _) =
+        read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
+    let policy = Policy::from_json(&policy_json).unwrap();
 
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+    proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
 
-        let policy_json_clone = policy_json.clone();
-        let server_handle = server_tls_loop(policy_json_clone);
+    server_tls_loop(policy_json.clone());
 
-        let program_provider_handle = async {
-            info!("### program provider start.");
-            let mut client = veracruz_client::VeracruzClient::new(
-                cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
-                cert_key_dir(PROGRAM_CLIENT_KEY).as_path(),
-                &policy_json,
-            )?;
-            let prog_path = program_dir(LINEAR_REGRESSION_WASM);
-            info!("### program provider read binary.");
-            let program_data = read_local_file(prog_path).unwrap();
-            info!("### program provider send binary.");
-            client.write_file("/program/linear-regression.wasm", &program_data)?;
-            Result::<()>::Ok(())
-        };
-        let data_provider_handle = async {
-            info!("### data provider start.");
-            let mut client = veracruz_client::VeracruzClient::new(
-                cert_key_dir(DATA_CLIENT_CERT).as_path(),
-                cert_key_dir(DATA_CLIENT_KEY).as_path(),
-                &policy_json,
-            )?;
+    let policy_json_cloned = policy_json.clone();
+    let client1_handle = thread::spawn(move || -> Result<()> {
+        info!("### program provider start.");
+        let mut client = veracruz_client::VeracruzClient::new(
+            cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
+            cert_key_dir(PROGRAM_CLIENT_KEY).as_path(),
+            &policy_json_cloned,
+        )?;
+        let prog_path = program_dir(LINEAR_REGRESSION_WASM);
+        info!("### program provider read binary.");
+        let program_data = read_local_file(prog_path).unwrap();
+        info!("### program provider send binary.");
+        client.write_file("/program/linear-regression.wasm", &program_data)?;
+        Result::<()>::Ok(())
+    });
 
-            let data_filename = data_dir(LINEAR_REGRESSION_DATA);
-            info!("### data provider read input.");
-            let data = read_local_file(&data_filename).unwrap();
-            info!("### data provider send input.");
-            client.write_file("/input/linear-regression.dat", &data)?;
-            info!("### data provider read result.");
-            client.request_compute("/program/linear-regression.wasm")?;
-            client.read_file("/output/linear-regression.dat")?;
-            info!("### data provider request shutdown.");
-            client.request_shutdown()?;
-            Result::<()>::Ok(())
-        };
-
-        let result = futures::future::try_join3(
-            server_handle,
-            program_provider_handle,
-            data_provider_handle,
+    let policy_json_cloned = policy_json.clone();
+    let client2_handle = thread::spawn(move || -> Result<()> {
+        info!("### data provider start.");
+        let mut client = veracruz_client::VeracruzClient::new(
+            cert_key_dir(DATA_CLIENT_CERT).as_path(),
+            cert_key_dir(DATA_CLIENT_KEY).as_path(),
+            &policy_json_cloned,
         )
-        .await;
-        assert!(result.is_ok(), "error: {:?}", result);
-    })
-    .await
+        .unwrap();
+
+        let data_filename = data_dir(LINEAR_REGRESSION_DATA);
+        info!("### data provider read input.");
+        let data = read_local_file(&data_filename).unwrap();
+        info!("### data provider send input.");
+        client.write_file("/input/linear-regression.dat", &data)?;
+        Result::<()>::Ok(())
+    });
+
+    client1_handle.join().unwrap().unwrap();
+    client2_handle.join().unwrap().unwrap();
+
+    (|| -> Result<()> {
+        info!("### third client start.");
+        let mut client = veracruz_client::VeracruzClient::new(
+            cert_key_dir(DATA_CLIENT_CERT).as_path(),
+            cert_key_dir(DATA_CLIENT_KEY).as_path(),
+            &policy_json,
+        )
+        .unwrap();
+
+        client.request_compute("/program/linear-regression.wasm")?;
+        client.read_file("/output/linear-regression.dat")?;
+        info!("### data provider request shutdown.");
+        client.request_shutdown()?;
+        Ok(())
+    })()
+    .unwrap();
 }
 
-async fn server_tls_loop(policy_json: String) -> Result<()> {
-    veracruz_server::server::server(&policy_json).unwrap();
-    Ok(())
+fn server_tls_loop(policy_json: String) {
+    veracruz_server::server::server(&policy_json).unwrap()
 }
 
 /// Test states.
@@ -323,24 +285,20 @@ struct TestExecutor {
 }
 
 impl TestExecutor {
-    async fn test_template<P: AsRef<str>, Q: AsRef<str>, K: AsRef<str>>(
+    fn test_template<P: AsRef<str>, Q: AsRef<str>, K: AsRef<str>>(
         // Policy files
         policy_filename: P,
         // List of client's certificates and private keys
         client_cert_key_pairs: &[(Q, K)],
         events: Vec<(usize, TestEvent)>,
-        timeout_sec: u64,
     ) -> Result<()> {
-        Self::new(policy_dir(policy_filename))?
-            .execute(
-                &client_cert_key_pairs
-                    .iter()
-                    .map(|(cert, key)| (cert_key_dir(cert), cert_key_dir(key)))
-                    .collect::<Vec<_>>(),
-                events,
-                Duration::from_secs(timeout_sec),
-            )
-            .await?;
+        Self::new(policy_dir(policy_filename))?.execute(
+            &client_cert_key_pairs
+                .iter()
+                .map(|(cert, key)| (cert_key_dir(cert), cert_key_dir(key)))
+                .collect::<Vec<_>>(),
+            events,
+        )?;
         Ok(())
     }
 
@@ -361,73 +319,43 @@ impl TestExecutor {
 
     /// Execute this test. Clients collectively execute as a block, driven by the `events`, in
     /// parallel with the server.
-    async fn execute<P: AsRef<Path>, Q: AsRef<Path>>(
+    fn execute<P: AsRef<Path>, Q: AsRef<Path>>(
         self,
         client_cert_key_pairs: &[(P, Q)],
         events: Vec<(usize, TestEvent)>,
-        timeout: Duration,
     ) -> Result<()> {
-        // create the async block, use `?` to convert the error type.
-        // NOTE: this does not run the code but only create a future.
-        let policy_json_clone = self.policy_json.clone();
-        let server_handle = server_tls_loop(policy_json_clone);
+        server_tls_loop(self.policy_json.clone());
 
-        // create the async block for all clients driven by events.
-        // NOTE: this does not run the code but only create a future.
-        let clients_handle = async move {
-            info!("Initialise clients.");
-            // Initialise all clients
-            let mut clients = Vec::new();
-            for (cert, key) in client_cert_key_pairs.iter() {
-                clients.push(veracruz_client::VeracruzClient::new(
-                    cert.as_ref(),
-                    key.as_ref(),
-                    &self.policy_json,
-                )?);
-            }
+        info!("Initialise clients.");
+        // Initialise all clients
+        let mut clients = Vec::new();
+        for (cert, key) in client_cert_key_pairs.iter() {
+            clients.push(
+                veracruz_client::VeracruzClient::new(&cert, &key, &self.policy_json).unwrap(),
+            );
+        }
 
-            // Process the events
-            for (client_index, event) in events.iter() {
-                let mut client = clients
-                    .get_mut(*client_index)
-                    .ok_or(anyhow!("cannot find client of index {}", client_index))?;
-                info!("Process client{} event {:?}.", client_index, event);
-                let time_init = Instant::now();
-                Self::process_event(&mut client, &event).map_err(|e| {
+        // Process the events
+        for (client_index, event) in events.iter() {
+            let mut client = clients
+                .get_mut(*client_index)
+                .ok_or(anyhow!("cannot find client of index {}", client_index))
+                .unwrap();
+            info!("Process client{} event {:?}.", client_index, event);
+            let time_init = Instant::now();
+            Self::process_event(&mut client, &event)
+                .map_err(|e| {
                     error!("Client of index {}: {:?}", client_index, e);
                     e
-                })?;
-                info!(
-                    "The event {:?} finished in {:?}.",
-                    event,
-                    time_init.elapsed()
-                );
-            }
-            Result::<()>::Ok(())
-        };
+                })
+                .unwrap();
+            info!(
+                "The event {:?} finished in {:?}.",
+                event,
+                time_init.elapsed()
+            );
+        }
 
-        // Trigger the async, and execute them in parallel
-        let timeout = match env::var("VERACRUZ_TEST_TIMEOUT")
-            .map_err(Left)
-            .and_then(|timeout| timeout.parse::<u64>().map_err(Right))
-        {
-            Ok(val) => Duration::from_secs(val),
-            Err(Left(VarError::NotPresent)) => timeout,
-            Err(err) => return Err(anyhow!("Couldn't parse VERACRUZ_TEST_TIMEOUT: {:?}", err)),
-        };
-
-        // Propogating both timeout and error from the try_join.
-        tokio::time::timeout(timeout, async {
-            // Must wrap in a async for the timeout, as it requests a future.
-            futures::try_join!(server_handle, clients_handle)
-        })
-        .await
-        .map_err(|_| {
-            anyhow!(
-                "timeout after {:?}, specify VERACRUZ_TEST_TIMEOUT to override",
-                timeout
-            )
-        })??;
         Ok(())
     }
 

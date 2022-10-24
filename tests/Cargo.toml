@@ -39,15 +39,11 @@ actix-rt = "2"
 anyhow = "1"
 either = "1.6.1"
 env_logger = "0.9.0"
-err-derive = "0.2"
-futures = "0.3"
 hex = "0.4.2"
 log = "0.4.13"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
-postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
-tokio = { version = "1.16.1", default-features = false, features = ["macros"] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }
