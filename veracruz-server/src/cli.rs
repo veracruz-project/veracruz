@@ -46,22 +46,15 @@ fn main() {
     };
     info!("Loaded policy {}", policy.policy_hash().unwrap_or("???"));
 
-    // create runtime
-    let rt = tokio::runtime::Runtime::new().unwrap_or_else(|err| {
-        eprintln!("{}", err);
-        process::exit(1);
-    });
-
     // create Veracruz Server instance
-    let veracruz_server = veracruz_server::server::server(&policy_json);
+    veracruz_server::server::server(&policy_json).unwrap();
 
     println!(
         "Veracruz Server running on {}",
         policy.veracruz_server_url()
     );
-    rt.block_on(async { veracruz_server.await })
-        .unwrap_or_else(|err| {
-            eprintln!("{}", err);
-            process::exit(1);
-        });
+
+    loop {
+        std::thread::sleep(std::time::Duration::MAX);
+    }
 }

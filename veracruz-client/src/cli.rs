@@ -143,8 +143,7 @@ macro_rules! qprintln {
 }
 
 /// Entry point
-#[tokio::main]
-async fn main() {
+fn main() {
     // parse args
     let opt = Opt::from_args();
 

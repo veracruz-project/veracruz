@@ -47,7 +47,7 @@ mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-server = { path = "../proxy-attestation-server" }
-tokio = { version = "1.16.1", default-features = false, features = [] }
+tokio = { version = "1.16.1", default-features = false, features = ["macros"] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }

@@ -956,9 +956,6 @@ fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     let mut veracruz_server =
         VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
 
-    // wait for the client to start
-    thread::sleep(Duration::from_millis(100));
-
     let session_id = veracruz_server
         .new_tls_session()
         .map_err(|e| anyhow!("{:?}", e))?;

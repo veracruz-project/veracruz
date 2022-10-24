@@ -66,7 +66,7 @@ use std::{
     path::Path,
     time::Duration,
 };
-use tokio::time::{sleep, Instant};
+use tokio::time::Instant;
 use veracruz_client::{self, VeracruzClient};
 use veracruz_server;
 
@@ -266,8 +266,6 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
         let server_handle = server_tls_loop(policy_json_clone);
 
         let program_provider_handle = async {
-            // Wait for the server
-            sleep(Duration::from_millis(30000)).await;
             info!("### program provider start.");
             let mut client = veracruz_client::VeracruzClient::new(
                 cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
@@ -282,8 +280,6 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             Result::<()>::Ok(())
         };
         let data_provider_handle = async {
-            // Wait for the server
-            sleep(Duration::from_millis(30000)).await;
             info!("### data provider start.");
             let mut client = veracruz_client::VeracruzClient::new(
                 cert_key_dir(DATA_CLIENT_CERT).as_path(),
@@ -316,11 +312,7 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
 }
 
 async fn server_tls_loop(policy_json: String) -> Result<()> {
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(veracruz_server::server::server(&policy_json))
-            .unwrap();
-    });
+    veracruz_server::server::server(&policy_json).unwrap();
     Ok(())
 }
 
@@ -383,9 +375,6 @@ impl TestExecutor {
         // create the async block for all clients driven by events.
         // NOTE: this does not run the code but only create a future.
         let clients_handle = async move {
-            // Wait for the server
-            sleep(Duration::from_millis(30000)).await;
-
             info!("Initialise clients.");
             // Initialise all clients
             let mut clients = Vec::new();

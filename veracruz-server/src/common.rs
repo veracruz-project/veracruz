@@ -15,7 +15,6 @@ use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use std::error::Error;
-use tokio::sync::mpsc;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -31,10 +30,6 @@ pub enum VeracruzServerError {
     LockError(String),
     #[error(display = "VeracruzServer: ParseIntError: {}.", _0)]
     ParseIntError(#[error(source)] std::num::ParseIntError),
-    #[error(display = "VeracruzServer: mpsc SendError (of type ()) Error: {}.", _0)]
-    MpscSendEmptyError(#[error(source)] mpsc::error::SendError<()>),
-    #[error(display = "VeracruzServer: FromUtf8Error")]
-    FromUtf8Error(#[error(source)] std::string::FromUtf8Error),
     #[cfg(any(feature = "linux", feature = "nitro"))]
     #[error(display = "VeracruzServer: BincodeError: {:?}", _0)]
     BincodeError(bincode::ErrorKind),
