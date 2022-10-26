@@ -141,7 +141,7 @@ fn native_attestation(
             runtime_manager_hash.len() as u64,
             csr_hash.as_ptr() as *const u8,
             csr_hash.len() as u64,
-            enclave_name.as_ptr() as *const i8,
+            enclave_name.as_ptr() as *const u8,
             enclave_name.len() as u64,
             challenge.as_ptr() as *const u8,
             challenge.len() as u64,
