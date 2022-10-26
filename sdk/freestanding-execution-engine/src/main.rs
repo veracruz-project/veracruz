@@ -331,6 +331,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     file_table.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), read_right);
     file_table.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), write_right);
     file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
+
+    // Set up services
+    file_table.insert(PathBuf::from("/services"), read_right);
+    file_table.insert(PathBuf::from("/services"), write_right);
+
     // Add read permission to input path
     for file_path in cmdline.input_sources.iter() {
         // NOTE: inject the root path.
