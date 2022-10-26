@@ -12,4 +12,5 @@
 pub(crate) mod aead;
 pub(crate) mod aes;
 pub(crate) mod common;
+pub(crate) mod darknet_inference;
 pub(crate) mod postcard;

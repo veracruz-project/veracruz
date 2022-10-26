@@ -17,7 +17,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::native_modules::{
-    aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
+    aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService, darknet_inference::DarknetInferenceService,
 };
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
@@ -822,6 +822,8 @@ impl FileSystem {
         services.push((Self::AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
         let service: Box<dyn Service> = Box::new(AeadService::new());
         services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
+        let service: Box<dyn Service> = Box::new(DarknetInferenceService::new());
+        services.push(("/services/darknet_inference.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;
 
         Ok(rst)
