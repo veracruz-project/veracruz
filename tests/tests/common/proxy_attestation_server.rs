@@ -50,7 +50,7 @@ pub fn proxy_attestation_setup(proxy_attestation_server_url: String) {
     PROXY_ATTESTATION_SETUP.call_once(|| {
         let vts_child = std::process::Command::new("/opt/veraison/vts/vts").current_dir("/opt/veraison/vts").spawn().expect("vts died");
         let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning").current_dir("/opt/veraison/provisioning").spawn().expect("provision died");
-        let proxy_child = std::process::Command::new("/opt/veraison/VeracruzVerifier").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(&proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
+        let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(&proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
 
         let mut pc_guard = PROXY_CHILDREN.lock().unwrap();
         *pc_guard = Some(ProxyChildren {

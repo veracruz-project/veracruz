@@ -20,8 +20,8 @@ from golang:1.19 AS go_builder
 RUN set -eux; \
     echo "iteration 0"; \
     git clone --branch aws_nitro https://github.com/dreemkiller/services.git; \
-    git clone --branch proxy_attestation_server https://github.com/veracruz-project/VeracruzVerifier.git; \
-    cd VeracruzVerifier; \
+    git clone https://github.com/veracruz-project/proxy_attestation_server.git; \
+    cd proxy_attestation_server; \
     go build -o ./vts github.com/veraison/services/vts/cmd/vts-service; \
     go build -o ./provisioning github.com/veraison/services/provisioning/cmd/provisioning-service; \
     go build -o ./corim-psa-decoder github.com/veraison/services/provisioning/plugins/corim-psa-decoder; \
@@ -141,13 +141,13 @@ RUN mkdir /opt/veraison/; \
     mkdir /opt/veraison/vts/plugins; \
     mkdir /opt/veraison/provisioning; \
     mkdir /opt/veraison/provisioning/plugins
-COPY --from=go_builder /go/VeracruzVerifier/vts /opt/veraison/vts/
-COPY --from=go_builder /go/VeracruzVerifier/provisioning /opt/veraison/provisioning/
-COPY --from=go_builder /go/VeracruzVerifier/corim-psa-decoder /opt/veraison/provisioning/plugins/
-COPY --from=go_builder /go/VeracruzVerifier/corim-nitro-decoder /opt/veraison/provisioning/plugins/
-COPY --from=go_builder /go/VeracruzVerifier/scheme-psa-iot /opt/veraison/vts/plugins
-COPY --from=go_builder /go/VeracruzVerifier/scheme-aws-nitro /opt/veraison/vts/plugins
-COPY --from=go_builder /go/VeracruzVerifier/VeracruzVerifier /opt/veraison/
+COPY --from=go_builder /go/proxy_attestation_server/vts /opt/veraison/vts/
+COPY --from=go_builder /go/proxy_attestation_server/provisioning /opt/veraison/provisioning/
+COPY --from=go_builder /go/proxy_attestation_server/corim-psa-decoder /opt/veraison/provisioning/plugins/
+COPY --from=go_builder /go/proxy_attestation_server/corim-nitro-decoder /opt/veraison/provisioning/plugins/
+COPY --from=go_builder /go/proxy_attestation_server/scheme-psa-iot /opt/veraison/vts/plugins
+COPY --from=go_builder /go/proxy_attestation_server/scheme-aws-nitro /opt/veraison/vts/plugins
+COPY --from=go_builder /go/proxy_attestation_server/proxy_attestation_server /opt/veraison/
 COPY --from=corim_builder /go/psa_corim.cbor /opt/veraison/
 COPY --from=corim_builder /go/nitro_corim.cbor /opt/veraison/
 
