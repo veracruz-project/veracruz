@@ -125,7 +125,7 @@ linux-run: linux-build
 	mkdir -p $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		--name $(CONTAINER)-linux-$(USER)-$(VERSION) \
-		$(IMAGE)_linux:$(USER) sleep inf
+		$(IMAGE)/linux/$(USER):$(VERSION) sleep inf
 
 .PHONY:
 linux-exec:
