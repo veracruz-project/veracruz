@@ -10,7 +10,6 @@
 //! information on licensing and copyright.
 
 use lazy_static::lazy_static;
-use log::info;
 use reqwest;
 use std::{
     io::Read,
@@ -22,6 +21,8 @@ use std::{
 pub static PROXY_ATTESTATION_SETUP: Once = Once::new();
 pub static PROVISION_SETUP: Once = Once::new();
 
+static PROVISIONING_URL_BASE: &str = "127.0.0.1:8888";
+
 
 struct ProxyChildren {
     vts_child: std::process::Child,
@@ -30,7 +31,7 @@ struct ProxyChildren {
 }
 
 impl Drop for ProxyChildren {
-    // Note: This `Drop` is never being called for `proxy_children` because `drop` is never called for static variables (for apparently good reasons)
+    // Note: This `Drop` is never being called for `PROXY_CHILDREN` because `drop` is never called for static variables (for apparently good reasons)
     fn drop(&mut self) {
         println!("Dropping ProxyChildren");
         let _kill_ignore = self.vts_child.kill();
@@ -40,75 +41,69 @@ impl Drop for ProxyChildren {
 }
 
 lazy_static! {
-    static ref proxy_children: Mutex<Option<ProxyChildren>> = Mutex::new(None);
+    static ref PROXY_CHILDREN: Mutex<Option<ProxyChildren>> = Mutex::new(None);
 }
 
 pub const CA_CERT: &'static str = "CACert.pem";
 
 pub fn proxy_attestation_setup(proxy_attestation_server_url: String) {
     PROXY_ATTESTATION_SETUP.call_once(|| {
-        info!("Proxy attestation server: initialize.");
-        println!("starting vts");
         let vts_child = std::process::Command::new("/opt/veraison/vts/vts").current_dir("/opt/veraison/vts").spawn().expect("vts died");
-        println!("starting provisioning service");
         let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning").current_dir("/opt/veraison/provisioning").spawn().expect("provision died");
-        println!("starting proxy service on url:{:?}", proxy_attestation_server_url);
-        let proxy_child = std::process::Command::new("/opt/veraison/VeracruzVerifier").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
+        let proxy_child = std::process::Command::new("/opt/veraison/VeracruzVerifier").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(&proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
 
-        let mut pc_guard = proxy_children.lock().unwrap();
+        let mut pc_guard = PROXY_CHILDREN.lock().unwrap();
         *pc_guard = Some(ProxyChildren {
             vts_child: vts_child,
             provisioning_child: provisioning_child,
             proxy_child: proxy_child,
         });
-    });
-    // Sleep to wait for the proxy attestation server to start
-    println!("sleeping while proxy service sets ups");
-    std::thread::sleep(std::time::Duration::from_millis(100));
-    println!("done sleeping");
-    
-    PROVISION_SETUP.call_once(|| {
-        println!("post PSA CORIM to provisioning server");
-        let corim_filename = "/opt/veraison/psa_corim.cbor";
-        let mut f = std::fs::File::open(&corim_filename).expect("no file found");
-        let metadata = std::fs::metadata(&corim_filename).expect("unable to read metadata");
-        let mut psa_corim = vec![0; metadata.len() as usize];
-        f.read(&mut psa_corim).expect("buffer overflow");
-        let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(None)
-            .build()
-            .map_err(|err| panic!("Unable to build clien tto post PSA CORIM:{:?}", err)).unwrap();
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/corim-unsigned+cbor; profile=http://arm.com/psa/iot/1"));
-        let response = client.post("http://127.0.0.1:8888/endorsement-provisioning/v1/submit")
-            .headers(headers)
-            .body(psa_corim)
-            .send()
-            .unwrap();
-        if !response.status().is_success() {
-            panic!("Failed to post PSA CORIM to provisioning service. Status:{:?}", response.status());
-        }
 
-        println!("post Nitro CORIM to provisioning server");
-        let corim_filename = "/opt/veraison/nitro_corim.cbor";
-        let mut f = std::fs::File::open(&corim_filename).expect("no file found");
-        let metadata = std::fs::metadata(&corim_filename).expect("unable to read metadata");
-        let mut psa_corim = vec![0; metadata.len() as usize];
-        f.read(&mut psa_corim).expect("buffer overflow");
-        let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(None)
-            .build()
-            .map_err(|err| panic!("Unable to build client to post Nitro CORIM:{:?}", err)).unwrap();
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/corim-unsigned+cbor; profile=http://aws.com/nitro"));
-        let response = client.post("http://127.0.0.1:8888/endorsement-provisioning/v1/submit")
-            .headers(headers)
-            .body(psa_corim)
-            .send()
-            .unwrap();
-        if !response.status().is_success() {
-            panic!("Failed to post Nitro CORIM to provisioning service. Status:{:?}", response.status());
-        }
+        // Poll the proxy service until it is up
+        poll_until_status(&format!("http://{:}", proxy_attestation_server_url));
+    });
+  
+
+    PROVISION_SETUP.call_once(|| {
+        // Poll the provisioning service until it is up
+        poll_until_status(&format!("http://{:}", PROVISIONING_URL_BASE));
+
+        provision_file("/opt/veraison/psa_corim.cbor", "http://arm.com/psa/iot/1");
+
+        provision_file("/opt/veraison/nitro_corim.cbor", "http://aws.com/nitro");
     });
 }
 
+fn poll_until_status(root_url: &str) {
+    // Poll the service until it is up
+    // when the get returns a non-error Result (and thus receives a 404 status) for the non-existent path used below, the server is up
+    let provision_poll_url = format!("{:}/foo", root_url);
+    let mut result = reqwest::blocking::get(&provision_poll_url);
+    while result.is_err() {
+        println!("Looping because result is:{:?}", result);
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        result = reqwest::blocking::get(&provision_poll_url);
+    }
+}
+
+fn provision_file(corim_filename: &str, profile: &str) {
+    let mut f = std::fs::File::open(&corim_filename).expect("no file found");
+    let metadata = std::fs::metadata(&corim_filename).expect("unable to read metadata");
+    let mut psa_corim = vec![0; metadata.len() as usize];
+    f.read(&mut psa_corim).expect("buffer overflow");
+    let client = reqwest::blocking::ClientBuilder::new()
+        .timeout(None)
+        .build()
+        .map_err(|err| panic!("Unable to build clien tto post PSA CORIM:{:?}", err)).unwrap();
+    let mut headers = reqwest::header::HeaderMap::new();
+    let provision_submit_url = format!("http://{:}/endorsement-provisioning/v1/submit", PROVISIONING_URL_BASE);
+    headers.insert(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_str(&format!("application/corim-unsigned+cbor; profile={:}", profile)).unwrap());
+    let response = client.post(&provision_submit_url)
+        .headers(headers)
+        .body(psa_corim)
+        .send()
+        .unwrap();
+    if !response.status().is_success() {
+        panic!("Failed to post CORIM file contents({:}) to provisioning service. Status:{:?}", corim_filename, response.status());
+    }
+}
