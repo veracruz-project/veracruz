@@ -85,30 +85,20 @@ static mut VIRTIO_POOL: Option<VirtioPool> = None;
 // virtio pool page mappings for virtio-drivers
 #[no_mangle]
 pub unsafe extern "C" fn virtio_dma_alloc(pages: usize) -> usize {
-    debug_println!(
-        "virtio_pool: allocating {}x{} pages",
-        pages,
-        virtio_drivers::PAGE_SIZE
-    );
+    //debug_println!("virtio_pool: allocating {}x{} pages", pages, virtio_drivers::PAGE_SIZE);
     let pool = VIRTIO_POOL.as_mut().unwrap();
-    if pool.mark + pages * virtio_drivers::PAGE_SIZE > pool.pool.len() {
-        debug_println!(
-            "virtio_pool: out of pages ({}/{})!",
-            pool.pool.len() / virtio_drivers::PAGE_SIZE,
-            pool.pool.len() / virtio_drivers::PAGE_SIZE
-        );
+    if pool.mark + pages*virtio_drivers::PAGE_SIZE > pool.pool.len() {
+      //  debug_println!("virtio_pool: out of pages ({}/{})!",
+       //     pool.pool.len() / virtio_drivers::PAGE_SIZE,
+       //     pool.pool.len() / virtio_drivers::PAGE_SIZE
+       // );
         return 0;
     }
 
     let old_mark = pool.mark;
     pool.mark += pages * virtio_drivers::PAGE_SIZE;
     let p = &mut pool.pool[old_mark] as *mut _ as usize;
-    debug_println!(
-        "virtio_pool: allocating {}x{} pages -> {:012x}",
-        pages,
-        virtio_drivers::PAGE_SIZE,
-        virtio_virt_to_phys(p as usize)
-    );
+    //debug_println!("virtio_pool: allocating {}x{} pages -> {:012x}", pages, virtio_drivers::PAGE_SIZE, virtio_virt_to_phys(p as usize));
     virtio_virt_to_phys(p as usize)
 }
 
@@ -148,7 +138,7 @@ pub unsafe extern "C" fn virtio_virt_to_phys(vaddr: usize) -> usize {
 
 // entry point
 fn main(config: Config) -> Fallible<()> {
-    debug_println!("Hello from virtio-console-server!");
+   // debug_println!("Hello from virtio-console-server!");
     // FIXME: Yield 10 times to let the runtime start before the console server
     for _i in 1..10 {
         icecap_core::sel4::yield_();
@@ -196,26 +186,26 @@ fn main(config: Config) -> Fallible<()> {
         }
     }
 
-    debug_println!("virtio{}@{:012x}: sending...", virtio_i, virtio_mmio);
+    //debug_println!("virtio{}@{:012x}: sending...", virtio_i, virtio_mmio);
     // we need to send over a frame, allocate one from the pool
     let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
-    let formatted = format!("\nhello from virtio-console-server over virtio{}@{:012x}!\n\n", virtio_i, virtio_mmio);
+   /* let formatted = format!("\nhello from virtio-console-server over virtio{}@{:012x}!\n\n", virtio_i, virtio_mmio);
     send_page[..formatted.as_bytes().len()].copy_from_slice(&formatted.as_bytes());
     console.send_slice(&send_page[..formatted.as_bytes().len()])?;
-
+*/
     // begin processing requests
     let mut rb = BufferedRingBuffer::new(RingBuffer::unmanaged_from_config(
         &config.client_ring_buffer,
     ));
 
-    debug_println!("virtio{}@{:012x}: processing requests...", virtio_i, virtio_mmio);
+    //debug_println!("virtio{}@{:012x}: processing requests...", virtio_i, virtio_mmio);
 
     // we may have already received data to send, but lost the notification
     // during initialization, so there may already be data in our ring buffer
     // we need to write out
     loop {
         let badge = config.event_nfn.wait();
-        debug_println!("virtio{}@{:012x}: received notification\n", virtio_i, virtio_mmio);
+        //debug_println!("virtio{}@{:012x}: received notification\n", virtio_i, virtio_mmio);
         if badge & config.badges.irq != 0 {
             loop {
                 console.ack_interrupt()?;
