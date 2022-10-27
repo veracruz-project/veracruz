@@ -59,26 +59,18 @@ struct Config {
 struct Badges {
     virtio_console_server_tx: Badge,
     virtio_console_server_rx: Badge,
+    //virtio_console_server_ring_buffer: Badge,
 }
 
 fn main(config: Config) -> Fallible<()> {
     // TODO why do we need this?
     icecap_runtime_init();
-    debug_println!("hello from runtime manager");
-    debug_println!("icecap-realmos: initializing...");
-
     // enable ring buffer to serial-server
     let mut virtio_console_client = BufferedRingBuffer::new(
         RingBuffer::unmanaged_from_config(
             &config.virtio_console_server_ring_buffer,
         )
     );
-
-    // send hello to test
-    out!(&mut virtio_console_client, "\nhello from veracruz runtime manager over virtio-console-server!\n");
-
-    debug_println!("icecap-realmos: enabled ring buffer");
-
     debug_println!("icecap-realmos: running...");
     RuntimeManager::new(
         virtio_console_client,
@@ -122,62 +114,39 @@ impl RuntimeManager {
             let badge = self.event.wait();
             if badge &  self.virtio_console_server_rx != 0 {
                 self.process()?;
-                if let Some(chars) = self.channel.rx() {
-                    let mut input = String::from("");
-                    for c in chars.iter() {
-                        input.push(char::from(*c));
-                    }
-                    out!(&mut self.channel, "{:?}\n", input);
-                }
                 self.channel.rx_callback();
-                if !self.active {
-                    return Ok(());
-                }
             }
-            // always handle tx operations
             self.channel.tx_callback();
         }
     }
 
     fn process(&mut self) -> Fallible<()> {
-        // recv request if we have a full request in our ring buffer
-        if self.channel.poll() < size_of::<u32>() {
-            return Ok(());
+        let mut raw_header = vec![];
+        while raw_header.len() < size_of::<u32>() {
+            if let Some(raw) = self.channel.rx() {
+                raw_header = [&raw_header[..], &raw[..]].concat();
+            }
         }
-        let mut raw_header = [0; size_of::<u32>()];
-        self.channel.rx_into(&mut raw_header);
-        let header = bincode::deserialize::<u32>(&raw_header)
-            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-        let size = usize::try_from(header)
-            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-
-        if self.channel.poll() < size_of::<u32>() + size {
-            return Ok(());
+        let mut raw_request = vec![];
+        //header containers part of the request
+        if raw_header.len() > size_of::<u32>() {
+            raw_request = raw_header[size_of::<u32>()..].to_vec();
         }
-        let mut raw_request = vec![0; usize::try_from(header).unwrap()];
-        self.channel.skip(size_of::<u32>());
-        self.channel.rx_into(&mut raw_request);
-        let request = bincode::deserialize::<RuntimeManagerRequest>(&raw_request)
-            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-
+        let header = bincode::deserialize::<u32>(&raw_header[..size_of::<u32>()]).map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+        let size = usize::try_from(header).map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+        while raw_request.len() < size {
+            if let Some(raw) = self.channel.rx() {
+                raw_request = [&raw_request[..], &raw[..]].concat();
+            }
+        }
+        let request: RuntimeManagerRequest = bincode::deserialize(&raw_request).map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
         // process requests
-        //let response = self.handle(request)?;
-        let response_buffer = runtime
-            .decode_dispatch(&raw_request)
-            .map_err(|err| format_err!("runtime.decode_dispatch failed: {}", err))?;
-
-        // send response
-        // let raw_response = bincode::serialize(&response_buffer)
-        //     .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-        let raw_header = bincode::serialize(&u32::try_from(response_buffer.len()).unwrap())
-            .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-
+        let response = self.handle(request)?;
+        let raw_response = bincode::serialize(&response).map_err(|e| format_err!("Failed to serialize response: {}", e))?;
+        let raw_header = bincode::serialize(&u32::try_from(raw_response.len()).unwrap()).map_err(|e| format_err!("Failed to serialize response: {}", e))?;
+        //send response
         self.channel.tx(&raw_header);
         self.channel.tx(&raw_response);
-
-        self.channel.rx();
-        self.channel.rx_callback();
-
         Ok(())
     }
 
