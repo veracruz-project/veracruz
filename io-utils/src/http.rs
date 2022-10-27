@@ -116,7 +116,7 @@ fn convert_reqwest_response_to_http_response(res: blocking::Response) -> Result<
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
 /// Curl session fails for any reason, or if a non-success HTTP code is
 /// returned.
-pub fn post_string<U,>(url: U, buffer: &String, content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
+pub fn post_buffer<U>(url: U, buffer: &String, content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
 where
     U: AsRef<str>,
 {

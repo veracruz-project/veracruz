@@ -95,12 +95,7 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 serde_json = "1.0"
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }
+uuid = { version = "1.1.2", features = ["serde"] }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi", optional = true }
-[dependencies.uuid]
-version = "1.1.2"
-features = [
-    "serde",                # for serialization
-]
-

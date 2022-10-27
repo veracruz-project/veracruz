@@ -12,7 +12,7 @@
 use anyhow::{anyhow, Result as AnyhowResult};
 use base64;
 use err_derive::Error;
-use io_utils::http::{HttpResponse, post_form, post_string};
+use io_utils::http::{HttpResponse, post_form, post_buffer};
 use log::{error, info};
 use std::{
     collections::HashMap,
@@ -42,7 +42,7 @@ pub fn start_proxy_attestation<U: AsRef<str>>(
     let url = format!("http://{}/proxy/v1/Start", proxy_attestation_server_url_base);
     let empty_buffer: String = "".to_string();
 
-    let (id, nonce) = match post_string(&url, &empty_buffer, None).map_err(|e| {
+    let (id, nonce) = match post_buffer(&url, &empty_buffer, None).map_err(|e| {
             error!(
                 "Failed to send proxy attestation service start message.  Error produced: {}.",
                 e
@@ -53,7 +53,7 @@ pub fn start_proxy_attestation<U: AsRef<str>>(
             (location, body)
         }
         non_created => {
-            println!("Received incorrect response:{:?} from post_string", non_created);
+            println!("Received incorrect response:{:?} from post_buffer", non_created);
             return Err(anyhow!(ProxyAttestationClientError::BadResponse));
         }
     };

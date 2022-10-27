@@ -11,7 +11,6 @@
 
 use crate::common::{VeracruzServer, VeracruzServerError};
 use err_derive::Error;
-use io_utils::http::{post_string, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
 use proxy_attestation_client;
 use signal_hook::{

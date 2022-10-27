@@ -11,8 +11,4 @@ base64 = { version = "0.13.0", default-features = false }
 err-derive = "0.2"
 io-utils = { path = "../io-utils"}
 log = "0.4.13"
-[dependencies.uuid]
-version = "1.1.2"
-features = [
-    "serde",                # for serialization
-]
+uuid = { version = "1.1.2", features = ["serde"] }

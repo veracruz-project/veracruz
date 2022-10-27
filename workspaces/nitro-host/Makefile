@@ -52,14 +52,14 @@ test-dependencies: test-collateral
 CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
 
 test-server: test-dependencies
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test server_test -- --test-threads=1
 	./nitro-terminate.sh
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1 --nocapture
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1
 	./nitro-terminate.sh
 
 doc:

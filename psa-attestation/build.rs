@@ -52,10 +52,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=shim");
 
     // Tell cargo to invalidate the build crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed=wrapper.h");
-    println!("cargo:rerun-if-changed=c_src/attestation_core.c");
-    println!("cargo:rerun-if-changed=c_src/attest_token.c");
-    println!("cargo:rerun-if-changed=c_src/psa_attestation.c");
+    //println!("cargo:rerun-if-changed=wrapper.h");
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
