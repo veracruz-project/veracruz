@@ -15,8 +15,8 @@
 use anyhow::{anyhow, Result as AnyhowResult};
 use err_derive::Error;
 use log::{error, info};
-use reqwest;
-use std::{string::String, vec::Vec};
+use reqwest::{blocking, Error as ReqwestError, header, StatusCode};
+use std::{collections::HashMap, string::String, vec::Vec};
 use transport_protocol::{
     ProxyAttestationServerResponse, TransportProtocolError,
 };
@@ -31,10 +31,10 @@ use uuid::Uuid;
 pub enum HttpError {
     /// Reqwest generated an error
     #[error(display = "Reqwest generated an error:{}", _0)]
-    ReqwestError(reqwest::Error),
+    ReqwestError(ReqwestError),
     /// Invalid Header value
     #[error(display = "Invalid header value:{}", _0)]
-    InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
+    InvalidHeaderValue(header::InvalidHeaderValue),
     /// An unexpected HTTP status code was returned.
     #[error(display = "An unexpected HTTP return code was returned.")]
     UnexpectedHttpCode,
@@ -76,14 +76,14 @@ pub enum HttpResponse {
     PartialContent(Vec<u8>), // 206: Body
 }
 
-fn convert_reqwest_response_to_http_response(res: reqwest::blocking::Response) -> Result<HttpResponse, HttpError> {
+fn convert_reqwest_response_to_http_response(res: blocking::Response) -> Result<HttpResponse, HttpError> {
     let response = match res.status() {
-        reqwest::StatusCode::OK => {
+        StatusCode::OK => {
             let body = res.bytes().map_err(|_| HttpError::PoorlyFormedResponse)?;
             HttpResponse::Ok(body.to_vec())
         },
-        reqwest::StatusCode::CREATED => {
-            let location = match res.headers().get(reqwest::header::LOCATION) {
+        StatusCode::CREATED => {
+            let location = match res.headers().get(header::LOCATION) {
                 None => return Err(HttpError::PoorlyFormedResponse),
                 Some(loc) => loc.to_str().map_err(|_| HttpError::PoorlyFormedResponse)?.to_string(),
             };
@@ -91,20 +91,20 @@ fn convert_reqwest_response_to_http_response(res: reqwest::blocking::Response) -
 
             HttpResponse::Created(location, body.to_vec())
         }
-        reqwest::StatusCode::ACCEPTED => {
+        StatusCode::ACCEPTED => {
             let body = res.bytes().map_err(|_| HttpError::PoorlyFormedResponse)?;
             HttpResponse::Accepted(body.to_vec())
         }
-        reqwest::StatusCode::NON_AUTHORITATIVE_INFORMATION => {
+        StatusCode::NON_AUTHORITATIVE_INFORMATION => {
             let body = res.bytes().map_err(|_| HttpError::PoorlyFormedResponse)?;
             HttpResponse::NonAuthoritativeInformation(body.to_vec())
         }
-        reqwest::StatusCode::NO_CONTENT => HttpResponse::NoContent,
-        reqwest::StatusCode::RESET_CONTENT => {
+        StatusCode::NO_CONTENT => HttpResponse::NoContent,
+        StatusCode::RESET_CONTENT => {
             let body = res.bytes().map_err(|_| HttpError::PoorlyFormedResponse)?;
             HttpResponse::ResetContent(body.to_vec())
         }
-        reqwest::StatusCode::PARTIAL_CONTENT => {
+        StatusCode::PARTIAL_CONTENT => {
             let body = res.bytes().map_err(|_| HttpError::PoorlyFormedResponse)?;
             HttpResponse::PartialContent(body.to_vec())
         }
@@ -116,7 +116,7 @@ fn convert_reqwest_response_to_http_response(res: reqwest::blocking::Response) -
 /// Sends an encoded `buffer` via HTTP to a server at `url`.  Fails if the
 /// Curl session fails for any reason, or if a non-success HTTP code is
 /// returned.
-pub fn post_string<U>(url: U, buffer: &String, content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
+pub fn post_string<U,>(url: U, buffer: &String, content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
 where
     U: AsRef<str>,
 {
@@ -130,13 +130,13 @@ where
         url
     );
 
-    let request_builder = reqwest::blocking::Client::new()
+    let request_builder = blocking::Client::new()
         .post(url)
         .body(buffer);
     
     let request_builder = match content_type_option {
         Some(content_type) => {
-            request_builder.header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_str(content_type).map_err(|err| HttpError::InvalidHeaderValue(err))?)
+            request_builder.header(header::CONTENT_TYPE, header::HeaderValue::from_str(content_type).map_err(|err| HttpError::InvalidHeaderValue(err))?)
         }
         None => request_builder, // do nothing
     };
@@ -147,79 +147,26 @@ where
     return Ok(response);
 }
 
-/// Sends an raw byte `buffer` via HTTP to a server at `url`.  Fails if the
-/// Curl session fails for any reason, or if a non-success HTTP code is
-/// returned.
-pub fn post_bytes<U>(url: U, buffer: &[u8], content_type_option: Option<&str>) -> Result<HttpResponse, HttpError>
-where
-    U: AsRef<str>,
-{
+pub fn post_form<U: AsRef<str>>(url: U, form_data: &HashMap<String, String>) -> Result<HttpResponse, HttpError> {
     let url = url.as_ref();
-    let buffer = buffer.to_vec();
+    let client_builder = blocking::ClientBuilder::new();
 
-    info!(
-        "Posting byte buffer {:?} ({} bytes) to {}.",
-        buffer,
-        buffer.len(),
-        url
-    );
+    let client = client_builder.build()
+        .map_err(|err| {
+            HttpError::ReqwestError(err)
+        })?;
+    let mut form = blocking::multipart::Form::new();
+    for (key, value) in &*form_data {
+        form = form.text(key.clone(), value.clone());
+    }
 
-    let request_builder = reqwest::blocking::Client::new()
-        .post(url)
-        .body(buffer);
-    let request_builder = match content_type_option {
-        Some(content_type) => {
-            request_builder.header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_str(content_type).map_err(|err| HttpError::InvalidHeaderValue(err))?)
-        }
-        None => request_builder, // do nothing
-    };
-    let ret = request_builder.send()
-        .map_err(|err| HttpError::ReqwestError(err))?;
-    let response = convert_reqwest_response_to_http_response(ret)?;
-
+    let response = client.post(url)
+        .multipart(form)
+        .send()
+        .map_err(|err| {
+            HttpError::ReqwestError(err)
+        })?;
+    let response = convert_reqwest_response_to_http_response(response)?;
     return Ok(response);
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Proxy-attestation server-related functionality.
-///////////////////////////////////////////////////////////////////////////////
-
-/// Sends the "Start" message to the Proxy Attestation Server via HTTP.
-/// Returns a device ID and a generated challenge from the Proxy Attestation
-/// Service, which is generated in response to the "Start" message, if the
-/// message is successfully sent.
-pub fn send_proxy_attestation_server_start<U: AsRef<str>>(
-    proxy_attestation_server_url_base: U
-) -> AnyhowResult<(Uuid, Vec<u8>)> {
-    let proxy_attestation_server_url_base = proxy_attestation_server_url_base.as_ref();
-
-    info!("Sending Start message to Proxy Attestation Service.");
-
-
-    let url = format!("http://{}/proxy/v1/Start", proxy_attestation_server_url_base);
-    let empty_buffer: Vec<u8> = Vec::new();
-
-    let (id, nonce) = match post_bytes(&url, &empty_buffer, None).map_err(|e| {
-            error!(
-                "Failed to send proxy attestation service start message.  Error produced: {}.",
-                e
-            );
-            e
-        })? {
-        HttpResponse::Created(location, body) => {
-            (location, body)
-        }
-        non_created => {
-            println!("Received incorrect response:{:?} from post_string", non_created);
-            return Err(anyhow!(HttpError::UnexpectedHttpCode));
-        }
-    };
-    println!("calling parse_str on id:{:?}", id);
-    let id = Uuid::parse_str(&id)
-        .map_err(|e| {
-            println!("Uuid::parse_str failed:{:?}", e);
-            e
-        })?;
-
-    return Ok((id, nonce));
-}

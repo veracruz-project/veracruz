@@ -14,16 +14,15 @@ pub mod veracruz_server_linux {
 
     use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use data_encoding::HEXLOWER;
-    use io_utils::{
-        http::{send_proxy_attestation_server_start},
-        tcp::{receive_message, send_message},
-    };
+    use io_utils::tcp::{receive_message, send_message};
     use log::{error, info};
     use nix::sys::signal;
     use nix::unistd::alarm;
     use policy_utils::policy::Policy;
+    use proxy_attestation_client;
     use rand::Rng;
     use std::{
+        collections::HashMap,
         env,
         error::Error,
         fs::{self, File},
@@ -344,7 +343,7 @@ pub mod veracruz_server_linux {
 
             let proxy_attestation_server_url = policy.proxy_attestation_server_url();
 
-            let (challenge_id, challenge) = send_proxy_attestation_server_start(
+            let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
                 proxy_attestation_server_url,
             )
             .map_err(|e| {
@@ -394,9 +393,9 @@ pub mod veracruz_server_linux {
             info!("Requesting certificate chain from proxy attestation server.");
 
             let cert_chain = {
-                let cert_chain = post_attestation_token_csr(proxy_attestation_server_url, &token, &csr, challenge_id)
+                let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, challenge_id)
                     .map_err(|err| {
-                        error!("post_attestation_token_csr failed:{:?}", err);
+                        error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
                         err
                     })?;
                 cert_chain
@@ -612,37 +611,5 @@ pub mod veracruz_server_linux {
             info!("TCP connection and process killed.");
             Ok(())
         }
-    }
-
-    fn post_attestation_token_csr(proxy_attestation_server_url: &str, token: &[u8], csr: &[u8], challenge_id: Uuid) -> Result<Vec<u8>, VeracruzServerError> {
-        let url = format!("http://{:}/proxy/v1/PSA/{:}", proxy_attestation_server_url, challenge_id);
-        let client_builder = reqwest::blocking::ClientBuilder::new();
-
-        let client = client_builder.build()
-            .map_err(|err| {
-                VeracruzServerError::ReqwestError(err)
-            })?;
-        let form = reqwest::blocking::multipart::Form::new()
-            .text("token", base64::encode(token))
-            .text("csr", base64::encode(csr));
-
-        let response = client.post(url)
-            .multipart(form)
-            .send()
-            .map_err(|err| {
-                VeracruzServerError::ReqwestError(err)
-            })?;
-        let cert_chain = match response.status() {
-            reqwest::StatusCode::OK => {
-                response.bytes()
-                .map_err(|err| {
-                    VeracruzServerError::ReqwestError(err)
-                })?
-            }
-            bad_status => {
-                return Err(VeracruzServerError::HttpError(bad_status));
-            }
-        };
-        return Ok(cert_chain.to_vec());
     }
 }

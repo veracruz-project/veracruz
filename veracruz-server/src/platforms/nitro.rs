@@ -18,6 +18,7 @@ pub mod veracruz_server_nitro {
         nitro::NitroEnclave,
     };
     use policy_utils::policy::Policy;
+    use proxy_attestation_client;
     use reqwest;
     use std::{env, error::Error};
     use uuid::Uuid;
@@ -38,7 +39,7 @@ pub mod veracruz_server_nitro {
             // Set up, initialize Nitro Root Enclave
             let policy: Policy = Policy::from_json(policy_json)?;
 
-            let (challenge_id, challenge) = send_proxy_attestation_server_start(
+            let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
                 policy.proxy_attestation_server_url(),
             )
             .map_err(|e| {
@@ -95,7 +96,7 @@ pub mod veracruz_server_nitro {
                 }
             };
 
-            let cert_chain = post_native_attestation_token(
+            let cert_chain = proxy_attestation_client::complete_proxy_attestation_nitro(
                 policy.proxy_attestation_server_url(),
                 &attestation_doc,
                 &csr,
@@ -254,50 +255,5 @@ pub mod veracruz_server_nitro {
             };
             Ok(tls_data_needed)
         }
-    }
-
-    fn post_attestation_doc_csr(url: &str, att_doc: &[u8], csr: &[u8]) -> Result<Vec<u8>, VeracruzServerError> {
-        let client_builder = reqwest::blocking::ClientBuilder::new();
-
-        let client = client_builder.build()
-            .map_err(|err| {
-                VeracruzServerError::ReqwestError(err)
-            })?;
-        let form = reqwest::blocking::multipart::Form::new()
-            .text("token", base64::encode(att_doc))
-            .text("csr", base64::encode(csr));
-
-        let response = client.post(url)
-            .multipart(form)
-            .send()
-            .map_err(|err| {
-                VeracruzServerError::ReqwestError(err)
-            })?;
-        let cert_chain = match response.status() {
-            reqwest::StatusCode::OK => {
-                response.bytes()
-                .map_err(|err| {
-                    VeracruzServerError::ReqwestError(err)
-                })?
-            }
-            bad_status => {
-                return Err(VeracruzServerError::HttpError(bad_status));
-            }
-        };
-        return Ok(cert_chain.to_vec());
-    }
-
-    /// Send the native (AWS Nitro) attestation token to the proxy attestation server
-    fn post_native_attestation_token(
-        proxy_attestation_server_url: &str,
-        att_doc: &[u8],
-        csr: &[u8],
-        challenge_id: Uuid,
-    ) -> Result<Vec<u8>, VeracruzServerError> {
-        let url = format!("http://{:}/proxy/v1/Nitro/{:}", proxy_attestation_server_url, challenge_id);
-        let cert_chain = post_attestation_doc_csr(&url, att_doc, csr).map_err(|e| {
-            e
-        })?;
-        Ok(cert_chain.to_vec())
     }
 }

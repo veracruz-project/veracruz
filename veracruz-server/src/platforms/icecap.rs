@@ -13,6 +13,7 @@ use crate::common::{VeracruzServer, VeracruzServerError};
 use err_derive::Error;
 use io_utils::http::{post_string, send_proxy_attestation_server_start};
 use policy_utils::policy::Policy;
+use proxy_attestation_client;
 use signal_hook::{
     consts::SIGINT,
     iterator::{Handle, Signals},
@@ -300,7 +301,7 @@ impl VeracruzServer for VeracruzServerIceCap {
         // create the realm
         let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
-        let (device_id, challenge) = send_proxy_attestation_server_start(
+        let (device_id, challenge) = proxy_attestation_client::start_proxy_attestation(
             policy.proxy_attestation_server_url()
         )?;
 
@@ -314,27 +315,18 @@ impl VeracruzServer for VeracruzServerIceCap {
                 }
             };
 
-        let (root_cert, compute_cert) = {
-            let req = transport_protocol::serialize_native_psa_attestation_token(
-                &token, &csr, device_id,
-            )?;
-            let req = base64::encode(&req);
-            let url = format!(
-                "{:}/PSA/AttestationToken",
-                policy.proxy_attestation_server_url()
-            );
-            let resp = post_string(&url, &req, None).map_err(VeracruzServerError::HttpError)?;
-            let resp = base64::decode(&resp)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)?;
-            let cert_chain = pasr.get_cert_chain();
-            let root_cert = cert_chain.get_root_cert();
-            let compute_cert = cert_chain.get_enclave_cert();
-            (root_cert.to_vec(), compute_cert.to_vec())
+        let cert_chain = {
+            let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, device_id)
+                .map_err(|err| {
+                    error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
+                    err
+                })?;
+            cert_chain
         };
 
         match self_.communicate(&RuntimeManagerRequest::Initialize(
             policy_json.to_string(),
-            vec![compute_cert, root_cert],
+            cert_chain,
         ))? {
             RuntimeManagerResponse::Status(Status::Success) => (),
             resp => {

@@ -25,8 +25,6 @@ pub enum VeracruzServerError {
     SerdeJsonError(#[error(source)] serde_json::Error),
     #[error(display = "VeracruzServer: IOError: {:?}.", _0)]
     IOError(#[error(source)] std::io::Error),
-    #[error(display = "VeracruzServer: HttpError: {:?}", _0)]
-    HttpError(reqwest::StatusCode),
     #[error(display = "VeracruzServer: Base64Error: {:?}.", _0)]
     Base64Error(#[error(source)] base64::DecodeError),
     #[error(display = "VeracruzServer: Failed to obtain lock {:?}.", _0)]
