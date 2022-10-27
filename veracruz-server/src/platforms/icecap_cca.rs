@@ -81,13 +81,6 @@ struct IceCapRealm {
     child: Arc<Mutex<Child>>,
     channel: UnixStream,
     #[allow(dead_code)]
-    stdout_handler: JoinHandle<()>,
-    #[allow(dead_code)]
-    stderr_handler: JoinHandle<()>,
-    signal_handle: Handle,
-    #[allow(dead_code)]
-    signal_handler: JoinHandle<()>,
-    #[allow(dead_code)]
     tempdir: TempDir,
 }
 
@@ -107,7 +100,7 @@ impl IceCapRealm {
         }
 
         // Allow overriding these from environment variables
-        let lkvm_bin = env_flags("VERACRUZ_ICECAP_LKVM_BIN_DEFAULT", VERACRUZ_ICECAP_LKVM_BIN_DEFAULT)?;
+        let lkvm_bin = env_flags("VERACRUZ_ICECAP_LKVM_BIN", VERACRUZ_ICECAP_LKVM_BIN_DEFAULT)?;
         let lkvm_flags = env_flags("VERACRUZ_ICECAP_LKVM_FLAGS", VERACRUZ_ICECAP_LKVM_FLAGS_DEFAULT)?;
         let lkvm_firmware_flags = env_flags(
             "VERACRUZ_ICECAP_LKVM_FIRMWARE_IMAGE",
@@ -132,45 +125,9 @@ impl IceCapRealm {
                 .args(&lkvm_flags)
                 .args(&lkvm_firmware_flags)
                 .args(&lkvm_firmware_address_flags)
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
                 .spawn()
                 .map_err(IceCapError::LkvmSpawnError)?,
         ));
-
-        // forward stderr/stdin via threads, this is necessary to avoid stdio
-        // issues under Cargo test
-        let stdout_handler = thread::spawn({
-            let mut child_stdout = child.lock().unwrap().stdout.take().unwrap();
-            move || {
-                let err = io::copy(&mut child_stdout, &mut io::stdout());
-                eprintln!("vc-server: lkvm: stdout closed: {:?}", err);
-            }
-        });
-
-        let stderr_handler = thread::spawn({
-            let mut child_stderr = child.lock().unwrap().stderr.take().unwrap();
-            move || {
-                let err = io::copy(&mut child_stderr, &mut io::stderr());
-                eprintln!("vc-server: lkvm: stderr closed: {:?}", err);
-            }
-        });
-
-        // hookup signal handler so SIGINT will teardown the child process
-        let mut signals = Signals::new(&[SIGINT])?;
-        let signal_handle = signals.handle();
-        let signal_handler = thread::spawn({
-            let child = child.clone();
-            move || {
-                for sig in signals.forever() {
-                    eprintln!("vc-server: lkvm: Killed by signal: {:?}", sig);
-                    child.lock().unwrap().kill().unwrap();
-                    signal_hook::low_level::emulate_default_handler(SIGINT).unwrap();
-                }
-            }
-        });
-
         // connect via socket
         let channel = loop {
             match UnixStream::connect(&channel_path) {
@@ -194,10 +151,6 @@ impl IceCapRealm {
 
         Ok(IceCapRealm {
             child,
-            stdout_handler,
-            stderr_handler,
-            signal_handle,
-            signal_handler,
             channel,
             tempdir,
         })
@@ -235,7 +188,6 @@ impl IceCapRealm {
     // NOTE close can report errors, but drop can still happen in weird cases
     fn shutdown(self) -> Result<(), IceCapError> {
         println!("vc-server: shutting down");
-        self.signal_handle.close();
         self.child
             .lock()
             .unwrap()
@@ -272,7 +224,6 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
     fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
         let policy: Policy = Policy::from_json(policy_json)?;
 
-        // create the realm
         let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
         let (device_id, challenge) = send_proxy_attestation_server_start(
@@ -308,7 +259,7 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
             let compute_cert = cert_chain.get_enclave_cert();
             (root_cert.to_vec(), compute_cert.to_vec())
         };
-
+        println!("vc-server: send policy");
         match self_.communicate(&RuntimeManagerRequest::Initialize(
             policy_json.to_string(),
             vec![compute_cert, root_cert],
@@ -320,7 +271,6 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
                 ))
             }
         }
-
         Ok(self_)
     }
 
