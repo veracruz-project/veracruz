@@ -101,7 +101,7 @@ struct Arguments {
     css_file: Option<PathBuf>,
     /// The filename of the Runtime Manager PRCR0 file for Nitro Enclave
     /// measurement.  This is optional.
-    pcr_file: Option<PathBuf>,
+    pcr0_file: Option<PathBuf>,
     /// The filename of the output policy file.
     output_policy_file: PathBuf,
     /// The expiry timepoint of the server certificate.  This is not optional,
@@ -371,10 +371,10 @@ impl Arguments {
         let css_file = matches
             .value_of("css-file")
             .map(|fname| PathBuf::from(fname));
-        let pcr_file = matches
+        let pcr0_file = matches
             .value_of("pcr-file")
             .map(|fname| PathBuf::from(fname));
-        if css_file.is_none() && pcr_file.is_none() {
+        if css_file.is_none() && pcr0_file.is_none() {
             return Err(anyhow!(
                 "Either the CSS.bin or the PCR0 file must be provided as a \
     command-line parameter.",
@@ -421,7 +421,7 @@ impl Arguments {
             proxy_attestation_server_ip,
             proxy_service_cert,
             css_file,
-            pcr_file,
+            pcr0_file,
             output_policy_file,
             certificate_expiry,
             program_binaries,
@@ -588,12 +588,12 @@ impl Arguments {
     fn compute_nitro_enclave_hash(&self) -> Result<Option<String>> {
         info!("Computing AWS Nitro Enclave hash.");
 
-        let pcr_file = match &self.pcr_file {
+        let pcr0_file = match &self.pcr0_file {
             None => return Ok(None),
-            Some(pcr_file) => pcr_file,
+            Some(pcr0_file) => pcr0_file,
         };
 
-        let mut file = File::open(pcr_file)
+        let mut file = File::open(pcr0_file)
             .map_err(|_| anyhow!("Runtime Manager PCR0 file cannot be opened."))?;
         let mut content = String::new();
 

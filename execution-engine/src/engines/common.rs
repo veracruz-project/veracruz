@@ -814,12 +814,12 @@ pub struct WasiWrapper {
     ///            |  Internal    |
     ///            ----------------
     filesystem: FileSystem,
-    /// The exit code returned by the last executing program.
-    exit_code: Option<u32>,
     /// The environment variables currently set, and their bindings.
     environment_variables: Vec<(String, String)>,
     /// The program arguments of the executable being executed.
     program_arguments: Vec<String>,
+    /// The exit code returned by the last executing program.
+    exit_code: Option<u32>,
     /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
     /// enabled.
     pub(crate) enable_clock: bool,
