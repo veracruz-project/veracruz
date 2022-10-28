@@ -38,7 +38,8 @@ target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/runtime_manager_enclave: runti
 
 runtime-manager-enclave:
 	rustup target add $(ARCH)-unknown-linux-musl
-	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
+	CC_$(ARCH)_unknown_linux_musl=$(ARCH)-linux-musl-gcc \
+	CXX_$(ARCH)_unknown_linux_musl=$(ARCH)-linux-musl-g++ \
 	RUSTFLAGS="-C link-args=-Wl,--build-id=none" \
 	cargo build --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
 		--features nitro -p runtime_manager_enclave
@@ -49,7 +50,8 @@ doc:
 
 clippy:
 	rustup target add $(ARCH)-unknown-linux-musl
-	CC_$(ARCH)_unknown_linux_musl=musl-gcc \
+	CC_$(ARCH)_unknown_linux_musl=$(ARCH)-linux-musl-gcc \
+	CXX_$(ARCH)_unknown_linux_musl=$(ARCH)-linux-musl-g++ \
 	cargo clippy --target $(ARCH)-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG) \
 		-p runtime_manager_enclave -p execution-engine \
 		-p session-manager -p policy-utils -p platform-services \
