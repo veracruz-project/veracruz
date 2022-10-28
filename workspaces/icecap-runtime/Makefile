@@ -16,6 +16,7 @@ PROJECT = .
 HOST_CC ?= gcc
 LD = $(abspath $(shell RUSTC_BOOTSTRAP=1 cargo -Z unstable-options rustc --print target-libdir 2>/dev/null)/../bin/rust-lld)
 CC = aarch64-linux-gnu-gcc
+CXX = aarch64-linux-gnu-g++
 
 deps := deps
 src := src
@@ -242,6 +243,7 @@ rust-project: $(now) sysroot-install userspace_c sel4
 	$(call cargo_target_config_prefix,$(rust_target))RUSTFLAGS="$(icecap_rustflags)" \
 	$(call cargo_target_config_prefix,$(rust_target))LINKER="$(LD)" \
 	CC_$(call kebab_to_caml,$(rust_target))="$(CC)" \
+	CXX_$(call kebab_to_caml,$(rust_target))="$(CXX)" \
 	BINDGEN_EXTRA_CLANG_ARGS="$(icecap_c_include_flags) -I$(compiler_some_libc_include) -I/usr/aarch64-linux-gnu/include" \
 		cargo build \
 			-Z unstable-options \
