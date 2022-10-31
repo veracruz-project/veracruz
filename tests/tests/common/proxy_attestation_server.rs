@@ -9,22 +9,19 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use lazy_static::lazy_static;
+use nix::{sys::signal::{self, Signal},
+         unistd::Pid
+};
 use reqwest;
 use std::{
+    convert::TryInto,
     io::Read,
-    sync::{Mutex,
-           Once,
-    }
 };
-
-pub static PROXY_ATTESTATION_SETUP: Once = Once::new();
-pub static PROVISION_SETUP: Once = Once::new();
 
 static PROVISIONING_URL_BASE: &str = "127.0.0.1:8888";
 
 
-struct ProxyChildren {
+pub struct ProxyChildren {
     vts_child: std::process::Child,
     provisioning_child: std::process::Child,
     proxy_child: std::process::Child,
@@ -34,44 +31,33 @@ impl Drop for ProxyChildren {
     // Note: This `Drop` is never being called for `PROXY_CHILDREN` because `drop` is never called for static variables (for apparently good reasons)
     fn drop(&mut self) {
         println!("Dropping ProxyChildren");
-        let _kill_ignore = self.vts_child.kill();
-        let _kill_ignore = self.provisioning_child.kill();
-        let _kill_ignore = self.proxy_child.kill();
+        signal::kill(Pid::from_raw(self.vts_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
+        signal::kill(Pid::from_raw(self.provisioning_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
+        signal::kill(Pid::from_raw(self.proxy_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
     }
-}
-
-lazy_static! {
-    static ref PROXY_CHILDREN: Mutex<Option<ProxyChildren>> = Mutex::new(None);
 }
 
 pub const CA_CERT: &'static str = "CACert.pem";
 
-pub fn proxy_attestation_setup(proxy_attestation_server_url: String) {
-    PROXY_ATTESTATION_SETUP.call_once(|| {
-        let vts_child = std::process::Command::new("/opt/veraison/vts/vts").current_dir("/opt/veraison/vts").spawn().expect("vts died");
-        let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning").current_dir("/opt/veraison/provisioning").spawn().expect("provision died");
-        let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(&proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
+pub fn proxy_attestation_setup(proxy_attestation_server_url: String) -> ProxyChildren {
+    let vts_child = std::process::Command::new("/opt/veraison/vts/vts").current_dir("/opt/veraison/vts").spawn().expect("vts died");
+    let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning").current_dir("/opt/veraison/provisioning").spawn().expect("provision died");
+    let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(&proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
 
-        let mut pc_guard = PROXY_CHILDREN.lock().unwrap();
-        *pc_guard = Some(ProxyChildren {
-            vts_child: vts_child,
-            provisioning_child: provisioning_child,
-            proxy_child: proxy_child,
-        });
-
-        // Poll the proxy service until it is up
-        poll_until_status(&format!("http://{:}", proxy_attestation_server_url));
-    });
+    // Poll the proxy service until it is up
+    poll_until_status(&format!("http://{:}", proxy_attestation_server_url));
   
+    // Poll the provisioning service until it is up
+    poll_until_status(&format!("http://{:}", PROVISIONING_URL_BASE));
 
-    PROVISION_SETUP.call_once(|| {
-        // Poll the provisioning service until it is up
-        poll_until_status(&format!("http://{:}", PROVISIONING_URL_BASE));
+    provision_file("/opt/veraison/psa_corim.cbor", "http://arm.com/psa/iot/1");
 
-        provision_file("/opt/veraison/psa_corim.cbor", "http://arm.com/psa/iot/1");
-
-        provision_file("/opt/veraison/nitro_corim.cbor", "http://aws.com/nitro");
-    });
+    provision_file("/opt/veraison/nitro_corim.cbor", "http://aws.com/nitro");
+    return ProxyChildren {
+        vts_child: vts_child,
+        provisioning_child: provisioning_child,
+        proxy_child: proxy_child,
+    };
 }
 
 fn poll_until_status(root_url: &str) {

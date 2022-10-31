@@ -12,7 +12,6 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
-use anyhow::{anyhow, Result as AnyhowResult};
 use err_derive::Error;
 use log::{error, info};
 use reqwest::{blocking, Error as ReqwestError, header, StatusCode};
@@ -20,7 +19,6 @@ use std::{collections::HashMap, string::String, vec::Vec};
 use transport_protocol::{
     ProxyAttestationServerResponse, TransportProtocolError,
 };
-use uuid::Uuid;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Errors.

@@ -22,7 +22,6 @@ pub mod veracruz_server_linux {
     use proxy_attestation_client;
     use rand::Rng;
     use std::{
-        collections::HashMap,
         env,
         error::Error,
         fs::{self, File},
@@ -32,7 +31,6 @@ pub mod veracruz_server_linux {
         process::{Child, Command, Stdio},
     };
     use tempfile::{self, TempDir};
-    use uuid::Uuid;
     use veracruz_utils::runtime_manager_message::{
         RuntimeManagerRequest, RuntimeManagerResponse, Status,
     };

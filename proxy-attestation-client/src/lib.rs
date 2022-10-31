@@ -14,10 +14,7 @@ use base64;
 use err_derive::Error;
 use io_utils::http::{HttpResponse, post_form, post_buffer};
 use log::{error, info};
-use std::{
-    collections::HashMap,
-    error::Error
-};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Debug, Error)]
