@@ -37,7 +37,7 @@ impl Drop for ProxyChildren {
 
 pub const CA_CERT: &'static str = "CACert.pem";
 
-pub fn proxy_attestation_setup(proxy_attestation_server_url: String) -> ProxyChildren {
+pub fn proxy_attestation_setup(proxy_attestation_server_url: String, proxy_start_dir: &String) -> ProxyChildren {
     let vts_child = std::process::Command::new("/opt/veraison/vts/vts")
         .current_dir("/opt/veraison/vts")
         .spawn()
@@ -47,7 +47,7 @@ pub fn proxy_attestation_setup(proxy_attestation_server_url: String) -> ProxyChi
         .spawn()
         .expect("provision died");
     let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server")
-        .current_dir("/work/veracruz/workspaces/icecap-host/test-collateral")
+        .current_dir(proxy_start_dir)
         .arg("-l")
         .arg(&proxy_attestation_server_url)
         .spawn().expect("Proxy Attestation Service died");

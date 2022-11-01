@@ -216,7 +216,7 @@ async fn veracruz_phase4_linear_regression_two_clients_parallel() {
             read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
         let policy = Policy::from_json(&policy_json).unwrap();
 
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
         sleep(std::time::Duration::from_millis(5000)).await;
         let policy_json_clone = policy_json.clone();
@@ -313,7 +313,7 @@ impl TestExecutor {
         let (policy, policy_json, _) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
         Ok(TestExecutor { policy_json })
     }
