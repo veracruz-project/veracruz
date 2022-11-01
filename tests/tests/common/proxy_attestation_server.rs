@@ -28,9 +28,7 @@ pub struct ProxyChildren {
 }
 
 impl Drop for ProxyChildren {
-    // Note: This `Drop` is never being called for `PROXY_CHILDREN` because `drop` is never called for static variables (for apparently good reasons)
     fn drop(&mut self) {
-        println!("Dropping ProxyChildren");
         signal::kill(Pid::from_raw(self.vts_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
         signal::kill(Pid::from_raw(self.provisioning_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
         signal::kill(Pid::from_raw(self.proxy_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
@@ -40,9 +38,19 @@ impl Drop for ProxyChildren {
 pub const CA_CERT: &'static str = "CACert.pem";
 
 pub fn proxy_attestation_setup(proxy_attestation_server_url: String) -> ProxyChildren {
-    let vts_child = std::process::Command::new("/opt/veraison/vts/vts").current_dir("/opt/veraison/vts").spawn().expect("vts died");
-    let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning").current_dir("/opt/veraison/provisioning").spawn().expect("provision died");
-    let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server").current_dir("/work/veracruz/workspaces/linux-host/test-collateral").arg("-l").arg(&proxy_attestation_server_url).spawn().expect("Proxy Attestation Service died");            
+    let vts_child = std::process::Command::new("/opt/veraison/vts/vts")
+        .current_dir("/opt/veraison/vts")
+        .spawn()
+        .expect("vts died");
+    let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning")
+        .current_dir("/opt/veraison/provisioning")
+        .spawn()
+        .expect("provision died");
+    let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server")
+        .current_dir("/work/veracruz/workspaces/icecap-host/test-collateral")
+        .arg("-l")
+        .arg(&proxy_attestation_server_url)
+        .spawn().expect("Proxy Attestation Service died");
 
     // Poll the proxy service until it is up
     poll_until_status(&format!("http://{:}", proxy_attestation_server_url));

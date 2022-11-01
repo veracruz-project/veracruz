@@ -12,16 +12,10 @@
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
     use crate::common::{VeracruzServer, VeracruzServerError};
-    use base64;
-    use io_utils::{
-        http::send_proxy_attestation_server_start,
-        nitro::NitroEnclave,
-    };
+    use io_utils::nitro::NitroEnclave;
     use policy_utils::policy::Policy;
     use proxy_attestation_client;
-    use reqwest;
     use std::{env, error::Error};
-    use uuid::Uuid;
     use veracruz_utils::runtime_manager_message::{
         RuntimeManagerRequest, RuntimeManagerResponse, Status,
     };

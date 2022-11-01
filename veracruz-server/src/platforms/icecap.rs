@@ -315,9 +315,8 @@ impl VeracruzServer for VeracruzServerIceCap {
             };
 
         let cert_chain = {
-            let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, device_id)
+            let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(policy.proxy_attestation_server_url(), &token, &csr, device_id)
                 .map_err(|err| {
-                    error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
                     err
                 })?;
             cert_chain
