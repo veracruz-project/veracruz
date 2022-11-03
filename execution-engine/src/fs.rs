@@ -18,6 +18,7 @@
 
 use crate::native_modules::{
     aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
+    tflite_inference::TfLiteInferenceService,
 };
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
@@ -822,6 +823,11 @@ impl FileSystem {
         services.push((Self::AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
         let service: Box<dyn Service> = Box::new(AeadService::new());
         services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
+        let service: Box<dyn Service> = Box::new(TfLiteInferenceService::new());
+        services.push((
+            "/services/tflite_inference.dat",
+            Arc::new(Mutex::new(service)),
+        ));
         rst.install_services(services)?;
 
         Ok(rst)

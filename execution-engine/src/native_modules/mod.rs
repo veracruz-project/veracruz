@@ -13,3 +13,4 @@ pub(crate) mod aead;
 pub(crate) mod aes;
 pub(crate) mod common;
 pub(crate) mod postcard;
+pub(crate) mod tflite_inference;
