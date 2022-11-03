@@ -237,7 +237,7 @@ impl WasmtimeRuntimeState {
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
-    /// Raises a panic if the global wasmtime host is unavailable.
+    /// Raises a panic if the global Wasmtime host is unavailable.
     /// Returns an error if no program is registered, the program is invalid,
     /// the program contains invalid external function calls or if the machine is not
     /// in the `LifecycleState::ReadyToExecute` state prior to being called.
@@ -253,11 +253,12 @@ impl WasmtimeRuntimeState {
     pub(crate) fn invoke_engine(&self, binary: Vec<u8>) -> Result<u32> {
         let mut config = Config::default();
         config.wasm_simd(true);
+
         let engine = Engine::new(&config)?;
         let module = Module::new(&engine, binary)?;
         let mut linker = Linker::new(&engine);
 
-        info!("Initialize a wasmtime engine.");
+        info!("Initialized Wasmtime engine.");
 
         // Link all WASI functions
         let wasi_scope = WasiWrapper::WASI_SNAPSHOT_MODULE_NAME;
@@ -517,7 +518,7 @@ impl WasmtimeRuntimeState {
             // otherwise the actual return code or default success code `0`.
             None => {
                 info!(
-                    "The return trace: {:?}, (it should not reach here).",
+                    "The return trace: {:?}, (`proc_exit` is not called).",
                     return_from_main
                 );
                 return_from_main?;
@@ -1107,13 +1108,14 @@ impl WasmtimeRuntimeState {
         let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
+
 }
 
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WasmtimeRuntimeState {
-    /// ExecutionEngine wrapper of invoke_entry_point.
-    /// Raises a panic if the global wasmtime host is unavailable.
+    /// ExecutionEngine wrapper of `invoke_engine`.  Raises a panic if
+    /// the global Wasmtime host is unavailable.
     #[inline]
     fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
         self.invoke_engine(program)

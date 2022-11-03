@@ -376,6 +376,9 @@ impl TestExecutor {
             TestEvent::Execute(remote_path) => {
                 client.request_compute(remote_path)?;
             }
+            TestEvent::Pipeline(pipeline_id) => {
+                client.request_pipeline(pipeline_id)?;
+            }
             TestEvent::ReadFile(remote_path) => {
                 let result = client.read_file(&remote_path)?;
                 info!("receive data of bytes {}", result.len());

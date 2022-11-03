@@ -9,6 +9,19 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
 //! and copyright information.
 
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, Datelike, FixedOffset, Timelike};
+use clap::{App, Arg};
+use data_encoding::HEXLOWER;
+use log::{info, warn};
+use policy_utils::{
+    expiry::Timepoint,
+    parsers::{enforce_leading_backslash, parse_renamable_paths},
+    policy::Policy,
+    principal::{ExecutionStrategy, FileHash, FileRights, Identity, Pipeline, Program},
+};
+use regex::Regex;
+use serde_json::{json, to_string_pretty, Value};
 use std::{
     convert::TryFrom,
     fmt::Debug,
@@ -16,44 +29,14 @@ use std::{
     io::{Read, Write},
     net::SocketAddr,
     path::PathBuf,
-    process::exit,
     str::FromStr,
 };
-
-use chrono::{DateTime, Datelike, FixedOffset, Timelike};
-use clap::{App, Arg};
-use data_encoding::HEXLOWER;
-use log::{info, warn};
-use policy_utils::{
-    expiry::Timepoint,
-    parsers::enforce_leading_backslash,
-    parsers::parse_renamable_paths,
-    policy::Policy,
-    principal::{ExecutionStrategy, FileHash, FileRights, Identity, Program},
-};
-use regex::Regex;
-use serde_json::{json, to_string_pretty, Value};
 use veracruz_utils::sha256::sha256;
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// Aborts the program with a message on `stderr`.
-fn abort_with<T: Debug>(msg: T) -> ! {
-    eprintln!("{:?}", msg);
-    exit(1);
-}
-
-/// Pretty-prints a `PathBuf`, aborting if this cannot be done.
-fn pretty_pathbuf(buf: PathBuf) -> String {
-    if let Ok(s) = buf.into_os_string().into_string() {
-        return s.clone();
-    } else {
-        abort_with("Failed to pretty-print path.");
-    }
-}
 
 /// Pretty-prints the SHA256 digest of the input `buf` into a lowercase
 /// hex-formatted string.
@@ -106,10 +89,11 @@ struct Arguments {
     /// as each principal and program has an accompanying capability table.
     certificate_capabilities: Vec<Vec<String>>,
     binary_capabilities: Vec<Vec<String>>,
+    pipeline_capabilities: Vec<Vec<String>>,
     /// The socket address (IP and port) of the Veracruz server instance.
-    veracruz_server_ip: Option<SocketAddr>,
+    veracruz_server_ip: SocketAddr,
     /// The socket address (IP and port) of the Veracruz proxy attestation instance.
-    proxy_attestation_server_ip: Option<SocketAddr>,
+    proxy_attestation_server_ip: SocketAddr,
     /// The filename of the Proxy Attestation Service certificate
     proxy_service_cert: PathBuf,
     /// The filename of the Runtime Manager CSS file for SGX measurement.  This is
@@ -125,12 +109,17 @@ struct Arguments {
     /// yet been intiialized, due to `DateTime` not really having an obvious
     /// default value.  Past command-line parsing, any value of `None` in this
     /// field is an internal invariant failure.
-    certificate_expiry: Option<DateTime<FixedOffset>>,
+    certificate_expiry: DateTime<FixedOffset>,
     /// The filename of the WASM program.
     ///
     /// Note this is an array of string+path pairs, since a string enclave path
     /// can be provided along with the local file path.
     program_binaries: Vec<(String, PathBuf)>,
+    /// The conditional pipeline of programs to execute.  We parse this eagerly
+    /// to check for parsing issues before writing the string to the policy
+    /// file.  However, this string is then re-parsed by the Veracruz runtime
+    /// as we have no way of writing the binary AST into JSON.
+    pipelines: Vec<String>,
     /// The hash of files.
     ///
     /// Note this is an array of string+path pairs, since a string enclave path
@@ -152,45 +141,524 @@ struct Arguments {
 }
 
 impl Arguments {
-    /// Creates a new `Arguments` structure with all fields set to empty (with
-    /// the `enclave_debug_mode` flag set to `false`, and the
-    /// `certificate_lifetime` field set to `0`).
-    #[inline]
-    pub fn new() -> Self {
-        Arguments {
-            certificates: Vec::new(),
-            certificate_capabilities: Vec::new(),
-            binary_capabilities: Vec::new(),
-            veracruz_server_ip: None,
-            proxy_attestation_server_ip: None,
-            proxy_service_cert: PathBuf::new(),
-            css_file: None,
-            pcr0_file: None,
-            output_policy_file: PathBuf::new(),
-            certificate_expiry: None,
-            program_binaries: Vec::new(),
-            hashes: Vec::new(),
-            enclave_debug_mode: false,
-            execution_strategy: String::new(),
-            enable_clock: false,
-            max_memory_mib: 0,
+    /// Parses the command line options, building a `Arguments` struct out
+    /// of them.  If required options are not present, or if any options are
+    /// malformed, this will abort the program.
+    fn parse_command_line() -> Result<Self> {
+        let matches = App::new(APPLICATION_NAME)
+            .version(VERSION)
+            .author(AUTHORS)
+            .about(ABOUT)
+            .arg(
+                Arg::with_name("certificate")
+                    .short("c")
+                    .long("certificate")
+                    .value_name("FILE")
+                    .help("The filename of a cryptographic certificate identifying a computation participant.")
+                    .required(true)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("capability")
+                    .short("p")
+                    .long("capability")
+                    .value_name("CAPABILITIES")
+                    .help("The capability table of a client or a program of the form 'output:rw,input-0:w,program.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
+                    .required(true)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("veracruz-server-ip")
+                    .short("s")
+                    .long("veracruz-server-ip")
+                    .value_name("IP ADDRESS")
+                    .help("IP address of the Veracruz server.")
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("proxy-attestation-server-ip")
+                    .short("t")
+                    .long("proxy-attestation-server-ip")
+                    .value_name("IP ADDRESS")
+                    .help("IP address of the Veracruz proxy attestation server.")
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("proxy-attestation-server-cert")
+                    .long("proxy-attestation-server-cert")
+                    .value_name("PROXY_CERT")
+                    .help("CA Certificate that the proxy attestation service uses to create and sign certificates")
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("css-file")
+                    .short("b")
+                    .long("css-file")
+                    .value_name("FILE")
+                    .help("Filename of the CSS file for the Runtime Manager enclave for SGX measurement.")
+                    .required(false),
+            )
+            .arg(
+                Arg::with_name("pcr-file")
+                    .short("l")
+                    .long("pcr-file")
+                    .value_name("FILE")
+                    .help("Filename of the PCR0 file for the Runtime Manager enclave for AWS Nitro Enclave measurement.")
+                    .required(false),
+            )
+            .arg(
+                Arg::with_name("output-policy-file")
+                    .short("o")
+                    .long("output-policy-file")
+                    .value_name("FILE")
+                    .help("Filename of the generated policy file.")
+            )
+            .arg(
+                Arg::with_name("certificate-expiry")
+                    .short("x")
+                    .long("certificate-expiry")
+                    .value_name("RFC2822 TIMEPOINT")
+                    .help(
+                        "The expiry point of the server certificate, expressed \
+    as an RFC-2822 formatted timepoint.",
+                    )
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("binary")
+                    .short("w")
+                    .long("binary")
+                    .value_name("FILE")
+                    .help("Specifies the filename of the WASM binary to use for the computation. \
+    This can be of the form \"--binary name\" or \"--binary enclave_name=path\" if you want to \
+    supply the file as a different name in the enclave. Multiple --binary flags or a comma-separated \
+    list of files may be provided.")
+                    .required(true)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("pipeline")
+                    //.short("i")
+                    .long("pipeline")
+                    .value_name("SCRIPT")
+                    .help("Script for executing several programs.")
+                    .required(false)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("debug")
+                    .short("d")
+                    .long("enclave-debug-mode")
+                    .help(
+                        "Specifies whether the Veracruz trusted runtime should allow debugging \
+    information to be produced by the executing WASM binary.",
+                    )
+            )
+            .arg(
+                Arg::with_name("execution-strategy")
+                    .short("e")
+                    .long("execution-strategy")
+                    .value_name("Interpretation | JIT")
+                    .help(
+                        "Specifies whether to use interpretation or JIT execution for the WASM \
+    binary.",
+                    )
+            )
+            .arg(
+                Arg::with_name("enable-clock")
+                    .short("n")
+                    .long("enable-clock")
+                    .help(
+                        "Specifies whether the Veracruz trusted runtime should allow the WASM \
+    binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
+                    )
+            )
+            .arg(
+                Arg::with_name("max-memory-mib")
+                    .short("m")
+                    .long("max-memory-mib")
+                    .value_name("SIZE")
+                    .help(
+                        "Specifies the maximum amount of memory in MiB available to the isolate. \
+    Only enforced in Nitro for now.",
+                    )
+            )
+            .arg(
+                Arg::with_name("hash")
+                    .short("h")
+                    .long("hashes")
+                    .value_name("FILE")
+                    .help("Specifies the filename of any (local) file that must match a hash. \
+    This can be of the form \"--hash name\" or \"--hash  enclave_name=path\" if you want to \
+    supply the file as a different name in the enclave. Multiple --hash flags or a comma-separated \
+    list of files may be provided.")
+                    .multiple(true),
+            )
+            .get_matches();
+
+        info!("Parsed command line.");
+
+        // Read all clients' certificates
+        let certificates = matches
+            .values_of("certificate")
+            .ok_or(anyhow!(
+                "No certificates were passed as command line parameters."
+            ))?
+            .map(|c| PathBuf::from(c))
+            .collect::<Vec<_>>();
+
+        // Read all program paths
+        let mut program_binaries = Vec::new();
+        for path_raw in matches
+            .values_of_os("binary")
+            .ok_or(anyhow!("No program binary filename passed as an argument."))?
+        {
+            program_binaries
+                .append(&mut parse_renamable_paths(path_raw).map_err(|e| anyhow!("{:?}", e))?);
         }
+
+        // Use the program paths as the base of hashes
+        // and append the extra hashes
+        let mut hashes = program_binaries.clone();
+        if let Some(hashes_raw) = matches.values_of_os("hash") {
+            for hash_raw in hashes_raw {
+                hashes
+                    .append(&mut parse_renamable_paths(hash_raw).map_err(|e| anyhow!("{:?}", e))?);
+            }
+        }
+
+        // Read all the pipelines
+        let pipelines = matches
+            .values_of("pipeline")
+            .map_or(Vec::new(), |pipelines| {
+                pipelines.map(|b| b.to_string()).collect::<Vec<_>>()
+            });
+
+        // Check all the capabilities. This includes (1) format and (2) length.
+        let mut capabilities = matches
+            .values_of("capability")
+            .ok_or(anyhow!(
+                "No capabilities were passed as command line parameters."
+            ))?
+            .map(|s| s.split(",").map(|s| String::from(s)).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        check_capability(&capabilities)?;
+
+        if certificates.len() + program_binaries.len() + pipelines.len() != capabilities.len() {
+            return Err(anyhow!("The number of capabilities attributes differ from the total number of certificate and binary attributes."));
+        }
+
+        // Split the capabilities into three groups, certificate, program, and pipeline.
+        let mut binary_capabilities = capabilities.split_off(certificates.len());
+        let certificate_capabilities = capabilities;
+        let pipeline_capabilities = binary_capabilities.split_off(program_binaries.len());
+
+        let veracruz_server_ip =
+            SocketAddr::from_str(matches.value_of("veracruz-server-ip").ok_or(anyhow!(
+                "No Veracruz server IP address was passed as a command line parameter."
+            ))?)?;
+
+        let proxy_attestation_server_ip = SocketAddr::from_str(matches.value_of("proxy-attestation-server-ip").ok_or(anyhow!("No Veracruz proxy attestation server IP address was passed as a command line parameter."))?)?;
+
+        let proxy_service_cert = PathBuf::from(matches.value_of("proxy-attestation-server-cert").ok_or(anyhow!("No Proxy Attestation Server certificate filename was passed as a command line parameter."))?);
+
+        let output_policy_file = PathBuf::from(
+            matches
+                .value_of("output-policy-file")
+                .map_or(DEFAULT_OUTPUT_FILENAME, |fname| fname),
+        );
+
+        let css_file = matches
+            .value_of("css-file")
+            .map(|fname| PathBuf::from(fname));
+        let pcr0_file = matches
+            .value_of("pcr-file")
+            .map(|fname| PathBuf::from(fname));
+        if css_file.is_none() && pcr0_file.is_none() {
+            return Err(anyhow!(
+                "Either the CSS.bin or the PCR0 file must be provided as a \
+    command-line parameter.",
+            ));
+        }
+
+        let certificate_expiry = DateTime::parse_from_rfc2822(
+            matches
+                .value_of("certificate-expiry")
+                .ok_or(anyhow!("No certificate lifetime passed as an argument."))?,
+        )?;
+
+        let execution_strategy = String::from(
+            matches
+                .value_of("execution-strategy")
+                .map_or(DEFAULT_EXECUTION_STRATEGY, |strategy| strategy),
+        );
+        check_execution_strategy(&execution_strategy)?;
+
+        let enclave_debug_mode = matches.is_present("debug");
+
+        let enable_clock = matches.is_present("enable-clock");
+
+        let max_memory_mib = if let Some(max_memory_mib) = matches.value_of("max-memory-mib") {
+            max_memory_mib.parse().map_err(|e| {
+                anyhow!(format!(
+                    "Failed to parse max memory.  Error produced: {}.",
+                    e
+                ))
+            })?
+        } else {
+            info!("No maximum amount of memory passed as an argument.  Using a default.");
+            DEFAULT_MAX_MEMORY_MIB
+        };
+
+        info!("Successfully extracted command line arguments.");
+
+        Ok(Self {
+            certificates,
+            certificate_capabilities,
+            binary_capabilities,
+            pipeline_capabilities,
+            veracruz_server_ip,
+            proxy_attestation_server_ip,
+            proxy_service_cert,
+            css_file,
+            pcr0_file,
+            output_policy_file,
+            certificate_expiry,
+            program_binaries,
+            pipelines,
+            hashes,
+            enclave_debug_mode,
+            execution_strategy,
+            enable_clock,
+            max_memory_mib,
+        })
+    }
+
+    /// Serializes the Veracruz policy file as a JSON value.
+    fn serialize_json(&self) -> Result<Value> {
+        info!("Serializing JSON policy file.");
+
+        let policy = Policy::new(
+            self.serialize_identities()?,
+            self.serialize_binaries()?,
+            self.serialize_pipeline()?,
+            format!("{}", self.veracruz_server_ip),
+            self.serialize_enclave_certificate_timepoint()?,
+            POLICY_CIPHERSUITE.to_string(),
+            self.compute_linux_enclave_hash()?,
+            self.compute_nitro_enclave_hash()?,
+            self.compute_icecap_enclave_hash()?,
+            format!("{}", self.proxy_attestation_server_ip),
+            self.serialize_proxy_service_certificate()?,
+            self.enclave_debug_mode,
+            self.serialize_execution_strategy()?,
+            self.serialize_file_hash()?,
+            self.enable_clock,
+            self.max_memory_mib,
+        )
+        .map_err(|_| anyhow!("Failed to instantiate a (struct) policy"))?;
+
+        Ok(json!(policy))
+    }
+
+    /// Serializes the identities of all principals in the Veracruz computation into
+    /// a vec of VeracruzIdentity<String>.
+    fn serialize_identities(&self) -> Result<Vec<Identity<String>>> {
+        info!("Serializing identities of computation Principals.");
+
+        assert_eq!(self.certificates.len(), self.certificate_capabilities.len());
+
+        let mut values = Vec::new();
+
+        for (id, (cert, capability)) in self
+            .certificates
+            .iter()
+            .zip(&self.certificate_capabilities)
+            .enumerate()
+        {
+            let mut file = File::open(cert)
+                .map_err(|_| anyhow!("Could not open certificate file {:?}.", cert))?;
+            let mut content = String::new();
+
+            file.read_to_string(&mut content)
+                .expect("Failed to read file.");
+
+            let certificates = content
+                .replace("\n", "")
+                .replace(
+                    "-----BEGIN CERTIFICATE-----",
+                    "-----BEGIN CERTIFICATE-----\n",
+                )
+                .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
+            let file_permissions = serialize_capability(capability)?;
+
+            values.push(Identity::new(certificates, id as u32, file_permissions));
+        }
+        Ok(values)
+    }
+
+    /// Serializes the identities of all principals in the Veracruz computation into
+    /// a vec of VeracruzProgram.
+    fn serialize_binaries(&self) -> Result<Vec<Program>> {
+        info!("Serializing programs.");
+
+        assert_eq!(self.program_binaries.len(), self.binary_capabilities.len());
+
+        let mut result = Vec::new();
+        for (id, ((program_file_name, _), capability)) in self
+            .program_binaries
+            .iter()
+            .zip(&self.binary_capabilities)
+            .enumerate()
+        {
+            let file_permissions = serialize_capability(capability)?;
+            let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
+
+            result.push(Program::new(program_file_name, id as u32, file_permissions));
+        }
+        Ok(result)
+    }
+
+    /// Serializes the identities of all pipelines.
+    fn serialize_pipeline(&self) -> Result<Vec<Pipeline>> {
+        info!("Serializing pipelines.");
+
+        assert_eq!(self.pipelines.len(), self.pipeline_capabilities.len());
+
+        let mut result = Vec::new();
+        for (id, (preparsed_pipeline, capability)) in self
+            .pipelines
+            .iter()
+            .zip(&self.pipeline_capabilities)
+            .enumerate()
+        {
+            let file_permissions = serialize_capability(capability)?;
+
+            result.push(Pipeline::new(
+                id.to_string(),
+                id as u32,
+                preparsed_pipeline.to_string(),
+                file_permissions,
+            )?);
+        }
+        Ok(result)
+    }
+
+    /// Serializes the enclave server certificate expiry timepoint to a JSON value,
+    /// computing the time when the certificate will expire as a point relative to
+    /// the current time.
+    fn serialize_enclave_certificate_timepoint(&self) -> Result<Timepoint> {
+        info!("Serializing enclave certificate expiry timepoint.");
+
+        let timepoint = self.certificate_expiry;
+
+        Ok(Timepoint::new(
+            timepoint.year() as u32,
+            timepoint.month() as u8,
+            timepoint.day() as u8,
+            timepoint.hour() as u8,
+            timepoint.minute() as u8,
+        )?)
+    }
+
+    /// Computes the Linux hash of the Runtime Manager enclave using a SHA256
+    /// digest of the runtime manager binary's content.
+    fn compute_linux_enclave_hash(&self) -> Result<Option<String>> {
+        info!("Computing Linux enclave hash.");
+
+        let css_file = match &self.css_file {
+            None => {
+                warn!("No Linux CSS file specified.");
+                warn!("Continuing without computing a Linux runtime manager hash.");
+                None
+            }
+            Some(css_file) => {
+                info!("Measuring content of: {:?}.", css_file);
+                info!("Computed sha256sum of Linux CSS file.");
+                Some(compute_file_hash(css_file)?)
+            }
+        };
+
+        Ok(css_file)
+    }
+
+    /// Reads the Runtime Manager PCR0 file content, munging it a little, for the Nitro
+    /// Enclave hash.  Returns `None` iff no `pcr0` file was provided as a command
+    /// line argument.
+    fn compute_nitro_enclave_hash(&self) -> Result<Option<String>> {
+        info!("Computing AWS Nitro Enclave hash.");
+
+        let pcr0_file = match &self.pcr0_file {
+            None => return Ok(None),
+            Some(pcr0_file) => pcr0_file,
+        };
+
+        let mut file = File::open(pcr0_file)
+            .map_err(|_| anyhow!("Runtime Manager PCR0 file cannot be opened."))?;
+        let mut content = String::new();
+
+        file.read_to_string(&mut content)?;
+
+        content = content.replace("\n", "");
+        // Nitro Enclave hashes are computed using SHA384, which produces 48
+        // bytes. We only have room right now for 32 byte hashes.
+        // Thus, we need to truncate down to 32 bytes (64 hex characters)
+        content = content[0..64].to_string();
+
+        info!("Hash successfully computed, {}.", content);
+
+        Ok(Some(content))
+    }
+
+    // HACK attestation not yet implemented for IceCap
+    #[inline]
+    fn compute_icecap_enclave_hash(&self) -> Result<Option<String>> {
+        Ok(Some(
+            "deadbeefdeadbeefdeadbeefdeadbeeff00dcafef00dcafef00dcafef00dcafe".to_string(),
+        ))
+    }
+
+    /// Serializes the proxy attestation service certificate (basically reads the
+    /// string from the file and returns that
+    fn serialize_proxy_service_certificate(&self) -> Result<String> {
+        Ok(read_to_string(self.proxy_service_cert.to_str().ok_or(
+            anyhow!("Fail to convert proxy_service_cert to str."),
+        )?)?)
+    }
+
+    fn serialize_execution_strategy(&self) -> Result<ExecutionStrategy> {
+        match self.execution_strategy.as_str() {
+            "Interpretation" => Ok(ExecutionStrategy::Interpretation),
+            "JIT" => Ok(ExecutionStrategy::JIT),
+            _otherwise => Err(anyhow!("Could not parse execution strategy argument.")),
+        }
+    }
+
+    fn serialize_file_hash(&self) -> Result<Vec<FileHash>> {
+        info!("Serializing standard streams.");
+        let mut result = Vec::new();
+        for (file_name, file_path) in self.hashes.iter() {
+            let hash = compute_file_hash(file_path)?;
+            let file_name = enforce_leading_backslash(file_name).into_owned();
+
+            result.push(FileHash::new(file_name, hash));
+        }
+        Ok(result)
     }
 }
 
 /// Checks that the string `strategy` matches either "Interpretation" or "JIT",
 /// and if not prints an error message and aborts.
-fn check_execution_strategy(strategy: &str) {
-    if strategy == "Interpretation" || strategy == "JIT" {
-        return;
-    } else {
-        abort_with("Could not parse execution strategy argument.");
+fn check_execution_strategy(strategy: &str) -> Result<()> {
+    match strategy {
+        "Interpretation" | "JIT" => Ok(()),
+        _otherwise => Err(anyhow!("Could not parse execution strategy argument.")),
     }
 }
 
 /// Checks that all strings appearing in all vectors in the `capabilities` argument are
 /// valid Veracruz capabilities: of the form "[FILE_NAME]:[Right_number]".
-fn check_capability(capabilities: &[Vec<String>]) {
+fn check_capability(capabilities: &[Vec<String>]) -> Result<()> {
     if !capabilities.iter().all(|v| {
         v.iter().all(|s| {
             let mut split = s.split(':');
@@ -204,304 +672,11 @@ fn check_capability(capabilities: &[Vec<String>]) {
             cap_check || split.next().is_none()
         })
     }) {
-        abort_with("Could not parse the capability command line arguments.");
+        return Err(anyhow!(
+            "Could not parse the capability command line arguments."
+        ));
     }
-}
-
-/// Parses the command line options, building a `CommandLineOptions` struct out
-/// of them.  If required options are not present, or if any options are
-/// malformed, this will abort the program.
-fn parse_command_line() -> Arguments {
-    let matches = App::new(APPLICATION_NAME)
-        .version(VERSION)
-        .author(AUTHORS)
-        .about(ABOUT)
-        .arg(
-            Arg::with_name("certificate")
-                .short("c")
-                .long("certificate")
-                .value_name("FILE")
-                .help("The filename of a cryptographic certificate identifying a computation participant.")
-                .required(true)
-                .multiple(true),
-        )
-        .arg(
-            Arg::with_name("capability")
-                .short("p")
-                .long("capability")
-                .value_name("CAPABILITIES")
-                .help("The capability table of a client or a program of the form 'output:rw,input-0:w,program.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
-                .required(true)
-                .multiple(true),
-        )
-        .arg(
-            Arg::with_name("veracruz-server-ip")
-                .short("s")
-                .long("veracruz-server-ip")
-                .value_name("IP ADDRESS")
-                .help("IP address of the Veracruz server.")
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("proxy-attestation-server-ip")
-                .short("t")
-                .long("proxy-attestation-server-ip")
-                .value_name("IP ADDRESS")
-                .help("IP address of the Veracruz proxy attestation server.")
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("proxy-attestation-server-cert")
-                .long("proxy-attestation-server-cert")
-                .value_name("PROXY_CERT")
-                .help("CA Certificate that the proxy attestation service uses to create and sign certificates")
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("css-file")
-                .short("b")
-                .long("css-file")
-                .value_name("FILE")
-                .help("Filename of the CSS file for the Runtime Manager enclave for SGX measurement.")
-                .required(false),
-        )
-        .arg(
-            Arg::with_name("pcr-file")
-                .short("l")
-                .long("pcr-file")
-                .value_name("FILE")
-                .help("Filename of the PCR0 file for the Runtime Manager enclave for AWS Nitro Enclave measurement.")
-                .required(false),
-        )
-        .arg(
-            Arg::with_name("output-policy-file")
-                .short("o")
-                .long("output-policy-file")
-                .value_name("FILE")
-                .help("Filename of the generated policy file.")
-        )
-        .arg(
-            Arg::with_name("certificate-expiry")
-                .short("x")
-                .long("certificate-expiry")
-                .value_name("RFC2822 TIMEPOINT")
-                .help(
-                    "The expiry point of the server certificate, expressed \
-as an RFC-2822 formatted timepoint.",
-                )
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("binary")
-                .short("w")
-                .long("binary")
-                .value_name("FILE")
-                .help("Specifies the filename of the WASM binary to use for the computation. \
-This can be of the form \"--binary name\" or \"--binary enclave_name=path\" if you want to \
-supply the file as a different name in the enclave. Multiple --binary flags or a comma-separated \
-list of files may be provided.")
-                .required(true)
-                .multiple(true),
-        )
-        .arg(
-            Arg::with_name("debug")
-                .short("d")
-                .long("enclave-debug-mode")
-                .help(
-                    "Specifies whether the Veracruz trusted runtime should allow debugging \
-information to be produced by the executing WASM binary.",
-                )
-        )
-        .arg(
-            Arg::with_name("execution-strategy")
-                .short("e")
-                .long("execution-strategy")
-                .value_name("Interpretation | JIT")
-                .help(
-                    "Specifies whether to use interpretation or JIT execution for the WASM \
-binary.",
-                )
-        )
-        .arg(
-            Arg::with_name("enable-clock")
-                .short("n")
-                .long("enable-clock")
-                .help(
-                    "Specifies whether the Veracruz trusted runtime should allow the WASM \
-binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
-                )
-        )
-        .arg(
-            Arg::with_name("max-memory-mib")
-                .short("m")
-                .long("max-memory-mib")
-                .value_name("SIZE")
-                .help(
-                    "Specifies the maximum amount of memory in MiB available to the isolate. \
-Only enforced in Nitro for now.",
-                )
-        )
-        .arg(
-            Arg::with_name("hash")
-                .short("h")
-                .long("hashes")
-                .value_name("FILE")
-                .help("Specifies the filename of any (local) file that must match a hash. \
-This can be of the form \"--hash name\" or \"--hash  enclave_name=path\" if you want to \
-supply the file as a different name in the enclave. Multiple --hash flags or a comma-separated \
-list of files may be provided.")
-                .multiple(true),
-        )
-        .get_matches();
-
-    info!("Parsed command line.");
-
-    let mut arguments = Arguments::new();
-
-    if let Some(certificates) = matches.values_of("certificate") {
-        arguments.certificates = certificates.map(|c| PathBuf::from(c)).collect();
-    } else {
-        abort_with("No certificates were passed as command line parameters.");
-    }
-
-    if let Some(binaries) = matches.values_of_os("binary") {
-        let mut binaries_list = binaries
-            .map(|b| match parse_renamable_paths(b) {
-                Ok(paths) => paths,
-                Err(err) => {
-                    abort_with(err);
-                }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        arguments.program_binaries = binaries_list.clone();
-        arguments.hashes.append(&mut binaries_list);
-    } else {
-        abort_with("No program binary filename passed as an argument.");
-    }
-
-    if let Some(hashes) = matches.values_of_os("hash") {
-        let mut hashes_list = hashes
-            .map(|b| match parse_renamable_paths(b) {
-                Ok(paths) => paths,
-                Err(err) => {
-                    abort_with(err);
-                }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        arguments.hashes.append(&mut hashes_list);
-    }
-
-    if let Some(capabilities) = matches.values_of("capability") {
-        let mut capabilities = capabilities
-            .map(|s| s.split(",").map(|s| String::from(s)).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-
-        check_capability(&capabilities);
-
-        if arguments.certificates.len() + arguments.program_binaries.len() != capabilities.len() {
-            abort_with("The number of capabilities attributes differ from the total number of certificate and binary attributes.");
-        }
-        let binary_capabilities = capabilities.split_off(arguments.certificates.len());
-
-        arguments.certificate_capabilities = capabilities;
-        arguments.binary_capabilities = binary_capabilities;
-    } else {
-        abort_with("No capabilities were passed as command line parameters.");
-    }
-
-    if let Some(url) = matches.value_of("veracruz-server-ip") {
-        if let Ok(url) = SocketAddr::from_str(url) {
-            arguments.veracruz_server_ip = Some(url);
-        } else {
-            abort_with("Could not parse the Veracruz server IP address argument.");
-        }
-    } else {
-        abort_with("No Veracruz server IP address was passed as a command line parameter.");
-    }
-
-    if let Some(url) = matches.value_of("proxy-attestation-server-ip") {
-        if let Ok(url) = SocketAddr::from_str(url) {
-            arguments.proxy_attestation_server_ip = Some(url);
-        } else {
-            abort_with("Could not parse Veracruz proxy attestation server IP address argument.");
-        }
-    } else {
-        abort_with("No Veracruz proxy attestation server IP address was passed as a command line parameter.");
-    }
-
-    if let Some(cert_file) = matches.value_of("proxy-attestation-server-cert") {
-        arguments.proxy_service_cert = PathBuf::from(cert_file);
-    } else {
-        abort_with("No Proxy Attestation Server certificate filename was passed as a command line parameter.");
-    }
-
-    if let Some(fname) = matches.value_of("output-policy-file") {
-        arguments.output_policy_file = PathBuf::from(fname);
-    } else {
-        info!("No output filename passed as an argument.  Using a default.");
-        arguments.output_policy_file = PathBuf::from(DEFAULT_OUTPUT_FILENAME);
-    }
-
-    if let Some(fname) = matches.value_of("css-file") {
-        arguments.css_file = Some(PathBuf::from(fname));
-    } else {
-        info!(
-            "No CSS file was passed as a command line parameter.  SGX hashes will not be computed."
-        );
-    }
-
-    if let Some(fname) = matches.value_of("pcr-file") {
-        arguments.pcr0_file = Some(PathBuf::from(fname));
-    } else {
-        info!("No PCR0 file was passed as a command line parameter.  Nitro hashes will not be computed.");
-    }
-
-    if let Some(expiry) = matches.value_of("certificate-expiry") {
-        if let Ok(expiry) = DateTime::parse_from_rfc2822(expiry) {
-            arguments.certificate_expiry = Some(expiry);
-        } else {
-            abort_with("The certificate expiry timepoint argument could not be parsed.");
-        }
-    } else {
-        abort_with("No certificate lifetime passed as an argument.");
-    }
-
-    arguments.enclave_debug_mode = matches.is_present("debug");
-
-    if let Some(strategy) = matches.value_of("execution-strategy") {
-        check_execution_strategy(strategy);
-        arguments.execution_strategy = String::from(strategy);
-    } else {
-        info!("No execution strategy passed as an argument.  Using a default.");
-        arguments.execution_strategy = String::from(DEFAULT_EXECUTION_STRATEGY);
-    }
-
-    if arguments.pcr0_file.is_none() && arguments.css_file.is_none() {
-        abort_with(
-            "Either the CSS.bin or the PCR0 file must be provided as a \
-command-line parameter.",
-        );
-    }
-
-    arguments.enable_clock = matches.is_present("enable-clock");
-
-    if let Some(max_memory_mib) = matches.value_of("max-memory-mib") {
-        arguments.max_memory_mib = max_memory_mib.parse().unwrap_or_else(|e| {
-            abort_with(format!(
-                "Failed to parse max memory.  Error produced: {}.",
-                e
-            ));
-        });
-    } else {
-        info!("No maximum amount of memory passed as an argument.  Using a default.");
-        arguments.max_memory_mib = DEFAULT_MAX_MEMORY_MIB;
-    }
-
-    info!("Successfully extracted command line arguments.");
-
-    arguments
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -510,192 +685,32 @@ command-line parameter.",
 
 /// Executes the hashing program on the WASM binary, returning the computed
 /// SHA256 hash as a string.
-fn compute_file_hash(argument: &PathBuf) -> String {
-    if let Ok(mut file) = File::open(argument) {
-        let mut buffer = vec![];
+fn compute_file_hash(argument: &PathBuf) -> Result<String> {
+    let mut file = File::open(argument)
+        .map_err(|_| anyhow!("Failed to open WASM program binary: {:?}.", argument))?;
+    let mut buffer = vec![];
 
-        file.read_to_end(&mut buffer).unwrap_or_else(|e| {
-            abort_with(format!(
-                "Failed to read file: {:?}.  Error produced: {}.",
-                argument, e
-            ));
-        });
+    file.read_to_end(&mut buffer).map_err(|e| {
+        anyhow!(
+            "Failed to read file: {:?}.  Error produced: {}.",
+            argument,
+            e
+        )
+    })?;
 
-        return pretty_digest(&mut buffer);
-    } else {
-        abort_with(format!(
-            "Failed to open WASM program binary: {:?}.",
-            argument
-        ));
-    }
-}
-
-/// Computes the Linux hash of the Runtime Manager enclave using a SHA256
-/// digest of the runtime manager binary's content.
-fn compute_linux_enclave_hash(arguments: &Arguments) -> Option<String> {
-    info!("Computing Linux enclave hash.");
-
-    let css_file = match &arguments.css_file {
-        None => {
-            warn!("No Linux CSS file specified.");
-            warn!("Continuing without computing a Linux runtime manager hash.");
-
-            return None;
-        }
-        Some(css_file) => {
-            info!("Measuring content of: {:?}.", css_file);
-
-            css_file
-        }
-    };
-
-    let hash = compute_file_hash(css_file);
-
-    info!("Computed sha256sum of Linux CSS file: {:?}.", hash);
-
-    Some(hash)
-}
-
-/// Reads the Runtime Manager PCR0 file content, munging it a little, for the Nitro
-/// Enclave hash.  Returns `None` iff no `pcr0` file was provided as a command
-/// line argument.
-fn compute_nitro_enclave_hash(arguments: &Arguments) -> Option<String> {
-    info!("Computing AWS Nitro Enclave hash.");
-
-    let pcr0_file = match &arguments.pcr0_file {
-        None => return None,
-        Some(pcr0_file) => pcr0_file,
-    };
-
-    if let Ok(mut file) = File::open(pcr0_file) {
-        let mut content = String::new();
-
-        file.read_to_string(&mut content)
-            .expect("Failed to read file.");
-
-        content = content.replace("\n", "");
-        // Nitro Enclave hashes are computed using SHA384, which produces 48
-        // bytes. We only have room right now for 32 byte hashes.
-        // Thus, we need to truncate down to 32 bytes (64 hex characters)
-        content = content[0..64].to_string();
-
-        info!("Hash successfully computed, {}.", content);
-
-        Some(content)
-    } else {
-        info!("Runtime Manager PCR0 file cannot be opened.");
-        info!("Continuing on without computing a Nitro hash.");
-        None
-    }
-}
-
-// HACK attestation not yet implemented for IceCap
-#[inline]
-fn compute_icecap_enclave_hash(_arguments: &Arguments) -> Option<String> {
-    Some("deadbeefdeadbeefdeadbeefdeadbeeff00dcafef00dcafef00dcafef00dcafe".to_string())
-}
-
-/// Serializes the identities of all principals in the Veracruz computation into
-/// a vec of VeracruzIdentity<String>.
-fn serialize_identities(arguments: &Arguments) -> Vec<Identity<String>> {
-    info!("Serializing identities of computation Principals.");
-
-    assert_eq!(
-        arguments.certificates.len(),
-        arguments.certificate_capabilities.len()
-    );
-
-    let mut values = Vec::new();
-
-    for (id, (cert, capability)) in arguments
-        .certificates
-        .iter()
-        .zip(&arguments.certificate_capabilities)
-        .enumerate()
-    {
-        if let Ok(mut file) = File::open(cert) {
-            let mut content = String::new();
-
-            file.read_to_string(&mut content)
-                .expect("Failed to read file.");
-
-            let certificates = content
-                .replace("\n", "")
-                .replace(
-                    "-----BEGIN CERTIFICATE-----",
-                    "-----BEGIN CERTIFICATE-----\n",
-                )
-                .replace("-----END CERTIFICATE-----", "\n-----END CERTIFICATE-----");
-            let file_permissions = serialize_capability(capability);
-
-            values.push(Identity::new(certificates, id as u32, file_permissions));
-        } else {
-            let error_msg = format!("Could not open certificate file {:?}.", cert);
-            abort_with(error_msg);
-        }
-    }
-    values
-}
-
-/// Serializes the proxy attestation service certificate (basically reads the
-/// string from the file and returns that
-pub fn serialize_certificate(path: &PathBuf) -> String {
-    return read_to_string(path.to_str().unwrap()).unwrap();
-}
-
-/// Serializes the identities of all principals in the Veracruz computation into
-/// a vec of VeracruzProgram.
-fn serialize_binaries(arguments: &Arguments) -> Vec<Program> {
-    info!("Serializing programs.");
-
-    assert_eq!(
-        arguments.program_binaries.len(),
-        arguments.binary_capabilities.len()
-    );
-
-    arguments
-        .program_binaries
-        .iter()
-        .zip(&arguments.binary_capabilities)
-        .enumerate()
-        .map(|(id, ((program_file_name, _), capability))| {
-            let file_permissions = serialize_capability(capability);
-            let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
-
-            Program::new(program_file_name, id as u32, file_permissions)
-        })
-        .collect()
-}
-
-/// Serializes the enclave server certificate expiry timepoint to a JSON value,
-/// computing the time when the certificate will expire as a point relative to
-/// the current time.
-fn serialize_enclave_certificate_timepoint(arguments: &Arguments) -> Timepoint {
-    info!("Serializing enclave certificate expiry timepoint.");
-
-    let timepoint = arguments
-        .certificate_expiry
-        .expect("Internal invariant failed: certificate lifetime is missing.");
-
-    Timepoint::new(
-        timepoint.year() as u32,
-        timepoint.month() as u8,
-        timepoint.day() as u8,
-        timepoint.hour() as u8,
-        timepoint.minute() as u8,
-    )
-    .expect("Failed to instantiate a timepoint")
+    Ok(pretty_digest(&mut buffer))
 }
 
 #[inline]
-fn serialize_capability(cap_string: &[String]) -> Vec<FileRights> {
-    cap_string
-        .iter()
-        .map(|c| serialize_capability_entry(c.as_str()))
-        .collect()
+fn serialize_capability(cap_string: &[String]) -> Result<Vec<FileRights>> {
+    let mut result = Vec::new();
+    for c in cap_string.iter() {
+        result.push(serialize_capability_entry(c.as_str())?);
+    }
+    Ok(result)
 }
 
-fn serialize_capability_entry(cap_string: &str) -> FileRights {
+fn serialize_capability_entry(cap_string: &str) -> Result<FileRights> {
     // common shorthand (r = read, w = write, rw = read + write)
     #[allow(non_snake_case)]
     let READ_RIGHTS = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
@@ -709,7 +724,7 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         | Rights::PATH_CREATE_DIRECTORY;
 
     #[allow(non_snake_case)]
-    let EXECUTE_RIGHTS = Rights::PATH_OPEN | Rights::FD_EXECUTE;
+    let EXECUTE_RIGHTS = Rights::PATH_OPEN | Rights::FD_EXECUTE | Rights::FD_SEEK;
 
     let mut split = cap_string.split(':');
     let file_name = enforce_leading_backslash(
@@ -727,7 +742,7 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         ))
         .trim();
 
-    let re = Regex::new(r"[rwx]+").unwrap();
+    let re = Regex::new(r"[rwx]+")?;
     let rights = {
         if re.is_match(string_number) {
             let mut rights = Rights::empty();
@@ -754,74 +769,10 @@ fn serialize_capability_entry(cap_string: &str) -> FileRights {
         }
     };
 
-    FileRights::new(
+    Ok(FileRights::new(
         file_name,
         u32::try_from(rights.bits()).expect("capability could not fit into u32"),
-    )
-}
-
-fn serialize_execution_strategy(strategy: &str) -> ExecutionStrategy {
-    match strategy {
-        "Interpretation" => ExecutionStrategy::Interpretation,
-        "JIT" => ExecutionStrategy::JIT,
-        _otherwise => abort_with("Could not parse execution strategy argument."),
-    }
-}
-
-fn serialize_file_hash(arguments: &Arguments) -> Vec<FileHash> {
-    info!("Serializing standard streams.");
-    arguments
-        .hashes
-        .iter()
-        .map(|(file_name, file_path)| {
-            let hash = compute_file_hash(file_path);
-            let file_name = enforce_leading_backslash(file_name).into_owned();
-
-            FileHash::new(file_name, hash)
-        })
-        .collect()
-}
-
-/// Serializes the Veracruz policy file as a JSON value.
-///
-/// NOTE: we are glossing over TrustZone attestation for the moment, so we use
-/// the measurement of the SGX enclave as the measurement of the TrustZone
-/// trusted application, too.
-fn serialize_json(arguments: &Arguments) -> Value {
-    info!("Serializing JSON policy file.");
-
-    let policy = Policy::new(
-        serialize_identities(arguments),
-        serialize_binaries(arguments),
-        format!(
-            "{}",
-            &arguments
-                .veracruz_server_ip
-                .as_ref()
-                .expect(&format!("Failed to get the veracruz server ip"))
-        ),
-        serialize_enclave_certificate_timepoint(arguments),
-        POLICY_CIPHERSUITE.to_string(),
-        compute_linux_enclave_hash(arguments),
-        compute_nitro_enclave_hash(arguments),
-        compute_icecap_enclave_hash(arguments),
-        format!(
-            "{}",
-            &arguments
-                .proxy_attestation_server_ip
-                .as_ref()
-                .expect(&format!("Failed to get the proxy attestation server ip"))
-        ),
-        serialize_certificate(&arguments.proxy_service_cert),
-        arguments.enclave_debug_mode,
-        serialize_execution_strategy(&arguments.execution_strategy),
-        serialize_file_hash(arguments),
-        arguments.enable_clock,
-        arguments.max_memory_mib,
-    )
-    .expect("Failed to instantiate a (struct) policy");
-
-    json!(policy)
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -830,32 +781,25 @@ fn serialize_json(arguments: &Arguments) -> Value {
 
 /// Entry point: reads the command line, serializes the policy file to JSON, and
 /// then writes the serialized JSON to the specified output file.
-fn main() {
+fn main() -> Result<()> {
     env_logger::init();
 
-    let arguments = parse_command_line();
+    let arguments = Arguments::parse_command_line()?;
 
+    info!("Writing JSON file, {:?}.", arguments.output_policy_file);
+
+    let mut file = File::create(&arguments.output_policy_file)
+        .map_err(|_| anyhow!("Could not open file {:?}.", arguments.output_policy_file))?;
+
+    let json = to_string_pretty(&arguments.serialize_json()?)
+        .map_err(|_| anyhow!("Failed to prettify serialized JSON."))?;
     info!(
-        "Writing JSON file, {}.",
-        pretty_pathbuf(arguments.output_policy_file.clone())
+        "Writing JSON policy file with SHA256 hash {}.",
+        pretty_digest(&mut json.as_bytes())
     );
 
-    if let Ok(mut file) = File::create(&arguments.output_policy_file) {
-        if let Ok(json) = to_string_pretty(&serialize_json(&arguments)) {
-            println!(
-                "Writing JSON policy file with SHA256 hash {}.",
-                pretty_digest(&mut json.as_bytes())
-            );
-            write!(file, "{}", json).expect("Failed to write file.");
-            info!("JSON file written successfully.");
-            exit(0);
-        } else {
-            abort_with("Failed to prettify serialized JSON.");
-        }
-    } else {
-        abort_with(format!(
-            "Could not open file {}.",
-            pretty_pathbuf(arguments.output_policy_file.clone())
-        ));
-    }
+    write!(file, "{}", json).expect("Failed to write file.");
+    info!("JSON file written successfully.");
+
+    Ok(())
 }

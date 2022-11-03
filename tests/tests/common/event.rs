@@ -17,6 +17,8 @@ pub(crate) enum TestEvent {
     AppendFile(String, PathBuf),
     // Execute a remote file
     Execute(String),
+    // Execute a pipeline
+    Pipeline(String),
     // Read a remote file
     ReadFile(String),
     // Request to shutdown the runtime
@@ -58,6 +60,11 @@ impl TestEvent {
     /// Create a test event for reading result.
     pub(crate) fn read_result<T: AsRef<str>>(filepath: T) -> TestEvent {
         TestEvent::ReadFile(String::from(filepath.as_ref()))
+    }
+
+    /// Create a test event for execute the pipeline of `pipeline_id`.
+    pub(crate) fn pipeline<T: AsRef<str>>(pipeline_id: T) -> TestEvent {
+        TestEvent::Pipeline(String::from(pipeline_id.as_ref()))
     }
 
     /// Function produces a vec of input lists. Each list corresponds to a round

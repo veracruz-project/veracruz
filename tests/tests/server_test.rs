@@ -280,8 +280,7 @@ fn basic_pipeline() {
     let events = vec![
         TestEvent::write_program(RANDOM_U32_LIST_WASM),
         TestEvent::write_program(SORT_NUBMER_WASM),
-        TestEvent::execute(RANDOM_U32_LIST_WASM),
-        TestEvent::execute(SORT_NUBMER_WASM),
+        TestEvent::pipeline("0"),
         TestEvent::read_result("/output/sorted_numbers.txt"),
         TestEvent::ShutDown,
     ];
@@ -307,7 +306,6 @@ fn integration_linear_regression() {
 }
 
 #[test]
-#[ignore] // FIXME: test currently disabled because it fails on IceCap
 /// Integration test: intersection sum.
 /// Intersection of two data sources and then the sum of the values in the intersection.
 /// data sources: customer and advertisement, vecs of AdvertisementViewer and Customer
@@ -758,6 +756,7 @@ impl TestExecutor {
                 self.append_file(&remote_path, local_path)?
             }
             TestEvent::Execute(remote_path) => self.execute_program(&remote_path)?,
+            TestEvent::Pipeline(pipeline_id) => self.execute_pipeline(&pipeline_id)?,
             TestEvent::ReadFile(remote_path) => self.read_file(&remote_path)?,
             TestEvent::ShutDown => self.shutdown()?,
         };
@@ -853,6 +852,11 @@ impl TestExecutor {
     #[inline]
     fn execute_program(&mut self, remote_path: &str) -> Result<Vec<u8>> {
         self.client_send(&transport_protocol::serialize_request_result(remote_path)?[..])
+    }
+
+    #[inline]
+    fn execute_pipeline(&mut self, pipeline_id: &str) -> Result<Vec<u8>> {
+        self.client_send(&transport_protocol::serialize_request_pipeline(pipeline_id)?[..])
     }
 
     #[inline]

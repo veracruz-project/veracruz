@@ -298,11 +298,22 @@ impl VeracruzClient {
         Ok(())
     }
 
-    /// Check the policy and runtime hashes, and request the veracruz to execute the program at the
-    /// remote `path`.
+    /// Request the veracruz to execute the program at the remote `path`.
     pub fn request_compute<P: AsRef<Path>>(&mut self, path: P) -> Result<Vec<u8>> {
         let parsed_response = self.request_functor(path, &[], |_, path| {
             transport_protocol::serialize_request_result(path)
+        })?;
+
+        if !parsed_response.has_result() {
+            return Err(anyhow!(VeracruzClientError::ResponseNoResult));
+        }
+        Ok(parsed_response.get_result().data.clone())
+    }
+
+    /// Request the veracruz to execute the program at the remote `path`.
+    pub fn request_pipeline<P: AsRef<Path>>(&mut self, pipeline_id: P) -> Result<Vec<u8>> {
+        let parsed_response = self.request_functor(pipeline_id, &[], |_, pipeline_id| {
+            transport_protocol::serialize_request_pipeline(pipeline_id)
         })?;
 
         if !parsed_response.has_result() {

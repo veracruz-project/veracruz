@@ -228,6 +228,18 @@ pub fn serialize_request_result(file_name: &str) -> TransportProtocolResult {
     set_length_prefix(&mut buffer)
 }
 
+/// Serialize the request for .
+pub fn serialize_request_pipeline(pipeline_name: &str) -> TransportProtocolResult {
+    let mut command = transport_protocol::RequestResult::new();
+    command.set_file_name(pipeline_name.to_string());
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
+    request.set_request_pipeline(command);
+
+    // Prefix buffer with its length
+    let mut buffer = request.write_to_bytes()?;
+    set_length_prefix(&mut buffer)
+}
+
 /// Serialize the request for shutting down the enclave.
 pub fn serialize_request_shutdown() -> TransportProtocolResult {
     let command = transport_protocol::RequestShutdown::new();

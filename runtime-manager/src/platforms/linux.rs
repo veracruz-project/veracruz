@@ -46,9 +46,9 @@ const INCOMING_ADDRESS: &'static str = "0.0.0.0";
 
 /// **TOTALLY INSECURE** root private key to use for Linux PSA attestation.
 ///
-/// NOTE that Linux attestation is "mocked up" and totally insecure.  See the attestation flow for
-/// AWS Nitro Enclaves for a secure attestation implementation.  This is merely here for
-/// illustrative purposes.
+/// NOTE that Linux attestation is "mocked up" and totally insecure.  See the
+/// attestation flow for AWS Nitro Enclaves for a secure attestation
+/// implementation.  This is merely here for illustrative purposes.
 static TOTALLY_INSECURE_ROOT_PRIVATE_KEY: [u8; 32] = [
     0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe, 0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54, 0xd0,
     0xba, 0x94, 0xbf, 0xb5, 0x47, 0x67, 0x2c, 0x31, 0xc1, 0xd4, 0xee, 0x1c, 0x05, 0x76, 0xa1, 0x44,
@@ -79,8 +79,9 @@ fn initialize() -> RuntimeManagerResponse {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Performs a dummy implementation of native attestation using the insecure
-/// root private keys and computing the runtime manager hash.  If successful, produces a PSA
-/// attestation token binding the CSR hash, runtime manager hash, and challenge.
+/// root private keys and computing the runtime manager hash.  If successful,
+/// produces a PSA attestation token binding the CSR hash, runtime manager hash,
+/// and challenge.
 fn native_attestation(
     csr: Vec<u8>,
     challenge: Vec<u8>,

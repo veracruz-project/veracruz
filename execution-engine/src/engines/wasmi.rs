@@ -86,11 +86,7 @@ impl MemoryHandler for MemoryRef {
     type Slice = &'static [u8];
     type SliceMut = &'static mut [u8];
 
-    fn get_slice<'a>(
-        &'a self,
-        address: u32,
-        length: u32,
-    ) -> FileSystemResult<Bound<'a, Self::Slice>> {
+    fn get_slice(&self, address: u32, length: u32) -> FileSystemResult<Bound<Self::Slice>> {
         let address = usize::try_from(address).unwrap();
         let length = usize::try_from(length).unwrap();
         // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
@@ -106,11 +102,11 @@ impl MemoryHandler for MemoryRef {
         })))
     }
 
-    fn get_slice_mut<'a>(
-        &'a mut self,
+    fn get_slice_mut(
+        &mut self,
         address: u32,
         length: u32,
-    ) -> FileSystemResult<BoundMut<'a, Self::SliceMut>> {
+    ) -> FileSystemResult<BoundMut<Self::SliceMut>> {
         let address = usize::try_from(address).unwrap();
         let length = usize::try_from(length).unwrap();
         // NOTE in more recent version of Wasmi, MemoryRef has a safe version of
@@ -588,7 +584,7 @@ impl Externals for WASMIRuntimeState {
 /// Functionality of the `WASMIRuntimeState` type that relies on it satisfying
 /// the `Externals` and `ModuleImportResolver` constraints.
 impl WASMIRuntimeState {
-    /// Creates a new initial `HostProvisioningState`.
+    /// Creates a new initial `WASMIRuntimeState`.
     #[inline]
     pub fn new(filesystem: FileSystem, options: Options) -> FileSystemResult<Self> {
         Ok(Self {
@@ -1294,6 +1290,7 @@ impl WASMIRuntimeState {
         let address = args.nth_checked::<u32>(0)?;
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1303,21 +1300,13 @@ impl WASMIRuntimeState {
 /// The `WASMIRuntimeState` implements everything needed to create a
 /// compliant instance of `ExecutionEngine`.
 impl ExecutionEngine for WASMIRuntimeState {
-    /// Executes the entry point of the WASM program provisioned into the
-    /// Veracruz host.
+    /// Executes the program, `program`, within the context of the execution
+    /// engine options, `options`.
     ///
-    /// Returns an error if no program is registered, the program registered
-    /// does not have an appropriate entry point, or if the machine is not
-    /// in the `LifecycleState::ReadyToExecute` state prior to being called.
-    ///
-    /// Also returns an error if the WASM program or the Veracruz instance
-    /// create a runtime trap during program execution (e.g. if the program
-    /// executes an abort instruction, or passes bad parameters to the Veracruz
-    /// host).
-    ///
-    /// Otherwise, returns the return value of the entry point function of the
-    /// program, along with a host state capturing the result of the program's
-    /// execution.
+    /// Returns `Ok(code)` if the pipeline successfully executed and returned a
+    /// defined error code, `code`.  Alternatively, returns `Err(fatal)` to
+    /// signal that a fatal runtime error, `fatal`, occurred during the
+    /// execution of the pipeline.
     fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
         self.load_program(&program)?;
 

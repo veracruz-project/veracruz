@@ -40,6 +40,8 @@ pub mod error;
 pub mod expiry;
 /// Parsers for turning strings into useful policy-related types.
 pub mod parsers;
+/// Pipelines of programs, and parsing their textual representation.
+pub mod pipeline;
 /// Types for working with policies themselves.
 pub mod policy;
 /// Principals, and their roles.

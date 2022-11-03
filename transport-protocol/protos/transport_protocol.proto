@@ -238,6 +238,7 @@ message RuntimeManagerRequest {
     PsaAttestationInit psa_attestation_init = 9;
     RequestPolicyHash request_policy_hash = 10;
     Read read_file = 11;
+    RequestResult request_pipeline = 12;
   }
   uint32 context = 1;
 }

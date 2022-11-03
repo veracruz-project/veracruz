@@ -1,0 +1,24 @@
+use crate::pipeline::Expr;
+
+grammar;
+
+pub Expr: Box<Expr> = {
+    <PathString> => Box::new(Expr::Literal(<>)),
+    "if"  <cond:PathString> <tt:("{" <Exprs> "}")> <ff:("else" "{" <Exprs> "}")?> => Box::new(Expr::IfElse(cond, tt, ff)),
+    "{" <Exprs> "}",
+};
+
+pub Exprs: Box<Expr> = {
+    <mut prefix:(<Expr> ";")*> <next:Expr?> => match next {
+        None => Box::new(Expr::Seq(prefix)),
+        Some(e) => {
+            prefix.push(e);
+            Box::new(Expr::Seq(prefix))
+        }
+    }
+}
+
+PathString: String = {
+    // Relative and absolute pathes.
+    r"/?([^/\s]+/)*[^/\s]+" => <>.to_string(),
+};
