@@ -46,6 +46,7 @@ RUN apt-get update && \
         g++ \
         gcc \
         gcc-aarch64-linux-gnu \
+        g++-aarch64-linux-gnu \
         gdb \
         ghc \
         git \

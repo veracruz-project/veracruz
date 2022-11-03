@@ -59,6 +59,13 @@ ENV \
     AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_INCLUDE_DIR=/work/veracruz-nitro-root-enclave/musl/include \
     X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_INCLUDE_DIR=/work/veracruz-nitro-root-enclave/musl/include
 
+WORKDIR /work
+RUN wget https://musl.cc/${ARCH}-linux-musl-native.tgz && \
+    tar zxvf ${ARCH}-linux-musl-native.tgz && \
+    ln -sf /work/${ARCH}-linux-musl-native/bin/${ARCH}-linux-musl-gcc /usr/bin/${ARCH}-linux-musl-gcc && \
+    ln -sf /work/${ARCH}-linux-musl-native/bin/${ARCH}-linux-musl-g++ /usr/bin/${ARCH}-linux-musl-g++ && \
+    rm ${ARCH}-linux-musl-native.tgz
+
 RUN mkdir -p /var/log/nitro_enclaves ; \
     touch /var/log/nitro_enclaves/nitro_enclaves.log ; \
     chmod -R a+rw /var/log/nitro_enclaves ; \
