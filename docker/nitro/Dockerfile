@@ -41,9 +41,9 @@ COPY aws-nitro-enclaves-cli/build/nitro_cli/${ARCH}-unknown-linux-musl/release/n
 
 RUN pip install --no-cache-dir awscli
 
-RUN wget https://github.com/openssl/openssl/archive/refs/tags/openssl-3.0.1.tar.gz && \
-    tar zxvf openssl-3.0.1.tar.gz &&\
-    cd openssl-openssl-3.0.1 && \
+RUN wget https://github.com/openssl/openssl/archive/refs/tags/openssl-3.0.7.tar.gz && \
+    tar zxvf openssl-3.0.7.tar.gz &&\
+    cd openssl-openssl-3.0.7 && \
     CC="musl-gcc -fPIE -pie -static -idirafter /usr/include/ -idirafter /usr/include/${ARCH}-linux-gnu/" \
         ./Configure no-shared no-async -DOPENSSL_NO_SECURE_MEMORY \
         --prefix=/work/veracruz-nitro-root-enclave/musl \
@@ -51,7 +51,7 @@ RUN wget https://github.com/openssl/openssl/archive/refs/tags/openssl-3.0.1.tar.
     make -j $(nproc) && \
     make install_sw install_ssldirs && \
     cd .. && \
-    rm -rf openssl-openssl-3.0.1 openssl-3.0.1.tar.gz
+    rm -rf openssl-openssl-3.0.7 openssl-3.0.7.tar.gz
 
 ENV \
     AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_LIB_DIR=/work/veracruz-nitro-root-enclave/musl/lib64 \
