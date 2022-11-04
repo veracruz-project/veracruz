@@ -26,39 +26,11 @@ use std::thread;
 type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
-#[post("/veracruz_server")]
-async fn veracruz_server_request(
-    enclave_handler: web::Data<EnclaveHandler>,
-    _request: HttpRequest,
-    input_data: String,
-) -> VeracruzServerResponder {
-    let input_data_decoded = base64::decode(&input_data)?;
-
-    let mut enclave_handler_locked = enclave_handler.lock()?;
-
-    let enclave = enclave_handler_locked
-        .as_mut()
-        .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-
-    let result = enclave.plaintext_data(input_data_decoded)?;
-
-    let result_string = match result {
-        Some(return_data) => base64::encode(&return_data),
-        None => String::new(),
-    };
-
-    Ok(result_string)
-}
-
-#[post("/runtime_manager")]
-async fn runtime_manager_request(
-    enclave_handler: web::Data<EnclaveHandler>,
-    stopper: web::Data<mpsc::Sender<()>>,
-    _request: HttpRequest,
-    input_data: String,
-) -> VeracruzServerResponder {
-    let fields = input_data.split_whitespace().collect::<Vec<&str>>();
-    if fields.len() < 2 {
+fn veracruz_server_request(
+    enclave_handler: EnclaveHandler,
+    input_data: &[u8],
+) -> Result<Vec<u8>, VeracruzServerError> {
+    if input_data.len() < 4 {
         return Err(VeracruzServerError::InvalidRequestFormatError);
     }
     let session_id = match bincode::deserialize(&input_data).unwrap() {
