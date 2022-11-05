@@ -282,6 +282,7 @@ fn server_tls_loop(policy_json: String) {
 struct TestExecutor {
     // The json string of the policy
     policy_json: String,
+    proxy_children: ProxyChildren,
 }
 
 impl TestExecutor {
@@ -312,9 +313,9 @@ impl TestExecutor {
         let (policy, policy_json, _) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
-        Ok(TestExecutor { policy_json })
+        Ok(TestExecutor { policy_json, proxy_children })
     }
 
     /// Execute this test. Clients collectively execute as a block, driven by the `events`, in
