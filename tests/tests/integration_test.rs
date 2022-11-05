@@ -57,7 +57,7 @@ use anyhow::{anyhow, Result};
 use env_logger;
 use log::{error, info};
 use policy_utils::policy::Policy;
-use std::{path::Path, thread, time::Instant};
+use std::{env, path::Path, thread, time::Instant};
 use veracruz_client::{self, VeracruzClient};
 use veracruz_server;
 
@@ -209,60 +209,59 @@ fn veracruz_phase3_string_edit_distance_four_clients() {
 
 /// a test of veracruz using network communication using two parallel sessions
 /// (one for program, one for data sending and retrieving)
-#[actix_rt::test]
-async fn veracruz_phase4_linear_regression_two_clients_parallel() {
-    timeout(Duration::from_secs(1200), async {
-        let (_, policy_json, _) =
-            read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
-        let policy = Policy::from_json(&policy_json).unwrap();
+#[test]
+fn veracruz_phase4_linear_regression_two_clients_parallel() {
+    let (_, policy_json, _) =
+        read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
+    let policy = Policy::from_json(&policy_json).unwrap();
 
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+    let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
-        sleep(std::time::Duration::from_millis(5000)).await;
-        let policy_json_clone = policy_json.clone();
-        let server_handle = server_tls_loop(policy_json_clone);
+    server_tls_loop(policy_json.clone());
 
-        let program_provider_handle = async {
-            sleep(std::time::Duration::from_millis(10000)).await;
-            info!("### program provider start.");
-            let mut client = veracruz_client::VeracruzClient::new(
-                cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
-                cert_key_dir(PROGRAM_CLIENT_KEY).as_path(),
-                &policy_json,
-            )?;
-            let prog_path = program_dir(LINEAR_REGRESSION_WASM);
-            info!("### program provider read binary.");
-            let program_data = read_local_file(prog_path).unwrap();
-            info!("### program provider send binary.");
-            client.write_file("/program/linear-regression.wasm", &program_data)?;
-            Result::<()>::Ok(())
-        };
-        let data_provider_handle = async {
-            sleep(std::time::Duration::from_millis(15000)).await;
-            info!("### data provider start.");
-            let mut client = veracruz_client::VeracruzClient::new(
-                cert_key_dir(DATA_CLIENT_CERT).as_path(),
-                cert_key_dir(DATA_CLIENT_KEY).as_path(),
-                &policy_json,
-            )?;
+    let policy_json_cloned = policy_json.clone();
+    let client1_handle = thread::spawn(move || -> Result<()> {
+        info!("### program provider start.");
+        let mut client = veracruz_client::VeracruzClient::new(
+            cert_key_dir(PROGRAM_CLIENT_CERT).as_path(),
+            cert_key_dir(PROGRAM_CLIENT_KEY).as_path(),
+            &policy_json_cloned,
+        )?;
+        let prog_path = program_dir(LINEAR_REGRESSION_WASM);
+        info!("### program provider read binary.");
+        let program_data = read_local_file(prog_path).unwrap();
+        info!("### program provider send binary.");
+        client.write_file("/program/linear-regression.wasm", &program_data)?;
+        Result::<()>::Ok(())
+    });
 
-            let data_filename = data_dir(LINEAR_REGRESSION_DATA);
-            info!("### data provider read input.");
-            let data = read_local_file(&data_filename).unwrap();
-            info!("### data provider send input.");
-            client.write_file("/input/linear-regression.dat", &data)?;
-            info!("### data provider read result.");
-            client.request_compute("/program/linear-regression.wasm")?;
-            client.read_file("/output/linear-regression.dat")?;
-            info!("### data provider request shutdown.");
-            client.request_shutdown()?;
-            Result::<()>::Ok(())
-        };
+    let policy_json_cloned = policy_json.clone();
+    let client2_handle = thread::spawn(move || -> Result<()> {
+        info!("### data provider start.");
+        let mut client = veracruz_client::VeracruzClient::new(
+            cert_key_dir(DATA_CLIENT_CERT).as_path(),
+            cert_key_dir(DATA_CLIENT_KEY).as_path(),
+            &policy_json_cloned,
+        )
+        .unwrap();
 
-        let result = futures::future::try_join3(
-            server_handle,
-            program_provider_handle,
-            data_provider_handle,
+        let data_filename = data_dir(LINEAR_REGRESSION_DATA);
+        info!("### data provider read input.");
+        let data = read_local_file(&data_filename).unwrap();
+        info!("### data provider send input.");
+        client.write_file("/input/linear-regression.dat", &data)?;
+        Result::<()>::Ok(())
+    });
+
+    client1_handle.join().unwrap().unwrap();
+    client2_handle.join().unwrap().unwrap();
+
+    (|| -> Result<()> {
+        info!("### third client start.");
+        let mut client = veracruz_client::VeracruzClient::new(
+            cert_key_dir(DATA_CLIENT_CERT).as_path(),
+            cert_key_dir(DATA_CLIENT_KEY).as_path(),
+            &policy_json,
         )
         .unwrap();
 

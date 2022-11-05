@@ -137,7 +137,7 @@ FD_EXECUTE              := $(shell echo "2^29"  | bc)
 READ_RIGHT          := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) | bc)
 WRITE_RIGHT         := $(shell echo $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(FD_SEEK) + $(PATH_OPEN) + $(PATH_CREATE_DIRECTORY) | bc)
 READ_WRITE_RIGHT    := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) + $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(PATH_CREATE_DIRECTORY) | bc)
-OPEN_EXECUTE_RIGHT  := $(shell echo $(PATH_OPEN) + $(FD_EXECUTE) | bc)
+OPEN_EXECUTE_RIGHT  := $(shell echo $(PATH_OPEN) + $(FD_EXECUTE) + $(FD_SEEK) | bc)
 WRITE_EXECUTE_RIGHT := $(shell echo $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(FD_SEEK) + $(PATH_OPEN) + $(PATH_CREATE_DIRECTORY) + $(FD_EXECUTE) | bc)
 
 ifeq ($(PLATFORM), Darwin)
