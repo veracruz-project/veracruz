@@ -152,11 +152,11 @@ And since the Proxy Attestation Server acts as a certificate authority,
 we also need to provide it with its own identity:
 
 ``` bash
-$ openssl ecparam -name prime256v1 -genkey > example/example-ca-key.pem
+$ openssl ecparam -name prime256v1 -noout -genkey > example/CAKey.pem
 $ openssl req -x509 -days 1825 \
     -subj "/C=Mx/ST=Veracruz/L=Veracruz/O=Veracruz/OU=Proxy/CN=VeracruzProxyServer" \
-    -key example/example-ca-key.pem \
-    -out example/example-ca-cert.pem \
+    -key example/CAKey.pem \
+    -out example/CACert.pem \
     -config workspaces/ca-cert.conf
 ```
 
@@ -174,7 +174,7 @@ use localhost for now), and a hash of the WebAssembly file we plan to execute.
 ``` bash
 $ vc-pgen \
     --proxy-attestation-server-ip 127.0.0.1:3010 \
-    --proxy-attestation-server-cert example/example-ca-cert.pem \
+    --proxy-attestation-server-cert example/CACert.pem \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
     --css-file workspaces/linux-runtime/target/debug/runtime_manager_enclave \
@@ -206,16 +206,20 @@ change the runtime hashes.
 
 ## Running the Proxy Attestation Server
 
-Now we can launch the Proxy Attestation Server with the
-`vc-pas`/`proxy-attestation-server` command. Note we are using the bash
-character `&` to launch the Proxy Attestation Server in the background:
-
+Now we can launch the Proxy Attestation Server and it's helper services.
+Note we are using the bash character `&` to launch the services in the
+background:
 ``` bash
-$ vc-pas :3010 \
-    --ca-cert=example/example-ca-cert.pem \
-    --ca-key=example/example-ca-key.pem &
-Proxy Attestation Server running on 127.0.0.1:3010
+$ cd /opt/veraison/vts && /opt/veraison/vts/vts &
+$ cd /opt/veraison/provisioning && /opt/veraison/provisioning/provisioning &
+$ cd example && /opt/veraison/proxy_attestation_server -l 127.0.0.1:3010 &
 $ sleep 5
+```
+
+Now we provision the attestation "personalities" into the proxy server:
+``` bash
+$ curl -X POST -H 'Content-Type: application/corim-unsigned+cbor; profile=http://arm.com/psa/iot/1' --data-binary "@/opt/veraison/psa_corim.cbor" localhost:8888/endorsement-provisioning/v1/submit
+$ curl -X POST -H 'Content-Type: application/corim-unsigned+cbor; profile=http://aws.com/nitro' --data-binary "@/opt/veraison/nitro_corim.cbor" localhost:8888/endorsement-provisioning/v1/submit
 ```
 
 ## Running the Veracruz Server
