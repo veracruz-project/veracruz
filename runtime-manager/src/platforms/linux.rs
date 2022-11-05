@@ -31,7 +31,6 @@ use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
 use std::net::TcpListener;
-use std::os::raw::c_char;
 use veracruz_utils::{
     runtime_manager_message::{RuntimeManagerRequest, RuntimeManagerResponse, Status},
     sha256::sha256,
@@ -391,10 +390,6 @@ pub fn linux_main() -> Result<()> {
                         error!("Failed to send TLS data.  Error produced: {:?}.", e);
                         RuntimeManagerResponse::Status(Status::Fail)
                     })
-            }
-            otherwise => {
-                error!("Received unknown or unimplemented opcode: {:?}.", otherwise);
-                RuntimeManagerResponse::Status(Status::Unimplemented)
             }
         };
 
