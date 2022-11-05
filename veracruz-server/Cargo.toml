@@ -58,7 +58,7 @@ log = "0.4.13"
 nix = { version = "0.20.2", optional = true }
 postcard = "0.7.2"
 policy-utils = { path = "../policy-utils", optional = true }
-proxy-attestation-client = { path = "../proxy-attestation-client" }
+proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
 psa-attestation = { path = "../psa-attestation", optional = true }
 rand = "0.8.3"
 reqwest = { version = "0.11.12", features = ["blocking", "multipart"] }
