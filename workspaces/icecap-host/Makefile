@@ -23,7 +23,6 @@ WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
 MEASUREMENT_FILE = $(abspath ../icecap-runtime/css-icecap.bin)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
-PROFILE = release
 
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk

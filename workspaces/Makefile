@@ -32,7 +32,7 @@ nitro: shared
 	$(MAKE) -C nitro-runtime
 
 icecap: shared
-	$(MAKE) -C icecap-runtime build PROFILE=release
+	$(MAKE) -C icecap-runtime build
 	$(MAKE) -C icecap-host
 
 icecap-tests:
