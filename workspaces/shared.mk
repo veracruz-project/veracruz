@@ -132,7 +132,6 @@ PATH_UNLINK_FILE        := $(shell echo "2^26" | bc)
 POLL_FD_READWRITE       := $(shell echo "2^27" | bc)
 SOCK_SHUTDOWN           := $(shell echo "2^28" | bc)
 FD_EXECUTE              := $(shell echo "2^29"  | bc)
-FD_EXECUTE              := $(shell echo "2^29"  | bc)
 # Common rights
 READ_RIGHT          := $(shell echo $(FD_READ) + $(FD_SEEK) + $(PATH_OPEN) + $(FD_READDIR) | bc)
 WRITE_RIGHT         := $(shell echo $(FD_WRITE) + $(PATH_CREATE_FILE) + $(PATH_FILESTAT_SET_SIZE) + $(FD_SEEK) + $(PATH_OPEN) + $(PATH_CREATE_DIRECTORY) | bc)
