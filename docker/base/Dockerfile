@@ -19,8 +19,8 @@ from golang:1.19 AS go_builder
 
 RUN set -eux; \
     echo "iteration 0"; \
-    git clone --branch aws_nitro https://github.com/dreemkiller/services.git; \
-    git clone https://github.com/veracruz-project/proxy_attestation_server.git; \
+    git clone --branch aws_nitro https://github.com/dreemkiller/services.git --branch v0.2 --depth 1; \
+    git clone https://github.com/veracruz-project/proxy_attestation_server.git --branch v0.1 --depth 1; \
     cd proxy_attestation_server; \
     go build -o ./vts github.com/veraison/services/vts/cmd/vts-service; \
     go build -o ./provisioning github.com/veraison/services/provisioning/cmd/provisioning-service; \
