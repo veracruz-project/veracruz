@@ -30,7 +30,3 @@ codegen-units = 1
 lto = true
 opt-level = 3
 
-[profile.dev]
-codegen-units = 1
-lto = true
-opt-level = 3

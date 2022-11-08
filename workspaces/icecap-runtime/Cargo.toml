@@ -29,10 +29,5 @@ codegen-units = 1
 lto = true
 opt-level = 3
 
-[profile.dev]
-codegen-units = 1
-lto = true
-opt-level = 3
-
 [patch.crates-io]
 libc = { path = "crates/icecap/sysroot/libc" }
