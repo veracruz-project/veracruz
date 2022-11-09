@@ -135,11 +135,10 @@ impl SessionContext {
         return Ok(());
     }
 
-    pub fn set_cert_chain(&mut self, chain_data: &Vec<Vec<u8>>) -> Result<()> {
+    pub fn set_cert_chain(&mut self, chain_data: &Vec<u8>) -> Result<()> {
         let mut cert_chain = List::new();
-        for this_chain_data in chain_data {
-            cert_chain.append(Certificate::from_pem_multiple(this_chain_data)?)
-        }
+        let cert_list = Certificate::from_pem_multiple(chain_data)?;
+        cert_chain.append(cert_list);
         self.cert_chain = cert_chain;
         Ok(())
     }

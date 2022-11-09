@@ -14,14 +14,12 @@ pub mod veracruz_server_linux {
 
     use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
     use data_encoding::HEXLOWER;
-    use io_utils::{
-        http::{post_buffer, send_proxy_attestation_server_start},
-        tcp::{receive_message, send_message},
-    };
+    use io_utils::tcp::{receive_message, send_message};
     use log::{error, info};
     use nix::sys::signal;
     use nix::unistd::alarm;
     use policy_utils::policy::Policy;
+    use proxy_attestation_client;
     use rand::Rng;
     use std::{
         env,
@@ -33,9 +31,6 @@ pub mod veracruz_server_linux {
         process::{Child, Command, Stdio},
     };
     use tempfile::{self, TempDir};
-    use transport_protocol::{
-        parse_proxy_attestation_server_response, serialize_native_psa_attestation_token,
-    };
     use veracruz_utils::runtime_manager_message::{
         RuntimeManagerRequest, RuntimeManagerResponse, Status,
     };
@@ -56,11 +51,6 @@ pub mod veracruz_server_linux {
     const RUNTIME_MANAGER_ENCLAVE_PORT_MIN: i32 = 6000;
     /// Maximum port number for the Runtime Manager enclave.
     const RUNTIME_MANAGER_ENCLAVE_PORT_MAX: i32 = 6999;
-
-    /// The protocol to use with the proxy attestation server.
-    const PROXY_ATTESTATION_PROTOCOL: &str = "psa";
-    /// The firmware version to use when communicating with the proxy attestation server.
-    const FIRMWARE_VERSION: &str = "0.0";
 
     /// A struct capturing all the metadata needed to start and communicate with
     /// the Linux root enclave.
@@ -202,13 +192,13 @@ pub mod veracruz_server_linux {
 
     impl VeracruzServer for VeracruzServerLinux {
         /// Creates a new instance of the `VeracruzServerLinux` type.
-        fn new(policy: &str) -> VeracruzServerResult<Self>
+        fn new(policy_json: &str) -> VeracruzServerResult<Self>
         where
             Self: Sized,
         {
             // TODO: add in dummy measurement and attestation token issuance here
             // which will use fields from the JSON policy file.
-            let policy_json = Policy::from_json(policy).map_err(|e| {
+            let policy: Policy = Policy::from_json(policy_json).map_err(|e| {
                 error!(
                     "Failed to parse Veracruz policy file.  Error produced: {:?}.",
                     e
@@ -308,6 +298,7 @@ pub mod veracruz_server_linux {
 
             // Use a closure here so that we can catch any error and
             // terminate the runtime manager.
+            // TODO: The indent of the content of this closure is off.
             let (received, runtime_manager_socket) = (|| {
 
             // Request SIGALRM after the specified time has elapsed.
@@ -348,12 +339,10 @@ pub mod veracruz_server_linux {
 
             info!("Sending proxy attestation 'start' message.");
 
-            let proxy_attestation_server_url = policy_json.proxy_attestation_server_url();
+            let proxy_attestation_server_url = policy.proxy_attestation_server_url();
 
-            let (challenge_id, challenge) = send_proxy_attestation_server_start(
+            let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
                 proxy_attestation_server_url,
-                PROXY_ATTESTATION_PROTOCOL,
-                FIRMWARE_VERSION,
             )
             .map_err(|e| {
                 error!(
@@ -364,6 +353,7 @@ pub mod veracruz_server_linux {
                 e
             })?;
 
+            // Send a message to the runtime manager
             send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Attestation(challenge, challenge_id)).map_err(|e| {
                 error!("Failed to send attestation message to runtime manager enclave.  Error returned: {:?}.", e);
 
@@ -400,39 +390,18 @@ pub mod veracruz_server_linux {
 
             info!("Requesting certificate chain from proxy attestation server.");
 
-            let (root_cert, compute_cert) = {
-                let req = serialize_native_psa_attestation_token(&token, &csr, challenge_id).map_err(|e| {
-                    error!("Failed to serialize native PSA attestation token request.  Error received: {:?}.", e);
-
-                    e
-                })?;
-                let req = base64::encode(&req);
-                let url = format!("{}/PSA/AttestationToken", proxy_attestation_server_url);
-                let resp = post_buffer(&url, &req).map_err(|e| {
-                    error!("Failed to send request to proxy attestation server (at URL {:?}).  Error received: {:?}.", url, e);
-
-                    e
-                })?;
-                let resp = base64::decode(&resp).map_err(|e| {
-                    error!("Failed to Base64 decode response from proxy attestation server.  Error received: {:?}.", e);
-
-                    VeracruzServerError::Base64Error(e)
-                })?;
-                let pasr = parse_proxy_attestation_server_response(None, &resp).map_err(|e| {
-                    error!("Failed to parse reponse from proxy attestation server.  Error received: {:?}.", e);
-
-                    e
-                })?;
-                let cert_chain = pasr.get_cert_chain();
-                let root_cert = cert_chain.get_root_cert();
-                let compute_cert = cert_chain.get_enclave_cert();
-
-                (root_cert.to_vec(), compute_cert.to_vec())
+            let cert_chain = {
+                let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, challenge_id)
+                    .map_err(|err| {
+                        error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
+                        err
+                    })?;
+                cert_chain
             };
 
             info!("Certificate chain received from proxy attestation server.  Forwarding to runtime manager enclave.");
 
-            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy), vec![compute_cert, root_cert])).map_err(|e| {
+            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy_json), cert_chain)).map_err(|e| {
                 error!("Failed to send certificate chain message to runtime manager enclave.  Error returned: {:?}.", e);
 
                 e

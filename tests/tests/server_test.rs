@@ -23,6 +23,7 @@ use log::{error, info};
 use mbedtls::{alloc::List, x509::Certificate};
 use policy_utils::{policy::Policy, Platform};
 use std::{
+    env,
     error::Error,
     io::{Read, Write},
     path::Path,
@@ -91,7 +92,7 @@ const TIME_OUT_SECS: u64 = 1200;
 fn basic_init_destroy_enclave() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
         VeracruzServerEnclave::new(&policy_json).unwrap();
     })
 }
@@ -102,7 +103,7 @@ fn basic_new_session() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
         // start the proxy attestation server
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
         init_veracruz_server_and_tls_session(policy_json).unwrap();
     })
 }
@@ -127,6 +128,7 @@ fn basic_read_write_and_traverse() {
 /// Generate random number.
 fn basic_random_source() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(RANDOM_SOURCE_WASM),
         TestEvent::execute(RANDOM_SOURCE_WASM),
         TestEvent::read_result("/output/random.dat"),
@@ -245,6 +247,7 @@ fn basic_unauthorized_certificate_key_pair() {
 /// Call an example native module.
 fn basic_postcard_native_module() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(POSTCARD_NATIVE_WASM),
         TestEvent::write_data(POSTCARD_DATA),
         TestEvent::execute(POSTCARD_NATIVE_WASM),
@@ -260,6 +263,7 @@ fn basic_postcard_native_module() {
 /// It sums up an initial f64 number and two streams of f64 numbers.
 fn basic_number_accumulation_batch_process() {
     let mut events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(NUMBER_STREM_WASM),
         TestEvent::write_data(SINGLE_F64_DATA),
     ];
@@ -278,6 +282,7 @@ fn basic_number_accumulation_batch_process() {
 /// It sums up an initial f64 number and two streams of f64 numbers.
 fn basic_pipeline() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(RANDOM_U32_LIST_WASM),
         TestEvent::write_program(SORT_NUBMER_WASM),
         TestEvent::pipeline("0"),
@@ -295,6 +300,7 @@ fn basic_pipeline() {
 /// in two-dimensional space, represented by Vec<(f64, f64)>.
 fn integration_linear_regression() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(LINEAR_REGRESSION_WASM),
         TestEvent::write_data(LINEAR_REGRESSION_DATA),
         TestEvent::execute(LINEAR_REGRESSION_WASM),
@@ -318,6 +324,7 @@ fn integration_linear_regression() {
 /// reversed order (data 1, then data 0)
 fn integration_intersection_sum() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
         TestEvent::write_data(INTERSECTION_SET_SUM_CUSTOMER_DATA),
         TestEvent::write_data(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
@@ -334,6 +341,7 @@ fn integration_intersection_sum() {
 /// Computing the string edit distance.
 fn integration_string_edit_distance() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(STRING_EDIT_DISTANCE_WASM),
         TestEvent::write_data(STRING_1_DATA),
         TestEvent::write_data(STRING_2_DATA),
@@ -352,6 +360,7 @@ fn integration_string_edit_distance() {
 /// A standard two data sources scenario with attestation.
 fn integration_private_set_intersection() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(PERSON_SET_INTERSECTION_WASM),
         TestEvent::write_data(PERSON_SET_1_DATA),
         TestEvent::write_data(PERSON_SET_2_DATA),
@@ -367,6 +376,7 @@ fn integration_private_set_intersection() {
 /// Attempt to fetch result without enough stream data.
 fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(NUMBER_STREM_WASM),
         TestEvent::write_data(SINGLE_F64_DATA),
         TestEvent::read_result("/output/accumulation.dat"),
@@ -382,6 +392,7 @@ fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation()
 /// Integration test: deserialize postcard encoding and reserialize to json.
 fn integration_postcard_json() {
     let events = vec![
+        TestEvent::CheckHash,
         TestEvent::write_program(POSTCARD_WASM),
         TestEvent::write_data(POSTCARD_DATA),
         TestEvent::execute(POSTCARD_WASM),
@@ -403,6 +414,7 @@ fn performance_idash2017() {
         "/input/idash2017/",
     ));
     events.append(&mut vec![
+        TestEvent::CheckHash,
         TestEvent::execute(LOGISTICS_REGRESSION_WASM),
         // only read two outputs
         TestEvent::read_result("/output/idash2017/generate-data-0.dat"),
@@ -424,6 +436,7 @@ fn performance_macd() {
         "/input/macd/",
     ));
     events.append(&mut vec![
+        TestEvent::CheckHash,
         TestEvent::execute(MACD_WASM),
         // only read two outputs
         TestEvent::read_result("/output/macd/generate-1000.dat"),
@@ -443,6 +456,7 @@ fn performance_set_intersection_sum() {
         "/input/private-set-inter-sum/",
     ));
     events.append(&mut vec![
+        TestEvent::CheckHash,
         TestEvent::execute(INTERSECTION_SET_SUM_WASM),
         // only read two outputs
         TestEvent::read_result("/output/private-set-inter-sum/data-2000-0"),
@@ -473,6 +487,7 @@ struct TestExecutor {
     // Hold the server thread. The test will join the thread in the end to check the server
     // state.
     server_thread: JoinHandle<Result<()>>,
+    proxy_children: ProxyChildren,
 }
 
 struct Buffers {
@@ -571,7 +586,7 @@ impl TestExecutor {
         let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+        let proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
         info!("Create simulated connection channels.");
         // Create two channel, simulating the connecting channels.
@@ -641,6 +656,7 @@ impl TestExecutor {
             client_tls_receiver,
             alive_flag,
             server_thread,
+            proxy_children,
         })
     }
 

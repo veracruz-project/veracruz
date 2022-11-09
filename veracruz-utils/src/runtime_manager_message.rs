@@ -10,6 +10,7 @@
 //! information on licensing and copyright.
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Status messages.
@@ -43,7 +44,7 @@ pub enum RuntimeManagerRequest {
     /// parameters:
     /// Vec<u8> - the challenge value
     /// i32     - the challenge ID
-    Attestation(Vec<u8>, i32),
+    Attestation(Vec<u8>, Uuid),
     /// A request to close an already established TLS session.  Parameters in
     /// order are:
     /// - The Session ID of the session to be closed.
@@ -60,7 +61,7 @@ pub enum RuntimeManagerRequest {
     /// parameters:
     /// String  - The policy, in JSON format
     /// Vec<Vec<u8>> - The certificate chain for the enclave
-    Initialize(String, Vec<Vec<u8>>),
+    Initialize(String, Vec<u8>),
     /// A request to establish a new TLS session with the enclave.
     NewTlsSession,
     /// Request to send TLS data to the enclave.  Parameters in order are:
@@ -76,12 +77,6 @@ pub enum RuntimeManagerRequest {
 /// and deserialized using bincode after transport.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RuntimeManagerResponse {
-    #[cfg(feature = "nitro")]
-    /// The response to the `Attestation` request.
-    /// parameters:
-    /// Vec<u8> - The nitro attestation document from the enclave
-    AttestationData(Vec<u8>),
-    #[cfg(any(feature = "icecap", feature = "linux"))]
     /// The response to the `Attestation` request.  Parameters (in order) are:
     /// - A byte encoding of the PSA attestation token,
     /// - A byte encoding of the Certificate Signing Request.

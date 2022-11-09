@@ -17,8 +17,9 @@ use nix::sys::socket::{
 };
 use nsm_api;
 use nsm_lib;
-use veracruz_utils::runtime_manager_message::{
-    RuntimeManagerRequest, RuntimeManagerResponse, Status,
+use veracruz_utils::{
+    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status},
+    sha256::sha256
 };
 
 /// The CID for the VSOCK to listen on
@@ -62,8 +63,8 @@ pub fn nitro_main() -> Result<()> {
         let received_buffer = receive_buffer(fd)?;
         let received_message: RuntimeManagerRequest = bincode::deserialize(&received_buffer)?;
         let return_message = match received_message {
-            RuntimeManagerRequest::Attestation(challenge, challenge_id) => {
-                attestation(&challenge, challenge_id)?
+            RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
+                attestation(&challenge)?
             }
             RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => {
                 initialize(&policy_json, &certificate_chain)?
@@ -113,10 +114,6 @@ pub fn nitro_main() -> Result<()> {
                 };
                 return_message
             }
-            _ => {
-                println!("runtime_manager_nitro::main Unknown Opcode");
-                RuntimeManagerResponse::Status(Status::Unimplemented)
-            }
         };
         let return_buffer = bincode::serialize(&return_message)?;
         println!(
@@ -127,7 +124,7 @@ pub fn nitro_main() -> Result<()> {
     }
 }
 
-fn attestation(challenge: &[u8], _challenge_id: i32) -> Result<RuntimeManagerResponse> {
+fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
     println!("runtime_manager_nitro::attestation started");
     managers::session_manager::init_session_manager()?;
     // generate the csr
@@ -140,11 +137,12 @@ fn attestation(challenge: &[u8], _challenge_id: i32) -> Result<RuntimeManagerRes
         if nsm_fd < 0 {
             return Err(anyhow!(RuntimeManagerError::NsmLibError(nsm_fd)));
         }
+        let csr_hash = sha256(&csr);
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
                 nsm_fd,                        //fd
-                csr.as_ptr() as *const u8,     // user_data
-                csr.len() as u32,              // user_data_len
+                csr_hash.as_ptr() as *const u8,     // user_data
+                csr_hash.len() as u32,              // user_data_len
                 challenge.as_ptr(),            // nonce_data
                 challenge.len() as u32,        // nonce_len
                 std::ptr::null() as *const u8, // pub_key_data
@@ -163,13 +161,12 @@ fn attestation(challenge: &[u8], _challenge_id: i32) -> Result<RuntimeManagerRes
         buffer.clone()
     };
 
-    return Ok(RuntimeManagerResponse::AttestationData(att_doc));
+    return Ok(RuntimeManagerResponse::AttestationData(att_doc, csr));
 }
 
 /// Handler for the RuntimeManagerRequest::Initialize message
-fn initialize(policy_json: &str, cert_chain: &Vec<Vec<u8>>) -> Result<RuntimeManagerResponse> {
+fn initialize(policy_json: &str, cert_chain: &Vec<u8>) -> Result<RuntimeManagerResponse> {
     managers::session_manager::load_policy(policy_json)?;
-    println!("runtime_manager_nitro::initialize started");
     managers::session_manager::load_cert_chain(cert_chain)?;
 
     return Ok(RuntimeManagerResponse::Status(Status::Success));

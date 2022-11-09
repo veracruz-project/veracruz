@@ -26,6 +26,7 @@ use veracruz_utils::runtime_manager_message::{
 use crate::managers::session_manager;
 use bincode;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 declare_generic_main!(main);
 
@@ -190,7 +191,7 @@ impl RuntimeManager {
 
     fn handle_attestation(
         &self,
-        _device_id: i32,
+        _device_id: Uuid,
         challenge: &[u8],
     ) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
         let csr = session_manager::generate_csr()?;
@@ -221,6 +222,14 @@ fn icecap_runtime_init() {
 mod attestation_hack {
 
     use veracruz_utils::sha256::sha256;
+
+    const EXAMPLE_PUBLIC_KEY: [u8; 65] = [
+        0x4, 0x5f, 0x5, 0x5d, 0x39, 0xd9, 0xad, 0x60, 0x89, 0xf1, 0x33, 0x7e, 0x6c, 0xf9, 0x57, 0xe,
+        0x6f, 0x84, 0x25, 0x5f, 0x16, 0xf8, 0xcd, 0x9c, 0xe4, 0xa0, 0xa2, 0x8d, 0x7a, 0x4f, 0xb7, 0xe4,
+        0xd3, 0x60, 0x37, 0x2a, 0x81, 0x4f, 0x7, 0xc2, 0x5a, 0x24, 0x85, 0xbf, 0x47, 0xbc, 0x84, 0x47,
+        0x40, 0xc5, 0x9b, 0xff, 0xff, 0xd2, 0x76, 0x32, 0x82, 0x4d, 0x76, 0x4d, 0xb4, 0x50, 0xee, 0x9f,
+        0x22,
+    ];
 
     const EXAMPLE_PRIVATE_KEY: [u8; 32] = [
         0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe, 0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54,
@@ -256,6 +265,17 @@ mod attestation_hack {
             )
         });
 
+        // Section 3.2.1 of https://www.ietf.org/archive/id/draft-tschofenig-rats-psa-token-09.txt
+        // EAT UEID of type RAND.
+        // Length must be 33 bytes
+        // first byte MUST be 0x01 (RAND)
+        // next 32 bytes must be the hash of the key (Is this the public or private key? It's unclear, presume the public key because a hash of the private key could theoretically bleed info
+        // about the private key)
+        let public_key_hash = sha256(&EXAMPLE_PUBLIC_KEY);
+        let mut enclave_name: Vec<u8> = Vec::new();
+        enclave_name.push(0x01);
+        enclave_name.extend_from_slice(&public_key_hash);
+
         let mut token: Vec<u8> = Vec::with_capacity(2048);
         let mut token_len: u64 = 0;
         assert_eq!(0, unsafe {
@@ -264,8 +284,8 @@ mod attestation_hack {
                 enclave_hash.len() as u64,
                 csr_hash.as_ptr() as *const u8,
                 csr_hash.len() as u64,
-                std::ptr::null() as *const u8,
-                0,
+                enclave_name.as_ptr() as *const u8,
+                enclave_name.len() as u64,
                 challenge.as_ptr() as *const u8,
                 challenge.len() as u64,
                 token.as_mut_ptr() as *mut u8,

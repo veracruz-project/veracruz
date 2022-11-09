@@ -1,0 +1,43 @@
+{
+  "lang": "en-GB",
+  "tag-identity": {
+    "id": "366D0A0A-5988-45ED-8488-2F2A544F6242",
+    "version": 0
+  },
+  "entities": [
+    {
+      "name": "ACME Ltd.",
+      "regid": "https://acme.example",
+      "roles": [
+        "tagCreator",
+        "creator",
+        "maintainer"
+      ]
+    }
+  ],
+  "triples": {
+    "attester-verification-keys": [
+      {
+        "environment": {
+          "class": {
+            "id": {
+              "type": "psa.impl-id",
+              "value": "YWNtZS1pbXBsZW1lbnRhdGlvbi1pZC0wMDAwMDAwMDE="
+            },
+            "vendor": "ACME",
+            "model": "RoadRunner"
+          },
+          "instance": {
+            "type": "ueid",
+            "value": "AUPrpZ0QYvwASGLQxlP3km/UKvWLBi5bSilQndDQphu7"
+          }
+        },
+        "verification-keys": [
+          {
+            "key": "BF8FXTnZrWCJ8TN+bPlXDm+EJV8W+M2c5KCijXpPt+TTYDcqgU8Hwlokhb9HvIRHQMWb///SdjKCTXZNtFDunyI="
+          }
+        ]
+      }
+    ]
+  }
+}

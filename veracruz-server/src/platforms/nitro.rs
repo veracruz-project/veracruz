@@ -11,12 +11,10 @@
 
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
-    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
-    use io_utils::{
-        http::{post_buffer, send_proxy_attestation_server_start},
-        nitro::NitroEnclave,
-    };
+    use crate::common::{VeracruzServer, VeracruzServerError};
+    use io_utils::nitro::NitroEnclave;
     use policy_utils::policy::Policy;
+    use proxy_attestation_client;
     use std::{env, error::Error};
     use veracruz_utils::runtime_manager_message::{
         RuntimeManagerRequest, RuntimeManagerResponse, Status,
@@ -25,23 +23,18 @@ pub mod veracruz_server_nitro {
     /// Path of the Runtime Manager enclave EIF file.
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
     /// The protocol to use when interacting with the proxy attestation server.
-    const PROXY_ATTESTATION_PROTOCOL: &str = "nitro";
-    /// The protocol version we are using with the proxy attestation server.
-    const FIRMWARE_VERSION: &str = "0.0";
 
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
     }
 
     impl VeracruzServer for VeracruzServerNitro {
-        fn new(policy_json: &str) -> VeracruzServerResult<Self> {
+        fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
             // Set up, initialize Nitro Root Enclave
             let policy: Policy = Policy::from_json(policy_json)?;
 
-            let (challenge_id, challenge) = send_proxy_attestation_server_start(
+            let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
                 policy.proxy_attestation_server_url(),
-                PROXY_ATTESTATION_PROTOCOL,
-                FIRMWARE_VERSION,
             )
             .map_err(|e| {
                 eprintln!(
@@ -81,14 +74,14 @@ pub mod veracruz_server_nitro {
             };
             println!("VeracruzServerNitro::new Runtime Manager instantiated. Calling initialize");
 
-            let attestation_doc = {
+            let (attestation_doc, csr) = {
                 let attestation = RuntimeManagerRequest::Attestation(challenge, challenge_id);
                 meta.enclave
                     .send_buffer(&bincode::serialize(&attestation)?)?;
                 // read the response
                 let response = meta.enclave.receive_buffer()?;
                 match bincode::deserialize(&response[..])? {
-                    RuntimeManagerResponse::AttestationData(doc) => doc,
+                    RuntimeManagerResponse::AttestationData(doc, csr) => (doc, csr),
                     response_message => {
                         return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
                             response_message,
@@ -97,9 +90,10 @@ pub mod veracruz_server_nitro {
                 }
             };
 
-            let cert_chain = post_native_attestation_token(
+            let cert_chain = proxy_attestation_client::complete_proxy_attestation_nitro(
                 policy.proxy_attestation_server_url(),
                 &attestation_doc,
+                &csr,
                 challenge_id,
             )?;
 
@@ -125,11 +119,11 @@ pub mod veracruz_server_nitro {
             Ok(meta)
         }
 
-        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
+        fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
             Err(VeracruzServerError::UnimplementedError)
         }
 
-        fn new_tls_session(&mut self) -> VeracruzServerResult<u32> {
+        fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerRequest::NewTlsSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
             self.enclave.send_buffer(&nls_buffer)?;
@@ -148,7 +142,7 @@ pub mod veracruz_server_nitro {
             Ok(session_id)
         }
 
-        fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()> {
+        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
             let cts_message = RuntimeManagerRequest::CloseTlsSession(session_id);
             let cts_buffer = bincode::serialize(&cts_message)?;
 
@@ -168,7 +162,7 @@ pub mod veracruz_server_nitro {
             &mut self,
             session_id: u32,
             input: Vec<u8>,
-        ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)> {
+        ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
             let std_message: RuntimeManagerRequest =
                 RuntimeManagerRequest::SendTlsData(session_id, input);
             let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
@@ -240,7 +234,7 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServerNitro {
-        fn tls_data_needed(&self, session_id: u32) -> VeracruzServerResult<bool> {
+        fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
             let gtdn_message = RuntimeManagerRequest::GetTlsDataNeeded(session_id);
             let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
 
@@ -255,47 +249,5 @@ pub mod veracruz_server_nitro {
             };
             Ok(tls_data_needed)
         }
-    }
-
-    /// Send the native (AWS Nitro) attestation token to the proxy attestation server
-    fn post_native_attestation_token(
-        proxy_attestation_server_url: &str,
-        att_doc: &[u8],
-        challenge_id: i32,
-    ) -> VeracruzServerResult<Vec<Vec<u8>>> {
-        let serialized_nitro_attestation_doc_request =
-            transport_protocol::serialize_nitro_attestation_doc(att_doc, challenge_id)?;
-        let encoded_str = base64::encode(&serialized_nitro_attestation_doc_request);
-        let url = format!("{:}/Nitro/AttestationToken", proxy_attestation_server_url);
-        println!(
-            "veracruz-server-nitro::post_native_attestation_token posting to URL{:?}",
-            url
-        );
-        let received_body: String = post_buffer(&url, &encoded_str).map_err(|e| {
-            println!(
-                "Failed to post native attestation token.  Error produced: {}.",
-                e
-            );
-
-            e
-        })?;
-
-        println!(
-            "veracruz-server-nitro::post_psa_attestation_token received buffer:{:?}",
-            received_body
-        );
-
-        let body_vec = base64::decode(&received_body)?;
-        let response =
-            transport_protocol::parse_proxy_attestation_server_response(None, &body_vec)?;
-
-        let (re_cert, ca_cert) = if response.has_cert_chain() {
-            let cert_chain = response.get_cert_chain();
-            (cert_chain.get_enclave_cert(), cert_chain.get_root_cert())
-        } else {
-            return Err(VeracruzServerError::InvalidProtoBufMessage);
-        };
-        let cert_chain: Vec<Vec<u8>> = vec![re_cert.to_vec(), ca_cert.to_vec()];
-        Ok(cert_chain)
     }
 }
