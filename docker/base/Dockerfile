@@ -94,6 +94,7 @@ RUN apt-get update && \
         pkg-config \
         protobuf-compiler \
         procps \
+        psmisc \
         python3-dev \
         python3-pip \
         python3-protobuf \
