@@ -16,80 +16,60 @@ use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 use crate::platforms::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
-use bincode;
 use policy_utils::policy::Policy;
 use std::io::{Read, Write};
-use std::net::{Shutdown, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
 type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
 
-fn veracruz_server_request(
-    enclave_handler: EnclaveHandler,
-    input_data: &[u8],
-) -> Result<Vec<u8>, VeracruzServerError> {
-    if input_data.len() < 4 {
-        return Err(VeracruzServerError::InvalidRequestFormatError);
-    }
-    let session_id = match bincode::deserialize(&input_data).unwrap() {
-        0 => {
-            let mut enclave_handler_locked = enclave_handler.lock()?;
-
-            let enclave = enclave_handler_locked
-                .as_mut()
-                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-
-            enclave.new_tls_session()?
-        }
-        n @ 1u32..=std::u32::MAX => n,
-    };
-
-    let received_data = &input_data[4..];
-
-    let (active_flag, output_data_option) = {
-        let mut enclave_handler_locked = enclave_handler.lock()?;
-
-        let enclave = enclave_handler_locked
-            .as_mut()
-            .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-
-        enclave.tls_data(session_id, received_data.to_vec())?
-    };
-
-    // Shutdown the enclave
-    if !active_flag {
-        let mut enclave_handler_locked = enclave_handler.lock()?;
-
-        // Drop the `VeracruzServer` object which triggers enclave shutdown
-        *enclave_handler_locked = None;
-    }
-
-    // Response this request
-    let result = match output_data_option {
-        None => vec![],
-        Some(output_data) => {
-            let mut output = bincode::serialize(&session_id).unwrap();
-            assert_eq!(output.len(), 4);
-            for x in output_data {
-                output.extend_from_slice(&x);
-            }
-            output
-        }
-    };
-    Ok(result)
-}
+// This buffer size gave close to optimal performance for
+// copying a 100 MB file into the enclave on Linux:
+const BUFFER_SIZE: usize = 32768;
 
 fn handle_veracruz_server_request(
     enclave_handler: EnclaveHandler,
     mut stream: TcpStream,
 ) -> Result<(), VeracruzServerError> {
-    let mut buf = vec![];
-    stream.read_to_end(&mut buf)?;
-    let result = veracruz_server_request(enclave_handler, &buf)?;
-    stream.write_all(&result)?;
-    stream.shutdown(Shutdown::Both)?;
+    let session_id = {
+        let mut enclave_handler_locked = enclave_handler.lock()?;
+        let enclave = enclave_handler_locked
+            .as_mut()
+            .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+        enclave.new_tls_session()?
+    };
+
+    loop {
+        let mut buf = [0; BUFFER_SIZE];
+        let n = stream.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        let (active_flag, output_data_option) = {
+            let mut enclave_handler_locked = enclave_handler.lock()?;
+            let enclave = enclave_handler_locked
+                .as_mut()
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
+            enclave.tls_data(session_id, buf[0..n].to_vec())?
+        };
+
+        // Shutdown the enclave
+        if !active_flag {
+            let mut enclave_handler_locked = enclave_handler.lock()?;
+            // Drop the `VeracruzServer` object which triggers enclave shutdown
+            *enclave_handler_locked = None;
+        }
+
+        // Response this request
+        for x1 in output_data_option {
+            for x in x1 {
+                stream.write_all(&x)?;
+            }
+        }
+    }
+
     Ok(())
 }
 

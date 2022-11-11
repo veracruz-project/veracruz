@@ -11,95 +11,22 @@
 
 use crate::error::VeracruzClientError;
 use anyhow::{anyhow, Result};
-use bincode;
 use log::{error, info};
 use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
 use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
 use std::{
     io::{Read, Write},
+    net::TcpStream,
     path::Path,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
-/// VeracruzClient struct. The remote_session_id is shared between
-/// VeracruzClient and InsecureConnection so that it is available from
-/// VeracruzClient methods and can also be updated by the
-/// InsecureConnection methods invoked by mbedtls. Although we do not
-/// expect multiple threads to be involved, since the compiler can not
-/// check this, it is safer to use a Mutex.
+/// VeracruzClient struct.
 pub struct VeracruzClient {
-    tls_context: Context<InsecureConnection>,
-    // The default should be ZERO
-    remote_session_id: Arc<AtomicU32>,
+    tls_context: Context<TcpStream>,
     policy: Policy,
     policy_hash: String,
-}
-
-/// This is the structure given to mbedtls and used for reading and
-/// writing cyphertext, using the standard Read and Write traits.
-struct InsecureConnection {
-    read_buffer: Vec<u8>,
-    veracruz_server_url: String,
-    // The default should be ZERO
-    remote_session_id: Arc<AtomicU32>,
-}
-
-impl Read for InsecureConnection {
-    fn read(&mut self, data: &mut [u8]) -> Result<usize, std::io::Error> {
-        // Return as much data from the read_buffer as fits.
-        let n = std::cmp::min(data.len(), self.read_buffer.len());
-        if n == 0 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::WouldBlock,
-                "InsecureConnection Read",
-            ))
-        } else {
-            data[0..n].clone_from_slice(&self.read_buffer[0..n]);
-            self.read_buffer = self.read_buffer[n..].to_vec();
-            Ok(n)
-        }
-    }
-}
-
-impl Write for InsecureConnection {
-    fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> {
-        // To convert any error to a std::io error:
-        let err = |t| std::io::Error::new(std::io::ErrorKind::Other, t);
-
-        // Send all the data to the server.
-        let mut combined_data =
-            bincode::serialize(&self.remote_session_id.load(Ordering::SeqCst)).unwrap();
-        assert_eq!(combined_data.len(), 4);
-        combined_data.extend_from_slice(&data);
-        let addr = self.veracruz_server_url.to_string();
-        let mut socket = std::net::TcpStream::connect(addr)?;
-        socket.write_all(&combined_data)?;
-        socket.shutdown(std::net::Shutdown::Write)?;
-        let mut body = vec![];
-        socket.read_to_end(&mut body)?;
-
-        // We received a response ...
-        if body.len() > 0 {
-            if body.len() < 4 {
-                return Err(err("bad session id"));
-            }
-            // If it was not empty, update the remote_session_id ...
-            let received_session_id = bincode::deserialize(&body).unwrap();
-            self.remote_session_id
-                .store(received_session_id, Ordering::SeqCst);
-            // And append response data to the read_buffer.
-            self.read_buffer.extend_from_slice(&body[4..]);
-        }
-        // Return value to indicate that we handled all the data.
-        Ok(data.len())
-    }
-    fn flush(&mut self) -> Result<(), std::io::Error> {
-        Ok(())
-    }
 }
 
 impl VeracruzClient {
@@ -115,7 +42,6 @@ impl VeracruzClient {
             Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
             Err(err) => return Err(err.into()),
         }
-
         Ok(buffer)
     }
 
@@ -243,17 +169,11 @@ impl VeracruzClient {
         config.set_ca_list(Arc::new(proxy_service_cert), None);
         config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
         let mut ctx = Context::new(Arc::new(config));
-        let remote_session_id = Arc::new(AtomicU32::new(0));
-        let conn = InsecureConnection {
-            read_buffer: vec![],
-            veracruz_server_url: policy.veracruz_server_url().to_string(),
-            remote_session_id: remote_session_id.clone(),
-        };
-        ctx.establish(conn, None)?;
+        let socket = TcpStream::connect(policy.veracruz_server_url())?;
+        ctx.establish(socket, None)?;
 
         Ok(VeracruzClient {
             tls_context: ctx,
-            remote_session_id: remote_session_id.clone(),
             policy,
             policy_hash,
         })
@@ -399,13 +319,14 @@ impl VeracruzClient {
     /// and return the response.
     pub(crate) fn send(&mut self, data: &[u8]) -> Result<Vec<u8>> {
         self.tls_context.write_all(&data)?;
-        let mut response = vec![];
-        match self.tls_context.read_to_end(&mut response) {
-            Ok(_) => (),
-            // Suppress the following err
-            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
-            Err(err) => return Err(anyhow!(err)),
-        };
+        const PREFLEN: usize = transport_protocol::LENGTH_PREFIX_SIZE;
+        let mut length_buffer = [0; PREFLEN];
+        self.tls_context.read_exact(&mut length_buffer)?;
+        let length = PREFLEN + u64::from_be_bytes(length_buffer) as usize;
+        let mut response = length_buffer.to_vec();
+        response.resize(length, 0);
+        self.tls_context
+            .read_exact(&mut response[PREFLEN..length])?;
         Ok(response)
     }
 }
