@@ -275,10 +275,7 @@ impl VeracruzClient {
         let serialized_data = serialize_functor(data, &path)?;
         let response = self.send(&serialized_data)?;
 
-        let parsed_response = transport_protocol::parse_runtime_manager_response(
-            Some(self.remote_session_id.load(Ordering::SeqCst)),
-            &response,
-        )?;
+        let parsed_response = transport_protocol::parse_runtime_manager_response(None, &response)?;
         let status = parsed_response.get_status();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(parsed_response),
