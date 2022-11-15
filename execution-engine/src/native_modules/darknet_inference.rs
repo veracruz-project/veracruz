@@ -1,6 +1,6 @@
 //! A native module for ML inference on Darknet.
-//! Takes an input image, feeds it to the model and outputs a list of detected
-//! objects.
+//! Takes an input image and various parameters, feeds it to the model and
+//! outputs a list of detected objects.
 //!
 //! ## Authors
 //!
@@ -36,7 +36,7 @@ lazy_static! {
 /// Module's API.
 #[derive(Deserialize, Debug)]
 pub(crate) struct DarknetInferenceService {
-    /// Path to the input to be fed to the network.
+    /// Path to the input (image) to be fed to the network.
     input_path: PathBuf,
     /// Path to the model's configuration.
     cfg_path: PathBuf,
@@ -46,6 +46,22 @@ pub(crate) struct DarknetInferenceService {
     labels_path: PathBuf,
     /// Path to the output file containing the result of the prediction.
     output_path: PathBuf,
+    /// Threshold above which an object is considered detected.
+    objectness_threshold: f32,
+    /// Threshold above which a class is considered detected assuming objectness
+    /// within the detection box. Darknet internally sets class probabilities to
+    /// 0 if they are below the objectness threshold, so this should be above it
+    /// to make any difference.
+    class_threshold: f32,
+    /// Hierarchical threshold. Only used in YOLO9000, a model able to detect
+    /// hierarchised objects.
+    hierarchical_threshold: f32,
+    /// Intersection-over-union threshold. Used to eliminate irrelevant
+    /// detection boxes.
+    iou_threshold: f32,
+    /// Whether the image should be letterboxed, i.e. padded while preserving
+    /// its aspect ratio, or resized, before being fed to the model.
+    letterbox: bool,
 }
 
 impl Service for DarknetInferenceService {
@@ -95,6 +111,11 @@ impl DarknetInferenceService {
             model_path: PathBuf::new(),
             labels_path: PathBuf::new(),
             output_path: PathBuf::new(),
+            objectness_threshold: 0.0,
+            class_threshold: 0.0,
+            hierarchical_threshold: 0.0,
+            iou_threshold: 0.0,
+            letterbox: true,
         }
     }
 
@@ -109,6 +130,11 @@ impl DarknetInferenceService {
             model_path,
             labels_path,
             output_path,
+            objectness_threshold,
+            class_threshold,
+            hierarchical_threshold,
+            iou_threshold,
+            letterbox,
         } = self;
 
         let input_file_paths: [&PathBuf; 4] = [input_path, cfg_path, labels_path, model_path];
@@ -134,15 +160,19 @@ impl DarknetInferenceService {
 
         // Run inference
         let image = Image::open(input_path).map_err(|_| ErrNo::Canceled)?;
-        let detections = net.predict(&image, 0.25, 0.5, 0.45, true);
+        let detections = net.predict(
+            &image,
+            *objectness_threshold,
+            *hierarchical_threshold,
+            *iou_threshold,
+            *letterbox,
+        );
 
-        // Map detected objects to labels
-        let objectness_threshold = 0.0;
+        // Apply class threshold and map detected objects to labels
         let mut labeled_detections: Vec<(usize, (Detection, f32, &String))> = detections
             .iter()
-            .filter(|det| det.objectness() > objectness_threshold)
             .flat_map(|det| {
-                det.best_class(None)
+                det.best_class(Some(*class_threshold))
                     .map(|(class_index, prob)| (det, prob, &object_labels[class_index]))
             })
             .enumerate()
@@ -193,6 +223,10 @@ impl DarknetInferenceService {
         self.model_path = PathBuf::new();
         self.labels_path = PathBuf::new();
         self.output_path = PathBuf::new();
+        self.objectness_threshold = 0.0;
+        self.hierarchical_threshold = 0.0;
+        self.iou_threshold = 0.0;
+        self.letterbox = true;
 
         // Go back to work directory and delete files passed to the module and
         // created during execution
