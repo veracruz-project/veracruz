@@ -29,65 +29,108 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     needs: [check]
+    outputs:
+      output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
       image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running linux test script
         id: linux-build-and-test
         run: |
             make -C /work/veracruz/workspaces linux-tests
+      - name: Move back to veracruz root
+        run: cd /work/veracruz
+      - name: Check modification to Cargo.lock 
+        id: verify-changed-files
+        uses: ShaleXIONG/verify-changed-files@main
+        with:
+          files: |
+            **/Cargo.lock
+      - name: Run step only when any of the above files change.
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        id: check-diff
+        run: |
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
 
   nitro:
     runs-on: ubuntu-latest
     needs: [check]
+    outputs:
+      output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
       image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running Nitro test script
         id: nitro-build
         run: |
             make -C /work/veracruz/workspaces nitro
+      - name: Check modification to Cargo.lock 
+        id: verify-changed-files
+        uses: ShaleXIONG/verify-changed-files@main
+        with:
+          files: |
+            **/Cargo.lock
+      - name: Run step only when any of the above files change.
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        id: check-diff
+        run: |
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
 
   icecap:
     runs-on: ubuntu-latest
     needs: [check]
+    outputs:
+      output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
       image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running IceCap test script
         id: icecap-build
         run: |
             VERACRUZ_TEST_TIMEOUT=2400 make -C /work/veracruz/workspaces icecap-tests PROFILE=release
+      - name: Check modification to Cargo.lock 
+        id: verify-changed-files
+        uses: ShaleXIONG/verify-changed-files@main
+        with:
+          files: |
+            **/Cargo.lock
+      - name: Run step only when any of the above files change.
+        id: check-diff
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        run: |
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
 
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
     runs-on: ubuntu-latest
     needs: [check]
+    outputs:
+      output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
       image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running CLI_QUICKSTART.markdown
@@ -108,3 +151,208 @@ jobs:
           cd tests/tlstest && \
           sed -n '/``` bash/,/```/{/```/d; p}' README.md > README.md.sh && \
           bash -euxo pipefail README.md.sh
+      - name: Check modification to Cargo.lock 
+        id: verify-changed-files
+        uses: ShaleXIONG/verify-changed-files@main
+        with:
+          files: |
+            **/Cargo.lock
+      - name: Run step only when any of the above files change.
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        id: check-diff
+        run: |
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+
+  cargo-lock-check:
+    needs: [linux, nitro, icecap, quickstart]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/veracruz-project/veracruz/ci:v22.09
+      volumes:
+        - ${{ github.workspace }}:/work/veracruz
+    steps:
+      - name: linux
+        if: needs.linux.outputs.output != ''
+        run: |
+          echo "::warning:: ${{ needs.linux.outputs.output }}" 
+          exit 1
+      - name: nitro
+        if: needs.nitro.outputs.output != ''
+        run: |
+          echo "::warning:: ${{ needs.nitro.outputs.output }}" 
+          exit 1
+      - name: icecap
+        if: needs.icecap.outputs.output != ''
+        run: |
+          echo "::warning:: ${{ needs.icecap.outputs.output }}" 
+          exit 1
+      - name: quickstart
+        if: needs.quickstart.outputs.output != ''
+        run: |
+          echo "::warning:: ${{ needs.quickstart.outputs.output }}" 
+          exit 1
+
+  #test-pass:
+    #runs-on: ubuntu-latest
+    #outputs:
+      #output: ${{ steps.check-diff.outputs.cargo-lock }}
+    #container:
+      #image: ghcr.io/veracruz-project/veracruz/ci:v22.09
+      #volumes:
+        #- ${{ github.workspace }}:/work/veracruz
+    #steps:
+      #- uses: actions/checkout@v3
+        #with:
+          #submodules: recursive
+      #- name: Change cargo.lock
+        #run: |
+              #echo "aa" > /work/veracruz/workspaces/linux-host/Cargo.lock
+      #- name: LS
+        #run: |
+          #pwd
+          #echo "----"
+          #ls -lha
+          #echo "----"
+          #ls .git -lha
+          #echo "----"
+          #cat .git/HEAD
+          #echo "----"
+          #git --version 
+          #cd /work/veracruz/workspaces
+          #echo "----"
+          #pwd
+      #- name: git config
+        #run: |
+          #pwd
+          #git config --local core.autocrlf "$INPUT_AUTO_CRLF"
+      #- name: Check modification to Cargo.lock 
+        #id: verify-changed-files
+        #uses: tj-actions/verify-changed-files@v12
+        #with:
+          #files: |
+            #**/Cargo.lock
+      #- name: Run step only when any of the above files change.
+        #id: check-diff
+        #if: steps.verify-changed-files.outputs.files_changed == 'true'
+        #run: |
+          #echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+
+  #test-fail:
+    #runs-on: ubuntu-latest
+    #outputs:
+      #output: ${{ steps.check-diff.outputs.cargo-lock }}
+    #container:
+      #image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      #volumes:
+        #- ${{ github.workspace }}:/work/veracruz
+    #steps:
+      #- uses: actions/checkout@v3
+        #with:
+          #submodules: recursive
+      #- name: Change cargo.lock
+        #run: |
+              #echo "aa" > /work/veracruz/workspaces/linux-host/Cargo.lock
+      #- name: LS
+        #run: |
+          #pwd
+          #echo "----"
+          #ls -lha
+          #echo "----"
+          #ls .git -lha
+          #echo "----"
+          #cat .git/HEAD
+          #echo "----"
+          #git --version 
+          #echo "----"
+          #pwd
+      #- name: git config
+        #run: |
+          #pwd
+          #git config --local core.autocrlf "$INPUT_AUTO_CRLF"
+      #- name: Check modification to Cargo.lock 
+        #id: verify-changed-files
+        #uses: tj-actions/verify-changed-files@v12
+        #with:
+          #files: |
+            #**/Cargo.lock
+      #- name: Run step only when any of the above files change.
+        #id: check-diff
+        #if: steps.verify-changed-files.outputs.files_changed == 'true'
+        #run: |
+          #echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+
+
+  #test-fail-2:
+    #runs-on: ubuntu-latest
+    #outputs:
+      #output: ${{ steps.check-diff.outputs.cargo-lock }}
+    #container:
+      #image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      #volumes:
+        #- ${{ github.workspace }}:/work/veracruz
+    #steps:
+      #- uses: actions/checkout@v2
+        #with:
+          #submodules: recursive
+      #- name: Change cargo.lock
+        #run: |
+              #echo "aa" > /work/veracruz/workspaces/linux-host/Cargo.lock
+      #- name: LS
+        #run: |
+          #pwd
+          #echo "----"
+          #ls .git -lha
+          #echo "----"
+          #cat .git/HEAD
+          #echo "----"
+          #git --version 
+      #- name: git config
+        #run: |
+          #git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      #- name: Check modification to Cargo.lock 
+        #id: verify-changed-files
+        #uses: ShaleXIONG/verify-changed-files@main
+        #with:
+          #files: |
+            #**/Cargo.lock
+      #- name: Run step only when any of the above files change.
+        #id: check-diff
+        #if: steps.verify-changed-files.outputs.files_changed == 'true'
+        #run: |
+          #echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+
+  #test2:
+    #runs-on: ubuntu-latest
+    #outputs:
+      #output: ${{ steps.check-diff.outputs.cargo-lock }}
+    #container:
+      #image: ghcr.io/veracruz-project/veracruz/ci:v22.09
+      #volumes:
+        #- ${{ github.workspace }}:/work/veracruz
+    #steps:
+      #- uses: actions/checkout@v2
+      #- name: Check modification to Cargo.lock 
+        #id: verify-changed-files
+        #uses: tj-actions/verify-changed-files@v12
+        #with:
+          #files: |
+            #**/Cargo.lock
+      #- name: Run step only when any of the above files change.
+        #id: check-diff
+        #if: steps.verify-changed-files.outputs.files_changed == 'true'
+        #run: |
+          #echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+
+  #cargo-lock-check:
+    #needs: [test]
+    #runs-on: ubuntu-latest
+    #container:
+      #image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      #volumes:
+        #- ${{ github.workspace }}:/work/veracruz
+    #steps:
+      #- name: test
+        #if: needs.test.outputs.output != ''
+        #run: |
+          #echo "::warning:: ${{ needs.test.outputs.output }}" 
+          #exit 1
