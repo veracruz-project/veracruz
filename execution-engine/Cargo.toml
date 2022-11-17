@@ -33,7 +33,7 @@ cfg-if = "1"
 ctor = "=0.1.16"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-libc = "0.2.137"
+libc = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 num = { version = "0.4", default-features = false }
 num-derive = { version = "0.3", default-features = false }
