@@ -70,9 +70,10 @@ impl Service for TfLiteInferenceService {
         result
     }
 
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the
-    /// result for further uses.
+    /// An attacker may inject malformed paths but that should be caught by the
+    /// VFS when attempting to access the corresponding files.
+    /// The input tensor might not match the model's input dimensions, but this
+    /// will be caught by TensorFlow Lite.
     fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
         let deserialized_input: TfLiteInferenceService =
             match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
