@@ -12,12 +12,14 @@ icecap = [
   "policy-utils/icecap",
 ]
 nitro = [
+  "darknet",
   "mbedtls/monitor_getrandom",
   "platform-services/nitro",
   "policy-utils/std",
   "wasmtime",
 ]
 std = [
+  "darknet",
   "platform-services/std",
   "policy-utils/std",
   "wasmtime",
@@ -31,7 +33,7 @@ cfg-if = "1"
 # ctor is not used by this crate, but we must prevent other crates from
 # picking up a newer version of this crate which does not work with IceCap:
 ctor = "=0.1.16"
-darknet = "0.3.4"
+darknet = { version = "0.3.4", optional = true }
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
