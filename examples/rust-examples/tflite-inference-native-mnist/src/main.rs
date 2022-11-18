@@ -2,16 +2,8 @@
 //!
 //! ## Context
 //!
-//! It calls the module mounted at path `/services/tflite_inference.dat`, via
-//! the postcard encoding of the interface,
-//! ```
-//! pub struct TfLiteInferenceInput {
-//!     input_tensor_path: PathBuf,
-//!     model_path: PathBuf,
-//!     output_tensor_path: PathBuf,
-//!     num_threads: c_int,
-//! }
-//! ```
+//! It calls the module mounted at path `/services/tflite_inference.dat` via a
+//! `DarknetInferenceInput` structure serialized with postcard.
 //!
 //! ## Authors
 //!
@@ -33,9 +25,13 @@ use std::{
 /// The interface with the TensorFlow Lite inference service
 #[derive(Serialize, Debug)]
 pub struct TfLiteInferenceInput {
+    /// Path to the input tensor to be fed to the network.
     input_tensor_path: PathBuf,
+    /// Path to the model serialized with FlatBuffers.
     model_path: PathBuf,
+    /// Path to the output tensor containing the result of the prediction.
     output_tensor_path: PathBuf,
+    /// Number of CPU threads to use for the TensorFlow Lite interpreter.
     num_threads: c_int,
 }
 
