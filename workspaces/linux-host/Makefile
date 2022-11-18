@@ -41,20 +41,16 @@ build:
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(CC) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG) \
-		-p proxy-attestation-server \
 		-p veracruz-client -p veracruz-server \
-		--features proxy-attestation-server/linux \
 		--features veracruz-client/linux \
 		--features veracruz-server/linux \
 		--features cli
 
 install:
 	# create full names
-	cp -f target/$(PROFILE_PATH)/proxy-attestation-server $(BIN_DIR)
 	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)
 	cp -f target/$(PROFILE_PATH)/veracruz-server $(BIN_DIR)
 	# create short names
-	ln -sf $(BIN_DIR)/proxy-attestation-server $(BIN_DIR)/vc-pas
 	ln -sf $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
 	ln -sf $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
 
@@ -84,10 +80,9 @@ clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(CC) \
 		cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
-		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils  \
-		--features proxy-attestation-server/linux \
 		--features veracruz-client/linux \
 		--features veracruz-server/linux \
 		--features io-utils/linux \

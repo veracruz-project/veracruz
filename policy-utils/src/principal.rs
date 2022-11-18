@@ -17,6 +17,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
+use crate::{pipeline::Expr, parsers::parse_pipeline};
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.
@@ -31,6 +32,8 @@ pub enum Principal {
     Participant(u64),
     /// Program in Veracruz, indentified by the program file name.
     Program(String),
+    /// Pipeline in Veracruz, indentified by the pipeline name.
+    Pipeline(String),
     /// No Capability, the bottom Capability. It is used in some Initialization.
     NoCap,
 }
@@ -97,9 +100,7 @@ pub struct Program {
 impl Program {
     /// Creates a veracruz program.
     #[inline]
-    pub fn new<T>(program_file_name: String, id: T, file_rights: Vec<FileRights>) -> Self
-    where
-        T: Into<u32>,
+    pub fn new<T: Into<u32>>(program_file_name: String, id: T, file_rights: Vec<FileRights>) -> Self
     {
         Self {
             program_file_name,
@@ -124,6 +125,71 @@ impl Program {
     #[inline]
     pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
         FileRights::compute_right_map(&self.file_rights)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Pipeline
+////////////////////////////////////////////////////////////////////////////////
+/// Defines a program that can be loaded into execution engine.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Pipeline {
+    /// The pipeline name
+    name: String,
+    /// The script
+    #[serde(rename = "pipeline")]
+    preparsed_pipeline: String,
+    /// The parsed, AST representation of the conditional pipeline of programs
+    /// to execute.  This is not present in the JSON representation of a policy
+    /// file.
+    #[serde(skip)]
+    parsed_pipeline: Option<Box<Expr>>,
+    /// The pipeline ID
+    id: u32,
+    /// The file permission that specifies the program's ability to read, write and execute files.
+    file_rights: Vec<FileRights>,
+}
+
+impl Pipeline {
+    /// Creates a veracruz pipeline.
+    #[inline]
+    pub fn new<T: Into<u32>>(name: String, id: T, preparsed_pipeline: String, file_rights: Vec<FileRights>) -> Result<Self>
+    {
+        let parsed_pipeline = Some(parse_pipeline(&preparsed_pipeline)?);
+        Ok(Self {
+            name,
+            id: id.into(),
+            parsed_pipeline,
+            preparsed_pipeline,
+            file_rights,
+        })
+    }
+    
+    /// Parse the pipeline.
+    #[inline]
+    pub fn parse(&mut self)  -> Result<()> {
+        if let None = self.parsed_pipeline {
+            self.parsed_pipeline = Some(parse_pipeline(&self.preparsed_pipeline)?);
+        }
+        Ok(())
+    }
+    
+    /// Return the name of the pipeline.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Return file rights map associated to the program.
+    #[inline]
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
+        FileRights::compute_right_map(&self.file_rights)
+    }
+
+    /// Return the pipeline AST.
+    #[inline]
+    pub fn get_parsed_pipeline(&self) -> Result<&Box<Expr>> {
+        self.parsed_pipeline.as_ref().ok_or(anyhow!("The pipeline is not parsed"))
     }
 }
 

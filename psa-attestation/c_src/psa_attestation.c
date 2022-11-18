@@ -25,7 +25,7 @@ psa_initial_attest_load_key(uint8_t const *private_key,
 
     psa_key_attributes_t attributes = psa_key_attributes_init();
     psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_HASH );
-    psa_set_key_algorithm(&attributes, PSA_ALG_ECDSA(PSA_ALG_SHA_256));
+    psa_set_key_algorithm(&attributes, PSA_ALG_ECDSA(PSA_ALG_ANY_HASH));
     psa_set_key_type(&attributes, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
     status = psa_import_key(&attributes,
                             private_key,

@@ -57,7 +57,7 @@ use anyhow::{anyhow, Result};
 use env_logger;
 use log::{error, info};
 use policy_utils::policy::Policy;
-use std::{path::Path, thread, time::Instant};
+use std::{env, path::Path, thread, time::Instant};
 use veracruz_client::{self, VeracruzClient};
 use veracruz_server;
 
@@ -215,7 +215,7 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
         read_policy(policy_dir(LINEAR_REGRESSION_PARALLEL_POLICY).as_path()).unwrap();
     let policy = Policy::from_json(&policy_json).unwrap();
 
-    proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+    let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
     server_tls_loop(policy_json.clone());
 
@@ -282,6 +282,7 @@ fn server_tls_loop(policy_json: String) {
 struct TestExecutor {
     // The json string of the policy
     policy_json: String,
+    proxy_children: ProxyChildren,
 }
 
 impl TestExecutor {
@@ -312,9 +313,9 @@ impl TestExecutor {
         let (policy, policy_json, _) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        proxy_attestation_setup(policy.proxy_attestation_server_url().clone());
+        let proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
-        Ok(TestExecutor { policy_json })
+        Ok(TestExecutor { policy_json, proxy_children })
     }
 
     /// Execute this test. Clients collectively execute as a block, driven by the `events`, in
@@ -375,6 +376,9 @@ impl TestExecutor {
             }
             TestEvent::Execute(remote_path) => {
                 client.request_compute(remote_path)?;
+            }
+            TestEvent::Pipeline(pipeline_id) => {
+                client.request_pipeline(pipeline_id)?;
             }
             TestEvent::ReadFile(remote_path) => {
                 let result = client.read_file(&remote_path)?;

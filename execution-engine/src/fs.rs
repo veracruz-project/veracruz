@@ -46,6 +46,7 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
+use log::error;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -191,12 +192,13 @@ enum InodeImpl {
 
 impl InodeImpl {
     const CURRENT_PATH_STR: &'static str = ".";
-    const PARRENT_PATH_STR: &'static str = "..";
+    const PARENT_PATH_STR: &'static str = "..";
+
     /// Return a new Directory InodeImpl containing only current and parent paths
     pub(crate) fn new_directory(current: Inode, parent: Inode) -> Self {
         let mut dir = HashMap::new();
         dir.insert(PathBuf::from(Self::CURRENT_PATH_STR), current);
-        dir.insert(PathBuf::from(Self::PARRENT_PATH_STR), parent);
+        dir.insert(PathBuf::from(Self::PARENT_PATH_STR), parent);
         Self::Directory(dir)
     }
 
@@ -441,6 +443,7 @@ impl InodeTable {
     /// The root directory inode. It will be pre-opened for any wasm program.
     /// File descriptors 0 to 2 are reserved for the standard streams.
     pub(self) const ROOT_DIRECTORY_INODE: Inode = Inode(2);
+
     fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
         let mut rst = Self {
             table: HashMap::new(),
@@ -776,18 +779,24 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////////
     // Creating filesystems.
     ////////////////////////////////////////////////////////////////////////////
-    /// The first file descriptor. It will be pre-opened for any wasm program.
+
+    /// The first file descriptor. It will be pre-opened for any Wasm program.
     pub const FIRST_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
     pub const DEFAULT_RIGHTS: Rights = Rights::all();
 
-    /// Creates a new, empty filesystem and return the superuser handler, which has all the
-    /// capabilities on the entire filesystem.
+    /// Path to the Postcard serialization native module.
+    pub const POSTCARD_SERVICE_PATH: &'static str = "/services/postcard_string.dat";
+    /// Path to the AES counter mode native module.
+    pub const AES_COUNTER_MODE_SERVICE_PATH: &'static str = "/services/aesctr.dat";
+
+    /// Creates a new, empty `Filesystem` and returns the superuser handle, which
+    /// has all the capabilities on the entire filesystem.
     ///
-    /// NOTE: the file descriptors 0, 1, and 2 are pre-allocated for stdin and
-    /// similar with respect to the parameter `std_streams_table`.
-    /// Rust programs are going to expect that this is true, so we
-    /// need to preallocate some files corresponding to those, here.
+    /// NOTE: the file descriptors `0`, `1`, and `2` are pre-allocated for `stdin`
+    /// and similar with respect to the parameter `std_streams_table`.  Userspace
+    /// Wasm programs are going to expect that this is true, so we need to
+    /// preallocate some files corresponding to those, here.
     pub fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -795,6 +804,7 @@ impl FileSystem {
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table)?)),
             prestat_table: HashMap::new(),
         };
+
         let mut all_rights = HashMap::new();
         all_rights.insert(PathBuf::from("/"), Rights::all());
         all_rights.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), Rights::all());
@@ -802,23 +812,24 @@ impl FileSystem {
         all_rights.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), Rights::all());
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
+
         let mut services = Vec::new();
+
         let service: Box<dyn Service> = Box::new(PostcardService::new());
-        services.push((
-            "/services/postcard_string.dat",
-            Arc::new(Mutex::new(service)),
-        ));
+        services.push((Self::POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
+
         let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
-        services.push(("/services/aesctr.dat", Arc::new(Mutex::new(service))));
+        services.push((Self::AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
         let service: Box<dyn Service> = Box::new(AeadService::new());
         services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
         rst.install_services(services)?;
+
         Ok(rst)
     }
 
-    /// This is the ONLY public API to create a new FileSystem (handler).
-    /// It return a FileSystem where directories are pre-opened with appropriate
-    /// capabilities in related to `principal`.
+    /// This is the *only* public API to create a new `FileSystem` (handler).
+    /// It returns a `FileSystem` where directories are pre-opened with appropriate
+    /// capabilities in relation to a principal, `principal`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -826,9 +837,11 @@ impl FileSystem {
             inode_table: self.inode_table.clone(),
             prestat_table: HashMap::new(),
         };
-        // Must clone as install_prestat need to lock the inode_table too
+
+        // Must clone as `install_prestat` needs to lock the `inode_table` too
         let rights_table = self.lock_inode_table()?.get_rights(principal)?.clone();
         rst.install_prestat::<PathBuf>(&rights_table)?;
+
         Ok(rst)
     }
 
@@ -1193,6 +1206,23 @@ impl FileSystem {
         offset: FileSize,
     ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_READ)?;
+        self.fd_pread_internal(fd, bufs, offset)
+    }
+
+    /// A rust-style implementation for `fd_pread`, yet without rights check.
+    /// The actual WASI spec, requires, after `fd`, an extra parameter of type IoVec,
+    /// to which the content should be written.
+    /// Also the WASI requires the function returns the number of byte read.
+    /// However, the implementation of WASI spec of fd_pread depends on
+    /// how a particular execution engine handles the memory.
+    /// That is, different engines provide different API to interact the linear memory
+    /// space of WASM. Hence, the method here return the read bytes as `Vec<u8>`.
+    fn fd_pread_internal<B: AsMut<[u8]>>(
+        &self,
+        fd: Fd,
+        bufs: &mut [B],
+        offset: FileSize,
+    ) -> FileSystemResult<usize> {
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
         let f = self.lock_inode_table()?;
@@ -1284,6 +1314,22 @@ impl FileSystem {
         let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
 
         let read_len = self.fd_pread(fd, bufs, offset)?;
+        self.fd_seek(fd, read_len as i64, Whence::Current)?;
+        Ok(read_len)
+    }
+
+    /// Function `fd_read_executable` reads an executable. This function should *only* be called
+    /// internally. It directly calls `fd_pread` with the
+    /// current `offset` of Fd `fd` and then calls `fd_seek`.
+    pub(crate) fn fd_read_executable<B: AsMut<[u8]>>(
+        &mut self,
+        fd: Fd,
+        bufs: &mut [B],
+    ) -> FileSystemResult<usize> {
+        self.check_right(&fd, Rights::FD_EXECUTE)?;
+        let offset = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset;
+
+        let read_len = self.fd_pread_internal(fd, bufs, offset)?;
         self.fd_seek(fd, read_len as i64, Whence::Current)?;
         Ok(read_len)
     }
@@ -1805,6 +1851,25 @@ impl FileSystem {
         &mut self,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
+        self.read_file_by_absolute_path_internal(file_name, false)
+    }
+
+    /// Read a file on path `file_name`.
+    /// The `principal` must have the right on `path_open`,
+    /// `fd_read` and `fd_seek`.
+    pub fn read_exeutable_by_absolute_path<T: AsRef<Path>>(
+        &mut self,
+        file_name: T,
+    ) -> Result<Vec<u8>, ErrNo> {
+        self.read_file_by_absolute_path_internal(file_name, true)
+    }
+
+    fn read_file_by_absolute_path_internal<T: AsRef<Path>>(
+        &mut self,
+        file_name: T,
+        is_reading_executable: bool,
+    ) -> Result<Vec<u8>, ErrNo> {
+        let expected_rights = Rights::FD_SEEK | if is_reading_executable {Rights::FD_EXECUTE} else {Rights::FD_READ};
         let file_name = file_name.as_ref();
         let (fd, file_name) = self.find_prestat(file_name)?;
         let fd = self.path_open(
@@ -1822,13 +1887,18 @@ impl FileSystem {
             .ok_or(ErrNo::BadF)?
             .fd_stat
             .rights_base
-            .contains(Rights::FD_READ | Rights::FD_SEEK)
+            .contains(expected_rights)
         {
+            error!("internal read denies, expected rights {:?}", expected_rights);
             return Err(ErrNo::Access);
         }
         let file_stat = self.fd_filestat_get(fd)?;
         let mut vec = vec![0u8; file_stat.file_size as usize];
-        let read_size = self.fd_read(fd, &mut [&mut vec[..]])?;
+        let read_size = if is_reading_executable {
+            self.fd_read_executable(fd, &mut [&mut vec[..]])?
+        } else {
+            self.fd_read(fd, &mut [&mut vec[..]])?
+        };
         debug_assert_eq!(read_size, vec.len());
         self.fd_close(fd)?;
         Ok(vec)
@@ -1878,6 +1948,33 @@ impl FileSystem {
         }
 
         Ok(rst)
+    }
+
+    /// Check if a `file_name` exists.
+    /// Note: this function *has* side effect ! 
+    /// It will try to open the file and then close it.
+    pub fn file_exists<T: AsRef<Path>>(
+        &mut self,
+        file_name: T,
+    ) -> Result<bool, ErrNo> {
+        let file_name = file_name.as_ref();
+        let (fd, file_name) = self.find_prestat(file_name)?;
+        match self.path_open(
+            fd,
+            LookupFlags::empty(),
+            file_name,
+            OpenFlags::empty(),
+            FileSystem::DEFAULT_RIGHTS,
+            FileSystem::DEFAULT_RIGHTS,
+            FdFlags::empty(),
+        ) {
+            Ok(new_fd) => {
+                self.fd_close(new_fd)?;
+                Ok(true)
+            }
+            Err(ErrNo::Access) => Err(ErrNo::Access),
+            Err(_) => Ok(false),
+        }
     }
 
     /// A public API for writing to stdin.

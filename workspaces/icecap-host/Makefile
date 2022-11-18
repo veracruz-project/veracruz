@@ -52,9 +52,7 @@ all: build test-collateral
 build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) \
-		-p proxy-attestation-server \
 		-p veracruz-client -p veracruz-server \
-		--features proxy-attestation-server/icecap \
 		--features veracruz-client/icecap \
 		--features veracruz-server/icecap \
 		--features cli \
@@ -109,10 +107,9 @@ clippy: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	# workspace members and relevant dependencies
 	$(BUILD_PARAMETERS) $(COMPILERS) \
 	cargo clippy $(PROFILE_FLAG) \
-		-p proxy-attestation-server -p veracruz-client \
+		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils \
-		--features proxy-attestation-server/icecap \
 		--features veracruz-client/icecap \
 		--features veracruz-server/icecap \
 		--features transport-protocol/icecap \

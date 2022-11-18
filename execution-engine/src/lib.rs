@@ -25,27 +25,20 @@ extern crate num_derive;
 mod engines;
 pub mod fs;
 mod native_modules;
+mod pipeline;
 // Expose the error to the external.
 pub use engines::common::FatalEngineError;
 
-#[cfg(feature = "std")]
-use crate::engines::wasmtime::WasmtimeRuntimeState;
-use crate::{
-    engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
-    fs::FileSystem,
-};
-use anyhow::Result;
-use policy_utils::principal::ExecutionStrategy;
-use std::{boxed::Box, string::String, vec::Vec};
+use crate::fs::FileSystem;
+use policy_utils::{pipeline::Expr, principal::ExecutionStrategy};
+use std::boxed::Box;
 
 /// Runtime options for a program.
-#[derive(Default)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]
 pub struct Options {
-    /// A list of key-value pairs corresponding to the environment variables of the
-    /// program, if any.
+    /// The environment variables currently set, and their bindings.
     pub environment_variables: Vec<(String, String)>,
-    /// A list of strings, corresponding to the command-line arguments of the program,
-    /// if any.
+    /// The program arguments of the executable being executed.
     pub program_arguments: Vec<String>,
     /// Whether clock-related functionality is enabled for the program.  If not
     /// enabled, clock- and time-related WASI host-calls return an unimplemented
@@ -55,30 +48,23 @@ pub struct Options {
     pub enable_strace: bool,
 }
 
-/// The top-level function executes program `program` on
-/// the `filesystem` handler, in which inputs, outputs and programs are stored.
-/// The function requires execution `strategy`.
-/// It currently supports `interp` or `JIT`, backed by `WASI` and `wasmtime`, respectively.
+/// The top-level function executes the pipeline of programs, `pipeline`, on
+/// the `filesystem` handler, in which inputs, outputs and programs are stored,
+/// and an initial set of environment variables "shared" across the entire
+/// pipeline, `initial_environment_variables`.
+///
+/// The function also requires a specified execution `strategy`, which is either
+/// `interp` or `JIT`, backed by `WASMI` and `Wasmtime`, respectively.
+///
 /// Note that the `execute` function is essentially this library's
 /// interface to the outside world, and details exactly what external clients
 /// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    filesystem: FileSystem,
-    program: Vec<u8>,
-    options: Options,
-) -> Result<u32> {
-    let mut engine: Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, options)?),
-        ExecutionStrategy::JIT => {
-            cfg_if::cfg_if! {
-                if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, options)?)
-                } else {
-                    return Err(anyhow::anyhow!(FatalEngineError::EngineIsNotReady));
-                }
-            }
-        }
-    };
-    engine.invoke_entry_point(program)
+    mut caller_filesystem: FileSystem,
+    pipepine_filesystem: FileSystem,
+    pipeline: Box<Expr>,
+    options: &Options,
+) -> anyhow::Result<u32> {
+    Ok(pipeline::execute_pipeline(strategy, &mut caller_filesystem, &pipepine_filesystem, pipeline, options)?)
 }

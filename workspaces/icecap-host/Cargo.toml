@@ -19,7 +19,6 @@ exclude = [
   "crates/third-party/wasmi",
 ]
 members = [
-  "crates/proxy-attestation-server",
   "crates/veracruz-client",
   "crates/veracruz-server",
   "crates/tests",
@@ -30,3 +29,4 @@ resolver = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
+

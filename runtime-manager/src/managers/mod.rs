@@ -10,13 +10,15 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
+use policy_utils::{
+    pipeline::Expr, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
+};
 use execution_engine::{execute, fs::FileSystem};
 use lazy_static::lazy_static;
-use policy_utils::{policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH};
 use std::{
     collections::HashMap,
     path::PathBuf,
-    string::{String, ToString},
+    string::String,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
         Mutex,
@@ -25,6 +27,7 @@ use std::{
 };
 use veracruz_utils::sha256::sha256;
 use wasi_types::{ErrNo, Rights};
+use log::info;
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -71,7 +74,8 @@ pub(crate) struct ProtocolState {
     expected_shutdown_sources: Vec<u64>,
     /// The ref to the VFS, this is a FS handler with super user capability.
     vfs: FileSystem,
-    /// Digest table. Certain files must match the digest before writting to the filesystem.
+    /// Digest table. Certain files must match the digest before writing to
+    /// the filesystem.
     digest_table: HashMap<PathBuf, Vec<u8>>,
 }
 
@@ -180,6 +184,16 @@ impl ProtocolState {
         Ok(Some(rst))
     }
 
+    pub(crate) fn read_pipeline_script(
+        &self,
+        pipeline_id: usize,
+    ) -> Result<Box<Expr>> {
+        info!("try tp read pipeline_id {}.", pipeline_id);
+        let expr = self.global_policy.get_pipeline(pipeline_id)?.get_parsed_pipeline().map(|e| e.clone())?;
+        info!("result {:?}",expr);
+        Ok(expr)
+    }
+
     /// Requests shutdown on behalf of a client, as identified by their client
     /// ID.
     /// TODO: Do something better (https://github.com/veracruz-project/veracruz/issues/393)
@@ -187,36 +201,37 @@ impl ProtocolState {
         Ok(self.expected_shutdown_sources.contains(&client_id))
     }
 
-    /// Execute the program `file_name` on behalf of the client (participant) identified by `client_id`.
-    /// The client must have the right to execute the program.
-    pub(crate) fn execute(&mut self, client_id: &Principal, file_name: &str) -> ProvisioningResult {
+    /// Execute the program `file_name` on behalf of the client (participant)
+    /// identified by `principal`.  The client must have the right to execute the
+    /// program.
+    pub(crate) fn execute(
+        &mut self,
+        caller_principal: &Principal,
+        execution_principal: &Principal,
+        environment_variables: Vec<(String, String)>,
+        pipeline: Box<Expr>,
+    ) -> ProvisioningResult {
+        info!("Execute program, caller: {:?} and execution: {:?}", caller_principal, execution_principal);
         let execution_strategy = self.global_policy.execution_strategy();
         let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
+            environment_variables,
             ..Default::default()
         };
 
-        if !self
-            .vfs
-            .is_executable(client_id, &PathBuf::from(file_name))?
-        {
-            return Err(anyhow!(RuntimeManagerError::ExecutionDenied));
-        }
-
-        let program = self
-            .read_file(&Principal::InternalSuperUser, file_name)?
-            .ok_or(RuntimeManagerError::FileSystemError(ErrNo::NoEnt))?;
         let return_code = execute(
             &execution_strategy,
-            self.vfs.spawn(&Principal::Program(file_name.to_string()))?,
-            program,
-            options,
+            self.vfs.spawn(caller_principal)?,
+            self.vfs.spawn(execution_principal)?,
+            pipeline,
+            &options,
         )?;
 
         let response = Self::response_error_code_returned(return_code);
         Ok(Some(response))
     }
 
+    /// Internal function converts error code to response message.
     #[inline]
     fn response_error_code_returned(error_code: u32) -> std::vec::Vec<u8> {
         transport_protocol::serialize_result(

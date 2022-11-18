@@ -37,7 +37,7 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable},
+    principal::{ExecutionStrategy, FileHash, Identity, Principal, Program, RightsTable, Pipeline},
     Platform,
 };
 use anyhow::{anyhow, Result};
@@ -60,7 +60,7 @@ use wasi_types::Rights;
 /// and contains data that every principal needs to audit and understand before
 /// they enroll in a computation, so that they are capable of assessing whether
 /// a computation is "safe" or not for them to join.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Policy {
     /// The identities of every principal involved in a computation.
     identities: Vec<Identity<String>>,
@@ -68,6 +68,8 @@ pub struct Policy {
     programs: Vec<Program>,
     /// The list of files, e.g. binaries and configurations, that must match given hashes.
     file_hashes: Vec<FileHash>,
+    /// The list of pipelines.
+    pipelines: Vec<Pipeline>,
     /// The URL of the Veracruz server.
     veracruz_server_url: String,
     /// The expiry of the enclave's self-signed certificate, which will be
@@ -100,7 +102,8 @@ pub struct Policy {
     /// The maximum amount of memory in MiB available to the isolate. Only
     /// enforced in Nitro for now.
     max_memory_mib: u32,
-    /// Hash of the JSON representation if the Policy was parsed from a file.
+    /// Hash of the JSON representation if the policy was parsed from a file.
+    /// This field is not present in the text JSON file.
     #[serde(skip)]
     policy_hash: Option<String>,
 }
@@ -112,6 +115,7 @@ impl Policy {
     pub fn new(
         identities: Vec<Identity<String>>,
         programs: Vec<Program>,
+        mut pipelines: Vec<Pipeline>,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
         ciphersuite: String,
@@ -126,10 +130,17 @@ impl Policy {
         enable_clock: bool,
         max_memory_mib: u32,
     ) -> Result<Self> {
+
+
+        for p in pipelines.iter_mut() {
+            p.parse()?;
+        }
+
         let policy = Self {
             identities,
             proxy_service_cert,
             programs,
+            pipelines,
             veracruz_server_url,
             enclave_cert_expiry,
             ciphersuite,
@@ -156,6 +167,11 @@ impl Policy {
     pub fn from_json(json: &str) -> Result<Self> {
         // parse json
         let mut policy: Self = serde_json::from_str(json)?;
+
+        for p in policy.pipelines.iter_mut() {
+            p.parse()?;
+        }
+
         policy.assert_valid()?;
 
         // include hash?
@@ -322,8 +338,12 @@ impl Policy {
             table.insert(id, right_map);
         }
         for program in &self.programs {
-            let program_file_name = program.program_file_name();
-            let id = Principal::Program(program_file_name.to_string());
+            let id = Principal::Program(program.program_file_name().to_string());
+            let right_map = program.file_rights_map();
+            table.insert(id, right_map);
+        }
+        for program in &self.pipelines {
+            let id = Principal::Pipeline(program.name().to_string());
             let right_map = program.file_rights_map();
             table.insert(id, right_map);
         }
@@ -355,6 +375,11 @@ impl Policy {
             );
         }
         Ok(table)
+    }
+
+    /// Return the pipeline of `pipeline_id`
+    pub fn get_pipeline(&self, pipeline_id: usize) -> Result<&Pipeline> {
+        self.pipelines.get(pipeline_id).ok_or(anyhow!("Failed to find pipeline {}", pipeline_id))
     }
 
     /// Extract the input filenames from a right_map. If a prorgam has rights call

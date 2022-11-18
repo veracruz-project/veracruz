@@ -28,7 +28,6 @@ icecap = [
   "icecap-std-external",
   "libc",
   "libm",
-  "log",
   "policy-utils/icecap",
   "psa-attestation",
   "serde",
@@ -44,7 +43,6 @@ linux = [
   "env_logger",
   "execution-engine/std",
   "io-utils/linux",
-  "log",
   "nix",
   "policy-utils/std",
   "psa-attestation/linux",
@@ -67,6 +65,7 @@ nitro = [
 
 [dependencies]
 anyhow = "1"
+base64 = "0.13.0"
 bincode = { version = "1.2.1", default-features = false, optional = true }
 clap = { version = "2.33", optional = true }
 env_logger = { version = "0.9.0", optional = true }
@@ -85,7 +84,7 @@ io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { version = "0.2.124", optional = true }
 libm = { version = "0.2", optional = true }
-log = { version = "0.4.13", optional = true }
+log = "0.4.13"
 nix = { version = "0.20.2", optional = true }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "aws-nitro-enclaves-nsm-api", optional = true }
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "nsm-lib", optional = true }
@@ -96,6 +95,7 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 serde_json = "1.0"
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }
+uuid = { version = "1.1.2", features = ["serde"] }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi", optional = true }

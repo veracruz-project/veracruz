@@ -14,6 +14,7 @@ use crate::platforms::icecap::IceCapError;
 use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
+use reqwest;
 use std::error::Error;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
@@ -73,6 +74,8 @@ pub enum VeracruzServerError {
     /// Return the anyhow.
     #[error(display = "Runtime manager did not start up correctly")]
     Anyhow(anyhow::Error),
+    #[error(display = "VeracruzServer: Reqwest Error: {:?}", _0)]
+    ReqwestError(reqwest::Error),
 }
 
 impl<T> From<std::sync::PoisonError<T>> for VeracruzServerError {

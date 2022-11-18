@@ -228,6 +228,18 @@ pub fn serialize_request_result(file_name: &str) -> TransportProtocolResult {
     set_length_prefix(&mut buffer)
 }
 
+/// Serialize the request for .
+pub fn serialize_request_pipeline(pipeline_name: &str) -> TransportProtocolResult {
+    let mut command = transport_protocol::RequestResult::new();
+    command.set_file_name(pipeline_name.to_string());
+    let mut request = transport_protocol::RuntimeManagerRequest::new();
+    request.set_request_pipeline(command);
+
+    // Prefix buffer with its length
+    let mut buffer = request.write_to_bytes()?;
+    set_length_prefix(&mut buffer)
+}
+
 /// Serialize the request for shutting down the enclave.
 pub fn serialize_request_shutdown() -> TransportProtocolResult {
     let command = transport_protocol::RequestShutdown::new();
@@ -506,19 +518,15 @@ pub fn parse_result(
 
 pub fn parse_start_msg(
     parsed: &transport_protocol::ProxyAttestationServerRequest,
-) -> (std::string::String, std::string::String) {
+) -> std::string::String {
     let start_msg = parsed.get_start_msg();
-    (
-        start_msg.protocol.clone(),
-        start_msg.firmware_version.clone(),
-    )
+    return start_msg.protocol.clone();
 }
 
-pub fn serialize_start_msg(protocol: &str, firmware_version: &str) -> TransportProtocolResult {
+pub fn serialize_start_msg(protocol: &str) -> TransportProtocolResult {
     let mut transport_protocol = transport_protocol::ProxyAttestationServerRequest::new();
     let mut start_msg = transport_protocol::StartMsg::new();
     start_msg.set_protocol(protocol.to_string());
-    start_msg.set_firmware_version(firmware_version.to_string());
     transport_protocol.set_start_msg(start_msg);
 
     // Prefix buffer with its length
