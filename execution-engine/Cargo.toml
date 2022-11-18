@@ -12,12 +12,14 @@ icecap = [
   "policy-utils/icecap",
 ]
 nitro = [
+  "tflite",
   "mbedtls/monitor_getrandom",
   "platform-services/nitro",
   "policy-utils/std",
   "wasmtime",
 ]
 std = [
+  "tflite",
   "platform-services/std",
   "policy-utils/std",
   "wasmtime",
@@ -45,7 +47,7 @@ serde = { version = "1.0.115", features = ["derive"] }
 serde_json = "1.0"
 strum = "0.24"
 strum_macros = "0.24"
-tflite = "0.9.6"
+tflite = { version = "0.9.6", optional = true }
 typetag = "=0.1.6"
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi" }

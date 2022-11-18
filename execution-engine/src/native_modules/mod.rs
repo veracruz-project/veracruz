@@ -13,4 +13,5 @@ pub(crate) mod aead;
 pub(crate) mod aes;
 pub(crate) mod common;
 pub(crate) mod postcard;
+#[cfg(feature = "tflite")]
 pub(crate) mod tflite_inference;
