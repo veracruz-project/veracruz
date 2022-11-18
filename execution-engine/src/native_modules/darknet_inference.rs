@@ -88,9 +88,11 @@ impl Service for DarknetInferenceService {
         result
     }
 
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the
-    /// result for further uses.
+    /// An attacker may inject malformed paths but that should be caught by the
+    /// VFS when attempting to access the corresponding files.
+    /// The input image is resized or letterboxed (depending on the `letterbox`
+	/// parameter) before being fed to the model, which guarantees dimensions
+	/// match.
     fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
         let deserialized_input: DarknetInferenceService =
             match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {

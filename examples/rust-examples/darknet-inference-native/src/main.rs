@@ -2,8 +2,8 @@
 //!
 //! ## Context
 //!
-//! It calls the module mounted at path `/services/darknet_inference.dat` by
-//! serializing a `DarknetInferenceInput` structure with postcard.
+//! It calls the module mounted at path `/services/darknet_inference.dat` via a
+//! `DarknetInferenceInput` structure serialized with postcard.
 //!
 //! ## Authors
 //!
