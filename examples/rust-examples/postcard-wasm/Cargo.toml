@@ -12,8 +12,3 @@ anyhow = "1.0.14"
 postcard = { version = "0.7.2", features = [ "alloc", "use-std" ] }
 serde = { version = "1.0.3", features = ["derive"] }
 serde_json = { version = "1.0" }
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3

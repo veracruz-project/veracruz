@@ -9,8 +9,3 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.14"
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
