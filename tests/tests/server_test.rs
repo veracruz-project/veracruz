@@ -487,7 +487,6 @@ struct TestExecutor {
     // Hold the server thread. The test will join the thread in the end to check the server
     // state.
     server_thread: JoinHandle<Result<()>>,
-    proxy_children: ProxyChildren,
 }
 
 struct Buffers {
@@ -586,7 +585,7 @@ impl TestExecutor {
         let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        let proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
 
         info!("Create simulated connection channels.");
         // Create two channel, simulating the connecting channels.
@@ -656,7 +655,6 @@ impl TestExecutor {
             client_tls_receiver,
             alive_flag,
             server_thread,
-            proxy_children,
         })
     }
 
