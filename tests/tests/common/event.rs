@@ -18,6 +18,7 @@ pub(crate) enum TestEvent {
     // Execute a remote file
     Execute(String),
     // Execute a pipeline
+    #[allow(dead_code)] // FIXME
     Pipeline(String),
     // Read a remote file
     ReadFile(String),
@@ -63,6 +64,7 @@ impl TestEvent {
     }
 
     /// Create a test event for execute the pipeline of `pipeline_id`.
+    #[allow(dead_code)] // FIXME
     pub(crate) fn pipeline<T: AsRef<str>>(pipeline_id: T) -> TestEvent {
         TestEvent::Pipeline(String::from(pipeline_id.as_ref()))
     }

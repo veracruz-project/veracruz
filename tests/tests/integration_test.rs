@@ -282,6 +282,7 @@ fn server_tls_loop(policy_json: String) {
 struct TestExecutor {
     // The json string of the policy
     policy_json: String,
+    #[allow(dead_code)] // FIXME
     proxy_children: ProxyChildren,
 }
 

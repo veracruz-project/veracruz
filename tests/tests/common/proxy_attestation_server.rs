@@ -35,6 +35,7 @@ impl Drop for ProxyChildren {
     }
 }
 
+#[allow(dead_code)] // FIXME
 pub const CA_CERT: &'static str = "CACert.pem";
 
 pub fn proxy_attestation_setup(proxy_attestation_server_url: String, proxy_start_dir: &String) -> ProxyChildren {
