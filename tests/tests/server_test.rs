@@ -92,7 +92,10 @@ const TIME_OUT_SECS: u64 = 1200;
 fn basic_init_destroy_enclave() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _children = proxy_attestation_setup(
+            policy.proxy_attestation_server_url().clone(),
+            &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
+        );
         VeracruzServerEnclave::new(&policy_json).unwrap();
     })
 }
@@ -103,7 +106,10 @@ fn basic_new_session() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
         // start the proxy attestation server
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _children = proxy_attestation_setup(
+            policy.proxy_attestation_server_url().clone(),
+            &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
+        );
         init_veracruz_server_and_tls_session(policy_json).unwrap();
     })
 }
@@ -585,7 +591,10 @@ impl TestExecutor {
         let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        let _proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _proxy_children = proxy_attestation_setup(
+            policy.proxy_attestation_server_url().clone(),
+            &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
+        );
 
         info!("Create simulated connection channels.");
         // Create two channel, simulating the connecting channels.

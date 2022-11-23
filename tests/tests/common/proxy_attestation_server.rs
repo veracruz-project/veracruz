@@ -9,17 +9,14 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use nix::{sys::signal::{self, Signal},
-         unistd::Pid
+use nix::{
+    sys::signal::{self, Signal},
+    unistd::Pid,
 };
 use reqwest;
-use std::{
-    convert::TryInto,
-    io::Read,
-};
+use std::{convert::TryInto, io::Read};
 
 static PROVISIONING_URL_BASE: &str = "127.0.0.1:8888";
-
 
 pub struct ProxyChildren {
     vts_child: std::process::Child,
@@ -29,16 +26,31 @@ pub struct ProxyChildren {
 
 impl Drop for ProxyChildren {
     fn drop(&mut self) {
-        signal::kill(Pid::from_raw(self.vts_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
-        signal::kill(Pid::from_raw(self.provisioning_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
-        signal::kill(Pid::from_raw(self.proxy_child.id().try_into().unwrap()), Signal::SIGTERM).unwrap();
+        signal::kill(
+            Pid::from_raw(self.vts_child.id().try_into().unwrap()),
+            Signal::SIGTERM,
+        )
+        .unwrap();
+        signal::kill(
+            Pid::from_raw(self.provisioning_child.id().try_into().unwrap()),
+            Signal::SIGTERM,
+        )
+        .unwrap();
+        signal::kill(
+            Pid::from_raw(self.proxy_child.id().try_into().unwrap()),
+            Signal::SIGTERM,
+        )
+        .unwrap();
     }
 }
 
 #[allow(dead_code)] // FIXME
 pub const CA_CERT: &'static str = "CACert.pem";
 
-pub fn proxy_attestation_setup(proxy_attestation_server_url: String, proxy_start_dir: &String) -> ProxyChildren {
+pub fn proxy_attestation_setup(
+    proxy_attestation_server_url: String,
+    proxy_start_dir: &String,
+) -> ProxyChildren {
     let vts_child = std::process::Command::new("/opt/veraison/vts/vts")
         .current_dir("/opt/veraison/vts")
         .spawn()
@@ -51,11 +63,12 @@ pub fn proxy_attestation_setup(proxy_attestation_server_url: String, proxy_start
         .current_dir(proxy_start_dir)
         .arg("-l")
         .arg(&proxy_attestation_server_url)
-        .spawn().expect("Proxy Attestation Service died");
+        .spawn()
+        .expect("Proxy Attestation Service died");
 
     // Poll the proxy service until it is up
     poll_until_status(&format!("http://{:}", proxy_attestation_server_url));
-  
+
     // Poll the provisioning service until it is up
     poll_until_status(&format!("http://{:}", PROVISIONING_URL_BASE));
 
@@ -89,16 +102,32 @@ fn provision_file(corim_filename: &str, profile: &str) {
     let client = reqwest::blocking::ClientBuilder::new()
         .timeout(None)
         .build()
-        .map_err(|err| panic!("Unable to build clien tto post PSA CORIM:{:?}", err)).unwrap();
+        .map_err(|err| panic!("Unable to build clien tto post PSA CORIM:{:?}", err))
+        .unwrap();
     let mut headers = reqwest::header::HeaderMap::new();
-    let provision_submit_url = format!("http://{:}/endorsement-provisioning/v1/submit", PROVISIONING_URL_BASE);
-    headers.insert(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_str(&format!("application/corim-unsigned+cbor; profile={:}", profile)).unwrap());
-    let response = client.post(&provision_submit_url)
+    let provision_submit_url = format!(
+        "http://{:}/endorsement-provisioning/v1/submit",
+        PROVISIONING_URL_BASE
+    );
+    headers.insert(
+        reqwest::header::CONTENT_TYPE,
+        reqwest::header::HeaderValue::from_str(&format!(
+            "application/corim-unsigned+cbor; profile={:}",
+            profile
+        ))
+        .unwrap(),
+    );
+    let response = client
+        .post(&provision_submit_url)
         .headers(headers)
         .body(psa_corim)
         .send()
         .unwrap();
     if !response.status().is_success() {
-        panic!("Failed to post CORIM file contents({:}) to provisioning service. Status:{:?}", corim_filename, response.status());
+        panic!(
+            "Failed to post CORIM file contents({:}) to provisioning service. Status:{:?}",
+            corim_filename,
+            response.status()
+        );
     }
 }
