@@ -92,7 +92,10 @@ const TIME_OUT_SECS: u64 = 1200;
 fn basic_init_destroy_enclave() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _children = proxy_attestation_setup(
+            policy.proxy_attestation_server_url().clone(),
+            &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
+        );
         VeracruzServerEnclave::new(&policy_json).unwrap();
     })
 }
@@ -103,7 +106,10 @@ fn basic_new_session() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
         // start the proxy attestation server
-        let _children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _children = proxy_attestation_setup(
+            policy.proxy_attestation_server_url().clone(),
+            &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
+        );
         init_veracruz_server_and_tls_session(policy_json).unwrap();
     })
 }
@@ -487,7 +493,6 @@ struct TestExecutor {
     // Hold the server thread. The test will join the thread in the end to check the server
     // state.
     server_thread: JoinHandle<Result<()>>,
-    proxy_children: ProxyChildren,
 }
 
 struct Buffers {
@@ -586,7 +591,10 @@ impl TestExecutor {
         let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
 
         // start the proxy attestation server
-        let proxy_children = proxy_attestation_setup(policy.proxy_attestation_server_url().clone(), &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()));
+        let _proxy_children = proxy_attestation_setup(
+            policy.proxy_attestation_server_url().clone(),
+            &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
+        );
 
         info!("Create simulated connection channels.");
         // Create two channel, simulating the connecting channels.
@@ -656,7 +664,6 @@ impl TestExecutor {
             client_tls_receiver,
             alive_flag,
             server_thread,
-            proxy_children,
         })
     }
 

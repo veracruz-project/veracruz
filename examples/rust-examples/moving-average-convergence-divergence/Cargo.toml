@@ -4,7 +4,6 @@ description = "Computes the moving-average-convergence-divergence (MACD) metric 
 edition = "2018"
 name = "moving-average-convergence-divergence"
 version = "0.3.0"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.14"

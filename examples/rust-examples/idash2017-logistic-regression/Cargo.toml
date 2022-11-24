@@ -4,7 +4,6 @@ description = "A Rust reimplementation of the winning logistic regression entry 
 edition = "2018"
 name = "idash2017-logistic-regression"
 version = "0.3.0"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.14"
