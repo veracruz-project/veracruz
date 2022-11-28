@@ -21,6 +21,7 @@ use crate::native_modules::darknet_inference::DarknetInferenceService;
 use crate::native_modules::{
     aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
 };
+use log::error;
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -38,7 +39,6 @@ use std::{
 };
 // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
 // potential utf-8 encoding check
-use log::error;
 #[cfg(not(feature = "icecap"))]
 use std::{
     ffi::OsString,
@@ -827,7 +827,8 @@ impl FileSystem {
         ));
         let service: Box<dyn Service> = Box::new(AeadService::new());
         services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
-        #[cfg(feature = "darknet")] {
+        #[cfg(feature = "darknet")]
+        {
             let service: Box<dyn Service> = Box::new(DarknetInferenceService::new());
             services.push((
                 "/services/darknet_inference.dat",
