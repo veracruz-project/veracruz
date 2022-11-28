@@ -3,7 +3,7 @@
 //! ## Context
 //!
 //! It calls the module mounted at path `/services/tflite_inference.dat` via a
-//! `DarknetInferenceInput` structure serialized with postcard.
+//! `TfLiteInferenceInput` structure serialized with postcard.
 //!
 //! ## Authors
 //!

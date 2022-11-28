@@ -16,11 +16,12 @@
 
 #![allow(clippy::too_many_arguments)]
 
+#[cfg(feature = "tflite")]
+use crate::native_modules::tflite_inference::TfLiteInferenceService;
 use crate::native_modules::{
     aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
 };
-#[cfg(feature = "tflite")]
-use crate::native_modules::tflite_inference::TfLiteInferenceService;
+use log::error;
 use policy_utils::{
     principal::{FileRights, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -48,7 +49,6 @@ use wasi_types::{
     FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
     SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
 };
-use log::error;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Filesystem errors.
@@ -821,10 +821,14 @@ impl FileSystem {
         services.push((Self::POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
 
         let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
-        services.push((Self::AES_COUNTER_MODE_SERVICE_PATH, Arc::new(Mutex::new(service))));
+        services.push((
+            Self::AES_COUNTER_MODE_SERVICE_PATH,
+            Arc::new(Mutex::new(service)),
+        ));
         let service: Box<dyn Service> = Box::new(AeadService::new());
         services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
-        #[cfg(feature = "tflite")] {
+        #[cfg(feature = "tflite")]
+        {
             let service: Box<dyn Service> = Box::new(TfLiteInferenceService::new());
             services.push((
                 "/services/tflite_inference.dat",
@@ -1878,7 +1882,12 @@ impl FileSystem {
         file_name: T,
         is_reading_executable: bool,
     ) -> Result<Vec<u8>, ErrNo> {
-        let expected_rights = Rights::FD_SEEK | if is_reading_executable {Rights::FD_EXECUTE} else {Rights::FD_READ};
+        let expected_rights = Rights::FD_SEEK
+            | if is_reading_executable {
+                Rights::FD_EXECUTE
+            } else {
+                Rights::FD_READ
+            };
         let file_name = file_name.as_ref();
         let (fd, file_name) = self.find_prestat(file_name)?;
         let fd = self.path_open(
@@ -1898,7 +1907,10 @@ impl FileSystem {
             .rights_base
             .contains(expected_rights)
         {
-            error!("internal read denies, expected rights {:?}", expected_rights);
+            error!(
+                "internal read denies, expected rights {:?}",
+                expected_rights
+            );
             return Err(ErrNo::Access);
         }
         let file_stat = self.fd_filestat_get(fd)?;
@@ -1960,12 +1972,9 @@ impl FileSystem {
     }
 
     /// Check if a `file_name` exists.
-    /// Note: this function *has* side effect ! 
+    /// Note: this function *has* side effect !
     /// It will try to open the file and then close it.
-    pub fn file_exists<T: AsRef<Path>>(
-        &mut self,
-        file_name: T,
-    ) -> Result<bool, ErrNo> {
+    pub fn file_exists<T: AsRef<Path>>(&mut self, file_name: T) -> Result<bool, ErrNo> {
         let file_name = file_name.as_ref();
         let (fd, file_name) = self.find_prestat(file_name)?;
         match self.path_open(
