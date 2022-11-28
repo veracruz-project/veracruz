@@ -22,7 +22,9 @@ use std::{
     path::PathBuf,
 };
 
-/// The interface with the TensorFlow Lite inference service
+/// The interface with the TensorFlow Lite inference service. This structure
+/// should reflect the one expected by the native module, defined in
+/// `tflite_inference.rs`
 #[derive(Serialize, Debug)]
 pub struct TfLiteInferenceInput {
     /// Path to the input tensor to be fed to the network.
