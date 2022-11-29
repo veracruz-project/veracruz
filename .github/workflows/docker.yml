@@ -8,7 +8,21 @@ jobs:
   image:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the Veracruz repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1
+        with:
+          submodules: false
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build Docker Image
         id: docker-build
         run: |
-          echo "Do nothing"
+          make -C docker ci-image
+          make -C docker ci-image-tag
+          # make -C docker ci-image-push
