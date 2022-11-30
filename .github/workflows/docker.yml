@@ -7,6 +7,9 @@ on:
 jobs:
   image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Check out the Veracruz repository
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1
@@ -25,4 +28,4 @@ jobs:
         run: |
           make -C docker ci-image
           make -C docker ci-image-tag
-          # make -C docker ci-image-push
+          make -C docker ci-image-push
