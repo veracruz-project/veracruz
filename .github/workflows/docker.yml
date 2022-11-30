@@ -1,0 +1,14 @@
+name: Build Docker Image
+
+on:
+  # Only run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Docker Image
+        id: docker-build
+        run: |
+          echo "Do nothing"
