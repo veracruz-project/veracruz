@@ -20,8 +20,11 @@ DOCKER_GROUP_ID=$(shell stat --format "%g" $(shell readlink -f /var/run/docker.s
 NE_GID := $(shell getent group ne | awk -F: '{printf $$3}')
 endif
 
+DOCKER_BUILD_CMD = DOCKER_BUILDKIT=1 docker build
+
 BUILD_ARGS = --build-arg ARCH=$(ARCH) \
-	--build-arg VERSION=$(VERSION)
+	--build-arg VERSION=$(VERSION) \
+	$(EXTRA_BUILD_ARGS)
 
 DOCKER_RUN_PARAMS = \
 		-v $(abspath $(VERACRUZ_ROOT)):/work/veracruz \
@@ -34,11 +37,11 @@ default:
 
 .PHONY: base
 base: base/Dockerfile
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/base:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/base:$(VERSION) -f $< .
 
 .PHONY: %-build
 %-build: Dockerfile %-base
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) \
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
 		--build-arg USER=$(USER) --build-arg UID=$(UID) --build-arg TEE=$* \
 		--build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) \
 		-t $(IMAGE)/$*/$(USER):$(VERSION) -f $< .
@@ -54,7 +57,7 @@ all-base: base linux-base nitro-base icecap-base
 	localci-run localci-exec localci-base
 
 ci-base: ci/Dockerfile.base nitro-base
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/ci-base:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci-base:$(VERSION) -f $< .
 
 ci-run: ci-image
 	# Make sure the cargo registry directory exists to avoid permission issues
@@ -69,7 +72,7 @@ ci-exec:
 	docker exec -u root -i -t $(CONTAINER)-ci-$(USER)-$(VERSION) /bin/bash || true
 
 ci-image: ci/Dockerfile.cache ci-base
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/ci:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci:$(VERSION) -f $< .
 
 ci-image-tag: ci-image
 	docker tag $(IMAGE)/ci:$(VERSION) ghcr.io/veracruz-project/veracruz/ci:$(VERSION)
@@ -91,7 +94,7 @@ localci-exec:
 	docker exec -i -t $(CONTAINER)-localci-$(USER)-$(VERSION) /bin/bash || true
 
 localci-base: ci/Dockerfile.local ci-base
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/localci:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/localci:$(VERSION) -f $< .
 
 .PHONY: all-ci
 all-ci: ci-image localci-base
@@ -114,7 +117,7 @@ icecap-exec:
 
 .PHONY: icecap-base
 icecap-base: icecap/Dockerfile base
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/icecap:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/icecap:$(VERSION) -f $< .
 
 #####################################################################
 # Linux-related targets
@@ -133,7 +136,7 @@ linux-exec:
 
 .PHONY:
 linux-base: linux/Dockerfile base
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) -t $(IMAGE)/linux:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux:$(VERSION) -f $< .
 
 #####################################################################
 # Nitro-related targets
@@ -178,5 +181,5 @@ endif
 	cd "aws-nitro-enclaves-cli" && git checkout $(AWS_NITRO_CLI_REVISION) || \
 		(git fetch ; git checkout $(AWS_NITRO_CLI_REVISION))
 	make -C aws-nitro-enclaves-cli HOST_MACHINE=$(ARCH) nitro-cli
-	DOCKER_BUILDKIT=1 docker build $(BUILD_ARGS) \
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
 		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro:$(VERSION) -f $< .

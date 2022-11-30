@@ -26,6 +26,6 @@ jobs:
       - name: Build Docker Image
         id: docker-build
         run: |
-          make -C docker ci-image
+          make -C docker ci-image DOCKER_BUILD_CMD="docker buildx build" EXTRA_BUILD_ARGS="--cache-from=type=gha --cache-to=type=gha,mode=max"
           make -C docker ci-image-tag
           make -C docker ci-image-push
