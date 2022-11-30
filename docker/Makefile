@@ -74,11 +74,15 @@ ci-exec:
 ci-image: ci/Dockerfile.cache ci-base
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci:$(VERSION) -f $< .
 
-ci-image-tag: ci-image
+ci-image-tag:
 	docker tag $(IMAGE)/ci:$(VERSION) ghcr.io/veracruz-project/veracruz/ci:$(VERSION)
 
-ci-image-push: ci-image-tag
+ci-image-push:
 	docker push ghcr.io/veracruz-project/veracruz/ci:$(VERSION)
+
+ci-image-sign:
+	COSIGN_EXPERIMENTAL=true cosign sign -y \
+		$(shell docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/veracruz-project/veracruz/ci:$(VERSION))
 
 # "localci" is similar to "ci" but does not run as root to avoid problems
 # with file permissions.

@@ -38,15 +38,4 @@ jobs:
           make -C docker ci-image DOCKER_BUILD_CMD="docker buildx build" EXTRA_BUILD_ARGS="--cache-from=type=gha --cache-to=type=gha,mode=max"
           make -C docker ci-image-tag
           make -C docker ci-image-push
-
-      - id: docker_meta
-        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea # v4.1.1
-        with:
-          images: ghcr.io/veracruz-project/veracruz/ci
-          tags: type=sha,format=long
-
-      - name: Sign the images with GitHub OIDC Token
-        env:
-          TAGS: ${{ steps.docker_meta.outputs.tags }}
-          COSIGN_EXPERIMENTAL: true
-        run: cosign sign ${TAGS}
+          make -C docker ci-image-sign
