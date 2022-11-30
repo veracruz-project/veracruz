@@ -10,6 +10,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
     steps:
       - name: Check out the Veracruz repository
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1
@@ -23,9 +26,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install cosign
+        # https://github.com/sigstore/cosign-installer
+        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+        with:
+          cosign-release: "v1.13.1"
+
       - name: Build Docker Image
         id: docker-build
         run: |
           make -C docker ci-image DOCKER_BUILD_CMD="docker buildx build" EXTRA_BUILD_ARGS="--cache-from=type=gha --cache-to=type=gha,mode=max"
           make -C docker ci-image-tag
           make -C docker ci-image-push
+
+      - id: docker_meta
+        uses: docker/metadata-action@57396166ad8aefe6098280995947635806a0e6ea # v4.1.1
+        with:
+          images: ghcr.io/veracruz-project/veracruz/ci
+          tags: type=sha,format=long
+
+      - name: Sign the images with GitHub OIDC Token
+        env:
+          TAGS: ${{ steps.docker_meta.outputs.tags }}
+          COSIGN_EXPERIMENTAL: true
+        run: cosign sign ${TAGS}
