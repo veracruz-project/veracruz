@@ -24,22 +24,11 @@ where
     {
         let mut buff = [0u8; 9];
         LittleEndian::write_u64(&mut buff, len as u64);
-
-        let mut sent_bytes = 0;
-
-        while sent_bytes < 9 {
-            sent_bytes += fd.write(&buff[sent_bytes..9])?;
-        }
+        fd.write_all(&buff)?;
     }
 
     // 2. Send the data proper.
-    {
-        let mut sent_bytes = 0;
-
-        while sent_bytes < len {
-            sent_bytes += fd.write(&buffer[sent_bytes..len])?;
-        }
-    }
+    fd.write_all(&buffer)?;
 
     Ok(())
 }
@@ -53,25 +42,13 @@ where
     // 1. First read and decode the length of the data proper.
     let length = {
         let mut buff = [0u8; 9];
-        let mut received_bytes = 0;
-
-        while received_bytes < 9 {
-            received_bytes += fd.read(&mut buff[received_bytes..9])?;
-        }
-
+        fd.read_exact(&mut buff)?;
         LittleEndian::read_u64(&buff) as usize
     };
 
     // 2. Next, read the data proper.
     let mut buffer = vec![0u8; length];
-
-    {
-        let mut received_bytes = 0;
-
-        while received_bytes < length {
-            received_bytes += fd.read(&mut buffer[received_bytes..length])?;
-        }
-    }
+    fd.read_exact(&mut buffer)?;
 
     Ok(buffer)
 }
