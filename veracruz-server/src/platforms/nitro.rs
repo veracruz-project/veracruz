@@ -119,10 +119,6 @@ pub mod veracruz_server_nitro {
             Ok(meta)
         }
 
-        fn plaintext_data(&mut self, _data: Vec<u8>) -> Result<Option<Vec<u8>>, VeracruzServerError> {
-            Err(VeracruzServerError::UnimplementedError)
-        }
-
         fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
             let nls_message = RuntimeManagerRequest::NewTlsSession;
             let nls_buffer = bincode::serialize(&nls_message)?;
@@ -140,22 +136,6 @@ pub mod veracruz_server_nitro {
                 }
             };
             Ok(session_id)
-        }
-
-        fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
-            let cts_message = RuntimeManagerRequest::CloseTlsSession(session_id);
-            let cts_buffer = bincode::serialize(&cts_message)?;
-
-            self.enclave.send_buffer(&cts_buffer)?;
-
-            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
-
-            let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
-            match received_message {
-                RuntimeManagerResponse::Status(_status) => Ok(()),
-
-                _ => Err(VeracruzServerError::Status(Status::Fail)),
-            }
         }
 
         fn tls_data(
@@ -214,12 +194,6 @@ pub mod veracruz_server_nitro {
                 },
             ))
         }
-
-        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
-            // Don't do anything. The enclave gets shutdown when the
-            // `NitroEnclave` object inside `VeracruzServerNitro` is dropped
-            Ok(())
-        }
     }
 
     impl Drop for VeracruzServerNitro {
@@ -248,6 +222,12 @@ pub mod veracruz_server_nitro {
                 _ => return Err(VeracruzServerError::Status(Status::Fail)),
             };
             Ok(tls_data_needed)
+        }
+
+        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+            // Don't do anything. The enclave gets shutdown when the
+            // `NitroEnclave` object inside `VeracruzServerNitro` is dropped
+            Ok(())
         }
     }
 }

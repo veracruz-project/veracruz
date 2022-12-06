@@ -168,6 +168,21 @@ pub mod veracruz_server_linux {
                 }
             }
         }
+
+        /// Kills the Runtime Manager enclave, then closes TCP connection.
+        #[inline]
+        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+            info!("Shutting down Linux runtime manager enclave.");
+
+            info!("Closing TCP connection...");
+            self.runtime_manager_socket.shutdown(Shutdown::Both)?;
+
+            info!("Killing and Runtime Manager process...");
+            self.runtime_manager_process.kill()?;
+
+            info!("TCP connection and process killed.");
+            Ok(())
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -455,11 +470,6 @@ pub mod veracruz_server_linux {
             };
         }
 
-        #[inline]
-        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
-            Err(VeracruzServerError::UnimplementedError)
-        }
-
         fn new_tls_session(&mut self) -> VeracruzServerResult<u32> {
             info!("Requesting new TLS session.");
 
@@ -479,44 +489,6 @@ pub mod veracruz_server_linux {
                 RuntimeManagerResponse::TlsSession(session_id) => {
                     info!("Enclave started new TLS session with ID: {}.", session_id);
                     Ok(session_id)
-                }
-                otherwise => {
-                    error!(
-                        "Unexpected response returned from enclave.  Received: {:?}.",
-                        otherwise
-                    );
-                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
-                        otherwise,
-                    ))
-                }
-            }
-        }
-
-        fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()> {
-            info!("Requesting close of TLS session with ID: {}.", session_id);
-
-            send_message(
-                &mut self.runtime_manager_socket,
-                &RuntimeManagerRequest::CloseTlsSession(session_id),
-            )?;
-
-            info!("Close TLS session message successfully sent.");
-
-            info!("Awaiting response...");
-
-            let message: RuntimeManagerResponse =
-                receive_message(&mut self.runtime_manager_socket)?;
-
-            info!("Response received.");
-
-            match message {
-                RuntimeManagerResponse::Status(Status::Success) => {
-                    info!("TLS session successfully closed.");
-                    Ok(())
-                }
-                RuntimeManagerResponse::Status(status) => {
-                    error!("TLS session close request resulted in unexpected status message.  Received: {:?}.", status);
-                    Err(VeracruzServerError::Status(status))
                 }
                 otherwise => {
                     error!(
@@ -593,21 +565,6 @@ pub mod veracruz_server_linux {
             } else {
                 Ok((active, Some(buffer)))
             }
-        }
-
-        /// Kills the Runtime Manager enclave, then closes TCP connection.
-        #[inline]
-        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
-            info!("Shutting down Linux runtime manager enclave.");
-
-            info!("Closing TCP connection...");
-            self.runtime_manager_socket.shutdown(Shutdown::Both)?;
-
-            info!("Killing and Runtime Manager process...");
-            self.runtime_manager_process.kill()?;
-
-            info!("TCP connection and process killed.");
-            Ok(())
         }
     }
 }

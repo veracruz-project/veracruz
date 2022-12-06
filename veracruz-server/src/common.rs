@@ -15,7 +15,6 @@ use err_derive::Error;
 #[cfg(feature = "nitro")]
 use io_utils::nitro::NitroError;
 use reqwest;
-use std::error::Error;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;
 
@@ -104,14 +103,7 @@ pub trait VeracruzServer {
     where
         Self: Sized;
 
-    fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
-        // this function is not strictly needed, should we remove at some point?
-        unimplemented!();
-    }
-
     fn new_tls_session(&mut self) -> VeracruzServerResult<u32>;
-
-    fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()>;
 
     // The first bool indicates if the enclave is active, and the second vec contains the response
     fn tls_data(
@@ -119,6 +111,4 @@ pub trait VeracruzServer {
         session_id: u32,
         input: Vec<u8>,
     ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)>;
-
-    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>>;
 }

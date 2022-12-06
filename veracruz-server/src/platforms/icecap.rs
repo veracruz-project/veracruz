@@ -291,6 +291,16 @@ impl VeracruzServerIceCap {
             resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp).into()),
         }
     }
+
+    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+        match self.0.take() {
+            Some(realm) => {
+                realm.shutdown()?;
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
 }
 
 impl VeracruzServer for VeracruzServerIceCap {
@@ -301,7 +311,7 @@ impl VeracruzServer for VeracruzServerIceCap {
         let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
         let (device_id, challenge) = proxy_attestation_client::start_proxy_attestation(
-            policy.proxy_attestation_server_url()
+            policy.proxy_attestation_server_url(),
         )?;
 
         let (token, csr) =
@@ -315,10 +325,13 @@ impl VeracruzServer for VeracruzServerIceCap {
             };
 
         let cert_chain = {
-            let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(policy.proxy_attestation_server_url(), &token, &csr, device_id)
-                .map_err(|err| {
-                    err
-                })?;
+            let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(
+                policy.proxy_attestation_server_url(),
+                &token,
+                &csr,
+                device_id,
+            )
+            .map_err(|err| err)?;
             cert_chain
         };
 
@@ -340,15 +353,6 @@ impl VeracruzServer for VeracruzServerIceCap {
     fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
         match self.communicate(&RuntimeManagerRequest::NewTlsSession)? {
             RuntimeManagerResponse::TlsSession(session_id) => Ok(session_id),
-            resp => Err(VeracruzServerError::IceCapError(
-                IceCapError::UnexpectedRuntimeManagerResponse(resp),
-            )),
-        }
-    }
-
-    fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
-        match self.communicate(&RuntimeManagerRequest::CloseTlsSession(session_id))? {
-            RuntimeManagerResponse::Status(Status::Success) => Ok(()),
             resp => Err(VeracruzServerError::IceCapError(
                 IceCapError::UnexpectedRuntimeManagerResponse(resp),
             )),
@@ -392,16 +396,6 @@ impl VeracruzServer for VeracruzServerIceCap {
                 _ => Some(acc),
             },
         ))
-    }
-
-    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
-        match self.0.take() {
-            Some(realm) => {
-                realm.shutdown()?;
-                Ok(())
-            }
-            None => Ok(()),
-        }
     }
 }
 
