@@ -30,7 +30,7 @@ use log::{error, info};
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
-use std::net::TcpListener;
+use std::net::TcpStream;
 use veracruz_utils::{
     runtime_manager_message::{RuntimeManagerRequest, RuntimeManagerResponse, Status},
     sha256::sha256,
@@ -39,9 +39,6 @@ use veracruz_utils::{
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
 ////////////////////////////////////////////////////////////////////////////////
-
-/// Incoming address to listen on.  Note that `0.0.0.0` implies all addresses.
-const INCOMING_ADDRESS: &'static str = "0.0.0.0";
 
 /// **TOTALLY INSECURE** root private key to use for Linux PSA attestation.
 ///
@@ -52,7 +49,6 @@ static TOTALLY_INSECURE_ROOT_PRIVATE_KEY: [u8; 32] = [
     0xe6, 0xbf, 0x1e, 0x3d, 0xb4, 0x45, 0x42, 0xbe, 0xf5, 0x35, 0xe7, 0xac, 0xbc, 0x2d, 0x54, 0xd0,
     0xba, 0x94, 0xbf, 0xb5, 0x47, 0x67, 0x2c, 0x31, 0xc1, 0xd4, 0xee, 0x1c, 0x05, 0x76, 0xa1, 0x44,
 ];
-
 
 // Yes, I'm doing what you think I'm doing here. Each instance of the SGX root enclave
 // will have the same public key. Yes, I'm embedding that key in the source
@@ -184,13 +180,13 @@ pub fn linux_main() -> Result<()> {
     let matches = App::new("Linux runtime manager enclave")
         .author("The Veracruz Development Team")
         .arg(
-            Arg::with_name("port")
-                .short("p")
-                .long("port")
+            Arg::with_name("address")
+                .short("a")
+                .long("address")
                 .takes_value(true)
                 .required(true)
-                .help("Port to listen for new connections on.")
-                .value_name("PORT"),
+                .help("Address for connecting to Veracruz Server.")
+                .value_name("ADDRESS"),
         )
         .arg(
             Arg::with_name("runtime_manager_measurement")
@@ -201,29 +197,19 @@ pub fn linux_main() -> Result<()> {
                 .help("SHA256 measurement of the Runtime Manager enclave binary.")
                 .value_name("MEASUREMENT"),
         )
-        .arg(
-            Arg::with_name("write_nl_when_ready")
-                .long("write-nl")
-                .help("Write a newline character when server is ready."),
-        )
         .get_matches();
 
-    let port = if let Some(port) = matches.value_of("port") {
-        info!("Received {} as port to listen on.", port);
-        port
+    let address = if let Some(address) = matches.value_of("address") {
+        address
     } else {
-        error!("Did not receive any port to listen on.  Exiting...");
+        error!("No address given. Exiting...");
         return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
     let measurement = if let Some(measurement) = matches.value_of("runtime_manager_measurement") {
-        info!(
-            "Received {} as Runtime Manager enclave measurement.",
-            measurement
-        );
         measurement
     } else {
-        error!("Did not receive any expected Runtime Manager enclave measurement.  Exiting...");
+        error!("No measurement given. Exiting...");
         return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
@@ -234,39 +220,18 @@ pub fn linux_main() -> Result<()> {
             "Failed to decode Runtime Manager measurement ({}).  Error produced: {:?}.",
             measurement, err
         );
-
         return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     }
 
-    let address = format!("{}:{}", INCOMING_ADDRESS, port);
-
-    info!("Preparing to listen on {}.", address);
-
-    let listener = TcpListener::bind(&address).map_err(|e| {
-        error!("Could not bind TCP listener.  Error produced: {}.", e);
-
+    let mut fd = TcpStream::connect(&address).map_err(|e| {
+        error!("Could not connect to Veracruz Server on {}: {}", address, e);
         anyhow!(e)
     })?;
-
-    info!("TCP listener created on {}.", address);
-
-    if matches.is_present("write_nl_when_ready") {
-        println!("");
-    }
-
-    let (mut fd, client_addr) = listener.accept().map_err(|ioerr| {
-        error!(
-            "Failed to accept any incoming TCP connection.  Error produced: {}.",
-            ioerr
-        );
-        anyhow!(ioerr)
-    })?;
+    info!("Connected to Veracruz Server on {}.", address);
 
     // Configure TCP to flush outgoing buffers immediately. This reduces latency
     // when dealing with small packets
     let _ = fd.set_nodelay(true);
-
-    info!("TCP listener connected on {:?}.", client_addr);
 
     loop {
         info!("Listening for incoming message...");

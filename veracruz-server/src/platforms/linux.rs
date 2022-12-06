@@ -26,9 +26,9 @@ pub mod veracruz_server_linux {
         error::Error,
         fs::{self, File},
         io::Read,
-        net::{Shutdown, TcpStream},
+        net::{Shutdown, TcpListener, TcpStream},
         os::unix::fs::PermissionsExt,
-        process::{Child, Command, Stdio},
+        process::{Child, Command},
     };
     use tempfile::{self, TempDir};
     use veracruz_utils::runtime_manager_message::{
@@ -45,8 +45,8 @@ pub mod veracruz_server_linux {
     /// Delay (in seconds) before terminating this process with SIGALRM if
     /// the Runtime Manager has not yet started up.
     const RUNTIME_ENCLAVE_STARTUP_TIMEOUT: u32 = 30;
-    /// IP address to use when communicating with the Runtime Manager enclave.
-    const RUNTIME_MANAGER_ENCLAVE_ADDRESS: &str = "127.0.0.1";
+    /// IP address for use by Runtime Manager enclave.
+    const VERACRUZ_SERVER_ADDRESS: &str = "127.0.0.1";
     /// Minimum port number for the Runtime Manager enclave.
     const RUNTIME_MANAGER_ENCLAVE_PORT_MIN: i32 = 6000;
     /// Maximum port number for the Runtime Manager enclave.
@@ -168,6 +168,21 @@ pub mod veracruz_server_linux {
                 }
             }
         }
+
+        /// Kills the Runtime Manager enclave, then closes TCP connection.
+        #[inline]
+        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+            info!("Shutting down Linux runtime manager enclave.");
+
+            info!("Closing TCP connection...");
+            self.runtime_manager_socket.shutdown(Shutdown::Both)?;
+
+            info!("Killing and Runtime Manager process...");
+            self.runtime_manager_process.kill()?;
+
+            info!("TCP connection and process killed.");
+            Ok(())
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -203,7 +218,6 @@ pub mod veracruz_server_linux {
                     "Failed to parse Veracruz policy file.  Error produced: {:?}.",
                     e
                 );
-
                 e
             })?;
 
@@ -265,6 +279,13 @@ pub mod veracruz_server_linux {
                 runtime_enclave_binary_path, port
             );
 
+            let address = format!("{}:{}", VERACRUZ_SERVER_ADDRESS, port);
+            let listener = TcpListener::bind(&address).map_err(|e| {
+                error!("Could not bind TCP listener: {}", e);
+                VeracruzServerError::IOError(e)
+            })?;
+            info!("TCP listener created on {}.", address);
+
             // Ignore SIGCHLD to avoid zombie processes.
             unsafe {
                 signal::sigaction(
@@ -280,12 +301,10 @@ pub mod veracruz_server_linux {
 
             // Spawn the runtime manager.
             let mut runtime_manager_process = Command::new(runtime_enclave_binary_path)
-                .arg("--port")
-                .arg(format!("{}", port))
+                .arg("--address")
+                .arg(format!("{}:{}", VERACRUZ_SERVER_ADDRESS, port))
                 .arg("--measurement")
                 .arg(measurement)
-                .arg("--write-nl")
-                .stdout(Stdio::piped())
                 .spawn()
                 .map_err(|e| {
                     error!(
@@ -295,125 +314,102 @@ pub mod veracruz_server_linux {
 
                     VeracruzServerError::IOError(e)
                 })?;
+            info!("Runtime Manager has been spawned.");
 
             // Use a closure here so that we can catch any error and
             // terminate the runtime manager.
-            // TODO: The indent of the content of this closure is off.
             let (received, runtime_manager_socket) = (|| {
 
-            // Request SIGALRM after the specified time has elapsed.
-            alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
-            let mut buf: [u8; 1] = [0];
-            runtime_manager_process.stdout.take()
-                .ok_or(VeracruzServerError::RuntimeManagerFailed)?
-                .read_exact(&mut buf)?;
-            alarm::cancel(); // Cancel the alarm.
-            if buf[0] != b'\n' {
-                return Err(VeracruzServerError::RuntimeManagerFailed);
-            }
+                // Request SIGALRM after the specified time has elapsed.
+                alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
 
-            let runtime_manager_address = format!(
-                "{}:{}",
-                RUNTIME_MANAGER_ENCLAVE_ADDRESS, port
-            );
-
-            info!(
-                "Establishing connection with new Runtime Manager enclave on address: {}.",
-                runtime_manager_address
-            );
-
-            let mut runtime_manager_socket = TcpStream::connect(&runtime_manager_address).map_err(|e| {
-                error!("Failed to connect to Runtime Manager enclave at address {}.  Error produced: {}.", runtime_manager_address, e);
-
-                VeracruzServerError::IOError(e)
-            })?;
-
-            // Configure TCP to flush outgoing buffers immediately. This reduces
-            // latency when dealing with small packets
-            let _ = runtime_manager_socket.set_nodelay(true);
-
-            info!(
-                "Connected to Runtime Manager enclave at address {}.",
-                runtime_manager_address
-            );
-
-            info!("Sending proxy attestation 'start' message.");
-
-            let proxy_attestation_server_url = policy.proxy_attestation_server_url();
-
-            let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
-                proxy_attestation_server_url,
-            )
-            .map_err(|e| {
-                error!(
-                    "Failed to start proxy attestation process.  Error received: {:?}.",
-                    e
-                );
-
-                e
-            })?;
-
-            // Send a message to the runtime manager
-            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Attestation(challenge, challenge_id)).map_err(|e| {
-                error!("Failed to send attestation message to runtime manager enclave.  Error returned: {:?}.", e);
-
-                e
-            })?;
-
-            info!("Attestation message successfully sent to runtime manager enclave.");
-
-            let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
-                error!("Failed to receive response to runtime manager enclave attestation message.  Error received: {:?}.", e);
-
-                e
-            })?;
-
-            info!("Response to attestation message received from runtime manager enclave.");
-
-            let (token, csr) = match received {
-                RuntimeManagerResponse::AttestationData(token, csr) => {
-                    info!("Response to attestation message successfully received.",);
-
-                    (token, csr)
-                }
-                otherwise => {
+                let (mut runtime_manager_socket, _) = listener.accept().map_err(|ioerr| {
                     error!(
-                        "Unexpected response received from runtime manager enclave: {:?}.",
-                        otherwise
+                        "Failed to accept any incoming TCP connection.  Error produced: {}.",
+                        ioerr
                     );
+                    VeracruzServerError::IOError(ioerr)
+                })?;
+                info!("Accepted connection from Runtime Manager.");
 
-                    return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
-                        otherwise,
-                    ));
-                }
-            };
+                // Cancel the alarm.
+                alarm::cancel();
 
-            info!("Requesting certificate chain from proxy attestation server.");
+                // Configure TCP to flush outgoing buffers immediately. This reduces
+                // latency when dealing with small packets
+                let _ = runtime_manager_socket.set_nodelay(true);
 
-            let cert_chain = {
-                let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, challenge_id)
-                    .map_err(|err| {
-                        error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
-                        err
+                info!("Sending proxy attestation 'start' message.");
+
+                let proxy_attestation_server_url = policy.proxy_attestation_server_url();
+
+                let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
+                    proxy_attestation_server_url,
+                )
+                    .map_err(|e| {
+                        error!(
+                            "Failed to start proxy attestation process.  Error received: {:?}.",
+                            e
+                        );
+                        e
                     })?;
-                cert_chain
-            };
 
-            info!("Certificate chain received from proxy attestation server.  Forwarding to runtime manager enclave.");
+                // Send a message to the runtime manager
+                send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Attestation(challenge, challenge_id)).map_err(|e| {
+                    error!("Failed to send attestation message to runtime manager enclave.  Error returned: {:?}.", e);
+                    e
+                })?;
 
-            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy_json), cert_chain)).map_err(|e| {
-                error!("Failed to send certificate chain message to runtime manager enclave.  Error returned: {:?}.", e);
+                info!("Attestation message successfully sent to runtime manager enclave.");
 
-                e
-            })?;
+                let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
+                    error!("Failed to receive response to runtime manager enclave attestation message.  Error received: {:?}.", e);
+                    e
+                })?;
 
-            info!("Certificate chain message sent, awaiting response.");
+                info!("Response to attestation message received from runtime manager enclave.");
 
-            let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
-                error!("Failed to receive response to certificate chain message message from runtime manager enclave.  Error returned: {:?}.", e);
+                let (token, csr) = match received {
+                    RuntimeManagerResponse::AttestationData(token, csr) => {
+                        info!("Response to attestation message successfully received.",);
+                        (token, csr)
+                    }
+                    otherwise => {
+                        error!(
+                            "Unexpected response received from runtime manager enclave: {:?}.",
+                            otherwise
+                        );
 
-                e
-            })?;
+                        return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                            otherwise,
+                        ));
+                    }
+                };
+
+                info!("Requesting certificate chain from proxy attestation server.");
+
+                let cert_chain = {
+                    let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, challenge_id)
+                        .map_err(|err| {
+                            error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
+                            err
+                        })?;
+                    cert_chain
+                };
+
+                info!("Certificate chain received from proxy attestation server.  Forwarding to runtime manager enclave.");
+
+                send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy_json), cert_chain)).map_err(|e| {
+                    error!("Failed to send certificate chain message to runtime manager enclave.  Error returned: {:?}.", e);
+                    e
+                })?;
+
+                info!("Certificate chain message sent, awaiting response.");
+
+                let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
+                    error!("Failed to receive response to certificate chain message message from runtime manager enclave.  Error returned: {:?}.", e);
+                    e
+                })?;
 
                 Ok((received, runtime_manager_socket))
             })().map_err(|e| {
@@ -455,11 +451,6 @@ pub mod veracruz_server_linux {
             };
         }
 
-        #[inline]
-        fn plaintext_data(&mut self, _data: Vec<u8>) -> VeracruzServerResult<Option<Vec<u8>>> {
-            Err(VeracruzServerError::UnimplementedError)
-        }
-
         fn new_tls_session(&mut self) -> VeracruzServerResult<u32> {
             info!("Requesting new TLS session.");
 
@@ -479,44 +470,6 @@ pub mod veracruz_server_linux {
                 RuntimeManagerResponse::TlsSession(session_id) => {
                     info!("Enclave started new TLS session with ID: {}.", session_id);
                     Ok(session_id)
-                }
-                otherwise => {
-                    error!(
-                        "Unexpected response returned from enclave.  Received: {:?}.",
-                        otherwise
-                    );
-                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
-                        otherwise,
-                    ))
-                }
-            }
-        }
-
-        fn close_tls_session(&mut self, session_id: u32) -> VeracruzServerResult<()> {
-            info!("Requesting close of TLS session with ID: {}.", session_id);
-
-            send_message(
-                &mut self.runtime_manager_socket,
-                &RuntimeManagerRequest::CloseTlsSession(session_id),
-            )?;
-
-            info!("Close TLS session message successfully sent.");
-
-            info!("Awaiting response...");
-
-            let message: RuntimeManagerResponse =
-                receive_message(&mut self.runtime_manager_socket)?;
-
-            info!("Response received.");
-
-            match message {
-                RuntimeManagerResponse::Status(Status::Success) => {
-                    info!("TLS session successfully closed.");
-                    Ok(())
-                }
-                RuntimeManagerResponse::Status(status) => {
-                    error!("TLS session close request resulted in unexpected status message.  Received: {:?}.", status);
-                    Err(VeracruzServerError::Status(status))
                 }
                 otherwise => {
                     error!(
@@ -593,21 +546,6 @@ pub mod veracruz_server_linux {
             } else {
                 Ok((active, Some(buffer)))
             }
-        }
-
-        /// Kills the Runtime Manager enclave, then closes TCP connection.
-        #[inline]
-        fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
-            info!("Shutting down Linux runtime manager enclave.");
-
-            info!("Closing TCP connection...");
-            self.runtime_manager_socket.shutdown(Shutdown::Both)?;
-
-            info!("Killing and Runtime Manager process...");
-            self.runtime_manager_process.kill()?;
-
-            info!("TCP connection and process killed.");
-            Ok(())
         }
     }
 }
