@@ -218,7 +218,6 @@ pub mod veracruz_server_linux {
                     "Failed to parse Veracruz policy file.  Error produced: {:?}.",
                     e
                 );
-
                 e
             })?;
 
@@ -319,105 +318,98 @@ pub mod veracruz_server_linux {
 
             // Use a closure here so that we can catch any error and
             // terminate the runtime manager.
-            // TODO: The indent of the content of this closure is off.
             let (received, runtime_manager_socket) = (|| {
 
-            // Request SIGALRM after the specified time has elapsed.
-            alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
+                // Request SIGALRM after the specified time has elapsed.
+                alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
 
-            let (mut runtime_manager_socket, _) = listener.accept().map_err(|ioerr| {
-                error!(
-                    "Failed to accept any incoming TCP connection.  Error produced: {}.",
-                    ioerr
-                );
-                VeracruzServerError::IOError(ioerr)
-            })?;
-            info!("Accepted connection from Runtime Manager.");
-
-            // Cancel the alarm.
-            alarm::cancel();
-
-            // Configure TCP to flush outgoing buffers immediately. This reduces
-            // latency when dealing with small packets
-            let _ = runtime_manager_socket.set_nodelay(true);
-
-            info!("Sending proxy attestation 'start' message.");
-
-            let proxy_attestation_server_url = policy.proxy_attestation_server_url();
-
-            let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
-                proxy_attestation_server_url,
-            )
-            .map_err(|e| {
-                error!(
-                    "Failed to start proxy attestation process.  Error received: {:?}.",
-                    e
-                );
-
-                e
-            })?;
-
-            // Send a message to the runtime manager
-            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Attestation(challenge, challenge_id)).map_err(|e| {
-                error!("Failed to send attestation message to runtime manager enclave.  Error returned: {:?}.", e);
-
-                e
-            })?;
-
-            info!("Attestation message successfully sent to runtime manager enclave.");
-
-            let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
-                error!("Failed to receive response to runtime manager enclave attestation message.  Error received: {:?}.", e);
-
-                e
-            })?;
-
-            info!("Response to attestation message received from runtime manager enclave.");
-
-            let (token, csr) = match received {
-                RuntimeManagerResponse::AttestationData(token, csr) => {
-                    info!("Response to attestation message successfully received.",);
-
-                    (token, csr)
-                }
-                otherwise => {
+                let (mut runtime_manager_socket, _) = listener.accept().map_err(|ioerr| {
                     error!(
-                        "Unexpected response received from runtime manager enclave: {:?}.",
-                        otherwise
+                        "Failed to accept any incoming TCP connection.  Error produced: {}.",
+                        ioerr
                     );
+                    VeracruzServerError::IOError(ioerr)
+                })?;
+                info!("Accepted connection from Runtime Manager.");
 
-                    return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
-                        otherwise,
-                    ));
-                }
-            };
+                // Cancel the alarm.
+                alarm::cancel();
 
-            info!("Requesting certificate chain from proxy attestation server.");
+                // Configure TCP to flush outgoing buffers immediately. This reduces
+                // latency when dealing with small packets
+                let _ = runtime_manager_socket.set_nodelay(true);
 
-            let cert_chain = {
-                let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, challenge_id)
-                    .map_err(|err| {
-                        error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
-                        err
+                info!("Sending proxy attestation 'start' message.");
+
+                let proxy_attestation_server_url = policy.proxy_attestation_server_url();
+
+                let (challenge_id, challenge) = proxy_attestation_client::start_proxy_attestation(
+                    proxy_attestation_server_url,
+                )
+                    .map_err(|e| {
+                        error!(
+                            "Failed to start proxy attestation process.  Error received: {:?}.",
+                            e
+                        );
+                        e
                     })?;
-                cert_chain
-            };
 
-            info!("Certificate chain received from proxy attestation server.  Forwarding to runtime manager enclave.");
+                // Send a message to the runtime manager
+                send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Attestation(challenge, challenge_id)).map_err(|e| {
+                    error!("Failed to send attestation message to runtime manager enclave.  Error returned: {:?}.", e);
+                    e
+                })?;
 
-            send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy_json), cert_chain)).map_err(|e| {
-                error!("Failed to send certificate chain message to runtime manager enclave.  Error returned: {:?}.", e);
+                info!("Attestation message successfully sent to runtime manager enclave.");
 
-                e
-            })?;
+                let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
+                    error!("Failed to receive response to runtime manager enclave attestation message.  Error received: {:?}.", e);
+                    e
+                })?;
 
-            info!("Certificate chain message sent, awaiting response.");
+                info!("Response to attestation message received from runtime manager enclave.");
 
-            let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
-                error!("Failed to receive response to certificate chain message message from runtime manager enclave.  Error returned: {:?}.", e);
+                let (token, csr) = match received {
+                    RuntimeManagerResponse::AttestationData(token, csr) => {
+                        info!("Response to attestation message successfully received.",);
+                        (token, csr)
+                    }
+                    otherwise => {
+                        error!(
+                            "Unexpected response received from runtime manager enclave: {:?}.",
+                            otherwise
+                        );
 
-                e
-            })?;
+                        return Err(VeracruzServerError::InvalidRuntimeManagerResponse(
+                            otherwise,
+                        ));
+                    }
+                };
+
+                info!("Requesting certificate chain from proxy attestation server.");
+
+                let cert_chain = {
+                    let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(proxy_attestation_server_url, &token, &csr, challenge_id)
+                        .map_err(|err| {
+                            error!("proxy_attestation_client::complete_proxy_attestation_linux failed:{:?}", err);
+                            err
+                        })?;
+                    cert_chain
+                };
+
+                info!("Certificate chain received from proxy attestation server.  Forwarding to runtime manager enclave.");
+
+                send_message(&mut runtime_manager_socket, &RuntimeManagerRequest::Initialize(String::from(policy_json), cert_chain)).map_err(|e| {
+                    error!("Failed to send certificate chain message to runtime manager enclave.  Error returned: {:?}.", e);
+                    e
+                })?;
+
+                info!("Certificate chain message sent, awaiting response.");
+
+                let received: RuntimeManagerResponse = receive_message(&mut runtime_manager_socket).map_err(|e| {
+                    error!("Failed to receive response to certificate chain message message from runtime manager enclave.  Error returned: {:?}.", e);
+                    e
+                })?;
 
                 Ok((received, runtime_manager_socket))
             })().map_err(|e| {
