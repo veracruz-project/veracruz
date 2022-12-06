@@ -26,9 +26,9 @@ pub mod veracruz_server_linux {
         error::Error,
         fs::{self, File},
         io::Read,
-        net::{Shutdown, TcpStream},
+        net::{Shutdown, TcpListener, TcpStream},
         os::unix::fs::PermissionsExt,
-        process::{Child, Command, Stdio},
+        process::{Child, Command},
     };
     use tempfile::{self, TempDir};
     use veracruz_utils::runtime_manager_message::{
@@ -45,8 +45,8 @@ pub mod veracruz_server_linux {
     /// Delay (in seconds) before terminating this process with SIGALRM if
     /// the Runtime Manager has not yet started up.
     const RUNTIME_ENCLAVE_STARTUP_TIMEOUT: u32 = 30;
-    /// IP address to use when communicating with the Runtime Manager enclave.
-    const RUNTIME_MANAGER_ENCLAVE_ADDRESS: &str = "127.0.0.1";
+    /// IP address for use by Runtime Manager enclave.
+    const VERACRUZ_SERVER_ADDRESS: &str = "127.0.0.1";
     /// Minimum port number for the Runtime Manager enclave.
     const RUNTIME_MANAGER_ENCLAVE_PORT_MIN: i32 = 6000;
     /// Maximum port number for the Runtime Manager enclave.
@@ -280,6 +280,13 @@ pub mod veracruz_server_linux {
                 runtime_enclave_binary_path, port
             );
 
+            let address = format!("{}:{}", VERACRUZ_SERVER_ADDRESS, port);
+            let listener = TcpListener::bind(&address).map_err(|e| {
+                error!("Could not bind TCP listener: {}", e);
+                VeracruzServerError::IOError(e)
+            })?;
+            info!("TCP listener created on {}.", address);
+
             // Ignore SIGCHLD to avoid zombie processes.
             unsafe {
                 signal::sigaction(
@@ -295,12 +302,10 @@ pub mod veracruz_server_linux {
 
             // Spawn the runtime manager.
             let mut runtime_manager_process = Command::new(runtime_enclave_binary_path)
-                .arg("--port")
-                .arg(format!("{}", port))
+                .arg("--address")
+                .arg(format!("{}:{}", VERACRUZ_SERVER_ADDRESS, port))
                 .arg("--measurement")
                 .arg(measurement)
-                .arg("--write-nl")
-                .stdout(Stdio::piped())
                 .spawn()
                 .map_err(|e| {
                     error!(
@@ -310,6 +315,7 @@ pub mod veracruz_server_linux {
 
                     VeracruzServerError::IOError(e)
                 })?;
+            info!("Runtime Manager has been spawned.");
 
             // Use a closure here so that we can catch any error and
             // terminate the runtime manager.
@@ -318,39 +324,22 @@ pub mod veracruz_server_linux {
 
             // Request SIGALRM after the specified time has elapsed.
             alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
-            let mut buf: [u8; 1] = [0];
-            runtime_manager_process.stdout.take()
-                .ok_or(VeracruzServerError::RuntimeManagerFailed)?
-                .read_exact(&mut buf)?;
-            alarm::cancel(); // Cancel the alarm.
-            if buf[0] != b'\n' {
-                return Err(VeracruzServerError::RuntimeManagerFailed);
-            }
 
-            let runtime_manager_address = format!(
-                "{}:{}",
-                RUNTIME_MANAGER_ENCLAVE_ADDRESS, port
-            );
-
-            info!(
-                "Establishing connection with new Runtime Manager enclave on address: {}.",
-                runtime_manager_address
-            );
-
-            let mut runtime_manager_socket = TcpStream::connect(&runtime_manager_address).map_err(|e| {
-                error!("Failed to connect to Runtime Manager enclave at address {}.  Error produced: {}.", runtime_manager_address, e);
-
-                VeracruzServerError::IOError(e)
+            let (mut runtime_manager_socket, _) = listener.accept().map_err(|ioerr| {
+                error!(
+                    "Failed to accept any incoming TCP connection.  Error produced: {}.",
+                    ioerr
+                );
+                VeracruzServerError::IOError(ioerr)
             })?;
+            info!("Accepted connection from Runtime Manager.");
+
+            // Cancel the alarm.
+            alarm::cancel();
 
             // Configure TCP to flush outgoing buffers immediately. This reduces
             // latency when dealing with small packets
             let _ = runtime_manager_socket.set_nodelay(true);
-
-            info!(
-                "Connected to Runtime Manager enclave at address {}.",
-                runtime_manager_address
-            );
 
             info!("Sending proxy attestation 'start' message.");
 
