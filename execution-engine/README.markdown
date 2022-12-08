@@ -1,10 +1,10 @@
 # Proposal for WASI ABI in Veracruz Execution Engine
 
-This proposal includes: 
+This proposal includes:
 
- * Moves to a named model, wherein inputs, outputs and programs are "file-like" stored in a 
-   virtual file system (VFS) and have names set by policy. This makes programs more reusable and composable. 
- * Introduces a familiar file-oriented programming model for data IO. 
+ * Moves to a named model, wherein inputs, outputs and programs are "file-like" stored in a
+   virtual file system (VFS) and have names set by policy. This makes programs more reusable and composable.
+ * Introduces a familiar file-oriented programming model for data IO.
  * Moves to an incremental read/write model, wherein programs can incrementally
    read inputs into smaller buffers as they consume input, and incrementally
    write to outputs as they generate it.
@@ -19,7 +19,7 @@ debug their programs.
 ## WASI ABI Summary
 
 Implementation is based on the description in [wasi_snapshot_preview1][1].
-However, the actual ABI definitions, particularly parameters, is slightly different, which can be found in 
+However, the actual ABI definitions, particularly parameters, is slightly different, which can be found in
 [here](https://github.com/alexcrichton/rust-wasi/blob/master/src/wasi_unstable/raw.rs) or [here][2].
 We use a fork of [wasi-type](https://github.com/veracruz-project/wasi-types) for all type definitions in [wasi_snapshot_preview1][1].
 
@@ -38,7 +38,7 @@ Notes:
 
 ## WASI Implementation Summary
 
-A summary our WASI implementation. We repeat the high-level WASI API definitions in [wasi_snapshot_preview1][1] 
+A summary our WASI implementation. We repeat the high-level WASI API definitions in [wasi_snapshot_preview1][1]
 and the actual ABI definitions in [here][2], and provide our understanding of the WASI ABI standard and implementation strategy.
 Any WASI ABI that veracruz currently does not support, labeled with **NOT SUPPORTED** through this document,
 will return `ErrNo::NoSys` _after_ right (capability) check and minimum validity check on parameters.
@@ -53,7 +53,7 @@ Also, there is _NO_ API for participants to access the arguments and environment
 fn args_get(argv: Pointer<Pointer<u8>>, argv_buf: Pointer<u8>) -> Result<(),ErrNo>;
 fn args_get(argv: u32, argv_buf: u32) -> u16;
 ```
-Return the arguments. Each argument is `\0`-ended. All arguments are stored at the memory 
+Return the arguments. Each argument is `\0`-ended. All arguments are stored at the memory
 at `argv_buf`. `argv` stores addresses (pointing to `argv_buf`) to arguments.
 For example:
 ```
@@ -64,23 +64,23 @@ argv_buf --> |  ... \0 ... \0 ... \0 ... ...
          ----------------------------------
 argv --> |  0x12  |  0x34  |  0x56 | ..
          ----------------------------------
-``` 
+```
 **Question:** Not sure the upper bound of `argv` and `argv_buf`.
 
 #### `args_sizes_get`
 ```rust
 fn args_sizes_get() -> Result<(size, size), ErrNo>;
 fn args_sizes_get(argc: u32, argv_buf_size: u32) -> u16;
-``` 
-Write the number of arguments to the memory at `argc`, 
+```
+Write the number of arguments to the memory at `argc`,
 and the total number of valid bytes of `argv_buf` (in `args_get`), including `\0`, to the memory at `argv_buf_size`.
 
 #### `environ_get`
-```rust 
+```rust
 fn environ_get(environ: Pointer<Pointer<u8>>, environ_buf: Pointer<u8>) -> Result<(), ErrNo>;
 fn environ_get(environ: u32, environ_buf: u32) -> u16;
 ```
-Return the environment variables in a similar style as `args_get`, 
+Return the environment variables in a similar style as `args_get`,
 however, each entry is of the form `$KEY=$VALUE`.
 For example:
 ```
@@ -91,7 +91,7 @@ environ_buf --> |  key1=value1 \0 key2=value \0 ...  ...
               ---------------------------------------------
 environ -->   |  0x12         |  0x34        |  0x56 | ..
               ---------------------------------------------
-``` 
+```
 **Question:** Not sure the upper bound of `environ_buf` and `environ`.
 
 #### `environ_sizes_get`
@@ -99,8 +99,8 @@ environ -->   |  0x12         |  0x34        |  0x56 | ..
 fn environ_sizes_get() -> Result<(size, size), ErrNo>;
 fn environ_sizes_get(environ_count, environ_buf_size) -> u16;
 ```
-Write the number of environment variables to the memory at `environ_count`, 
-and the total number of valid bytes of `environ_buf` (in `environ_get`), including `\0`, 
+Write the number of environment variables to the memory at `environ_count`,
+and the total number of valid bytes of `environ_buf` (in `environ_get`), including `\0`,
 to the memory at `environ_buf_size`.
 
 ### Times
@@ -110,14 +110,14 @@ to the memory at `environ_buf_size`.
 fn clock_res_get(id: ClockId) -> Result<Timestamp, ErrNo>;
 fn clock_res_get(id: u32, resolution: u32) -> u16;
 ```
-Write the time resolution as `u64` to the memory at `resolution`. 
+Write the time resolution as `u64` to the memory at `resolution`.
 
 #### `clock_time_get`
 ```rust
 fn clock_time_get(id: ClockId, precision: Timestamp) -> Result<Timestamp, ErrNo>;
 fn clock_time_get(id: u32, precision: u64, time: u32) -> u16;
 ```
-Write the time of `precision` to the memory at `time`. 
+Write the time of `precision` to the memory at `time`.
 
 ### Files
 
@@ -135,7 +135,7 @@ We only tested the following calls:
 * `fd_tell`
 * `path_open`
 
-The test source programs can be found at `$VARCRUZ_ROOT/sdk/rust-examples`.
+The test source programs can be found at `$VERACRUZ_ROOT/sdk/rust-examples`.
 
 #### `fd_advise`
 ```rust
@@ -203,7 +203,7 @@ Write the status of the file opened by the file descriptor `fd` to the memory at
 fn fd_filestat_set_size(fd: Fd, size: FileSize) -> Result<(), ErrNo>;
 fn fd_filestat_set_size(fd: u32, size: u64) -> u16;
 ```
-Set the file size of the file opened by the file descriptor `fd` to the new size `size`. 
+Set the file size of the file opened by the file descriptor `fd` to the new size `size`.
 It will zero-fill, if the new size is larger than the existing size,
 or truncate, if the new size is smaller.
 
@@ -259,7 +259,7 @@ buf --> |  dirent[0] path[0] dirent[1] path[1] ... ... ... ...|
 
 Each `dirent[i]` contains:
 - `next` the offset of the next dir entry
-- `inode` 
+- `inode`
 - `name_len` the length of the `path[i]`
 - `file_type`
 Given the wasm program compiled from Rust, it is required to fill the buf as much as possible. Particularly, if `dirent[i]` is able to fit in while `path[i]` is not, then it should fill `dirent[i]`.
@@ -347,7 +347,7 @@ fn fd_seek(fd: u32, delta: i64, whence: u8, offset: u32) -> u16;
 ```
 Move the offset of the file descriptor `fd` based on the flag `whence`:
 * if it is `Current`, move from the current offset by `delta`;
-* if it is `Start`, move from the start of the file by `delta`; or 
+* if it is `Start`, move from the start of the file by `delta`; or
 * if it is `End`, move from the end of the file by `delta`.
 If the new offset is negative or exceeds the file size, return `SPipe` (invalid seek).
 Otherwise, write the new offset to the memory at `offset`.
@@ -367,7 +367,7 @@ fn fd_tell(fd: u32, offset: u32) -> u16;
 ```
 Write the offset of the file descriptor `fd` to the memory at `offset`.
 
-#### `path_create_directory` 
+#### `path_create_directory`
 ```rust
 fn path_create_directory(fd: Fd, path: String) -> Result<(), ErrNo>;
 fn path_create_directory(fd: Fd, path_addr: u32, path_len: u32) -> u16;
@@ -391,7 +391,7 @@ fn path_filestat_get(fd: Fd, flags: LookupFlags, path: String) -> Result<FileSta
 fn path_filestat_get(fd: u32, flags: u32, path_addr: u32, path_len: u32, file_stat: u32) -> u16;
 ```
 Read the path at address `path_addr` of length `path_len`.
-Then write the status of the file at the path starting from the directory opened by the file descriptor `fd`. 
+Then write the status of the file at the path starting from the directory opened by the file descriptor `fd`.
 
 #### `path_filestat_set_times`
 ```
@@ -488,7 +488,7 @@ fn poll_oneoff(in: u32, out: u32, nsubscriptions: u32, size: u32) -> u16;
 fn proc_exit(error: Exitcode) -> !;
 fn proc_exit(error: u32) -> !;
 ```
-Terminate the execution with error code `error`. 
+Terminate the execution with error code `error`.
 We cannot find API for terminating execution in in WASMI and wasmtime.
 Hence Veracruz stores the `error` and allows to execute further, which is likely to raise a trap due to an `Unreachable` command immediately after `proc_exit`.
 
@@ -538,7 +538,7 @@ WASM passes a `u32` as the `si_flags` parameter.
 
 **NOT SUPPORTED**
 
-#### `sock_shutdown` 
+#### `sock_shutdown`
 ```rust
 fn sock_shutdown(socket: Fd, flags: SdFlags) -> Result<(), ErrNo>;
 fn sock_shutdown(socket: u32, flags: u8) -> u16;

@@ -204,7 +204,7 @@ change the runtime hashes.
 
 ## Running the Proxy Attestation Server
 
-Now we can launch the Proxy Attestation Server and it's helper services.
+Now we can launch the Proxy Attestation Server and its helper services.
 Note we are using the bash character `&` to launch the services in the
 background:
 ``` bash
@@ -236,10 +236,10 @@ Veracruz Server running on 127.0.0.1:3017
 $ sleep 10
 ```
 
-## Running the Veracruz Client 
+## Running the Veracruz Client
 
 In practice you may integrate the `veracruz-client` Rust crate directly into
-your application, sending data programatically via the Rust API, but for this
+your application, sending data programmatically via the Rust API, but for this
 example we'll use the Veracruz Client CLI interface. This provides the same
 functionality, but in a CLI form.
 
