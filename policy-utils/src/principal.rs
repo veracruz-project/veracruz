@@ -13,11 +13,11 @@
 //! information on licensing and copyright.
 
 use super::error::PolicyError;
+use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
-use crate::{pipeline::Expr, parsers::parse_pipeline};
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.
@@ -100,8 +100,11 @@ pub struct Program {
 impl Program {
     /// Creates a veracruz program.
     #[inline]
-    pub fn new<T: Into<u32>>(program_file_name: String, id: T, file_rights: Vec<FileRights>) -> Self
-    {
+    pub fn new<T: Into<u32>>(
+        program_file_name: String,
+        id: T,
+        file_rights: Vec<FileRights>,
+    ) -> Self {
         Self {
             program_file_name,
             id: id.into(),
@@ -153,8 +156,12 @@ pub struct Pipeline {
 impl Pipeline {
     /// Creates a veracruz pipeline.
     #[inline]
-    pub fn new<T: Into<u32>>(name: String, id: T, preparsed_pipeline: String, file_rights: Vec<FileRights>) -> Result<Self>
-    {
+    pub fn new<T: Into<u32>>(
+        name: String,
+        id: T,
+        preparsed_pipeline: String,
+        file_rights: Vec<FileRights>,
+    ) -> Result<Self> {
         let parsed_pipeline = Some(parse_pipeline(&preparsed_pipeline)?);
         Ok(Self {
             name,
@@ -167,7 +174,7 @@ impl Pipeline {
 
     /// Parse the pipeline.
     #[inline]
-    pub fn parse(&mut self)  -> Result<()> {
+    pub fn parse(&mut self) -> Result<()> {
         if let None = self.parsed_pipeline {
             self.parsed_pipeline = Some(parse_pipeline(&self.preparsed_pipeline)?);
         }
@@ -189,7 +196,9 @@ impl Pipeline {
     /// Return the pipeline AST.
     #[inline]
     pub fn get_parsed_pipeline(&self) -> Result<&Box<Expr>> {
-        self.parsed_pipeline.as_ref().ok_or(anyhow!("The pipeline is not parsed"))
+        self.parsed_pipeline
+            .as_ref()
+            .ok_or(anyhow!("The pipeline is not parsed"))
     }
 }
 

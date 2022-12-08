@@ -60,7 +60,12 @@ fn dispatch_on_result(
     protocol_state: &mut ProtocolState,
     client_id: u64,
 ) -> ProvisioningResult {
-    protocol_state.execute(&Principal::Participant(client_id), &Principal::Program(file_name.clone()), Vec::new(), Box::new(Expr::Literal(file_name)))
+    protocol_state.execute(
+        &Principal::Participant(client_id),
+        &Principal::Program(file_name.clone()),
+        Vec::new(),
+        Box::new(Expr::Literal(file_name)),
+    )
 }
 
 /// Request to compute the pipeline of `pipeline_id`.
@@ -71,7 +76,12 @@ fn dispatch_on_pipeline(
 ) -> ProvisioningResult {
     let pipeline_id = file_name.parse::<usize>()?;
     let pipeline = protocol_state.read_pipeline_script(pipeline_id)?;
-    protocol_state.execute(&Principal::Participant(client_id), &Principal::Pipeline(file_name), Vec::new(), pipeline)
+    protocol_state.execute(
+        &Principal::Participant(client_id),
+        &Principal::Pipeline(file_name),
+        Vec::new(),
+        pipeline,
+    )
 }
 
 /// Write a file into the VFS. It will overwrite previous content. Fails if the client has no permission.
@@ -164,11 +174,9 @@ fn parse_incoming_buffer(
 ) -> Result<Option<transport_protocol::RuntimeManagerRequest>> {
     match transport_protocol::parse_runtime_manager_request(Some(tls_session_id), &input) {
         Ok(v) => Ok(Some(v)),
-        Err(e) => {
-            match e.downcast_ref::<TransportProtocolError>() {
-                Some(TransportProtocolError::PartialBuffer(_)) => Ok(None),
-                _otherwise => Err(e),
-            }
+        Err(e) => match e.downcast_ref::<TransportProtocolError>() {
+            Some(TransportProtocolError::PartialBuffer(_)) => Ok(None),
+            _otherwise => Err(e),
         },
     }
 }

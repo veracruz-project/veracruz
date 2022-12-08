@@ -10,11 +10,12 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
+use execution_engine::{execute, fs::FileSystem};
+use lazy_static::lazy_static;
+use log::info;
 use policy_utils::{
     pipeline::Expr, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
 };
-use execution_engine::{execute, fs::FileSystem};
-use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -27,7 +28,6 @@ use std::{
 };
 use veracruz_utils::sha256::sha256;
 use wasi_types::{ErrNo, Rights};
-use log::info;
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -184,13 +184,14 @@ impl ProtocolState {
         Ok(Some(rst))
     }
 
-    pub(crate) fn read_pipeline_script(
-        &self,
-        pipeline_id: usize,
-    ) -> Result<Box<Expr>> {
+    pub(crate) fn read_pipeline_script(&self, pipeline_id: usize) -> Result<Box<Expr>> {
         info!("try tp read pipeline_id {}.", pipeline_id);
-        let expr = self.global_policy.get_pipeline(pipeline_id)?.get_parsed_pipeline().map(|e| e.clone())?;
-        info!("result {:?}",expr);
+        let expr = self
+            .global_policy
+            .get_pipeline(pipeline_id)?
+            .get_parsed_pipeline()
+            .map(|e| e.clone())?;
+        info!("result {:?}", expr);
         Ok(expr)
     }
 
@@ -211,7 +212,10 @@ impl ProtocolState {
         environment_variables: Vec<(String, String)>,
         pipeline: Box<Expr>,
     ) -> ProvisioningResult {
-        info!("Execute program, caller: {:?} and execution: {:?}", caller_principal, execution_principal);
+        info!(
+            "Execute program, caller: {:?} and execution: {:?}",
+            caller_principal, execution_principal
+        );
         let execution_strategy = self.global_policy.execution_strategy();
         let options = execution_engine::Options {
             enable_clock: *self.global_policy.enable_clock(),
