@@ -39,8 +39,6 @@ separate binaries:
 
 - `vc-pgen`/`generate-policy` - Generates and validates policy files
   used to describe a Veracruz computation.
-- `vc-pas`/`proxy-attestation-server` - Runs the Veracruz proxy-attestation
-  server, which is used to attest Veracruz server instances.
 - `vc-server`/`veracruz-server` - Runs the Veracruz server, which provides a
   trusted, attestable enclave for Veracruz computation.
 - `vc-client`/`veracruz-client` - Communicates with the Veracruz server using
@@ -210,9 +208,9 @@ Now we can launch the Proxy Attestation Server and it's helper services.
 Note we are using the bash character `&` to launch the services in the
 background:
 ``` bash
-$ cd /opt/veraison/vts && /opt/veraison/vts/vts &
-$ cd /opt/veraison/provisioning && /opt/veraison/provisioning/provisioning &
-$ cd example && /opt/veraison/proxy_attestation_server -l 127.0.0.1:3010 &
+$ ( cd /opt/veraison/vts && /opt/veraison/vts/vts ) &
+$ ( cd /opt/veraison/provisioning && /opt/veraison/provisioning/provisioning ) &
+$ ( cd example && /opt/veraison/proxy_attestation_server -l 127.0.0.1:3010 ) &
 $ sleep 5
 ```
 
@@ -319,6 +317,8 @@ If we are done running computations, we can take down the Veracruz servers
 with a pkill command:
 
 ``` bash
+$ pkill provisioning || true
+$ pkill proxy_attestati || true
 $ pkill vc-server || true
-$ pkill vc-pas || true
+$ pkill vts || true
 ```
