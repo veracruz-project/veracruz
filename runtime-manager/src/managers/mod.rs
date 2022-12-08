@@ -81,7 +81,7 @@ pub(crate) struct ProtocolState {
 
 impl ProtocolState {
     /// Constructs a new `ProtocolState` from a global policy.  The selected
-    /// execution strategy is extrated from the global policy and a suitable
+    /// execution strategy is extracted from the global policy and a suitable
     /// Veracruz execution strategy is selected based on that.
     pub fn new(global_policy: Policy, global_policy_hash: String) -> Result<Self> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();

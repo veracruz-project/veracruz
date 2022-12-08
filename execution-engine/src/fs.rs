@@ -1,6 +1,6 @@
 //! A synthetic filesystem.
 //!
-//! This virtual file system(VFS) for Veracruz runtime and axecution engine.
+//! This virtual file system(VFS) for Veracruz runtime and execution engine.
 //! The VFS adopts most WASI API with *strict typing* and *Rust-style error handling*.
 //! The Veracruz runtime will use this VFS directly, while any execution engine
 //! can wrap all methods here to match the WASI API.
@@ -181,7 +181,7 @@ enum InodeImpl {
     ///     - The program is allowed to read the (input) content to the service; and the input
     ///     information, might be sensitive, is cleaned on the invocation `fd_closed`.
     ///     In single thread situation, it is fine.
-    ///     - The output of the service is determinded by the service itself. It can try to open
+    ///     - The output of the service is determined by the service itself. It can try to open
     ///     any file and write to it, as long as the service has enough capabilities in FileSystem.
     NativeModule(Arc<Mutex<Box<dyn Service>>>, Vec<u8>),
     /// A file
@@ -597,7 +597,7 @@ impl InodeTable {
         Ok(cur)
     }
 
-    /// Install a directory with inode `new_inode` and attatch it under the parent inode `parent`.
+    /// Install a directory with inode `new_inode` and attach it under the parent inode `parent`.
     /// The `new_inode` MUST be fresh.
     fn add_dir<T: AsRef<Path>>(
         &mut self,
@@ -663,7 +663,7 @@ impl InodeTable {
         Ok(parent)
     }
 
-    /// Install a file with content `raw_file_data` and attatch it to `inode`.
+    /// Install a file with content `raw_file_data` and attach it to `inode`.
     /// Create any missing directory in the path.
     fn add_file<T: AsRef<Path>>(
         &mut self,
@@ -909,7 +909,7 @@ impl FileSystem {
         &mut self,
         rights_table: &HashMap<T, Rights>,
     ) -> FileSystemResult<()> {
-        // contrusct the rights for stdin stdout and stderr.
+        // construct the rights for stdin stdout and stderr.
         let std_streams_table = rights_table
             .iter()
             .filter_map(|(k, v)| {
@@ -1951,7 +1951,7 @@ impl FileSystem {
     }
 
     /// Check if a `file_name` exists.
-    /// Note: this function *has* side effect ! 
+    /// Note: this function *has* side effect!
     /// It will try to open the file and then close it.
     pub fn file_exists<T: AsRef<Path>>(
         &mut self,

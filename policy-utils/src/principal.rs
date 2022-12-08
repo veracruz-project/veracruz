@@ -28,11 +28,11 @@ use crate::{pipeline::Expr, parsers::parse_pipeline};
 pub enum Principal {
     /// The Maximum Capability. It is used in some internal functions.
     InternalSuperUser,
-    /// Participant of Veracruz indentified by ID
+    /// Participant of Veracruz identified by ID
     Participant(u64),
-    /// Program in Veracruz, indentified by the program file name.
+    /// Program in Veracruz, identified by the program file name.
     Program(String),
-    /// Pipeline in Veracruz, indentified by the pipeline name.
+    /// Pipeline in Veracruz, identified by the pipeline name.
     Pipeline(String),
     /// No Capability, the bottom Capability. It is used in some Initialization.
     NoCap,
@@ -164,7 +164,7 @@ impl Pipeline {
             file_rights,
         })
     }
-    
+
     /// Parse the pipeline.
     #[inline]
     pub fn parse(&mut self)  -> Result<()> {
@@ -173,7 +173,7 @@ impl Pipeline {
         }
         Ok(())
     }
-    
+
     /// Return the name of the pipeline.
     #[inline]
     pub fn name(&self) -> &str {

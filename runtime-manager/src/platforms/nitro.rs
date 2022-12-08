@@ -27,7 +27,7 @@ use veracruz_utils::{
 const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
 /// The incoming port to listen on
 const PORT: u32 = 5005;
-/// max number of outstanding connectiosn in the socket listen queue
+/// max number of outstanding connections in the socket listen queue
 const BACKLOG: usize = 128;
 
 /// The maximum attestation document size

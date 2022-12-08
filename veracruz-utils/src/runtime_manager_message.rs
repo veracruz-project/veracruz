@@ -36,7 +36,7 @@ pub enum Status {
 /// An enumerated type describing request messages passed to the Runtime
 /// Manager enclave (these originate from the Untrusted Pass-through (Veracruz
 /// server).
-/// These messages are inteded to be serialized using bincode before transport,
+/// These messages are intended to be serialized using bincode before transport,
 /// and deserialized using bincode after transport.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RuntimeManagerRequest {
@@ -73,7 +73,7 @@ pub enum RuntimeManagerRequest {
 /// An enumerated type describing response messages received from the Runtime
 /// Manager enclave (these originate from the Untrusted Pass-through (Veracruz
 /// server) in response to the request messages, above.
-/// These messages are inteded to be serialized using bincode before transport,
+/// These messages are intended to be serialized using bincode before transport,
 /// and deserialized using bincode after transport.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RuntimeManagerResponse {

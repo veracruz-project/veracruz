@@ -109,7 +109,7 @@ struct Opt {
     /// accepts "-" to write to stdout.
     ///
     /// If --no-shutdown is not provided, Veracruz Client will request a shutdown
-    /// from the Veracruz server after recieving the results.
+    /// from the Veracruz server after receiving the results.
     ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
@@ -123,7 +123,7 @@ struct Opt {
     )]
     output: Vec<Vec<(String, path::PathBuf)>>,
 
-    /// Do not request a shutdown of the Veracruz server after recieving the
+    /// Do not request a shutdown of the Veracruz server after receiving the
     /// results. This can be useful if you have multiple result readers.
     #[structopt(short, long)]
     no_shutdown: bool,

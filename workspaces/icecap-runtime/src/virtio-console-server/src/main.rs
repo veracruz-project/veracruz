@@ -179,7 +179,7 @@ fn main(config: Config) -> Fallible<()> {
     ));
     let send_page = unsafe { VIRTIO_POOL.as_mut() }.unwrap().alloc(virtio_drivers::PAGE_SIZE)?;
 
-    // we may have already recieved data to send, but lost the notification
+    // we may have already received data to send, but lost the notification
     // during initialization, so there may already be data in our ring buffer
     // we need to write out
     rb.rx_callback();

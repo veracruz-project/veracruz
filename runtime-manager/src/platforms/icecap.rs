@@ -204,7 +204,7 @@ const LOG_LEVEL: Level = Level::Error;
 
 // HACK
 // System time is provided at build time. The same time is provided to the test Linux userland.
-// These must align with eachother and with the time the test policies were generated.
+// These must align with each other and with the time the test policies were generated.
 const NOW: u64 = include!("../../NOW");
 
 fn icecap_runtime_init() {

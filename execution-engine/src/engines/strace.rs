@@ -116,7 +116,7 @@ impl Strace {
         info!("...")
     }
 
-    /// Handle argument that is a directoy entry.
+    /// Handle argument that is a directory entry.
     pub fn arg_dirents<T: MemoryHandler>(
         &mut self,
         _mem: &mut T,

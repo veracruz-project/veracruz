@@ -382,7 +382,7 @@ impl Policy {
         self.pipelines.get(pipeline_id).ok_or(anyhow!("Failed to find pipeline {}", pipeline_id))
     }
 
-    /// Extract the input filenames from a right_map. If a prorgam has rights call
+    /// Extract the input filenames from a right_map. If a program has rights call
     /// fd_read and path_open, it is considered as an input file.
     fn get_required_inputs(right_map: &HashMap<PathBuf, Rights>) -> Vec<PathBuf> {
         let mut rst = right_map

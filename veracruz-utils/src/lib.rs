@@ -11,7 +11,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing all copyright.
 
-/// Material related to cerficate signing requests (CSR).
+/// Material related to certificate signing requests (CSR).
 pub mod csr;
 
 /// Requests and responses for the Runtime Manager.

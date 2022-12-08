@@ -85,7 +85,7 @@ fn set_length_prefix(buffer: &mut Vec<u8>) -> TransportProtocolResult {
 /// Strip the length prefix from the first chunk received and append subsequent
 /// chunks to the session's incoming buffer until the protocol buffer is
 /// complete and can be deserialized into a message.
-/// This function must be called everytime a new chunk is received.
+/// This function must be called every time a new chunk is received.
 /// Take a session id and chunk as input.
 /// Return the complete buffer, or an error indicating that the buffer is
 /// partial, or any other error
