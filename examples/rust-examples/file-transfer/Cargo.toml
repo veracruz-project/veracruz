@@ -1,0 +1,9 @@
+[package]
+name = "file-transfer"
+version = "0.3.0"
+description = "Generate a large output file"
+authors = ["The Veracruz Development Team"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.14"
