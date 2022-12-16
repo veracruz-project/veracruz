@@ -40,6 +40,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: add the GITHUB_WORKSPACE into git config
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Running linux test script
         id: linux-build-and-test
         run: |
@@ -48,15 +51,15 @@ jobs:
         run: cd /work/veracruz
       - name: Check modification to Cargo.lock 
         id: verify-changed-files
-        uses: ShaleXIONG/verify-changed-files@main
+        uses: tj-actions/verify-changed-files@v13
         with:
           files: |
-            **/Cargo.lock
+            **/Cargo.lock 
       - name: Run step only when any of the above files change.
         if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
 
   nitro:
     runs-on: ubuntu-latest
@@ -72,21 +75,24 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: add the GITHUB_WORKSPACE into git config
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Running Nitro test script
         id: nitro-build
         run: |
             make -C /work/veracruz/workspaces nitro
       - name: Check modification to Cargo.lock 
         id: verify-changed-files
-        uses: ShaleXIONG/verify-changed-files@main
+        uses: tj-actions/verify-changed-files@v13
         with:
           files: |
-            **/Cargo.lock
+            **/Cargo.lock 
       - name: Run step only when any of the above files change.
         if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
 
   icecap:
     runs-on: ubuntu-latest
@@ -102,21 +108,24 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: add the GITHUB_WORKSPACE into git config
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Running IceCap test script
         id: icecap-build
         run: |
             VERACRUZ_TEST_TIMEOUT=2400 make -C /work/veracruz/workspaces icecap-tests PROFILE=release
       - name: Check modification to Cargo.lock 
         id: verify-changed-files
-        uses: ShaleXIONG/verify-changed-files@main
+        uses: tj-actions/verify-changed-files@v13
         with:
           files: |
-            **/Cargo.lock
+            **/Cargo.lock 
       - name: Run step only when any of the above files change.
-        id: check-diff
         if: steps.verify-changed-files.outputs.files_changed == 'true'
+        id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
 
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
@@ -133,6 +142,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: add the GITHUB_WORKSPACE into git config
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Running CLI_QUICKSTART.markdown
         id: quickstart-test
         run: |
@@ -153,15 +165,15 @@ jobs:
           bash -euxo pipefail README.md.sh
       - name: Check modification to Cargo.lock 
         id: verify-changed-files
-        uses: ShaleXIONG/verify-changed-files@main
+        uses: tj-actions/verify-changed-files@v13
         with:
           files: |
-            **/Cargo.lock
+            **/Cargo.lock 
       - name: Run step only when any of the above files change.
         if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT
+          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
 
   cargo-lock-check:
     needs: [linux, nitro, icecap, quickstart]
