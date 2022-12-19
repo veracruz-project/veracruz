@@ -12,10 +12,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cosign
+        # https://github.com/sigstore/cosign-installer
+        uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+        with:
+          cosign-release: "v1.13.1"
+      - name: Check image signature
+        id: cosign-verify
+        run: |
+            COSIGN_EXPERIMENTAL=true cosign verify \
+              ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
+
   linux:
     runs-on: ubuntu-latest
+    needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -30,8 +45,9 @@ jobs:
 
   nitro:
     runs-on: ubuntu-latest
+    needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -46,8 +62,9 @@ jobs:
 
   icecap:
     runs-on: ubuntu-latest
+    needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -63,8 +80,9 @@ jobs:
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
     runs-on: ubuntu-latest
+    needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci:v22.11
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
