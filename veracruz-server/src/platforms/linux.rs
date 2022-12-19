@@ -52,7 +52,7 @@
 
     /// A struct capturing all the metadata needed to start and communicate with
     /// the Linux root enclave.
-    pub struct VeracruzServerLinux {
+    struct VeracruzServerLinux {
         /// A handle to the Runtime Manager enclave process.
         runtime_manager_process: Child,
         /// The socket used to communicate with the Runtime Manager enclave.
@@ -78,7 +78,7 @@
         ///    deserialized.
         /// 3. The Runtime Manager enclave sends back a message indicating that
         ///    it was not expecting further TLS data to be requested.
-        pub fn read_tls_data(&mut self, session_id: u32) -> VeracruzServerResult<(bool, Vec<u8>)> {
+        fn read_tls_data(&mut self, session_id: u32) -> VeracruzServerResult<(bool, Vec<u8>)> {
             info!(
                 "Reading TLS data from Runtime Manager enclave (with session: {}).",
                 session_id

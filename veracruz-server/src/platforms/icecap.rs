@@ -9,7 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::common::{VeracruzServer, VeracruzServerError};
+use crate::common::{VeracruzServerError, VeracruzServerResult};
 use err_derive::Error;
 use policy_utils::policy::Policy;
 use proxy_attestation_client;
@@ -27,7 +27,7 @@ use std::{
     os::unix::net::UnixStream,
     process::{Child, Command, Stdio},
     string::ToString,
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
 };
@@ -296,7 +296,7 @@ impl VeracruzServerIceCap {
     }
 }
 
-impl VeracruzServer for VeracruzServerIceCap {
+impl VeracruzServerIceCap {
     fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
         let policy: Policy = Policy::from_json(policy_json)?;
 
@@ -397,5 +397,104 @@ impl Drop for VeracruzServerIceCap {
         if let Err(err) = self.shutdown_isolate() {
             panic!("Realm failed to shutdown: {}", err)
         }
+    }
+}
+
+type EnclaveHandler = Arc<Mutex<Option<VeracruzServerIceCap>>>;
+
+pub struct VeracruzServer(EnclaveHandler);
+
+impl VeracruzServer {
+    pub fn new(policy: &str) -> VeracruzServerResult<Self> {
+        Ok(VeracruzServer(Arc::new(Mutex::new(Some(
+            VeracruzServerIceCap::new(policy)?,
+        )))))
+    }
+    pub fn clone(&self) -> Self {
+        VeracruzServer(self.0.clone())
+    }
+    pub fn new_session(&mut self) -> VeracruzServerResult<VeracruzSession> {
+        Ok(VeracruzSession {
+            enclave: VeracruzServer(self.0.clone()),
+            session_id: self
+                .0
+                .lock()?
+                .as_mut()
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?
+                .new_tls_session()?,
+            buffer: Arc::new((Mutex::new(vec![]), Condvar::new())),
+        })
+    }
+}
+
+pub struct VeracruzSession {
+    enclave: VeracruzServer,
+    session_id: u32,
+    buffer: Arc<(Mutex<Vec<u8>>, Condvar)>,
+}
+
+impl VeracruzSession {
+    pub fn clone(&self) -> Self {
+        VeracruzSession {
+            enclave: self.enclave.clone(),
+            session_id: self.session_id,
+            buffer: self.buffer.clone(),
+        }
+    }
+}
+
+impl Read for VeracruzSession {
+    fn read(&mut self, buf: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+        if buf.len() == 0 {
+            Ok(0)
+        } else {
+            let mut buffer = self.buffer.0.lock().unwrap();
+            while buffer.len() == 0 {
+                buffer = self.buffer.1.wait(buffer).unwrap();
+            }
+            let n = std::cmp::min(buf.len(), buffer.len());
+            buf[0..n].clone_from_slice(&buffer[0..n]);
+            buffer.drain(0..n);
+            Ok(n)
+        }
+    }
+}
+
+impl Write for VeracruzSession {
+    fn write(&mut self, buf: &[u8]) -> std::result::Result<usize, std::io::Error> {
+        if buf.len() > 0 {
+            let (active, output) = self
+                .enclave
+                .0
+                .lock()
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?
+                .as_mut()
+                .ok_or(std::io::Error::new(std::io::ErrorKind::Other, "xx"))?
+                .tls_data(self.session_id, buf.to_vec())
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?;
+            if !active {
+                let mut mb_enclave = self
+                    .enclave
+                    .0
+                    .lock()
+                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?;
+                *mb_enclave = None;
+            }
+            let mut buffer = self
+                .buffer
+                .0
+                .lock()
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?;
+            for x1 in output {
+                for mut x in x1 {
+                    buffer.append(&mut x);
+                }
+            }
+            self.buffer.1.notify_one();
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
+        Ok(())
     }
 }

@@ -100,8 +100,8 @@ pub type VeracruzServerResult<T> = Result<T, VeracruzServerError>;
 
 // Import and reexport the platform-specific enclave types.
 #[cfg(feature = "icecap")]
-use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
+pub use crate::platforms::icecap::{VeracruzServer, VeracruzSession};
 #[cfg(feature = "linux")]
 pub use crate::platforms::linux::{VeracruzServer, VeracruzSession};
 #[cfg(feature = "nitro")]
-use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
+pub use crate::platforms::nitro::{VeracruzServer, VeracruzSession};
