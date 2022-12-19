@@ -41,7 +41,7 @@ use veracruz_server::common::*;
 #[cfg(feature = "icecap")]
 use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]
-use veracruz_server::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
+use veracruz_server::linux::{VeracruzServer, VeracruzSession};
 #[cfg(feature = "nitro")]
 use veracruz_server::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
@@ -96,7 +96,7 @@ fn basic_init_destroy_enclave() {
             policy.proxy_attestation_server_url().clone(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
-        VeracruzServerEnclave::new(&policy_json).unwrap();
+        VeracruzServer::new(&policy_json).unwrap();
     })
 }
 
@@ -531,11 +531,11 @@ struct TestExecutor {
     policy_hash: String,
     // The emulated TLS connect from client to server.
     client_tls_receiver: Receiver<Vec<u8>>,
-    client_tls_sender: Sender<(u32, Vec<u8>)>,
+    client_tls_sender: Sender<Vec<u8>>,
     // Paths to client certification and private key.
     // Note that we only have one client in all tests.
     client_connection: mbedtls::ssl::Context<InsecureConnection>,
-    client_connection_id: u32,
+    veracruz_session: VeracruzSession,
     // Read and write buffers shared with InsecureConnection.
     shared_buffers: Arc<Mutex<Buffers>>,
     // A alive flag. This is to solve the problem where the server thread still in loop while
@@ -664,7 +664,7 @@ impl TestExecutor {
         info!("Create simulated connection channels.");
         // Create two channel, simulating the connecting channels.
         let (server_tls_sender, client_tls_receiver) = channel::<Vec<u8>>();
-        let (client_tls_sender, server_tls_receiver) = channel::<(u32, Vec<u8>)>();
+        let (client_tls_sender, server_tls_receiver) = channel::<Vec<u8>>();
 
         let shared_buffers = Arc::new(Mutex::new(Buffers {
             read_buffer: vec![],
@@ -683,15 +683,12 @@ impl TestExecutor {
         info!("Initialise Veracruz runtime.");
         // Create the server
         let mut veracruz_server =
-            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
+            VeracruzServer::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
 
         // Create the client tls session. Note that we need the session id.
-        let client_connection_id = veracruz_server
-            .new_tls_session()
+        let mut veracruz_session = veracruz_server
+            .new_session()
             .map_err(|e| anyhow!("{:?}", e))?;
-        if client_connection_id == 0 {
-            return Err(anyhow!("client session id is zero"));
-        }
 
         info!("Spawn server thread.");
         // Create the sever loop, it is the end of the previous created channels.
@@ -700,9 +697,10 @@ impl TestExecutor {
         // Create a clone which passes to server thread.
         let alive_flag_clone = alive_flag.clone();
         let init_flag_clone = init_flag.clone();
+        let mut veracruz_session_clone = veracruz_session.clone();
         let server_thread = thread::spawn(move || {
             if let Err(e) = TestExecutor::simulated_server(
-                &mut veracruz_server,
+                &mut veracruz_session_clone,
                 server_tls_sender,
                 server_tls_receiver,
                 alive_flag_clone.clone(),
@@ -723,7 +721,7 @@ impl TestExecutor {
             policy,
             policy_hash,
             client_connection,
-            client_connection_id,
+            veracruz_session,
             shared_buffers,
             client_tls_sender,
             client_tls_receiver,
@@ -734,9 +732,9 @@ impl TestExecutor {
 
     /// This function simulating a Veracruz server, it should run on a separate thread.
     fn simulated_server(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
+        veracruz_session: &mut veracruz_server::VeracruzSession,
         sender: Sender<Vec<u8>>,
-        receiver: Receiver<(u32, Vec<u8>)>,
+        receiver: Receiver<Vec<u8>>,
         test_alive_flag: Arc<AtomicBool>,
         test_init_flag: Arc<AtomicBool>,
     ) -> Result<()> {
@@ -744,46 +742,33 @@ impl TestExecutor {
 
         test_init_flag.store(true, Ordering::SeqCst);
 
-        while test_alive_flag.load(Ordering::SeqCst) {
-            let received = receiver.recv();
-            let (session_id, received_buffer) = received.map_err(|e| anyhow!("Server: {:?}", e))?;
-            info!(
-                "Server: receive {} byte(s) on session ID {}.",
-                received_buffer.len(),
-                session_id
-            );
-
-            let (veracruz_active_flag, output_data_option) = veracruz_server
-                .tls_data(session_id, received_buffer)
-                .map_err(|e| {
-                    // This point has a high chance to fail.
-                    error!("Veracruz Server: {:?}", e);
-                    e
-                })
-                .map_err(|e| anyhow!("{:?}", e))?;
-
-            // At least send an empty message, this notifies the client.
-            let output_data = output_data_option.unwrap_or_else(|| vec![vec![]]);
-
-            for output in output_data.iter() {
-                sender.send(output.clone()).map_err(|e| {
-                    anyhow!(
-                        "Failed to send data on TX channel.  Error produced: {:?}.",
-                        e
-                    )
-                })?;
+        let mut veracruz_session_clone = veracruz_session.clone();
+        let mut test_alive_flag_clone = test_alive_flag.clone();
+        let h1 = thread::spawn(move || {
+            while test_alive_flag_clone.load(Ordering::SeqCst) {
+                let received = receiver.recv();
+                let received_buffer = received.map_err(|e| anyhow!("Server: {:?}", e)).unwrap();
+                info!(
+                    "Server: receive {} byte(s).",
+                    received_buffer.len(),
+                );
+                veracruz_session_clone.write_all(&received_buffer).unwrap();
             }
+        });
 
-            if !veracruz_active_flag {
-                info!("Veracruz server TLS loop dying due to lack of TLS data.");
-                return Ok(());
+        let mut veracruz_session_clone = veracruz_session.clone();
+        let mut test_alive_flag_clone = test_alive_flag.clone();
+        let h2 = thread::spawn(move || {
+            while test_alive_flag_clone.load(Ordering::SeqCst) {
+                let mut buf = vec![0; 1000];
+                let n = veracruz_session_clone.read(&mut buf).unwrap();
+                sender.send(buf[0..n].to_vec());
             }
-        }
+        });
 
-        // The server should not reach here.
-        Err(anyhow!(
-            "VeracruzServer TLS loop dieing due to no activity..."
-        ))
+        h1.join();
+        h2.join();
+        Ok(())
     }
 
     /// Execute this test. The client sends messages though the channel to the server
@@ -1000,7 +985,7 @@ impl TestExecutor {
                 Some(output) => {
                     // client_tls_sender.send
                     self.client_tls_sender
-                        .send((self.client_connection_id, output))
+                        .send(output)
                         .map_err(|e| {
                             anyhow!(
                                 "Failed to send data on TX channel. Error produced: {:?}.",
@@ -1049,18 +1034,14 @@ impl TestExecutor {
 /// Auxiliary function: initialise the Veracruz server from policy and open a tls session
 fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     policy_json: T,
-) -> Result<(VeracruzServerEnclave, u32)> {
+) -> Result<(VeracruzServer, VeracruzSession)> {
     let mut veracruz_server =
-        VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
+        VeracruzServer::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
 
-    let session_id = veracruz_server
-        .new_tls_session()
+    let session = veracruz_server
+        .new_session()
         .map_err(|e| anyhow!("{:?}", e))?;
-    if session_id != 0 {
-        Ok((veracruz_server, session_id))
-    } else {
-        Err(anyhow!("Session ID cannot be zero").into())
-    }
+    Ok((veracruz_server, session))
 }
 
 fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
