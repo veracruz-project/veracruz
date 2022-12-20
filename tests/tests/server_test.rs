@@ -722,7 +722,7 @@ impl TestExecutor {
     }
 
     /// Execute this test. The client sends messages though the channel to the server
-    /// thread driven by `events`. It comsumes the ownership of `self`,
+    /// thread driven by `events`. It consumes the ownership of `self`,
     /// because it will join server thread at the end.
     fn execute(mut self, events: Vec<TestEvent>, timeout: Duration) -> anyhow::Result<()> {
         // Spawn a thread that will send the timeout signal by killing alive flag.

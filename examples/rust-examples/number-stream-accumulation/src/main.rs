@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Read 'output' if exists. Othewise read 'input-0'.
+/// Read 'output' if exists. Otherwise read 'input-0'.
 fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
     let mut file = match File::open("/output/accumulation.dat") {
         Ok(o) => o,

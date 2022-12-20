@@ -314,7 +314,7 @@ fn read_csv(filename: &str, is_y_first: bool) -> Result<(Vec<String>, Dataset), 
     let mut rst = Vec::new();
     for record in reader.records() {
         let record = record?;
-        // put the `y` at begining and covert it to 1.0 and -1.0
+        // put the `y` at beginning and covert it to 1.0 and -1.0
         let y_index = if is_y_first { 0 } else { record.len() - 1 };
         let y = match record
             .get(y_index)

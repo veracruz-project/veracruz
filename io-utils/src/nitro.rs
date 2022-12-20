@@ -31,7 +31,7 @@ pub struct NitroEnclave {
     enclave_id: String,
     /// A convenience struct for handling VSOCK connections to the enclave
     vsocksocket: crate::vsocket::VsockSocket,
-    /// the path to the Nictro CLI function. Not all AMI images have it in the
+    /// the path to the Nitro CLI function. Not all AMI images have it in the
     /// same place in the file system, so we need to keep track of it
     nitro_cli_path: String,
 }

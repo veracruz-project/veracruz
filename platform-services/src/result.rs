@@ -4,7 +4,7 @@
 //!
 //! 1. *Success*, in which the platform service successfully executed,
 //! 2. *Unavailable*, in which the service in question is not available on
-//!    the current platfrom.  For example: a trusted time source may not be
+//!    the current platform.  For example: a trusted time source may not be
 //!    available on all platforms that Veracruz supports.
 //! 3. *UnknownError*: the service is available, but there was some error
 //!    raised during service execution.

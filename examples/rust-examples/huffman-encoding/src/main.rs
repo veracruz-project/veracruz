@@ -5,7 +5,7 @@
 //! Reads user input, and then encodes the file to binary format to compress it and save space.
 //! And then, it prints the encoded file.
 //! After that, the encoded file gets converted back to the original text, then that is outputted.
-//! WARNING: Program is only desinged for ASCII characters, not UTF-8 encoding !!
+//! WARNING: Program is only designed for ASCII characters, not UTF-8 encoding !!
 //!
 //! ## Authors
 //!
@@ -49,7 +49,7 @@ fn new_node(freq: u32, ch: Option<char>) -> Node {
     }
 }
 
-/// Count the frequency of occurence of each unique ASCII character in the input string
+/// Count the frequency of occurrence of each unique ASCII character in the input string
 fn frequency<A>(s: A) -> HashMap<char, u32>
 where
     A: AsRef<str>,
@@ -133,8 +133,8 @@ fn main() -> anyhow::Result<()> {
 
     while p.len() > 1 {
         p.sort_by(|a, b| (&(b.freq)).cmp(&(a.freq)));
-        let a = p.pop().expect("error occured inside main while loop");
-        let b = p.pop().expect("error occured inside main while loop");
+        let a = p.pop().expect("error occurred inside main while loop");
+        let b = p.pop().expect("error occurred inside main while loop");
         let mut c = Box::new(new_node(a.freq + b.freq, None));
         c.left = Some(a);
         c.right = Some(b);
@@ -143,7 +143,7 @@ fn main() -> anyhow::Result<()> {
 
     let root = p
         .pop()
-        .expect("error occured during building of binary tree using &Box<Node>");
+        .expect("error occurred during building of binary tree using &Box<Node>");
     let mut hm: HashMap<char, String> = HashMap::new();
 
     assign_codes(&root, &mut hm, String::new());

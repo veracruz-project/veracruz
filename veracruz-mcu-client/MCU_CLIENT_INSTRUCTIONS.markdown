@@ -2,7 +2,7 @@
 # MCU client demo
 
 This is a quick guide on how to run the MCU client demo. It assumes you have
-already set up a Veracru build environment (see [BUILD_INSTRUCTIONS.markdown](../BUILD_INSTRUCTIONS.markdown)),
+already set up a Veracruz build environment (see [BUILD_INSTRUCTIONS.markdown](../BUILD_INSTRUCTIONS.markdown)),
 and are familiar with running the Veracruz server.
 
 
@@ -139,7 +139,7 @@ This sets up the Zephyr build system and necessary networking interfaces
 to simulate an MCU's IP stack.
 
 Now we can build and run the MCU client demo. We just need to provide the
-paths to the policy.json and device certifcate/key so these can be built
+paths to the policy.json and device certificate/key so these can be built
 into the MCU image:
 
 ``` bash client

@@ -9,8 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use anyhow::{anyhow, Result};
 use crate::transport_protocol;
+use anyhow::{anyhow, Result};
 use err_derive::Error;
 use lazy_static::lazy_static;
 use protobuf::{error::ProtobufError, Message, ProtobufEnum};
@@ -59,12 +59,11 @@ pub type TransportProtocolResult = Result<std::vec::Vec<u8>>;
 /// Strip the length prefix from the input buffer.
 /// Return the length and the stripped buffer.
 /// This function must be called before deserializing a `protobuf` message
-fn get_length_prefix(
-    session_id: u32,
-    buffer: &[u8],
-) -> Result<(u64, &[u8])> {
+fn get_length_prefix(session_id: u32, buffer: &[u8]) -> Result<(u64, &[u8])> {
     if buffer.len() < LENGTH_PREFIX_SIZE {
-        return Err(anyhow!(TransportProtocolError::MissingLengthPrefix(session_id)));
+        return Err(anyhow!(TransportProtocolError::MissingLengthPrefix(
+            session_id
+        )));
     }
 
     let mut length_bytes: [u8; LENGTH_PREFIX_SIZE] = [0; LENGTH_PREFIX_SIZE];
@@ -85,7 +84,7 @@ fn set_length_prefix(buffer: &mut Vec<u8>) -> TransportProtocolResult {
 /// Strip the length prefix from the first chunk received and append subsequent
 /// chunks to the session's incoming buffer until the protocol buffer is
 /// complete and can be deserialized into a message.
-/// This function must be called everytime a new chunk is received.
+/// This function must be called every time a new chunk is received.
 /// Take a session id and chunk as input.
 /// Return the complete buffer, or an error indicating that the buffer is
 /// partial, or any other error
@@ -498,7 +497,9 @@ pub fn parse_result(
         transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST => 6,
     };
     if status != transport_protocol::ResponseStatus::SUCCESS {
-        return Err(anyhow!(TransportProtocolError::ResponseStatusError(decoded_status)));
+        return Err(anyhow!(TransportProtocolError::ResponseStatusError(
+            decoded_status
+        )));
     }
 
     let data_opt = {

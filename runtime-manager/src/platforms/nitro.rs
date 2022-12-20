@@ -18,8 +18,8 @@ use nix::sys::socket::{
 use nsm_api;
 use nsm_lib;
 use veracruz_utils::{
-    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status},
-    sha256::sha256
+    runtime_manager_message::{RuntimeManagerRequest, RuntimeManagerResponse, Status},
+    sha256::sha256,
 };
 
 /// The CID for the VSOCK to listen on
@@ -27,7 +27,7 @@ use veracruz_utils::{
 const CID: u32 = 0xFFFFFFFF; // VMADDR_CID_ANY
 /// The incoming port to listen on
 const PORT: u32 = 5005;
-/// max number of outstanding connectiosn in the socket listen queue
+/// max number of outstanding connections in the socket listen queue
 const BACKLOG: usize = 128;
 
 /// The maximum attestation document size
@@ -140,15 +140,15 @@ fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
         let csr_hash = sha256(&csr);
         let status = unsafe {
             nsm_lib::nsm_get_attestation_doc(
-                nsm_fd,                        //fd
-                csr_hash.as_ptr() as *const u8,     // user_data
-                csr_hash.len() as u32,              // user_data_len
-                challenge.as_ptr(),            // nonce_data
-                challenge.len() as u32,        // nonce_len
-                std::ptr::null() as *const u8, // pub_key_data
-                0 as u32,                      // pub_key_len
-                buffer.as_mut_ptr(),           // att_doc_data
-                &mut buffer_len,               // att_doc_len
+                nsm_fd,                         // fd
+                csr_hash.as_ptr() as *const u8, // user_data
+                csr_hash.len() as u32,          // user_data_len
+                challenge.as_ptr(),             // nonce_data
+                challenge.len() as u32,         // nonce_len
+                std::ptr::null() as *const u8,  // pub_key_data
+                0 as u32,                       // pub_key_len
+                buffer.as_mut_ptr(),            // att_doc_data
+                &mut buffer_len,                // att_doc_len
             )
         };
         match status {

@@ -20,7 +20,7 @@ use thiserror::Error;
 
 /// An individual audio event
 struct AudioEvent {
-    /// Timestamp of when even occured (currently unused)
+    /// Timestamp of when even occurred (currently unused)
     #[allow(dead_code)]
     timestamp: u32,
     /// Location in 32-bit signed GPS coordinates
@@ -83,7 +83,7 @@ fn decode_audio_event(event: &[u8]) -> anyhow::Result<AudioEvent> {
 /// using measured signal power to estimate distance
 ///
 /// Note! This is a fairly naive solution, using only 3 events
-/// leaves us with farily low confidence. We also don't take
+/// leaves us with fairly low confidence. We also don't take
 /// things like the curvature of the earth into account, so
 /// this should only be used for demo purposes
 ///

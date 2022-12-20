@@ -28,13 +28,13 @@ pub(crate) enum TestEvent {
 
 impl TestEvent {
     /// Create a test event for provisioning program. The function adds the local and remote
-    /// path prefices on the filename.
+    /// path prefixes on the filename.
     pub(crate) fn write_program(filename: &str) -> TestEvent {
         TestEvent::WriteFile(runtime_program_dir(filename), program_dir(filename))
     }
 
     /// Create a test event for provisioning data. The function adds the local and remote
-    /// path prefices on the filename.
+    /// path prefixes on the filename.
     pub(crate) fn write_data(filename: &str) -> TestEvent {
         TestEvent::WriteFile(runtime_data_dir(filename), data_dir(filename))
     }
@@ -53,7 +53,7 @@ impl TestEvent {
     }
 
     /// Create a test event for executing a program. The function adds the remote
-    /// path prefices on the filename.
+    /// path prefixes on the filename.
     pub(crate) fn execute<T: AsRef<str>>(filename: T) -> TestEvent {
         TestEvent::Execute(runtime_program_dir(filename))
     }
@@ -123,7 +123,7 @@ impl TestEvent {
 
     /// Function produces a vec of pairs of remote (des) file and local (src) file path,
     /// which corresponds to provisioning/overwriting the content of the local file to the remote file.
-    /// Read all files and diretory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
+    /// Read all files and directory in the path of 'dir_path' in the local machine and replace the prefix with 'remote_dir_path'.
     /// E.g. if call the function with '/local/path/' and '/remote/path/',
     /// the result could be [(/remote/path/a.txt, /local/path/a.txt), (/remote/path/b/c.txt, /local/path/b/c.txt), ... ].
     #[allow(dead_code)] // FIXME

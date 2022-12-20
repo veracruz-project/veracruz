@@ -1,5 +1,5 @@
 //! Logistic regression example
-//! A Rust implementaion of the logistic regression algorithm presented in https://github.com/kimandrik/IDASH2017
+//! A Rust implementation of the logistic regression algorithm presented in https://github.com/kimandrik/IDASH2017
 //!
 //! ## Context
 //!
@@ -151,7 +151,7 @@ fn plain_nlgd_iteration(
     Ok((w_data, v_data))
 }
 
-/// Multply the matrix in dataset by `w_data`.
+/// Multiply the matrix in dataset by `w_data`.
 fn plain_ip(dataset: &[Vec<f64>], data_vec: &[f64]) -> anyhow::Result<Vec<f64>> {
     if get_factor_len(&dataset)? != data_vec.len() {
         return Err(anyhow!("bad factor len"));

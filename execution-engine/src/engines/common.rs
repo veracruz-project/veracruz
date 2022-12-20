@@ -302,11 +302,11 @@ pub trait MemorySliceMut: AsMut<[u8]> {
 impl MemorySlice for &'static [u8] {}
 impl MemorySliceMut for &'static mut [u8] {}
 
-/// Bound<'a, T> is a wrappper that explicitly enforces unrelated lifetimes
+/// Bound<'a, T> is a wrapper that explicitly enforces unrelated lifetimes
 /// on objects
 ///
 /// It combines PhantomData and Deref to provide a simple wrapper that is
-/// garaunteed by the borrow checker to not outlive the provided lifetime.
+/// guaranteed by the borrow checker to not outlive the provided lifetime.
 ///
 /// This wrapper is useful for reintroducing lifetimes that have been stripped
 /// away be unsafe code.
@@ -329,11 +329,11 @@ impl<'a, T> Deref for Bound<'a, T> {
     }
 }
 
-/// BoundMut<'a, T> is a wrappper that explicitly enforces unrelated lifetimes
+/// BoundMut<'a, T> is a wrapper that explicitly enforces unrelated lifetimes
 /// on objects
 ///
 /// It combines PhantomData and DerefMut to provide a simple wrapper that is
-/// garaunteed by the borrow checker to not outlive the provided lifetime.
+/// guaranteed by the borrow checker to not outlive the provided lifetime.
 ///
 /// This wrapper is useful for reintroducing lifetimes that have been stripped
 /// away be unsafe code.
@@ -376,7 +376,7 @@ const IOVECSLICES_SOO_COUNT: usize = 2;
 /// in the struct with no allocation. 1 iovec is the most common, though
 /// 2 iovecs is used sometimes for things like appending newlines to stdout.
 /// At the time of writing I have never seen >2 iovecs used in a call, though
-/// it's certainly possible for aggresively optimized io.
+/// it's certainly possible for aggressively optimized io.
 ///
 pub struct IoVecSlices<'a, R> {
     _ref: R,
@@ -414,7 +414,7 @@ impl<'a, R> AsRef<[&'a [u8]]> for IoVecSlices<'a, R> {
 /// in the struct with no allocation. 1 iovec is the most common, though
 /// 2 iovecs is used sometimes for things like appending newlines to stdout.
 /// At the time of writing I have never seen >2 iovecs used in a call, though
-/// it's certainly possible for aggresively optimized io.
+/// it's certainly possible for aggressively optimized io.
 ///
 pub struct IoVecSlicesMut<'a, R> {
     _ref: R,
@@ -664,7 +664,7 @@ pub trait MemoryHandler {
             // `MemorySlice` type is movable, even behind a borrow. This is
             // outside of Rust's rules, but is actually reasonable for most
             // types we would want to use for `MemorySlice`. This requirement
-            // is satisfied by `&[u8]`, `MutexGaurd<[u8]>`, and even `Vec<u8>`,
+            // is satisfied by `&[u8]`, `MutexGuard<[u8]>`, and even `Vec<u8>`,
             // but not by any type where `as_ref` referenced data in original
             // struct, such as `[u8; 128]`.
             //

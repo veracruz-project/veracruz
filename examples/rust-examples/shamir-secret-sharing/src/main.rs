@@ -1,4 +1,4 @@
-//! An implementation of Shamir's secret sharing algorithm using Langrange
+//! An implementation of Shamir's secret sharing algorithm using Lagrange
 //! interpolation over GF(256)
 //!
 //! ## Context

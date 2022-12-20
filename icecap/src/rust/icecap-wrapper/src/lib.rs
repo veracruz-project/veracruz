@@ -4,7 +4,7 @@
 //! allows the build system to replace them all at once with a dummy outside of the context of the
 //! IceCap build system.
 //!
-//! This will be unecessary once we have per-isolate backend workspaces.
+//! This will be unnecessary once we have per-isolate backend workspaces.
 //!
 //! The source of these crates can be found at:
 //!
