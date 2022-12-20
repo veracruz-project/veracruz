@@ -154,7 +154,7 @@ fn fd_create() {
         .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// A client attempts to execute a non-existent file
 fn basic_execute_non_existent() {
     let events = vec![
@@ -174,7 +174,7 @@ fn basic_execute_non_existent() {
     .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// A client attempts to read a non-existent file
 fn basic_client_read_non_existent() {
     let events = vec![
@@ -193,7 +193,7 @@ fn basic_client_read_non_existent() {
     .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// A program attempts to read a non-existent file
 fn basic_program_read_non_existent() {
     let events = vec![
@@ -413,7 +413,7 @@ fn integration_private_set_intersection() {
         .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// Attempt to fetch result without enough stream data.
 fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
     let events = vec![
