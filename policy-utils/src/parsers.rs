@@ -13,6 +13,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+#![allow(dead_code)]
+
 #[cfg(feature = "std")]
 use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
 #[cfg(feature = "std")]
@@ -20,7 +22,7 @@ use std::{borrow::Cow, ffi, path};
 use lalrpop_util::lalrpop_mod;
 use crate::pipeline::Expr;
 
-lalrpop_mod!(pub pipeline);
+lalrpop_mod!(pipeline);
 
 /// parser for a single file path either in the form of
 /// --program a.wasm or --program b=a.wasm if a file should
@@ -92,6 +94,6 @@ pub fn parse_pipeline(pipeline_str : &str) -> anyhow::Result<Box<Expr>> {
     let tmp : &'static str = Box::leak(Box::new(pipeline_str.to_owned().into_boxed_str()));
     let rst = engine.parse(&tmp)?.clone();
     // Re-box so the tmp will drop
-    unsafe{ Box::from_raw(tmp as *const str as*mut str); }
+    let _ = unsafe{ Box::from_raw(tmp as *const str as*mut str) };
     Ok(rst)
 }
