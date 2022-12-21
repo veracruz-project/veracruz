@@ -40,26 +40,33 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
-      - name: add the GITHUB_WORKSPACE into git config
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Running linux test script
         id: linux-build-and-test
         run: |
-            make -C /work/veracruz/workspaces linux-tests
+           make -C /work/veracruz/workspaces linux-tests
       - name: Move back to veracruz root
-        run: cd /work/veracruz
+        run: |
+          cd /work/veracruz
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Check modification to Cargo.lock 
-        id: verify-changed-files
-        uses: tj-actions/verify-changed-files@v13
-        with:
-          files: |
-            **/workspaces/**/Cargo.lock 
-      - name: Run step only when any of the above files change.
-        if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
+          # Find if any Cargo.lock changed, pad them into a line and trim leading and trailing whitespace.
+          file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
+          echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
+      - name: Output list of changed Cargo.lock
+        id: output-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        run: |
+            echo "::warning::Cargo.lock files modified" 
+            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+      - name: Upload Cargo.lock files
+        id: upload-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        uses: actions/upload-artifact@v3
+        with: 
+          name: linux 
+          path: workspaces/**/Cargo.lock
 
   nitro:
     runs-on: ubuntu-latest
@@ -83,16 +90,23 @@ jobs:
         run: |
             make -C /work/veracruz/workspaces nitro
       - name: Check modification to Cargo.lock 
-        id: verify-changed-files
-        uses: tj-actions/verify-changed-files@v13
-        with:
-          files: |
-            **/workspaces/**/Cargo.lock 
-      - name: Run step only when any of the above files change.
-        if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
+          file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
+          echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
+      - name: Output list of changed Cargo.lock
+        id: output-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        run: |
+            echo "::warning::Cargo.lock files modified" 
+            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+      - name: Upload Cargo.lock files
+        id: upload-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        uses: actions/upload-artifact@v3
+        with: 
+          name: nitro 
+          path: workspaces/**/Cargo.lock
 
   icecap:
     runs-on: ubuntu-latest
@@ -116,16 +130,23 @@ jobs:
         run: |
             VERACRUZ_TEST_TIMEOUT=2400 make -C /work/veracruz/workspaces icecap-tests PROFILE=release
       - name: Check modification to Cargo.lock 
-        id: verify-changed-files
-        uses: tj-actions/verify-changed-files@v13
-        with:
-          files: |
-            **/workspaces/**/Cargo.lock 
-      - name: Run step only when any of the above files change.
-        if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
+          file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
+          echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
+      - name: Output list of changed Cargo.lock
+        id: output-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        run: |
+            echo "::warning::Cargo.lock files modified" 
+            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+      - name: Upload Cargo.lock files
+        id: upload-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        uses: actions/upload-artifact@v3
+        with: 
+          name: icecap 
+          path: workspaces/**/Cargo.lock
 
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
@@ -164,16 +185,23 @@ jobs:
           sed -n '/``` bash/,/```/{/```/d; p}' README.md > README.md.sh && \
           bash -euxo pipefail README.md.sh
       - name: Check modification to Cargo.lock 
-        id: verify-changed-files
-        uses: tj-actions/verify-changed-files@v13
-        with:
-          files: |
-            **/workspaces/**/Cargo.lock 
-      - name: Run step only when any of the above files change.
-        if: steps.verify-changed-files.outputs.files_changed == 'true'
         id: check-diff
         run: |
-          echo "cargo-lock=\"Detect 'Cargo.lock' changes in ${{ github.job }} CI/CD task: ${{ steps.verify-changed-files.outputs.changed_files }}\"" >> $GITHUB_OUTPUT 
+          file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
+          echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
+      - name: Output list of changed Cargo.lock
+        id: output-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        run: |
+            echo "::warning::Cargo.lock files modified" 
+            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+      - name: Upload Cargo.lock files
+        id: upload-changed-cargo-lock
+        if: steps.check-diff.outputs.cargo-lock != ''
+        uses: actions/upload-artifact@v3
+        with: 
+          name: quickstart 
+          path: workspaces/**/Cargo.lock
 
   cargo-lock-check:
     needs: [linux, nitro, icecap, quickstart]
@@ -186,20 +214,20 @@ jobs:
       - name: linux
         if: needs.linux.outputs.output != ''
         run: |
-          echo "::warning:: ${{ needs.linux.outputs.output }}" 
+          echo "::warning:: linux Cargo.lock change list: ${{ needs.linux.outputs.output }}"
           exit 1
       - name: nitro
         if: needs.nitro.outputs.output != ''
         run: |
-          echo "::warning:: ${{ needs.nitro.outputs.output }}" 
+          echo "::warning:: nitro Cargo.lock change list: ${{ needs.nitro.outputs.output }}"
           exit 1
       - name: icecap
         if: needs.icecap.outputs.output != ''
         run: |
-          echo "::warning:: ${{ needs.icecap.outputs.output }}" 
+          echo "::warning:: icecap Cargo.lock change list: ${{ needs.icecap.outputs.output }}"
           exit 1
       - name: quickstart
         if: needs.quickstart.outputs.output != ''
         run: |
-          echo "::warning:: ${{ needs.quickstart.outputs.output }}" 
+          echo "::warning:: quickstart Cargo.lock change list: ${{ needs.quickstart.outputs.output }}"
           exit 1
