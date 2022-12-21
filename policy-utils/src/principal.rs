@@ -34,6 +34,8 @@ pub enum Principal {
     Program(String),
     /// Pipeline in Veracruz, identified by the pipeline name.
     Pipeline(String),
+    /// Native module in Veracruz, identified by its name.
+    NativeModule(String),
     /// No Capability, the bottom Capability. It is used in some Initialization.
     NoCap,
 }
@@ -128,6 +130,61 @@ impl Program {
     #[inline]
     pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
         FileRights::compute_right_map(&self.file_rights)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Native module
+////////////////////////////////////////////////////////////////////////////////
+/// Defines a native module that can be loaded.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NativeModule {
+    /// TODO: add name
+    //name: String,
+    /// Native module's entry point (path to main binary)
+    entry_point_path: PathBuf,
+    /// Path to native module's special interface. Writing data to this file triggers the execution of the native module with some input
+	interface_path: PathBuf,
+    /// The native module's ID
+    id: u32,
+	// TODO: add sandbox policy
+}
+
+impl NativeModule {
+    /// Creates a Veracruz native module.
+    #[inline]
+    pub fn new<T: Into<u32>>(entry_point_path: PathBuf, interface_path: PathBuf, id: T) -> Self
+    {
+        Self {
+            //name,
+            entry_point_path,
+			interface_path,
+            id: id.into(),
+        }
+    }
+
+    /// Return the name.
+    /*#[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }*/
+
+    /// Return path to entry point.
+    #[inline]
+    pub fn entry_point_path(&self) -> &PathBuf {
+        &self.entry_point_path
+    }
+
+    /// Return path to interface.
+    #[inline]
+    pub fn interface_path(&self) -> &PathBuf {
+        &self.interface_path
+    }
+
+    /// Return the native module's id.
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.id
     }
 }
 
