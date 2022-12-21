@@ -277,7 +277,7 @@ fn basic_unauthorized_certificate_key_pair() {
     assert!(result.is_err(), "An error should occur");
 }
 
-//xx#[test]
+#[test]
 /// Call an example native module.
 fn basic_postcard_native_module() {
     let events = vec![
@@ -435,7 +435,7 @@ fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation()
     .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// Integration test: deserialize postcard encoding and reserialize to json.
 fn integration_postcard_json() {
     let events = vec![
@@ -474,7 +474,7 @@ fn performance_idash2017() {
         .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// Performance test: moving-average-convergence-divergence.
 /// Ref: https://github.com/woonhulktin/HETSA.
 /// data sources: macd/*.dat
@@ -747,7 +747,7 @@ impl TestExecutor {
         let test_alive_flag_clone = test_alive_flag.clone();
         thread::spawn(move || {
             while test_alive_flag_clone.load(Ordering::SeqCst) {
-                let mut buf = vec![0; 1000];
+                let mut buf = vec![0; 100000];
                 let n = veracruz_session_clone.read(&mut buf).unwrap();
                 if n == 0 {
                     break;
