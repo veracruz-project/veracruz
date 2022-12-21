@@ -499,15 +499,26 @@
         }
     }
 
-type EnclaveHandler = Arc<Mutex<Option<VeracruzServerLinux>>>;
+////////////////////////////////////////////////////////////////////////////////
 
-pub struct VeracruzServer(EnclaveHandler);
+//xx This should perhaps be called VeracruzEnclave?
+pub struct VeracruzServer(
+    Arc<(Mutex<Option<VeracruzServerLinux>>, Condvar)>
+);
+
+//xx This should perhaps be called VeracruzConnection?
+pub struct VeracruzSession {
+    enclave: VeracruzServer,
+    session_id: u32,
+    buffer: Arc<Mutex<Vec<u8>>>,
+}
 
 impl VeracruzServer {
     pub fn new(policy: &str) -> VeracruzServerResult<Self> {
-        Ok(VeracruzServer(Arc::new(Mutex::new(Some(
-            VeracruzServerLinux::new(policy)?,
-        )))))
+        Ok(VeracruzServer(Arc::new((
+            Mutex::new(Some(VeracruzServerLinux::new(policy)?)),
+            Condvar::new(),
+        ))))
     }
     pub fn clone(&self) -> Self {
         VeracruzServer(self.0.clone())
@@ -517,19 +528,15 @@ impl VeracruzServer {
             enclave: VeracruzServer(self.0.clone()),
             session_id: self
                 .0
-                .lock()?
+                .0
+                .lock()
+                .unwrap()
                 .as_mut()
                 .ok_or(VeracruzServerError::UninitializedEnclaveError)?
                 .new_tls_session()?,
-            buffer: Arc::new((Mutex::new(vec![]), Condvar::new())),
+            buffer: Arc::new(Mutex::new(vec![])),
         })
     }
-}
-
-pub struct VeracruzSession {
-    enclave: VeracruzServer,
-    session_id: u32,
-    buffer: Arc<(Mutex<Vec<u8>>, Condvar)>,
 }
 
 impl VeracruzSession {
@@ -547,14 +554,19 @@ impl Read for VeracruzSession {
         if buf.len() == 0 {
             Ok(0)
         } else {
-            let mut buffer = self.buffer.0.lock().unwrap();
-            while buffer.len() == 0 {
-                buffer = self.buffer.1.wait(buffer).unwrap();
+            let mut enclave = self.enclave.0.0.lock().unwrap();
+            loop {
+                {
+                    let mut buffer = self.buffer.lock().unwrap();
+                    if enclave.is_none() || buffer.len() > 0 {
+                        let n = std::cmp::min(buf.len(), buffer.len());
+                        buf[0..n].clone_from_slice(&buffer[0..n]);
+                        buffer.drain(0..n);
+                        return Ok(n);
+                    }
+                }
+                enclave = self.enclave.0.1.wait(enclave).unwrap();
             }
-            let n = std::cmp::min(buf.len(), buffer.len());
-            buf[0..n].clone_from_slice(&buffer[0..n]);
-            buffer.drain(0..n);
-            Ok(n)
         }
     }
 }
@@ -562,34 +574,34 @@ impl Read for VeracruzSession {
 impl Write for VeracruzSession {
     fn write(&mut self, buf: &[u8]) -> std::result::Result<usize, std::io::Error> {
         if buf.len() > 0 {
-            let (active, output) = self
-                .enclave
-                .0
-                .lock()
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?
-                .as_mut()
-                .ok_or(std::io::Error::new(std::io::ErrorKind::Other, "xx"))?
-                .tls_data(self.session_id, buf.to_vec())
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?;
-            if !active {
-                let mut mb_enclave = self
-                    .enclave
-                    .0
-                    .lock()
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?;
-                *mb_enclave = None;
-            }
-            let mut buffer = self
-                .buffer
-                .0
-                .lock()
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "xx"))?;
-            for x1 in output {
-                for mut x in x1 {
-                    buffer.append(&mut x);
+            let mut mb_enclave = self.enclave.0.0.lock().unwrap();
+            match mb_enclave.as_mut() {
+                None => return Ok(0),
+                Some(enclave) => {
+                    let (active, output) =
+                        match enclave.tls_data(self.session_id, buf.to_vec()) {
+                            Ok(x) => x,
+                            Err(e) => {
+                                error!("tls_data gave error: {}", e);
+                                (false, None)
+                            }
+                        };
+                    if !active {
+                        eprintln!("session write: !active");
+                        mb_enclave.take();
+                    }
+                    let mut buffer = self.buffer.lock().unwrap();
+                    let buffer_len = buffer.len();
+                    for x1 in output {
+                        for mut x in x1 {
+                            buffer.append(&mut x);
+                        }
+                    }
+                    if !active || (buffer_len == 0 && buf.len() > 0) {
+                        self.enclave.0.1.notify_all();
+                    }
                 }
             }
-            self.buffer.1.notify_one();
         }
         Ok(buf.len())
     }

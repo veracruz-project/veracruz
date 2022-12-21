@@ -214,7 +214,7 @@ fn basic_program_read_non_existent() {
     .unwrap();
 }
 
-//xx#[test]
+#[test]
 /// A client attempts to use an unauthorized key
 fn basic_unauthorized_key() {
     let events = vec![
@@ -235,7 +235,7 @@ fn basic_unauthorized_key() {
     assert!(result.is_err(), "An error should occur");
 }
 
-//xx#[test]
+#[test]
 /// A client attempts to use an unauthorized certificate
 fn basic_unauthorized_certificate() {
     let events = vec![
@@ -256,7 +256,7 @@ fn basic_unauthorized_certificate() {
     assert!(result.is_err(), "An error should occur");
 }
 
-//xx#[test]
+#[test]
 /// A unauthorized client attempts to connect the service
 fn basic_unauthorized_certificate_key_pair() {
     let events = vec![
@@ -735,32 +735,27 @@ impl TestExecutor {
 
         let mut veracruz_session_clone = veracruz_session.clone();
         let test_alive_flag_clone = test_alive_flag.clone();
-        let h1 = thread::spawn(move || {
+        thread::spawn(move || {
             while test_alive_flag_clone.load(Ordering::SeqCst) {
                 let received = receiver.recv();
                 let received_buffer = received.map_err(|e| anyhow!("Server: {:?}", e)).unwrap();
-                info!(
-                    "Server: receive {} byte(s).",
-                    received_buffer.len(),
-                );
                 veracruz_session_clone.write_all(&received_buffer).unwrap();
             }
         });
 
         let mut veracruz_session_clone = veracruz_session.clone();
         let test_alive_flag_clone = test_alive_flag.clone();
-        let h2 = thread::spawn(move || {
+        thread::spawn(move || {
             while test_alive_flag_clone.load(Ordering::SeqCst) {
                 let mut buf = vec![0; 1000];
                 let n = veracruz_session_clone.read(&mut buf).unwrap();
+                if n == 0 {
+                    break;
+                }
                 sender.send(buf[0..n].to_vec()).unwrap();
             }
         });
 
-        /*
-        h1.join().unwrap();
-        h2.join().unwrap();
-        */
         Ok(())
     }
 
