@@ -24,13 +24,13 @@ jobs:
         id: cosign-verify
         run: |
             COSIGN_EXPERIMENTAL=true cosign verify \
-              ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
+              ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
 
   linux:
     runs-on: ubuntu-latest
     needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:b5eb834cd58c69e6acc19b1b19c6345a020ad2ad090cdab3bc9f7d5d48fb00ba
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
