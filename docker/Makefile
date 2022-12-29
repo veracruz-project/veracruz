@@ -1,4 +1,4 @@
-VERSION = v22.12
+VERSION = v23.01
 IMAGE ?= veracruz
 CONTAINER ?= veracruz
 VERACRUZ_ROOT ?= ..
@@ -6,7 +6,7 @@ USER ?= $(shell id -un)
 UID ?= $(shell id -u)
 OS_NAME := $(shell uname -s | tr A-Z a-z)
 ARCH = $(shell uname -m)
-AWS_NITRO_CLI_REVISION = v1.2.0
+AWS_NITRO_CLI_REVISION = v1.2.1
 
 ifeq ($(OS_NAME),darwin)
 LOCALIP = $(shell "(ifconfig en0 ; ifconfig en1) | grep "inet " | grep -Fv 127.0.0.1 | awk '{print $2}'")
