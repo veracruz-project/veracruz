@@ -35,7 +35,7 @@ jobs:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running linux test script
@@ -52,7 +52,7 @@ jobs:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running Nitro test script
@@ -69,7 +69,7 @@ jobs:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running IceCap test script
@@ -87,7 +87,7 @@ jobs:
         - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: Check out the Veracruz repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Running CLI_QUICKSTART.markdown
