@@ -166,7 +166,7 @@ pub mod veracruz_server_nitro {
 
             let mut active_flag = true;
             let mut ret_array = Vec::new();
-            while self.tls_data_needed(session_id)? {
+            loop {
                 let gtd_message = RuntimeManagerRequest::GetTlsData(session_id);
                 let gtd_buffer: Vec<u8> = bincode::serialize(&gtd_message)?;
 
@@ -178,7 +178,12 @@ pub mod veracruz_server_nitro {
                     bincode::deserialize(&received_buffer)?;
                 match received_message {
                     RuntimeManagerResponse::TlsData(data, alive) => {
-                        active_flag = alive;
+                        if !alive {
+                            active_flag = false
+                        }
+                        if data.len() == 0 {
+                            break;
+                        }
                         ret_array.push(data);
                     }
                     _ => return Err(VeracruzServerError::Status(Status::Fail)),
@@ -208,22 +213,6 @@ pub mod veracruz_server_nitro {
     }
 
     impl VeracruzServerNitro {
-        fn tls_data_needed(&self, session_id: u32) -> Result<bool, VeracruzServerError> {
-            let gtdn_message = RuntimeManagerRequest::GetTlsDataNeeded(session_id);
-            let gtdn_buffer: Vec<u8> = bincode::serialize(&gtdn_message)?;
-
-            self.enclave.send_buffer(&gtdn_buffer)?;
-
-            let received_buffer: Vec<u8> = self.enclave.receive_buffer()?;
-
-            let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
-            let tls_data_needed = match received_message {
-                RuntimeManagerResponse::TlsDataNeeded(needed) => needed,
-                _ => return Err(VeracruzServerError::Status(Status::Fail)),
-            };
-            Ok(tls_data_needed)
-        }
-
         fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
             // Don't do anything. The enclave gets shutdown when the
             // `NitroEnclave` object inside `VeracruzServerNitro` is dropped

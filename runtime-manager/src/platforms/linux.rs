@@ -16,8 +16,8 @@
 
 use crate::managers::{
     session_manager::{
-        close_session, generate_csr, get_data, get_data_needed, init_session_manager,
-        load_cert_chain, load_policy, new_session, send_data,
+        close_session, generate_csr, get_data, init_session_manager, load_cert_chain, load_policy,
+        new_session, send_data,
     },
     RuntimeManagerError,
 };
@@ -323,16 +323,6 @@ pub fn linux_main() -> Result<()> {
                     .map(|_e| RuntimeManagerResponse::Status(Status::Success))
                     .unwrap_or_else(|e| {
                         error!("Failed to close TLS session.  Error produced: {:?}.", e);
-                        RuntimeManagerResponse::Status(Status::Fail)
-                    })
-            }
-            RuntimeManagerRequest::GetTlsDataNeeded(session_id) => {
-                info!("Checking whether TLS data is needed.");
-
-                get_data_needed(session_id)
-                    .map(|needed| RuntimeManagerResponse::TlsDataNeeded(needed))
-                    .unwrap_or_else(|e|{
-                        error!("Failed to check whether further TLS data needed.  Error produced: {:?}.", e);
                         RuntimeManagerResponse::Status(Status::Fail)
                     })
             }

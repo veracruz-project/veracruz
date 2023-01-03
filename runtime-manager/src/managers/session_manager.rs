@@ -121,44 +121,24 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<()> {
     }
 }
 
-// TODO: The 'match' inside the and_then closure is difficult to parse
 pub fn get_data(session_id: u32) -> Result<(bool, Vec<u8>)> {
-    let (result, _) = match super::SESSIONS
+    let result = match super::SESSIONS
         .lock()
         .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?
         .get_mut(&session_id)
     {
-        Some(this_session) => {
-            let result = this_session.read_tls_data();
-            let needed = this_session.read_tls_needed();
-            //TODO: change the error type
-            Ok((result, needed))
-        }
+        Some(this_session) => Ok(this_session.read_tls_data()),
         None => Err(anyhow!(RuntimeManagerError::UnavailableSessionError(
             session_id as u64,
         ))),
-    }?;
+    }??;
 
     let active_flag = super::PROTOCOL_STATE
         .lock()
         .map_err(|_| anyhow!(RuntimeManagerError::LockProtocolState))?
         .is_some();
 
-    match result? {
-        Some(output_data) => Ok((active_flag, output_data)),
-        None => Err(anyhow!(RuntimeManagerError::NoDataError)),
-    }
-}
-
-pub fn get_data_needed(session_id: u32) -> Result<bool> {
-    Ok(super::SESSIONS
-        .lock()
-        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?
-        .get_mut(&session_id)
-        .ok_or(anyhow!(RuntimeManagerError::UnavailableSessionError(
-            session_id as u64,
-        )))?
-        .read_tls_needed()?)
+    Ok((active_flag, result.unwrap_or(vec![])))
 }
 
 fn get_enclave_private_key_der() -> Result<Vec<u8>> {

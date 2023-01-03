@@ -52,10 +52,6 @@ pub enum RuntimeManagerRequest {
     /// Request TLS data from the enclave.  Parameters in order are:
     /// - The Session ID of the TLS session to request data from.
     GetTlsData(u32),
-    /// Request to determine if the TLS Session needs data to be sent to it.
-    /// Parameters in order are:
-    /// - The Session ID of the TLS session.
-    GetTlsDataNeeded(u32),
     /// A request to initialize the Runtime Manager enclave with the provided
     /// policy and certificate (for Nitro).
     /// parameters:
@@ -92,9 +88,6 @@ pub enum RuntimeManagerResponse {
     /// - The TLS data, which may be empty.
     /// - A flag indicating if the TLS session is still alive.
     TlsData(Vec<u8>, bool),
-    /// Response to `GetTlsDataNeeded` message.  Parameters in order are:
-    /// - Is data needed?
-    TlsDataNeeded(bool),
     /// The response to the `NewTLSSession` message.  Parameters in order are:
     /// - The Session ID of the created TLS session.
     TlsSession(u32),

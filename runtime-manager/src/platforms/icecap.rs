@@ -173,12 +173,6 @@ impl RuntimeManager {
                     Ok(()) => RuntimeManagerResponse::Status(Status::Success),
                 }
             }
-            RuntimeManagerRequest::GetTlsDataNeeded(sess) => {
-                match session_manager::get_data_needed(sess) {
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                    Ok(needed) => RuntimeManagerResponse::TlsDataNeeded(needed),
-                }
-            }
             RuntimeManagerRequest::GetTlsData(sess) => match session_manager::get_data(sess) {
                 Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                 Ok((active, data)) => {

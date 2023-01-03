@@ -13,7 +13,7 @@
 
 use crate::error::SessionManagerError;
 use anyhow::{anyhow, Result};
-use mbedtls::{alloc::List, x509::Certificate, ssl::Config};
+use mbedtls::{alloc::List, ssl::Config, x509::Certificate};
 use policy_utils::principal::Identity;
 use std::{
     io::{Read, Write},
@@ -188,18 +188,6 @@ impl Session {
         } else {
             Ok(None)
         }
-    }
-
-    /// Returns `true` iff the session's TLS server session has data to be read.
-    #[inline]
-    pub fn read_tls_needed(&self) -> Result<bool> {
-        let r = Ok(self
-            .shared_buffers
-            .lock()
-            .map_err(|_| SessionManagerError::SharedBufferLock)?
-            .write_buffer
-            .is_some());
-        r
     }
 
     fn established(&mut self) -> Result<()> {
