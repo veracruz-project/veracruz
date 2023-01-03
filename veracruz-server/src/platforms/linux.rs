@@ -65,57 +65,6 @@ pub mod veracruz_server_linux {
     }
 
     impl VeracruzServerLinux {
-        /// Returns `Ok(true)` iff further TLS data can be read from the socket
-        /// connecting the Veracruz server and the Linux root enclave.
-        /// Returns `Ok(false)` iff no further TLS data can be read.
-        ///
-        /// Returns an appropriate error if:
-        ///
-        /// 1. The request could not be serialized, or sent to the enclave.
-        /// 2. The response could be not be received, or deserialized.
-        /// 3. The response was received and deserialized correctly, but was of
-        ///    an unexpected form.
-        pub fn tls_data_needed(&mut self, session_id: u32) -> VeracruzServerResult<bool> {
-            info!("Checking whether TLS data can be read from Runtime Manager enclave (with session: {}).", session_id);
-
-            info!("Sending TLS data check message.");
-
-            send_message(
-                &mut self.runtime_manager_socket,
-                &RuntimeManagerRequest::GetTlsDataNeeded(session_id),
-            )?;
-
-            info!("TLS data check message successfully sent.");
-
-            info!("Awaiting response...");
-
-            let received: RuntimeManagerResponse =
-                receive_message(&mut self.runtime_manager_socket)?;
-
-            info!("Response received.");
-
-            match received {
-                RuntimeManagerResponse::TlsDataNeeded(response) => {
-                    info!(
-                        "Runtime Manager enclave can have further TLS data read: {}.",
-                        response
-                    );
-
-                    Ok(response)
-                }
-                otherwise => {
-                    error!(
-                        "Runtime Manager enclave returned unexpected response.  Received: {:?}.",
-                        otherwise
-                    );
-
-                    Err(VeracruzServerError::InvalidRuntimeManagerResponse(
-                        otherwise,
-                    ))
-                }
-            }
-        }
-
         /// Reads TLS data from the Runtime Manager enclave.  Implicitly assumes
         /// that the Runtime Manager enclave has more data to be read.  Returns
         /// `Ok((alive_status, buffer))` if more TLS data could be read from the
@@ -523,15 +472,18 @@ pub mod veracruz_server_linux {
                 }
             }
 
-            let mut active = true;
-            let mut buffer = Vec::new();
-
             info!("Reading TLS data...");
 
-            while self.tls_data_needed(session_id)? {
+            let mut active = true;
+            let mut buffer = Vec::new();
+            loop {
                 let (alive_status, received) = self.read_tls_data(session_id)?;
-
-                active = alive_status;
+                if !alive_status {
+                    active = false;
+                }
+                if received.len() == 0 {
+                    break;
+                }
                 buffer.push(received);
             }
 

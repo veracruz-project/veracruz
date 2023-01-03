@@ -285,13 +285,6 @@ impl VeracruzServerIceCap {
         Ok(response)
     }
 
-    fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
-        match self.communicate(&RuntimeManagerRequest::GetTlsDataNeeded(session_id))? {
-            RuntimeManagerResponse::TlsDataNeeded(needed) => Ok(needed),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp).into()),
-        }
-    }
-
     fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
         match self.0.take() {
             Some(realm) => {
@@ -375,11 +368,11 @@ impl VeracruzServer for VeracruzServerIceCap {
 
         let mut acc = Vec::new();
         let active = loop {
-            if !self.tls_data_needed(session_id)? {
-                break true;
-            }
             match self.communicate(&RuntimeManagerRequest::GetTlsData(session_id))? {
                 RuntimeManagerResponse::TlsData(data, active) => {
+                    if data.len() == 0 {
+                        break active;
+                    }
                     acc.push(data);
                     if !active {
                         break false;

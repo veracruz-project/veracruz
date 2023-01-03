@@ -87,14 +87,6 @@ pub fn nitro_main() -> Result<()> {
                 };
                 return_message
             }
-            RuntimeManagerRequest::GetTlsDataNeeded(session_id) => {
-                println!("runtime_manager_nitro::main GetTlsDataNeeded");
-                let return_message = match managers::session_manager::get_data_needed(session_id) {
-                    Ok(needed) => RuntimeManagerResponse::TlsDataNeeded(needed),
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                };
-                return_message
-            }
             RuntimeManagerRequest::SendTlsData(session_id, tls_data) => {
                 println!("runtime_manager_nitro::main SendTlsData");
                 let return_message =

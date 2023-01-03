@@ -27,8 +27,6 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "linux")]
     #[error(display = "RuntimeManager: {} failed with error code {:?}.", _0, _1)]
     UnsafeCallError(&'static str, u32),
-    #[error(display = "RuntimeManager: Received no data.")]
-    NoDataError,
     #[error(display = "RuntimeManager: Unavailable session with ID {}.", _0)]
     UnavailableSessionError(u64),
     #[error(display = "RuntimeManager: Unavailable protocol state.")]
