@@ -39,26 +39,6 @@ RUN apt-get update && \
 
 COPY aws-nitro-enclaves-cli/build/nitro_cli/${ARCH}-unknown-linux-musl/release/nitro-cli /usr/bin/
 
-RUN pip install --no-cache-dir awscli
-
-RUN wget https://github.com/openssl/openssl/archive/refs/tags/openssl-3.0.7.tar.gz && \
-    tar zxvf openssl-3.0.7.tar.gz &&\
-    cd openssl-openssl-3.0.7 && \
-    CC="musl-gcc -fPIE -pie -static -idirafter /usr/include/ -idirafter /usr/include/${ARCH}-linux-gnu/" \
-        ./Configure no-shared no-async -DOPENSSL_NO_SECURE_MEMORY \
-        --prefix=/work/veracruz-nitro-root-enclave/musl \
-        --openssldir=/work/veracruz/nitro-root-enclave/musl/ssl linux-${ARCH} && \
-    make -j $(nproc) && \
-    make install_sw install_ssldirs && \
-    cd .. && \
-    rm -rf openssl-openssl-3.0.7 openssl-3.0.7.tar.gz
-
-ENV \
-    AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_LIB_DIR=/work/veracruz-nitro-root-enclave/musl/lib64 \
-    X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_LIB_DIR=/work/veracruz-nitro-root-enclave/musl/lib64 \
-    AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_INCLUDE_DIR=/work/veracruz-nitro-root-enclave/musl/include \
-    X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_INCLUDE_DIR=/work/veracruz-nitro-root-enclave/musl/include
-
 WORKDIR /work
 RUN wget https://musl.cc/${ARCH}-linux-musl-native.tgz && \
     tar zxvf ${ARCH}-linux-musl-native.tgz && \

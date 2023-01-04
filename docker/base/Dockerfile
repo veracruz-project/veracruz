@@ -44,7 +44,6 @@ RUN cocli comid create --template AWSNitroComid.json
 RUN cocli corim create -m MyComidPsaIak.cbor -t corimMini.json -o psa_corim.cbor
 RUN cocli corim create -m AWSNitroComid.cbor -t corimMini.json -o nitro_corim.cbor
 
-
 FROM ubuntu:22.04
 
 ARG ARCH=x86_64
@@ -120,7 +119,7 @@ RUN apt-get update && \
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.60.0
+    RUST_VERSION=1.65.0
 
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \

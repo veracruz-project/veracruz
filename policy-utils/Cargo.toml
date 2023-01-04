@@ -20,14 +20,14 @@ std = [
 anyhow = "1"
 err-derive = { version = "0.2", default-features = false }
 hex = { version = "0.4.2" }
+lalrpop-util = { version = "0.19.8", features = ["lexer"] }
 lexical-core = { version = "0.8.2", default-features = false }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
+regex = "1"
 serde = { version = "1.0.115", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
-lalrpop-util = { version = "0.18", features = ["lexer"] }
-regex = "1"
 
 [build-dependencies]
-lalrpop = { version = "0.18", features = ["lexer"] }
+lalrpop = { version = "0.19.8", features = ["lexer"] }
