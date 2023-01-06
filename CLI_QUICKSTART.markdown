@@ -44,7 +44,7 @@ separate binaries:
 - `vc-client`/`veracruz-client` - Communicates with the Veracruz server using
   an identity's certificate to upload/download data and programs for
   computation.
-- `vc-fee`/`freestanding-execution-environment` - Provides a freestanding
+- `vc-fee`/`freestanding-execution-engine` - Provides a freestanding
   execution environment that can be used to test Veracruz programs without
   needing the full attestation/TEE framework.
 - `vc-wc`/`wasm-checker` - Checks that a Veracruz program is able to run in

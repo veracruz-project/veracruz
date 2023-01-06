@@ -98,17 +98,10 @@ impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError {
 
 pub type VeracruzServerResult<T> = Result<T, VeracruzServerError>;
 
-pub trait VeracruzServer {
-    fn new(policy: &str) -> VeracruzServerResult<Self>
-    where
-        Self: Sized;
-
-    fn new_tls_session(&mut self) -> VeracruzServerResult<u32>;
-
-    // The first bool indicates if the enclave is active, and the second vec contains the response
-    fn tls_data(
-        &mut self,
-        session_id: u32,
-        input: Vec<u8>,
-    ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)>;
-}
+// Import and reexport the platform-specific enclave types.
+#[cfg(feature = "icecap")]
+pub use crate::platforms::icecap::{VeracruzServer, VeracruzSession};
+#[cfg(feature = "linux")]
+pub use crate::platforms::linux::{VeracruzServer, VeracruzSession};
+#[cfg(feature = "nitro")]
+pub use crate::platforms::nitro::{VeracruzServer, VeracruzSession};

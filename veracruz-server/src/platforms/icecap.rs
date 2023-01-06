@@ -9,8 +9,9 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::common::{VeracruzServer, VeracruzServerError};
+use crate::common::{VeracruzServerError, VeracruzServerResult};
 use err_derive::Error;
+use log::error;
 use policy_utils::policy::Policy;
 use proxy_attestation_client;
 use signal_hook::{
@@ -27,7 +28,7 @@ use std::{
     os::unix::net::UnixStream,
     process::{Child, Command, Stdio},
     string::ToString,
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
 };
@@ -296,7 +297,7 @@ impl VeracruzServerIceCap {
     }
 }
 
-impl VeracruzServer for VeracruzServerIceCap {
+impl VeracruzServerIceCap {
     fn new(policy_json: &str) -> Result<Self, VeracruzServerError> {
         let policy: Policy = Policy::from_json(policy_json)?;
 
@@ -397,5 +398,116 @@ impl Drop for VeracruzServerIceCap {
         if let Err(err) = self.shutdown_isolate() {
             panic!("Realm failed to shutdown: {}", err)
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+//xx This should perhaps be called VeracruzEnclave?
+pub struct VeracruzServer(
+    Arc<(Mutex<Option<VeracruzServerIceCap>>, Condvar)>
+);
+
+//xx This should perhaps be called VeracruzConnection?
+pub struct VeracruzSession {
+    enclave: VeracruzServer,
+    session_id: u32,
+    buffer: Arc<Mutex<Vec<u8>>>,
+}
+
+impl VeracruzServer {
+    pub fn new(policy: &str) -> VeracruzServerResult<Self> {
+        Ok(VeracruzServer(Arc::new((
+            Mutex::new(Some(VeracruzServerIceCap::new(policy)?)),
+            Condvar::new(),
+        ))))
+    }
+    pub fn clone(&self) -> Self {
+        VeracruzServer(self.0.clone())
+    }
+    pub fn new_session(&mut self) -> VeracruzServerResult<VeracruzSession> {
+        Ok(VeracruzSession {
+            enclave: VeracruzServer(self.0.clone()),
+            session_id: self
+                .0
+                .0
+                .lock()
+                .unwrap()
+                .as_mut()
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?
+                .new_tls_session()?,
+            buffer: Arc::new(Mutex::new(vec![])),
+        })
+    }
+}
+
+impl VeracruzSession {
+    pub fn clone(&self) -> Self {
+        VeracruzSession {
+            enclave: self.enclave.clone(),
+            session_id: self.session_id,
+            buffer: self.buffer.clone(),
+        }
+    }
+}
+
+impl Read for VeracruzSession {
+    fn read(&mut self, buf: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+        if buf.len() == 0 {
+            Ok(0)
+        } else {
+            let mut enclave = self.enclave.0.0.lock().unwrap();
+            loop {
+                {
+                    let mut buffer = self.buffer.lock().unwrap();
+                    if enclave.is_none() || buffer.len() > 0 {
+                        let n = std::cmp::min(buf.len(), buffer.len());
+                        buf[0..n].clone_from_slice(&buffer[0..n]);
+                        buffer.drain(0..n);
+                        return Ok(n);
+                    }
+                }
+                enclave = self.enclave.0.1.wait(enclave).unwrap();
+            }
+        }
+    }
+}
+
+impl Write for VeracruzSession {
+    fn write(&mut self, buf: &[u8]) -> std::result::Result<usize, std::io::Error> {
+        if buf.len() > 0 {
+            let mut mb_enclave = self.enclave.0.0.lock().unwrap();
+            match mb_enclave.as_mut() {
+                None => return Ok(0),
+                Some(enclave) => {
+                    let (active, output) =
+                        match enclave.tls_data(self.session_id, buf.to_vec()) {
+                            Ok(x) => x,
+                            Err(e) => {
+                                error!("tls_data gave error: {}", e);
+                                (false, None)
+                            }
+                        };
+                    if !active {
+                        eprintln!("session write: !active");
+                        mb_enclave.take();
+                    }
+                    let mut buffer = self.buffer.lock().unwrap();
+                    let buffer_len = buffer.len();
+                    for x1 in output {
+                        for mut x in x1 {
+                            buffer.append(&mut x);
+                        }
+                    }
+                    if !active || (buffer_len == 0 && buf.len() > 0) {
+                        self.enclave.0.1.notify_all();
+                    }
+                }
+            }
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
+        Ok(())
     }
 }

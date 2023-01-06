@@ -9,10 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#[cfg(feature = "linux")]
-pub mod veracruz_server_linux {
-
-    use crate::common::{VeracruzServer, VeracruzServerError, VeracruzServerResult};
+    use crate::common::{VeracruzServerError, VeracruzServerResult};
     use data_encoding::HEXLOWER;
     use io_utils::tcp::{receive_message, send_message};
     use log::{error, info};
@@ -25,10 +22,11 @@ pub mod veracruz_server_linux {
         env,
         error::Error,
         fs::{self, File},
-        io::Read,
+        io::{Read, Write},
         net::{Shutdown, TcpListener, TcpStream},
         os::unix::fs::PermissionsExt,
         process::{Child, Command},
+        sync::{Arc, Condvar, Mutex},
     };
     use tempfile::{self, TempDir};
     use veracruz_utils::runtime_manager_message::{
@@ -54,7 +52,7 @@ pub mod veracruz_server_linux {
 
     /// A struct capturing all the metadata needed to start and communicate with
     /// the Linux root enclave.
-    pub struct VeracruzServerLinux {
+    struct VeracruzServerLinux {
         /// A handle to the Runtime Manager enclave process.
         runtime_manager_process: Child,
         /// The socket used to communicate with the Runtime Manager enclave.
@@ -80,7 +78,7 @@ pub mod veracruz_server_linux {
         ///    deserialized.
         /// 3. The Runtime Manager enclave sends back a message indicating that
         ///    it was not expecting further TLS data to be requested.
-        pub fn read_tls_data(&mut self, session_id: u32) -> VeracruzServerResult<(bool, Vec<u8>)> {
+        fn read_tls_data(&mut self, session_id: u32) -> VeracruzServerResult<(bool, Vec<u8>)> {
             info!(
                 "Reading TLS data from Runtime Manager enclave (with session: {}).",
                 session_id
@@ -154,7 +152,7 @@ pub mod veracruz_server_linux {
         }
     }
 
-    impl VeracruzServer for VeracruzServerLinux {
+    impl VeracruzServerLinux {
         /// Creates a new instance of the `VeracruzServerLinux` type.
         fn new(policy_json: &str) -> VeracruzServerResult<Self>
         where
@@ -499,5 +497,115 @@ pub mod veracruz_server_linux {
                 Ok((active, Some(buffer)))
             }
         }
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+
+//xx This should perhaps be called VeracruzEnclave?
+pub struct VeracruzServer(
+    Arc<(Mutex<Option<VeracruzServerLinux>>, Condvar)>
+);
+
+//xx This should perhaps be called VeracruzConnection?
+pub struct VeracruzSession {
+    enclave: VeracruzServer,
+    session_id: u32,
+    buffer: Arc<Mutex<Vec<u8>>>,
+}
+
+impl VeracruzServer {
+    pub fn new(policy: &str) -> VeracruzServerResult<Self> {
+        Ok(VeracruzServer(Arc::new((
+            Mutex::new(Some(VeracruzServerLinux::new(policy)?)),
+            Condvar::new(),
+        ))))
+    }
+    pub fn clone(&self) -> Self {
+        VeracruzServer(self.0.clone())
+    }
+    pub fn new_session(&mut self) -> VeracruzServerResult<VeracruzSession> {
+        Ok(VeracruzSession {
+            enclave: VeracruzServer(self.0.clone()),
+            session_id: self
+                .0
+                .0
+                .lock()
+                .unwrap()
+                .as_mut()
+                .ok_or(VeracruzServerError::UninitializedEnclaveError)?
+                .new_tls_session()?,
+            buffer: Arc::new(Mutex::new(vec![])),
+        })
+    }
+}
+
+impl VeracruzSession {
+    pub fn clone(&self) -> Self {
+        VeracruzSession {
+            enclave: self.enclave.clone(),
+            session_id: self.session_id,
+            buffer: self.buffer.clone(),
+        }
+    }
+}
+
+impl Read for VeracruzSession {
+    fn read(&mut self, buf: &mut [u8]) -> std::result::Result<usize, std::io::Error> {
+        if buf.len() == 0 {
+            Ok(0)
+        } else {
+            let mut enclave = self.enclave.0.0.lock().unwrap();
+            loop {
+                {
+                    let mut buffer = self.buffer.lock().unwrap();
+                    if enclave.is_none() || buffer.len() > 0 {
+                        let n = std::cmp::min(buf.len(), buffer.len());
+                        buf[0..n].clone_from_slice(&buffer[0..n]);
+                        buffer.drain(0..n);
+                        return Ok(n);
+                    }
+                }
+                enclave = self.enclave.0.1.wait(enclave).unwrap();
+            }
+        }
+    }
+}
+
+impl Write for VeracruzSession {
+    fn write(&mut self, buf: &[u8]) -> std::result::Result<usize, std::io::Error> {
+        if buf.len() > 0 {
+            let mut mb_enclave = self.enclave.0.0.lock().unwrap();
+            match mb_enclave.as_mut() {
+                None => return Ok(0),
+                Some(enclave) => {
+                    let (active, output) =
+                        match enclave.tls_data(self.session_id, buf.to_vec()) {
+                            Ok(x) => x,
+                            Err(e) => {
+                                error!("tls_data gave error: {}", e);
+                                (false, None)
+                            }
+                        };
+                    if !active {
+                        eprintln!("session write: !active");
+                        mb_enclave.take();
+                    }
+                    let mut buffer = self.buffer.lock().unwrap();
+                    let buffer_len = buffer.len();
+                    for x1 in output {
+                        for mut x in x1 {
+                            buffer.append(&mut x);
+                        }
+                    }
+                    if !active || (buffer_len == 0 && buf.len() > 0) {
+                        self.enclave.0.1.notify_all();
+                    }
+                }
+            }
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
+        Ok(())
     }
 }

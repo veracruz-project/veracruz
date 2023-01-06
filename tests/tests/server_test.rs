@@ -27,23 +27,12 @@ use std::{
     error::Error,
     io::{Read, Write},
     path::Path,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex,
-    },
-    thread::{self, JoinHandle},
+    sync::Arc,
     time::{Duration, Instant},
     vec::Vec,
 };
 use transport_protocol;
 use veracruz_server::common::*;
-#[cfg(feature = "icecap")]
-use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
-#[cfg(feature = "linux")]
-use veracruz_server::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
-#[cfg(feature = "nitro")]
-use veracruz_server::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
@@ -96,7 +85,7 @@ fn basic_init_destroy_enclave() {
             policy.proxy_attestation_server_url().clone(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
-        VeracruzServerEnclave::new(&policy_json).unwrap();
+        VeracruzServer::new(&policy_json).unwrap();
     })
 }
 
@@ -127,7 +116,8 @@ fn basic_read_write_and_traverse() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -141,7 +131,8 @@ fn basic_random_source() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -154,7 +145,8 @@ fn fd_create() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -166,9 +158,15 @@ fn basic_execute_non_existent() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -179,9 +177,15 @@ fn basic_client_read_non_existent() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -194,9 +198,15 @@ fn basic_program_read_non_existent() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -209,8 +219,14 @@ fn basic_unauthorized_key() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, UNAUTHORIZED_KEY, events, TIME_OUT_SECS);
+    let result = TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        UNAUTHORIZED_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    );
     assert!(result.is_err(), "An error should occur");
 }
 
@@ -224,8 +240,14 @@ fn basic_unauthorized_certificate() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, UNAUTHORIZED_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
+    let result = TestExecutor::test_template(
+        POLICY,
+        UNAUTHORIZED_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    );
     assert!(result.is_err(), "An error should occur");
 }
 
@@ -245,6 +267,7 @@ fn basic_unauthorized_certificate_key_pair() {
         UNAUTHORIZED_KEY,
         events,
         TIME_OUT_SECS,
+        false,
     );
     assert!(result.is_err(), "An error should occur");
 }
@@ -261,7 +284,8 @@ fn basic_postcard_native_module() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -280,7 +304,8 @@ fn basic_number_accumulation_batch_process() {
     ));
     events.push(TestEvent::ShutDown);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -295,7 +320,8 @@ fn basic_pipeline() {
         TestEvent::read_result("/output/sorted_numbers.txt"),
         TestEvent::ShutDown,
     ];
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -314,7 +340,8 @@ fn integration_linear_regression() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -339,7 +366,8 @@ fn integration_intersection_sum() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -356,7 +384,8 @@ fn integration_string_edit_distance() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -375,7 +404,8 @@ fn integration_private_set_intersection() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -389,9 +419,15 @@ fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation()
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -406,7 +442,8 @@ fn integration_postcard_json() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -428,7 +465,8 @@ fn performance_idash2017() {
         TestEvent::ShutDown,
     ]);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -449,7 +487,8 @@ fn performance_macd() {
         TestEvent::ShutDown,
     ]);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -469,108 +508,51 @@ fn performance_set_intersection_sum() {
         TestEvent::ShutDown,
     ]);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 /// Test states.
 struct TestExecutor {
     // The policy for the runtime.
     policy: Policy,
-    // The hash of the policy, that is used in attestation
+    // The hash of the policy, that is used in attestation.
     policy_hash: String,
-    // The emulated TLS connect from client to server.
-    client_tls_receiver: Receiver<Vec<u8>>,
-    client_tls_sender: Sender<(u32, Vec<u8>)>,
-    // Paths to client certification and private key.
     // Note that we only have one client in all tests.
-    client_connection: mbedtls::ssl::Context<InsecureConnection>,
-    client_connection_id: u32,
-    // Read and write buffers shared with InsecureConnection.
-    shared_buffers: Arc<Mutex<Buffers>>,
-    // A alive flag. This is to solve the problem where the server thread still in loop while
-    // client thread is terminated.
-    alive_flag: Arc<AtomicBool>,
-    // Hold the server thread. The test will join the thread in the end to check the server
-    // state.
-    server_thread: JoinHandle<Result<()>>,
-}
-
-struct Buffers {
-    // Read buffer used by mbedtls for cyphertext.
-    read_buffer: Vec<u8>,
-    // Write buffer used by mbedtls for cyphertext.
-    write_buffer: Option<Vec<u8>>,
-}
-
-/// This is the structure given to mbedtls and used for reading and
-/// writing cyphertext, using the standard Read and Write traits.
-struct InsecureConnection {
-    // Read and write buffers shared with Session.
-    shared_buffers: Arc<Mutex<Buffers>>,
-}
-
-// To convert any error to a std::io error:
-fn std_err(error_text: &str) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, error_text)
-}
-
-impl Read for InsecureConnection {
-    fn read(&mut self, data: &mut [u8]) -> Result<usize, std::io::Error> {
-        // Return as much data from the read_buffer as fits.
-        let mut shared_buffers = self
-            .shared_buffers
-            .lock()
-            .map_err(|_| std_err("lock failed"))?;
-        let n = std::cmp::min(data.len(), shared_buffers.read_buffer.len());
-        if n == 0 {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::WouldBlock,
-                "InsecureConnection Read",
-            ))
-        } else {
-            data[0..n].clone_from_slice(&shared_buffers.read_buffer[0..n]);
-            shared_buffers.read_buffer = shared_buffers.read_buffer[n..].to_vec();
-            Ok(n)
-        }
-    }
-}
-
-impl Write for InsecureConnection {
-    fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> {
-        // Append to write buffer.
-        let mut shared_buffers = self
-            .shared_buffers
-            .lock()
-            .map_err(|_| std_err("lock failed"))?;
-        match &mut shared_buffers.write_buffer {
-            None => shared_buffers.write_buffer = Some(data.to_vec()),
-            Some(x) => x.extend_from_slice(data),
-        }
-        // Return value to indicate that we handled all the data.
-        Ok(data.len())
-    }
-    fn flush(&mut self) -> Result<(), std::io::Error> {
-        Ok(())
-    }
+    client_connection: mbedtls::ssl::Context<VeracruzSession>,
 }
 
 impl TestExecutor {
-    /// This is the template. The template appends the path to the policy, and client
-    /// certificate and key file, initials the test veracruz server and a mock client
-    /// accordingly, and then executes the test-case driven by mock client `events`.
+    /// This is the template. The template appends the path to the
+    /// policy, and client certificate and key file, initialises the
+    /// test veracruz server and a mock client accordingly, and then
+    /// executes the test-case driven by mock client `events`. The
+    /// function returns `Err(_)` if an error occurred before all the
+    /// events were executed. Otherwise, the function panics if
+    /// `expect_success` was set and one of the events did not return
+    /// SUCCESS or if `expect_success` was not set and all of the
+    /// events returned SUCCESS. Otherwise, it returns `Ok(())`.
     fn test_template<P: AsRef<str>, Q: AsRef<str>, K: AsRef<str>>(
         policy_filename: P,
         client_cert_filename: Q,
         client_key_filename: K,
         events: Vec<TestEvent>,
         timeout_sec: u64,
+        expect_success: bool,
     ) -> Result<(), Box<dyn Error + 'static>> {
-        Self::new(
+        let result = Self::new(
             policy_dir(policy_filename),
             cert_key_dir(client_cert_filename),
             cert_key_dir(client_key_filename),
         )?
         .execute(events, Duration::from_secs(timeout_sec))?;
+        if result != expect_success {
+            if expect_success {
+                panic!("There was an unexpected failure");
+            } else {
+                panic!("A failure was expected");
+            }
+        }
         Ok(())
     }
 
@@ -596,15 +578,15 @@ impl TestExecutor {
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
 
-        info!("Create simulated connection channels.");
-        // Create two channel, simulating the connecting channels.
-        let (server_tls_sender, client_tls_receiver) = channel::<Vec<u8>>();
-        let (client_tls_sender, server_tls_receiver) = channel::<(u32, Vec<u8>)>();
+        info!("Initialise Veracruz runtime.");
+        // Create the server
+        let mut veracruz_server =
+            VeracruzServer::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
 
-        let shared_buffers = Arc::new(Mutex::new(Buffers {
-            read_buffer: vec![],
-            write_buffer: None,
-        }));
+        // Create the client tls session.
+        let veracruz_session = veracruz_server
+            .new_session()
+            .map_err(|e| anyhow!("{:?}", e))?;
 
         info!("Initialise a client with its certificate and key.");
         // Create a fake client session which only ends to the simulated connecting channel.
@@ -612,130 +594,21 @@ impl TestExecutor {
             client_cert_path,
             client_key_path,
             &policy.ciphersuite(),
-            Arc::clone(&shared_buffers),
+            veracruz_session.clone(),
         )?;
-
-        info!("Initialise Veracruz runtime.");
-        // Create the server
-        let mut veracruz_server =
-            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
-
-        // Create the client tls session. Note that we need the session id.
-        let client_connection_id = veracruz_server
-            .new_tls_session()
-            .map_err(|e| anyhow!("{:?}", e))?;
-        if client_connection_id == 0 {
-            return Err(anyhow!("client session id is zero"));
-        }
-
-        info!("Spawn server thread.");
-        // Create the sever loop, it is the end of the previous created channels.
-        let alive_flag = Arc::new(AtomicBool::new(true));
-        let init_flag = Arc::new(AtomicBool::new(false));
-        // Create a clone which passes to server thread.
-        let alive_flag_clone = alive_flag.clone();
-        let init_flag_clone = init_flag.clone();
-        let server_thread = thread::spawn(move || {
-            if let Err(e) = TestExecutor::simulated_server(
-                &mut veracruz_server,
-                server_tls_sender,
-                server_tls_receiver,
-                alive_flag_clone.clone(),
-                init_flag_clone,
-            ) {
-                alive_flag_clone.store(false, Ordering::SeqCst);
-                Err(e)
-            } else {
-                Ok(())
-            }
-        });
-        info!("A new test executor is created.");
-
-        // Block until the init_flag is set by the server thread.
-        while !init_flag.load(Ordering::SeqCst) {}
 
         Ok(TestExecutor {
             policy,
             policy_hash,
             client_connection,
-            client_connection_id,
-            shared_buffers,
-            client_tls_sender,
-            client_tls_receiver,
-            alive_flag,
-            server_thread,
         })
-    }
-
-    /// This function simulating a Veracruz server, it should run on a separate thread.
-    fn simulated_server(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
-        sender: Sender<Vec<u8>>,
-        receiver: Receiver<(u32, Vec<u8>)>,
-        test_alive_flag: Arc<AtomicBool>,
-        test_init_flag: Arc<AtomicBool>,
-    ) -> Result<()> {
-        info!("Server: simulated server loop starts...");
-
-        test_init_flag.store(true, Ordering::SeqCst);
-
-        while test_alive_flag.load(Ordering::SeqCst) {
-            let received = receiver.recv();
-            let (session_id, received_buffer) = received.map_err(|e| anyhow!("Server: {:?}", e))?;
-            info!(
-                "Server: receive {} byte(s) on session ID {}.",
-                received_buffer.len(),
-                session_id
-            );
-
-            let (veracruz_active_flag, output_data_option) = veracruz_server
-                .tls_data(session_id, received_buffer)
-                .map_err(|e| {
-                    // This point has a high chance to fail.
-                    error!("Veracruz Server: {:?}", e);
-                    e
-                })
-                .map_err(|e| anyhow!("{:?}", e))?;
-
-            // At least send an empty message, this notifies the client.
-            let output_data = output_data_option.unwrap_or_else(|| vec![vec![]]);
-
-            for output in output_data.iter() {
-                sender.send(output.clone()).map_err(|e| {
-                    anyhow!(
-                        "Failed to send data on TX channel.  Error produced: {:?}.",
-                        e
-                    )
-                })?;
-            }
-
-            if !veracruz_active_flag {
-                info!("Veracruz server TLS loop dying due to lack of TLS data.");
-                return Ok(());
-            }
-        }
-
-        // The server should not reach here.
-        Err(anyhow!(
-            "VeracruzServer TLS loop dieing due to no activity..."
-        ))
     }
 
     /// Execute this test. The client sends messages though the channel to the server
     /// thread driven by `events`. It consumes the ownership of `self`,
     /// because it will join server thread at the end.
-    fn execute(mut self, events: Vec<TestEvent>, timeout: Duration) -> anyhow::Result<()> {
-        // Spawn a thread that will send the timeout signal by killing alive flag.
-        let alive_flag_clone = self.alive_flag.clone();
-        thread::spawn(move || {
-            thread::sleep(timeout);
-            if alive_flag_clone.load(Ordering::SeqCst) {
-                error!(
-                    "--->>> Force timeout. It is very likely to trigger error on the test. <<<---"
-                );
-            }
-            alive_flag_clone.store(false, Ordering::SeqCst);
-        });
+    fn execute(mut self, events: Vec<TestEvent>, _timeout: Duration) -> anyhow::Result<bool> {
+        let mut error_occurred = false;
 
         // process test events
         for event in events.iter() {
@@ -743,9 +616,11 @@ impl TestExecutor {
             let time_init = Instant::now();
             let response = self.process_event(&event).map_err(|e| {
                 error!("Client: {:?}", e);
-                self.alive_flag.store(false, Ordering::SeqCst);
                 e
             })?;
+            if response.get_status() != transport_protocol::ResponseStatus::SUCCESS {
+                error_occurred = true;
+            }
             info!(
                 "The event {:?} finished with response status {:?} in {:?}.",
                 event,
@@ -754,12 +629,7 @@ impl TestExecutor {
             );
         }
 
-        // Wait the server to finish.
-        self.server_thread
-            .join()
-            .map_err(|e| anyhow!("server thread failed with error {:?}", e))?
-            .map_err(|e| anyhow!("{:?}", e))?;
-        Ok(())
+        Ok(!error_occurred)
     }
 
     fn process_event(
@@ -894,103 +764,30 @@ impl TestExecutor {
 
     /// The client sends TLS packages via the simulated channel.
     fn client_send(&mut self, send_data: &[u8]) -> Result<Vec<u8>> {
-        info!(
-            "Client: client send with length of data {:?}",
-            send_data.len()
-        );
         let connection = &mut self.client_connection;
-        let mut write_all_succeeded = false;
-        while self.alive_flag.load(Ordering::SeqCst) {
-            // connection.write_all
-            if !write_all_succeeded {
-                match connection.write_all(&send_data[..]) {
-                    Ok(()) => write_all_succeeded = true,
-                    Err(err) => {
-                        if err.kind() == std::io::ErrorKind::WouldBlock {
-                            ()
-                        } else {
-                            return Err(anyhow!(
-                                "Failed to send all data.  Error produced: {:?}.",
-                                err
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // write_buffer.take
-            let taken = self
-                .shared_buffers
-                .lock()
-                .map_err(|_| anyhow!("lock failed"))?
-                .write_buffer
-                .take();
-            match taken {
-                None => (),
-                Some(output) => {
-                    // client_tls_sender.send
-                    self.client_tls_sender
-                        .send((self.client_connection_id, output))
-                        .map_err(|e| {
-                            anyhow!(
-                                "Failed to send data on TX channel. Error produced: {:?}.",
-                                e
-                            )
-                        })?;
-
-                    // client_tls_receiver.recv
-                    let received = self.client_tls_receiver.recv()?;
-
-                    // read_buffer.extend_from_slice
-                    self.shared_buffers
-                        .lock()
-                        .map_err(|_| anyhow!("lock failed"))?
-                        .read_buffer
-                        .extend_from_slice(&received);
-                }
-            }
-
-            // connection.read_to_end
-            let mut received_buffer: Vec<u8> = Vec::new();
-            let res = connection.read_to_end(&mut received_buffer);
-            if received_buffer.len() > 0 {
-                return Ok(received_buffer);
-            }
-            match res {
-                Ok(_) => (),
-                Err(err) => {
-                    if err.kind() == std::io::ErrorKind::WouldBlock {
-                        ()
-                    } else {
-                        return Err(anyhow!(
-                            "Failed to read data to end.  Error produced: {:?}.",
-                            err
-                        ));
-                    }
-                }
-            }
-        }
-
-        // If reach here, it means the server crashed.
-        Err(anyhow!("Terminate due to server crash"))
+        connection.write_all(&send_data)?;
+        const PREFLEN: usize = transport_protocol::LENGTH_PREFIX_SIZE;
+        let mut length_buffer = [0; PREFLEN];
+        connection.read_exact(&mut length_buffer)?;
+        let length = PREFLEN + u64::from_be_bytes(length_buffer) as usize;
+        let mut response = length_buffer.to_vec();
+        response.resize(length, 0);
+        connection.read_exact(&mut response[PREFLEN..length])?;
+        Ok(response)
     }
 }
 
 /// Auxiliary function: initialise the Veracruz server from policy and open a tls session
 fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     policy_json: T,
-) -> Result<(VeracruzServerEnclave, u32)> {
+) -> Result<(VeracruzServer, VeracruzSession)> {
     let mut veracruz_server =
-        VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
+        VeracruzServer::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
 
-    let session_id = veracruz_server
-        .new_tls_session()
+    let session = veracruz_server
+        .new_session()
         .map_err(|e| anyhow!("{:?}", e))?;
-    if session_id != 0 {
-        Ok((veracruz_server, session_id))
-    } else {
-        Err(anyhow!("Session ID cannot be zero").into())
-    }
+    Ok((veracruz_server, session))
 }
 
 fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) -> bool {
@@ -1025,8 +822,8 @@ fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
     client_cert_filename: P,
     client_key_filename: Q,
     ciphersuite_str: &str,
-    shared_buffers: Arc<Mutex<Buffers>>,
-) -> Result<mbedtls::ssl::Context<InsecureConnection>> {
+    session: VeracruzSession,
+) -> Result<mbedtls::ssl::Context<VeracruzSession>> {
     let client_cert = read_cert_file(client_cert_filename)?;
 
     let client_priv_key = read_priv_key_file(client_key_filename)?;
@@ -1062,8 +859,7 @@ fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
     config.set_ca_list(Arc::new(root_store), None);
     config.push_cert(Arc::new(client_cert), Arc::new(client_priv_key))?;
     let mut ctx = mbedtls::ssl::Context::new(Arc::new(config));
-    let conn = InsecureConnection { shared_buffers };
-    let _ = ctx.establish(conn, None);
+    let _ = ctx.establish(session, None);
     Ok(ctx)
 }
 
