@@ -474,6 +474,11 @@ impl WasmtimeRuntimeState {
             VeracruzAPIName::FD_CREATE.into(),
             Self::veracruz_si_fd_create,
         )?;
+        linker.func_wrap(
+            WasiWrapper::VERACRUZ_SI_MODULE_NAME,
+            VeracruzAPIName::NANOSLEEP.into(),
+            Self::veracruz_si_nanosleep,
+        )?;
 
         info!("Link external functions.");
 
@@ -1107,6 +1112,13 @@ impl WasmtimeRuntimeState {
         let caller_data = caller.data().clone();
         let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
+    }
+
+    fn veracruz_si_nanosleep(mut _caller: CallerWrapper, x: u64) -> u32 {
+        println!("xx wasmtime nanosleep({}) begin", x);
+        std::thread::sleep(std::time::Duration::from_nanos(x));
+        println!("xx wasmtime nanosleep({}) end", x);
+        Self::convert_to_errno(Err(ErrNo::Success))
     }
 
 }

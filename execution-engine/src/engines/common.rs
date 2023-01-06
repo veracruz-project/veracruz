@@ -128,6 +128,7 @@ pub enum WasiAPIName {
 #[strum(serialize_all = "lowercase")]
 pub enum VeracruzAPIName {
     FD_CREATE,
+    NANOSLEEP,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

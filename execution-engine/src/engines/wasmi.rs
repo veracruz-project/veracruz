@@ -401,6 +401,7 @@ impl TypeCheck {
             },
             APIName::VeracruzAPIName(index) => match index {
                 VeracruzAPIName::FD_CREATE => vec![Self::POINTER],
+                VeracruzAPIName::NANOSLEEP => vec![ValueType::I64],
             },
         }
     }
@@ -571,6 +572,7 @@ impl Externals for WASMIRuntimeState {
             },
             APIName::VeracruzAPIName(veracruz_call_index) => match veracruz_call_index {
                 VeracruzAPIName::FD_CREATE => self.veracruz_fd_create(args),
+                VeracruzAPIName::NANOSLEEP => self.veracruz_nanosleep(args),
             },
         }
         .map_err(|e| {
@@ -1289,6 +1291,14 @@ impl WASMIRuntimeState {
     fn veracruz_fd_create(&mut self, args: RuntimeArgs) -> WasiResult {
         let address = args.nth_checked::<u32>(0)?;
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
+    }
+
+    fn veracruz_nanosleep(&mut self, args: RuntimeArgs) -> WasiResult {
+        let x = args.nth_checked::<u64>(0)?;
+        println!("xx wasmi nanosleep({}) begin", x);
+        std::thread::sleep(std::time::Duration::from_nanos(x));
+        println!("xx wasmi nanosleep({}) end", x);
+        Ok(ErrNo::Success)
     }
 
 }

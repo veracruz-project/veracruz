@@ -15,12 +15,16 @@ mod veracruz_si_import {
     #[link(wasm_import_module = "veracruz_si")]
     extern "C" {
         pub fn fd_create(x: u32) -> u32;
+        pub fn nanosleep(x: u64) -> u32;
     }
 }
 
 mod veracruz_si {
     pub fn fd_create(fd: *mut crate::RawFd) -> u32 {
         unsafe { crate::veracruz_si_import::fd_create(fd as u32) }
+    }
+    pub fn nanosleep(x: u64) -> u32 {
+        unsafe { crate::veracruz_si_import::nanosleep(x) }
     }
 }
 
@@ -36,4 +40,10 @@ pub fn fd_create() -> std::io::Result<File> {
         // though fd_create should never fail.
         panic!("unexpected")
     }
+}
+
+/// Nanosleep added for testing.
+pub fn nanosleep(x: u64) -> std::io::Result<u32> {
+    veracruz_si::nanosleep(x);
+    Ok(0)
 }
