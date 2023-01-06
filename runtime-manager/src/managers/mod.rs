@@ -95,7 +95,8 @@ impl ProtocolState {
         rights_table.insert(Principal::InternalSuperUser, su_read_rights);
 
         let digest_table = global_policy.get_file_hash_table()?;
-        let vfs = FileSystem::new(rights_table)?;
+        let native_modules = global_policy.native_modules();
+        let vfs = FileSystem::new(rights_table, native_modules.to_vec())?;
 
         Ok(ProtocolState {
             global_policy,

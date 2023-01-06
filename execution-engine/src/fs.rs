@@ -16,11 +16,9 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::{
-    aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
-};
+use crate::native_modules::common::Service;
 use policy_utils::{
-    principal::{FileRights, Principal, RightsTable},
+    principal::{FileRights, NativeModule, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -155,17 +153,11 @@ impl InodeEntry {
         self.data.is_service()
     }
 
-    /// Try to parse the input.
-    #[inline]
-    pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
-        self.data.service_valid_input()
-    }
-
     /// Return the service handler, and the current content of in the special file.
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<Service>>>, Vec<u8>)> {
         self.data.service_handler()
     }
 }
@@ -183,7 +175,7 @@ enum InodeImpl {
     ///     In single thread situation, it is fine.
     ///     - The output of the service is determined by the service itself. It can try to open
     ///     any file and write to it, as long as the service has enough capabilities in FileSystem.
-    NativeModule(Arc<Mutex<Box<dyn Service>>>, Vec<u8>),
+    NativeModule(Arc<Mutex<Box<Service>>>, Vec<u8>),
     /// A file
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
@@ -342,23 +334,11 @@ impl InodeImpl {
         }
     }
 
-    /// Try to parse the input of a service. Return true if it is a valid input.
-    #[inline]
-    pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
-        match self {
-            Self::NativeModule(service, input) => {
-                let mut service = service.lock().map_err(|_| ErrNo::Busy)?;
-                service.try_parse(input)
-            }
-            _ => Err(ErrNo::Inval),
-        }
-    }
-
     /// Return the service.
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<Service>>>, Vec<u8>)> {
         match self {
             Self::NativeModule(service, input) => {
                 // NOTE: We copy out, particularly `input`, on purpose, as they are protected by a
@@ -428,7 +408,7 @@ impl Debug for InodeTable {
                     k,
                     service
                         .try_lock()
-                        .map_or_else(|_| "(failed to lock)".to_string(), |o| o.name().to_string())
+                        .map_or_else(|_| "(failed to lock)".to_string(), |o| String::from(o.native_module().interface_path().to_str().unwrap_or("(failed to convert path to unicode")))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
             }
@@ -464,23 +444,25 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (output_path, service_instance) tuples.
+    /// Install all the (interface_file_path, service_instance) tuples, one per
+    /// native module.
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
-    fn install_services<T: AsRef<Path>>(
+    fn install_services(
         &mut self,
-        services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
+        native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
-        for (path, service) in services {
-            let path = path.as_ref();
+        for native_module in native_modules {
+            let path = native_module.interface_path();
+            let service = Arc::new(Mutex::new(Box::new(Service::new(native_module.clone()))));
             let new_inode = self.new_inode()?;
             let path = strip_root_slash(path);
             // Call the existing function to create general files.
             self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
             // Manually uplift the general file to special file bound with the service.
             self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
-                InodeImpl::NativeModule(service.clone(), Vec::new());
+                InodeImpl::NativeModule(service, Vec::new());
         }
         Ok(())
     }
@@ -759,6 +741,8 @@ pub struct FileSystem {
     inode_table: SharedInodeTable,
     /// Preopen FD table. Mapping the FD to dir name.
     prestat_table: HashMap<Fd, PathBuf>,
+    /// A list of native modules available for the computation.
+    native_modules: Vec<NativeModule>,
 }
 
 impl Debug for FileSystem {
@@ -797,12 +781,13 @@ impl FileSystem {
     /// and similar with respect to the parameter `std_streams_table`.  Userspace
     /// Wasm programs are going to expect that this is true, so we need to
     /// preallocate some files corresponding to those, here.
-    pub fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
+    pub fn new(rights_table: RightsTable, native_modules: Vec<NativeModule>) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table)?)),
             prestat_table: HashMap::new(),
+            native_modules: native_modules.to_vec(),
         };
 
         let mut all_rights = HashMap::new();
@@ -813,32 +798,22 @@ impl FileSystem {
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
 
-        let mut services = Vec::new();
-
-        let service: Box<dyn Service> = Box::new(PostcardService::new());
-        services.push((Self::POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
-
-        let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
-        services.push((
-            Self::AES_COUNTER_MODE_SERVICE_PATH,
-            Arc::new(Mutex::new(service)),
-        ));
-        let service: Box<dyn Service> = Box::new(AeadService::new());
-        services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
-        rst.install_services(services)?;
+        rst.install_services(native_modules)?;
 
         Ok(rst)
     }
 
     /// This is the *only* public API to create a new `FileSystem` (handler).
     /// It returns a `FileSystem` where directories are pre-opened with appropriate
-    /// capabilities in relation to a principal, `principal`.
+    /// capabilities in relation to a principal, `principal`. Native modules are
+    /// inherited from the parent `FileSystem`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
             inode_table: self.inode_table.clone(),
             prestat_table: HashMap::new(),
+            native_modules: self.native_modules.to_vec(),
         };
 
         // Must clone as `install_prestat` needs to lock the `inode_table` too
@@ -863,6 +838,7 @@ impl FileSystem {
             next_fd_candidate: Self::FIRST_FD,
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table).unwrap())),
             prestat_table: HashMap::new(),
+            native_modules: Vec::new(),
         }
     }
 
@@ -977,11 +953,11 @@ impl FileSystem {
         Ok(())
     }
 
-    fn install_services<T: AsRef<Path>>(
+    fn install_services(
         &mut self,
-        services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
+        native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
-        self.lock_inode_table()?.install_services(services)
+        self.lock_inode_table()?.install_services(native_modules)
     }
 
     /// Install a `fd` to the file system. The fd will be of type RegularFile.
@@ -1290,18 +1266,21 @@ impl FileSystem {
             (len, f.is_service())
         };
 
-        // If it is a service, call it when there is a valid input
-        if is_service && {
-            self.lock_inode_table()?
-                .get_mut(&inode)?
-                .service_valid_input()?
-        } {
+        // If it is a service, call it.
+        // Warning: There is no input validity check performed here. It is the
+        // native module's responsibility to implement that.
+        if is_service
+        {
             let (service, input) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let mut service = service.lock().map_err(|_| ErrNo::Busy)?;
-            service.serve(&mut self.service_fs()?, &input)?;
+            let native_module = service
+                .lock()
+                .map_err(|_| ErrNo::Busy)?
+                .native_module();
+            
+            // TODO: Prepare sandbox environment with native module's configuration and run native module with input
         }
         Ok(len)
     }

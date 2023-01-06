@@ -189,6 +189,12 @@ impl Policy {
         &self.identities
     }
 
+    /// Returns the native modules associated with this policy.
+    #[inline]
+    pub fn native_modules(&self) -> &Vec<NativeModule> {
+        &self.native_modules
+    }
+
     /// Returns the URL of the Veracruz server associated with this policy.
     #[inline]
     pub fn veracruz_server_url(&self) -> &String {
