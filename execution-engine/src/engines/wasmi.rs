@@ -408,6 +408,7 @@ impl TypeCheck {
 
     /// Check if the numbers of parameters in `args` is correct against the wasi function call `index`.
     /// Return FatalEngineError::BadArgumentsToHostFunction{ index }, if not.
+    // TODO: Make this also work for VeracruzAPIName.
     pub(crate) fn check_args_number(args: &RuntimeArgs, index: WasiAPIName) -> Result<()> {
         if args.len() == Self::get_params(APIName::WasiAPIName(index)).len() {
             Ok(())
