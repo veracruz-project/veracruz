@@ -39,7 +39,11 @@ pub fn execute_pipeline(
 ) -> Result<u32> {
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
-        Literal(path_string) => {
+        Literal(mut path_string) => {
+            // Turn a relative path into an absolute path.
+            if &path_string[0..1] != "/" {
+                path_string.insert(0, '/');
+            }
             info!("Literal {:?}", path_string);
             // read and call execute_program
             let binary = caller_filesystem.read_exeutable_by_absolute_path(path_string)?;
