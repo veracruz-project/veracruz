@@ -23,13 +23,14 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use anyhow::anyhow;
 use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use policy_utils::{
+    parsers::{parse_pipeline, enforce_leading_backslash},
     pipeline::Expr, 
-    parsers::parse_pipeline,
-    principal::{ExecutionStrategy, Principal},
+    principal::{ExecutionStrategy, NativeModule, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -83,6 +84,10 @@ struct CommandLineOptions {
     environment_variables: Vec<(String, String)>,
     /// Whether strace is enabled.
     enable_strace: bool,
+    /// A list of paths to native module entry points.
+    native_modules_entry_points: Vec<PathBuf>,
+    /// A list of paths to native module interface files.
+    native_modules_interface_paths: Vec<PathBuf>,
     /// The conditional pipeline of programs to execute.
     pipeline: Box<Expr>,
 }
@@ -116,6 +121,24 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                     "Space-separated paths to the output directories. The directories are copied \
                      into disk on the host. All program are granted with write capabilities.",
                 )
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("native-module-entry-point")
+                .long("native-module-entry-point")
+                .value_name("FILE")
+                .help("Specifies the path to the entry point of the native module to use for the computation. \
+This must be of the form \"--native-module-entry-point path\". Multiple --native-module-entry-point flags may be provided.")
+                .required(false)
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("native-module-interface-file")
+                .long("native-module-interface-file")
+                .value_name("FILE")
+                .help("Specifies the path to the interface file of the native module to use for the computation. \
+This must be of the form \"--native-module-interface-file path\". Multiple --native-module-interface-file flags may be provided.")
+                .required(false)
                 .multiple(true),
         )
         .arg(
@@ -195,6 +218,19 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         }
     };
 
+    // Read all native module entry points
+    let native_modules_entry_points = matches
+        .values_of_os("native-module-entry-point")
+        .map_or(Vec::new(), |p| {
+            p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
+        });
+
+    // Read all native module interface paths
+    let native_modules_interface_paths = matches
+        .values_of_os("native-module-interface-file")
+        .map_or(Vec::new(), |p| {
+            p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
+        });
 
     let pipeline = if let Some(pipeline_string) = matches.value_of("pipeline") {
         parse_pipeline(pipeline_string)?
@@ -249,6 +285,8 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
         enable_clock,
         environment_variables,
         enable_strace,
+        native_modules_entry_points,
+        native_modules_interface_paths,
         pipeline,
     })
 }
@@ -355,7 +393,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     info!("The final rights table: {:?}", right_table);
 
-    let mut vfs = FileSystem::new(right_table)?;
+    // Construct the native module table
+    info!("Serializing native modules.");
+
+    assert_eq!(cmdline.native_modules_entry_points.len(), cmdline.native_modules_interface_paths.len());
+
+    let mut native_modules = Vec::new();
+    for (id, (entry_point_path, interface_path)) in cmdline.native_modules_entry_points
+        .iter()
+        .zip(&cmdline.native_modules_interface_paths)
+        .enumerate()
+    {
+        let interface_path = enforce_leading_backslash(interface_path.to_str()
+        .ok_or(
+            anyhow!("Fail to convert interface_path to str."),
+        )?).into_owned();
+
+        native_modules.push(NativeModule::new(entry_point_path.to_path_buf(), PathBuf::from(interface_path), id as u32));
+    }
+
+    let mut vfs = FileSystem::new(right_table, native_modules)?;
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
 
     info!("Data sources loaded.");
