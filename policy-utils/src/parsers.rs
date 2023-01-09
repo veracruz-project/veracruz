@@ -17,10 +17,10 @@
 
 #[cfg(feature = "std")]
 use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
+use crate::pipeline::Expr;
+use lalrpop_util::lalrpop_mod;
 #[cfg(feature = "std")]
 use std::{borrow::Cow, ffi, path};
-use lalrpop_util::lalrpop_mod;
-use crate::pipeline::Expr;
 
 lalrpop_mod!(pipeline);
 
@@ -68,13 +68,13 @@ pub fn parse_renamable_paths(
         .collect::<Result<Vec<_>, _>>()
 }
 
-/// Insert a backslash (/) if the path does not already have one
+/// Insert a slash (/) if the path does not already have one
 ///
 /// Veracruz currently doesn't have a concept of "current directory", so
 /// the "current directory" is always the root. This avoids easy typing
 /// mistakes.
 #[cfg(feature = "std")]
-pub fn enforce_leading_backslash(path: &str) -> Cow<str> {
+pub fn enforce_leading_slash(path: &str) -> Cow<str> {
     let is_special_file = path == CANONICAL_STDIN_FILE_PATH
         || path == CANONICAL_STDOUT_FILE_PATH
         || path == CANONICAL_STDERR_FILE_PATH;
@@ -87,13 +87,13 @@ pub fn enforce_leading_backslash(path: &str) -> Cow<str> {
 }
 
 /// Parse a pineline string `pipeline_str` and return the syntax tree.
-pub fn parse_pipeline(pipeline_str : &str) -> anyhow::Result<Box<Expr>> {
+pub fn parse_pipeline(pipeline_str: &str) -> anyhow::Result<Box<Expr>> {
     let engine = pipeline::ExprsParser::new();
 
-    // NOTE: not sure why the parse need a 'static str, use the box to escape and rebox 
-    let tmp : &'static str = Box::leak(Box::new(pipeline_str.to_owned().into_boxed_str()));
+    // NOTE: not sure why the parse need a 'static str, use the box to escape and rebox
+    let tmp: &'static str = Box::leak(Box::new(pipeline_str.to_owned().into_boxed_str()));
     let rst = engine.parse(&tmp)?.clone();
     // Re-box so the tmp will drop
-    let _ = unsafe{ Box::from_raw(tmp as *const str as*mut str) };
+    let _ = unsafe { Box::from_raw(tmp as *const str as *mut str) };
     Ok(rst)
 }

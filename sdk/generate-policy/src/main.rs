@@ -16,7 +16,7 @@ use data_encoding::HEXLOWER;
 use log::{info, warn};
 use policy_utils::{
     expiry::Timepoint,
-    parsers::{enforce_leading_backslash, parse_renamable_paths},
+    parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
     principal::{ExecutionStrategy, FileHash, FileRights, Identity, Pipeline, Program},
 };
@@ -512,7 +512,7 @@ impl Arguments {
             .enumerate()
         {
             let file_permissions = serialize_capability(capability)?;
-            let program_file_name = enforce_leading_backslash(program_file_name).into_owned();
+            let program_file_name = enforce_leading_slash(program_file_name).into_owned();
 
             result.push(Program::new(program_file_name, id as u32, file_permissions));
         }
@@ -639,7 +639,7 @@ impl Arguments {
         let mut result = Vec::new();
         for (file_name, file_path) in self.hashes.iter() {
             let hash = compute_file_hash(file_path)?;
-            let file_name = enforce_leading_backslash(file_name).into_owned();
+            let file_name = enforce_leading_slash(file_name).into_owned();
 
             result.push(FileHash::new(file_name, hash));
         }
@@ -727,7 +727,7 @@ fn serialize_capability_entry(cap_string: &str) -> Result<FileRights> {
     let EXECUTE_RIGHTS = Rights::PATH_OPEN | Rights::FD_EXECUTE | Rights::FD_SEEK;
 
     let mut split = cap_string.split(':');
-    let file_name = enforce_leading_backslash(
+    let file_name = enforce_leading_slash(
         split
             .next()
             .expect(&format!("Failed to parse {}, empty string", cap_string))
