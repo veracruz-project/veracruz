@@ -6,14 +6,18 @@ name = "policy-utils"
 version = "0.3.0"
 
 [features]
-icecap = []
+icecap = [
+  "veracruz-utils/icecap",
+]
 nitro = [
   "mbedtls/monitor_getrandom",
+  "veracruz-utils/nitro",
 ]
 std = [
   "hex/std",
   "serde/std",
   "serde_json/std",
+  "veracruz-utils/std",
 ]
 
 [dependencies]
@@ -26,7 +30,7 @@ mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 regex = "1"
 serde = { version = "1.0.115", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
-veracruz-utils = { path = "../veracruz-utils" }
+veracruz-utils = { path = "../veracruz-utils", optional = true }
 wasi-types = { path = "../third-party/wasi-types" }
 
 [build-dependencies]

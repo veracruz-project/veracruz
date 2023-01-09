@@ -8,13 +8,16 @@ version = "0.3.0"
 [features]
 icecap = [
   "policy-utils/icecap",
+  "veracruz-utils/icecap",
 ]
 nitro = [
   "mbedtls/monitor_getrandom",
   "policy-utils/std",
+  "veracruz-utils/nitro",
 ]
 std = [
   "policy-utils/std",
+  "veracruz-utils/std",
 ]
 
 [dependencies]
@@ -23,4 +26,4 @@ err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-veracruz-utils = { path = "../veracruz-utils" }
+veracruz-utils = { path = "../veracruz-utils", optional = true }
