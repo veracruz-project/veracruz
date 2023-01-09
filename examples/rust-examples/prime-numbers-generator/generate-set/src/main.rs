@@ -21,13 +21,7 @@ const OUTPUT_FILENAME: &'static str = "/output/number-set.txt";
 fn main() -> anyhow::Result<()> {
     let mut set: Vec<u32> = Vec::new();
 
-    let args: Vec<String> = std::env::args().collect();
-
-    let upper_limit = args
-        .get(0)
-        .unwrap_or(&String::from("100"))
-        .to_owned()
-        .parse::<u32>()?;
+    let upper_limit = std::env::var("LIMIT")?.parse::<u32>()?;
 
     for i in 2..=upper_limit {
         set.push(i);

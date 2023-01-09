@@ -6,11 +6,11 @@ This is a simple program that lets you move the cursor inside a text file for a 
 
 1. Go to `sdk/freestanding-execution-engine` directory
 
-2. run `cp -r ../rust-examples/file-seek .`. This will copy the current directory to the Veracruz freestanding execution engine.
+2. Run `cp -r ../../examples/rust-examples/file-seek .`. This will copy the current directory to the Veracruz freestanding execution engine.
 
 3. Inside `sdk/freestanding-execution-engine`, Create a directory called `input`, and another directory called `output`.
 
-4. Run the following command `cp ../../README.markdown input`, this will copy the Veracruz README file to the input directory to be our input to the program.
+4. Run the command `cp ../../README.markdown input/`. This will copy the Veracruz README file to the input directory to be our input to the program.
 
 5. Go to `file-seek` directory and run the following commands
   ```
@@ -24,8 +24,8 @@ The first command adds WebAssembly (WASM) as the compilation target, so the rust
 
 7. Go back to `freestanding-execution-engine` directory and Run the following command
 ```
-RUST_LOG="info" cargo run -- --arg 1000 --input-source input --input-source file-seek --program file-seek/file-seek.wasm --output-source output -e -d -c
+RUST_LOG="info" cargo run -- --env SKIP=1000 --input-source input --input-source file-seek --pipeline file-seek/file-seek.wasm --output-source output -e -d -c
 ```
-The number after `--arg` is the number of bytes that you want to skip from the beginning of the text file. Feel free to change it to whatever you want.
+The number after `--env SKIP=` is the number of bytes that you want to skip from the beginning of the text file. Feel free to change it to whatever you want.
 
 8. You should have seen a very long log of information. Go to the `output` directory and you should see the `NEW_README.markdown` file and it should the remainder of the text file after skipping the desired number of bytes.
