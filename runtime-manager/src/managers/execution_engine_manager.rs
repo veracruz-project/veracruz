@@ -201,6 +201,6 @@ pub fn dispatch_on_incoming_data(
         Some(REQUEST {
             message_oneof: Some(request),
             ..
-        }) => dispatch_on_request(client_id, request),
+        }) => dispatch_on_request(client_id, request).or(response_invalid_request()),
     }
 }

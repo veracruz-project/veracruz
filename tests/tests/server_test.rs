@@ -127,7 +127,8 @@ fn basic_read_write_and_traverse() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -141,7 +142,8 @@ fn basic_random_source() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -154,7 +156,8 @@ fn fd_create() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -166,9 +169,15 @@ fn basic_execute_non_existent() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -179,9 +188,15 @@ fn basic_client_read_non_existent() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -194,9 +209,15 @@ fn basic_program_read_non_existent() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -209,8 +230,14 @@ fn basic_unauthorized_key() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, UNAUTHORIZED_KEY, events, TIME_OUT_SECS);
+    let result = TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        UNAUTHORIZED_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    );
     assert!(result.is_err(), "An error should occur");
 }
 
@@ -224,8 +251,14 @@ fn basic_unauthorized_certificate() {
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, UNAUTHORIZED_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
+    let result = TestExecutor::test_template(
+        POLICY,
+        UNAUTHORIZED_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    );
     assert!(result.is_err(), "An error should occur");
 }
 
@@ -245,6 +278,7 @@ fn basic_unauthorized_certificate_key_pair() {
         UNAUTHORIZED_KEY,
         events,
         TIME_OUT_SECS,
+        false,
     );
     assert!(result.is_err(), "An error should occur");
 }
@@ -261,7 +295,8 @@ fn basic_postcard_native_module() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -280,7 +315,8 @@ fn basic_number_accumulation_batch_process() {
     ));
     events.push(TestEvent::ShutDown);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -295,7 +331,8 @@ fn basic_pipeline() {
         TestEvent::read_result("/output/sorted_numbers.txt"),
         TestEvent::ShutDown,
     ];
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -314,7 +351,8 @@ fn integration_linear_regression() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -339,7 +377,8 @@ fn integration_intersection_sum() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -356,7 +395,8 @@ fn integration_string_edit_distance() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -375,7 +415,8 @@ fn integration_private_set_intersection() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -389,9 +430,15 @@ fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation()
         TestEvent::ShutDown,
     ];
 
-    let result =
-        TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS);
-    assert!(result.is_err(), "An error should occur");
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -406,7 +453,8 @@ fn integration_postcard_json() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -428,7 +476,8 @@ fn performance_idash2017() {
         TestEvent::ShutDown,
     ]);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -449,7 +498,8 @@ fn performance_macd() {
         TestEvent::ShutDown,
     ]);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
@@ -469,7 +519,8 @@ fn performance_set_intersection_sum() {
         TestEvent::ShutDown,
     ]);
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS).unwrap();
+    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 /// Test states.
@@ -555,22 +606,36 @@ impl Write for InsecureConnection {
 }
 
 impl TestExecutor {
-    /// This is the template. The template appends the path to the policy, and client
-    /// certificate and key file, initials the test veracruz server and a mock client
-    /// accordingly, and then executes the test-case driven by mock client `events`.
+    /// This is the template. The template appends the path to the
+    /// policy, and client certificate and key file, initialises the
+    /// test veracruz server and a mock client accordingly, and then
+    /// executes the test-case driven by mock client `events`. The
+    /// function returns `Err(_)` if an error occurred before all the
+    /// events were executed. Otherwise, the function panics if
+    /// `expect_success` was set and one of the events did not return
+    /// SUCCESS or if `expect_success` was not set and all of the
+    /// events returned SUCCESS. Otherwise, it returns `Ok(())`.
     fn test_template<P: AsRef<str>, Q: AsRef<str>, K: AsRef<str>>(
         policy_filename: P,
         client_cert_filename: Q,
         client_key_filename: K,
         events: Vec<TestEvent>,
         timeout_sec: u64,
+        expect_success: bool,
     ) -> Result<(), Box<dyn Error + 'static>> {
-        Self::new(
+        let result = Self::new(
             policy_dir(policy_filename),
             cert_key_dir(client_cert_filename),
             cert_key_dir(client_key_filename),
         )?
         .execute(events, Duration::from_secs(timeout_sec))?;
+        if result != expect_success {
+            if expect_success {
+                panic!("There was an unexpected failure");
+            } else {
+                panic!("A failure was expected");
+            }
+        }
         Ok(())
     }
 
@@ -724,7 +789,7 @@ impl TestExecutor {
     /// Execute this test. The client sends messages though the channel to the server
     /// thread driven by `events`. It consumes the ownership of `self`,
     /// because it will join server thread at the end.
-    fn execute(mut self, events: Vec<TestEvent>, timeout: Duration) -> anyhow::Result<()> {
+    fn execute(mut self, events: Vec<TestEvent>, timeout: Duration) -> anyhow::Result<bool> {
         // Spawn a thread that will send the timeout signal by killing alive flag.
         let alive_flag_clone = self.alive_flag.clone();
         thread::spawn(move || {
@@ -737,6 +802,8 @@ impl TestExecutor {
             alive_flag_clone.store(false, Ordering::SeqCst);
         });
 
+        let mut error_occurred = false;
+
         // process test events
         for event in events.iter() {
             info!("Process event {:?}.", event);
@@ -746,6 +813,9 @@ impl TestExecutor {
                 self.alive_flag.store(false, Ordering::SeqCst);
                 e
             })?;
+            if response.get_status() != transport_protocol::ResponseStatus::SUCCESS {
+                error_occurred = true;
+            }
             info!(
                 "The event {:?} finished with response status {:?} in {:?}.",
                 event,
@@ -759,7 +829,7 @@ impl TestExecutor {
             .join()
             .map_err(|e| anyhow!("server thread failed with error {:?}", e))?
             .map_err(|e| anyhow!("{:?}", e))?;
-        Ok(())
+        Ok(!error_occurred)
     }
 
     fn process_event(
