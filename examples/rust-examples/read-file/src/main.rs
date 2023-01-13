@@ -2,7 +2,7 @@
 //!
 //! ## Context
 //!
-//! Read from 'input.txt', encode then using postcard and write to 'output'.
+//! Read data from a file, encode using postcard, then write to another file.
 //!
 //! ## Authors
 //!
@@ -16,7 +16,7 @@
 use anyhow;
 use std::{fs, io::Write};
 
-/// Read from 'input.txt', encode then using postcard and write to 'output'.
+/// Read data from a file, encode using postcard, then write to another file.
 fn main() -> anyhow::Result<()> {
     let input = "/input/hello-world-1.dat";
     let output = "/output/hello-world-1.dat";

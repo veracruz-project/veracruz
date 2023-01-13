@@ -14,22 +14,13 @@
 //! copyright information.
 
 use anyhow::{self, Ok};
-use std::{env, fs, process};
+use std::fs;
 
 const INPUT_FILENAME: &'static str = "/input/hello-world-1.dat";
 const OUTPUT_FILENAME: &'static str = "/output/search_results.dat";
 
 fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 1 {
-        process::exit(1);
-    }
-
-    let query: String = args
-        .get(0)
-        .expect("Couldn't read the argument.")
-        .to_string(); // Argument: To be searched for
+    let query = std::env::var("QUERY")?.to_string(); // search argument
 
     let file_vec: Vec<u8> = fs::read(INPUT_FILENAME)?;
 

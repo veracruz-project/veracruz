@@ -11,7 +11,7 @@
 
 set -e
 
-export WASI_BASE=/data/wasi-sdk
+export WASI_BASE=/work/veracruz/wasi-sdk
 
 export WASI_VERSION=12
 export WASI_VERSION_FULL=${WASI_VERSION}.0
@@ -37,9 +37,9 @@ fi
 
 $WASM_CC -Wall -O2 prog.c -o prog.wasm
 
-( cd ../../freestanding-execution-engine/ && cargo build )
+( cd ../../../sdk/freestanding-execution-engine/ && cargo build )
 
-RUN=../../freestanding-execution-engine/target/debug/freestanding-execution-engine
+RUN=../../../sdk/freestanding-execution-engine/target/debug/freestanding-execution-engine
 
-"$RUN" --program prog.wasm --input-source . -d -e -x jit
-"$RUN" --program prog.wasm --input-source . -d -e -x interp
+"$RUN" --pipeline prog.wasm --input-source . -d -e -x jit
+"$RUN" --pipeline prog.wasm --input-source . -d -e -x interp

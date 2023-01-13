@@ -17,5 +17,5 @@ policy-utils = { path = "../../policy-utils", features = ["std"] }
 regex = "1.5.5"
 serde = { version = "1.0.115", features = ["std"] }
 serde_json = { version = "1.0", features = ["std"] }
-veracruz-utils = {path = "../../veracruz-utils", features = ["std"]}
+veracruz-utils = { path = "../../veracruz-utils", features = ["std"] }
 wasi-types = { path = "../../third-party/wasi-types" }

@@ -14,8 +14,8 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-use std::{fs::File, io::prelude::*, io::SeekFrom};
 use anyhow;
+use std::{fs::File, io::prelude::*, io::SeekFrom};
 
 const INPUT_FILENAME: &'static str = "/input/README.markdown";
 const OUTPUT_FILENAME: &'static str = "/output/NEW_README.markdown";
@@ -23,12 +23,8 @@ const OUTPUT_FILENAME: &'static str = "/output/NEW_README.markdown";
 fn main() -> anyhow::Result<()> {
     let mut f = File::open(INPUT_FILENAME)?;
 
-    // get the number of bytes to skip from the command line arguments
-    let args: Vec<String> = std::env::args().collect();
-    let cursor_start = args.get(0)
-        .unwrap()
-        .to_owned()
-        .parse::<u64>()?;
+    // get the number of bytes to skip from the environment
+    let cursor_start = std::env::var("SKIP")?.parse::<u64>()?;
 
     // move the cursor <cursor_start> bytes from the start of the file
     f.seek(SeekFrom::Start(cursor_start))?;

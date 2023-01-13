@@ -13,7 +13,7 @@ use crate::error::VeracruzClientError;
 use anyhow::{anyhow, Result};
 use log::{error, info};
 use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
-use policy_utils::{parsers::enforce_leading_backslash, policy::Policy, Platform};
+use policy_utils::{parsers::enforce_leading_slash, policy::Policy, Platform};
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -187,7 +187,7 @@ impl VeracruzClient {
         data: &[u8],
         serialize_functor: fn(&[u8], &str) -> transport_protocol::TransportProtocolResult,
     ) -> Result<transport_protocol::RuntimeManagerResponse> {
-        let path = enforce_leading_backslash(
+        let path = enforce_leading_slash(
             path.as_ref()
                 .to_str()
                 .ok_or(VeracruzClientError::InvalidPath)?,

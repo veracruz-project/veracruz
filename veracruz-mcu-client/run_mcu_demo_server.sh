@@ -20,8 +20,8 @@ cd $(dirname $0)/..
 make sdk sgx-cli-install
 
 mkdir -p veracruz-mcu-client/example
-make -C sdk/rust-examples/audio-event-triangulation
-cp sdk/rust-examples/audio-event-triangulation/target/wasm32-wasi/release/audio-event-triangulation.wasm veracruz-mcu-client/example/audio-event-triangulation.wasm
+make -C examples/rust-examples/audio-event-triangulation
+cp examples/rust-examples/audio-event-triangulation/target/wasm32-wasi/release/audio-event-triangulation.wasm veracruz-mcu-client/example/audio-event-triangulation.wasm
 
 # setup identities
 openssl ecparam -name prime256v1 -genkey \
@@ -95,9 +95,8 @@ sleep 10
 
 # run the controller
 PYTHONIOENCODING=utf-8 \
-    ./sdk/rust-examples/audio-event-triangulation/scripts/poll_for_result.py \
+    ./examples/rust-examples/audio-event-triangulation/scripts/poll_for_result.py \
         veracruz-mcu-client/example/policy.json \
         --identity veracruz-mcu-client/example/controller-cert.pem \
         --key veracruz-mcu-client/example/controller-key.pem \
         --program veracruz-mcu-client/example/audio-event-triangulation.wasm
-

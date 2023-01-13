@@ -13,9 +13,8 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-
-use std::fs;
 use anyhow;
+use std::fs;
 
 const INPUT_FILENAME: &'static str = "/output/unsorted_numbers.txt";
 const OUTPUT_FILENAME: &'static str = "/output/sorted_numbers.txt";
