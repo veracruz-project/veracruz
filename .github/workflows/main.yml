@@ -54,12 +54,10 @@ jobs:
           # Find if any Cargo.lock changed, pad them into a line and trim leading and trailing whitespace.
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-      - name: Output list of changed Cargo.lock
-        id: output-changed-cargo-lock
-        if: steps.check-diff.outputs.cargo-lock != ''
-        run: |
-            echo "::warning::Cargo.lock files modified" 
-            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+          if [ -n "$file_changed" ] ; then 
+              echo "::warning::Cargo.lock files modified"; 
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
@@ -94,12 +92,10 @@ jobs:
         run: |
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-      - name: Output list of changed Cargo.lock
-        id: output-changed-cargo-lock
-        if: steps.check-diff.outputs.cargo-lock != ''
-        run: |
-            echo "::warning::Cargo.lock files modified" 
-            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+          if [ -n "$file_changed" ] ; then 
+              echo "::warning::Cargo.lock files modified"; 
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
@@ -134,12 +130,10 @@ jobs:
         run: |
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-      - name: Output list of changed Cargo.lock
-        id: output-changed-cargo-lock
-        if: steps.check-diff.outputs.cargo-lock != ''
-        run: |
-            echo "::warning::Cargo.lock files modified" 
-            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+          if [ -n "$file_changed" ] ; then 
+              echo "::warning::Cargo.lock files modified"; 
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
@@ -189,12 +183,10 @@ jobs:
         run: |
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-      - name: Output list of changed Cargo.lock
-        id: output-changed-cargo-lock
-        if: steps.check-diff.outputs.cargo-lock != ''
-        run: |
-            echo "::warning::Cargo.lock files modified" 
-            echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}" 
+          if [ -n "$file_changed" ] ; then 
+              echo "::warning::Cargo.lock files modified"; 
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
@@ -206,10 +198,6 @@ jobs:
   cargo-lock-check:
     needs: [linux, nitro, icecap, quickstart]
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/veracruz-project/veracruz/ci:v22.09
-      volumes:
-        - ${{ github.workspace }}:/work/veracruz
     steps:
       - name: linux
         if: needs.linux.outputs.output != ''
