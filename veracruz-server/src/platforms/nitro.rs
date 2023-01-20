@@ -12,7 +12,7 @@
 #[cfg(feature = "nitro")]
 pub mod veracruz_server_nitro {
     use crate::common::{VeracruzServer, VeracruzServerError};
-    use io_utils::nitro::NitroEnclave;
+    use nitro_enclave::NitroEnclave;
     use policy_utils::policy::Policy;
     use proxy_attestation_client;
     use std::{env, error::Error};
@@ -22,7 +22,9 @@ pub mod veracruz_server_nitro {
 
     /// Path of the Runtime Manager enclave EIF file.
     const RUNTIME_MANAGER_EIF_PATH: &str = "../runtime-manager/runtime_manager.eif";
-    /// The protocol to use when interacting with the proxy attestation server.
+
+    /// The port to use for communicating with the Veracruz Nitro enclave
+    const VERACRUZ_NITRO_PORT: u32 = 5005;
 
     pub struct VeracruzServerNitro {
         enclave: NitroEnclave,
@@ -52,20 +54,20 @@ pub mod veracruz_server_nitro {
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in debug mode");
                 NitroEnclave::new(
-                    false,
                     &runtime_manager_eif_path,
                     true,
                     *policy.max_memory_mib(),
+                    VERACRUZ_NITRO_PORT,
                 )?
             };
             #[cfg(not(feature = "debug"))]
             let runtime_manager_enclave = {
                 println!("Starting Runtime Manager enclave in release mode");
                 NitroEnclave::new(
-                    false,
                     &runtime_manager_eif_path,
                     false,
                     *policy.max_memory_mib(),
+                    VERACRUZ_NITRO_PORT,
                 )?
             };
             println!("VeracruzServerNitro::new NitroEnclave::new returned");

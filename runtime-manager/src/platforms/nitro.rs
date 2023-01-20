@@ -11,12 +11,12 @@
 
 use crate::managers::{self, RuntimeManagerError};
 use anyhow::{anyhow, Result};
-use io_utils::raw_fd::{receive_buffer, send_buffer};
 use nix::sys::socket::{
     accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
 };
 use nsm_api;
 use nsm_lib;
+use raw_fd::{receive_buffer, send_buffer};
 use veracruz_utils::{
     runtime_manager_message::{RuntimeManagerRequest, RuntimeManagerResponse, Status},
     sha256::sha256,
