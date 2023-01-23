@@ -18,14 +18,6 @@ pub mod error;
 #[cfg(any(feature = "nitro", feature = "linux"))]
 /// FD-related material.
 pub mod fd;
-#[cfg(feature = "nitro")]
-pub mod nitro;
-/// Buffer send- and receive-related functionality for raw file descriptors.
-#[cfg(feature = "nitro")]
-pub mod raw_fd;
 #[cfg(feature = "linux")]
 /// TCP-socket related material.
 pub mod tcp;
-/// A Nitro-specific abstraction over sockets.
-#[cfg(feature = "nitro")]
-pub mod vsocket;

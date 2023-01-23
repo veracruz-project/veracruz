@@ -13,7 +13,7 @@
 use crate::platforms::icecap::IceCapError;
 use err_derive::Error;
 #[cfg(feature = "nitro")]
-use io_utils::nitro::NitroError;
+use nitro_enclave::NitroError;
 use reqwest;
 
 pub type VeracruzServerResponder = Result<String, VeracruzServerError>;

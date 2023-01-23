@@ -59,6 +59,7 @@ nitro = [
   "nsm_api",
   "nsm_lib",
   "nix",
+  "raw-fd",
   "session-manager/nitro",
   "veracruz-utils/nitro",
 ]
@@ -91,6 +92,7 @@ nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag 
 policy-utils = { path = "../policy-utils" }
 protobuf = "=2.8.1"
 psa-attestation = { path = "../psa-attestation", optional = true }
+raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1", optional = true}
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
 serde_json = "1.0"
 session-manager = { path = "../session-manager" }

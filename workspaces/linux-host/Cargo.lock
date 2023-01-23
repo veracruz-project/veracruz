@@ -1004,6 +1004,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
+name = "nitro-enclave"
+version = "0.1.0"
+source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.1#f9313e5ea14d4fde269062dc4ed3a85731350299"
+dependencies = [
+ "anyhow",
+ "err-derive",
+ "nix 0.20.2",
+ "raw-fd",
+ "serde_json",
+]
+
+[[package]]
 name = "nix"
 version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1463,6 +1475,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "raw-fd"
+version = "0.1.0"
+source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.1#f9313e5ea14d4fde269062dc4ed3a85731350299"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "nix 0.20.2",
 ]
 
 [[package]]
@@ -2213,6 +2235,7 @@ dependencies = [
  "io-utils",
  "lazy_static",
  "log",
+ "nitro-enclave",
  "nix 0.20.2",
  "policy-utils",
  "postcard",
