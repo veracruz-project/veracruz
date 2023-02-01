@@ -408,7 +408,7 @@ impl Debug for InodeTable {
                     k,
                     service
                         .try_lock()
-                        .map_or_else(|_| "(failed to lock)".to_string(), |o| String::from(o.native_module().interface_path().to_str().unwrap_or("(failed to convert path to unicode")))
+                        .map_or_else(|_| "(failed to lock)".to_string(), |o| String::from(o.native_module().name().to_owned() + &" (".to_owned() + o.native_module().special_file_path().to_str().unwrap_or("failed to convert path to unicode") + &")".to_owned()))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
             }
@@ -444,7 +444,7 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (interface_file_path, service_instance) tuples, one per
+    /// Install all the (special_file_path, service_instance) tuples, one per
     /// native module.
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
@@ -454,7 +454,7 @@ impl InodeTable {
         native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
         for native_module in native_modules {
-            let path = native_module.interface_path();
+            let path = native_module.special_file_path();
             let service = Arc::new(Mutex::new(Box::new(Service::new(native_module.clone()))));
             let new_inode = self.new_inode()?;
             let path = strip_root_slash(path);
@@ -768,11 +768,6 @@ impl FileSystem {
     pub const FIRST_FD: Fd = Fd(3);
     /// The default initial rights on a newly created file.
     pub const DEFAULT_RIGHTS: Rights = Rights::all();
-
-    /// Path to the Postcard serialization native module.
-    pub const POSTCARD_SERVICE_PATH: &'static str = "/services/postcard_string.dat";
-    /// Path to the AES counter mode native module.
-    pub const AES_COUNTER_MODE_SERVICE_PATH: &'static str = "/services/aesctr.dat";
 
     /// Creates a new, empty `Filesystem` and returns the superuser handle, which
     /// has all the capabilities on the entire filesystem.
@@ -1271,15 +1266,16 @@ impl FileSystem {
         // native module's responsibility to implement that.
         if is_service
         {
-            let (service, input) = self
+            let (service, exec_config) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let native_module = service
+            let service = service
                 .lock()
-                .map_err(|_| ErrNo::Busy)?
+                .map_err(|_| ErrNo::Busy)?;
+            let native_module = service
                 .native_module();
-            
+
             // TODO: Prepare sandbox environment with native module's configuration and run native module with input
         }
         Ok(len)

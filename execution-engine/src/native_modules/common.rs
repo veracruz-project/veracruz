@@ -36,6 +36,6 @@ impl Service {
 }
 impl Debug for Service {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Service: {}", self.native_module.interface_path().to_str().unwrap_or_default())
+        write!(f, "Service: {}", self.native_module.special_file_path().to_str().unwrap_or_default())
     }
 }

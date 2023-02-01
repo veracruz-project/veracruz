@@ -139,35 +139,37 @@ impl Program {
 /// Defines a native module that can be loaded.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NativeModule {
-    /// TODO: add name
-    //name: String,
-    /// Native module's entry point (path to main binary)
+    /// Native module's name
+    name: String,
+    /// Native module's entry point, i.e. path to the main binary relative to
+    /// the native module's root directory
     entry_point_path: PathBuf,
-    /// Path to native module's special interface. Writing data to this file triggers the execution of the native module with some input
-	interface_path: PathBuf,
-    /// The native module's ID
+    /// Path to native module's special file. Writing data to this file triggers
+    /// the execution of the native module with data as input
+    special_file_path: PathBuf,
+    /// Native module's ID
     id: u32,
-	// TODO: add sandbox policy
+    // TODO: add sandbox policy
 }
 
 impl NativeModule {
     /// Creates a Veracruz native module.
     #[inline]
-    pub fn new<T: Into<u32>>(entry_point_path: PathBuf, interface_path: PathBuf, id: T) -> Self
+    pub fn new<T: Into<u32>>(name: String, entry_point_path: PathBuf, special_file_path: PathBuf, id: T) -> Self
     {
         Self {
-            //name,
+            name,
             entry_point_path,
-			interface_path,
+            special_file_path,
             id: id.into(),
         }
     }
 
     /// Return the name.
-    /*#[inline]
+    #[inline]
     pub fn name(&self) -> &str {
         self.name.as_str()
-    }*/
+    }
 
     /// Return path to entry point.
     #[inline]
@@ -177,8 +179,8 @@ impl NativeModule {
 
     /// Return path to interface.
     #[inline]
-    pub fn interface_path(&self) -> &PathBuf {
-        &self.interface_path
+    pub fn special_file_path(&self) -> &PathBuf {
+        &self.special_file_path
     }
 
     /// Return the native module's id.

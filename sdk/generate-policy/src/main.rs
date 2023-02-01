@@ -115,10 +115,12 @@ struct Arguments {
     /// Note this is an array of string+path pairs, since a string enclave path
     /// can be provided along with the local file path.
     program_binaries: Vec<(String, PathBuf)>,
+    /// A list of native module names.
+    native_modules_names: Vec<String>,
     /// A list of paths to native module entry points.
     native_modules_entry_points: Vec<PathBuf>,
-    /// A list of paths to native module interface files.
-    native_modules_interface_paths: Vec<PathBuf>,
+    /// A list of paths to native module special files.
+    native_modules_special_files: Vec<PathBuf>,
     /// The conditional pipeline of programs to execute.  We parse this eagerly
     /// to check for parsing issues before writing the string to the policy
     /// file.  However, this string is then re-parsed by the Veracruz runtime
@@ -241,6 +243,15 @@ impl Arguments {
                     .multiple(true),
             )
             .arg(
+                Arg::with_name("native-module-name")
+                    .long("native-module-name")
+                    .value_name("NAME")
+                    .help("Specifies the name of the native module to use for the computation. \
+    This must be of the form \"--native-module-name name\". Multiple --native-module-name flags may be provided.")
+                    .required(false)
+                    .multiple(true),
+            )
+            .arg(
                 Arg::with_name("native-module-entry-point")
                     .long("native-module-entry-point")
                     .value_name("FILE")
@@ -250,11 +261,11 @@ impl Arguments {
                     .multiple(true),
             )
             .arg(
-                Arg::with_name("native-module-interface-file")
-                    .long("native-module-interface-file")
+                Arg::with_name("native-module-special-file")
+                    .long("native-module-special-file")
                     .value_name("FILE")
-                    .help("Specifies the path to the interface file of the native module to use for the computation. \
-    This must be of the form \"--native-module-interface-file path\". Multiple --native-module-interface-file flags may be provided.")
+                    .help("Specifies the path to the special file of the native module to use for the computation. \
+    This must be of the form \"--native-module-special-file path\". Multiple --native-module-special-file flags may be provided.")
                     .required(false)
                     .multiple(true),
             )
@@ -349,6 +360,13 @@ impl Arguments {
             }
         }
 
+        // Read all native module names
+        let native_modules_names = matches
+            .values_of("native-module-name")
+            .map_or(Vec::new(), |p| {
+                p.map(|s| s.to_string()).collect::<Vec<_>>()
+            });
+
         // Read all native module entry points
         let native_modules_entry_points = matches
             .values_of_os("native-module-entry-point")
@@ -356,9 +374,9 @@ impl Arguments {
                 p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
             });
 
-        // Read all native module interface paths
-        let native_modules_interface_paths = matches
-            .values_of_os("native-module-interface-file")
+        // Read all native module special files
+        let native_modules_special_files = matches
+            .values_of_os("native-module-special-file")
             .map_or(Vec::new(), |p| {
                 p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
             });
@@ -461,8 +479,9 @@ impl Arguments {
             output_policy_file,
             certificate_expiry,
             program_binaries,
+            native_modules_names,
             native_modules_entry_points,
-            native_modules_interface_paths,
+            native_modules_special_files,
             pipelines,
             hashes,
             enclave_debug_mode,
@@ -562,37 +581,26 @@ impl Arguments {
     fn serialize_native_modules(&self) -> Result<Vec<NativeModule>> {
         info!("Serializing native modules.");
 
-        assert_eq!(self.native_modules_entry_points.len(), self.native_modules_interface_paths.len());
+        assert_eq!(self.native_modules_names.len(), self.native_modules_entry_points.len());
+        assert_eq!(self.native_modules_entry_points.len(), self.native_modules_special_files.len());
 
         let mut result = Vec::new();
-        for (id, (entry_point_path, interface_path)) in self
-            .native_modules_entry_points
+        for (id, ((name, entry_point_path), special_file)) in self
+            .native_modules_names
             .iter()
-            .zip(&self.native_modules_interface_paths)
+            .zip(&self.native_modules_entry_points)
+            .zip(&self.native_modules_special_files)
             .enumerate()
         {
-            // We add a backslash cause VFS
-            let interface_path = enforce_leading_backslash(interface_path.to_str()
+            // Add a backslash (VFS requirement)
+            let special_file = enforce_leading_backslash(special_file.to_str()
             .ok_or(
-                anyhow!("Fail to convert interface_path to str."),
+                anyhow!("Fail to convert special_file to str."),
             )?).into_owned();
 
-            result.push(NativeModule::new(entry_point_path.to_path_buf(), PathBuf::from(interface_path), id as u32));
+            result.push(NativeModule::new(name.to_string(), entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
         }
         Ok(result)
-
-
-
-/*
-        for (id, entry_point_path) in self.native_modules.iter().enumerate() {
-            let entry_point_path = enforce_leading_backslash(entry_point_path.to_str()
-            .ok_or(
-                anyhow!("Fail to convert entry_point_path to str."),
-            )?).into_owned();
-
-            result.push(NativeModule::new(entry_point_path, id as u32));
-        }
-*/
     }
 
     /// Serializes the identities of all pipelines.
