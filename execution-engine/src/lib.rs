@@ -24,6 +24,7 @@ extern crate num_derive;
 
 mod engines;
 pub mod fs;
+mod native_module_manager;
 mod native_modules;
 mod pipeline;
 // Expose the error to the external.

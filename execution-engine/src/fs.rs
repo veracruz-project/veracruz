@@ -16,6 +16,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
+use crate::native_module_manager::NativeModuleManager;
 use crate::native_modules::common::Service;
 use policy_utils::{
     principal::{FileRights, NativeModule, Principal, RightsTable},
@@ -1276,7 +1277,10 @@ impl FileSystem {
             let native_module = service
                 .native_module();
 
-            // TODO: Prepare sandbox environment with native module's configuration and run native module with input
+            // Prepare sandbox environment
+            let mut native_module_manager = NativeModuleManager::new(native_module.clone(), self.service_fs()?);
+            // Invoke native module with execution configuration
+            native_module_manager.execute(exec_config)?;
         }
         Ok(len)
     }
@@ -1931,6 +1935,60 @@ impl FileSystem {
         } else {
             let buf = self.read_file_by_absolute_path(path)?;
             rst.push((path.to_path_buf(), buf));
+        }
+
+        Ok(rst)
+    }
+
+    /// Just like `read_all_files_by_absolute_path()`, except it also returns
+    /// empty directories, in which case the data associated with the path is
+    /// `None`.
+    /// For now, this function is only used by the native module manager to
+    /// duplicate the VFS before running native modules.
+    pub fn read_all_files_and_dirs_by_absolute_path<T: AsRef<Path>>(
+        &mut self,
+        path: T,
+    ) -> Result<Vec<(PathBuf, Option<Vec<u8>>)>, ErrNo> {
+        let path = path.as_ref();
+        // Convert the absolute path to relative path and then find the inode
+        let inode = self
+            .lock_inode_table()?
+            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
+            .0;
+        let mut rst = Vec::new();
+        if self.lock_inode_table()?.is_dir(&inode) {
+            // Limit the lock scope
+            let all_dir = {
+                let inode_table = self.lock_inode_table()?;
+                inode_table.get(&inode)?.read_dir(&inode_table)?
+            };
+            let iter = all_dir.iter();
+            if iter.count() == 0 {
+                // Directory is empty
+                rst.push((path.to_path_buf(), None));
+            } else {
+                for (_, sub_relative_path) in all_dir.iter() {
+                    // TODO: wait for icecap support direct conversion from bytes to os_str, bypassing
+                    // potential utf-8 encoding check
+                    #[cfg(feature = "icecap")]
+                    let sub_relative_path =
+                        PathBuf::from(String::from_utf8(sub_relative_path.to_vec()).unwrap());
+                    #[cfg(not(feature = "icecap"))]
+                    let sub_relative_path =
+                        PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
+                    // Ignore the path for current and parent directories.
+                    if sub_relative_path != PathBuf::from(".")
+                        && sub_relative_path != PathBuf::from("..")
+                    {
+                        let mut sub_absolute_path = path.to_path_buf();
+                        sub_absolute_path.push(sub_relative_path);
+                        rst.append(&mut self.read_all_files_and_dirs_by_absolute_path(sub_absolute_path)?);
+                    }
+                }
+            }
+        } else {
+            let buf = self.read_file_by_absolute_path(path)?;
+            rst.push((path.to_path_buf(), Some(buf)));
         }
 
         Ok(rst)
