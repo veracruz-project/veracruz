@@ -140,6 +140,12 @@ impl NativeModuleManager {
                 let entry = entry?;
                 let path_prefixed = entry.path();
                 let path_unprefixed = path_prefixed.strip_prefix(&self.native_module_directory).map_err(|_| ErrNo::Access)?;
+
+                // Ignore execution configuration file
+                if path_unprefixed == PathBuf::from(EXECUTION_CONFIGURATION_FILE) {
+                    continue;
+                }
+
                 let path_unprefixed = PathBuf::from("/").join(path_unprefixed);
                 if path_prefixed.is_dir() {
                     // Create directory on the VFS with `path_open()`
