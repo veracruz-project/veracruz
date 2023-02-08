@@ -222,8 +222,9 @@ impl NativeModuleManager {
             .spawn()?;
         let _ = child.wait_with_output();
 
-        println!("Propagating side effects to the VFS...");
+        print!("Propagating side effects to the VFS...");
         self.copy_fs_to_vfs(&PathBuf::from(""))?;
+        println!("OK");
 
         // TODO:
         //self.teardown_fs()?;
