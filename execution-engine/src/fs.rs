@@ -1760,7 +1760,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////
 
     /// Return an appropriate prestat fd for the path
-    fn find_prestat<T: AsRef<Path>>(&self, path: T) -> Result<(Fd, PathBuf), ErrNo> {
+    pub fn find_prestat<T: AsRef<Path>>(&self, path: T) -> Result<(Fd, PathBuf), ErrNo> {
         let path = path.as_ref();
         let (fd, parent_path) = path
             .ancestors()
@@ -1940,22 +1940,36 @@ impl FileSystem {
         Ok(rst)
     }
 
-    /// Just like `read_all_files_by_absolute_path()`, except it also returns
-    /// empty directories, in which case the data associated with the path is
-    /// `None`.
-    /// For now, this function is only used by the native module manager to
-    /// duplicate the VFS before running native modules.
+    /// Similarly to `read_all_files_by_absolute_path()`, recursively read all
+    /// files under the specified `path`.
+    /// The `principal` must have the right on `path_open`, `fd_read` and
+    /// `fd_seek`, though read errors on leaf files are tolerated.
+    /// Returns two vectors:
+    ///  - A list of leaf files, along with their data, that the `principal` can
+    ///    read. Also includes empty directories, just in case the native module
+    ///    is expecting them; in that case the associated data is set to `None`
+    ///  - A list of top-level files immediately under the root. This allows the
+    ///    native module manager to mount the filesystem into the sandbox, since
+    ///    Sandbox2 doesn't allow mapping a directory to `/`.
+    /// This function is used by the native module manager to duplicate the
+    /// VFS before running native modules.
     pub fn read_all_files_and_dirs_by_absolute_path<T: AsRef<Path>>(
         &mut self,
         path: T,
-    ) -> Result<Vec<(PathBuf, Option<Vec<u8>>)>, ErrNo> {
+    ) -> Result<(Vec<(PathBuf, Option<Vec<u8>>)>, Vec<PathBuf>), ErrNo> {
         let path = path.as_ref();
+        // Ignore special files. This avoids permission errors and deadlocks
+        // when respectively reading and writing to special files.
+        if path == PathBuf::from("/services") {
+            return Ok((vec![], vec![]));
+        }
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
             .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
             .0;
         let mut rst = Vec::new();
+        let mut top_level_files = Vec::new();
         if self.lock_inode_table()?.is_dir(&inode) {
             // Limit the lock scope
             let all_dir = {
@@ -1963,8 +1977,9 @@ impl FileSystem {
                 inode_table.get(&inode)?.read_dir(&inode_table)?
             };
             let iter = all_dir.iter();
-            if iter.count() == 0 {
-                // Directory is empty
+            if iter.count() <= 2 {
+                // Directory is empty (current and parent directories don't
+                // count)
                 rst.push((path.to_path_buf(), None));
             } else {
                 for (_, sub_relative_path) in all_dir.iter() {
@@ -1982,16 +1997,23 @@ impl FileSystem {
                     {
                         let mut sub_absolute_path = path.to_path_buf();
                         sub_absolute_path.push(sub_relative_path);
-                        rst.append(&mut self.read_all_files_and_dirs_by_absolute_path(sub_absolute_path)?);
+                        let (mut list, _) = self.read_all_files_and_dirs_by_absolute_path(&sub_absolute_path)?;
+                        rst.append(&mut list);
+                        if path == Path::new("/") {
+                            top_level_files.push(sub_absolute_path);
+                        }
                     }
                 }
             }
         } else {
-            let buf = self.read_file_by_absolute_path(path)?;
-            rst.push((path.to_path_buf(), Some(buf)));
+            // Ignore unreadable files
+            match self.read_file_by_absolute_path(path) {
+                Ok(b) => rst.push((path.to_path_buf(), Some(b))),
+                Err(_) => (),
+            }
         }
 
-        Ok(rst)
+        Ok((rst, top_level_files))
     }
 
     /// Check if a `file_name` exists.
@@ -2090,6 +2112,6 @@ where
     }
 }
 
-fn strip_root_slash(path: &Path) -> &Path {
+pub fn strip_root_slash(path: &Path) -> &Path {
     path.strip_prefix("/").unwrap_or(path)
 }
