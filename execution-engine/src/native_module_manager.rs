@@ -20,6 +20,8 @@ use std::fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+#[cfg(feature = "std")]
+use nix::sys::signal;
 use wasi_types::{ErrNo, FdFlags, LookupFlags, OpenFlags};
 
 /// Path to the native module's manager sysroot on the kernel filesystem. Native
@@ -208,9 +210,26 @@ impl NativeModuleManager {
         let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
         file.write_all(&input)?;
 
+        // Enable SIGCHLD handling in order to synchronously execute the
+        // sandboxer.
+        // This is necessary as Veracruz-Server (Linux) disables SIGCHLD
+        // handling, which is inherited by the runtime manager
+        #[cfg(feature = "std")]
+        unsafe {
+            signal::sigaction(
+                signal::Signal::SIGCHLD,
+                &signal::SigAction::new(
+                    signal::SigHandler::SigDfl,
+                    signal::SaFlags::empty(),
+                    signal::SigSet::empty(),
+                ),
+            )
+            .expect("sigaction failed");
+        }
+
         println!("Calling sandboxer...");
         let mount_mappings = self.build_mappings(top_level_files)?;
-        let child = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
+        let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
             .args([
                 "--sandbox2tool_resolve_and_add_libraries",
                 "--sandbox2tool_mount_tmp",
@@ -218,9 +237,7 @@ impl NativeModuleManager {
                 &mount_mappings,
                 &self.native_module.entry_point_path().to_str().ok_or(ErrNo::Inval)?.to_owned(),
             ])
-            .stdout(Stdio::piped())
-            .spawn()?;
-        let _ = child.wait_with_output();
+            .output();
 
         print!("Propagating side effects to the VFS...");
         self.copy_fs_to_vfs(&PathBuf::from(""))?;
