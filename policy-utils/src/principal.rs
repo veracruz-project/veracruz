@@ -177,7 +177,7 @@ impl NativeModule {
         &self.entry_point_path
     }
 
-    /// Return path to interface.
+    /// Return path to special file.
     #[inline]
     pub fn special_file_path(&self) -> &PathBuf {
         &self.special_file_path
