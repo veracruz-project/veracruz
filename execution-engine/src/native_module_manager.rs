@@ -2,9 +2,19 @@
 //!
 //! This module prepares a sandbox environment for each native module, before
 //! running them inside it.
-//! The execution environment is torn down after computation as a security
-//! precaution.
+//! The execution environment can optionally be torn down after computation as
+//! a security precaution.
 //!
+//! Native modules follow the specifications below:
+//!  - Each native module has a name, special file and entry point
+//!  - A native module has the same access rights to the VFS as the WASM program
+//!    calling it
+//!  - The WASM program passes the execution configuration to the native module
+//!    via the native module's special file on the VFS.
+//!    It is up to the WASM program and native module to determine how the data
+//!    is encoded, however the native module MUST read the data from
+//!    `EXECUTION_CONFIGURATION_FILE` (defined here), a file copied into the
+//!    sandbox environment by the native module manager
 //! ## Authors
 //!
 //! The Veracruz Development Team.
