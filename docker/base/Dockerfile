@@ -19,15 +19,11 @@ from golang:1.19 AS go_builder
 
 RUN set -eux; \
     echo "iteration 0"; \
-    git clone --branch aws_nitro https://github.com/dreemkiller/services.git --branch v0.2 --depth 1; \
-    git clone https://github.com/veracruz-project/proxy_attestation_server.git --branch v0.1 --depth 1; \
+    git clone https://github.com/veracruz-project/proxy_attestation_server.git --branch main --tags ; \
     cd proxy_attestation_server; \
-    go build -o ./vts github.com/veraison/services/vts/cmd/vts-service; \
-    go build -o ./provisioning github.com/veraison/services/provisioning/cmd/provisioning-service; \
-    go build -o ./corim-psa-decoder github.com/veraison/services/provisioning/plugins/corim-psa-decoder; \
-    go build -o ./corim-nitro-decoder github.com/veraison/services/provisioning/plugins/corim-nitro-decoder; \
-    go build -o ./scheme-psa-iot github.com/veraison/services/vts/plugins/scheme-psa-iot; \
-    go build -o ./scheme-aws-nitro github.com/veraison/services/vts/plugins/scheme-aws-nitro; \
+    git checkout v0.2; \
+    go build -o ./vts/vts -ldflags "-X 'github.com/veraison/services/config.SchemeLoader=builtin'" github.com/veraison/services/vts/cmd/vts-service; \
+    go build -o ./provisioning/provisioning -ldflags "-X 'github.com/veraison/services/config.SchemeLoader=builtin'" github.com/veraison/services/provisioning/cmd/provisioning-service; \
     go build .; \
     ls
 
@@ -143,14 +139,11 @@ RUN mkdir /opt/veraison/; \
     mkdir /opt/veraison/provisioning/plugins
 COPY --from=go_builder /go/proxy_attestation_server/vts /opt/veraison/vts/
 COPY --from=go_builder /go/proxy_attestation_server/provisioning /opt/veraison/provisioning/
-COPY --from=go_builder /go/proxy_attestation_server/corim-psa-decoder /opt/veraison/provisioning/plugins/
-COPY --from=go_builder /go/proxy_attestation_server/corim-nitro-decoder /opt/veraison/provisioning/plugins/
-COPY --from=go_builder /go/proxy_attestation_server/scheme-psa-iot /opt/veraison/vts/plugins
-COPY --from=go_builder /go/proxy_attestation_server/scheme-aws-nitro /opt/veraison/vts/plugins
 COPY --from=go_builder /go/proxy_attestation_server/proxy_attestation_server /opt/veraison/
 COPY --from=corim_builder /go/psa_corim.cbor /opt/veraison/
 COPY --from=corim_builder /go/nitro_corim.cbor /opt/veraison/
 
 COPY vts_config.yaml /opt/veraison/vts/config.yaml
+COPY --from=go_builder /go/proxy_attestation_server/vts/skey.jwk /opt/veraison/vts/
 COPY provisioning_config.yaml /opt/veraison/provisioning/config.yaml
 

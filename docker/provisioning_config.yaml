@@ -1,6 +1,10 @@
 provisioning:
-  plugin-dir: ./plugins/
   listen-addr: 127.0.0.1:8888
-vts-grpc:
-  vts-server:
-    addr: 127.0.0.1:50051
+plugin:
+  backend: builtin
+  go-plugin:
+    dir: ./plugins/
+vts:
+  server-addr: 127.0.0.1:50051
+logging:
+  level: debug

@@ -24,7 +24,7 @@ jobs:
         id: cosign-verify
         run: |
             COSIGN_EXPERIMENTAL=true cosign verify \
-              ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+              ghcr.io/veracruz-project/veracruz/ci@sha256:f9c1d079ce0fc404ec8a9c5f6c70a52fc5e52dc4866847d1b66260006207f67b
 
   linux:
     runs-on: ubuntu-latest
