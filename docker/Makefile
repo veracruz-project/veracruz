@@ -1,4 +1,4 @@
-VERSION = v23.01
+VERSION = v23.03
 IMAGE ?= veracruz
 CONTAINER ?= veracruz
 VERACRUZ_ROOT ?= ..
