@@ -1,3 +1,6 @@
 {
-  "corim-id": "5c57e8f4-46cd-421b-91c9-08cf93e13cfc"
+  "corim-id": "5c57e8f4-46cd-421b-91c9-08cf93e13cfc",
+  "profiles": [
+    "http://amazon.com"
+  ]
 }

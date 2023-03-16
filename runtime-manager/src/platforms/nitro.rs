@@ -122,7 +122,7 @@ fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
     // generate the csr
     let csr: Vec<u8> = managers::session_manager::generate_csr()?;
     // generate the attestation document
-    let att_doc: Vec<u8> = {
+    let mut att_doc: Vec<u8> = {
         let mut buffer: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
         let mut buffer_len: u32 = buffer.len() as u32;
         let nsm_fd = nsm_lib::nsm_lib_init();
@@ -152,6 +152,7 @@ fn attestation(challenge: &[u8]) -> Result<RuntimeManagerResponse> {
         }
         buffer.clone()
     };
+    att_doc.insert(0, 0xd2); // the golang implementation of cose needs this. Still need to investigate why
 
     return Ok(RuntimeManagerResponse::AttestationData(att_doc, csr));
 }
