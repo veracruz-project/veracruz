@@ -17,7 +17,6 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::native_module_manager::NativeModuleManager;
-use crate::native_modules::common::Service;
 use policy_utils::{
     principal::{FileRights, NativeModule, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -158,7 +157,7 @@ impl InodeEntry {
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(Arc<Mutex<Box<Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<NativeModule>>>, Vec<u8>)> {
         self.data.service_handler()
     }
 }
@@ -176,7 +175,7 @@ enum InodeImpl {
     ///     In single thread situation, it is fine.
     ///     - The output of the service is determined by the service itself. It can try to open
     ///     any file and write to it, as long as the service has enough capabilities in FileSystem.
-    NativeModule(Arc<Mutex<Box<Service>>>, Vec<u8>),
+    NativeModule(Arc<Mutex<Box<NativeModule>>>, Vec<u8>),
     /// A file
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
@@ -339,7 +338,7 @@ impl InodeImpl {
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(Arc<Mutex<Box<Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<NativeModule>>>, Vec<u8>)> {
         match self {
             Self::NativeModule(service, input) => {
                 // NOTE: We copy out, particularly `input`, on purpose, as they are protected by a
@@ -409,7 +408,7 @@ impl Debug for InodeTable {
                     k,
                     service
                         .try_lock()
-                        .map_or_else(|_| "(failed to lock)".to_string(), |o| String::from(o.native_module().name().to_owned() + &" (".to_owned() + o.native_module().special_file_path().to_str().unwrap_or("failed to convert path to unicode") + &")".to_owned()))
+                        .map_or_else(|_| "(failed to lock)".to_string(), |o| String::from(o.name().to_owned() + &" (".to_owned() + o.special_file_path().to_str().unwrap_or("failed to convert path to unicode") + &")".to_owned()))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
             }
@@ -456,7 +455,7 @@ impl InodeTable {
     ) -> FileSystemResult<()> {
         for native_module in native_modules {
             let path = native_module.special_file_path();
-            let service = Arc::new(Mutex::new(Box::new(Service::new(native_module.clone()))));
+            let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
             let new_inode = self.new_inode()?;
             let path = strip_root_slash(path);
             // Call the existing function to create general files.
@@ -1271,14 +1270,12 @@ impl FileSystem {
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let service = service
+            let native_module = service
                 .lock()
                 .map_err(|_| ErrNo::Busy)?;
-            let native_module = service
-                .native_module();
 
             // Prepare sandbox environment
-            let mut native_module_manager = NativeModuleManager::new(native_module.clone(), self.service_fs()?);
+            let mut native_module_manager = NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
             // Invoke native module with execution configuration
             native_module_manager.execute(exec_config)?;
         }
