@@ -595,7 +595,7 @@ impl Arguments {
             .enumerate()
         {
             // Add a backslash (VFS requirement)
-            let special_file = enforce_leading_backslash(special_file.to_str()
+            let special_file = enforce_leading_slash(special_file.to_str()
             .ok_or(
                 anyhow!("Fail to convert special_file to str."),
             )?).into_owned();

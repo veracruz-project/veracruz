@@ -28,7 +28,7 @@ use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use policy_utils::{
-    parsers::{parse_pipeline, enforce_leading_backslash},
+    parsers::{parse_pipeline, enforce_leading_slash},
     pipeline::Expr, 
     principal::{ExecutionStrategy, NativeModule, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -428,7 +428,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .enumerate()
     {
         // Add a backslash (VFS requirement)
-        let special_file = enforce_leading_backslash(special_file.to_str()
+        let special_file = enforce_leading_slash(special_file.to_str()
         .ok_or(
             anyhow!("Fail to convert special_file to str."),
         )?).into_owned();
