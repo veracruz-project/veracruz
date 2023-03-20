@@ -36,10 +36,10 @@ use crate::{
 use log::debug;
 use policy_utils::principal::NativeModule;
 use std::{
-    fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all},
+    fs::{create_dir, create_dir_all, File, read_dir},
     io::{Read, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio}
+    process::Command
 };
 #[cfg(feature = "std")]
 use nix::sys::signal;
@@ -215,10 +215,11 @@ impl NativeModuleManager {
     /// native module executions stateful. In the future, we might consider
     /// giving native modules access to only a subset of the program's VFS with
     /// limited permissions.
-    fn teardown_fs(&self) -> FileSystemResult<()> {
+    /// TODO: use it
+    /*fn teardown_fs(&self) -> FileSystemResult<()> {
         remove_dir_all(self.native_module_directory.as_path())?;
         Ok(())
-    }
+    }*/
 
     /// Run the native module. The input is passed by the WASM program via the
     /// native module's special file.
@@ -262,7 +263,7 @@ impl NativeModuleManager {
 
             debug!("Calling sandboxer...");
             let mount_mappings = self.build_mappings(top_level_files)?;
-            let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
+            Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
                 .args([
                     "--sandbox2tool_resolve_and_add_libraries",
                     "--sandbox2tool_mount_tmp",
@@ -270,7 +271,7 @@ impl NativeModuleManager {
                     &mount_mappings,
                     &self.native_module.entry_point_path().to_str().ok_or(ErrNo::Inval)?.to_owned(),
                 ])
-                .output();
+                .output()?;
 
             debug!("Propagating side effects to the VFS...");
             self.copy_fs_to_vfs(&PathBuf::from(""))?;
