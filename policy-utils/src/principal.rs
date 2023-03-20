@@ -16,7 +16,7 @@ use super::error::PolicyError;
 use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,13 +136,17 @@ impl Program {
 ////////////////////////////////////////////////////////////////////////////////
 // Native module
 ////////////////////////////////////////////////////////////////////////////////
-/// Defines a native module that can be loaded.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Defines a native module that can be loaded. Encompasses both static and
+/// dynamic native modules, which are respectively part of the Veracruz runtime
+/// and separate binaries, both executed on invocation by the WASM program
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct NativeModule {
     /// Native module's name
     name: String,
-    /// Native module's entry point, i.e. path to the main binary relative to
-    /// the native module's root directory
+    /// Dynamic native module's entry point, i.e. path to the main binary
+    /// relative to the native module's root directory. If set to `None`, the
+    /// native module is assumed to be static and is searched for in the list of
+    /// static native modules
     entry_point_path: PathBuf,
     /// Path to native module's special file. Writing data to this file triggers
     /// the execution of the native module with data as input
@@ -187,6 +191,23 @@ impl NativeModule {
     #[inline]
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    /// Return whether the native module is static or dynamic.
+    #[inline]
+    pub fn is_static(&self) -> bool {
+        self.entry_point_path() == &PathBuf::from("")
+    }
+}
+
+impl Debug for NativeModule {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "\"{}\" special_file=\"{}\" entry_point=", self.name(), self.special_file_path().to_str().unwrap_or_default())?;
+        if self.is_static() {
+            write!(f, "static")
+        } else {
+            write!(f, "\"{}\"", self.entry_point_path().to_str().unwrap_or_default())
+        }
     }
 }
 

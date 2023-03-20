@@ -1,20 +1,25 @@
 //! The Veracruz native module manager
 //!
-//! This module prepares a sandbox environment for each native module, before
-//! running them inside it.
-//! The execution environment can optionally be torn down after computation as
-//! a security precaution.
+//! This module manages the execution of native modules. It supports the
+//! execution of both static (always part of the Veracruz runtime) and dynamic
+//! (loaded as a separate binary on invocation) native modules.
+//! For the dynamic ones, the module manager prepares a sandbox environment
+//! before running them inside it. The execution environment can optionally be
+//! torn down after computation as a security precaution.
 //!
 //! Native modules follow the specifications below:
-//!  - Each native module has a name, special file and entry point
+//!  - A native module has a name, special file and entry point
 //!  - A native module has the same access rights to the VFS as the WASM program
 //!    calling it
 //!  - The WASM program passes the execution configuration to the native module
 //!    via the native module's special file on the VFS.
 //!    It is up to the WASM program and native module to determine how the data
-//!    is encoded, however the native module MUST read the data from
+//!    is encoded, however dynamic native modules MUST read the data from
 //!    `EXECUTION_CONFIGURATION_FILE` (defined here), a file copied into the
-//!    sandbox environment by the native module manager
+//!    sandbox environment by the native module manager. Static native modules,
+//!    on the other hand, read the data via `try_parse()` (cf. the
+//!    `StaticNativeModule` trait)
+//! 
 //! ## Authors
 //!
 //! The Veracruz Development Team.
@@ -24,12 +29,17 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult, strip_root_slash};
+use crate::{
+    fs::{FileSystem, FileSystemResult, strip_root_slash},
+    native_modules::common::STATIC_NATIVE_MODULES
+};
 use policy_utils::principal::NativeModule;
-use std::fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all};
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::{
+    fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all},
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    process::{Command, Stdio}
+};
 #[cfg(feature = "std")]
 use nix::sys::signal;
 use wasi_types::{ErrNo, FdFlags, LookupFlags, OpenFlags};
@@ -212,49 +222,62 @@ impl NativeModuleManager {
     /// Run the native module. The input is passed by the WASM program via the
     /// native module's special file.
     pub fn execute(&mut self, input: Vec<u8>) -> FileSystemResult<()> {
-        print!("Preparing the native module's filesystem...");
-        let top_level_files = self.prepare_fs()?;
-        println!("OK");
+        if self.native_module.is_static() {
+            // Look up native module in the static native modules table
+            let mut nm = STATIC_NATIVE_MODULES
+                .lock()
+                .map_err(|_| ErrNo::Inval)?;
+            let nm = nm
+                .get_mut(&self.native_module.name().to_string())
+                .ok_or(ErrNo::Inval)?;
+            if nm.try_parse(&input)? {
+                nm.serve(&mut self.native_module_vfs, &input)?;
+            }
+        } else {
+            print!("Preparing the native module's filesystem...");
+            let top_level_files = self.prepare_fs()?;
+            println!("OK");
 
-        // Inject execution configuration into the native module's directory
-        let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
-        file.write_all(&input)?;
+            // Inject execution configuration into the native module's directory
+            let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
+            file.write_all(&input)?;
 
-        // Enable SIGCHLD handling in order to synchronously execute the
-        // sandboxer.
-        // This is necessary as Veracruz-Server (Linux) disables SIGCHLD
-        // handling, which is inherited by the runtime manager
-        #[cfg(feature = "std")]
-        unsafe {
-            signal::sigaction(
-                signal::Signal::SIGCHLD,
-                &signal::SigAction::new(
-                    signal::SigHandler::SigDfl,
-                    signal::SaFlags::empty(),
-                    signal::SigSet::empty(),
-                ),
-            )
-            .expect("sigaction failed");
+            // Enable SIGCHLD handling in order to synchronously execute the
+            // sandboxer.
+            // This is necessary as Veracruz-Server (Linux) disables SIGCHLD
+            // handling, which is inherited by the runtime manager
+            #[cfg(feature = "std")]
+            unsafe {
+                signal::sigaction(
+                    signal::Signal::SIGCHLD,
+                    &signal::SigAction::new(
+                        signal::SigHandler::SigDfl,
+                        signal::SaFlags::empty(),
+                        signal::SigSet::empty(),
+                    ),
+                )
+                .expect("sigaction failed");
+            }
+
+            println!("Calling sandboxer...");
+            let mount_mappings = self.build_mappings(top_level_files)?;
+            let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
+                .args([
+                    "--sandbox2tool_resolve_and_add_libraries",
+                    "--sandbox2tool_mount_tmp",
+                    "--sandbox2tool_additional_bind_mounts",
+                    &mount_mappings,
+                    &self.native_module.entry_point_path().to_str().ok_or(ErrNo::Inval)?.to_owned(),
+                ])
+                .output();
+
+            print!("Propagating side effects to the VFS...");
+            self.copy_fs_to_vfs(&PathBuf::from(""))?;
+            println!("OK");
+
+            // TODO:
+            //self.teardown_fs()?;
         }
-
-        println!("Calling sandboxer...");
-        let mount_mappings = self.build_mappings(top_level_files)?;
-        let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
-            .args([
-                "--sandbox2tool_resolve_and_add_libraries",
-                "--sandbox2tool_mount_tmp",
-                "--sandbox2tool_additional_bind_mounts",
-                &mount_mappings,
-                &self.native_module.entry_point_path().to_str().ok_or(ErrNo::Inval)?.to_owned(),
-            ])
-            .output();
-
-        print!("Propagating side effects to the VFS...");
-        self.copy_fs_to_vfs(&PathBuf::from(""))?;
-        println!("OK");
-
-        // TODO:
-        //self.teardown_fs()?;
 
         Ok(())
     }

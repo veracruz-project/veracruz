@@ -139,7 +139,9 @@ This must be of the form \"--native-module-name name\". Multiple --native-module
                 .long("native-module-entry-point")
                 .value_name("FILE")
                 .help("Specifies the path to the entry point of the native module to use for the computation. \
-This must be of the form \"--native-module-entry-point path\". Multiple --native-module-entry-point flags may be provided.")
+This must be of the form \"--native-module-entry-point path\". Multiple --native-module-entry-point flags may be provided. \
+If the value is an empty string, the native module is assumed to be static, i.e. part of the Veracruz runtime, \
+and is looked up by name in the static native modules table.")
                 .required(false)
                 .multiple(true),
         )

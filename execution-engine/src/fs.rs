@@ -408,7 +408,7 @@ impl Debug for InodeTable {
                     k,
                     service
                         .try_lock()
-                        .map_or_else(|_| "(failed to lock)".to_string(), |o| String::from(o.name().to_owned() + &" (".to_owned() + o.special_file_path().to_str().unwrap_or("failed to convert path to unicode") + &")".to_owned()))
+                        .map_or_else(|_| "(failed to lock)".to_string(), |o| format!("{:?}", o))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
             }
@@ -1274,7 +1274,7 @@ impl FileSystem {
                 .lock()
                 .map_err(|_| ErrNo::Busy)?;
 
-            // Prepare sandbox environment
+            // Invoke native module manager
             let mut native_module_manager = NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
             // Invoke native module with execution configuration
             native_module_manager.execute(exec_config)?;
