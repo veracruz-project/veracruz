@@ -33,6 +33,7 @@ use crate::{
     fs::{FileSystem, FileSystemResult, strip_root_slash},
     native_modules::common::STATIC_NATIVE_MODULES
 };
+use log::debug;
 use policy_utils::principal::NativeModule;
 use std::{
     fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all},
@@ -234,9 +235,9 @@ impl NativeModuleManager {
                 nm.serve(&mut self.native_module_vfs, &input)?;
             }
         } else {
-            print!("Preparing the native module's filesystem...");
+            debug!("Preparing the native module's filesystem...");
             let top_level_files = self.prepare_fs()?;
-            println!("OK");
+            debug!("OK");
 
             // Inject execution configuration into the native module's directory
             let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
@@ -259,7 +260,7 @@ impl NativeModuleManager {
                 .expect("sigaction failed");
             }
 
-            println!("Calling sandboxer...");
+            debug!("Calling sandboxer...");
             let mount_mappings = self.build_mappings(top_level_files)?;
             let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
                 .args([
@@ -271,9 +272,9 @@ impl NativeModuleManager {
                 ])
                 .output();
 
-            print!("Propagating side effects to the VFS...");
+            debug!("Propagating side effects to the VFS...");
             self.copy_fs_to_vfs(&PathBuf::from(""))?;
-            println!("OK");
+            debug!("OK");
 
             // TODO:
             //self.teardown_fs()?;
