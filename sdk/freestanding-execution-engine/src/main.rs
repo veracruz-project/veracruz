@@ -3,7 +3,7 @@
 //! ## About
 //!
 //! The WASM binary to execute, and any data sources being passed to the binary,
-//! are passed with the `--binary` and `--data` flags, respectively.  A
+//! are passed with the `--program-binary` and `--data` flags, respectively.  A
 //! runtime error is raised if the number of input data sources does not match
 //! the number specified in the configuration TOML.
 //!
