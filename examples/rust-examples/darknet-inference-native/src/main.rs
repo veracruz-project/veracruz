@@ -20,7 +20,9 @@ use std::{
     path::PathBuf,
 };
 
-/// The interface with the Darknet inference service.
+/// The interface with the Darknet inference service. This structure should
+/// reflect the one expected by the native module, defined in
+/// `darknet_inference.rs`
 #[derive(Serialize, Debug)]
 pub struct DarknetInferenceInput {
     /// Path to the input (image) to be fed to the network.
