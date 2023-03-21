@@ -708,6 +708,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mbedtls",
+ "nix",
  "num",
  "num-derive",
  "num-traits",
