@@ -48,6 +48,7 @@ use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
 const POLICY: &'static str = "single_client.json";
+const POLICY_POSTCARD_NATIVE: &'static str = "single_client_postcard_native.json";
 const CLIENT_CERT: &'static str = "client_cert.pem";
 const CLIENT_KEY: &'static str = "client_key.pem";
 const UNAUTHORIZED_CERT: &'static str = "data_client_cert.pem";
@@ -295,7 +296,7 @@ fn basic_postcard_native_module() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+    TestExecutor::test_template(POLICY_POSTCARD_NATIVE, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
         .unwrap();
 }
 
