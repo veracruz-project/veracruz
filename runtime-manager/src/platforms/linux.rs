@@ -27,6 +27,7 @@ use clap::{App, Arg};
 use hex::decode_to_slice;
 use io_utils::fd::{receive_buffer, send_buffer};
 use log::{error, info};
+use nix::libc::c_char;
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
@@ -136,7 +137,7 @@ fn native_attestation(
             runtime_manager_hash.len() as u64,
             csr_hash.as_ptr() as *const u8,
             csr_hash.len() as u64,
-            enclave_name.as_ptr() as *const i8,
+            enclave_name.as_ptr() as *const c_char,
             enclave_name.len() as u64,
             challenge.as_ptr() as *const u8,
             challenge.len() as u64,
