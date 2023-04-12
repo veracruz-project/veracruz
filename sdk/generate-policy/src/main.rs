@@ -683,11 +683,11 @@ fn check_capability(capabilities: &[Vec<String>]) -> Result<()> {
 // JSON serialization.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Executes the hashing program on the WASM binary, returning the computed
+/// Executes the hashing program on a file, returning the computed
 /// SHA256 hash as a string.
 fn compute_file_hash(argument: &PathBuf) -> Result<String> {
     let mut file = File::open(argument)
-        .map_err(|_| anyhow!("Failed to open WASM program binary: {:?}.", argument))?;
+        .map_err(|_| anyhow!("Failed to open file for hasing: {:?}.", argument))?;
     let mut buffer = vec![];
 
     file.read_to_end(&mut buffer).map_err(|e| {
