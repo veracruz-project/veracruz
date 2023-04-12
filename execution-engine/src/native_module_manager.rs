@@ -36,7 +36,7 @@ use crate::{
 use log::info;
 use policy_utils::principal::NativeModule;
 use std::{
-    fs::{create_dir, create_dir_all, File, read_dir},
+    fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all},
     io::{Read, Write},
     path::{Path, PathBuf},
     process::Command
@@ -215,11 +215,10 @@ impl NativeModuleManager {
     /// native module executions stateful. In the future, we might consider
     /// giving native modules access to only a subset of the program's VFS with
     /// limited permissions.
-    /// TODO: use it
-    /*fn teardown_fs(&self) -> FileSystemResult<()> {
+    fn teardown_fs(&self) -> FileSystemResult<()> {
         remove_dir_all(self.native_module_directory.as_path())?;
         Ok(())
-    }*/
+    }
 
     /// Run the native module. The input is passed by the WASM program via the
     /// native module's special file.
@@ -277,8 +276,7 @@ impl NativeModuleManager {
             self.copy_fs_to_vfs(&PathBuf::from(""))?;
             info!("OK");
 
-            // TODO:
-            //self.teardown_fs()?;
+            self.teardown_fs()?;
         }
 
         Ok(())
@@ -288,6 +286,6 @@ impl NativeModuleManager {
 impl Drop for NativeModuleManager {
     /// Drop the native module manager.
     fn drop(&mut self) {
-        //let _ = self.teardown_fs();
+        let _ = self.teardown_fs();
     }
 }
