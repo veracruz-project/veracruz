@@ -2109,6 +2109,6 @@ where
     }
 }
 
-pub fn strip_root_slash(path: &Path) -> &Path {
+pub(crate) fn strip_root_slash(path: &Path) -> &Path {
     path.strip_prefix("/").unwrap_or(path)
 }
