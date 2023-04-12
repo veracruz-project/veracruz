@@ -538,6 +538,16 @@ impl InodeTable {
         self.get(inode).map(|i| i.is_dir()).unwrap_or(false)
     }
 
+    /// Return if the `inode` is an empty directory.
+    #[inline]
+    fn is_dir_empty(&self, inode: &Inode) -> FileSystemResult<bool> {
+        let inode = self.get(inode);
+        match inode.map(|i| i.is_dir()).unwrap_or(false) {
+            true => Ok(inode?.read_dir(&self)?.iter().count() <= 2),
+            false => Ok(false)
+        }
+    }
+
     /// Return the rights table of `principal`.
     #[inline]
     fn get_rights(&self, principal: &Principal) -> FileSystemResult<&HashMap<PathBuf, Rights>> {
@@ -1969,12 +1979,12 @@ impl FileSystem {
         let mut top_level_files = Vec::new();
         if self.lock_inode_table()?.is_dir(&inode) {
             // Limit the lock scope
-            let all_dir = {
+            let (all_dir, is_dir_empty) = {
                 let inode_table = self.lock_inode_table()?;
-                inode_table.get(&inode)?.read_dir(&inode_table)?
+                let inode_entry = inode_table.get(&inode)?;
+                (inode_entry.read_dir(&inode_table)?, inode_table.is_dir_empty(&inode))
             };
-            let iter = all_dir.iter();
-            if iter.count() <= 2 {
+            if is_dir_empty? {
                 // Directory is empty (current and parent directories don't
                 // count)
                 rst.push((path.to_path_buf(), None));
