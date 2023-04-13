@@ -87,10 +87,14 @@ impl NativeModuleManager {
     fn build_mappings(&self, unprefixed_files: Vec<PathBuf>) -> FileSystemResult<String> {
         let mut mappings = String::new();
         for f in unprefixed_files {
-            let mapping = self.native_module_directory.join(strip_root_slash(&f));
-            let mapping = mapping.to_str().ok_or(ErrNo::Inval)?.to_owned()
-                          + "=>"
-                          + &f.to_str().ok_or(ErrNo::Inval)?.to_owned();
+            let mapping = self
+                .native_module_directory
+                .join(strip_root_slash(&f))
+                .to_str()
+                .ok_or(ErrNo::Inval)?
+                .to_owned()
+                + "=>"
+                + &f.to_str().ok_or(ErrNo::Inval)?.to_owned();
             mappings = mappings + &mapping + ",";
         }
 
@@ -191,13 +195,13 @@ impl NativeModuleManager {
                     let mut f = File::open(self.native_module_directory.join(&path_prefixed))?;
                     let mut buf: [u8; 128] = [0; 128];
 
-                    // Copy it to the VFS. First truncate the VFS file first
-                    // then append to it. If the principal doesn't have write
-                    // access, just ignore it
+                    // Copy file to the VFS. First truncate the VFS file then
+                    // append to it. If the principal doesn't have write access,
+                    // just ignore it
                     if self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, vec![], false).is_ok() {
                         loop {
                             let n = f.read(&mut buf)?;
-                            if n <= 0 {
+                            if n == 0 {
                                 break;
                             }
                             self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, buf[..n].to_vec(), true)?;
