@@ -30,7 +30,7 @@ use log::*;
 use policy_utils::{
     parsers::{parse_pipeline, enforce_leading_slash},
     pipeline::Expr, 
-    principal::{ExecutionStrategy, NativeModule, Principal},
+    principal::{ExecutionStrategy, NativeModule, NativeModuleType, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -433,7 +433,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             anyhow!("Fail to convert special_file to str."),
         )?).into_owned();
 
-        native_modules.push(NativeModule::new(name.to_string(), entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
+        let nm_type = if entry_point_path == &PathBuf::from("") {
+            NativeModuleType::Static
+        } else {
+            NativeModuleType::Dynamic
+        };
+        native_modules.push(NativeModule::new(name.to_string(), nm_type, entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
     }
 
     let mut vfs = FileSystem::new(right_table, native_modules)?;

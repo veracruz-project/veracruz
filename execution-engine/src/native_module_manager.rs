@@ -1,24 +1,28 @@
 //! The Veracruz native module manager
 //!
 //! This module manages the execution of native modules. It supports the
-//! execution of both static (always part of the Veracruz runtime) and dynamic
-//! (loaded as a separate binary on invocation) native modules.
-//! For the dynamic ones, the module manager prepares a sandbox environment
-//! before running them inside it. The execution environment can optionally be
-//! torn down after computation as a security precaution.
+//! execution of static, dynamic and provisioned native modules (cf.
+//! `NativeModuleType` for more details).
+//! For the dynamic and provisioned ones, the native module manager prepares a
+//! sandbox environment before running them inside it. The execution environment
+//! is torn down after computation as a security precaution.
 //!
 //! Native modules follow the specifications below:
 //!  - A native module has a name, special file and entry point
 //!  - A native module has the same access rights to the VFS as the WASM program
-//!    calling it
-//!  - The WASM program passes the execution configuration to the native module
-//!    via the native module's special file on the VFS.
-//!    It is up to the WASM program and native module to determine how the data
-//!    is encoded, however dynamic native modules MUST read the data from
-//!    `EXECUTION_CONFIGURATION_FILE` (defined here), a file copied into the
-//!    sandbox environment by the native module manager. Static native modules,
-//!    on the other hand, read the data via `try_parse()` (cf. the
-//!    `StaticNativeModule` trait)
+//!    calling it. Provisioned native modules have their access rights specified
+//!    in the policy like a regular WASM program
+//!  - The caller (WASM program or participant) must provide an execution
+//!    configuration to the native module. For static and dynamic native
+//!    modules, it is provided via the native module's special file on the VFS.
+//!    For provisioned native modules, it is provided via the special
+//!    `EXECUTION_CONFIGURATION_FILE` on the VFS.
+//!    It is up to the caller and native module to determine how the data is
+//!    encoded, however dynamic and provisioned native modules MUST read the
+//!    data from `EXECUTION_CONFIGURATION_FILE`, a file copied into the sandbox
+//!    environment by the native module manager. Static native modules, on the
+//!    other hand, read the data via `try_parse()` (cf. the `StaticNativeModule`
+//!    trait)
 //! 
 //! ## Authors
 //!
@@ -34,7 +38,7 @@ use crate::{
     native_modules::common::STATIC_NATIVE_MODULES
 };
 use log::info;
-use policy_utils::principal::NativeModule;
+use policy_utils::principal::{NativeModule, NativeModuleType};
 use std::{
     fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all},
     io::{Read, Write},
@@ -227,7 +231,7 @@ impl NativeModuleManager {
     /// Run the native module. The input is passed by the WASM program via the
     /// native module's special file.
     pub fn execute(&mut self, input: Vec<u8>) -> FileSystemResult<()> {
-        if self.native_module.is_static() {
+        if self.native_module.r#type() == NativeModuleType::Static {
             // Look up native module in the static native modules table
             let mut nm = STATIC_NATIVE_MODULES
                 .lock()

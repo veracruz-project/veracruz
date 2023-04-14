@@ -18,7 +18,7 @@ use policy_utils::{
     expiry::Timepoint,
     parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
-    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, Pipeline, Program},
+    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType, Pipeline, Program},
 };
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
@@ -600,7 +600,12 @@ impl Arguments {
                 anyhow!("Fail to convert special_file to str."),
             )?).into_owned();
 
-            result.push(NativeModule::new(name.to_string(), entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
+            let nm_type = if entry_point_path == &PathBuf::from("") {
+                NativeModuleType::Static
+            } else {
+                NativeModuleType::Dynamic
+            };
+            result.push(NativeModule::new(name.to_string(), nm_type, entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
         }
         Ok(result)
     }
