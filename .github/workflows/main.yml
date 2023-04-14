@@ -96,14 +96,7 @@ jobs:
         with: 
           name: linux_deployment_artifacts
           path: |
-            artifacts/proxy_cleanup.sh
-            artifacts/ca-cert.conf
-            artifacts/cert.conf
-            artifacts/freestanding-execution-engine
-            artifacts/generate-policy
-            artifacts/veracruz-client
-            artifacts/veracruz-server
-            artifacts/runtime_manager_enclave
+            artifacts/*
 
   vod-full-deployment:
     runs-on: ubuntu-latest
