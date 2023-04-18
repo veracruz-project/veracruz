@@ -18,7 +18,7 @@
 
 use crate::native_module_manager::NativeModuleManager;
 use policy_utils::{
-    principal::{FileRights, NativeModule, Principal, RightsTable},
+    principal::{FileRights, NativeModule, NativeModuleType, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -444,8 +444,7 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (special_file_path, service_instance) tuples, one per
-    /// native module.
+    /// Install static and dynamic native modules.
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
@@ -454,15 +453,22 @@ impl InodeTable {
         native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
         for native_module in native_modules {
-            let path = native_module.special_file_path();
-            let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
-            let new_inode = self.new_inode()?;
-            let path = strip_root_slash(path);
-            // Call the existing function to create general files.
-            self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
-            // Manually uplift the general file to special file bound with the service.
-            self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
-                InodeImpl::NativeModule(service, Vec::new());
+            let path = match native_module.r#type() {
+                NativeModuleType::Static { special_file } => Some(special_file),
+                NativeModuleType::Dynamic { special_file, .. } => Some(special_file),
+                _ => None,
+            };
+            if path.is_some() {
+                let path = path.unwrap();
+                let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
+                let new_inode = self.new_inode()?;
+                let path = strip_root_slash(path);
+                // Call the existing function to create general files.
+                self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
+                // Manually uplift the general file to special file bound with the service.
+                self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
+                    InodeImpl::NativeModule(service, Vec::new());
+            }
         }
         Ok(())
     }

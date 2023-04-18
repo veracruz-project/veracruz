@@ -434,11 +434,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         )?).into_owned();
 
         let nm_type = if entry_point_path == &PathBuf::from("") {
-            NativeModuleType::Static
+            NativeModuleType::Static { special_file: PathBuf::from(special_file) }
         } else {
-            NativeModuleType::Dynamic
+            NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
         };
-        native_modules.push(NativeModule::new(name.to_string(), nm_type, entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
+        native_modules.push(NativeModule::new(name.to_string(), nm_type, id as u32));
     }
 
     let mut vfs = FileSystem::new(right_table, native_modules)?;

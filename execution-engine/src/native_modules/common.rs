@@ -16,13 +16,9 @@ use crate::{
 use lazy_static::lazy_static;
 use std::{collections::HashMap, sync::Mutex};
 
-/// Specifications for static native modules, i.e. native modules which are
-/// always part of the Veracruz runtime and don't have to be loaded as separate
-/// binaries.
-/// Despite their static behaviour, they have to be explicitly declared in the
-/// policy file to be used in a computation. See
-/// `policy_utils::principal::NativeModule` and `generate-policy` for more
-/// details.
+/// Specifications for static native module crates.
+/// See `policy_utils::principal::NativeModule` and `generate-policy` for more
+/// details on static native modules.
 pub trait StaticNativeModule: Send {
     fn name(&self) -> &str;
     //fn configure(&mut self, config: Self::Configuration) -> FileSystemResult<()>;

@@ -231,7 +231,7 @@ impl NativeModuleManager {
     /// Run the native module. The input is passed by the WASM program via the
     /// native module's special file.
     pub fn execute(&mut self, input: Vec<u8>) -> FileSystemResult<()> {
-        if self.native_module.r#type() == NativeModuleType::Static {
+        if self.native_module.is_static() {
             // Look up native module in the static native modules table
             let mut nm = STATIC_NATIVE_MODULES
                 .lock()
@@ -270,13 +270,18 @@ impl NativeModuleManager {
 
             info!("Calling sandboxer...");
             let mount_mappings = self.build_mappings(top_level_files)?;
+            let entry_point = match self.native_module.r#type() {
+                NativeModuleType::Dynamic { special_file: _, entry_point } => entry_point.to_str().ok_or(ErrNo::Inval)?,
+                NativeModuleType::Provisioned(program) => program.program_file_name(),
+                _ => panic!("should not happen"),
+            };
             Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
                 .args([
                     "--sandbox2tool_resolve_and_add_libraries",
                     "--sandbox2tool_mount_tmp",
                     "--sandbox2tool_additional_bind_mounts",
                     &mount_mappings,
-                    &self.native_module.entry_point_path().to_str().ok_or(ErrNo::Inval)?.to_owned(),
+                    entry_point,
                 ])
                 .output()?;
 
