@@ -14,7 +14,6 @@ cargo-features = ["resolver"]
 
 [workspace]
 exclude = [
-  "crates/third-party/libc",
   "crates/third-party/rust-mbedtls",
   "crates/third-party/wasmi",
 ]
