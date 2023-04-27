@@ -5,17 +5,17 @@ edition = "2018"
 name = "runtime_manager_enclave"
 version = "0.3.0"
 
-[lib]
-crate-type = ["staticlib"]
-name = "runtime_manager_enclave"
-path = "src/lib.rs"
+# [lib]
+# #crate-type = ["staticlib"]
+# name = "runtime_manager_enclave"
+# path = "src/lib.rs"
 
-[[bin]]
-name = "runtime_manager_enclave"
-path = "src/main.rs"
+# [[bin]]
+# name = "runtime_manager_enclave"
+# path = "src/main.rs"
 
 [features]
-default = []
+default = ["std"]
 icecap = [
   "bincode",
   "execution-engine/icecap",
@@ -62,6 +62,19 @@ nitro = [
   "raw-fd",
   "session-manager/nitro",
   "veracruz-utils/nitro",
+]
+
+std = [
+   "bincode",
+  "clap",
+  "env_logger",
+  "execution-engine/std",
+  "io-utils/linux",
+  "nix",
+  "policy-utils/std",
+  "psa-attestation/linux",
+  "session-manager/std",
+  "veracruz-utils/linux",
 ]
 
 [dependencies]

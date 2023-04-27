@@ -20,7 +20,7 @@ DOCKER_GROUP_ID=$(shell stat --format "%g" $(shell readlink -f /var/run/docker.s
 NE_GID := $(shell getent group ne | awk -F: '{printf $$3}')
 endif
 
-DOCKER_BUILD_CMD = DOCKER_BUILDKIT=1 docker build
+DOCKER_BUILD_CMD = DOCKER_BUILDKIT=1 docker build --network host
 
 BUILD_ARGS = --build-arg ARCH=$(ARCH) \
 	--build-arg VERSION=$(VERSION) \
@@ -28,7 +28,8 @@ BUILD_ARGS = --build-arg ARCH=$(ARCH) \
 
 DOCKER_RUN_PARAMS = \
 		-v $(abspath $(VERACRUZ_ROOT)):/work/veracruz \
-		--mount type=bind,src=$(abspath $(VERACRUZ_ROOT)),dst=/local
+		--mount type=bind,src=$(abspath $(VERACRUZ_ROOT)),dst=/local \
+		--network host
 
 default:
 
@@ -47,7 +48,7 @@ base: base/Dockerfile
 		-t $(IMAGE)/$*/$(USER):$(VERSION) -f $< .
 
 .PHONY: all-base
-all-base: base linux-base nitro-base icecap-base
+all-base: base linux-base nitro-base icecap-base sev-base
 	echo 'All base docker images re-built from scratch'
 
 #####################################################################
@@ -187,3 +188,38 @@ endif
 	make -C aws-nitro-enclaves-cli HOST_MACHINE=$(ARCH) nitro-cli
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
 		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro:$(VERSION) -f $< .
+
+#####################################################################
+# SEV-related targets
+
+.PHONY: sev-run sev-run-build sev-exec sev-base
+
+# "sev-run" should be run on a AMD SEV-SNP enabled system, "sev-run-build"
+# allows to build Veracruz with SEV-SNP support on other machines.
+sev-run: sev-build
+	# Make sure the cargo registry directory exists to avoid permission issues
+	mkdir -p $(HOME)/.cargo/registry
+	# This container must be started on a "AMD SEV-SNP"-capable system
+	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
+		-v /usr/bin:/host/bin \
+		--device=/dev/vsock:/dev/vsock \
+		-p $(LOCALIP):3010:3010/tcp \
+		--name $(CONTAINER)-sev-$(USER)-$(VERSION) \
+		$(IMAGE)/sev/$(USER):$(VERSION) sleep inf
+
+sev-run-build: sev-build
+	# Make sure the cargo registry directory exists to avoid permission issues
+	mkdir -p $(HOME)/.cargo/registry
+	# This container does not need to be run on an AMD SEV-SNP enabled system, it can build but not start enclaves
+	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
+		-p $(LOCALIP):3010:3010/tcp \
+		--name $(CONTAINER)-sev-$(USER)-$(VERSION) \
+		$(IMAGE)/sev/$(USER):$(VERSION) sleep inf
+
+sev-exec:
+	docker exec -i -t $(CONTAINER)-sev-$(USER)-$(VERSION) /bin/bash || true
+
+sev-base: sev/Dockerfile base
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
+		-t $(IMAGE)/sev:$(VERSION) -f $< .
+
