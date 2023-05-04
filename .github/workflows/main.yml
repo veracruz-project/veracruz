@@ -40,6 +40,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Build Veracruz-Linux
+        id: linux-build
+        run: |
+           make -C /work/veracruz/workspaces linux
       - name: Running linux test script
         id: linux-build-and-test
         run: |
@@ -65,6 +69,136 @@ jobs:
         with: 
           name: linux 
           path: workspaces/**/Cargo.lock
+      - name: Prepare deployment artifacts
+        run: |
+          # Strip binaries
+          strip \
+          workspaces/host/target/debug/freestanding-execution-engine \
+          workspaces/host/target/debug/generate-policy \
+          workspaces/linux-host/target/debug/veracruz-client \
+          workspaces/linux-host/target/debug/veracruz-server \
+          workspaces/linux-runtime/target/debug/runtime_manager_enclave
+          # Copy artifacts to new directory
+          mkdir -p artifacts
+          cp -a \
+          proxy_cleanup.sh \
+          workspaces/ca-cert.conf \
+          workspaces/cert.conf \
+          workspaces/host/target/debug/freestanding-execution-engine \
+          workspaces/host/target/debug/generate-policy \
+          workspaces/linux-host/target/debug/veracruz-client \
+          workspaces/linux-host/target/debug/veracruz-server \
+          workspaces/linux-runtime/target/debug/runtime_manager_enclave \
+          artifacts/
+      - name: Upload deployment artifacts
+        id: upload-deployment-artifacts
+        uses: actions/upload-artifact@v3
+        with: 
+          name: linux_deployment_artifacts
+          path: |
+            artifacts/*
+
+  vod-full-deployment:
+    runs-on: ubuntu-latest
+    needs: [linux]
+    container:
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+      volumes:
+        - ${{ github.workspace }}:/work/video-object-detection
+    steps:
+      - name: Check out the VOD repository
+        uses: actions/checkout@v3
+        with:
+          repository: 'veracruz-project/video-object-detection'
+          ref: 'main'
+          submodules: recursive
+          set-safe-directory: true
+      - name: Build
+        run: |
+          # grab every bash code block for this step, remove line continuation,
+          # and only keep lines that start with '$' (of course removing that '$'
+          # in the process)
+          sed -n '/``` bash ci-build/,/```/{/```/d; p}' README.md \
+            | sed ':a; /\\$/{N; s/\\\n//; ta}' \
+            | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
+            > README.md.ci-build.sh
+          # run the script
+          bash -euxo pipefail README.md.ci-build.sh
+          # Add current directory to $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE" >> $GITHUB_PATH
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: linux_deployment_artifacts
+          path: artifacts
+      - name: Post-process artifacts 
+        run: |
+          chmod -R 755 artifacts
+          # Add artifacts to $GITHUB_PATH
+          echo "artifacts" >> $GITHUB_PATH
+      - name: Download example video
+        run: |
+          # grab every bash code block for this step, remove line continuation,
+          # and only keep lines that start with '$' (of course removing that '$'
+          # in the process)
+          sed -n '/``` bash ci-video/,/```/{/```/d; p}' README.md \
+            | sed ':a; /\\$/{N; s/\\\n//; ta}' \
+            | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
+            > README.md.ci-video.sh
+          # run the script
+          bash -euxo pipefail README.md.ci-video.sh
+      - name: Replace big YOLO model with small one
+        run: |
+          cd program_data
+          ln -sf yolov3-tiny.cfg yolov3.cfg
+          ln -sf yolov3-tiny.weights yolov3.weights
+      - name: Run VOD as standalone native binary
+        run: |
+          # grab every bash code block for this step, remove line continuation,
+          # and only keep lines that start with '$' (of course removing that '$'
+          # in the process)
+          sed -n '/``` bash ci-run-native/,/```/{/```/d; p}' README.md \
+            | sed ':a; /\\$/{N; s/\\\n//; ta}' \
+            | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
+            > README.md.ci-run-native.sh
+          # run the script
+          bash -euxo pipefail README.md.ci-run-native.sh
+          # Check results
+          file output/prediction.0.jpg | grep "JPEG image data"
+          rm -rf output
+      - name: Run VOD in wasmtime
+        run: |
+          # grab every bash code block for this step, remove line continuation,
+          # and only keep lines that start with '$' (of course removing that '$'
+          # in the process)
+          sed -n '/``` bash ci-run-wasmtime/,/```/{/```/d; p}' README.md \
+            | sed ':a; /\\$/{N; s/\\\n//; ta}' \
+            | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
+            > README.md.ci-run-wasmtime.sh
+          # run the script
+          bash -euxo pipefail README.md.ci-run-wasmtime.sh
+          # Check results
+          file output/prediction.0.jpg | grep "JPEG image data"
+          rm -rf output
+      - name: Run VOD in Freestanding Execution Engine
+        run: |
+          # grab every bash code block for this step, remove line continuation,
+          # and only keep lines that start with '$' (of course removing that '$'
+          # in the process)
+          sed -n '/``` bash ci-run-fee/,/```/{/```/d; p}' README.md \
+            | sed ':a; /\\$/{N; s/\\\n//; ta}' \
+            | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
+            > README.md.ci-run-fee.sh
+          # run the script
+          bash -euxo pipefail README.md.ci-run-fee.sh
+          # Check results
+          file output/prediction.0.jpg | grep "JPEG image data"
+          rm -rf output
+      - name: Run VOD in Veracruz-Linux
+        run: |
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/veracruz-server" RUNTIME_MANAGER_PATH="artifacts/runtime_manager_enclave" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux.sh
+          # Check results
+          file prediction.0.jpg | grep "JPEG image data"
 
   nitro:
     runs-on: ubuntu-latest
