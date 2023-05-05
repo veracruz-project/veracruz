@@ -195,9 +195,9 @@ impl NativeModuleManager {
                         self.copy_fs_to_vfs(&path_unprefixed)?;
                     }
                 } else {
-                    // Read file on the kernel fileystem, chunk by chunk
+                    // Read file on the kernel fileystem by chunks of 1MiB
                     let mut f = File::open(&path_prefixed)?;
-                    let mut buf: [u8; 128] = [0; 128];
+                    let mut buf: [u8; 1048576] = [0; 1048576];
 
                     // Copy file to the VFS. First truncate the VFS file then
                     // append to it. If the principal doesn't have write access,
