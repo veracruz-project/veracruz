@@ -34,7 +34,7 @@
 //! information on licensing and copyright.
 
 use crate::{
-    fs::{FileSystem, FileSystemResult, strip_root_slash},
+    fs::{FileSystem, FileSystemResult, strip_root_slash_path, strip_root_slash_str},
     native_modules::common::STATIC_NATIVE_MODULES
 };
 use log::info;
@@ -75,7 +75,7 @@ pub struct NativeModuleManager {
 
 impl NativeModuleManager {
     pub fn new(native_module: NativeModule, native_module_vfs: FileSystem) -> Self {
-        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(native_module.name());
+        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(strip_root_slash_str(native_module.name()));
         Self {
             native_module,
             native_module_vfs,
@@ -93,7 +93,7 @@ impl NativeModuleManager {
         for f in unprefixed_files {
             let mapping = self
                 .native_module_directory
-                .join(strip_root_slash(&f))
+                .join(strip_root_slash_path(&f))
                 .to_str()
                 .ok_or(ErrNo::Inval)?
                 .to_owned()
@@ -105,7 +105,7 @@ impl NativeModuleManager {
         // Add the execution configuration file
         mappings = mappings
                    + &self.native_module_directory
-                     .join(EXECUTION_CONFIGURATION_FILE)
+                     .join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE))
                      .to_str()
                      .ok_or(ErrNo::Inval)?
                      .to_owned()
@@ -122,10 +122,10 @@ impl NativeModuleManager {
     /// To be useful, this function must be called after provisioning files to
     /// the VFS, and maybe even after the WASM program invokes the native module.
     fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
-        create_dir(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
+        create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
         let (visible_files_and_dirs, top_level_files) = self.native_module_vfs.read_all_files_and_dirs_by_absolute_path("/")?;
         for (path, buffer) in visible_files_and_dirs {
-            let path = self.native_module_directory.join(strip_root_slash(&path));
+            let path = self.native_module_directory.join(strip_root_slash_path(&path));
 
             // Create parent directories
             let parent_path = path.parent().ok_or(ErrNo::NoEnt)?;
@@ -150,7 +150,7 @@ impl NativeModuleManager {
         // this results in errors later, since the native module is not supposed
         // to access these files
         for f in &top_level_files {
-            let path = self.native_module_directory.join(strip_root_slash(&f));
+            let path = self.native_module_directory.join(strip_root_slash_path(&f));
             let _ = create_dir(path);
         }
 
@@ -165,7 +165,7 @@ impl NativeModuleManager {
     /// This function should be called after the native module's execution to
     /// reflect the side effects of execution onto the VFS.
     fn copy_fs_to_vfs(&mut self, path_unprefixed: &Path) -> FileSystemResult<()> {
-        let path_prefixed = self.native_module_directory.join(strip_root_slash(&path_unprefixed));
+        let path_prefixed = self.native_module_directory.join(strip_root_slash_path(&path_unprefixed));
         if path_prefixed.is_dir() {
             for entry in read_dir(path_prefixed)? {
                 let entry = entry?;
@@ -196,7 +196,7 @@ impl NativeModuleManager {
                     }
                 } else {
                     // Read file on the kernel fileystem, chunk by chunk
-                    let mut f = File::open(self.native_module_directory.join(&path_prefixed))?;
+                    let mut f = File::open(&path_prefixed)?;
                     let mut buf: [u8; 128] = [0; 128];
 
                     // Copy file to the VFS. First truncate the VFS file then
@@ -248,7 +248,7 @@ impl NativeModuleManager {
             info!("OK");
 
             // Inject execution configuration into the native module's directory
-            let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
+            let mut file = File::create(self.native_module_directory.join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE)))?;
             file.write_all(&input)?;
 
             // Enable SIGCHLD handling in order to synchronously execute the

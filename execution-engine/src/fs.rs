@@ -462,7 +462,7 @@ impl InodeTable {
                 let path = path.unwrap();
                 let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
                 let new_inode = self.new_inode()?;
-                let path = strip_root_slash(path);
+                let path = strip_root_slash_path(path);
                 // Call the existing function to create general files.
                 self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
                 // Manually uplift the general file to special file bound with the service.
@@ -939,7 +939,7 @@ impl FileSystem {
             let new_fd = Fd(u32::try_from_or_errno(index)? + first_fd);
             let path = path.as_ref();
             // strip off the root
-            let relative_path = strip_root_slash(path);
+            let relative_path = strip_root_slash_path(path);
             let new_inode = {
                 if relative_path == Path::new("") {
                     InodeTable::ROOT_DIRECTORY_INODE
@@ -1852,7 +1852,7 @@ impl FileSystem {
     /// Read a file on path `file_name`.
     /// The `principal` must have the right on `path_open`,
     /// `fd_read` and `fd_seek`.
-    pub fn read_exeutable_by_absolute_path<T: AsRef<Path>>(
+    pub fn read_executable_by_absolute_path<T: AsRef<Path>>(
         &mut self,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
@@ -1918,7 +1918,7 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
+            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
             .0;
         let mut rst = Vec::new();
         if self.lock_inode_table()?.is_dir(&inode) {
@@ -1979,7 +1979,7 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
+            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
             .0;
         let mut rst = Vec::new();
         let mut top_level_files = Vec::new();
@@ -2125,6 +2125,13 @@ where
     }
 }
 
-pub(crate) fn strip_root_slash(path: &Path) -> &Path {
+pub(crate) fn strip_root_slash_path(path: &Path) -> &Path {
     path.strip_prefix("/").unwrap_or(path)
+}
+
+pub(crate) fn strip_root_slash_str(path: &str) -> &str {
+    match &path[0..1] {
+        "/" => &path[1..],
+        _ => path,
+    }
 }
