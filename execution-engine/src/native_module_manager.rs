@@ -268,25 +268,43 @@ impl NativeModuleManager {
                 .expect("sigaction failed");
             }
 
-            info!("Calling sandboxer...");
             let mount_mappings = self.build_mappings(top_level_files)?;
+            let entry_point_tmp;
             let entry_point = match self.native_module.r#type() {
                 NativeModuleType::Dynamic { special_file: _, entry_point } => entry_point.to_str().ok_or(ErrNo::Inval)?,
-                NativeModuleType::Provisioned(program) => program.program_file_name(),
+                NativeModuleType::Provisioned { entry_point } => {
+                    entry_point_tmp = self.native_module_directory.join(strip_root_slash_path(entry_point));
+                    entry_point_tmp.to_str().ok_or(ErrNo::Inval)?
+                },
                 _ => panic!("should not happen"),
             };
-            Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
+
+            // Make sure the entry point is executable.
+            // This is a temporary workaround that only works on Linux.
+            Command::new("chmod")
+                .args([
+                    "500",
+                    entry_point,
+                ])
+                .output()?;
+            
+            info!("Calling sandboxer...");
+            let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
                 .args([
                     "--sandbox2tool_resolve_and_add_libraries",
                     "--sandbox2tool_mount_tmp",
                     "--sandbox2tool_additional_bind_mounts",
                     &mount_mappings,
+                    "--sandbox2tool_file_size_creation_limit",
+                    "1048576",
                     entry_point,
                 ])
                 .output()?;
 
-            info!("Propagating side effects to the VFS...");
+            info!("Propagating side effects to the VFS (access errors are ignored)...");
             self.copy_fs_to_vfs(&PathBuf::from(""))?;
+            let _ = self.native_module_vfs.write_stdout(&output.stdout);
+            let _ = self.native_module_vfs.write_stderr(&output.stderr);
             info!("OK");
 
             self.teardown_fs()?;

@@ -2065,10 +2065,22 @@ impl FileSystem {
         self.read_std_stream(Fd(1))
     }
 
+    /// A public API for writing to stdout.
+    #[inline]
+    pub fn write_stdout(&mut self, buf: &[u8]) -> FileSystemResult<usize> {
+        self.fd_write(Fd(1), &[buf])
+    }
+
     /// A public API for reading from stderr.
     #[inline]
     pub fn read_stderr(&mut self) -> FileSystemResult<Vec<u8>> {
         self.read_std_stream(Fd(2))
+    }
+
+    /// A public API for writing to stderr.
+    #[inline]
+    pub fn write_stderr(&mut self, buf: &[u8]) -> FileSystemResult<usize> {
+        self.fd_write(Fd(2), &[buf])
     }
 
     /// Read from std streaming.
