@@ -17,15 +17,24 @@
 
 #[cfg(feature = "std")]
 use crate::engines::wasmtime::WasmtimeRuntimeState;
+use crate::Options;
 use crate::{
     engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
     fs::FileSystem,
+    native_module_manager::NativeModuleManager,
 };
-use policy_utils::{pipeline::Expr, principal::ExecutionStrategy};
-use std::boxed::Box;
-use crate::Options;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::info;
+use policy_utils::{
+    pipeline::Expr,
+    principal::{ExecutionStrategy, NativeModule, NativeModuleType},
+};
+use std::{boxed::Box, path::PathBuf};
+
+/// Returns whether the given path corresponds to a WASM binary.
+fn is_wasm_binary(path_string: &String) -> bool {
+    path_string.ends_with(".wasm")
+}
 
 /// Execute `pipeline`. Program will be read with the `caller_filesystem`, who should have
 /// `FD_EXECUTE` and `FD_SEEK` permissions and executed with `pipeline_filesystem`.
@@ -45,12 +54,33 @@ pub fn execute_pipeline(
                 path_string.insert(0, '/');
             }
             info!("Literal {:?}", path_string);
-            // read and call execute_program
-            let binary = caller_filesystem.read_exeutable_by_absolute_path(path_string)?;
-            info!("Successful to read binary");
-            let return_code = execute_program(strategy, pipeline_filesystem.clone(), binary, options)?;
-            Ok(return_code)
-        },
+            if is_wasm_binary(&path_string) {
+                // Read and call execute_WASM program
+                let binary = caller_filesystem.read_executable_by_absolute_path(path_string)?;
+                info!("Successful to read binary");
+                let return_code =
+                    execute_program(strategy, pipeline_filesystem.clone(), binary, options)?;
+                Ok(return_code)
+            } else {
+                // Treat program as a provisioned native module
+                let native_module = NativeModule::new(
+                    path_string.clone(),
+                    NativeModuleType::Provisioned { entry_point: PathBuf::from(&path_string) },
+                );
+
+                // Invoke native module in the native module manager with no input.
+                // The execution principal (native module) should have read access
+                // to the directory containing the execution artifacts (binaries and
+                // shared libraries), or the native module manager won't be able to
+                // prepare the sandbox
+                let mut native_module_manager =
+                    NativeModuleManager::new(native_module, pipeline_filesystem.clone());
+                native_module_manager
+                    .execute(vec![])
+                    .map(|_| 0)
+                    .map_err(|err| anyhow!(err))
+            }
+        }
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {

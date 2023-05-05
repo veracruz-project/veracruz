@@ -157,11 +157,11 @@ pub enum NativeModuleType {
     Dynamic { special_file: PathBuf, entry_point: PathBuf },
     /// Native module that is provisioned to the enclave and executed just like
     /// a regular WASM program, i.e. via a result request from a participant.
-    /// Provisioning external shared libraries to the execution environment is
-    /// not supported yet, therefore the binary must whether be statically
-    /// linked, or depend on shared libraries provided by the underlying
-    /// operating system.
-    Provisioned(Program),
+    /// Dynamic linking is supported if the shared libraries can be found.
+    /// The execution principal corresponding to the native module should have
+    /// read access to every directory containing the execution artifacts
+    /// (binary and optional shared libraries).
+    Provisioned { entry_point: PathBuf },
 }
 
 /// Defines a native module that can be loaded directly (provisioned native
@@ -173,20 +173,17 @@ pub struct NativeModule {
     name: String,
     /// Native's module type
     r#type: NativeModuleType,
-    /// Native module's ID
-    id: u32,
     // TODO: add sandbox policy
 }
 
 impl NativeModule {
     /// Creates a Veracruz native module.
     #[inline]
-    pub fn new<T: Into<u32>>(name: String, r#type: NativeModuleType, id: T) -> Self
+    pub fn new(name: String, r#type: NativeModuleType) -> Self
     {
         Self {
             name,
             r#type,
-            id: id.into(),
         }
     }
 
@@ -200,12 +197,6 @@ impl NativeModule {
     #[inline]
     pub fn r#type(&self) -> &NativeModuleType {
         &self.r#type
-    }
-
-    /// Return the native module's id.
-    #[inline]
-    pub fn id(&self) -> u32 {
-        self.id
     }
 
     /// Return whether the native module is static

@@ -587,12 +587,11 @@ impl Arguments {
         assert_eq!(self.native_modules_entry_points.len(), self.native_modules_special_files.len());
 
         let mut result = Vec::new();
-        for (id, ((name, entry_point_path), special_file)) in self
+        for ((name, entry_point_path), special_file) in self
             .native_modules_names
             .iter()
             .zip(&self.native_modules_entry_points)
             .zip(&self.native_modules_special_files)
-            .enumerate()
         {
             // Add a backslash (VFS requirement)
             let special_file = enforce_leading_slash(special_file.to_str()
@@ -605,7 +604,7 @@ impl Arguments {
             } else {
                 NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
             };
-            result.push(NativeModule::new(name.to_string(), nm_type, id as u32));
+            result.push(NativeModule::new(name.to_string(), nm_type));
         }
         Ok(result)
     }
