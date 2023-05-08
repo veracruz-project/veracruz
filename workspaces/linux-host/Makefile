@@ -26,7 +26,6 @@ MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 include $(WORKSPACE_DIR)/shared.mk
 
-CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
@@ -42,7 +41,6 @@ all: build test-collateral
 build:
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
-	$(CC) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client -p veracruz-server \
 		--features veracruz-client/linux \
@@ -60,7 +58,6 @@ install:
 test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 
 CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	$(CC) \
 	$(TEST_PARAMETERS) \
 	cargo test $(PROFILE_FLAG) --features linux
 
@@ -81,7 +78,6 @@ $(RUNTIME_ENCLAVE_BINARY_PATH):
 clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	# workspace members and relevant dependencies
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	$(CC) \
 		cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \

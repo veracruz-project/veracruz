@@ -14,7 +14,6 @@
 WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
 
-
 all: crates/sdk/wasm-checker/bin/wasm-checker
 	cargo build $(PROFILE_FLAG) $(V_FLAG)
 
