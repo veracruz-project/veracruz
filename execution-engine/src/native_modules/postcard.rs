@@ -11,7 +11,7 @@
 //! information on licensing and copyright.
 
 use crate::fs::{FileSystem, FileSystemResult};
-use crate::native_modules::common::Service;
+use crate::native_modules::common::StaticNativeModule;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
 use wasi_types::ErrNo;
@@ -70,7 +70,7 @@ pub struct Struct3 {
     e3: Enum2,
 }
 
-impl Service for PostcardService {
+impl StaticNativeModule for PostcardService {
     fn name(&self) -> &str {
         "Postcard Service"
     }

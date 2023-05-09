@@ -53,7 +53,7 @@ vc-pgen \
     --css-file runtime-manager/css-sgx.bin \
     --certificate veracruz-mcu-client/test-data/test-cert.pem \
     --capability "test-binary.wasm:w,input-0:w,input-1:w,input-2:w,output:r" \
-    --binary test-binary.wasm=veracruz-mcu-client/test-data/test-binary.wasm \
+    --program-binary test-binary.wasm=veracruz-mcu-client/test-data/test-binary.wasm \
     --capability "input-0:r,input-1:r,input-2:r,output:w" \
     --output-policy-file veracruz-mcu-client/test-data/test-policy.json
 

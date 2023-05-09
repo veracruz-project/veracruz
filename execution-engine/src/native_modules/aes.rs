@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::fs::{FileSystem, FileSystemResult};
-use crate::native_modules::common::Service;
+use crate::native_modules::common::StaticNativeModule;
 use mbedtls::cipher::{Cipher, Decryption, Encryption, Fresh, Traditional};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -32,7 +32,7 @@ pub(crate) struct AesCounterModeService {
     is_encryption: bool,
 }
 
-impl Service for AesCounterModeService {
+impl StaticNativeModule for AesCounterModeService {
     /// Return the name of this service
     fn name(&self) -> &str {
         "Counter mode AES Service"

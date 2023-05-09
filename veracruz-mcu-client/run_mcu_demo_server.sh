@@ -75,7 +75,7 @@ vc-pgen \
     --capability "input-1:w" \
     --certificate veracruz-mcu-client/example/mcu2-cert.pem \
     --capability "input-2:w" \
-    --binary audio-event-triangulation.wasm=veracruz-mcu-client/example/audio-event-triangulation.wasm \
+    --program-binary audio-event-triangulation.wasm=veracruz-mcu-client/example/audio-event-triangulation.wasm \
     --capability "input-0:r,input-1:r,input-2:r,output:w" \
     --output-policy-file veracruz-mcu-client/example/policy.json
 

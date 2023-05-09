@@ -16,11 +16,9 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_modules::{
-    aead::AeadService, aes::AesCounterModeService, common::Service, postcard::PostcardService,
-};
+use crate::native_module_manager::NativeModuleManager;
 use policy_utils::{
-    principal::{FileRights, Principal, RightsTable},
+    principal::{FileRights, NativeModule, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -155,17 +153,11 @@ impl InodeEntry {
         self.data.is_service()
     }
 
-    /// Try to parse the input.
-    #[inline]
-    pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
-        self.data.service_valid_input()
-    }
-
     /// Return the service handler, and the current content of in the special file.
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<NativeModule>>>, Vec<u8>)> {
         self.data.service_handler()
     }
 }
@@ -183,7 +175,7 @@ enum InodeImpl {
     ///     In single thread situation, it is fine.
     ///     - The output of the service is determined by the service itself. It can try to open
     ///     any file and write to it, as long as the service has enough capabilities in FileSystem.
-    NativeModule(Arc<Mutex<Box<dyn Service>>>, Vec<u8>),
+    NativeModule(Arc<Mutex<Box<NativeModule>>>, Vec<u8>),
     /// A file
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
@@ -342,23 +334,11 @@ impl InodeImpl {
         }
     }
 
-    /// Try to parse the input of a service. Return true if it is a valid input.
-    #[inline]
-    pub(crate) fn service_valid_input(&self) -> FileSystemResult<bool> {
-        match self {
-            Self::NativeModule(service, input) => {
-                let mut service = service.lock().map_err(|_| ErrNo::Busy)?;
-                service.try_parse(input)
-            }
-            _ => Err(ErrNo::Inval),
-        }
-    }
-
     /// Return the service.
     #[inline]
     pub(crate) fn service_handler(
         &self,
-    ) -> FileSystemResult<(Arc<Mutex<Box<dyn Service>>>, Vec<u8>)> {
+    ) -> FileSystemResult<(Arc<Mutex<Box<NativeModule>>>, Vec<u8>)> {
         match self {
             Self::NativeModule(service, input) => {
                 // NOTE: We copy out, particularly `input`, on purpose, as they are protected by a
@@ -428,7 +408,7 @@ impl Debug for InodeTable {
                     k,
                     service
                         .try_lock()
-                        .map_or_else(|_| "(failed to lock)".to_string(), |o| o.name().to_string())
+                        .map_or_else(|_| "(failed to lock)".to_string(), |o| format!("{:?}", o))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
             }
@@ -464,23 +444,25 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (output_path, service_instance) tuples.
+    /// Install all the (special_file_path, service_instance) tuples, one per
+    /// native module.
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
-    fn install_services<T: AsRef<Path>>(
+    fn install_services(
         &mut self,
-        services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
+        native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
-        for (path, service) in services {
-            let path = path.as_ref();
+        for native_module in native_modules {
+            let path = native_module.special_file_path();
+            let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
             let new_inode = self.new_inode()?;
             let path = strip_root_slash(path);
             // Call the existing function to create general files.
             self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
             // Manually uplift the general file to special file bound with the service.
             self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
-                InodeImpl::NativeModule(service.clone(), Vec::new());
+                InodeImpl::NativeModule(service, Vec::new());
         }
         Ok(())
     }
@@ -554,6 +536,16 @@ impl InodeTable {
     #[inline]
     fn is_dir(&self, inode: &Inode) -> bool {
         self.get(inode).map(|i| i.is_dir()).unwrap_or(false)
+    }
+
+    /// Return if the `inode` is an empty directory.
+    #[inline]
+    fn is_dir_empty(&self, inode: &Inode) -> FileSystemResult<bool> {
+        let inode = self.get(inode);
+        match inode.map(|i| i.is_dir()).unwrap_or(false) {
+            true => Ok(inode?.read_dir(&self)?.iter().count() <= 2),
+            false => Ok(false)
+        }
     }
 
     /// Return the rights table of `principal`.
@@ -759,6 +751,8 @@ pub struct FileSystem {
     inode_table: SharedInodeTable,
     /// Preopen FD table. Mapping the FD to dir name.
     prestat_table: HashMap<Fd, PathBuf>,
+    /// A list of native modules available for the computation.
+    native_modules: Vec<NativeModule>,
 }
 
 impl Debug for FileSystem {
@@ -785,11 +779,6 @@ impl FileSystem {
     /// The default initial rights on a newly created file.
     pub const DEFAULT_RIGHTS: Rights = Rights::all();
 
-    /// Path to the Postcard serialization native module.
-    pub const POSTCARD_SERVICE_PATH: &'static str = "/services/postcard_string.dat";
-    /// Path to the AES counter mode native module.
-    pub const AES_COUNTER_MODE_SERVICE_PATH: &'static str = "/services/aesctr.dat";
-
     /// Creates a new, empty `Filesystem` and returns the superuser handle, which
     /// has all the capabilities on the entire filesystem.
     ///
@@ -797,12 +786,13 @@ impl FileSystem {
     /// and similar with respect to the parameter `std_streams_table`.  Userspace
     /// Wasm programs are going to expect that this is true, so we need to
     /// preallocate some files corresponding to those, here.
-    pub fn new(rights_table: RightsTable) -> FileSystemResult<Self> {
+    pub fn new(rights_table: RightsTable, native_modules: Vec<NativeModule>) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table)?)),
             prestat_table: HashMap::new(),
+            native_modules: native_modules.to_vec(),
         };
 
         let mut all_rights = HashMap::new();
@@ -813,32 +803,22 @@ impl FileSystem {
 
         rst.install_prestat::<PathBuf>(&all_rights)?;
 
-        let mut services = Vec::new();
-
-        let service: Box<dyn Service> = Box::new(PostcardService::new());
-        services.push((Self::POSTCARD_SERVICE_PATH, Arc::new(Mutex::new(service))));
-
-        let service: Box<dyn Service> = Box::new(AesCounterModeService::new());
-        services.push((
-            Self::AES_COUNTER_MODE_SERVICE_PATH,
-            Arc::new(Mutex::new(service)),
-        ));
-        let service: Box<dyn Service> = Box::new(AeadService::new());
-        services.push(("/services/aead.dat", Arc::new(Mutex::new(service))));
-        rst.install_services(services)?;
+        rst.install_services(native_modules)?;
 
         Ok(rst)
     }
 
     /// This is the *only* public API to create a new `FileSystem` (handler).
     /// It returns a `FileSystem` where directories are pre-opened with appropriate
-    /// capabilities in relation to a principal, `principal`.
+    /// capabilities in relation to a principal, `principal`. Native modules are
+    /// inherited from the parent `FileSystem`.
     pub fn spawn(&self, principal: &Principal) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
             inode_table: self.inode_table.clone(),
             prestat_table: HashMap::new(),
+            native_modules: self.native_modules.to_vec(),
         };
 
         // Must clone as `install_prestat` needs to lock the `inode_table` too
@@ -863,6 +843,7 @@ impl FileSystem {
             next_fd_candidate: Self::FIRST_FD,
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table).unwrap())),
             prestat_table: HashMap::new(),
+            native_modules: Vec::new(),
         }
     }
 
@@ -977,11 +958,11 @@ impl FileSystem {
         Ok(())
     }
 
-    fn install_services<T: AsRef<Path>>(
+    fn install_services(
         &mut self,
-        services: Vec<(T, Arc<Mutex<Box<dyn Service>>>)>,
+        native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
-        self.lock_inode_table()?.install_services(services)
+        self.lock_inode_table()?.install_services(native_modules)
     }
 
     /// Install a `fd` to the file system. The fd will be of type RegularFile.
@@ -1290,18 +1271,23 @@ impl FileSystem {
             (len, f.is_service())
         };
 
-        // If it is a service, call it when there is a valid input
-        if is_service && {
-            self.lock_inode_table()?
-                .get_mut(&inode)?
-                .service_valid_input()?
-        } {
-            let (service, input) = self
+        // If it is a service, call it.
+        // Warning: There is no input validity check performed here. It is the
+        // native module's responsibility to implement that.
+        if is_service
+        {
+            let (service, exec_config) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let mut service = service.lock().map_err(|_| ErrNo::Busy)?;
-            service.serve(&mut self.service_fs()?, &input)?;
+            let native_module = service
+                .lock()
+                .map_err(|_| ErrNo::Busy)?;
+
+            // Invoke native module manager
+            let mut native_module_manager = NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
+            // Invoke native module with execution configuration
+            native_module_manager.execute(exec_config)?;
         }
         Ok(len)
     }
@@ -1781,7 +1767,7 @@ impl FileSystem {
     ////////////////////////////////////////////////////////////////////////
 
     /// Return an appropriate prestat fd for the path
-    fn find_prestat<T: AsRef<Path>>(&self, path: T) -> Result<(Fd, PathBuf), ErrNo> {
+    pub fn find_prestat<T: AsRef<Path>>(&self, path: T) -> Result<(Fd, PathBuf), ErrNo> {
         let path = path.as_ref();
         let (fd, parent_path) = path
             .ancestors()
@@ -1961,6 +1947,82 @@ impl FileSystem {
         Ok(rst)
     }
 
+    /// Similarly to `read_all_files_by_absolute_path()`, recursively read all
+    /// files under the specified `path`.
+    /// The `principal` must have the right on `path_open`, `fd_read` and
+    /// `fd_seek`, though read errors on leaf files are tolerated.
+    /// Returns two vectors:
+    ///  - A list of leaf files, along with their data, that the `principal` can
+    ///    read. Also includes empty directories, just in case the native module
+    ///    is expecting them; in that case the associated data is set to `None`
+    ///  - A list of top-level files immediately under the root. This allows the
+    ///    native module manager to mount the filesystem into the sandbox, since
+    ///    Sandbox2 doesn't allow mapping a directory to `/`.
+    /// This function is used by the native module manager to duplicate the
+    /// VFS before running native modules.
+    pub fn read_all_files_and_dirs_by_absolute_path<T: AsRef<Path>>(
+        &mut self,
+        path: T,
+    ) -> Result<(Vec<(PathBuf, Option<Vec<u8>>)>, Vec<PathBuf>), ErrNo> {
+        let path = path.as_ref();
+        // Ignore special files. This avoids permission errors and deadlocks
+        // when respectively reading and writing to special files.
+        if path == PathBuf::from("/services") {
+            return Ok((vec![], vec![]));
+        }
+        // Convert the absolute path to relative path and then find the inode
+        let inode = self
+            .lock_inode_table()?
+            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
+            .0;
+        let mut rst = Vec::new();
+        let mut top_level_files = Vec::new();
+        if self.lock_inode_table()?.is_dir(&inode) {
+            // Limit the lock scope
+            let (all_dir, is_dir_empty) = {
+                let inode_table = self.lock_inode_table()?;
+                let inode_entry = inode_table.get(&inode)?;
+                (inode_entry.read_dir(&inode_table)?, inode_table.is_dir_empty(&inode))
+            };
+            if is_dir_empty? {
+                // Directory is empty (current and parent directories don't
+                // count)
+                rst.push((path.to_path_buf(), None));
+            } else {
+                for (_, sub_relative_path) in all_dir.iter() {
+                    // TODO: wait for icecap support direct conversion from bytes to os_str, bypassing
+                    // potential utf-8 encoding check
+                    #[cfg(feature = "icecap")]
+                    let sub_relative_path =
+                        PathBuf::from(String::from_utf8(sub_relative_path.to_vec()).unwrap());
+                    #[cfg(not(feature = "icecap"))]
+                    let sub_relative_path =
+                        PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
+                    // Ignore the path for current and parent directories.
+                    if sub_relative_path != PathBuf::from(".")
+                        && sub_relative_path != PathBuf::from("..")
+                    {
+                        let mut sub_absolute_path = path.to_path_buf();
+                        sub_absolute_path.push(sub_relative_path);
+                        let (mut list, _) = self.read_all_files_and_dirs_by_absolute_path(&sub_absolute_path)?;
+                        rst.append(&mut list);
+                        if path == Path::new("/") {
+                            top_level_files.push(sub_absolute_path);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Ignore unreadable files
+            match self.read_file_by_absolute_path(path) {
+                Ok(b) => rst.push((path.to_path_buf(), Some(b))),
+                Err(_) => (),
+            }
+        }
+
+        Ok((rst, top_level_files))
+    }
+
     /// Check if a `file_name` exists.
     /// Note: this function *has* side effect!
     /// It will try to open the file and then close it.
@@ -2057,6 +2119,6 @@ where
     }
 }
 
-fn strip_root_slash(path: &Path) -> &Path {
+pub(crate) fn strip_root_slash(path: &Path) -> &Path {
     path.strip_prefix("/").unwrap_or(path)
 }

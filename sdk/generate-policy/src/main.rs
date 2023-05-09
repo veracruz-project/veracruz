@@ -18,7 +18,7 @@ use policy_utils::{
     expiry::Timepoint,
     parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
-    principal::{ExecutionStrategy, FileHash, FileRights, Identity, Pipeline, Program},
+    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, Pipeline, Program},
 };
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
@@ -115,6 +115,12 @@ struct Arguments {
     /// Note this is an array of string+path pairs, since a string enclave path
     /// can be provided along with the local file path.
     program_binaries: Vec<(String, PathBuf)>,
+    /// A list of native module names.
+    native_modules_names: Vec<String>,
+    /// A list of paths to native module entry points.
+    native_modules_entry_points: Vec<PathBuf>,
+    /// A list of paths to native module special files.
+    native_modules_special_files: Vec<PathBuf>,
     /// The conditional pipeline of programs to execute.  We parse this eagerly
     /// to check for parsing issues before writing the string to the policy
     /// file.  However, this string is then re-parsed by the Veracruz runtime
@@ -225,15 +231,44 @@ impl Arguments {
                     .required(true),
             )
             .arg(
-                Arg::with_name("binary")
+                Arg::with_name("program-binary")
                     .short("w")
-                    .long("binary")
+                    .long("program-binary")
                     .value_name("FILE")
                     .help("Specifies the filename of the WASM binary to use for the computation. \
-    This can be of the form \"--binary name\" or \"--binary enclave_name=path\" if you want to \
-    supply the file as a different name in the enclave. Multiple --binary flags or a comma-separated \
+    This can be of the form \"--program-binary name\" or \"--program-binary enclave_name=path\" if you want to \
+    supply the file as a different name in the enclave. Multiple --program-binary flags or a comma-separated \
     list of files may be provided.")
                     .required(true)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("native-module-name")
+                    .long("native-module-name")
+                    .value_name("NAME")
+                    .help("Specifies the name of the native module to use for the computation. \
+    This must be of the form \"--native-module-name name\". Multiple --native-module-name flags may be provided.")
+                    .required(false)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("native-module-entry-point")
+                    .long("native-module-entry-point")
+                    .value_name("FILE")
+                    .help("Specifies the path to the entry point of the native module to use for the computation. \
+    This must be of the form \"--native-module-entry-point path\". Multiple --native-module-entry-point flags may be provided. \
+    If the value is an empty string, the native module is assumed to be static, i.e. part of the Veracruz runtime, \
+    and is looked up by name in the static native modules table.")
+                    .required(false)
+                    .multiple(true),
+            )
+            .arg(
+                Arg::with_name("native-module-special-file")
+                    .long("native-module-special-file")
+                    .value_name("FILE")
+                    .help("Specifies the path to the special file of the native module to use for the computation. \
+    This must be of the form \"--native-module-special-file path\". Multiple --native-module-special-file flags may be provided.")
+                    .required(false)
                     .multiple(true),
             )
             .arg(
@@ -310,7 +345,7 @@ impl Arguments {
         // Read all program paths
         let mut program_binaries = Vec::new();
         for path_raw in matches
-            .values_of_os("binary")
+            .values_of_os("program-binary")
             .ok_or(anyhow!("No program binary filename passed as an argument."))?
         {
             program_binaries
@@ -326,6 +361,27 @@ impl Arguments {
                     .append(&mut parse_renamable_paths(hash_raw).map_err(|e| anyhow!("{:?}", e))?);
             }
         }
+
+        // Read all native module names
+        let native_modules_names = matches
+            .values_of("native-module-name")
+            .map_or(Vec::new(), |p| {
+                p.map(|s| s.to_string()).collect::<Vec<_>>()
+            });
+
+        // Read all native module entry points
+        let native_modules_entry_points = matches
+            .values_of_os("native-module-entry-point")
+            .map_or(Vec::new(), |p| {
+                p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
+            });
+
+        // Read all native module special files
+        let native_modules_special_files = matches
+            .values_of_os("native-module-special-file")
+            .map_or(Vec::new(), |p| {
+                p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
+            });
 
         // Read all the pipelines
         let pipelines = matches
@@ -345,7 +401,7 @@ impl Arguments {
         check_capability(&capabilities)?;
 
         if certificates.len() + program_binaries.len() + pipelines.len() != capabilities.len() {
-            return Err(anyhow!("The number of capabilities attributes differ from the total number of certificate and binary attributes."));
+            return Err(anyhow!("The number of capabilities attributes differ from the total number of certificate and program binary attributes."));
         }
 
         // Split the capabilities into three groups, certificate, program, and pipeline.
@@ -425,6 +481,9 @@ impl Arguments {
             output_policy_file,
             certificate_expiry,
             program_binaries,
+            native_modules_names,
+            native_modules_entry_points,
+            native_modules_special_files,
             pipelines,
             hashes,
             enclave_debug_mode,
@@ -441,6 +500,7 @@ impl Arguments {
         let policy = Policy::new(
             self.serialize_identities()?,
             self.serialize_binaries()?,
+            self.serialize_native_modules()?,
             self.serialize_pipeline()?,
             format!("{}", self.veracruz_server_ip),
             self.serialize_enclave_certificate_timepoint()?,
@@ -515,6 +575,32 @@ impl Arguments {
             let program_file_name = enforce_leading_slash(program_file_name).into_owned();
 
             result.push(Program::new(program_file_name, id as u32, file_permissions));
+        }
+        Ok(result)
+    }
+
+    /// Serializes the native modules used in the computation into a vector.
+    fn serialize_native_modules(&self) -> Result<Vec<NativeModule>> {
+        info!("Serializing native modules.");
+
+        assert_eq!(self.native_modules_names.len(), self.native_modules_entry_points.len());
+        assert_eq!(self.native_modules_entry_points.len(), self.native_modules_special_files.len());
+
+        let mut result = Vec::new();
+        for (id, ((name, entry_point_path), special_file)) in self
+            .native_modules_names
+            .iter()
+            .zip(&self.native_modules_entry_points)
+            .zip(&self.native_modules_special_files)
+            .enumerate()
+        {
+            // Add a backslash (VFS requirement)
+            let special_file = enforce_leading_slash(special_file.to_str()
+            .ok_or(
+                anyhow!("Fail to convert special_file to str."),
+            )?).into_owned();
+
+            result.push(NativeModule::new(name.to_string(), entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
         }
         Ok(result)
     }

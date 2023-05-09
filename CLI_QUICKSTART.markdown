@@ -186,7 +186,7 @@ $ vc-pgen \
     --capability "/input/:w" \
     --certificate example/example-result-cert.pem \
     --capability "/program/:x,/output/:r" \
-    --binary /program/example-binary.wasm=example/example-binary.wasm \
+    --program-binary /program/example-binary.wasm=example/example-binary.wasm \
     --capability "/input/:r,/output/:w" \
     --output-policy-file example/example-policy.json \
     --max-memory-mib 256

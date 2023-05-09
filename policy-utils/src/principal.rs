@@ -16,7 +16,7 @@ use super::error::PolicyError;
 use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, string::String, vec::Vec};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf, string::String, vec::Vec};
 use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -34,6 +34,8 @@ pub enum Principal {
     Program(String),
     /// Pipeline in Veracruz, identified by the pipeline name.
     Pipeline(String),
+    /// Native module in Veracruz, identified by its name.
+    NativeModule(String),
     /// No Capability, the bottom Capability. It is used in some Initialization.
     NoCap,
 }
@@ -128,6 +130,84 @@ impl Program {
     #[inline]
     pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
         FileRights::compute_right_map(&self.file_rights)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Native module
+////////////////////////////////////////////////////////////////////////////////
+/// Defines a native module that can be loaded. Encompasses both static and
+/// dynamic native modules, which are respectively part of the Veracruz runtime
+/// and separate binaries, both executed on invocation by the WASM program
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct NativeModule {
+    /// Native module's name
+    name: String,
+    /// Dynamic native module's entry point, i.e. path to the main binary
+    /// relative to the native module's root directory. If set to `None`, the
+    /// native module is assumed to be static and is searched for in the list of
+    /// static native modules
+    entry_point_path: PathBuf,
+    /// Path to native module's special file. Writing data to this file triggers
+    /// the execution of the native module with data as input
+    special_file_path: PathBuf,
+    /// Native module's ID
+    id: u32,
+    // TODO: add sandbox policy
+}
+
+impl NativeModule {
+    /// Creates a Veracruz native module.
+    #[inline]
+    pub fn new<T: Into<u32>>(name: String, entry_point_path: PathBuf, special_file_path: PathBuf, id: T) -> Self
+    {
+        Self {
+            name,
+            entry_point_path,
+            special_file_path,
+            id: id.into(),
+        }
+    }
+
+    /// Return the name.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Return path to entry point.
+    #[inline]
+    pub fn entry_point_path(&self) -> &PathBuf {
+        &self.entry_point_path
+    }
+
+    /// Return path to special file.
+    #[inline]
+    pub fn special_file_path(&self) -> &PathBuf {
+        &self.special_file_path
+    }
+
+    /// Return the native module's id.
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Return whether the native module is static or dynamic.
+    #[inline]
+    pub fn is_static(&self) -> bool {
+        self.entry_point_path() == &PathBuf::from("")
+    }
+}
+
+impl Debug for NativeModule {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "\"{}\" special_file=\"{}\" entry_point=", self.name(), self.special_file_path().to_str().unwrap_or_default())?;
+        if self.is_static() {
+            write!(f, "static")
+        } else {
+            write!(f, "\"{}\"", self.entry_point_path().to_str().unwrap_or_default())
+        }
     }
 }
 

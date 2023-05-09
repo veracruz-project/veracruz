@@ -37,7 +37,7 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, FileHash, Identity, Pipeline, Principal, Program, RightsTable},
+    principal::{ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program, RightsTable},
     Platform,
 };
 use anyhow::{anyhow, Result};
@@ -66,6 +66,8 @@ pub struct Policy {
     identities: Vec<Identity<String>>,
     /// The candidate programs that can be loaded in the execution engine.
     programs: Vec<Program>,
+    /// The candidate native modules that can be loaded.
+    native_modules: Vec<NativeModule>,
     /// The list of files, e.g. binaries and configurations, that must match given hashes.
     file_hashes: Vec<FileHash>,
     /// The list of pipelines.
@@ -115,6 +117,7 @@ impl Policy {
     pub fn new(
         identities: Vec<Identity<String>>,
         programs: Vec<Program>,
+        native_modules: Vec<NativeModule>,
         mut pipelines: Vec<Pipeline>,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
@@ -138,6 +141,7 @@ impl Policy {
             identities,
             proxy_service_cert,
             programs,
+            native_modules,
             pipelines,
             veracruz_server_url,
             enclave_cert_expiry,
@@ -183,6 +187,12 @@ impl Policy {
     #[inline]
     pub fn identities(&self) -> &Vec<Identity<String>> {
         &self.identities
+    }
+
+    /// Returns the native modules associated with this policy.
+    #[inline]
+    pub fn native_modules(&self) -> &Vec<NativeModule> {
+        &self.native_modules
     }
 
     /// Returns the URL of the Veracruz server associated with this policy.
