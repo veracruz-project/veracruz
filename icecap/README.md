@@ -24,8 +24,6 @@ with some indications of how they depend on each other.
 
 * `c/libc-supplement/` has `getrandom` (**it's bogus!**), `printf`, ...
   It is built and linked in by `workspaces/icecap-runtime/Makefile`.
-* `rust/icecap-wrapper/` just pulls in four crates from
-  `icecap/icecap/src/rust/crates/...`. UNUSED!
 
 ### `icecap/sysroot/libc/`
 
