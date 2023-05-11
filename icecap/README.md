@@ -101,3 +101,52 @@ with some indications of how they depend on each other.
 
 * MODULE from https://gitlab.com/icecap-project/seL4_tools.git,
   forked from https://github.com/seL4/seL4_tools.git
+
+## How Veracruz IceCap binaries start
+
+There are two Veracruz IceCap binaries: `runtime_manager_enclave.elf`
+and `virtio-console-server.elf`.
+
+Execution starts at the `_start` defined in
+`icecap/icecap/src/c/icecap-runtime/src/start.S`, which is compiled
+into `libicecap-runtime.a`, which `icecap-runtime/build.rs` links with
+the crate `icecap-runtime`, which is depended on by `icecap-core`,
+which is depended on by the IceCap binaries. (The `-l
+static-icecap-runtime` in `workspaces/icecap-runtime/Makefile` is
+apparently unnecessary.)
+
+* The entry point is `_start`, defined in
+  `icecap/icecap/src/c/icecap-runtime/src/start.S`. This just branches
+  to `__icecap_runtime_start`.
+
+* `__icecap_runtime_start`, defined in
+  `icecap/icecap/src/c/icecap-runtime/src/runtime.c`, computes a
+  couple of values and then branches to `__icecap_runtime_reserve_tls`
+  (the function is not intended to return).
+
+* `__icecap_runtime_reserve_tls`, defined in
+  `icecap/icecap/src/c/icecap-runtime/src/tls.S`, has 5 instructions
+  then a branch to `__icecap_runtime_continue`.
+
+* `__icecap_runtime_continue`, defined in
+  `icecap/icecap/src/c/icecap-runtime/src/runtime.c`, is about 30
+  lines of C and calls `icecap_main`.
+
+* `icecap_main` is defined by `declare_generic_main`, a macro that is
+  defined in
+  `icecap/icecap/src/rust/crates/framework/base/icecap-start/generic/src/lib.rs`
+  and invoked in `runtime-manager/src/platforms/icecap.rs` or
+  `workspaces/icecap-runtime/src/virtio-console-server/src/main.rs`:
+  `icecap_main` calls `run_generic_main` with `main` as an argument,
+  but both of those functions are only used in one place and therefore
+  likely to be inlined by the Rust compiler.
+
+In the source for either binary, instead of using the attribute
+`#![no_main]`, we can instead remove that attribute, rename `main` to
+something else in both places, and provide a `main` function, which is
+then never invoked: and everything still works.
+
+It is not obvious how IceCap's `_start` takes precedence over one
+provided by the C library but this probably has to do with the linker
+specified in `workspaces/icecap-runtime/Makefile`: see the uses of
+`LD` in that file.
