@@ -35,10 +35,13 @@ TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 
 CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
 
+unresolved_crates_path := $(shell pwd)/crates
+
 all: build test-collateral
 
 build:
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
+	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
 	$(CC) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client -p veracruz-server \
