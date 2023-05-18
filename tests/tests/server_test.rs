@@ -44,6 +44,9 @@ use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 use veracruz_server::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use veracruz_server::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
+#[cfg(feature = "sev")]
+use sev_veracruz_server::server::VeracruzServerSev as VeracruzServerEnclave;
+
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
@@ -627,7 +630,10 @@ impl TestExecutor {
             policy_dir(policy_filename),
             cert_key_dir(client_cert_filename),
             cert_key_dir(client_key_filename),
-        )?
+        ).map_err(|err| {
+            println!("Self::new failed:{:?}", err);
+            err
+        })?
         .execute(events, Duration::from_secs(timeout_sec))?;
         if result != expect_success {
             if expect_success {
@@ -642,7 +648,7 @@ impl TestExecutor {
     /// Create a new test executor. It initiates a server in a separate thread and creates a
     /// pair of channels between the main thread, who acts as a client, and the server thread.
     /// Those two channels simulate the network.
-    fn new<P: AsRef<Path>, Q: AsRef<Path>, K: AsRef<Path>>(
+    fn new<P: AsRef<Path> + Clone, Q: AsRef<Path>, K: AsRef<Path>>(
         policy_path: P,
         client_cert_path: Q,
         client_key_path: K,
@@ -653,7 +659,11 @@ impl TestExecutor {
             .try_init();
         info!("Initialise test configuration and proxy attestation server.");
         // Read the the policy
-        let (policy, policy_json, policy_hash) = read_policy(policy_path)?;
+        let (policy, policy_json, policy_hash) = read_policy(policy_path.clone())
+            .map_err(|err| {
+                println!("new::read_policy failed on path:{:}, err:{:}", policy_path.clone().as_ref().display(), err);
+                err
+            })?;
 
         // start the proxy attestation server
         let _proxy_children = proxy_attestation_setup(
@@ -678,17 +688,26 @@ impl TestExecutor {
             client_key_path,
             &policy.ciphersuite(),
             Arc::clone(&shared_buffers),
-        )?;
+        ).map_err(|err| {
+            println!("create_client_test_connection failed:{:?}", err);
+            err
+        })?;
 
         info!("Initialise Veracruz runtime.");
         // Create the server
-        let mut veracruz_server =
-            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
+        let mut veracruz_server_native =
+            Box::new(VeracruzServerEnclave::new(&policy_json).map_err(|e| {
+                println!("VeracruzServerEnclave::new failed:{:?}", e);
+                anyhow!("{:?}", e)
+            })?);
 
         // Create the client tls session. Note that we need the session id.
-        let client_connection_id = veracruz_server
-            .new_tls_session()
-            .map_err(|e| anyhow!("{:?}", e))?;
+        let client_connection_id =
+            veracruz_server::server::new_tls_session(&mut veracruz_server_native)
+                .map_err(|e| {
+                    println!("new_tls_session failed:{:?}", e);
+                    anyhow!("{:?}", e)
+                })?;
         if client_connection_id == 0 {
             return Err(anyhow!("client session id is zero"));
         }
@@ -702,7 +721,7 @@ impl TestExecutor {
         let init_flag_clone = init_flag.clone();
         let server_thread = thread::spawn(move || {
             if let Err(e) = TestExecutor::simulated_server(
-                &mut veracruz_server,
+                &mut veracruz_server_native,
                 server_tls_sender,
                 server_tls_receiver,
                 alive_flag_clone.clone(),
@@ -734,7 +753,7 @@ impl TestExecutor {
 
     /// This function simulating a Veracruz server, it should run on a separate thread.
     fn simulated_server(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
+        veracruz_server_native: &mut Box<impl VeracruzServer + Send + Sync + ?Sized>,
         sender: Sender<Vec<u8>>,
         receiver: Receiver<(u32, Vec<u8>)>,
         test_alive_flag: Arc<AtomicBool>,
@@ -753,8 +772,7 @@ impl TestExecutor {
                 session_id
             );
 
-            let (veracruz_active_flag, output_data_option) = veracruz_server
-                .tls_data(session_id, received_buffer)
+            let (veracruz_active_flag, output_data_option) = veracruz_server::server::tls_data(session_id, received_buffer, veracruz_server_native)
                 .map_err(|e| {
                     // This point has a high chance to fail.
                     error!("Veracruz Server: {:?}", e);
@@ -1050,14 +1068,13 @@ impl TestExecutor {
 fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     policy_json: T,
 ) -> Result<(VeracruzServerEnclave, u32)> {
-    let mut veracruz_server =
-        VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
+    let mut veracruz_server_native =
+        Box::new(VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?);
 
-    let session_id = veracruz_server
-        .new_tls_session()
+    let session_id = veracruz_server::server::new_tls_session(&mut veracruz_server_native)
         .map_err(|e| anyhow!("{:?}", e))?;
     if session_id != 0 {
-        Ok((veracruz_server, session_id))
+        Ok((*veracruz_server_native, session_id))
     } else {
         Err(anyhow!("Session ID cannot be zero").into())
     }

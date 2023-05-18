@@ -42,10 +42,15 @@ RUN \
         if [ "$DOCKER_GROUP_ID" != "0" ] ; then \
             groupadd -g ${DOCKER_GROUP_ID} docker ; \
             usermod -a -G docker $USER ; \
+	    usermod -a -G kvm $USER; \
+	    usermod -a -G libvirtd $USER; \
         fi ; \
         if getent group ne &>/dev/null ; then \
             usermod -a -G ne $USER ; \
         fi ; \
+	echo "GOROOT=/usr/local/go" >> /home/$USER/.bashrc; \
+	echo "GOPATH=$HOME/go" >> /home/$USER/.bashrc; \
+	echo "PATH=$HOME/go/bin:/usr/local/go/bin:$PATH" >> /home/$USER/.bashrc; \
         echo "$USER ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USER && chmod 0440 /etc/sudoers.d/$USER ; \
     fi
 

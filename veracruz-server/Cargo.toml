@@ -45,6 +45,13 @@ nitro = [
   "veracruz-utils/nitro",
 ]
 
+sev = [
+  "io-utils",
+  "nix",
+  "policy-utils/std",
+  "veracruz-utils",
+]
+
 [dependencies]
 anyhow = "1"
 base64 = "0.13.0"

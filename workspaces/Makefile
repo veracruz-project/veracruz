@@ -14,7 +14,8 @@ default:
 include common.mk
 
 .PHONY: all clean icecap icecap-clippy icecap-clean linux linux-install linux-clippy \
-	linux-clean nitro nitro-clippy nitro-clean shared shared-install shared-clean
+	linux-clean nitro nitro-clippy nitro-clean sev sev-clippy sev-clean \
+	shared shared-install shared-clean
 
 all: shared linux nitro icecap
 
@@ -38,6 +39,12 @@ icecap: shared
 icecap-tests:
 	$(MAKE) -C icecap-host tests
 
+sev: shared
+	cd sev-host/crates/sev-runtime-manager && cargo build
+	$(MAKE) -C sev-host build
+
+sev-tests:
+	$(MAKE) -C sev-host tests
 shared:
 	$(MAKE) -C applications
 	$(MAKE) -C host
@@ -60,6 +67,9 @@ nitro-clippy:
 icecap-clippy:
 	make -C icecap-host clippy
 
+sev-clippy:
+	make -C sev-host clippy
+
 linux-clean:
 	$(MAKE) -C linux-host clean
 	$(MAKE) -C linux-runtime clean
@@ -71,6 +81,10 @@ nitro-clean:
 icecap-clean:
 	$(MAKE) -C icecap-host clean
 	$(MAKE) -C icecap-runtime clean
+
+sev-clean:
+	cd sev-host/crates/sev-runtime-manager && cargo clean
+	$(MAKE) -C sev-host clean
 
 shared-clean:
 	$(MAKE) -C applications clean

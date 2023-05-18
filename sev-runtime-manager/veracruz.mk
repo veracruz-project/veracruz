@@ -15,8 +15,6 @@ all: libsev-guest-get-report.a
 
 libsev-guest-get-report.a: $(SOURCE_DIR)/get-report.o
 	$(AR) cr -o $@ $^
-	strip -s --keep-symbol get_report --keep-symbol get_extended_report libsev-guest-get-report.a
-	ranlib libsev-guest-get-report.a
 
 clean:
 	$(RM) libsev-guest-get-report.a $(OBJECTS) 

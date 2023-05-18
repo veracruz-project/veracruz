@@ -23,6 +23,7 @@ nitro = [
 ]
 std = [
   "chrono",
+  "mbedtls/monitor_getrandom",
   "platform-services/std",
   "serde/std",
   "serde_json/std",

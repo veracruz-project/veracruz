@@ -25,7 +25,9 @@ RUN apt-get update && \
         ca-certificates \
         lsb-release \
         lxc \
-        musl-tools && \
+	    llvm \
+        musl-tools \
+	    guestfs-tools && \
     apt-get autoremove -y && apt-get clean && \
     rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 

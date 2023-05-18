@@ -59,7 +59,7 @@ fn encap() -> Result<()> {
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            println!("AMD SEV Runtime Manager::main_loop received:{:?}", response_buffer);
+            println!("AMD SEV Runtime Manager::main_loop received:{:02x?}", response_buffer);
             send_buffer(fd, &response_buffer)?;
         }
     }

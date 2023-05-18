@@ -202,8 +202,11 @@ sev-run: sev-build
 	# This container must be started on a "AMD SEV-SNP"-capable system
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		-v /usr/bin:/host/bin \
+		-v /boot:/boot \
+		-v /lib/modules:/lib/modules \
 		--device=/dev/vsock:/dev/vsock \
 		-p $(LOCALIP):3010:3010/tcp \
+		--privileged \
 		--name $(CONTAINER)-sev-$(USER)-$(VERSION) \
 		$(IMAGE)/sev/$(USER):$(VERSION) sleep inf
 
@@ -217,7 +220,7 @@ sev-run-build: sev-build
 		$(IMAGE)/sev/$(USER):$(VERSION) sleep inf
 
 sev-exec:
-	docker exec -i -t $(CONTAINER)-sev-$(USER)-$(VERSION) /bin/bash || true
+	docker exec -u root -i -t $(CONTAINER)-sev-$(USER)-$(VERSION) /bin/bash || true
 
 sev-base: sev/Dockerfile base
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
