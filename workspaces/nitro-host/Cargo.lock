@@ -1043,6 +1043,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nitro-host"
+version = "0.3.0"
+dependencies = [
+ "tests",
+ "veracruz-client",
+ "veracruz-server",
+]
+
+[[package]]
 name = "nix"
 version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
