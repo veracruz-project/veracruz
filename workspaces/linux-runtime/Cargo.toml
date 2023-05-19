@@ -16,9 +16,10 @@ cargo-features = ["resolver"]
 exclude = [
   "crates/third-party/rust-mbedtls",
   "crates/third-party/wasmi",
+  "crates/runtime-manager",
 ]
 members = [
-  "crates/runtime-manager",
+  "src/linux-runtime",
 ]
 resolver = "2"
 

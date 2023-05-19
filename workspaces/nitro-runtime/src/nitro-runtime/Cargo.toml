@@ -1,0 +1,14 @@
+[package]
+authors = ["The Veracruz Development Team"]
+description = "A dummy package"
+edition = "2018"
+name = "nitro-runtime"
+version = "0.3.0"
+resolver = "2"
+
+[[bin]]
+name = "runtime-manager-enclave"
+path = "src/main.rs"
+
+[dependencies]
+runtime-manager = { path = "../../crates/runtime-manager", features = [ "nitro" ] }

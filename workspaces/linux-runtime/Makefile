@@ -25,21 +25,16 @@ linux: runtime-manager-enclave
 
 runtime-manager-enclave:
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
-	cargo build $(PROFILE_FLAG) $(V_FLAG) --features linux -p runtime_manager_enclave
+	cargo build $(PROFILE_FLAG) $(V_FLAG)
 
 doc:
 	cargo doc
 
 clippy:
 	cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
-		-p runtime_manager_enclave -p execution-engine \
-		-p session-manager -p policy-utils -p platform-services \
-		--features runtime_manager_enclave/linux \
-		--features execution-engine/std \
-		--features session-manager/std \
-		--features policy-utils/std \
-		--features platform-services/std \
-		-- --no-deps 
+		-p linux-runtime -p runtime-manager -p execution-engine \
+		-p session-manager -p policy-utils -p platform-services
+		-- --no-deps
 
 fmt:
 	cargo fmt

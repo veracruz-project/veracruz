@@ -21,7 +21,7 @@ WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
 
 OUT_DIR ?= $(abspath test-collateral)
-RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave
+RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime-manager-enclave
 MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 include $(WORKSPACE_DIR)/shared.mk
@@ -41,11 +41,7 @@ all: build test-collateral
 build:
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
-		cargo build $(PROFILE_FLAG) $(V_FLAG) \
-		-p veracruz-client -p veracruz-server \
-		--features veracruz-client/linux \
-		--features veracruz-server/linux \
-		--features cli
+		cargo build $(PROFILE_FLAG) $(V_FLAG)
 
 install:
 	# create full names
@@ -58,8 +54,7 @@ install:
 test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 
 CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	$(TEST_PARAMETERS) \
-	cargo test $(PROFILE_FLAG) --features linux
+	$(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
 test-server: test-dependencies
 	$(CARGO_TEST) -p tests --no-run -- --nocapture
@@ -82,17 +77,11 @@ clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils  \
-		--features veracruz-client/linux \
-		--features veracruz-server/linux \
-		--features io-utils/linux \
-		--features psa-attestation/linux \
-		--features veracruz-utils/linux \
 		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
 		cargo clippy --tests \
 		$(PROFILE_FLAG) -p tests \
-		--features tests/linux \
 		-- $(CLIPPY_OPTIONS)
 
 doc:

@@ -2,17 +2,9 @@
 authors = ["The Veracruz Development Team"]
 description = "The trusted Veracruz runtime's command-and-control module.  Co-ordinates and directs the rest of the runtime."
 edition = "2018"
-name = "runtime_manager_enclave"
+name = "runtime-manager"
 version = "0.3.0"
-
-[lib]
-crate-type = ["staticlib"]
-name = "runtime_manager_enclave"
-path = "src/lib.rs"
-
-[[bin]]
-name = "runtime_manager_enclave"
-path = "src/main.rs"
+resolver = "2"
 
 [features]
 default = []
@@ -75,12 +67,6 @@ execution-engine = { path = "../execution-engine" }
 finite-set = { path = "../icecap/crates/framework/helpers/finite-set", optional = true }
 half = "=1.7.1"
 hex = { version = "0.4.2" }
-hypervisor-event-server-types = { path = "../icecap/crates/hypervisor/components/event-server/types", optional = true }
-icecap-core = { path = "../icecap/crates/framework/base/icecap-core", optional = true }
-icecap-rpc = { path = "../icecap/crates/framework/base/icecap-rpc", optional = true }
-icecap-ring-buffer = { path = "../icecap/crates/framework/base/icecap-ring-buffer", optional = true }
-icecap-start-generic = { path = "../icecap/crates/framework/base/icecap-start/generic", optional = true }
-icecap-std-external = { path = "../icecap/crates/framework/std-support/icecap-std-external", optional = true }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 libc = { version = "0.2.124", optional = true }
@@ -101,3 +87,12 @@ uuid = { version = "1.1.2", features = ["serde"] }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi", optional = true }
+
+
+[target.aarch64-icecap.dependencies]
+hypervisor-event-server-types = { path = "../icecap/crates/hypervisor/components/event-server/types", optional = true }
+icecap-core = { path = "../icecap/crates/framework/base/icecap-core", optional = true }
+icecap-rpc = { path = "../icecap/crates/framework/base/icecap-rpc", optional = true }
+icecap-ring-buffer = { path = "../icecap/crates/framework/base/icecap-ring-buffer", optional = true }
+icecap-start-generic = { path = "../icecap/crates/framework/base/icecap-start/generic", optional = true }
+icecap-std-external = { path = "../icecap/crates/framework/std-support/icecap-std-external", optional = true }

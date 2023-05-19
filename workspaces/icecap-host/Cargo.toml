@@ -18,9 +18,10 @@ exclude = [
   "crates/third-party/wasmi",
 ]
 members = [
+  "crates/tests",
   "crates/veracruz-client",
   "crates/veracruz-server",
-  "crates/tests",
+  "src/icecap-host",
 ]
 resolver = "2"
 
