@@ -68,29 +68,11 @@ complex software packages, at the cost of reducing portability.
 Native code execution is achieved by the Native Module Manager described above.
 Here is a summary of the several ways to execute native code in Veracruz:
 
-- Static native module:
-  + Part of the runtime
-  + Has to be specified in the policy to be invokable
-  + Invoked by a WebAssembly program. The execution configuration is written to
-    the module's special file on the VFS
-- Dynamic native module:
-  + Artifacts are injected into the execution environment before invocation (no
-    package manager yet)
-  + Has to be specified in the policy to be invokable
-  + Invoked by a WebAssembly program. The execution configuration is written to
-    the module's special file on the VFS
-  + Executed in a [sandbox](https://github.com/google/sandboxed-api) to control
-    its side effects
-- Provisioned native module:
-  + Provisioned and invoked just like a WebAssembly program
-  + Execution configuration is not supported
-  + Has to be specified in the policy to be invokable
-  + Assumed to be a native program if the binary does not have a `.wasm`
-    extension
-  + The program principal must have read access to the binary to be copied to
-    the kernel's filesystem before invocation
-  + Executed in a [sandbox](https://github.com/google/sandboxed-api) to control
-    its side effects
+| | Provisioning | Invocation | Execution | Requirements |
+|-|-|-|-|-|
+| Static native module | None (part of the runtime) | Invoked by a WebAssembly program. The execution configuration is written to the module's special file on the VFS | Executed as part of the runtime | Must be specified in the policy to be invokable |
+| Dynamic native module | Not supported yet: artifacts must be manually injected into the execution environment before invocation | Invoked by a WebAssembly program. The execution configuration is written to the module's special file on the VFS | Executed in a [sandbox](https://github.com/veracruz-project/native-module-sandboxer) to control its side effects (file system and syscalls) | Must be specified in the policy to be invokable
+| Provisioned native module | Before execution just like a WebAssembly program | Upon request just like a WebAssembly program. Execution configuration is not supported | Executed in a [sandbox](https://github.com/veracruz-project/native-module-sandboxer) to control its side effects (file system and syscalls) | Must have an extension different from `.wasm` or it will be considered WebAssembly. The program principal must have read access to the binary to be copied to the kernel's filesystem before invocation |
 
 See `NativeModuleType` and the code documentation for more details.
 
