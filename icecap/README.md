@@ -104,7 +104,7 @@ with some indications of how they depend on each other.
 
 ## How Veracruz IceCap binaries start
 
-There are two Veracruz IceCap binaries: `runtime_manager_enclave.elf`
+There are two Veracruz IceCap binaries: `runtimeimanager-enclave.elf`
 and `virtio-console-server.elf`.
 
 Execution starts at the `_start` defined in

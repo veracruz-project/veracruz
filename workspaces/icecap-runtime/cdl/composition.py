@@ -30,8 +30,8 @@ config = {
     "components": {
         "runtime_manager": {
             "image": {
-                "full": os.path.join(components_path, "runtime_manager_enclave.full.elf"),
-                "min": os.path.join(components_path, "runtime_manager_enclave.min.elf"),
+                "full": os.path.join(components_path, "runtime-manager-enclave.full.elf"),
+                "min": os.path.join(components_path, "runtime-manager-enclave.min.elf"),
             }
         },
         "virtio_console_server": {
