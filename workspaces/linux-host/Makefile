@@ -38,7 +38,7 @@ unresolved_crates_path := $(shell pwd)/crates
 
 all: build test-collateral
 
-build:
+build: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
 		cargo build $(PROFILE_FLAG) $(V_FLAG)
@@ -57,15 +57,15 @@ CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
 test-server: test-dependencies
-	$(CARGO_TEST) -p tests --no-run -- --nocapture
-	RUST_LOG="server_test=info,error" $(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) --no-run -- --nocapture
+	RUST_LOG="server_test=info,error" $(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	$(CARGO_TEST) -p tests --no-run -- --nocapture
-	RUST_LOG="integration_test=info,error" $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) --no-run -- --nocapture
+	RUST_LOG="integration_test=info,error" $(CARGO_TEST) --test integration_test -- --test-threads=1 --nocapture
 
 $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
