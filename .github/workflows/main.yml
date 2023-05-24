@@ -168,6 +168,14 @@ jobs:
           rm -rf output
       - name: Run VOD in wasmtime
         run: |
+          # Fetch wasmtime's latest version using $GITHUB_TOKEN to increase
+          # Github REST API's rate limit
+          latest_version=$(curl -s "https://api.github.com/repos/bytecodealliance/wasmtime/releases/latest" \
+             --header 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' | \
+             grep tag_name | cut -d '"' -f 4)
+          # Install wasmtime
+          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version $latest_version && \
+          . ~/.bashrc
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
