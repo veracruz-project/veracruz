@@ -41,7 +41,7 @@ build:
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \
 		--features cli
-	strip target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
+	strip -p target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
