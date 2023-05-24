@@ -17,11 +17,14 @@ WORKSPACE_DIR = $(abspath ..)
 
 include $(WORKSPACE_DIR)/common.mk
 
+unresolved_crates_path := $(shell pwd)/crates
+
 all: linux
 
 linux: runtime-manager-enclave
 
 runtime-manager-enclave:
+	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
 	cargo build $(PROFILE_FLAG) $(V_FLAG) --features linux -p runtime_manager_enclave
 
 doc:
