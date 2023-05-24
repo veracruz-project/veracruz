@@ -18,7 +18,7 @@ use policy_utils::{
     expiry::Timepoint,
     parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
-    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, Pipeline, Program},
+    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType, Pipeline, Program},
 };
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
@@ -587,12 +587,11 @@ impl Arguments {
         assert_eq!(self.native_modules_entry_points.len(), self.native_modules_special_files.len());
 
         let mut result = Vec::new();
-        for (id, ((name, entry_point_path), special_file)) in self
+        for ((name, entry_point_path), special_file) in self
             .native_modules_names
             .iter()
             .zip(&self.native_modules_entry_points)
             .zip(&self.native_modules_special_files)
-            .enumerate()
         {
             // Add a backslash (VFS requirement)
             let special_file = enforce_leading_slash(special_file.to_str()
@@ -600,7 +599,12 @@ impl Arguments {
                 anyhow!("Fail to convert special_file to str."),
             )?).into_owned();
 
-            result.push(NativeModule::new(name.to_string(), entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
+            let nm_type = if entry_point_path == &PathBuf::from("") {
+                NativeModuleType::Static { special_file: PathBuf::from(special_file) }
+            } else {
+                NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
+            };
+            result.push(NativeModule::new(name.to_string(), nm_type));
         }
         Ok(result)
     }

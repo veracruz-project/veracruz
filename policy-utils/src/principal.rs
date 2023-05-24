@@ -133,39 +133,57 @@ impl Program {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Native module
-////////////////////////////////////////////////////////////////////////////////
-/// Defines a native module that can be loaded. Encompasses both static and
-/// dynamic native modules, which are respectively part of the Veracruz runtime
-/// and separate binaries, both executed on invocation by the WASM program
+/// Defines a native module type.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub enum NativeModuleType {
+    /// Native module that is part of the Veracruz runtime and invoked as a
+    /// function call by a WASM program via a write to the native module's
+    /// special file on the VFS.
+    /// This type does not define an entry point, it is looked up by name in the
+    /// static native modules table.
+    /// Despite its static behaviour, a static native module must be explicitly
+    /// declared in the policy file to be used in a computation. See
+    /// `generate-policy` for more details.
+    Static { special_file: PathBuf },
+    /// Native module that is a separate binary built independently from
+    /// Veracruz and residing on the kernel's filesystem.
+    /// Defines an entry point, i.e. path to the main binary relative to the
+    /// native module's root directory.
+    /// Invoked by a WASM program via a write to the native module's special
+    /// file on the VFS and executed in a sandbox environment on the kernel's
+    /// filesystem. The environment's filesystem is copied back to the VFS after
+    /// execution.
+    /// Dynamic linking is supported if the shared libraries can be found.
+    Dynamic { special_file: PathBuf, entry_point: PathBuf },
+    /// Native module that is provisioned to the enclave and executed just like
+    /// a regular WASM program, i.e. via a result request from a participant.
+    /// Dynamic linking is supported if the shared libraries can be found.
+    /// The execution principal corresponding to the native module should have
+    /// read access to every directory containing the execution artifacts
+    /// (binary and optional shared libraries).
+    Provisioned { entry_point: PathBuf },
+}
+
+/// Defines a native module that can be loaded directly (provisioned native
+/// module) or indirectly (static and dynamic native modules) in the execution
+/// environment.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct NativeModule {
     /// Native module's name
     name: String,
-    /// Dynamic native module's entry point, i.e. path to the main binary
-    /// relative to the native module's root directory. If set to `None`, the
-    /// native module is assumed to be static and is searched for in the list of
-    /// static native modules
-    entry_point_path: PathBuf,
-    /// Path to native module's special file. Writing data to this file triggers
-    /// the execution of the native module with data as input
-    special_file_path: PathBuf,
-    /// Native module's ID
-    id: u32,
+    /// Native's module type
+    r#type: NativeModuleType,
     // TODO: add sandbox policy
 }
 
 impl NativeModule {
     /// Creates a Veracruz native module.
     #[inline]
-    pub fn new<T: Into<u32>>(name: String, entry_point_path: PathBuf, special_file_path: PathBuf, id: T) -> Self
+    pub fn new(name: String, r#type: NativeModuleType) -> Self
     {
         Self {
             name,
-            entry_point_path,
-            special_file_path,
-            id: id.into(),
+            r#type,
         }
     }
 
@@ -175,39 +193,25 @@ impl NativeModule {
         self.name.as_str()
     }
 
-    /// Return path to entry point.
+    /// Return the type.
     #[inline]
-    pub fn entry_point_path(&self) -> &PathBuf {
-        &self.entry_point_path
+    pub fn r#type(&self) -> &NativeModuleType {
+        &self.r#type
     }
 
-    /// Return path to special file.
-    #[inline]
-    pub fn special_file_path(&self) -> &PathBuf {
-        &self.special_file_path
-    }
-
-    /// Return the native module's id.
-    #[inline]
-    pub fn id(&self) -> u32 {
-        self.id
-    }
-
-    /// Return whether the native module is static or dynamic.
+    /// Return whether the native module is static
     #[inline]
     pub fn is_static(&self) -> bool {
-        self.entry_point_path() == &PathBuf::from("")
+        match self.r#type {
+            NativeModuleType::Static { .. } => true,
+            _ => false,
+        }
     }
 }
 
 impl Debug for NativeModule {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "\"{}\" special_file=\"{}\" entry_point=", self.name(), self.special_file_path().to_str().unwrap_or_default())?;
-        if self.is_static() {
-            write!(f, "static")
-        } else {
-            write!(f, "\"{}\"", self.entry_point_path().to_str().unwrap_or_default())
-        }
+        write!(f, "\"{}\" {:?}", self.name(), self.r#type)
     }
 }
 

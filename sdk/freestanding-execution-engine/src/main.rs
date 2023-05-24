@@ -30,7 +30,7 @@ use log::*;
 use policy_utils::{
     parsers::{parse_pipeline, enforce_leading_slash},
     pipeline::Expr, 
-    principal::{ExecutionStrategy, NativeModule, Principal},
+    principal::{ExecutionStrategy, NativeModule, NativeModuleType, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -69,7 +69,7 @@ const VERSION: &str = "pre-alpha";
 struct CommandLineOptions {
     /// The list of file names passed as input data-sources.
     input_sources: Vec<String>,
-    /// The list of file names passed as ouput.
+    /// The list of file names passed as output.
     output_sources: Vec<String>,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
@@ -421,11 +421,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(cmdline.native_modules_entry_points.len(), cmdline.native_modules_special_files.len());
 
     let mut native_modules = Vec::new();
-    for (id, ((name, entry_point_path), special_file)) in cmdline.native_modules_names
+    for ((name, entry_point_path), special_file) in cmdline.native_modules_names
         .iter()
         .zip(&cmdline.native_modules_entry_points)
         .zip(&cmdline.native_modules_special_files)
-        .enumerate()
     {
         // Add a backslash (VFS requirement)
         let special_file = enforce_leading_slash(special_file.to_str()
@@ -433,7 +432,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             anyhow!("Fail to convert special_file to str."),
         )?).into_owned();
 
-        native_modules.push(NativeModule::new(name.to_string(), entry_point_path.to_path_buf(), PathBuf::from(special_file), id as u32));
+        let nm_type = if entry_point_path == &PathBuf::from("") {
+            NativeModuleType::Static { special_file: PathBuf::from(special_file) }
+        } else {
+            NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
+        };
+        native_modules.push(NativeModule::new(name.to_string(), nm_type));
     }
 
     let mut vfs = FileSystem::new(right_table, native_modules)?;

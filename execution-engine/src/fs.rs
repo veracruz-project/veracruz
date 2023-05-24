@@ -18,7 +18,7 @@
 
 use crate::native_module_manager::NativeModuleManager;
 use policy_utils::{
-    principal::{FileRights, NativeModule, Principal, RightsTable},
+    principal::{FileRights, NativeModule, NativeModuleType, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
 use std::{
@@ -444,8 +444,7 @@ impl InodeTable {
         Ok(rst)
     }
 
-    /// Install all the (special_file_path, service_instance) tuples, one per
-    /// native module.
+    /// Install static and dynamic native modules.
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
@@ -454,15 +453,22 @@ impl InodeTable {
         native_modules: Vec<NativeModule>,
     ) -> FileSystemResult<()> {
         for native_module in native_modules {
-            let path = native_module.special_file_path();
-            let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
-            let new_inode = self.new_inode()?;
-            let path = strip_root_slash(path);
-            // Call the existing function to create general files.
-            self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
-            // Manually uplift the general file to special file bound with the service.
-            self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
-                InodeImpl::NativeModule(service, Vec::new());
+            let path = match native_module.r#type() {
+                NativeModuleType::Static { special_file } => Some(special_file),
+                NativeModuleType::Dynamic { special_file, .. } => Some(special_file),
+                _ => None,
+            };
+            if path.is_some() {
+                let path = path.unwrap();
+                let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
+                let new_inode = self.new_inode()?;
+                let path = strip_root_slash_path(path);
+                // Call the existing function to create general files.
+                self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
+                // Manually uplift the general file to special file bound with the service.
+                self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
+                    InodeImpl::NativeModule(service, Vec::new());
+            }
         }
         Ok(())
     }
@@ -933,7 +939,7 @@ impl FileSystem {
             let new_fd = Fd(u32::try_from_or_errno(index)? + first_fd);
             let path = path.as_ref();
             // strip off the root
-            let relative_path = strip_root_slash(path);
+            let relative_path = strip_root_slash_path(path);
             let new_inode = {
                 if relative_path == Path::new("") {
                     InodeTable::ROOT_DIRECTORY_INODE
@@ -1846,7 +1852,7 @@ impl FileSystem {
     /// Read a file on path `file_name`.
     /// The `principal` must have the right on `path_open`,
     /// `fd_read` and `fd_seek`.
-    pub fn read_exeutable_by_absolute_path<T: AsRef<Path>>(
+    pub fn read_executable_by_absolute_path<T: AsRef<Path>>(
         &mut self,
         file_name: T,
     ) -> Result<Vec<u8>, ErrNo> {
@@ -1912,7 +1918,7 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
+            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
             .0;
         let mut rst = Vec::new();
         if self.lock_inode_table()?.is_dir(&inode) {
@@ -1973,7 +1979,7 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash(path))?
+            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
             .0;
         let mut rst = Vec::new();
         let mut top_level_files = Vec::new();
@@ -2059,10 +2065,22 @@ impl FileSystem {
         self.read_std_stream(Fd(1))
     }
 
+    /// A public API for writing to stdout.
+    #[inline]
+    pub fn write_stdout(&mut self, buf: &[u8]) -> FileSystemResult<usize> {
+        self.fd_write(Fd(1), &[buf])
+    }
+
     /// A public API for reading from stderr.
     #[inline]
     pub fn read_stderr(&mut self) -> FileSystemResult<Vec<u8>> {
         self.read_std_stream(Fd(2))
+    }
+
+    /// A public API for writing to stderr.
+    #[inline]
+    pub fn write_stderr(&mut self, buf: &[u8]) -> FileSystemResult<usize> {
+        self.fd_write(Fd(2), &[buf])
     }
 
     /// Read from std streaming.
@@ -2119,6 +2137,13 @@ where
     }
 }
 
-pub(crate) fn strip_root_slash(path: &Path) -> &Path {
+pub(crate) fn strip_root_slash_path(path: &Path) -> &Path {
     path.strip_prefix("/").unwrap_or(path)
+}
+
+pub(crate) fn strip_root_slash_str(path: &str) -> &str {
+    match &path[0..1] {
+        "/" => &path[1..],
+        _ => path,
+    }
 }
