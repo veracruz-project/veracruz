@@ -169,7 +169,8 @@ jobs:
       - name: Run VOD in wasmtime
         run: |
           # Install wasmtime
-          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version v9.0.1
+          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version v9.0.1 && \
+          . ~/.bashrc
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
