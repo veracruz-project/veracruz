@@ -491,10 +491,10 @@ impl WasmtimeRuntimeState {
 
         let return_from_main = match check_main(&export.ty(&store)) {
             EntrySignature::ArgvAndArgc => instance
-                .get_typed_func::<(i32, i32), (), _>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
+                .get_typed_func::<(i32, i32), ()>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
                 .call(&mut store, (0, 0)),
             EntrySignature::NoParameters => instance
-                .get_typed_func::<(), (), _>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
+                .get_typed_func::<(), ()>(&mut store, WasiWrapper::ENTRY_POINT_NAME)?
                 .call(&mut store, ()),
             EntrySignature::NoEntryFound => {
                 return Err(anyhow!(FatalEngineError::NoProgramEntryPoint))
