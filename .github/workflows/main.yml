@@ -110,7 +110,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: 'veracruz-project/video-object-detection'
-          ref: 'main'
+          ref: '20230525'
           submodules: recursive
           set-safe-directory: true
       - name: Build
@@ -168,13 +168,8 @@ jobs:
           rm -rf output
       - name: Run VOD in wasmtime
         run: |
-          # Fetch wasmtime's latest version using $GITHUB_TOKEN to increase
-          # Github REST API's rate limit
-          latest_version=$(curl -s "https://api.github.com/repos/bytecodealliance/wasmtime/releases/latest" \
-             --header 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' | \
-             grep tag_name | cut -d '"' -f 4)
           # Install wasmtime
-          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version $latest_version && \
+          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version v9.0.1 && \
           . ~/.bashrc
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
