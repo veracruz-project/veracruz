@@ -14,9 +14,12 @@ cargo-features = ["resolver"]
 
 [workspace]
 members = [
-  # probrams
-  # "crates/sdk/rust-examples/audio-event-triangulation",
   "crates/examples/rust-examples/aesctr-native",
+  # "crates/examples/rust-examples/audio-event-triangulation",
+  "crates/examples/rust-examples/darknet-inference-native",
+  "crates/examples/rust-examples/fd-create",
+  "crates/examples/rust-examples/file-seek",
+  "crates/examples/rust-examples/huffman-encoding",
   "crates/examples/rust-examples/idash2017-logistic-regression",
   "crates/examples/rust-examples/image-processing",
   "crates/examples/rust-examples/intersection-set-sum",
@@ -27,6 +30,8 @@ members = [
   "crates/examples/rust-examples/number-stream-accumulation",
   "crates/examples/rust-examples/postcard-native",
   "crates/examples/rust-examples/postcard-wasm",
+  "crates/examples/rust-examples/prime-numbers-generator/generate-set",
+  "crates/examples/rust-examples/prime-numbers-generator/keep-primes",
   "crates/examples/rust-examples/private-set-intersection",
   "crates/examples/rust-examples/private-set-intersection-sum",
   "crates/examples/rust-examples/random-source",
@@ -35,7 +40,8 @@ members = [
   "crates/examples/rust-examples/shamir-secret-sharing",
   "crates/examples/rust-examples/sort-numbers",
   "crates/examples/rust-examples/string-edit-distance",
-  "crates/examples/rust-examples/fd-create",
+  "crates/examples/rust-examples/string-search",
+  "crates/examples/rust-examples/tflite-inference-native-mnist",
 ]
 resolver = "2"
 
