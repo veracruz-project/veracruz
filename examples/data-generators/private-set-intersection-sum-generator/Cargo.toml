@@ -8,6 +8,6 @@ version = "0.3.0"
 
 [dependencies]
 clap = "2.33"
-postcard = { version = "0.7.2", features = [ "alloc" ] }
+postcard = { version = "1.0.0", features = [ "alloc" ] }
 rand = "0.8.3"
 serde = { version = "1.0.103", features = ["derive"] }

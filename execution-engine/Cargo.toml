@@ -39,7 +39,7 @@ nix = { version = "0.20.2", optional = true }
 num = { version = "0.4", default-features = false }
 num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
-postcard = { version = "0.7.2", features = [ "alloc", "use-std" ] }
+postcard = { version = "1.0.0", features = [ "alloc", "use-std" ] }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
 serde = { version = "1.0.115", features = ["derive"] }

@@ -58,7 +58,7 @@ lazy_static = "1.4"
 log = "0.4.13"
 nitro-enclave = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1", optional = true}
 nix = { version = "0.20.2", optional = true }
-postcard = "0.7.2"
+postcard = "1.0.0"
 policy-utils = { path = "../policy-utils", optional = true }
 proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
 psa-attestation = { path = "../psa-attestation", optional = true }

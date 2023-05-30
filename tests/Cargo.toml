@@ -44,7 +44,7 @@ lazy_static = "1.4.0"
 log = "0.4.13"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
 nix = "0.25.0"
-postcard = "0.7.2"
+postcard = "1.0.0"
 policy-utils = { path = "../policy-utils", optional = true }
 reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls"]}
 transport-protocol = { path = "../transport-protocol" }
