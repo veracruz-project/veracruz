@@ -9,8 +9,8 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock doc fmt clippy \
-	test-client test-collateral test-dependencies test-server veracruz-test
+.PHONY: all build clean clean-cargo-lock clippy default doc fmt \
+	test-client test-dependencies test-server veracruz-test
 
 default: build
 
@@ -41,7 +41,7 @@ build:
 		--features veracruz-client/nitro \
 		--features veracruz-server/nitro \
 		--features cli
-	strip target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
+	strip -p target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
